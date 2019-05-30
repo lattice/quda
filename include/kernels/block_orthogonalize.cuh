@@ -117,8 +117,8 @@ namespace quda {
 
             for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-              int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	      int x_cb = x - parity*arg.fineVolumeCB;
+              int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+              int x_cb = x - parity*arg.fineVolumeCB;
 
 	      complex<Float> v[nSpin][nColor];
 	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
@@ -135,7 +135,7 @@ namespace quda {
           for (int parity = 0; parity < arg.nParity; parity++) {
             parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
+            for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
 	      int x_cb = x - parity*arg.fineVolumeCB;
@@ -157,7 +157,7 @@ namespace quda {
 
         } // i
 
-	sumFloat nrm[coarseSpin] = { };
+        sumFloat nrm[coarseSpin] = { };
 	for (int parity=0; parity<arg.nParity; parity++) {
 	  parity = (arg.nParity == 2) ? parity : arg.parity;
 
@@ -179,9 +179,9 @@ namespace quda {
         for (int parity = 0; parity < arg.nParity; parity++) {
           parity = (arg.nParity == 2) ? parity : arg.parity;
 
-          for (int b=0; b<arg.geoBlockSizeCB; b++) {
+          for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-	    int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
+            int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
 	    int x_cb = x - parity*arg.fineVolumeCB;
 
 	    complex<Float> v[nSpin][nColor];
