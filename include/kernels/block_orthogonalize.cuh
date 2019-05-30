@@ -115,7 +115,7 @@ namespace quda {
           for (int parity = 0; parity < arg.nParity; parity++) {
             parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
+            for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
 	      int x_cb = x - parity*arg.fineVolumeCB;
@@ -132,7 +132,7 @@ namespace quda {
           }
 
           // subtract the i blocks to orthogonalise
-	  for (int parity=0; parity<arg.nParity; parity++) {
+          for (int parity=0; parity<arg.nParity; parity++) {
 	    parity = (arg.nParity == 2) ? parity : arg.parity;
 
 	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
@@ -153,7 +153,7 @@ namespace quda {
               for (int s = 0; s < nSpin; s++)
                 for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
             }
-	  }
+          }
 
 	} // i
 
@@ -176,8 +176,8 @@ namespace quda {
 
         for (int s = 0; s < coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
 
-        for (int parity=0; parity<arg.nParity; parity++) {
-	  parity = (arg.nParity == 2) ? parity : arg.parity;
+        for (int parity = 0; parity < arg.nParity; parity++) {
+          parity = (arg.nParity == 2) ? parity : arg.parity;
 
 	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
 

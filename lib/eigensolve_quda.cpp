@@ -277,7 +277,7 @@ namespace quda
                             std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
   {
     // number of evecs
-    int n_defl = eig_param->nEv;
+    int n_defl = eig_param->nConv;
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Deflating %d vectors\n", n_defl);
 
