@@ -355,16 +355,17 @@ namespace quda {
       r2 = b2;
       blas::zero(y);
     }
-
+    
     if (param.deflate == true) {
       std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess
-      // or original RHS. r is used in both code paths.
-      rhs.push_back(&r);
+      // Use residual from supplied guess r, or original 
+      // rhs b. use `x` as a temp.
+      blas::copy(x, r);
+      rhs.push_back(&x);
       
       // Deflate
       eig_solve->deflate(defl_tmp, rhs, param.evecs, param.evals);
-
+      
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp[0], tmp2, tmp3);
       r2 = blas::xmyNorm(*rhs[0], r);
@@ -373,7 +374,7 @@ namespace quda {
         // defl_tmp1 and y must be added to the solution at the end
         blas::axpy(1.0, *defl_tmp[0], y);
       } else {
-        // Just add defl_tmp1 to y, which has been zeroed out
+        // Just add defl_tmp to y, which has been zeroed out
         blas::copy(y, *defl_tmp[0]);
       }
     }
