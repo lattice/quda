@@ -446,10 +446,12 @@ namespace quda
       if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
- 	// Due to coherence between these levels, an initial guess 
-	// is beneficial.
-	param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	
+        // Due to coherence between these levels, an initial guess
+        // might be beneficial.
+        if (param.mg_global.coarse_guess == QUDA_BOOLEAN_YES) {
+          param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        }
+
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);
@@ -611,8 +613,9 @@ namespace quda
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
 
-    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
-      ? param.mg_global.precision_null[param.level]  : csParam.Precision();
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision()) ?
+      param.mg_global.precision_null[param.level] :
+      csParam.Precision();
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
@@ -863,7 +866,9 @@ namespace quda
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    char prefix_bkup[100];  strncpy(prefix_bkup, prefix, 100);  setOutputPrefix(prefix);
+    char prefix_bkup[100];
+    strncpy(prefix_bkup, prefix, 100);
+    setOutputPrefix(prefix);
 
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
@@ -1109,7 +1114,7 @@ namespace quda
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
 
-    for (int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
+    for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
                    param.mg_global.num_setup_iter[param.level]);

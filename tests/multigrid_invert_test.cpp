@@ -131,6 +131,7 @@ extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
 extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
 extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
 extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_coarse_guess;
 
 extern char eig_QUDA_logfile[];
 
@@ -348,7 +349,6 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
-
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
@@ -490,7 +490,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   strcpy(mg_param.vec_outfile, vec_outfile);
   if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
   if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
-
+  
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
   inv_param.inv_type = QUDA_GCR_INVERTER;

@@ -1762,6 +1762,7 @@ bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL] = {};
 bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = {};
 QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = {};
 QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_coarse_guess = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1819,7 +1820,8 @@ void usage(char** argv )
   printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
-  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
+  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, "
+         "heatbath test only)\n");
   printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a "
          "random gauge is generated (default false)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
@@ -1845,7 +1847,8 @@ void usage(char** argv )
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
-  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
+  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, "
+         "normop-pc, normerr, normerr-pc) \n");
   printf("    --solution-type                           # The solution we desire (mat (default), mat-dag-mat, mat-pc, "
          "mat-pc-dag-mat-pc (default for multi-shift))\n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
@@ -1901,7 +1904,8 @@ void usage(char** argv )
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
-  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
+  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the "
+         "multigrid_test (requires QIO)\n");
   printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
          "summarize)\n");
 
@@ -1974,6 +1978,8 @@ void usage(char** argv )
          "4.0)\n");
   printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest "
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
+  printf("    --mg-eig-coarse-guess <true/false>                # If deflating on the coarse grid, optionaly use an "
+         "initial guess (default = false)\n");
   printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
 
   // Miscellanea
@@ -4087,6 +4093,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--mg-eig-coarse-guess") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_poly_acc = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_poly_acc = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-coarse-guess (true/false)\n");
+      exit(1);
+    }
+    
+    i++;
+    ret = 0;
+    goto out;
+  }
+  
   if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);
