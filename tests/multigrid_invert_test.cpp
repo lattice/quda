@@ -189,7 +189,8 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {
+void setGaugeParam(QudaGaugeParam &gauge_param) 
+{
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
@@ -230,14 +231,13 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &mg_eig_param, int level)
 {
-
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if (mg_eig_type[level] == QUDA_EIG_LANCZOS
-      && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+  if ( (mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS) && 
+       !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
-
+  
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
@@ -264,7 +264,8 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
-void setMultigridParam(QudaMultigridParam &mg_param) {
+void setMultigridParam(QudaMultigridParam &mg_param) 
+{
   QudaInvertParam &inv_param = *mg_param.invert_param;
 
   inv_param.Ls = 1;
@@ -622,7 +623,7 @@ int main(int argc, char **argv)
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_type[i] = QUDA_EIG_LANCZOS;
+    mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;

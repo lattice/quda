@@ -1004,12 +1004,14 @@ const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 QudaEigType get_eig_type(char *s)
 {
 
-  QudaEigType ret = QUDA_INVALID_EIG;
-
-  if (strcmp(s, "lanczos") == 0) {
-    ret = QUDA_EIG_LANCZOS;
-  } else if (strcmp(s, "arnoldi") == 0) {
-    ret = QUDA_EIG_ARNOLDI;
+  QudaEigType ret = QUDA_EIG_INVALID;
+  
+  if (strcmp(s, "trlm") == 0) {
+    ret = QUDA_EIG_TR_LANCZOS;
+  } else if (strcmp(s, "irlm") == 0) {
+    ret = QUDA_EIG_IR_LANCZOS;
+  } else if (strcmp(s, "iram") == 0) {
+    ret = QUDA_EIG_IR_ARNOLDI;
   } else {
     fprintf(stderr, "Error: invalid quda eigensolver type\n");
     exit(1);
@@ -1023,8 +1025,9 @@ const char *get_eig_type_str(QudaEigType type)
   const char *ret;
 
   switch (type) {
-  case QUDA_EIG_LANCZOS: ret = "lanczos"; break;
-  case QUDA_EIG_ARNOLDI: ret = "arnoldi"; break;
+  case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
+  case QUDA_EIG_IR_LANCZOS: ret = "irlm"; break;
+  case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
   default: ret = "unknown eigensolver"; break;
   }
 

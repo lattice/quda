@@ -346,35 +346,44 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-
-      // Just replace any initial guess with a deflated RHS
-      if (param.deflate == true) {
-
-        // Deflate the exact part from the RHS
-        std::vector<ColorSpinorField *> rhs;
-        rhs.push_back(&b);
-        eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
-
-        // Compute r_defl  = b - A * x_defl
-        mat(r, *defl_tmp1[0], y, tmp3);
-        r2 = blas::xmyNorm(b, r);
-
-        // Place the initial residiual in r. defl_tmp1 must be added
-        // to the solution at the end.
-        blas::copy(y, *defl_tmp1[0]);
-      } else {
-        // Compute r = b - A * x
-        mat(r, x, y, tmp3);
-        r2 = blas::xmyNorm(b, r);
-        if (b2 == 0) b2 = r2;
-        // y contains the original guess.
-        blas::copy(y, x);
-      }
+      // Compute r = b - A * x
+      mat(r, x, y, tmp3);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) b2 = r2;
+      // y contains the original guess.
+      blas::copy(y, x);
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
       blas::zero(y);
     }
+    
+    if (param.deflate == true) {      
+      std::vector<ColorSpinorField *> rhs;
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+	// Use residual from supplied guess
+	rhs.push_back(&r);
+      } else {
+	// Use original RHS
+	rhs.push_back(&b);
+      }
+
+      //Deflate
+      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+      
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0], y, tmp3);
+      r2 = blas::xmyNorm(*rhs[0], r);
+      
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+	// defl_tmp1 and y must be added to the solution at the end
+	blas::axpy(1.0, *defl_tmp1[0], y);
+      } else {
+	// Just add defl_tmp1
+	blas::copy(y, *defl_tmp1[0]);
+      }
+    }
+    
     blas::zero(x);
     if (&x != &xSloppy) blas::zero(xSloppy);
     blas::copy(rSloppy,r);

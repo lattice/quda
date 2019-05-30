@@ -1738,7 +1738,7 @@ bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
-QudaEigType eig_type = QUDA_EIG_LANCZOS;
+QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
@@ -1941,7 +1941,7 @@ void usage(char** argv )
          "false)\n");
   printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest "
          "R=real M=modulus I=imaginary\n");
-  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (default lanczos)\n");
+  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (default trlm)\n");
   printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
   printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, "
          "default false)\n");
@@ -1974,7 +1974,7 @@ void usage(char** argv )
          "4.0)\n");
   printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest "
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
-  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default lanczos)\n");
+  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
 
   // Miscellanea
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");

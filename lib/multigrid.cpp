@@ -315,7 +315,7 @@ namespace quda
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-
+      
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;
       param_postsmooth->pipeline = param_postsmooth->maxiter;
@@ -446,8 +446,7 @@ namespace quda
       if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
-        param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-
+	
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);
@@ -1416,21 +1415,31 @@ namespace quda
     
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
-      DiracM *m = new DiracM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *m, profile);
+      DiracM *mat = new DiracM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
     } else if (!normop && dagger) {
-      DiracMdag *mdag = new DiracMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdag, profile);
+      DiracMdag *mat = new DiracMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
     } else if (normop && !dagger) {
-      DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
+      DiracMdagM *mat = new DiracMdagM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;      
     } else if (normop && dagger) {
-      DiracMMdag *mmdag = new DiracMMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mmdag, profile);
+      DiracMMdag *mat = new DiracMMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;      
     }
     
-    (*eig_solve)(B_evecs, evals);
-    delete eig_solve;
     
     // now reallocate the B vectors copy in e-vectors
     for (int i = 0; i < (int)param.B.size(); i++) {

@@ -162,7 +162,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(eig_type, QUDA_EIG_LANCZOS);
+  P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
@@ -184,7 +184,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(eig_type, QUDA_INVALID_EIG);
+  P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif

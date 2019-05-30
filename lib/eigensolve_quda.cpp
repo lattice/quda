@@ -134,9 +134,10 @@ namespace quda
     EigenSolver *eig_solver = nullptr;
 
     switch (eig_param->eig_type) {
-    case QUDA_EIG_ARNOLDI: errorQuda("Arnoldi not implemented"); break;
-    case QUDA_EIG_LANCZOS:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TRLM eigensolver\n");
+    case QUDA_EIG_IR_ARNOLDI: errorQuda("IR Arnoldi not implemented"); break;
+    case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
+    case QUDA_EIG_TR_LANCZOS:
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
       break;
     default: errorQuda("Invalid eig solver type");
@@ -479,12 +480,11 @@ namespace quda
     // Thick restart specific checks
     if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
 
-    if (eig_param->eig_type == QUDA_EIG_LANCZOS
-        && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
-      errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+    if (!(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
+      errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
   }
-
+  
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     // Check to see if we are loading eigenvectors
