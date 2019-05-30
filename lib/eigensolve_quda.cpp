@@ -484,7 +484,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
   }
-  
+
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
     // Check to see if we are loading eigenvectors

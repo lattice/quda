@@ -1005,7 +1005,7 @@ QudaEigType get_eig_type(char *s)
 {
 
   QudaEigType ret = QUDA_EIG_INVALID;
-  
+
   if (strcmp(s, "trlm") == 0) {
     ret = QUDA_EIG_TR_LANCZOS;
   } else if (strcmp(s, "irlm") == 0) {

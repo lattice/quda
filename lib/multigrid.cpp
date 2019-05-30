@@ -315,7 +315,7 @@ namespace quda
       param_postsmooth = new SolverParam(*param_presmooth);
       param_postsmooth->return_residual = false;  // post smoother does not need to return the residual vector
       param_postsmooth->use_init_guess = QUDA_USE_INIT_GUESS_YES;
-      
+
       param_postsmooth->maxiter = param.nu_post;
       param_postsmooth->Nkrylov = param_postsmooth->maxiter;
       param_postsmooth->pipeline = param_postsmooth->maxiter;
@@ -446,7 +446,7 @@ namespace quda
       if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
-	
+
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);
@@ -1431,13 +1431,13 @@ namespace quda
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
-      delete mat;      
+      delete mat;
     } else if (normop && dagger) {
       DiracMMdag *mat = new DiracMMdag(*diracResidual);
       eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
-      delete mat;      
+      delete mat;
     }
 
     // now reallocate the B vectors copy in e-vectors
@@ -1445,14 +1445,14 @@ namespace quda
       param.B[i] = ColorSpinorField::Create(bParam);
       *param.B[i] = *B_evecs[i];
     }
-    
+
     // Local clean-up
     for (auto b : B_evecs) { delete b; }
-    
+
     // only save if outfile is defined
     if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(param.B); }
-    
+
     popLevel(param.level);
   }
-  
+
 } // namespace quda
