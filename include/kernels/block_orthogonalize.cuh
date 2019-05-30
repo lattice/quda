@@ -115,9 +115,9 @@ namespace quda {
           for (int parity = 0; parity < arg.nParity; parity++) {
             parity = (arg.nParity == 2) ? parity : arg.parity;
 
-            for (int b=0; b<arg.geoBlockSizeCB; b++) {
+            for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
+              int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
 	      int x_cb = x - parity*arg.fineVolumeCB;
 
 	      complex<Float> v[nSpin][nColor];
@@ -128,12 +128,12 @@ namespace quda {
                 for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
                 colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], vis);
               }
-	    }
+            }
           }
 
           // subtract the i blocks to orthogonalise
-          for (int parity=0; parity<arg.nParity; parity++) {
-	    parity = (arg.nParity == 2) ? parity : arg.parity;
+          for (int parity = 0; parity < arg.nParity; parity++) {
+            parity = (arg.nParity == 2) ? parity : arg.parity;
 
 	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
@@ -155,7 +155,7 @@ namespace quda {
             }
           }
 
-	} // i
+        } // i
 
 	sumFloat nrm[coarseSpin] = { };
 	for (int parity=0; parity<arg.nParity; parity++) {
@@ -179,7 +179,7 @@ namespace quda {
         for (int parity = 0; parity < arg.nParity; parity++) {
           parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
+          for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
 	    int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
 	    int x_cb = x - parity*arg.fineVolumeCB;
