@@ -430,19 +430,19 @@ int main(int argc, char **argv)
   // If we use the QUDA routine, we only need pass enough memory
   // for nEv vectors. If we use the ARPACK routine, we must
   // pass enough workspave for the full nKr array.
-  int evecs_needed = eig_param.arpack_check ? eig_nKr : eig_nEv;
-
+  int evecs_needed = eig_param.arpack_check ? eig_nKr : eig_nConv;
+  
   // Memory allocation
   if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(float));
+    host_evecs = (void *)malloc(V * inv_param.Ls * sss * evecs_needed * sizeof(float));
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(float));
   } else {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(double));
+    host_evecs = (void *)malloc(V * inv_param.Ls * sss * evecs_needed * sizeof(double));
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(double));
   }
 
   // Place an initial guess to first vector in host array
-  for (int i = 0; i < V * sss; i++) {
+  for (int i = 0; i < V * inv_param.Ls * sss; i++) {
     if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       ((float *)host_evecs)[i] = rand() / (float)RAND_MAX;
     } else {
@@ -450,7 +450,7 @@ int main(int argc, char **argv)
       ;
     }
   }
-
+  
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
   // solve is in the eig_param container. If eig_param.arpack_check == true and
@@ -462,7 +462,7 @@ int main(int argc, char **argv)
   eigensolveQuda(host_evecs, host_evals, &eig_param);
   time += (double)clock();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
-
+  
   // Deallocate host memory
   free(host_evecs);
   free(host_evals);
