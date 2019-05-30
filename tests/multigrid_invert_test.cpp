@@ -118,8 +118,8 @@ extern bool oblique_proj_check;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern bool mg_eig[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_nEv[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_nKr[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_nEv[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_nKr[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
 extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
@@ -161,7 +161,7 @@ display_test_info()
 
   printfQuda("Eigensolver parameters\n");
   for (int i = 0; i < mg_levels; i++) {
-    if (i < mg_levels && (low_mode_check || mg_eig[i])) {
+    if (low_mode_check || mg_eig[i]) {
       printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
       printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
       printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);

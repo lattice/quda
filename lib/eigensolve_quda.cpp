@@ -115,6 +115,7 @@ namespace quda
 
     // Print Eigensolver params
     if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("tol %.4e\n", tol);
       printfQuda("nConv %d\n", nConv);
       printfQuda("nEv %d\n", nEv);
       printfQuda("nKr %d\n", nKr);

@@ -1393,10 +1393,11 @@ namespace quda
     pushLevel(param.level);
 
     // Extract eigensolver params
-    int nConv = param.mg_global.eig_param[param.level]->nConv;
     int nEv = param.mg_global.eig_param[param.level]->nEv;
     int nKr = param.mg_global.eig_param[param.level]->nKr;
-
+    bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
+    bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
+    
     // Dummy array to keep the eigensolver happy.
     std::vector<Complex> evals(nEv, 0.0);
     
@@ -1412,12 +1413,25 @@ namespace quda
     // before entering the eigen solver, lets free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
-
-    DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
-    EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
+    
+    EigenSolver *eig_solve;
+    if (!normop && !dagger) {
+      DiracM *m = new DiracM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *m, profile);
+    } else if (!normop && dagger) {
+      DiracMdag *mdag = new DiracMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdag, profile);
+    } else if (normop && !dagger) {
+      DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
+    } else if (normop && dagger) {
+      DiracMMdag *mmdag = new DiracMMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mmdag, profile);
+    }
+    
     (*eig_solve)(B_evecs, evals);
     delete eig_solve;
-
+    
     // now reallocate the B vectors copy in e-vectors
     for (int i = 0; i < (int)param.B.size(); i++) {
       param.B[i] = ColorSpinorField::Create(bParam);
