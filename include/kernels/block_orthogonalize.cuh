@@ -45,7 +45,7 @@ namespace quda {
     {
       const Vector Btmp[nVec]{*B...};
       if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
-      memcpy(B_array_h, Btmp, sizeof(Btmp));
+      memcpy(B_array_h, (void *)Btmp, sizeof(Btmp));
       int geoBlockSize = 1;
       for (int d = 0; d < V.Ndim(); d++) geoBlockSize *= geo_bs[d];
       geoBlockSizeCB = geoBlockSize/2;
@@ -55,31 +55,43 @@ namespace quda {
     }
   };
 
-
-  template<typename sumType, typename real, int nColor, typename Arg>
-  inline __device__ __host__ complex<sumType> colorInnerProduct(int i, complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg) {
-    complex<sumType> dot = 0.0;
+  template <int nColor, typename sumType, typename real>
+  inline __device__ __host__ void colorInnerProduct(complex<sumType> &dot, int i, complex<real> v[nColor],
+                                                    complex<real> w[nColor])
+  {
 #pragma unroll
-    for (int c=0; c<nColor; c++) dot += static_cast<complex<real> >(conj(arg.V(parity,x_cb,s,c,i)) * v[c]);
-    return dot;
+    for (int c = 0; c < nColor; c++) {
+      dot.x += w[c].real() * v[c].real();
+      dot.x += w[c].imag() * v[c].imag();
+      dot.y += w[c].real() * v[c].imag();
+      dot.y -= w[c].imag() * v[c].real();
+    }
   }
 
-  template<typename sumType, typename real, int nColor, typename Arg>
-  inline __device__ __host__ sumType colorNorm(complex<real> v[nColor], int parity, int x_cb, int s, const Arg &arg) {
-    sumType  nrm(0.0);
+  template <int nColor, typename sumType, typename real>
+  inline __device__ __host__ void colorNorm(sumType &nrm, complex<real> v[nColor])
+  {
 #pragma unroll
-    for (int c=0; c<nColor; c++) nrm += norm(v[c]);
-    return nrm;
+    for (int c = 0; c < nColor; c++) {
+      nrm += v[c].real() * v[c].real();
+      nrm += v[c].imag() * v[c].imag();
+    }
   }
 
-  template<typename real, int nColor, typename Arg>
-  inline __device__ __host__ void colorScaleSubtract(complex<real> v[nColor], complex<real> a, int i, int parity, int x_cb, int s, const Arg &arg) {
+  template <typename real, int nColor>
+  inline __device__ __host__ void colorScaleSubtract(complex<real> v[nColor], complex<real> a, complex<real> w[nColor])
+  {
 #pragma unroll
-    for (int c=0; c<nColor; c++) v[c] -= a * arg.V(parity,x_cb,s,c,i);
+    for (int c = 0; c < nColor; c++) {
+      v[c].x -= a.real() * w[c].real();
+      v[c].x += a.imag() * w[c].imag();
+      v[c].y -= a.real() * w[c].imag();
+      v[c].y -= a.imag() * w[c].real();
+    }
   }
 
-  template<typename real, int nColor, typename Arg>
-  inline __device__ __host__ void colorScale(complex<real> v[nColor], real a, int parity, int x_cb, int s, const Arg &arg) {
+  template <typename real, int nColor> inline __device__ __host__ void colorScale(complex<real> v[nColor], real a)
+  {
 #pragma unroll
     for (int c=0; c<nColor; c++) v[c] *= a;
   }
@@ -97,71 +109,57 @@ namespace quda {
 	for (int i=0; i<j; i++) {
 
 	  // compute (j,i) block inner products
-	  complex<sumFloat> dot[coarseSpin];
-	  for (int s=0; s<coarseSpin; s++) dot[s] = 0.0;
-	  for (int parity=0; parity<arg.nParity; parity++) {
-	    parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
+          complex<sumFloat> dot[coarseSpin];
+          for (int s = 0; s < coarseSpin; s++) dot[s] = 0.0;
+          for (int parity = 0; parity < arg.nParity; parity++) {
+            parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	      int x_cb = x - parity*arg.fineVolumeCB;
+            for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-	      complex<Float> v[nSpin][nColor];
-	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+              int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+              int x_cb = x - parity * arg.fineVolumeCB;
+
+              complex<Float> v[nSpin][nColor];
+              for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
 
 	      for (int s=0; s<nSpin; s++) {
-		dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
-	      }
-	    }
-	  }
+                complex<Float> vis[nColor];
+                for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
+                colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], vis);
+              }
+            }
+          }
 
-	  // subtract the i blocks to orthogonalise
-	  for (int parity=0; parity<arg.nParity; parity++) {
-	    parity = (arg.nParity == 2) ? parity : arg.parity;
+          // subtract the i blocks to orthogonalise
+          for (int parity = 0; parity < arg.nParity; parity++) {
+            parity = (arg.nParity == 2) ? parity : arg.parity;
 
-	    for (int b=0; b<arg.geoBlockSizeCB; b++) {
+            for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-	      int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	      int x_cb = x - parity*arg.fineVolumeCB;
+              int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+              int x_cb = x - parity*arg.fineVolumeCB;
 
 	      complex<Float> v[nSpin][nColor];
 	      if (i==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
 	      else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
 	      for (int s=0; s<nSpin; s++) {
-		colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s,parity)]), i, parity, x_cb, s, arg);
-	      }
+                complex<Float> vis[nColor];
+                for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
+                colorScaleSubtract<Float, nColor>(v[s], static_cast<complex<Float>>(dot[arg.spin_map(s, parity)]), vis);
+              }
 
-	      for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
-	    }
-	  }
+              for (int s = 0; s < nSpin; s++)
+                for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
+            }
+          }
 
-	} // i
+        } // i
 
-	sumFloat nrm[coarseSpin] = { };
-	for (int parity=0; parity<arg.nParity; parity++) {
-	  parity = (arg.nParity == 2) ? parity : arg.parity;
-
-	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
-
-	    int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-	    int x_cb = x - parity*arg.fineVolumeCB;
-
-	    complex<Float> v[nSpin][nColor];
-	    if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-	    else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
-
-	    for (int s=0; s<nSpin; s++) {
-	      nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
-	    }
-	  }
-	}
-
-	for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
-
-	for (int parity=0; parity<arg.nParity; parity++) {
-	  parity = (arg.nParity == 2) ? parity : arg.parity;
+        sumFloat nrm[coarseSpin] = {};
+        for (int parity = 0; parity < arg.nParity; parity++) {
+          parity = (arg.nParity == 2) ? parity : arg.parity;
 
 	  for (int b=0; b<arg.geoBlockSizeCB; b++) {
 
@@ -172,14 +170,30 @@ namespace quda {
 	    if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
 	    else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
-	    for (int s=0; s<nSpin; s++) {
-	      colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s,parity)], parity, x_cb, s, arg);
-	    }
+            for (int s = 0; s < nSpin; s++) { colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s]); }
+          }
+        }
 
-	    for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
-	  }
+        for (int s = 0; s < coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
 
-	}
+        for (int parity = 0; parity < arg.nParity; parity++) {
+          parity = (arg.nParity == 2) ? parity : arg.parity;
+
+          for (int b = 0; b < arg.geoBlockSizeCB; b++) {
+
+            int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+            int x_cb = x - parity * arg.fineVolumeCB;
+
+            complex<Float> v[nSpin][nColor];
+	    if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+	    else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+
+            for (int s = 0; s < nSpin; s++) { colorScale<Float, nColor>(v[s], nrm[arg.spin_map(s, parity)]); }
+
+            for (int s = 0; s < nSpin; s++)
+              for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
+          }
+        }
 
       } // j
 
@@ -210,64 +224,60 @@ namespace quda {
     int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * blockDim.x + threadIdx.x];
     int x_cb = x - parity*arg.fineVolumeCB;
     if (x_cb >= arg.fineVolumeCB) return;
+    int chirality = blockIdx.z; // which chiral block we're working on (if chirality is present)
 
-    typedef vector_type<complex<sumFloat>,coarseSpin> cvector;
-    typedef vector_type<sumFloat,coarseSpin> rvector;
-    typedef cub::BlockReduce<cvector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
-    typedef cub::BlockReduce<rvector, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
+    constexpr int spinBlock = nSpin / coarseSpin; // size of spin block
+    typedef cub::BlockReduce<complex<sumFloat>, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> dotReduce;
+    typedef cub::BlockReduce<sumFloat, block_size, cub::BLOCK_REDUCE_WARP_REDUCTIONS, 2> normReduce;
 
     __shared__ typename dotReduce::TempStorage dot_storage;
-    typename normReduce::TempStorage *norm_storage = (typename normReduce::TempStorage*)&dot_storage;
-    cvector *dot_ = (cvector*)&dot_storage;
-    rvector *nrm_ = (rvector*)&dot_storage;
+    typename normReduce::TempStorage *norm_storage = (typename normReduce::TempStorage *)&dot_storage;
+    complex<sumFloat> *dot_ = (complex<sumFloat> *)&dot_storage;
+    sumFloat *nrm_ = (sumFloat *)&dot_storage;
 
     // cast the constant memory buffer to a Vector array
     typedef typename std::remove_reference<decltype(*arg.B)>::type Vector;
-    const Vector *B = reinterpret_cast<const Vector*>(B_array_d);
+    const Vector *B = reinterpret_cast<const Vector *>(B_array_d);
 
     for (int j=0; j<nVec; j++) {
 
-      complex<Float> v[nSpin][nColor];
+      complex<Float> v[spinBlock][nColor];
 #pragma unroll
-      for (int s=0; s<nSpin; s++)
+      for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-	for (int c=0; c<nColor; c++) v[s][c] = B[j](parity, x_cb, s, c);
+        for (int c = 0; c < nColor; c++) v[s][c] = B[j](parity, x_cb, chirality * spinBlock + s, c);
 
-      for (int i=0; i<j; i++) {
+      for (int i = 0; i < j; i++) {
 
-	cvector dot;
+        complex<Float> dot = 0.0;
+
+        // compute (j,i) block inner products
+        complex<Float> vi[spinBlock][nColor];
 #pragma unroll
-	for (int s=0; s<coarseSpin; s++) dot[s] = 0.0;
-
-	// compute (j,i) block inner products
+        for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-	for (int s=0; s<nSpin; s++) {
-	  dot[arg.spin_map(s,parity)] += colorInnerProduct<sumFloat,Float,nColor,Arg>(i, v[s], parity, x_cb, s, arg);
-	}
+          for (int c = 0; c < nColor; c++) vi[s][c] = arg.V(parity, x_cb, chirality * spinBlock + s, c, i);
 
-	__syncthreads();
-	dot = dotReduce(dot_storage).Sum(dot);
-	if (threadIdx.x==0 && threadIdx.y==0) *dot_ = dot;
-	__syncthreads();
-	dot = *dot_;
-
-	// subtract the blocks to orthogonalise
 #pragma unroll
-	for (int s=0; s<nSpin; s++) {
-	  colorScaleSubtract<Float,nColor,Arg>(v[s], static_cast<complex<Float> >(dot[arg.spin_map(s,parity)]), i, parity, x_cb, s, arg);
-	}
+        for (int s = 0; s < spinBlock; s++) { colorInnerProduct<nColor>(dot, i, v[s], vi[s]); }
+
+        __syncthreads();
+        dot = dotReduce(dot_storage).Sum(dot);
+        if (threadIdx.x == 0 && threadIdx.y == 0) *dot_ = dot;
+        __syncthreads();
+        dot = *dot_;
+
+        // subtract the blocks to orthogonalise
+#pragma unroll
+        for (int s = 0; s < spinBlock; s++) { colorScaleSubtract<Float, nColor>(v[s], dot, vi[s]); }
 
       } // i
 
       // normalize the block
-      rvector nrm;
-#pragma unroll
-      for (int s=0; s<coarseSpin; s++) nrm[s] = static_cast<sumFloat>(0.0);
+      sumFloat nrm = static_cast<sumFloat>(0.0);
 
 #pragma unroll
-      for (int s=0; s<nSpin; s++) {
-	nrm[arg.spin_map(s,parity)] += colorNorm<sumFloat,Float,nColor,Arg>(v[s], parity, x_cb, s, arg);
-      }
+      for (int s = 0; s < spinBlock; s++) { colorNorm<nColor>(nrm, v[s]); }
 
       __syncthreads();
       nrm = normReduce(*norm_storage).Sum(nrm);
@@ -275,21 +285,17 @@ namespace quda {
       __syncthreads();
       nrm = *nrm_;
 
-#pragma unroll
-      for (int s=0; s<coarseSpin; s++) nrm[s] = nrm[s] > 0.0 ? rsqrt(nrm[s]) : 0.0;
+      nrm = nrm > 0.0 ? rsqrt(nrm) : 0.0;
 
 #pragma unroll
-      for (int s=0; s<nSpin; s++) {
-	colorScale<Float,nColor,Arg>(v[s], nrm[arg.spin_map(s,parity)], parity, x_cb, s, arg);
-      }
+      for (int s = 0; s < spinBlock; s++) { colorScale<Float, nColor>(v[s], nrm); }
 
 #pragma unroll
-      for (int s=0; s<nSpin; s++)
+      for (int s = 0; s < spinBlock; s++)
 #pragma unroll
-	for (int c=0; c<nColor; c++) arg.V(parity, x_cb, s, c, j) = v[s][c];
+        for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
 
     } // j
-
   }
 
 } // namespace quda

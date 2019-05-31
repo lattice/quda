@@ -53,6 +53,7 @@ extern QudaReconstructType link_recon_precondition;
 extern double mass;
 extern double kappa; // kappa of Dirac operator
 extern double mu;
+extern double epsilon;
 extern double anisotropy;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
@@ -294,6 +295,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 
@@ -528,6 +530,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.mu = mu;
+    inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
 
@@ -810,7 +813,7 @@ int main(int argc, char **argv)
     }
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
+    plaquette(*gaugeEx);
 
     Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
 
@@ -823,8 +826,8 @@ int main(int argc, char **argv)
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    double3 plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
-    double charge = qChargeCuda();
+    double3 plaq = plaquette(*gaugeEx);
+    double charge = qChargeQuda();
     printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
 
     // create a point source at 0 (in each subvolume...  FIXME)
@@ -872,8 +875,8 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      plaq = plaquette( *gaugeEx, QUDA_CUDA_FIELD_LOCATION) ;
-      charge = qChargeCuda();
+      plaq = plaquette(*gaugeEx);
+      charge = qChargeQuda();
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
       // reference BiCGStab for comparison

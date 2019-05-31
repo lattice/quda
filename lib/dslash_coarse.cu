@@ -8,14 +8,9 @@
 #include <jitify_helper.cuh>
 #include <kernels/dslash_coarse.cuh>
 
-// ESW HACK
-//#define ESW_HACK_HALF_EXCHANGE
-//#define ESW_HACK_QUARTER_EXCHANGE
-
 namespace quda {
 
 #ifdef GPU_MULTIGRID
-
 
   template <typename Float, typename yFloat, typename ghostFloat, int nDim, int Ns, int Nc, int Mc, bool dslash, bool clover, bool dagger, DslashType type>
   class DslashCoarse : public TunableVectorY {
@@ -456,8 +451,10 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     } else if (inA.Ncolor() == 64) {
       ApplyCoarse<Float,yFloat,ghostFloat,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else if (inA.Ncolor() == 96) {
+#if 0 // ESW HACK FOR STAGGERED COMPILER
+    } else if (inA.Ncolor() == 96) { 
       ApplyCoarse<Float,yFloat,ghostFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
+#endif
 #endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
@@ -548,7 +545,8 @@ namespace quda {
 
       if (dslash && comm_partitioned() && comms) {
 	const int nFace = 1;
-	inA.exchangeGhost((QudaParity)(1-parity), nFace, dagger, pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
+        inA.exchangeGhost((QudaParity)(inA.SiteSubset() == QUDA_PARITY_SITE_SUBSET ? (1 - parity) : 0), nFace, dagger,
+                          pack_destination, halo_location, gdr_send, gdr_recv, halo_precision);
       }
 
       if (dslash::aux_worker) dslash::aux_worker->apply(0);
@@ -578,14 +576,22 @@ namespace quda {
             ApplyCoarse<float,short,float>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                            dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
             ApplyCoarse<float,short,short>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                            dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
             ApplyCoarse<float,short,char>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                           dagger, comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
           } else {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
+#else
+          errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
         } else {
           errorQuda("Unsupported precision %d\n", Y.Precision());
         }
@@ -603,18 +609,12 @@ namespace quda {
 
   };
 
-  // hooks into tune.cpp variables for policy tuning
-  typedef std::map<TuneKey, TuneParam> map;
-  const map& getTuneCache();
-
-  void disableProfileCount();
-  void enableProfileCount();
-  void setPolicyTuning(bool);
-
   static bool dslash_init = false;
-  static int config = 0; // 3-bit number used to record the machine config (p2p / gdr) and if this changes we will force a retune
   static std::vector<DslashCoarsePolicy> policies(static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED), DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
   static int first_active_policy=static_cast<int>(DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED);
+
+  // string used as a tunekey to ensure we retune if the dslash policy env changes
+  static char policy_string[TuneKey::aux_n];
 
   void enable_policy(DslashCoarsePolicy p){
     policies[static_cast<std::size_t>(p)] = p;
@@ -636,25 +636,6 @@ namespace quda {
  public:
    inline DslashCoarsePolicyTune(DslashCoarseLaunch &dslash) : dslash(dslash)
    {
-      strcpy(aux,"policy,");
-      if (dslash.dslash) strcat(aux,"dslash");
-      strcat(aux, dslash.clover ? "clover," : ",");
-      strcat(aux,dslash.inA.AuxString());
-      strcat(aux,",gauge_prec=");
-
-      char prec_str[8];
-      i32toa(prec_str,dslash.Y.Precision());
-      strcat(aux,prec_str);
-      strcat(aux,",halo_prec=");
-      i32toa(prec_str,dslash.halo_precision);
-      strcat(aux,prec_str);
-      strcat(aux,comm_dim_partitioned_string());
-      strcat(aux,comm_dim_topology_string());
-
-      int comm_sum = 4;
-      if (dslash.commDim) for (int i=0; i<4; i++) comm_sum -= (1-dslash.commDim[i]);
-      strcat(aux, comm_sum ? ",full" : ",interior");
-
       if (!dslash_init) {
 
 	static char *dslash_policy_env = getenv("QUDA_ENABLE_DSLASH_COARSE_POLICY");
@@ -695,10 +676,36 @@ namespace quda {
 	  }
 	}
 
-	config += comm_gdr_enabled();
-	config += 2*comm_peer2peer_enabled_global();
-	dslash_init = true;
+        // construct string specifying which policies have been enabled
+        strcat(policy_string, ",pol=");
+        for (int i = 0; i < (int)DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED; i++) {
+          strcat(policy_string, (int)policies[i] == i ? "1" : "0");
+        }
+
+        dslash_init = true;
       }
+
+      strcpy(aux, "policy,");
+      if (dslash.dslash) strcat(aux, "dslash");
+      strcat(aux, dslash.clover ? "clover," : ",");
+      strcat(aux, dslash.inA.AuxString());
+      strcat(aux, ",gauge_prec=");
+
+      char prec_str[8];
+      i32toa(prec_str, dslash.Y.Precision());
+      strcat(aux, prec_str);
+      strcat(aux, ",halo_prec=");
+      i32toa(prec_str, dslash.halo_precision);
+      strcat(aux, prec_str);
+      strcat(aux, comm_dim_partitioned_string(dslash.commDim));
+      strcat(aux, comm_dim_topology_string());
+      strcat(aux, comm_config_string()); // and change in P2P/GDR will be stored as a separate tunecache entry
+      strcat(aux, policy_string);        // any change in policies enabled will be stored as a separate entry
+
+      int comm_sum = 4;
+      if (dslash.commDim)
+        for (int i = 0; i < 4; i++) comm_sum -= (1 - dslash.commDim[i]);
+      strcat(aux, comm_sum ? ",full" : ",interior");
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning
@@ -708,18 +715,12 @@ namespace quda {
 	enableProfileCount();
 	setPolicyTuning(true);
       }
-    }
+   }
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
    inline void apply(const cudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-     if (config != tp.aux.y && comm_size() > 1) {
-       errorQuda("Machine configuration (P2P/GDR=%d) changed since tunecache was created (P2P/GDR=%d).  Please delete "
-		 "this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.",
-		 config, tp.aux.y);
-     }
 
      if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");
      if (policies[tp.aux.x] == DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED ) errorQuda("Requested policy is disabled");
@@ -742,12 +743,18 @@ namespace quda {
 
    void initTuneParam(TuneParam &param) const  {
      Tunable::initTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy;
+     param.aux.y = 0;
+     param.aux.z = 0;
+     param.aux.w = 0;
    }
 
    void defaultTuneParam(TuneParam &param) const  {
      Tunable::defaultTuneParam(param);
-     param.aux.x = first_active_policy; param.aux.y = config; param.aux.z = 0; param.aux.w = 0;
+     param.aux.x = first_active_policy;
+     param.aux.y = 0;
+     param.aux.z = 0;
+     param.aux.w = 0;
    }
 
    TuneKey tuneKey() const {

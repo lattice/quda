@@ -166,9 +166,13 @@ namespace quda {
     //coarseColor >= 8 && coarseColor % 8 == 0 ? 8 : coarseColor >= 4 && coarseColor % 4 == 0 ? 4 : 2;
 
     if (v.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       RestrictLaunch<Float, short, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       restrictor.apply(0);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else if (v.Precision() == in.Precision()) {
       RestrictLaunch<Float, Float, fineSpin, fineColor, coarseSpin, coarseColor, coarse_colors_per_thread>
         restrictor(out, in, v, fine_to_coarse, coarse_to_fine, parity);

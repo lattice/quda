@@ -103,9 +103,6 @@ namespace quda {
     /** Whether the CPU transfer operator has been constructed */
     mutable bool enable_cpu;
 
-    /** Whether to do the block-orthogonalization on the GPU */
-    bool gpu_setup;
-
     /** Whether to apply the transfer operaton the GPU (requires
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
@@ -167,7 +164,6 @@ namespace quda {
      * @param parity For single-parity fields are these QUDA_EVEN_PARITY or QUDA_ODD_PARITY
      * @param null_precision The precision to store the null-space basis vectors in
      * @param enable_gpu Whether to enable this to run on GPU (as well as CPU)
-     * @param gpu_setup Whether to do the block-orthogonalization on the GPU
      */
     Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs,
 	     QudaPrecision null_precision, TimeProfile &profile);
@@ -254,14 +250,7 @@ namespace quda {
     /**
      * @brief Sets whether the transfer operator is to act on full
      * fields or single parity fields, and if single-parity which
-     * parity.  If site_subset is QUDA_FULL_SITE_SUBSET, the transfer
-     * operator can still be applied to single-parity fields, however,
-     * if site_subset is QUDA_PARITY_SITE_SUBSET, then the transfer
-     * operator cannot be applied to full fields, and setSiteSubset
-     * will need to be called first to reset to QUDA_FULL_SITE_SUBSET.
-     * This method exists to reduce GPU memory overhead - if only
-     * transfering single-parity fine fields then we only store a
-     * single-parity copy of the null space components on the device.
+     * parity.
      * @param[in] site_subset The site_subset of the fine-grid fields
      * @param[in] parity The parity of the single-parity fields (if
      * applicable)

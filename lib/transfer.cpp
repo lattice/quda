@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <vector>
 
-#include <nvToolsExt.h>
 
 namespace quda {
 
@@ -17,13 +16,33 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField*> &B, int Nvec, int *geo_bs, int spin_bs, QudaPrecision null_precision, TimeProfile &profile)
-    : B(B), Nvec(Nvec), null_precision(null_precision), V_h(nullptr), V_d(nullptr),
-      fine_tmp_h(nullptr), fine_tmp_d(nullptr), coarse_tmp_h(nullptr), coarse_tmp_d(nullptr), geo_bs(nullptr),
-      fine_to_coarse_h(nullptr), coarse_to_fine_h(nullptr), fine_to_coarse_d(nullptr), coarse_to_fine_d(nullptr),
-      spin_bs(spin_bs), spin_map(0), nspin_fine(B[0]->Nspin()), site_subset(QUDA_FULL_SITE_SUBSET), parity(QUDA_INVALID_PARITY),
-      enable_gpu(false), enable_cpu(false), gpu_setup(true), use_gpu(true),
-      is_staggered(B[0]->Nspin() == 1), flops_(0), profile(profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int *geo_bs, int spin_bs,
+      QudaPrecision null_precision, TimeProfile &profile) :
+      B(B),
+      Nvec(Nvec),
+      null_precision(null_precision),
+      V_h(nullptr),
+      V_d(nullptr),
+      fine_tmp_h(nullptr),
+      fine_tmp_d(nullptr),
+      coarse_tmp_h(nullptr),
+      coarse_tmp_d(nullptr),
+      geo_bs(nullptr),
+      fine_to_coarse_h(nullptr),
+      coarse_to_fine_h(nullptr),
+      fine_to_coarse_d(nullptr),
+      coarse_to_fine_d(nullptr),
+      spin_bs(spin_bs),
+      spin_map(0),
+      nspin_fine(B[0]->Nspin()),
+      site_subset(QUDA_FULL_SITE_SUBSET),
+      parity(QUDA_INVALID_PARITY),
+      enable_gpu(false),
+      enable_cpu(false),
+      use_gpu(true),
+      is_staggered(B[0]->Nspin() == 1),
+      flops_(0),
+      profile(profile)
   {
     postTrace();
     int ndim = B[0]->Ndim();
@@ -233,50 +252,14 @@ namespace quda {
     if (geo_bs) delete []geo_bs;
   }
 
-  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_) {
-    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY) errorQuda("Undefined parity %d", parity_);
+  void Transfer::setSiteSubset(QudaSiteSubset site_subset_, QudaParity parity_)
+  {
+    if (site_subset_ == QUDA_PARITY_SITE_SUBSET && parity_ != QUDA_EVEN_PARITY && parity_ != QUDA_ODD_PARITY)
+      errorQuda("Undefined parity %d", parity_);
     parity = parity_;
 
     if (site_subset == site_subset_) return;
     site_subset = site_subset_;
-
-    if (is_staggered) { return; }
-
-    return; // FIXME apply memory optimization
-
-    // this function only does something non-trivial if the operator is on the GPU
-    if (!enable_gpu) return;
-
-    if (site_subset == QUDA_PARITY_SITE_SUBSET) {
-      // if doing single-parity then delete full field V and replace with single parity
-
-      ColorSpinorParam param(*V_h);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.x[0] /= 2;
-      param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-      param.setPrecision(V_d->Precision());
-
-      delete V_d;
-      V_d = ColorSpinorField::Create(param);
-      *V_d = parity == QUDA_EVEN_PARITY ? V_h->Even() : V_h->Odd();
-
-    } else if (site_subset == QUDA_FULL_SITE_SUBSET) {
-      // if doing full field then delete single parity V and replace with single parity
-
-      ColorSpinorParam param(*V_h);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      param.setPrecision(V_d->Precision());
-
-      delete V_d;
-      V_d = ColorSpinorField::Create(param);
-      *V_d = *V_h;
-
-    } else {
-      errorQuda("Undefined site_subset %d", site_subset_);
-    }
-
   }
 
   struct Int2 {

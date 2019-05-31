@@ -12,7 +12,14 @@
 
 #include <enum_quda.h>
 #include <stdio.h> /* for FILE */
+#include <quda_define.h>
 #include <quda_constants.h>
+
+#ifndef __CUDACC_RTC__
+#define double_complex double _Complex
+#else // keep NVRTC happy since it can't handle C types
+#define double_complex double2
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,13 +108,15 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double b_5[QUDA_MAX_DWF_LS];  /**< MDWF coefficients */
-    double c_5[QUDA_MAX_DWF_LS];  /**< will be used only for the mobius type of Fermion */
+    double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
     double mu;    /**< Twisted mass parameter */
     double epsilon; /**< Twisted mass parameter */
 
     QudaTwistFlavorType twist_flavor;  /**< Twisted mass flavor */
+
+    int laplace3D; /**< omit this direction from laplace operator: x,y,z,t -> 0,1,2,3 (-1 is full 4D) */
 
     double tol;    /**< Solver tolerance in the L2 residual norm */
     double tol_restart;   /**< Solver tolerance in the L2 residual norm (used to restart InitCG) */
@@ -132,7 +141,7 @@ extern "C" {
        requires more low-precision memory allocation. */
     int solution_accumulator_pipeline;
 
-    /**< This parameter determines how many consective reliable update
+    /**< This parameter determines how many consecutive reliable update
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase;
@@ -141,6 +150,16 @@ extern "C" {
     residual increases we tolerate before terminating the solver,
     i.e., how long do we want to keep trying to converge */
     int max_res_increase_total;
+
+    /**< This parameter determines how many consecutive heavy-quark
+    residual increases we tolerate before terminating the solver,
+    i.e., how long do we want to keep trying to converge */
+    int max_hq_res_increase;
+
+    /**< This parameter determines how many total heavy-quark residual
+    restarts we tolerate before terminating the solver, i.e., how long
+    do we want to keep trying to converge */
+    int max_hq_res_restart_total;
 
     /**< After how many iterations shall the heavy quark residual be updated */
     int heavy_quark_check;
@@ -231,8 +250,7 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
-
+    QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -256,6 +274,9 @@ extern "C" {
 
     /** Deflation instance */
     void *deflation_op;
+
+    /** defines deflation */
+    void *eig_param;
 
     /**
       Dirac Dslash used in preconditioner
@@ -351,11 +372,10 @@ extern "C" {
 
   } QudaInvertParam;
 
-
   // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
-    //EIGENSOLVER PARAMS
+    // EIGENSOLVER PARAMS
     //-------------------------------------------------
     /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
@@ -370,14 +390,14 @@ extern "C" {
     int poly_deg;
 
     /** Range used in polynomial acceleration **/
-    double a_min;    
+    double a_min;
     double a_max;
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
-    /** If use_dagger, use Mdag  instead of M. **/
-    /** If use_norm_op, use MdagM instead of M. **/
-    /** If use_norm_op && use_dagger use MMdag. **/    
+    /** If use_dagger, use Mdag **/
+    /** If use_norm_op, use MdagM **/
+    /** If use_norm_op && use_dagger use MMdag. **/
     QudaBoolean use_dagger;
     QudaBoolean use_norm_op;
 
@@ -391,30 +411,32 @@ extern "C" {
     int nEv;
     /** Total size of Krylov space **/
     int nKr;
-    /** Number of converged eigenvectors requested **/
+    /** Max number of locked eigenpairs (deduced at runtime) **/
+    int nLockedMax;
+    /** Number of requested converged eigenvectors **/
     int nConv;
     /** Tolerance on the least well known eigenvalue's residual **/
     double tol;
-    /** For Lanczos/Arnoldi, check every nth step **/
     /** For IRLM/IRAM, check every nth restart **/
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
-    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
-    char QUDA_logfile[512];
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
     /** For Arpack cross check, name of the Arpack logfile **/
     char arpack_logfile[512];
-        
+
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+
     //-------------------------------------------------
-    
-    //EIG-CG PARAMS
+
+    // EIG-CG PARAMS
     //-------------------------------------------------
     int nk;
-    int np;         
-    
+    int np;
+
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -453,7 +475,7 @@ extern "C" {
     QudaInvertParam *invert_param;
 
     QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
-    
+
     /** Number of multigrid levels */
     int n_level;
 
@@ -572,6 +594,9 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use eigenvectors for the nullspace or, if the coarsest instance deflate*/
+    QudaBoolean use_eig_solver[QUDA_MAX_MG_LEVEL];
+
     /** Minimize device memory allocations during the adaptive setup,
         placing temporary fields in mapped memory instad of device
         memory */
@@ -579,15 +604,12 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
- 
+
     /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels; 
+    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
-
-    /** Whether to load the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_load;
 
     /** Whether to run null Vs eigen vector overlap checks once set up is complete */
     QudaBoolean run_low_mode_check;
@@ -601,11 +623,17 @@ extern "C" {
     /** Deflate the coarsest grid  */
     QudaBoolean deflate_coarsest;
 
+    /** Whether to load the null-space vectors to disk (requires QIO) */
+    QudaBoolean vec_load;
+
     /** Filename prefix where to load the null-space vectors */
     char vec_infile[256];
 
     /** Whether to store the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_store;
+
+    /** Whether to use and initial guess during coarse grid deflation */
+    QudaBoolean coarse_guess;
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
@@ -619,8 +647,7 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
-    /** Boolean for if this is a staggered solve or not 
-      ESW hack for now, but will likely influence defaults long term */
+    /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
 
   } QudaMultigridParam;
@@ -672,6 +699,12 @@ extern "C" {
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
   /**
+   * @param mycomm User provided MPI communicator in place of MPI_COMM_WORLD
+   */
+
+  void qudaSetCommHandle(void *mycomm);
+
+  /**
    * Declare the grid mapping ("logical topology" in QMP parlance)
    * used for communications in a multi-GPU grid.  This function
    * should be called prior to initQuda().  The only case in which
@@ -697,6 +730,7 @@ extern "C" {
    *
    * @see QudaCommsMap
    */
+
   void initCommsGridQuda(int nDim, const int *dims, QudaCommsMap func, void *fdata);
 
   /**
@@ -845,11 +879,11 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, void *hp_alpha, void *hp_beta,
+                   QudaEigParam *eig_param);
 
   /**
-   * Perform the eigensolve. The problem matrix is defined by the invert param, the 
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the
    * mode of solution is specified by the eig param. It is assumed that the gauge
    * field has already been loaded via  loadGaugeQuda().
    * @param h_els  Host side eigenvalues
@@ -859,16 +893,6 @@ extern "C" {
   void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
 
   /**
-   * Perform the eigensolve using ARPACK. The problem matrix is defined by the 
-   * invert param, the mode of solution is specified by the eig param. 
-   * It is assumed that the gauge field has already been loaded via loadGaugeQuda().
-   * @param h_els  Host side eigenvalues
-   * @param h_evs  Host side eigenvectors
-   * @param param  Contains all metadata regarding the type of solve.
-   */
-  void eigensolveARPACK(void *h_evals, void *h_evecs, QudaEigParam *param);
-  
-  /**
    * Perform the solve, according to the parameters set in param.  It
    * is assumed that the gauge field has already been loaded via
    * loadGaugeQuda().
@@ -876,9 +900,9 @@ extern "C" {
    * @param h_b    Source spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
-   */  
+   */
   void invertQuda(void *h_x, void *h_b, QudaInvertParam *param);
-  
+
   /**
    * Perform the solve like @invertQuda but for multiples right hand sides.
    *
@@ -1229,7 +1253,14 @@ extern "C" {
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
-  double qChargeCuda();
+  double qChargeQuda();
+
+  /**
+     @brief Calculates the topological charge from gaugeSmeared, if it exist,
+     or from gaugePrecise if no smeared fields are present.
+     @param[out] qDensity array holding Q charge density
+  */
+  double qChargeDensityQuda(void *qDensity);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -1305,9 +1336,14 @@ extern "C" {
    */
   void destroyDeflationQuda(void *df_instance);
 
+  void setMPICommHandleQuda(void *mycomm);
+
 #ifdef __cplusplus
 }
 #endif
+
+// remove NVRTC WAR
+#undef double_complex
 
 /* #include <quda_new_interface.h> */
 

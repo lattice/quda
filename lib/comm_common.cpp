@@ -141,6 +141,9 @@ void comm_destroy_topology(Topology *topo)
   host_free(topo);
 }
 
+static int gpuid = -1;
+
+int comm_gpuid(void) { return gpuid; }
 
 static bool peer2peer_enabled[2][4] = { {false,false,false,false},
                                         {false,false,false,false} };
@@ -160,6 +163,18 @@ static int enable_peer_to_peer = 3;
 void comm_peer2peer_init(const char* hostname_recv_buf)
 {
   if (peer2peer_init) return;
+
+  // set gdr enablement
+  if (comm_gdr_enabled()) {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
+    comm_gdr_blacklist(); // set GDR blacklist
+    // by default, if GDR is enabled we disable non-p2p policies to
+    // prevent possible conflict between MPI and QUDA opening the same
+    // IPC memory handles when using CUDA-aware MPI
+    enable_peer_to_peer += 4;
+  } else {
+    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
+  }
 
   char *enable_peer_to_peer_env = getenv("QUDA_ENABLE_P2P");
 
@@ -258,14 +273,6 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
   comm_barrier();
 
   peer2peer_present = comm_peer2peer_enabled_global();
-
-  // set gdr enablement
-  if (comm_gdr_enabled()) {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Enabling GPU-Direct RDMA access\n");
-    comm_gdr_blacklist(); // set GDR blacklist
-  } else {
-    if (getVerbosity() > QUDA_SILENT) printfQuda("Disabling GPU-Direct RDMA access\n");
-  }
 
   checkCudaErrorNoSync();
   return;
@@ -427,13 +434,26 @@ int comm_coord(int dim)
   return comm_coords(topo)[dim];
 }
 
+inline bool isHost(const void *buffer)
+{
+  CUmemorytype memType;
+  void *attrdata[] = {(void *)&memType};
+  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
+  if (err != CUDA_SUCCESS) {
+    const char *str;
+    cuGetErrorName(err, &str);
+    errorQuda("cuPointerGetAttributes returned error %s", str);
+  }
 
-inline bool isHost(const cudaPointerAttributes &attributes) {
-#if CUDA_VERSION >= 10000
-  return (attributes.type == cudaMemoryTypeHost);
-#else
-  return (attributes.memoryType == cudaMemoryTypeHost);
-#endif
+  switch (memType) {
+  case CU_MEMORYTYPE_DEVICE: return false;
+  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
+  case CU_MEMORYTYPE_HOST:
+  default: // memory not allocated by CUDA allocaters will default to being host memory
+    return true;
+  }
 }
 
 /**
@@ -444,9 +464,8 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
-  cudaPointerAttributes attributes;
-  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || isHost(attributes)) {
+
+  if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(nbytes);
     try {
@@ -455,7 +474,6 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting");
     }
-    if (err != cudaSuccess) cudaGetLastError();
     host_free(tmp);
   } else {
     // test this memory allocation is ok by doing a memcpy from it
@@ -483,9 +501,8 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
-  cudaPointerAttributes attributes;
-  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || isHost(attributes)) {
+
+  if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
     try {
       std::fill(static_cast<char*>(buffer), static_cast<char*>(buffer)+nbytes, 0);
@@ -493,7 +510,6 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting");
     }
-    if (err != cudaSuccess) cudaGetLastError();
   } else {
     // test this memory allocation is ok by doing a memset
     cudaError_t err = cudaMemset(buffer, 0, nbytes);
@@ -518,9 +534,8 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
-  cudaPointerAttributes attributes;
-  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || isHost(attributes)) {
+
+  if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = safe_malloc(blksize*nblocks);
     try {
@@ -530,9 +545,8 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
 		 file, line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting");
-      }
+    }
     host_free(tmp);
-    if (err != cudaSuccess) cudaGetLastError();
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
@@ -561,9 +575,8 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 {
 #ifdef HOST_DEBUG
   checkCudaError(); // check and clear error state first
-  cudaPointerAttributes attributes;
-  cudaError_t err = cudaPointerGetAttributes(&attributes, buffer);
-  if (err != cudaSuccess || isHost(attributes)) {
+
+  if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
     try {
       for (int i=0; i<nblocks; i++)
@@ -573,7 +586,6 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 		 file, line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting");
     }
-    if (err != cudaSuccess) cudaGetLastError();
   } else {
     // test this memory allocation is ok by doing a memset
     cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
@@ -609,11 +621,8 @@ void comm_dim_partitioned_set(int dim)
 }
 
 void comm_dim_partitioned_reset(){
-  for (int i=0; i<QUDA_MAX_DIM; i++)
-   manual_set_partition[i] = 0;
-   
+  for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 }
-
 
 int comm_dim_partitioned(int dim)
 {
@@ -677,6 +686,114 @@ bool comm_gdr_blacklist() {
 
   return blacklist;
 }
+
+static char partition_string[16]; /** static string that contains a string of the machine partition */
+static char topology_string[128]; /** static string that contains a string of the machine partition */
+static char
+  partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
+
+static bool deterministic_reduce = false;
+
+void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
+{
+  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
+  comm_set_default_topology(topo);
+
+  // determine which GPU this rank will use
+  char *hostname_recv_buf = (char *)safe_malloc(128 * comm_size());
+  comm_gather_hostname(hostname_recv_buf);
+
+  gpuid = 0;
+  for (int i = 0; i < comm_rank(); i++) {
+    if (!strncmp(comm_hostname(), &hostname_recv_buf[128 * i], 128)) { gpuid++; }
+  }
+
+  int device_count;
+  cudaGetDeviceCount(&device_count);
+  if (device_count == 0) { errorQuda("No CUDA devices found"); }
+  if (gpuid >= device_count) {
+    char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
+    if (enable_mps_env && strcmp(enable_mps_env, "1") == 0) {
+      gpuid = gpuid % device_count;
+      printf("MPS enabled, rank=%d -> gpu=%d\n", comm_rank(), gpuid);
+    } else {
+      errorQuda("Too few GPUs available on %s", comm_hostname());
+    }
+  }
+
+  comm_peer2peer_init(hostname_recv_buf);
+
+  host_free(hostname_recv_buf);
+
+  char *enable_reduce_env = getenv("QUDA_DETERMINISTIC_REDUCE");
+  if (enable_reduce_env && strcmp(enable_reduce_env, "1") == 0) { deterministic_reduce = true; }
+
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
+           comm_dim_partitioned(2), comm_dim_partitioned(3));
+
+  // if CUDA_VISIBLE_DEVICES is set, we include this information in the topology_string
+  char *device_order_env = getenv("CUDA_VISIBLE_DEVICES");
+  if (device_order_env) {
+
+    // to ensure we have process consistency define using rank 0
+    if (comm_rank() == 0) {
+      std::stringstream device_list_raw(device_order_env); // raw input
+      std::stringstream device_list;                       // formatted (no commas)
+
+      int device;
+      int deviceCount;
+      cudaGetDeviceCount(&deviceCount);
+      while (device_list_raw >> device) {
+        // check this is a valid policy choice
+        if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }
+
+        device_list << device;
+        if (device_list_raw.peek() == ',') device_list_raw.ignore();
+      }
+      snprintf(topology_string, 128, ",topo=%d%d%d%d,order=%s", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3),
+               device_list.str().c_str());
+    }
+
+    comm_broadcast(topology_string, 128);
+  } else {
+    snprintf(topology_string, 128, ",topo=%d%d%d%d", comm_dim(0), comm_dim(1), comm_dim(2), comm_dim(3));
+  }
+}
+
+const char *comm_config_string()
+{
+  static char config_string[16];
+  static bool config_init = false;
+
+  if (!config_init) {
+    strcpy(config_string, ",p2p=");
+    strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
+    strcat(config_string, ",gdr=");
+    strcat(config_string, std::to_string(comm_gdr_enabled()).c_str());
+    config_init = true;
+  }
+
+  return config_string;
+}
+
+const char *comm_dim_partitioned_string(const int *comm_dim_override)
+{
+  if (comm_dim_override) {
+    char comm[5] = {(!comm_dim_partitioned(0) ? '0' : comm_dim_override[0] ? '1' : '0'),
+                    (!comm_dim_partitioned(1) ? '0' : comm_dim_override[1] ? '1' : '0'),
+                    (!comm_dim_partitioned(2) ? '0' : comm_dim_override[2] ? '1' : '0'),
+                    (!comm_dim_partitioned(3) ? '0' : comm_dim_override[3] ? '1' : '0'), '\0'};
+    strcpy(partition_override_string, ",comm=");
+    strcat(partition_override_string, comm);
+    return partition_override_string;
+  } else {
+    return partition_string;
+  }
+}
+
+const char *comm_dim_topology_string() { return topology_string; }
+
+bool comm_deterministic_reduce() { return deterministic_reduce; }
 
 static bool globalReduce = true;
 static bool asyncReduce = false;

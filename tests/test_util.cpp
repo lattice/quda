@@ -4,11 +4,10 @@
 #include <string.h>
 #include <short.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
+#include <comm_quda.h>
+
+// This contains the appropriate ifdef guards already
+#include <mpi_comm_handle.h>
 
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
@@ -49,6 +48,23 @@ extern float fat_link_max;
  */
 int gridsize_from_cmdline[4] = {1,1,1,1};
 
+void get_gridsize_from_env(int *const dims)
+{
+  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  if (grid_size_env) {
+    std::stringstream grid_list(grid_size_env);
+
+    int dim;
+    int i = 0;
+    while (grid_list >> dim) {
+      if (i >= 4) errorQuda("Unexpected grid size array length");
+      dims[i] = dim;
+      if (grid_list.peek() == ',') grid_list.ignore();
+      i++;
+    }
+  }
+}
+
 static int lex_rank_from_coords_t(const int *coords, void *fdata)
 {
   int rank = coords[0];
@@ -69,8 +85,10 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 
 static int rank_order = 0;
 
-void initComms(int argc, char **argv, const int *commDims)
+void initComms(int argc, char **argv, int *const commDims)
 {
+  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
@@ -83,23 +101,17 @@ void initComms(int argc, char **argv, const int *commDims)
     int map[] = { 0, 1, 2, 3 };
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   }
-
 #elif defined(MPI_COMMS)
-#ifdef PTHREADS
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-#else
   MPI_Init(&argc, &argv);
 #endif
 
-#endif
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
 
   initCommsGridQuda(4, commDims, func, NULL);
   initRand();
 
   printfQuda("Rank order is %s major (%s running fastest)\n",
-	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
+       rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
 
 }
 
@@ -163,12 +175,10 @@ void setDims(int *X) {
 
 }
 
-
 void dw_setDims(int *X, const int L5)
 {
   V = 1;
-  for (int d=0; d< 4; d++)
-  {
+  for (int d = 0; d < 4; d++) {
     V *= X[d];
     Z[d] = X[d];
 
@@ -327,7 +337,7 @@ static void su3Reconstruct12(Float *mat, int dir, int ga_idx, QudaGaugeParam *pa
   accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
   accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
   Float u0 = (dir < 3 ? param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
+        (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
   w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
 }
 
@@ -340,7 +350,7 @@ static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *par
   row_sum += mat[4]*mat[4];
   row_sum += mat[5]*mat[5];
   Float u0 = (dir < 3 ? param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
+        (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
   Float U00_mag = sqrt(1.f/(u0*u0) - row_sum);
 
   mat[14] = mat[0];
@@ -400,28 +410,6 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
   }
 }
 
-/*
-  void su3_construct_8_half(float *mat, short *mat_half) {
-  su3Construct8(mat);
-
-  mat_half[0] = floatToShort(mat[0] / M_PI);
-  mat_half[1] = floatToShort(mat[1] / M_PI);
-  for (int i=2; i<18; i++) {
-  mat_half[i] = floatToShort(mat[i]);
-  }
-  }
-
-  void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param) {
-
-  for (int i=0; i<18; i++) {
-  mat[i] = shortToFloat(mat_half[i]);
-  }
-  mat[0] *= M_PI;
-  mat[1] *= M_PI;
-
-  su3Reconstruct8(mat, dir, ga_idx, param);
-  }*/
-
 template <typename Float>
 static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   for (int i = 0; i < len; i++) {
@@ -473,11 +461,10 @@ int fullLatticeIndex(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd;
+  int X = 2 * sid + x1odd;
 
   return X;
 }
-
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
@@ -546,21 +533,18 @@ neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   if ( (ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   }
-
 
   return ret;
 }
-
 
 /*
  * This is a computation of neighbor using the full index and the displacement in each direction
  *
  */
 
-int
-neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
+int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -605,10 +589,7 @@ neighborIndexFullLattice(int dim[4], int index, int dx[4])
   return neighborHalfIndex + oddBit*halfVolume;
 }
 
-
-
-int
-neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
+int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
   int oddBit = 0;
@@ -633,7 +614,7 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
   if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
     return ret;
   }
 
@@ -677,7 +658,7 @@ int fullLatticeIndex_4d(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd;
+  int X = 2 * sid + x1odd;
 
   return X;
 }
@@ -699,8 +680,7 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit) {
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
-int
-x4_from_full_index(int i)
+int x4_from_full_index(int i)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -735,8 +715,8 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
-	gauge[3][j*gaugeSiteSize+i] *= -1.0;
-	gauge[3][(Vh+j)*gaugeSiteSize+i] *= -1.0;
+  gauge[3][j*gaugeSiteSize+i] *= -1.0;
+  gauge[3][(Vh+j)*gaugeSiteSize+i] *= -1.0;
       }
     }
   }
@@ -750,12 +730,12 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
     Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
     for (int i = 0; i< iMax; i++) {
       for (int m = 0; m < 3; m++) {
-	for (int n = 0; n < 3; n++) {
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  even[i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-	  odd [i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
-	}
+  for (int n = 0; n < 3; n++) {
+    even[i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+    even[i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+    odd [i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+    odd [i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+  }
       }
     }
   }
@@ -775,7 +755,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     for(int d=0; d<4; d++){
       for(int i=0; i < V*gaugeSiteSize; i++){
-	gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+  gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
       }
     }
   }
@@ -794,24 +774,24 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       int sign = 1;
 
       if (d == 0) {
-	if (i4 % 2 == 1){
-	  sign= -1;
-	}
+  if (i4 % 2 == 1){
+    sign= -1;
+  }
       }
 
       if (d == 1){
-	if ((i4+i1) % 2 == 1){
-	  sign= -1;
-	}
+  if ((i4+i1) % 2 == 1){
+    sign= -1;
+  }
       }
       if (d == 2){
-	if ( (i4+i1+i2) % 2 == 1){
-	  sign= -1;
-	}
+  if ( (i4+i1+i2) % 2 == 1){
+    sign= -1;
+  }
       }
 
       for (int j=0; j < 18; j++) {
-	gauge[d][i*gaugeSiteSize + j] *= sign;
+  gauge[d][i*gaugeSiteSize + j] *= sign;
       }
     }
     //odd
@@ -824,24 +804,24 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       int sign = 1;
 
       if (d == 0) {
-	if (i4 % 2 == 1){
-	  sign = -1;
-	}
+  if (i4 % 2 == 1){
+    sign = -1;
+  }
       }
 
       if (d == 1){
-	if ((i4+i1) % 2 == 1){
-	  sign = -1;
-	}
+  if ((i4+i1) % 2 == 1){
+    sign = -1;
+  }
       }
       if (d == 2){
-	if ( (i4+i1+i2) % 2 == 1){
-	  sign = -1;
-	}
+  if ( (i4+i1+i2) % 2 == 1){
+    sign = -1;
+  }
       }
 
       for (int j=0; j<18; j++){
-	gauge[d][(Vh+i)*gaugeSiteSize + j] *= sign;
+  gauge[d][(Vh+i)*gaugeSiteSize + j] *= sign;
       }
     }
 
@@ -852,18 +832,18 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
     for (int j = 0; j < Vh; j++) {
       int sign =1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
-	if (j >= (X4-3)*X1h*X2*X3 ){
-	  sign = -1;
-	}
+  if (j >= (X4-3)*X1h*X2*X3 ){
+    sign = -1;
+  }
       } else {
-	if (j >= (X4-1)*X1h*X2*X3 ){
-	  sign = -1;
-	}
+  if (j >= (X4-1)*X1h*X2*X3 ){
+    sign = -1;
+  }
       }
 
       for (int i=0; i<18; i++) {
-	gauge[3][j*gaugeSiteSize + i] *= sign;
-	gauge[3][(Vh+j)*gaugeSiteSize + i] *= sign;
+  gauge[3][j*gaugeSiteSize + i] *= sign;
+  gauge[3][(Vh+j)*gaugeSiteSize + i] *= sign;
       }
     }
   }
@@ -891,12 +871,12 @@ static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0; 
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0;
-        }
+  for (int n = 0; n < 3; n++) {
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
+    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0.0;
+  }
       }
     }
   }
@@ -921,7 +901,8 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
 }
 
 template <typename Float>
-static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
+static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH)
+{
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
@@ -931,16 +912,11 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
-        for (int n = 0; n < 3; n++) { // 3 columns
-          // ESW hack free fields with staggered phases
-          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0; 
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = (m==n) ? 1 : 0;
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 0;
-          /*resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-          resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-          resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;*/                    
+  for (int n = 0; n < 3; n++) { // 3 columns
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
         }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
@@ -952,60 +928,57 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
       normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
 
       {
-	Float *w = resEven[dir]+(i*3+0)*3*2;
-	Float *u = resEven[dir]+(i*3+1)*3*2;
-	Float *v = resEven[dir]+(i*3+2)*3*2;
+  Float *w = resEven[dir]+(i*3+0)*3*2;
+  Float *u = resEven[dir]+(i*3+1)*3*2;
+  Float *v = resEven[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
 
       {
-	Float *w = resOdd[dir]+(i*3+0)*3*2;
-	Float *u = resOdd[dir]+(i*3+1)*3*2;
-	Float *v = resOdd[dir]+(i*3+2)*3*2;
+  Float *w = resOdd[dir]+(i*3+0)*3*2;
+  Float *u = resOdd[dir]+(i*3+1)*3*2;
+  Float *v = resOdd[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
 
     }
   }
 
-  if (param->type == QUDA_WILSON_LINKS){
+  if (param->type == QUDA_WILSON_LINKS) {
     applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
-    for (int dir = 0; dir < 4; dir++){
+  } else if (param->type == QUDA_ASQTAD_FAT_LINKS) {
+    for (int dir = 0; dir < 4; dir++) {
       for (int i = 0; i < Vh; i++) {
-	for (int m = 0; m < 3; m++) { // last 2 rows
-	  for (int n = 0; n < 3; n++) { // 3 columns
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
-	    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 2.0* rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
-	    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
-	  }
-	}
+  for (int m = 0; m < 3; m++) { // last 2 rows
+    for (int n = 0; n < 3; n++) { // 3 columns
+      resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] =1.0* rand() / (Float)RAND_MAX;
+      resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 2.0* rand() / (Float)RAND_MAX;
+      resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = 3.0*rand() / (Float)RAND_MAX;
+      resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = 4.0*rand() / (Float)RAND_MAX;
+    }
+  }
       }
     }
-
   }
-
 }
 
-template <typename Float>
-void constructUnitaryGaugeField(Float **res)
+template <typename Float> void constructUnitaryGaugeField(Float **res)
 {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
@@ -1016,12 +989,12 @@ void constructUnitaryGaugeField(Float **res)
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
-	for (int n = 0; n < 3; n++) { // 3 columns
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
-	}
+  for (int n = 0; n < 3; n++) { // 3 columns
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+    resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
+    resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+        }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
@@ -1032,45 +1005,43 @@ void constructUnitaryGaugeField(Float **res)
       normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
 
       {
-	Float *w = resEven[dir]+(i*3+0)*3*2;
-	Float *u = resEven[dir]+(i*3+1)*3*2;
-	Float *v = resEven[dir]+(i*3+2)*3*2;
+  Float *w = resEven[dir]+(i*3+0)*3*2;
+  Float *u = resEven[dir]+(i*3+1)*3*2;
+  Float *v = resEven[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
 
       {
-	Float *w = resOdd[dir]+(i*3+0)*3*2;
-	Float *u = resOdd[dir]+(i*3+1)*3*2;
-	Float *v = resOdd[dir]+(i*3+2)*3*2;
+  Float *w = resOdd[dir]+(i*3+0)*3*2;
+  Float *u = resOdd[dir]+(i*3+1)*3*2;
+  Float *v = resOdd[dir]+(i*3+2)*3*2;
 
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
-	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-	accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
+  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
+  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
+  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
+  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
+  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
+  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
-
     }
   }
 }
 
-template <typename Float>
-static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type) {
+template <typename Float> static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type)
+{
 
   if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
 
   return;
 }
-
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
@@ -1081,15 +1052,14 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
     else constructGaugeField((float**)gauge, param);
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
-    else applyGaugeFieldScaling((float**)gauge, Vh, param);
+    else
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
   }
 
 }
 
-void
-construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
-			       QudaPrecision precision, QudaGaugeParam* param,
-			       QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision,
+    QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1117,55 +1087,51 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
       else applyStaggeredScaling((float**)fatlink, param, type);
 
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH)
-      {
+      if (dslash_type == QUDA_ASQTAD_DSLASH) {
         if(type != 3) constructGaugeField((float**)longlink, param, dslash_type);
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
-  }
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
-    // incorporate non-trivial phase into long links
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const complex<double> z = polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            } else {
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            }
+          }
+        }
+      }
+    }
 
-    const double phase = (M_PI * rand())/RAND_MAX;
-    const complex<double> z = polar(1.0, phase);
-    for (int dir=0; dir<4; ++dir) {
-      for (int i=0; i<V; ++i) {
-        for (int j=0; j<gaugeSiteSize; j+=2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
-          } else {
-            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
+    if (type == 3) return;
+
+    // set all links to zero to emulate the 1-link operator (needed for host comparison)
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            } else {
+              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            }
           }
         }
       }
     }
   }
-
-  if (type==3) return;
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) {
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(precision == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	}
-      }
-    }
-  }
-
 }
-
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {
@@ -1227,13 +1193,13 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
   for (int d=0; d<4; d++) {
     for (int eo=0; eo<2; eo++) {
       for (int i=0; i<Vh; i++) {
-	int ga_idx = (eo*Vh+i);
-	for (int j=0; j<18; j++) {
-	  double diff = fabs(newG[d][ga_idx*18+j] - oldG[d][ga_idx*18+j]);/// fabs(oldG[d][ga_idx*18+j]);
+  int ga_idx = (eo*Vh+i);
+  for (int j=0; j<18; j++) {
+    double diff = fabs(newG[d][ga_idx*18+j] - oldG[d][ga_idx*18+j]);/// fabs(oldG[d][ga_idx*18+j]);
 
-	  for (int f=0; f<fail_check; f++) if (diff > pow(10.0,-(f+1))) fail[d][f]++;
-	  if (diff > epsilon) iter[d][j]++;
-	}
+    for (int f=0; f<fail_check; f++) if (diff > pow(10.0,-(f+1))) fail[d][f]++;
+    if (diff > epsilon) iter[d][j]++;
+  }
       }
     }
   }
@@ -1243,9 +1209,9 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0,-(f+1)),
-	   fail[0][f], fail[1][f], fail[2][f], fail[3][f],
-	   fail[0][f]/(double)(V*18), fail[1][f]/(double)(V*18), fail[2][f]/(double)(V*18), fail[3][f]/(double)(V*18));
+    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],
+           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 18), fail[1][f] / (double)(V * 18),
+           fail[2][f] / (double)(V * 18), fail[3][f] / (double)(V * 18));
   }
 
 }
@@ -1257,10 +1223,7 @@ void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precisi
     checkGauge((float**)oldG, (float**)newG, epsilon);
 }
 
-
-
-void
-createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
+void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 {
 
   if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1280,105 +1243,101 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 
     for(int i=0;i < V;i++){
       for(int dir =XUP; dir <= TUP; dir++){
-	int idx = i;
-	int oddBit =0;
-	if (i >= Vh) {
-	  idx = i - Vh;
-	  oddBit = 1;
-	}
+  int idx = i;
+  int oddBit =0;
+  if (i >= Vh) {
+    idx = i - Vh;
+    oddBit = 1;
+  }
 
-	int X1 = Z[0];
-	int X2 = Z[1];
-	int X3 = Z[2];
-	int X4 = Z[3];
+  int X1 = Z[0];
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
 
-	int full_idx = fullLatticeIndex(idx, oddBit);
-	int i4 = full_idx /(X3*X2*X1);
-	int i3 = (full_idx - i4*(X3*X2*X1))/(X2*X1);
-	int i2 = (full_idx - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
-	int i1 = full_idx - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+  int full_idx = fullLatticeIndex(idx, oddBit);
+  int i4 = full_idx /(X3*X2*X1);
+  int i3 = (full_idx - i4*(X3*X2*X1))/(X2*X1);
+  int i2 = (full_idx - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+        int i1 = full_idx - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-	double coeff= 1.0;
-	switch(dir){
-	case XUP:
-	  if ( (i4 & 1) != 0){
-	    coeff *= -1;
-	  }
-	  break;
+        double coeff= 1.0;
+  switch(dir){
+  case XUP:
+    if ( (i4 & 1) != 0){
+      coeff *= -1;
+    }
+    break;
 
-	case YUP:
-	  if ( ((i4+i1) & 1) != 0){
-	    coeff *= -1;
-	  }
-	  break;
+  case YUP:
+    if ( ((i4+i1) & 1) != 0){
+      coeff *= -1;
+    }
+    break;
 
-	case ZUP:
-	  if ( ((i4+i1+i2) & 1) != 0){
-	    coeff *= -1;
-	  }
-	  break;
+  case ZUP:
+    if ( ((i4+i1+i2) & 1) != 0){
+      coeff *= -1;
+    }
+    break;
 
-	case TUP:
-	  if (last_node_in_t && i4 == (X4-1)){
-	    coeff *= -1;
-	  }
-	  break;
+        case TUP:
+    if (last_node_in_t && i4 == (X4-1)){
+      coeff *= -1;
+    }
+    break;
 
-	default:
-	  printf("ERROR: wrong dir(%d)\n", dir);
-	  exit(1);
-	}
+  default:
+    printf("ERROR: wrong dir(%d)\n", dir);
+    exit(1);
+  }
 
-	if (precision == QUDA_DOUBLE_PRECISION){
-	  //double* mylink = (double*)link;
-	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
-	  double* mylink = (double*)link[dir];
-	  mylink = mylink + i*gaugeSiteSize;
+        if (precision == QUDA_DOUBLE_PRECISION){
+    //double* mylink = (double*)link;
+    //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+    double* mylink = (double*)link[dir];
+    mylink = mylink + i*gaugeSiteSize;
 
-	  mylink[12] *= coeff;
-	  mylink[13] *= coeff;
-	  mylink[14] *= coeff;
-	  mylink[15] *= coeff;
-	  mylink[16] *= coeff;
-	  mylink[17] *= coeff;
+    mylink[12] *= coeff;
+    mylink[13] *= coeff;
+    mylink[14] *= coeff;
+    mylink[15] *= coeff;
+    mylink[16] *= coeff;
+    mylink[17] *= coeff;
 
-	}else{
-	  //float* mylink = (float*)link;
-	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
-	  float* mylink = (float*)link[dir];
-	  mylink = mylink + i*gaugeSiteSize;
+        }else{
+    //float* mylink = (float*)link;
+    //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+    float* mylink = (float*)link[dir];
+    mylink = mylink + i*gaugeSiteSize;
 
-	  mylink[12] *= coeff;
-	  mylink[13] *= coeff;
-	  mylink[14] *= coeff;
-	  mylink[15] *= coeff;
-	  mylink[16] *= coeff;
-	  mylink[17] *= coeff;
-
-	}
+          mylink[12] *= coeff;
+    mylink[13] *= coeff;
+    mylink[14] *= coeff;
+    mylink[15] *= coeff;
+    mylink[16] *= coeff;
+    mylink[17] *= coeff;
+        }
       }
     }
   }
-
 
 #if 1
   for(int dir= 0;dir < 4;dir++){
     for(int i=0;i< V*gaugeSiteSize;i++){
       if (precision ==QUDA_SINGLE_PRECISION){
-	float* f = (float*)link[dir];
-	if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
-	  fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
-	  exit(1);
-	}
+  float* f = (float*)link[dir];
+  if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
+    fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
+    exit(1);
+  }
       }else{
-	double* f = (double*)link[dir];
-	if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)){
-	  fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
-	  exit(1);
-	}
-
+  double* f = (double*)link[dir];
+  if (f[i] != f[i] || (fabs(f[i]) > 1.e+3)){
+    fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
+    exit(1);
+  }
       }
-
     }
   }
 #endif
@@ -1386,8 +1345,23 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
   return;
 }
 
+void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
+{
+  quda::ColorSpinorParam param;
+  param.v = v;
+  param.nColor = nColor;
+  param.nSpin = nSpin;
+  param.setPrecision(precision);
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  param.nDim = 4;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  quda::cpuColorSpinorField spinor_in(param);
 
-
+  quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
+}
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
@@ -1401,12 +1375,12 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
-	int is = i*18+j;
-	double diff = fabs(linkA[dir][is]-linkB[dir][is]);
-	for (int f=0; f<fail_check; f++)
-	  if (diff > pow(10.0,-(f+1))) fail[f]++;
-	//if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
-	if (diff > 1e-3) iter[j]++;
+  int is = i*18+j;
+  double diff = fabs(linkA[dir][is]-linkB[dir][is]);
+  for (int f=0; f<fail_check; f++)
+    if (diff > pow(10.0,-(f+1))) fail[f]++;
+  //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
+  if (diff > 1e-3) iter[j]++;
       }
     }
   }
@@ -1432,9 +1406,9 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
   int ret;
 
-  if (precision == QUDA_DOUBLE_PRECISION){
+  if (precision == QUDA_DOUBLE_PRECISION) {
     ret = compareLink((double**)linkA, (double**)linkB, len);
-  }else {
+  } else {
     ret = compareLink((float**)linkA, (float**)linkB, len);
   }
 
@@ -1443,8 +1417,7 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 
 
 // X indexes the lattice site
-static void
-printLinkElement(void *link, int X, QudaPrecision precision)
+static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     for(int i=0; i < 3;i++){
@@ -1459,16 +1432,14 @@ printLinkElement(void *link, int X, QudaPrecision precision)
   }
 }
 
-int strong_check_link(void** linkA, const char* msgA,
-		      void **linkB, const char* msgB,
-		      int len, QudaPrecision prec)
+int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec)
 {
   printfQuda("%s\n", msgA);
   printLinkElement(linkA[0], 0, prec);
   printfQuda("\n");
   printLinkElement(linkA[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkA[3], len-1, prec);
+  printLinkElement(linkA[3], len - 1, prec);
   printfQuda("\n");
 
   printfQuda("\n%s\n", msgB);
@@ -1476,16 +1447,14 @@ int strong_check_link(void** linkA, const char* msgA,
   printfQuda("\n");
   printLinkElement(linkB[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkB[3], len-1, prec);
+  printLinkElement(linkB[3], len - 1, prec);
   printfQuda("\n");
 
   int ret = compare_link(linkA, linkB, len, prec);
   return ret;
 }
 
-
-void
-createMomCPU(void* mom,  QudaPrecision precision)
+void createMomCPU(void *mom, QudaPrecision precision)
 {
   void* temp;
 
@@ -1496,24 +1465,22 @@ createMomCPU(void* mom,  QudaPrecision precision)
     exit(1);
   }
 
-
-
   for(int i=0;i < V;i++){
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
-	double* thismom = (double*)mom;
-	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}
+        double *thismom = (double *)mom;
+        for(int k=0; k < momSiteSize; k++){
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
-	float* thismom=(float*)mom;
-	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}
+  float* thismom=(float*)mom;
+  for(int k=0; k < momSiteSize; k++){
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
       }
     }
   }
@@ -1528,17 +1495,17 @@ createHwCPU(void* hw,  QudaPrecision precision)
   for(int i=0;i < V;i++){
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
-	double* thishw = (double*)hw;
-	for(int k=0; k < hwSiteSize; k++){
-	  thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	}
+  double* thishw = (double*)hw;
+  for(int k=0; k < hwSiteSize; k++){
+    thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+  }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
-	float* thishw=(float*)hw;
-	for(int k=0; k < hwSiteSize; k++){
-	  thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
-	}
+  float* thishw=(float*)hw;
+  for(int k=0; k < hwSiteSize; k++){
+    thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+  }
       }
     }
   }
@@ -1561,7 +1528,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
       int is = i*momSiteSize+j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
-	if (diff > pow(10.0,-(f+1))) fail[f]++;
+  if (diff > pow(10.0,-(f+1))) fail[f]++;
       //if (diff > 1e-1) printf("%d %d %e\n", i, j, diff);
       if (diff > 1e-3) iter[j]++;
     }
@@ -1583,8 +1550,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
   return accuracy_level;
 }
 
-static void
-printMomElement(void *mom, int X, QudaPrecision precision)
+static void printMomElement(void *mom, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     double* thismom = ((double*)mom)+ X*momSiteSize;
@@ -1596,7 +1562,7 @@ printMomElement(void *mom, int X, QudaPrecision precision)
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }
 }
-int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
+int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
 {
   printfQuda("mom:\n");
   printMomElement(momA, 0, prec);
@@ -1628,7 +1594,6 @@ int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec)
   return ret;
 }
 
-
 /************
  * return value
  *
@@ -1651,7 +1616,7 @@ QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
-QudaPrecision  prec_ritz = QUDA_INVALID_PRECISION;
+QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
 int xdim = 24;
 int ydim = 24;
@@ -1660,6 +1625,7 @@ int tdim = 24;
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
+int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
 char gauge_outfile[256] = "";
@@ -1680,13 +1646,12 @@ QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
-bool use_low_modes = false;
-bool deflate_coarsest = false;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
+double epsilon = 0.01;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -1698,11 +1663,10 @@ double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
 QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
-bool kernel_pack_t = false;
 QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
-QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
-
+QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
+QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
 
 int mg_levels = 2;
 
@@ -1759,40 +1723,46 @@ QudaExtLibType deflation_ext_lib  = QUDA_EIGEN_EXTLIB;
 QudaFieldLocation location_ritz   = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 
-//Parameters for the stand alone eigensolver
-int eig_nEv = 8;
-int eig_nKr = 12;
-int eig_nConv = 6;
-int eig_check_interval = 12;
+// Parameters for the stand alone eigensolver
+int eig_nEv = 16;
+int eig_nKr = 32;
+int eig_nConv = -1; // If unchanged, will be set to nEv
+int eig_check_interval = 10;
 int eig_max_restarts = 1000;
-double eig_tol = 1e-4;
-bool eig_use_poly_acc = false;
-int eig_poly_deg = 15;
-double eig_amin = 0.0;
-double eig_amax = 4;
+double eig_tol = 1e-6;
+bool eig_use_poly_acc = true;
+int eig_poly_deg = 100;
+double eig_amin = 0.1;
+double eig_amax = 4.0;
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
-QudaEigSpectrumType eig_spectrum = QUDA_LR_EIG_SPECTRUM;
-QudaEigType eig_type = QUDA_IMP_RST_LANCZOS;
+QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
+QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
+char eig_vec_infile[256] = "";
+char eig_vec_outfile[256] = "";
 
-//Parameters for the MG eigensolver.
-//The coarsest grid params are for deflation,
-//all others are for PR vectors.
-int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = { };
-int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = { };
-double mg_eig_tol[QUDA_MAX_MG_LEVEL] = { };
-bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL] = { };
-int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL] = { };
-double mg_eig_amin[QUDA_MAX_MG_LEVEL] = { };
-double mg_eig_amax[QUDA_MAX_MG_LEVEL] = { };
-bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL] = { };
-bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = { };
-QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = { };
-QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = { };
+// Parameters for the MG eigensolver.
+// The coarsest grid params are for deflation,
+// all others are for PR vectors.
+bool mg_eig[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_nEv[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_nKr[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = {};
+double mg_eig_tol[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL] = {};
+double mg_eig_amin[QUDA_MAX_MG_LEVEL] = {};
+double mg_eig_amax[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = {};
+QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = {};
+QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_coarse_guess = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1818,6 +1788,8 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");
 #endif
+
+  // Problem size and type parameters
   printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
@@ -1842,14 +1814,16 @@ void usage(char** argv )
   printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
-  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
+   "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
+  printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
-  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
-  printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)\n");
+  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, "
+         "heatbath test only)\n");
+  printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a "
+         "random gauge is generated (default false)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
   printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
@@ -1862,7 +1836,9 @@ void usage(char** argv )
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
   printf("    --kappa                                   # Kappa of Dirac operator (default 0.12195122... [equiv to mass])\n");
-  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
+  printf("    --mu                                      # Twisted-Mass chiral twist of Dirac operator (default 0.1)\n");
+  printf(
+   "    --epsilon                                 # Twisted-Mass flavor twist of Dirac operator (default 0.01)\n");
   printf("    --tadpole-coeff                           # Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)\n");
   printf("    --epsilon-naik                            # Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)\n");
   printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
@@ -1871,17 +1847,25 @@ void usage(char** argv )
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
-  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
+  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, "
+         "normop-pc, normerr, normerr-pc) \n");
+  printf("    --solution-type                           # The solution we desire (mat (default), mat-dag-mat, mat-pc, "
+         "mat-pc-dag-mat-pc (default for multi-shift))\n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
   printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
   printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --mg-use-low-modes <true/false>           # Use the low eigenmodes as the null vector subspace (default false)\n");
-  printf("    --mg-deflate-coarsest <true/false>        # Run the eigensolver on the coarsest grid to deflate low modes (default false)\n");
-  printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the low eigenmode subspace (default false)\n");
-  printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low eigenmode subspace (default false)\n");
-  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
+
+  // Multigrid
+  printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the "
+         "low eigenmode subspace (default false)\n");
+  printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low "
+         "eigenmode subspace (default false)\n");
+  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid "
+         "transfer operator on a given level\n"
+         "                                                If using the eigensolver of the coarsest level then this "
+         "dictates the size of the deflation space.\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre <level 1-20>                  # The number of pre-smoother applications to do at a given multigrid level (default 2)\n");
@@ -1920,8 +1904,12 @@ void usage(char** argv )
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
   printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
-  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
-  printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default summarize)\n");
+  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the "
+         "multigrid_test (requires QIO)\n");
+  printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
+         "summarize)\n");
+
+  // Deflated solvers
   printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
@@ -1931,46 +1919,71 @@ void usage(char** argv )
   printf("    --df-max-restart-num <n>                  # Set maximum number of the initCG restarts in the deflation stage (default 3)\n");
   printf("    --df-tol-eigenval <tol>                   # Set maximum eigenvalue residual norm (default 1e-1)\n");
 
-
   printf("    --solver-ext-lib-type <eigen/magma>       # Set external library for the solvers  (default Eigen library)\n");
   printf("    --df-ext-lib-type <eigen/magma>           # Set external library for the deflation methods  (default Eigen library)\n");
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
-  //Stand alone Eigensolver
+  // Eigensolver
   printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
   printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
-  printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
-  printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
+  printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in "
+         "the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
+  printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the eigensolver\n");
   printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
   printf("    --eig-use-poly-acc <true/false>           # Use Chebyshev polynomial acceleration in the eigensolver\n");
-  printf("    --eig-poly-deg <n>                        # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
+  printf("    --eig-poly-deg <n>                        # Set the degree of the Chebyshev polynomial acceleration in "
+         "the eigensolver\n");
   printf("    --eig-amin <Float>                        # The minimum in the polynomial acceleration\n");
   printf("    --eig-amax <Float>                        # The maximum in the polynomial acceleration\n");
-  printf("    --eig-use-normop <true/false>             # Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)\n");
-  printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if eig-use-normop == true) (default false)\n");
-  printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default false)\n");
-  printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary\n");
-  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...)\n");
+  printf("    --eig-use-normop <true/false>             # Solve the MdagM problem instead of M (MMdag if "
+         "eig-use-dagger == true) (default false)\n");
+  printf("    --eig-use-dagger <true/false>             # Solve the Mdag  problem instead of M (MMdag if "
+         "eig-use-normop == true) (default false)\n");
+  printf("    --eig-compute-svd <true/false>            # Solve the MdagM problem, use to compute SVD of M (default "
+         "false)\n");
+  printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest "
+         "R=real M=modulus I=imaginary\n");
+  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (default trlm)\n");
   printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
-  printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, default false)\n");
+  printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, "
+         "default false)\n");
+  printf("    --eig-load-vec <file>                     # Load eigenvectors to <file> (requires QIO)\n");
+  printf("    --eig-save-vec <file>                     # Save eigenvectors to <file> (requires QIO)\n");
 
-  //Multigrid Eigensolver
-  printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
-  printf("    --mg-eig-max-restarts <level> <n>                 # Perform n iterations of the restart in the IRAM/IRLM eigensolver\n");
-  printf("    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver\n");
-  printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the eigensolver\n");
-  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial acceleration in the eigensolver\n");
-  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration\n");
-  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration\n");
-  printf("    --mg-eig-use-normop <level> <true/false>          # Solve the MdagM problem instead of M (MMdag if eig-use-dagger == true) (default false)\n");
-  printf("    --mg-eig-use-dagger <level> <true/false>          # Solve the MMdag problem instead of M (MMdag if eig-use-normop == true) (default false)\n");
-  printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)\n");
-  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (lanczos, irlm, arnoldi, iram, trlm,...) (default irlm)\n");
+  // Multigrid Eigensolver
+  printf("    --mg-eig <level> <true/false>                     # Use the eigensolver on this level (default false)\n");
+  printf("    --mg-eig-nEv <level> <n>                          # The size of eigenvector search space in the "
+         "eigensolver\n");
+  printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
+         "eigensolver\n");
+  printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth "
+         "restart/iteration (only used in Implicit Restart types)\n");
+  printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver "
+         "(default 100)\n");
+  printf("    --mg-eig-use-normop <level> <true/false>          # Solve the MdagM problem instead of M (MMdag if "
+         "eig-use-dagger == true) (default false)\n");
+  printf("    --mg-eig-use-dagger <level> <true/false>          # Solve the MMdag problem instead of M (MMdag if "
+         "eig-use-normop == true) (default false)\n");
+  printf(
+    "    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver (default 1e-6)\n");
+  printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the "
+         "eigensolver (default true)\n");
+  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial (default "
+         "100)\n");
+  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration (default "
+         "0.1)\n");
+  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration (default "
+         "4.0)\n");
+  printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest "
+         "L=largest R=real M=modulus I=imaginary (default SR)\n");
+  printf("    --mg-eig-coarse-guess <true/false>                # If deflating on the coarse grid, optionaly use an "
+         "initial guess (default = false)\n");
+  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
 
+  // Miscellanea
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --heatbath-beta <beta>                    # Beta value used in heatbath test (default 6.2)\n");
   printf("    --heatbath-warmup-steps <n>               # Number of warmup steps in heatbath test (default 10)\n");
@@ -2008,9 +2021,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--verify") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
 
     if (strcmp(argv[i+1], "true") == 0){
       verify_results = true;
@@ -2026,16 +2037,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-low-mode-check") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+  if (strcmp(argv[i], "--mg-low-mode-check") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
 
-    if (strcmp(argv[i+1], "true") == 0){
+    if (strcmp(argv[i + 1], "true") == 0) {
       low_mode_check = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
+    } else if (strcmp(argv[i + 1], "false") == 0) {
       low_mode_check = false;
-    }else{
+    } else {
       fprintf(stderr, "ERROR: invalid low_mode_check type (true/false)\n");
       exit(1);
     }
@@ -2045,54 +2054,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--mg-use-low-modes") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+  if (strcmp(argv[i], "--mg-oblique-proj-check") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
 
-    if (strcmp(argv[i+1], "true") == 0){
-      use_low_modes = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      use_low_modes = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid use_low_modes type (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-deflate-coarsest") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      deflate_coarsest= true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      deflate_coarsest = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid deflate_coarsest type (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-oblique-proj-check") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
+    if (strcmp(argv[i + 1], "true") == 0) {
       oblique_proj_check = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
+    } else if (strcmp(argv[i + 1], "false") == 0) {
       oblique_proj_check = false;
-    }else{
+    } else {
       fprintf(stderr, "ERROR: invalid oblique_proj_check type (true/false)\n");
       exit(1);
     }
@@ -2127,9 +2096,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -2137,9 +2104,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec-sloppy") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec_sloppy =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -2147,9 +2112,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--prec-refine") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     prec_refinement_sloppy =  get_prec(argv[i+1]);
     i++;
     ret = 0;
@@ -2305,9 +2268,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--tdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     tdim =  atoi(argv[i+1]);
     if (tdim < 0 || tdim > 512){
       printf("Error: invalid t dimension");
@@ -2319,9 +2280,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--sdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int sdim =  atoi(argv[i+1]);
     if (sdim < 0 || sdim > 512){
       printf("ERROR: invalid S dimension\n");
@@ -2334,9 +2293,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--Lsdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int Ls =  atoi(argv[i+1]);
     if (Ls < 0 || Ls > 128){
       printf("ERROR: invalid Ls dimension\n");
@@ -2362,8 +2319,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     int value  =  atoi(argv[i+1]);
     for(int j=0; j < 4;j++){
       if (value &  (1 << j)){
-	commDimPartitionedSet(j);
-	dim_partitioned[j] = 1;
+  commDimPartitionedSet(j);
+  dim_partitioned[j] = 1;
       }
     }
 #else
@@ -2374,17 +2331,8 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--kernel-pack-t") == 0){
-    kernel_pack_t = true;
-    ret= 0;
-    goto out;
-  }
-
-
   if( strcmp(argv[i], "--multishift") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
 
     if (strcmp(argv[i+1], "true") == 0){
       multishift = true;
@@ -2401,9 +2349,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--gridsize") == 0){
-    if (i+4 >= argc){
-      usage(argv);
-    }
+    if (i + 4 >= argc) { usage(argv); }
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X grid size");
@@ -2441,9 +2387,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--xgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int xsize =  atoi(argv[i+1]);
     if (xsize <= 0 ){
       printf("ERROR: invalid X grid size");
@@ -2456,9 +2400,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--ygridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int ysize =  atoi(argv[i+1]);
     if (ysize <= 0 ){
       printf("ERROR: invalid Y grid size");
@@ -2471,9 +2413,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--zgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int zsize =  atoi(argv[i+1]);
     if (zsize <= 0 ){
       printf("ERROR: invalid Z grid size");
@@ -2486,9 +2426,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--tgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     int tsize =  atoi(argv[i+1]);
     if (tsize <= 0 ){
       printf("ERROR: invalid T grid size");
@@ -2511,19 +2449,27 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--dslash-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     dslash_type = get_dslash_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--flavor") == 0){
-    if (i+1 >= argc){
+  if (strcmp(argv[i], "--laplace3D") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    laplace3D = atoi(argv[i + 1]);
+    if (laplace3D > 4 || laplace3D < 3) {
+      printf("ERROR: invalid transverse dim %d given. Please use 3 or 4 for t,none.\n", laplace3D);
       usage(argv);
     }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--flavor") == 0){
+    if (i + 1 >= argc) { usage(argv); }
     twist_flavor = get_flavor_type(argv[i+1]);
     i++;
     ret = 0;
@@ -2531,29 +2477,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--inv-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     inv_type = get_solver_type(argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--precon-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    precon_type = get_solver_type(argv[i+1]);
+  if (strcmp(argv[i], "--precon-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    precon_type = get_solver_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--mass") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+  if (strcmp(argv[i], "--mass") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
     mass = atof(argv[i+1]);
     i++;
     ret = 0;
@@ -2603,6 +2543,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     mu = atof(argv[i+1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--epsilon") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    epsilon = atof(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -2734,10 +2682,16 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--solution-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    solution_type = get_solution_type(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--load-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     strcpy(latfile, argv[i+1]);
     i++;
     ret = 0;
@@ -2745,25 +2699,21 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--save-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     strcpy(gauge_outfile, argv[i+1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--unit-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+  if (strcmp(argv[i], "--unit-gauge") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
 
-    if (strcmp(argv[i+1], "true") == 0){
+    if (strcmp(argv[i + 1], "true") == 0) {
       unit_gauge = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
+    } else if (strcmp(argv[i + 1], "false") == 0) {
       unit_gauge = false;
-    }else{
+    } else {
       fprintf(stderr, "ERROR: invalid unit-gauge type given (true/false)\n");
       exit(1);
     }
@@ -2802,9 +2752,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--test") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
+    if (i + 1 >= argc) { usage(argv); }
     test_type = atoi(argv[i+1]);
     i++;
     ret = 0;
@@ -2823,7 +2771,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     nvec[level] = atoi(argv[i+1]);
-    if (nvec[level] < 0 || nvec[level] > 128){
+    if (nvec[level] < 0 || nvec[level] > 1024) {
       printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
       usage(argv);
     }
@@ -3219,7 +3167,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     int level = atoi(argv[i+1]);
-    if (level < 0 /* 1 */ || level >= QUDA_MAX_MG_LEVEL) { // ESW STAGGERED HACK
+    if (level < 1 || level >= QUDA_MAX_MG_LEVEL) {
       printf("ERROR: invalid multigrid level %d for coarse solver", level);
       usage(argv);
     }
@@ -3430,7 +3378,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     schwarz_cycle[level] = atoi(argv[i+1]);
     if (schwarz_cycle[level] < 0 || schwarz_cycle[level] >= 128) {
       printf("ERROR: invalid Schwarz cycle value requested %d for level %d",
-	     level, schwarz_cycle[level]);
+       level, schwarz_cycle[level]);
       usage(argv);
     }
     i++;
@@ -3439,9 +3387,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-block-size") == 0){
-    if (i+5 >= argc){
-      usage(argv);
-    }
+    if (i + 5 >= argc) { usage(argv); }
     int level = atoi(argv[i+1]);
     if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
       printf("ERROR: invalid multigrid level %d", level);
@@ -3480,9 +3426,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
     geo_block_size[level][3] = tsize;
     i++;
-
-    // staggered hack
-    geo_block_size[level][4] = 1;
 
     ret = 0;
     goto out;
@@ -3620,7 +3563,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
   if( strcmp(argv[i], "--df-tol-restart") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3631,7 +3573,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-
 
   if( strcmp(argv[i], "--df-tol-eigenval") == 0){
     if (i+1 >= argc){
@@ -3695,21 +3636,503 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if( strcmp(argv[i], "--eig-nEv") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_nEv = atoi(argv[i+1]);
+  if (strcmp(argv[i], "--eig-nEv") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_nEv = atoi(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
   }
 
-  if( strcmp(argv[i], "--eig-nKr") == 0){
+  if (strcmp(argv[i], "--eig-nKr") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_nKr = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-nConv") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_nConv = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-check-interval") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_check_interval = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-max-restarts") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_max_restarts = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-tol") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_tol = atof(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-use-poly-acc") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_poly_acc = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_poly_acc = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for use-poly-acc (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-poly-deg") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_poly_deg = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-amin") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_amin = atof(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-amax") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_amax = atof(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-use-normop") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_normop = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_normop = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for eig-use-normop (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-use-dagger") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_dagger = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_dagger = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for eig-use-dagger (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-compute-svd") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_compute_svd = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_compute_svd = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-spectrum") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_spectrum = get_eig_spectrum_type(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    eig_type = get_eig_type(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-ARPACK-logfile") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    strcpy(eig_arpack_logfile, argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-QUDA-logfile") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    strcpy(eig_QUDA_logfile, argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-arpack-check") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_arpack_check = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_arpack_check = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for arpack-check (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-load-vec") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    strcpy(eig_vec_infile, argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-save-vec") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    strcpy(eig_vec_outfile, argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig %d (true/false)\n", level);
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-nEv") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_nEv[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-nKr") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_nKr[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-check-interval") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_check_interval[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-max-restarts") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_max_restarts[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-tol") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_tol[level] = atof(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-use-poly-acc") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_use_poly_acc[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_use_poly_acc[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-poly-acc %d (true/false)\n", level);
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-poly-deg") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_poly_deg[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-amin") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_amin[level] = atof(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-amax") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_amax[level] = atof(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-use-normop") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_use_normop[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_use_normop[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-normop (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-use-dagger") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_use_dagger[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_use_dagger[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-dagger (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-spectrum") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_spectrum[level] = get_eig_spectrum_type(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_type[level] = get_eig_type(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-coarse-guess") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_poly_acc = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_poly_acc = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-coarse-guess (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--niter") == 0){
     if (i+1 >= argc){
       usage(argv);
     }
-    eig_nKr = atoi(argv[i+1]);
+    niter= atoi(argv[i+1]);
+    if (niter < 1 || niter > 1e6){
+      printf("ERROR: invalid number of iterations (%d)\n", niter);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--ngcrkrylov") == 0 || strcmp(argv[i], "--ca-basis-size") == 0) {
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    gcrNkrylov = atoi(argv[i+1]);
+    if (gcrNkrylov < 1 || gcrNkrylov > 1e6){
+      printf("ERROR: invalid number of gcrkrylov iterations (%d)\n", gcrNkrylov);
+      usage(argv);
+    }
     i++;
     ret = 0;
     goto out;
@@ -3754,463 +4177,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     }
     ca_lambda_max = atof(argv[i+1]);
     // negative value induces power iterations to guess
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-
-  if( strcmp(argv[i], "--eig-nConv") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_nConv = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-check-interval") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_check_interval = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-max-restarts") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_max_restarts = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-tol") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_tol = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-use-poly-acc") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_use_poly_acc = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_use_poly_acc = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for use-poly-acc (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-poly-deg") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_poly_deg = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-amin") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_amin = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-amax") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_amax = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-use-normop") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_use_normop = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_use_normop = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-use-normop (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-
-  if( strcmp(argv[i], "--eig-use-dagger") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_use_dagger = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_use_dagger = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-use-dagger (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-compute-svd") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_compute_svd = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_compute_svd = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-spectrum") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_spectrum = get_eig_spectrum_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    eig_type = get_eig_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-ARPACK-logfile") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    strcpy(eig_arpack_logfile, argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-QUDA-logfile") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    strcpy(eig_QUDA_logfile, argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--eig-arpack-check") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      eig_arpack_check = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      eig_arpack_check = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for arpack-check (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  //DMH
-  if( strcmp(argv[i], "--mg-eig-check-interval") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_check_interval[level] = atoi(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-max-restarts") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_max_restarts[level] = atoi(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-tol") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_tol[level] = atof(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-use-poly-acc") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    if (strcmp(argv[i+1], "true") == 0){
-      mg_eig_use_poly_acc[level] = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      mg_eig_use_poly_acc[level] = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-poly-deg") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_poly_deg[level] = atoi(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-amin") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_amin[level] = atof(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-amax") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_amax[level] = atof(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-use-normop") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    if (strcmp(argv[i+1], "true") == 0){
-      mg_eig_use_normop[level] = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      mg_eig_use_normop[level] = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-use-dagger") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    if (strcmp(argv[i+1], "true") == 0){
-      mg_eig_use_dagger[level] = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      mg_eig_use_dagger[level] = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-spectrum") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_spectrum[level] = get_eig_spectrum_type(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-eig-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    mg_eig_type[level] = get_eig_type(argv[i+1]);
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-
-
-  if( strcmp(argv[i], "--niter") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    niter= atoi(argv[i+1]);
-    if (niter < 1 || niter > 1e6){
-      printf("ERROR: invalid number of iterations (%d)\n", niter);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--ngcrkrylov") == 0  || strcmp(argv[i], "--ca-basis-size") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    gcrNkrylov = atoi(argv[i+1]);
-    if (gcrNkrylov < 1 || gcrNkrylov > 1e6){
-      printf("ERROR: invalid number of gcrkrylov iterations (%d)\n", gcrNkrylov);
-      usage(argv);
-    }
     i++;
     ret = 0;
     goto out;
@@ -4334,8 +4300,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--version") == 0){
-    printf("This program is linked with QUDA library, version %s,",
-	   get_quda_ver_str());
+    printf("This program is linked with QUDA library, version %s,", get_quda_ver_str());
     printf(" %s GPU build\n", msg);
     exit(0);
   }

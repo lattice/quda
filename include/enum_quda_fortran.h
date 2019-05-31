@@ -126,12 +126,19 @@
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
-#define QUDA_LANCZOS 0           //Lanczos solver
-#define QUDA_IMP_RST_LANCZOS 1   //Implicitly restarted lanczos solver
-#define QUDA_THICK_RST_LANCZOS 2 //Thick restarted lanczos solver
-#define QUDA_ARNOLDI 3           //Arnoldi solver
-#define QUDA_IMP_RST_ARNOLDI 4   //Implicitly restarted Arnoldi solver
-#define QUDA_INVALID_EIG QUDA_INVALID_ENUM
+#define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
+#define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_INVALID QUDA_INVALID_ENUM
+
+#define QudaEigSpectrumType integer(4)
+#define QUDA_SPECTRUM_SR_EIG 0
+#define QUDA_SPECTRUM_LR_EIG 1
+#define QUDA_SPECTRUM_SM_EIG 2
+#define QUDA_SPECTRUM_LM_EIG 3
+#define QUDA_SPECTRUM_SI_EIG 4
+#define QUDA_SPECTRUM_LI_EIG 5
+#define QUDA_SPECTRUM_INVALID QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)
 #define QUDA_MAT_SOLUTION 0 
@@ -266,22 +273,23 @@
 #define QUDA_CLOVERPC_DIRAC 3
 #define QUDA_DOMAIN_WALL_DIRAC 4
 #define QUDA_DOMAIN_WALLPC_DIRAC 5
-#define QUDA_DOMAIN_WALL_4DPC_DIRAC 6
-#define QUDA_MOBIUS_DOMAIN_WALL_DIRAC 7
-#define QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC 8
-#define QUDA_STAGGERED_DIRAC 9
-#define QUDA_STAGGEREDPC_DIRAC 10
-#define QUDA_ASQTAD_DIRAC 11
-#define QUDA_ASQTADPC_DIRAC 12
-#define QUDA_TWISTED_MASS_DIRAC 13
-#define QUDA_TWISTED_MASSPC_DIRAC 14
-#define QUDA_TWISTED_CLOVER_DIRAC 15
-#define QUDA_TWISTED_CLOVERPC_DIRAC 16
-#define QUDA_COARSE_DIRAC 17
-#define QUDA_COARSEPC_DIRAC 18
-#define QUDA_GAUGE_LAPLACE_DIRAC 19
-#define QUDA_GAUGE_LAPLACEPC_DIRAC 20
-#define QUDA_GAUGE_COVDEV_DIRAC 21
+#define QUDA_DOMAIN_WALL_4D_DIRAC 6
+#define QUDA_DOMAIN_WALL_4DPC_DIRAC 7
+#define QUDA_MOBIUS_DOMAIN_WALL_DIRAC 8
+#define QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC 9
+#define QUDA_STAGGERED_DIRAC 10
+#define QUDA_STAGGEREDPC_DIRAC 11
+#define QUDA_ASQTAD_DIRAC 12
+#define QUDA_ASQTADPC_DIRAC 13
+#define QUDA_TWISTED_MASS_DIRAC 14
+#define QUDA_TWISTED_MASSPC_DIRAC 15
+#define QUDA_TWISTED_CLOVER_DIRAC 16
+#define QUDA_TWISTED_CLOVERPC_DIRAC 17
+#define QUDA_COARSE_DIRAC 18
+#define QUDA_COARSEPC_DIRAC 19
+#define QUDA_GAUGE_LAPLACE_DIRAC 20
+#define QUDA_GAUGE_LAPLACEPC_DIRAC 21
+#define QUDA_GAUGE_COVDEV_DIRAC 22
 #define QUDA_INVALID_DIRAC QUDA_INVALID_ENUM
 
 ! Where the field is stored
@@ -345,10 +353,10 @@
 #define QUDA_MINRES_PROJECTION 0
 #define QUDA_GALERKIN_PROJECTION 1
 #define QUDA_INVALID_PROJECTION QUDA_INVALID_ENUM
-  
-#define QudaDWFPCType integer(4)
-#define QUDA_5D_PC 0
-#define QUDA_4D_PC 1
+
+#define QudaPCType integer(4)
+#define QUDA_4D_PC 4
+#define QUDA_5D_PC 5
 #define QUDA_PC_INVALID QUDA_INVALID_ENUM
 
 #define QudaTwistFlavorType integer(4)

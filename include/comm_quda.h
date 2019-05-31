@@ -8,7 +8,7 @@ extern "C" {
   typedef struct MsgHandle_s MsgHandle;
   typedef struct Topology_s Topology;
 
-  /* defined in quda.h; redefining here to avoid circular references */ 
+  /* defined in quda.h; redefining here to avoid circular references */
   typedef int (*QudaCommsMap)(const int *coords, void *fdata);
 
   /* implemented in comm_common.cpp */
@@ -121,10 +121,16 @@ extern "C" {
   int comm_partitioned();
 
   /**
+     @brief Create the topology and partition strings that are used in tuneKeys
+  */
+  void comm_set_tunekey_string();
+
+  /**
      @brief Return a string that defines the comm partitioning (used as a tuneKey)
+     @param comm_dim_override Optional override for partitioning
      @return String specifying comm partitioning
   */
-  const char* comm_dim_partitioned_string();
+  const char *comm_dim_partitioned_string(const int *comm_dim_override = 0);
 
   /**
      @brief Return a string that defines the comm topology (for use as a tuneKey)
@@ -132,12 +138,43 @@ extern "C" {
   */
   const char* comm_dim_topology_string();
 
-  /* implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp */
+  /**
+     @brief Return a string that defines the P2P/GDR environment
+     variable configuration (for use as a tuneKey to enable unique
+     policies).
+     @return String specifying comm config
+  */
+  const char *comm_config_string();
 
+  /**
+     @brief Initialize the communications, implemented in comm_single.cpp, comm_qmp.cpp, and comm_mpi.cpp
+  */
   void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+
+  /**
+     @brief Initialize the communications common to all communications abstractions
+  */
+  void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data);
+
+  /**
+     @return Rank id of this process
+  */
   int comm_rank(void);
+
+  /**
+     @return Number of processes
+  */
   int comm_size(void);
+
+  /**
+     @return GPU id associated with this process
+  */
   int comm_gpuid(void);
+
+  /**
+     @return Whether are doing determinisitic multi-process reductions or not
+   */
+  bool comm_deterministic_reduce();
 
   /**
      @brief Gather all hostnames
@@ -237,13 +274,13 @@ extern "C" {
   /**
      Create a persistent strided message handler for a displaced send
      @param buffer Buffer from which message will be sent
-     @param displacement Array of offsets specifying the relative node to which we are sending 
+     @param displacement Array of offsets specifying the relative node to which we are sending
      @param blksize Size of block in bytes
      @param nblocks Number of blocks
      @param stride Stride between blocks in bytes
   */
-  MsgHandle *comm_declare_strided_send_displaced(void *buffer, const int displacement[], 
-						 size_t blksize, int nblocks, size_t stride);
+  MsgHandle *comm_declare_strided_send_displaced(
+      void *buffer, const int displacement[], size_t blksize, int nblocks, size_t stride);
 
   /**
      Create a persistent strided message handler for a displaced receive
@@ -256,7 +293,7 @@ extern "C" {
   MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displacement[],
 						    size_t blksize, int nblocks, size_t stride);
 
-  void comm_free(MsgHandle *mh);
+  void comm_free(MsgHandle *&mh);
   void comm_start(MsgHandle *mh);
   void comm_wait(MsgHandle *mh);
   int comm_query(MsgHandle *mh);
@@ -278,10 +315,10 @@ extern "C" {
   int commCoords(int);
   int commDimPartitioned(int dir);
   void commDimPartitionedSet(int dir);
-  
+
   /**
    * @brief Reset the comm dim partioned array to zero,
-   * @details This should only be needed for automated testing 
+   * @details This should only be needed for automated testing
    * when different partitioning is applied within a single run.
    */
   void commDimPartitionedReset();

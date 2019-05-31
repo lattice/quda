@@ -13,34 +13,54 @@ namespace quda {
       // reads
       const bool override = true;
       if (out.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(FloatOut)==typeid(short) && out.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGauge<short,FloatIn,length>
-	    (FloatNOrder<short,length,2,19>(out, (short*)Out, (short**)outGhost, override), inOrder, out, in, location, type);
-	} else {
-	  typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGauge<FloatOut,FloatIn,length>
-	    (G(out, Out, outGhost, override), inOrder, out, in, location, type);
-	}
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_NO>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_12>::type G;
-	copyGauge<FloatOut,FloatIn,length>
-	  (G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#if QUDA_RECONSTRUCT & 2
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_12>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+#endif
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_8>::type G;
-	copyGauge<FloatOut,FloatIn,length> 
-	  (G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#if QUDA_RECONSTRUCT & 1
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_8>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+#endif
 #ifdef GPU_STAGGERED_DIRAC
       } else if (out.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_13>::type G;
-        copyGauge<FloatOut,FloatIn,length>
-	  (G(out, Out, outGhost, override), inOrder, out, in, location, type);
-      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	typedef typename gauge_mapper<FloatOut,QUDA_RECONSTRUCT_9>::type G;
-        copyGauge<FloatOut,FloatIn,length>
-	  (G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#if QUDA_RECONSTRUCT & 2
+        typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_13>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
+      } else if (out.Reconstruct() == QUDA_RECONSTRUCT_9) {
+#if QUDA_RECONSTRUCT & 1
+        if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
+#ifdef BUILD_TIFR_INTERFACE
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_TIFR>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+#else
+          errorQuda("TIFR interface has not been built so TIFR phase type not enabled\n");
+#endif
+        } else if (out.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+          typedef typename gauge_mapper<FloatOut, QUDA_RECONSTRUCT_9>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(out, Out, outGhost, override), inOrder, out, in, location, type);
+        } else {
+          errorQuda("Staggered phase type %d not supported", out.StaggeredPhase());
+        }
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+#endif
+#endif // GPU_STAGGERED_DIRAC
       } else {
-	errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
+        errorQuda("Reconstruction %d and order %d not supported", out.Reconstruct(), out.Order());
       }
     } else if (out.Order() == QUDA_QDP_GAUGE_ORDER) {
 
@@ -121,39 +141,57 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn, int length>
-    void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
-		   FloatOut *Out, FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
+  void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In,
+      FloatOut **outGhost, FloatIn **inGhost, int type)
+  {
 
     // reconstruction only supported on FloatN fields currently
-    if (in.isNative()) {      
+    if (in.isNative()) {
       // this overrides the check that the texture maps to the gauge
       // pointer - this is safe here since it only occurs when running
       // the copier on the host when we will not be using texture
       // reads
       const bool override = true;
       if (in.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(FloatIn)==typeid(short) && in.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  copyGauge<FloatOut,short,length> (FloatNOrder<short,length,2,19>
-					    (in,(short*)In,(short**)inGhost,override),
-					    out, in, location, Out, outGhost, type);
-	} else {
-	  typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_NO>::type G;
-	  copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
-	}
+        typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_NO>::type G;
+        copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
+#if QUDA_RECONSTRUCT & 2
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_12>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+#endif
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_8) {
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
+#if QUDA_RECONSTRUCT & 1
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_8>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+#endif
 #ifdef GPU_STAGGERED_DIRAC
       } else if (in.Reconstruct() == QUDA_RECONSTRUCT_13) {
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
+#if QUDA_RECONSTRUCT & 2
+        typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_13>::type G;
 	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
-      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	typedef typename gauge_mapper<FloatIn,QUDA_RECONSTRUCT_9>::type G;
-	copyGauge<FloatOut,FloatIn,length> (G(in,In,inGhost,override), out, in, location, Out, outGhost, type);
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
 #endif
+      } else if (in.Reconstruct() == QUDA_RECONSTRUCT_9) {
+#if QUDA_RECONSTRUCT & 1
+        if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
+        } else if (in.StaggeredPhase() == QUDA_STAGGERED_PHASE_NO) {
+          typedef typename gauge_mapper<FloatIn, QUDA_RECONSTRUCT_9>::type G;
+          copyGauge<FloatOut, FloatIn, length>(G(in, In, inGhost, override), out, in, location, Out, outGhost, type);
+        } else {
+          errorQuda("Staggered phase type %d not supported", in.StaggeredPhase());
+        }
+#else
+        errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+#endif
+#endif // GPU_STAGGERED_DIRAC
       } else {
 	errorQuda("Reconstruction %d and order %d not supported", in.Reconstruct(), in.Order());
       }
@@ -232,7 +270,6 @@ namespace quda {
     } else {
       errorQuda("Gauge field order %d not supported", in.Order());
     }
-
   }
 
   void checkMomOrder(const GaugeField &u);
@@ -244,13 +281,14 @@ namespace quda {
   }
 
   template <typename FloatOut, typename FloatIn>
-  void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, 
-		 FloatIn *In, FloatOut **outGhost, FloatIn **inGhost, int type) {
+  void copyGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, FloatOut *Out, FloatIn *In,
+      FloatOut **outGhost, FloatIn **inGhost, int type)
+  {
 
     if (in.Ncolor() != 3 && out.Ncolor() != 3) {
       errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }
-    
+
     if (out.Geometry() != in.Geometry()) {
       errorQuda("Field geometries %d %d do not match", out.Geometry(), in.Geometry());
     }
@@ -263,7 +301,7 @@ namespace quda {
 
       checkMomOrder(in);
       checkMomOrder(out);
-    
+
       // this overrides the check that the texture maps to the gauge
       // pointer - this is safe here since it only occurs when running
       // the copier on the host when we will not be using texture
@@ -392,5 +430,34 @@ namespace quda {
     }
   }
 
+  // this is the function that is actually called, from here on down we instantiate all required templates
+  template <typename FloatOut>
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+      void **ghostOut, void **ghostIn, int type)
+  {
+    if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+      copyGauge(out, in, location, (FloatOut *)Out, (double *)In, (FloatOut **)ghostOut, (double **)ghostIn, type);
+    } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      copyGauge(out, in, location, (FloatOut *)Out, (float *)In, (FloatOut **)ghostOut, (float **)ghostIn, type);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
+      copyGauge(out, in, location, (FloatOut *)Out, (short *)In, (FloatOut **)ghostOut, (short **)ghostIn, type);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      copyGauge(out, in, location, (FloatOut *)Out, (char *)In, (FloatOut **)ghostOut, (char **)ghostIn, type);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d", in.Precision());
+    }
+  }
 
 } // namespace quda

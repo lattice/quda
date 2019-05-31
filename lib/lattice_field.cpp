@@ -39,6 +39,7 @@ namespace quda {
   void* LatticeField::ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
   bool LatticeField::initGhostFaceBuffer = false;
+
   size_t LatticeField::ghostFaceBytes = 0;
 
   int LatticeField::bufferIndex = 0;
@@ -55,15 +56,61 @@ namespace quda {
     }
   }
 
-  LatticeField::LatticeField(const LatticeFieldParam &param)
-    : volume(1), pad(param.pad), total_bytes(0), nDim(param.nDim),
-      precision(param.Precision()), ghost_precision(param.GhostPrecision()),
-      scale(param.scale), siteSubset(param.siteSubset), ghostExchange(param.ghostExchange),
-      ghost_bytes(0), ghost_bytes_old(0), ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
-      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(param.mem_type),
-      backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
+  LatticeField::LatticeField(const LatticeFieldParam &param) :
+      volume(1),
+      pad(param.pad),
+      total_bytes(0),
+      nDim(param.nDim),
+      precision(param.Precision()),
+      ghost_precision(param.GhostPrecision()),
+      ghost_precision_reset(false),
+      scale(param.scale),
+      siteSubset(param.siteSubset),
+      ghostExchange(param.ghostExchange),
+      ghost_bytes(0),
+      ghost_bytes_old(0),
+      ghost_face_bytes {},
+      ghostOffset(),
+      ghostNormOffset(),
+      my_face_h {},
+      my_face_hd {},
+      my_face_d {},
+      from_face_h {},
+      from_face_hd {},
+      from_face_d {},
+      initComms(false),
+      mem_type(param.mem_type),
+      backup_h(nullptr),
+      backup_norm_h(nullptr),
+      backed_up(false)
   {
     precisionCheck();
+
+    for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
+      for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+
+        for (int b = 0; b < 2; b++) {
+          my_face_dim_dir_d[b][dim][dir] = nullptr;
+          my_face_dim_dir_hd[b][dim][dir] = nullptr;
+          my_face_dim_dir_h[b][dim][dir] = nullptr;
+
+          from_face_dim_dir_d[b][dim][dir] = nullptr;
+          from_face_dim_dir_hd[b][dim][dir] = nullptr;
+          from_face_dim_dir_h[b][dim][dir] = nullptr;
+        }
+
+        mh_recv_fwd[dir][dim] = nullptr;
+        mh_recv_back[dir][dim] = nullptr;
+        mh_send_fwd[dir][dim] = nullptr;
+        mh_send_back[dir][dim] = nullptr;
+
+        mh_recv_rdma_fwd[dir][dim] = nullptr;
+        mh_recv_rdma_back[dir][dim] = nullptr;
+        mh_send_rdma_fwd[dir][dim] = nullptr;
+        mh_send_rdma_back[dir][dim] = nullptr;
+      }
+    }
+
     for (int i=0; i<nDim; i++) {
       x[i] = param.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? param.r[i] : 0;
@@ -99,16 +146,50 @@ namespace quda {
     setTuningString();
   }
 
-  LatticeField::LatticeField(const LatticeField &field)
-    : volume(1), pad(field.pad), total_bytes(0), nDim(field.nDim),
-      precision(field.precision), ghost_precision(field.ghost_precision),
-      scale(field.scale), siteSubset(field.siteSubset), ghostExchange(field.ghostExchange),
-      ghost_bytes(0), ghost_bytes_old(0),
-      ghost_face_bytes{ }, ghostOffset( ), ghostNormOffset( ),
-      my_face_h{ }, my_face_hd{ }, initComms(false), mem_type(field.mem_type),
-      backup_h(nullptr), backup_norm_h(nullptr), backed_up(false)
+  LatticeField::LatticeField(const LatticeField &field) :
+      volume(1),
+      pad(field.pad),
+      total_bytes(0),
+      nDim(field.nDim),
+      precision(field.precision),
+      ghost_precision(field.ghost_precision),
+      ghost_precision_reset(false),
+      scale(field.scale),
+      siteSubset(field.siteSubset),
+      ghostExchange(field.ghostExchange),
+      ghost_bytes(0),
+      ghost_bytes_old(0),
+      ghost_face_bytes {},
+      ghostOffset(),
+      ghostNormOffset(),
+      my_face_h {},
+      my_face_hd {},
+      my_face_d {},
+      from_face_h {},
+      from_face_hd {},
+      from_face_d {},
+      initComms(false),
+      mem_type(field.mem_type),
+      backup_h(nullptr),
+      backup_norm_h(nullptr),
+      backed_up(false)
   {
     precisionCheck();
+
+    for (int dir = 0; dir < 2; dir++) { // XLC cannot do multi-dimensional array initialization
+      for (int dim = 0; dim < QUDA_MAX_DIM; dim++) {
+        mh_recv_fwd[dir][dim] = nullptr;
+        mh_recv_back[dir][dim] = nullptr;
+        mh_send_fwd[dir][dim] = nullptr;
+        mh_send_back[dir][dim] = nullptr;
+
+        mh_recv_rdma_fwd[dir][dim] = nullptr;
+        mh_recv_rdma_back[dir][dim] = nullptr;
+        mh_send_rdma_fwd[dir][dim] = nullptr;
+        mh_send_rdma_back[dir][dim] = nullptr;
+      }
+    }
+
     for (int i=0; i<nDim; i++) {
       x[i] = field.x[i];
       r[i] = ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED ? field.r[i] : 0;
@@ -142,19 +223,24 @@ namespace quda {
     if ( !initGhostFaceBuffer || ghost_bytes > ghostFaceBytes) {
 
       if (initGhostFaceBuffer) {
-	if (ghost_bytes) {
-	  for (int b=0; b<2; b++) {
+        if (ghostFaceBytes) {
+          // remove potential for inter-process race conditions
+          // ensures that all outstanding communication is complete
+          // before we free any comms buffers
+          qudaDeviceSynchronize();
+          comm_barrier();
+          for (int b=0; b<2; b++) {
 	    device_pinned_free(ghost_recv_buffer_d[b]);
 	    device_pinned_free(ghost_send_buffer_d[b]);
 	    host_free(ghost_pinned_send_buffer_h[b]);
 	    host_free(ghost_pinned_recv_buffer_h[b]);
 	  }
-	}
+        }
       }
 
       if (ghost_bytes > 0) {
-	for (int b=0; b<2; ++b) {
-	  // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
+        for (int b = 0; b < 2; ++b) {
+          // gpu receive buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
 	  ghost_recv_buffer_d[b] = device_pinned_malloc(ghost_bytes);
 
 	  // gpu send buffer (use pinned allocator to avoid this being redirected, e.g., by QDPJIT)
@@ -171,9 +257,9 @@ namespace quda {
 
 	  // set the matching device-mapped pointer
 	  cudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
-	}
+        }
 
-	initGhostFaceBuffer = true;
+        initGhostFaceBuffer = true;
 	ghostFaceBytes = ghost_bytes;
       }
 
@@ -215,12 +301,20 @@ namespace quda {
   {
     destroyComms(); // if we are requesting a new number of faces destroy and start over
 
+    // before allocating local comm handles, synchronize since the
+    // comms buffers are static so remove potential for interferring
+    // with any outstanding exchanges to the same buffers
+    qudaDeviceSynchronize();
+    comm_barrier();
+
     // initialize the ghost pinned buffers
     for (int b=0; b<2; b++) {
       my_face_h[b] = ghost_pinned_send_buffer_h[b];
       my_face_hd[b] = ghost_pinned_send_buffer_hd[b];
+      my_face_d[b] = ghost_send_buffer_d[b];
       from_face_h[b] = ghost_pinned_recv_buffer_h[b];
       from_face_hd[b] = ghost_pinned_recv_buffer_hd[b];
+      from_face_d[b] = ghost_recv_buffer_d[b];
     }
 
     // initialize ghost send pointers
@@ -235,8 +329,8 @@ namespace quda {
 	my_face_dim_dir_hd[b][i][0] = static_cast<char*>(my_face_hd[b]) + offset;
 	from_face_dim_dir_hd[b][i][0] = static_cast<char*>(from_face_hd[b]) + offset;
 
-	my_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][0] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][0]*ghost_precision;
+        my_face_dim_dir_d[b][i][0] = static_cast<char *>(my_face_d[b]) + offset;
+        from_face_dim_dir_d[b][i][0] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][0] * ghost_precision;
       } // loop over b
 
       // if not bidir then forwards and backwards will alias
@@ -249,8 +343,8 @@ namespace quda {
 	my_face_dim_dir_hd[b][i][1] = static_cast<char*>(my_face_hd[b]) + offset;
 	from_face_dim_dir_hd[b][i][1] = static_cast<char*>(from_face_hd[b]) + offset;
 
-	my_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_send_buffer_d[b]) + offset;
-	from_face_dim_dir_d[b][i][1] = static_cast<char*>(ghost_recv_buffer_d[b]) + ghostOffset[i][1]*ghost_precision;
+        my_face_dim_dir_d[b][i][1] = static_cast<char *>(my_face_d[b]) + offset;
+        from_face_dim_dir_d[b][i][1] = static_cast<char *>(from_face_d[b]) + ghostOffset[i][1] * ghost_precision;
       } // loop over b
       offset += ghost_face_bytes[i];
 
@@ -286,21 +380,28 @@ namespace quda {
   {
     if (initComms) {
 
+      // ensure that all processes bring down their communicators
+      // synchronously so that we don't end up in an undefined state
+      qudaDeviceSynchronize();
+      comm_barrier();
+
       for (int b=0; b<2; ++b) {
 	for (int i=0; i<nDimComms; i++) {
-	  if (commDimPartitioned(i)) {
-	    if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
-	    if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
-	    if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
-	    if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
+          if (mh_recv_fwd[b][i]) comm_free(mh_recv_fwd[b][i]);
+          if (mh_recv_back[b][i]) comm_free(mh_recv_back[b][i]);
+          if (mh_send_fwd[b][i]) comm_free(mh_send_fwd[b][i]);
+          if (mh_send_back[b][i]) comm_free(mh_send_back[b][i]);
 
-	    if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
-	    if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
-	    if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
-	    if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
-	  }
-	}
+          if (mh_recv_rdma_fwd[b][i]) comm_free(mh_recv_rdma_fwd[b][i]);
+          if (mh_recv_rdma_back[b][i]) comm_free(mh_recv_rdma_back[b][i]);
+          if (mh_send_rdma_fwd[b][i]) comm_free(mh_send_rdma_fwd[b][i]);
+          if (mh_send_rdma_back[b][i]) comm_free(mh_send_rdma_back[b][i]);
+        }
       } // loop over b
+
+      // local take down complete - now synchronize to ensure globally complete
+      qudaDeviceSynchronize();
+      comm_barrier();
 
       initComms = false;
       checkCudaError();
@@ -312,7 +413,8 @@ namespace quda {
     if ( initIPCComms && !ghost_field_reset ) return;
 
     if (!initComms) errorQuda("Can only be called after create comms");
-    if ( (!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1) errorQuda("ghost_field appears not to be allocated");
+    if ((!ghost_recv_buffer_d[0] || !ghost_recv_buffer_d[1]) && comm_size() > 1)
+      errorQuda("ghost_field appears not to be allocated");
 
     // handles for obtained ghost pointers
     cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
@@ -325,15 +427,15 @@ namespace quda {
 	  MsgHandle* receiveHandle = nullptr;
 	  int disp = (dir == 1) ? +1 : -1;
 
-	  // first set up receive
-	  if (comm_peer2peer_enabled(1-dir,dim)) {
+          // first set up receive
+          if (comm_peer2peer_enabled(1-dir,dim)) {
 	    receiveHandle = comm_declare_receive_relative(&ipcRemoteGhostDestHandle[b][1-dir][dim],
 							  dim, -disp,
 							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
 	  }
 	  // now send
-	  if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaIpcMemHandle_t ipcLocalGhostDestHandle;
+          cudaIpcMemHandle_t ipcLocalGhostDestHandle;
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
 						    dim, disp,
@@ -355,8 +457,8 @@ namespace quda {
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
 	if (comm_dim(dim)==1) continue;
-	// even if comm_dim(2) == 2, we not have p2p enabled in both directions, so check this
-	const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
+        // even if comm_dim(2) == 2, we might not have p2p enabled in both directions, so check this
+        const int num_dir = (comm_dim(dim) == 2 && comm_peer2peer_enabled(0,dim) && comm_peer2peer_enabled(1,dim)) ? 1 : 2;
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
@@ -390,9 +492,9 @@ namespace quda {
 	  }
 
 	  // now send
-	  if (comm_peer2peer_enabled(dir,dim)) {
+          cudaIpcEventHandle_t ipcLocalEventHandle;
+          if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
-	    cudaIpcEventHandle_t ipcLocalEventHandle;
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
@@ -456,6 +558,11 @@ namespace quda {
     if (!initIPCComms) return;
     checkCudaError();
 
+    // ensure that all processes bring down their communicators
+    // synchronously so that we don't end up in an undefined state
+    qudaDeviceSynchronize();
+    comm_barrier();
+
     for (int dim=0; dim<4; ++dim) {
 
       if (comm_dim(dim)==1) continue;
@@ -463,27 +570,32 @@ namespace quda {
 
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
-	  if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
-	  if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][1][dim]);
 	    // only close this handle if it doesn't alias the back ghost
 	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
 	  }
-	}
+          if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
+          if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
+        }
 
 	if (comm_peer2peer_enabled(0,dim)) {
-	  if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
-	  if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
 	    cudaEventDestroy(ipcCopyEvent[b][0][dim]);
 	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
 	  }
-	}
+          if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
+          if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
+        }
       } // buffer
     } // iterate over dim
 
     checkCudaError();
+
+    // local take down complete - now synchronize to ensure globally complete
+    qudaDeviceSynchronize();
+    comm_barrier();
+
     initIPCComms = false;
   }
 

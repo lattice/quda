@@ -6,13 +6,6 @@
 
 // ---------- blas_quda.cu ----------
 
-// these defitions are used to avoid calling
-// std::complex<type>::real/imag which have C++11 ABI incompatibility
-// issues with certain versions of GCC
-
-#define REAL(a) (*((double*)&a))
-#define IMAG(a) (*((double*)&a+1))
-
 namespace quda {
 
   namespace blas {
@@ -49,6 +42,8 @@ namespace quda {
 
     void caxpby(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y);
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y);
+    void caxpbypczw(const Complex &a, ColorSpinorField &x, const Complex &b, ColorSpinorField &y, const Complex &c,
+                    ColorSpinorField &z, ColorSpinorField &w);
     void cxpaypbz(ColorSpinorField &, const Complex &b, ColorSpinorField &y, const Complex &c, ColorSpinorField &z);
     void caxpbypzYmbw(const Complex &, ColorSpinorField &, const Complex &, ColorSpinorField &, ColorSpinorField &, ColorSpinorField &);
     void caxpyBzpx(const Complex &, ColorSpinorField &, ColorSpinorField &, const Complex &, ColorSpinorField &);

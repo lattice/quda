@@ -124,6 +124,12 @@ namespace quda {
       calculateY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
       calculateY<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+#ifdef GPU_STAGGERED_DIRAC
+    } else if (coarseColor == 64) {
+      calculateY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+    } else if (coarseColor == 96) {
+      calculateY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+#endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
