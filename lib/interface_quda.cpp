@@ -2461,7 +2461,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   cpuParam.v = host_evecs;
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(eig_param->cuda_prec_ritz, eig_param->cuda_prec_ritz, true);
 
   std::vector<Complex> evals(eig_param->nEv, 0.0);
