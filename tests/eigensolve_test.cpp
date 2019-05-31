@@ -434,15 +434,15 @@ int main(int argc, char **argv)
 
   // Memory allocation
   if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void *)malloc(V * inv_param.Ls * sss * evecs_needed * sizeof(float));
+    host_evecs = (void *)malloc(V * eig_inv_param.Ls * sss * evecs_needed * sizeof(float));
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(float));
   } else {
-    host_evecs = (void *)malloc(V * inv_param.Ls * sss * evecs_needed * sizeof(double));
+    host_evecs = (void *)malloc(V * eig_inv_param.Ls * sss * evecs_needed * sizeof(double));
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(double));
   }
 
   // Place an initial guess to first vector in host array
-  for (int i = 0; i < V * inv_param.Ls * sss; i++) {
+  for (int i = 0; i < V * eig_inv_param.Ls * sss; i++) {
     if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       ((float *)host_evecs)[i] = rand() / (float)RAND_MAX;
     } else {
