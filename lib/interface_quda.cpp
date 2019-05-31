@@ -2524,15 +2524,15 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     if (inv_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
       for (int i = 0; i < eig_param->nConv; i++) {
         ((complex<double> *)host_evals)[i] = evals[i];
-        ((complex<double> *)cpuParam.v)[0] = ((complex<double> *)host_evecs)[i * elems];
-        std::vector<ColorSpinorField *> host_vec;
+	cpuParam.v = ((char*)host_evecs)[i*cpuParam.Precision()*2*kSpace[i]->Volume()*kSpace[i]->Ncolor()*kSpace[i]->Nspin()];
+	std::vector<ColorSpinorField *> host_vec;
         host_vec.push_back(ColorSpinorField::Create(cpuParam));
         blas::copy(*host_vec[0], *kSpace[i]);
       }
     } else {
       for (int i = 0; i < eig_param->nConv; i++) {
         ((complex<float> *)host_evals)[i] = evals[i];
-        ((complex<float> *)cpuParam.v)[0] = ((complex<float> *)host_evecs)[i * elems];
+	cpuParam.v = ((char*)host_evecs)[i*cpuParam.Precision()*2*kSpace[i]->Volume()*kSpace[i]->Ncolor()*kSpace[i]->Nspin()];
         std::vector<ColorSpinorField *> host_vec;
         host_vec.push_back(ColorSpinorField::Create(cpuParam));
         blas::copy(*host_vec[0], *kSpace[i]);
