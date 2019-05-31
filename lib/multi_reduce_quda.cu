@@ -57,6 +57,9 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
+#if CUDA_VERSION < 9000
+      cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char*>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, *getStream());
+#endif
       LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
 #endif
