@@ -22,7 +22,12 @@ namespace quda
     static signed char *Bmatrix_h;
     static signed char *Cmatrix_h;
 
+#if CUDA_VERSION < 9000
+    // as a performance work around we put the argument struct into
+    // __constant__ memory to prevent the compiler from spilling
+    // registers on older CUDA
     static __constant__ signed char arg_buffer[MAX_MATRIX_SIZE];
+#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
