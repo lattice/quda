@@ -451,10 +451,8 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
     } else if (inA.Ncolor() == 64) {
       ApplyCoarse<Float,yFloat,ghostFloat,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#if 0 // ESW HACK FOR STAGGERED COMPILER
     } else if (inA.Ncolor() == 96) { 
       ApplyCoarse<Float,yFloat,ghostFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
 #endif
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
