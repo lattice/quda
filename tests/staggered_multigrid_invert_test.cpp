@@ -465,6 +465,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
@@ -814,22 +815,16 @@ int main(int argc, char **argv)
     printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
     mg_eig[0] = false;
   }
+  for(int i=0; i<mg_levels; i++) {
+    mg_eig_param[i] = newQudaEigParam();
+    setEigParam(mg_eig_param[i], i);
+  }
 
   setGaugeParam(gauge_param);
   setInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
-
-  for (int i = 0; i < mg_levels; i++) {
-    if (mg_eig[i]) {
-      mg_eig_param[i] = newQudaEigParam();
-      setEigParam(mg_eig_param[i], i);
-      mg_param.eig_param[i] = &mg_eig_param[i];
-    } else {
-      mg_param.eig_param[i] = nullptr;
-    }
-  }
 
   mg_param.invert_param = &mg_inv_param;
   for(int i=0; i<mg_levels; i++) {
