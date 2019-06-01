@@ -113,10 +113,15 @@ void initFields(int prec)
 
   switch (solve_type) {
   case QUDA_DIRECT_PC_SOLVE:
-  case QUDA_NORMOP_PC_SOLVE: param.siteSubset = QUDA_PARITY_SITE_SUBSET; break;
+  case QUDA_NORMOP_PC_SOLVE:
+    param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+    break;
   case QUDA_DIRECT_SOLVE:
-  case QUDA_NORMOP_SOLVE: param.siteSubset = QUDA_FULL_SITE_SUBSET; break;
-  default: errorQuda("Unexpected solve_type=%d\n", solve_type);
+  case QUDA_NORMOP_SOLVE:
+    param.siteSubset = QUDA_FULL_SITE_SUBSET;
+    break;
+  default:
+    errorQuda("Unexpected solve_type=%d\n", solve_type);
   }
 
   if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = xdim/2;
