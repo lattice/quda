@@ -1,5 +1,6 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
+  # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
