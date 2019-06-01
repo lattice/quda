@@ -427,11 +427,11 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
 
   // Host side arrays to store the eigenpairs computed by QUDA
-  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void*));
-  for (int i=0; i<eig_nConv; i++) {
+  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
+  for (int i = 0; i < eig_nConv; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex*)malloc(eig_param.nEv * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
@@ -447,7 +447,7 @@ int main(int argc, char **argv)
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
 
   // Deallocate host memory
-  for (int i=0; i<eig_nConv; i++) free(host_evecs[i]);
+  for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 

@@ -28,8 +28,8 @@ namespace quda
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
 
-  void arpack_solve(std::vector<ColorSpinorField*> &h_evecs, std::vector<Complex> &h_evals,
-                    const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile)
+  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+                    QudaEigParam *eig_param, TimeProfile &profile)
   {
     // Create Eigensolver object for member function use
     EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
@@ -138,7 +138,7 @@ namespace quda
 
     Complex *h_evecs_ = (Complex *)safe_malloc(nKr_ * ldv_ * sizeof(Complex));
     Complex *h_evals_ = (Complex *)safe_malloc(nEv_ * sizeof(Complex));
-    std::vector<ColorSpinorField*> h_evecs_arpack;
+    std::vector<ColorSpinorField *> h_evecs_arpack;
 
     for (int i = 0; i < nKr_; i++) {
       // create container wrapping the vectors returned from ARPACK
@@ -520,8 +520,8 @@ namespace quda
 
 #else
 
-  void arpack_solve(std::vector<ColorSpinorField*> &h_evecs, std::vector<Complex> &h_evals,
-                    const DiracMatrix &mat, QudaEigParam *eig_param, TimePrpfile &profile)
+  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+                    QudaEigParam *eig_param, TimePrpfile &profile)
   {
     errorQuda("(P)ARPACK has not been enabled for this build");
   }

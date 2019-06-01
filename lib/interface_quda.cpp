@@ -2453,7 +2453,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
 
   // create wrappers around application vector set
   std::vector<ColorSpinorField *> host_evecs_;
-  for (int i=0; i < eig_param->nConv; i++) {
+  for (int i = 0; i < eig_param->nConv; i++) {
     cpuParam.v = host_evecs[i];
     host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
   }
@@ -2516,9 +2516,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->nConv; i++) {
-    host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I;
-  }
+  for (int i = 0; i < eig_param->nConv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
 
   // Transfer Eigenpairs back to host if using GPU eigensolver
   if (!(eig_param->arpack_check)) {

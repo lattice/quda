@@ -234,7 +234,7 @@ public:
      @param[in] eig_param Parameter structure for all QUDA eigensolvers
      @param[in,out] profile TimeProfile instance used for profiling
   */
-  void arpack_solve(std::vector<ColorSpinorField*> &h_evecs, std::vector<Complex> &h_evals,
-                    const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+                    QudaEigParam *eig_param, TimeProfile &profile);
 
 } // namespace quda
