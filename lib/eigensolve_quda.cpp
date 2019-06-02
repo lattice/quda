@@ -66,49 +66,43 @@ namespace quda
     Qmat = (Complex *)safe_malloc(nEv * nKr * sizeof(Complex));
 
     // Part of the spectrum to be computed.
-    spectrum = strdup("SR"); // Initialised to stop the compiler warning.
-
-    if (eig_param->use_poly_acc) {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("LI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("SI");
-    } else {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("SI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("LI");
+    switch (eig_param->spectrum) {
+    case QUDA_SPECTRUM_SR_EIG:
+      strcpy(spectrum,"SR");
+      break;
+    case QUDA_SPECTRUM_LR_EIG:
+      strcpy(spectrum,"LR");
+      break;
+    case QUDA_SPECTRUM_SM_EIG:
+      strcpy(spectrum,"SM");
+      break;
+    case QUDA_SPECTRUM_LM_EIG:
+      strcpy(spectrum,"LM");
+      break;
+    case QUDA_SPECTRUM_SI_EIG:
+      strcpy(spectrum,"SI");
+      break;
+    case QUDA_SPECTRUM_LI_EIG:
+      strcpy(spectrum,"LI");
+      break;
+    default:
+      errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
     // Deduce whether to reverse the sorting
-    const char *L = "L";
-    const char *S = "S";
-    if (strncmp(L, spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
       reverse = true;
-    } else if (strncmp(S, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
-    } else if (strncmp(L, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      spectrum[0] = 'L';
+    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
+      spectrum[0] = 'S';
     }
 
     // Print Eigensolver params
     if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("spectrum %s\n", spectrum);
       printfQuda("tol %.4e\n", tol);
       printfQuda("nConv %d\n", nConv);
       printfQuda("nEv %d\n", nEv);
