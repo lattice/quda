@@ -194,7 +194,8 @@ namespace quda {
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 #if CUDA_VERSION < 9000
-        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char*>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, *getStream());
+        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
+                                *getStream());
 #endif
         multiBlasKernel<FloatN, M, NXZ><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif

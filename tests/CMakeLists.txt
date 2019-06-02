@@ -38,6 +38,13 @@ if(NOT QUDA_BUILD_ALL_TESTS)
   set(BUILD_TESTING OFF)
 endif()
 
+if(QUDA_ARPACK)
+  LIST(APPEND TEST_LIBS ${ARPACK})
+  if(QUDA_MPI OR QUDA_QMP) 
+    LIST(APPEND TEST_LIBS ${PARPACK})
+  endif()
+endif()
+
 #define tests
 
 # if we build with QDP JIT the tests cannot run anyway
@@ -56,6 +63,10 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(invert_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(eigensolve_test eigensolve_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  target_link_libraries(eigensolve_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(eigensolve_test QUDA_BUILD_ALL_TESTS)
 
   if(QUDA_BLOCKSOLVER)
     cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)

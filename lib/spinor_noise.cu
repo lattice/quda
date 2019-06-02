@@ -43,6 +43,26 @@ namespace quda {
     arg.v(parity, x_cb, s, c) = complex<real>(x, y);
   }
 
+  /** CPU function to reorder spinor fields.  */
+  template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg> void SpinorNoiseCPU(Arg &arg)
+  {
+
+    for (int parity = 0; parity < arg.nParity; parity++) {
+      for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) {
+        for (int s = 0; s < Ns; s++) {
+          for (int c = 0; c < Nc; c++) {
+            cuRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
+            if (type == QUDA_NOISE_GAUSS)
+              genGauss<real>(arg, localState, parity, x_cb, s, c);
+            else if (type == QUDA_NOISE_UNIFORM)
+              genUniform<real>(arg, localState, parity, x_cb, s, c);
+            arg.rng.State()[parity * arg.volumeCB + x_cb] = localState;
+          }
+        }
+      }
+    }
+  }
+
   /** CUDA kernel to reorder spinor fields.  Adopts a similar form as the CPU version, using the same inlined functions. */
   template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>
     __global__ void SpinorNoiseGPU(Arg arg) {
@@ -53,14 +73,14 @@ namespace quda {
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     if (parity >= arg.nParity) return;
 
-    cuRNGState localState = arg.rng.State()[parity+2*x_cb];
+    cuRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         if (type == QUDA_NOISE_GAUSS) genGauss<real>(arg, localState, parity, x_cb, s, c);
         else if (type == QUDA_NOISE_UNIFORM) genUniform<real>(arg, localState, parity, x_cb, s, c);
       }
     }
-    arg.rng.State()[parity+2*x_cb] = localState;
+    arg.rng.State()[parity * arg.volumeCB + x_cb] = localState;
   }
 
   template <typename real, int Ns, int Nc, QudaNoiseType type, typename Arg>

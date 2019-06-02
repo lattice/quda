@@ -1,7 +1,7 @@
-#ifndef _MG_QUDA_H
-#define _MG_QUDA_H
+#pragma once
 
 #include <invert_quda.h>
+//#include <eigensolve_quda.h>
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>
@@ -53,6 +53,9 @@ namespace quda {
     /** The null space vectors */
     std::vector<ColorSpinorField*> &B;
 
+    /** The eigenvalue array */
+    std::vector<Complex> evals;
+
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
 
@@ -99,19 +102,15 @@ namespace quda {
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(QudaMultigridParam &param,
-	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix *matResidual,
-	    DiracMatrix *matSmooth,
-	    DiracMatrix *matSmoothSloppy,
-	    int level=0) :
-      SolverParam(*(param.invert_param)), 
-      mg_global(param), 
+    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual,
+            DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+      SolverParam(*(param.invert_param)),
+      mg_global(param),
       level(level),
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
-      B(B), 
+      B(B),
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
       smoother_tol(param.smoother_tol[level]),
@@ -125,20 +124,16 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level])
-      { 
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.omega[level];
-      }
+      // set the smoother relaxation factor
+      omega = param.omega[level];
+    }
 
-    MGParam(const MGParam &param, 
-	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix *matResidual,
-	    DiracMatrix *matSmooth,
-	    DiracMatrix *matSmoothSloppy,
-	    int level=0) :
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
+            DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),
@@ -148,6 +143,7 @@ namespace quda {
       coarse(param.coarse),
       fine(param.fine),
       B(B),
+      evals(evals),
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
@@ -161,14 +157,13 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level])
-      {
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.mg_global.omega[level];
-      }
-
+      // set the smoother relaxation factor
+      omega = param.mg_global.omega[level];
+    }
   };
 
   /**
@@ -204,9 +199,6 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
-    MG *fine;
-
     /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
     Solver *coarse_solver;
 
@@ -221,9 +213,6 @@ namespace quda {
 
     /** Storage for the parameter struct for the coarse solver */
     SolverParam *param_coarse_solver;
-
-    /** The fine-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B;
 
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B_coarse;
@@ -242,6 +231,9 @@ namespace quda {
 
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
+
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp2_coarse;
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual;
@@ -274,18 +266,6 @@ namespace quda {
     RNG *rng;
 
     /**
-       @brief Load the null space vectors in from file
-       @param B Loaded null-space vectors (pre-allocated)
-    */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
-
-    /**
-       @brief Save the null space vectors in from file
-       @param B Save null-space vectors from here
-    */
-    void saveVectors(std::vector<ColorSpinorField*> &B) const;
-
-    /**
        @brief Helper function called on entry to each MG function
        @param[in] level The level we working on
     */
@@ -298,10 +278,10 @@ namespace quda {
     void popLevel(int level) const;
 
 public:
-    /** 
-      Constructor for MG class
-      @param param MGParam struct that defines all meta data
-      @param profile Timeprofile instance used to profile
+    /**
+       Constructor for MG class
+       @param param MGParam struct that defines all meta data
+       @param profile Timeprofile instance used to profile
     */
     MG(MGParam &param, TimeProfile &profile);
 
@@ -363,16 +343,33 @@ public:
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
+       @brief Load the null space vectors in from file
+       @param B Loaded null-space vectors (pre-allocated)
+    */
+    void loadVectors(std::vector<ColorSpinorField *> &B);
+
+    /**
+       @brief Save the null space vectors in from file
+       @param B Save null-space vectors from here
+    */
+    void saveVectors(const std::vector<ColorSpinorField *> &B) const;
+
+    /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
        @param refresh Whether we refreshing pre-exising vectors or starting afresh
-     */
+    */
     void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
+
+    /**
+       @brief Generate lowest eigenvectors
+    */
+    void generateEigenVectors();
 
     /**
        @brief Build free-field null-space vectors
        @param B Free-field null-space vectors
-     */
+    */
     void buildFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
@@ -468,6 +465,7 @@ public:
     DiracM *mSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
+    std::vector<Complex> evals;
 
     MGParam *mgParam;
 
@@ -497,5 +495,3 @@ public:
   };
 
 } // namespace quda
-
-#endif // _MG_QUDA_H

@@ -35,6 +35,8 @@ extern "C" {
   QudaSolveType get_solve_type(char* s);
   const char* get_solve_str(QudaSolveType);
 
+  QudaSolutionType get_solution_type(char *s);
+
   QudaSchwarzType get_schwarz_type(char* s);
 
   QudaTwistFlavorType get_flavor_type(char* s);
@@ -46,6 +48,12 @@ extern "C" {
 
   QudaInverterType get_solver_type(char* s);
   const char* get_solver_str(QudaInverterType type);
+
+  QudaEigSpectrumType get_eig_spectrum_type(char *spec);
+  const char *get_eig_spectrum_str(QudaEigSpectrumType type);
+
+  QudaEigType get_eig_type(char *s);
+  const char *get_eig_type_str(QudaEigType type);
 
   const char* get_quda_ver_str();
 

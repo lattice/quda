@@ -46,8 +46,7 @@ namespace quda
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
-      if (dir < 3 || dir > 4)
-	errorQuda("Unsupported laplace direction given");
+      if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
     }
   };
 

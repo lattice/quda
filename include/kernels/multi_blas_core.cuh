@@ -75,7 +75,7 @@ namespace quda
 #if CUDA_VERSION >= 9000
       Arg &arg = arg_;
 #else
-      Arg &arg = *((Arg*)arg_buffer);
+      Arg &arg = *((Arg *)arg_buffer);
 #endif
 
       // use i to loop over elements in kernel

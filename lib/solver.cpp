@@ -1,6 +1,7 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
 #include <multigrid.h>
+#include <eigensolve_quda.h>
 #include <cmath>
 
 namespace quda {
@@ -9,17 +10,30 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile), node_parity(0) {
+  Solver::Solver(SolverParam &param, TimeProfile &profile) :
+    param(param),
+    profile(profile),
+    node_parity(0),
+    eig_solve(nullptr)
+  {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
     node_parity = node_parity % 2;
+  }
+
+  Solver::~Solver()
+  {
+    if (eig_solve) {
+      delete eig_solve;
+      eig_solve = nullptr;
+    }
   }
 
   // solver factory
   Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			 DiracMatrix &matPrecon, TimeProfile &profile)
   {
-    Solver *solver=0;
+    Solver *solver = nullptr;
 
     if (param.preconditioner && param.inv_type != QUDA_GCR_INVERTER)
       errorQuda("Explicit preconditoner not supported for %d solver", param.inv_type);
@@ -238,7 +252,6 @@ namespace quda {
       }
     }
   }
-
 
   bool MultiShiftSolver::convergence(const double *r2, const double *r2_tol, int n) const {
 

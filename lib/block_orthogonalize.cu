@@ -170,7 +170,7 @@ namespace quda {
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       param.block = dim3(geoBlockSize/2, V.SiteSubset(), 1);
-      param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, coarseSpin);
+      param.grid = dim3((minThreads() + param.block.x - 1) / param.block.x, 1, coarseSpin);
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }
@@ -277,8 +277,6 @@ namespace quda {
       BlockOrthogonalize<vFloat,bFloat,4,2>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif
 #ifdef GPU_STAGGERED_DIRAC
-    } else if (V.Nspin() == 1 && spin_bs == 0) { // coarsening staggered fermions.
-      BlockOrthogonalize<vFloat,bFloat,1,0>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
     } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
       BlockOrthogonalize<vFloat,bFloat,1,1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs);
 #endif

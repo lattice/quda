@@ -81,7 +81,7 @@ namespace quda
 #if CUDA_VERSION >= 9000
       Arg &arg = arg_;
 #else
-      Arg &arg = *((Arg*)arg_buffer);
+      Arg &arg = *((Arg *)arg_buffer);
 #endif
       unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
