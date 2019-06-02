@@ -129,9 +129,10 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_EIG_LANCZOS, // Thick restarted lanczos solver
-    QUDA_EIG_ARNOLDI, // Arnoldi solver (not implemented)
-    QUDA_INVALID_EIG = QUDA_INVALID_ENUM
+    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
 
   /** S=smallest L=largest

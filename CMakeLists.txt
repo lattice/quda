@@ -372,6 +372,13 @@ if(QUDA_MPI)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
+if(QUDA_DOWNLOAD_USQCD)
+  find_program(MAKE_EXE NAMES gmake nmake make)
+  find_program(INSTALL_EXE NAMES install)
+  find_program(AUTORECONF_EXE NAMES autoreconf)
+endif()
+
+
 if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD)
     ExternalProject_Add(QMP
@@ -379,9 +386,9 @@ if(QUDA_QMP)
       GIT_TAG qmp2-5-1
       GIT_SHALLOW YES
       PREFIX usqcd
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
-      BUILD_COMMAND  make
-      INSTALL_COMMAND make install
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C" --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      BUILD_COMMAND  ${MAKE_EXE}
+      INSTALL_COMMAND ${MAKE_EXE} install
       LOG_INSTALL ON
       LOG_BUILD ON
       LOG_DOWNLOAD ON
@@ -394,7 +401,7 @@ if(QUDA_QMP)
     set(QUDA_QMP_LDFLAGS  "-L${QUDA_QMPHOME}/lib" CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
     set(QUDA_QMP_LIBS "-lqmp" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
     ExternalProject_Add_Step(QMP reconf
-      COMMAND autoreconf
+      COMMAND ${AUTORECONF_EXE} -fi
       WORKING_DIRECTORY <SOURCE_DIR>
       DEPENDERS configure
       DEPENDEES download
@@ -430,7 +437,7 @@ if(QUDA_QIO)
       GIT_TAG qio2-5-0
       GIT_SHALLOW YES
       PREFIX usqcd 
-      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C" --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
       BUILD_COMMAND  make
       INSTALL_COMMAND make install
       DEPENDS QMP
@@ -445,7 +452,7 @@ if(QUDA_QIO)
     set(QUDA_LIME_HOME ${INSTALL_DIR})
 
     ExternalProject_Add_Step(QIO reconf
-      COMMAND autoreconf
+      COMMAND ${AUTORECONF_EXE} -fi
       WORKING_DIRECTORY <SOURCE_DIR>
       DEPENDERS configure
       DEPENDEES download

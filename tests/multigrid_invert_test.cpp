@@ -118,8 +118,8 @@ extern bool oblique_proj_check;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern bool mg_eig[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_nEv[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_nKr[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_nEv[QUDA_MAX_MG_LEVEL];
+extern int mg_eig_nKr[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
 extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
@@ -131,6 +131,7 @@ extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
 extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
 extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
 extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_coarse_guess;
 
 extern char eig_QUDA_logfile[];
 
@@ -161,10 +162,10 @@ display_test_info()
 
   printfQuda("Eigensolver parameters\n");
   for (int i = 0; i < mg_levels; i++) {
-    if (i < mg_levels && (low_mode_check || mg_eig[i])) {
+    if (low_mode_check || mg_eig[i]) {
       printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
       printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-      printfQuda(" - level %d number of eigenvectors requested nConv%d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
@@ -189,7 +190,8 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {
+void setGaugeParam(QudaGaugeParam &gauge_param)
+{
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
@@ -230,12 +232,11 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &mg_eig_param, int level)
 {
-
   mg_eig_param.eig_type = mg_eig_type[level];
   mg_eig_param.spectrum = mg_eig_spectrum[level];
-  if (mg_eig_type[level] == QUDA_EIG_LANCZOS
+  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
       && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+    errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
   mg_eig_param.nEv = mg_eig_nEv[level];
@@ -256,10 +257,16 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.a_min = mg_eig_amin[level];
   mg_eig_param.a_max = mg_eig_amax[level];
 
+  // set file i/o parameters
+  // Give empty strings, Multigrid will handle IO.
+  strcpy(mg_eig_param.vec_infile, "");
+  strcpy(mg_eig_param.vec_outfile, "");
+
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
-void setMultigridParam(QudaMultigridParam &mg_param) {
+void setMultigridParam(QudaMultigridParam &mg_param)
+{
   QudaInvertParam &inv_param = *mg_param.invert_param;
 
   inv_param.Ls = 1;
@@ -341,7 +348,6 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
     mg_param.setup_ca_lambda_min[i] = setup_ca_lambda_min[i];
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
-
 
     mg_param.spin_block_size[i] = 1;
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
@@ -485,6 +491,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
   if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
 
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -617,7 +625,7 @@ int main(int argc, char **argv)
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_type[i] = QUDA_EIG_LANCZOS;
+    mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;

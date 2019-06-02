@@ -170,7 +170,7 @@ namespace quda {
     /** sets default values for when tuning is disabled */
     void defaultTuneParam(TuneParam &param) const {
       param.block = dim3(geoBlockSize/2, V.SiteSubset(), 1);
-      param.grid = dim3( (minThreads()+param.block.x-1) / param.block.x, 1, coarseSpin);
+      param.grid = dim3((minThreads() + param.block.x - 1) / param.block.x, 1, coarseSpin);
       param.shared_bytes = 0;
       param.aux.x = 1; // swizzle factor
     }

@@ -626,6 +626,9 @@ extern "C" {
     /** Whether to store the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_store;
 
+    /** Whether to use and initial guess during coarse grid deflation */
+    QudaBoolean coarse_guess;
+
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
@@ -874,11 +877,11 @@ extern "C" {
    * Perform the eigensolve. The problem matrix is defined by the invert param, the
    * mode of solution is specified by the eig param. It is assumed that the gauge
    * field has already been loaded via  loadGaugeQuda().
-   * @param h_els  Host side eigenvalues
-   * @param h_evs  Host side eigenvectors
-   * @param param  Contains all metadata regarding the type of solve.
+   * @param h_evecs  Array of pointers to application eigenvectors
+   * @param h_evals  Host side eigenvalues
+   * @param param Contains all metadata regarding the type of solve.
    */
-  void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
+  void eigensolveQuda(void **h_evecs, double_complex *h_evals, QudaEigParam *param);
 
   /**
    * Perform the solve, according to the parameters set in param.  It

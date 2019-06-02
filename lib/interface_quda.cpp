@@ -1516,6 +1516,7 @@ void endQuda(void)
     profileDslash.Print();
     profileInvert.Print();
     profileMulti.Print();
+    profileEigensolve.Print();
     profileFatLink.Print();
     profileGaugeForce.Print();
     profileGaugeUpdate.Print();
@@ -2404,21 +2405,17 @@ void cloverQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   popVerbosity();
 }
 
-void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
+void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam *eig_param)
 {
-
-  profilerStart(__func__);
+  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
+  profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
 
   // Transfer the inv param structure contained in eig_param
-  QudaInvertParam *inv_param;
-  inv_param = eig_param->invert_param;
+  QudaInvertParam *inv_param = eig_param->invert_param;
 
   if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
       || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH)
     setKernelPackT(true);
-
-  profileEigensolve.TPSTART(QUDA_PROFILE_TOTAL);
-  profileEigensolve.TPSTART(QUDA_PROFILE_INIT);
 
   if (!initialized) errorQuda("QUDA not initialized");
 
@@ -2448,15 +2445,18 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   // create the dirac operator
   createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
   Dirac &dirac = *d;
-  Dirac &diracSloppy = *dSloppy;
-  Dirac &diracPre = *dPre;
-  //------------------------------------------------------
 
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
-  ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
-  cpuParam.v = host_evecs;
+  ColorSpinorParam cpuParam(host_evecs[0], *inv_param, X, inv_param->solution_type, inv_param->input_location);
+
+  // create wrappers around application vector set
+  std::vector<ColorSpinorField *> host_evecs_;
+  for (int i = 0; i < eig_param->nConv; i++) {
+    cpuParam.v = host_evecs[i];
+    host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
+  }
 
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
@@ -2474,39 +2474,38 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
-  profileEigensolve.TPSTART(QUDA_PROFILE_COMPUTE);
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    DiracM m(dirac);
     if (eig_param->arpack_check) {
-      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    DiracMdag m(dirac);
     if (eig_param->arpack_check) {
-      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    DiracMdagM m(dirac);
     if (eig_param->arpack_check) {
-      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    DiracMMdag m(dirac);
     if (eig_param->arpack_check) {
-      arpack_solve(host_evecs, host_evals, m, eig_param, &cpuParam);
+      arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
       EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
@@ -2516,14 +2515,18 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
     errorQuda("Invalid use_norm_op and dagger combination");
   }
 
-  if (inv_param->cpu_prec == QUDA_DOUBLE_PRECISION) {
-    for (int i = 0; i < eig_param->nEv; i++) ((complex<double> *)host_evals)[i] = evals[i];
-  } else {
-    for (int i = 0; i < eig_param->nEv; i++) ((complex<float> *)host_evals)[i] = evals[i];
+  // Copy eigen values back
+  for (int i = 0; i < eig_param->nConv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
+
+  // Transfer Eigenpairs back to host if using GPU eigensolver
+  if (!(eig_param->arpack_check)) {
+    profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
+    for (int i = 0; i < eig_param->nConv; i++) *host_evecs_[i] = *kSpace[i];
+    profileEigensolve.TPSTOP(QUDA_PROFILE_D2H);
   }
 
-  profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);
+  for (int i = 0; i < eig_param->nConv; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
   delete dPre;
@@ -2536,7 +2539,6 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   saveTuneCache();
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_TOTAL);
-  profilerStop(__func__);
 }
 
 multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &profile)

@@ -56,6 +56,8 @@ extern int niter;
 extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
 extern int pipeline;   // length of pipeline for fused operations in GCR or BiCGstab-l
 
+extern QudaVerbosity verbosity;
+
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
@@ -251,7 +253,7 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.matpc_type = matpc_type;
   inv_param.inv_type = QUDA_GCR_INVERTER;
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.tol = tol;
 
@@ -284,16 +286,18 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if (eig_type == QUDA_EIG_LANCZOS && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
   }
 
   // The solver will exit when nConv extremal eigenpairs have converged
   if (eig_nConv < 0) {
     eig_param.nConv = eig_nEv;
     eig_nConv = eig_nEv;
-  } else
+  } else {
     eig_param.nConv = eig_nConv;
+  }
 
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
@@ -423,32 +427,11 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
 
   // Host side arrays to store the eigenpairs computed by QUDA
-  void *host_evecs;
-  void *host_evals;
-
-  // If we use the QUDA routine, we only need pass enough memory
-  // for nEv vectors. If we use the ARPACK routine, we must
-  // pass enough workspave for the full nKr array.
-  int evecs_needed = eig_param.arpack_check ? eig_nKr : eig_nEv;
-
-  // Memory allocation
-  if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(float));
-    host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(float));
-  } else {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(double));
-    host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(double));
+  void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
+  for (int i = 0; i < eig_nConv; i++) {
+    host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
-
-  // Place an initial guess to first vector in host array
-  for (int i = 0; i < V * sss; i++) {
-    if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      ((float *)host_evecs)[i] = rand() / (float)RAND_MAX;
-    } else {
-      ((double *)host_evecs)[i] = rand() / (double)RAND_MAX;
-      ;
-    }
-  }
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the
@@ -456,13 +439,15 @@ int main(int argc, char **argv)
   // precision is double, the routine will use ARPACK rather than the GPU.
   double time = -((double)clock());
   if (eig_param.arpack_check && !(eig_inv_param.cpu_prec == QUDA_DOUBLE_PRECISION)) {
-    errorQuda("ARPACK check only availible in double precision");
+    errorQuda("ARPACK check only available in double precision");
   }
+
   eigensolveQuda(host_evecs, host_evals, &eig_param);
   time += (double)clock();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
 
   // Deallocate host memory
+  for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 

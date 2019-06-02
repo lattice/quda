@@ -446,7 +446,11 @@ namespace quda
       if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
-        param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        // Due to coherence between these levels, an initial guess
+        // might be beneficial.
+        if (param.mg_global.coarse_guess == QUDA_BOOLEAN_YES) {
+          param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        }
 
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
@@ -609,8 +613,9 @@ namespace quda
     ColorSpinorField *tmp2 = ColorSpinorField::Create(csParam);
     double deviation;
 
-    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision())
-      ? param.mg_global.precision_null[param.level]  : csParam.Precision();
+    QudaPrecision prec = (param.mg_global.precision_null[param.level] < csParam.Precision()) ?
+      param.mg_global.precision_null[param.level] :
+      csParam.Precision();
 
     // may want to revisit this---these were relaxed for cases where ghost_precision < precision
     // these were set while hacking in tests of quarter precision ghosts
@@ -861,7 +866,9 @@ namespace quda
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    char prefix_bkup[100];  strncpy(prefix_bkup, prefix, 100);  setOutputPrefix(prefix);
+    char prefix_bkup[100];
+    strncpy(prefix_bkup, prefix, 100);
+    setOutputPrefix(prefix);
 
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
@@ -1107,7 +1114,7 @@ namespace quda
       solve = Solver::create(solverParam, *param.matSmooth, *param.matSmoothSloppy, *param.matSmoothSloppy, profile);
     }
 
-    for (int si=0; si<param.mg_global.num_setup_iter[param.level]; si++ ) {
+    for (int si = 0; si < param.mg_global.num_setup_iter[param.level]; si++) {
       if (getVerbosity() >= QUDA_VERBOSE)
         printfQuda("Running vectors setup on level %d iter %d of %d\n", param.level, si + 1,
                    param.mg_global.num_setup_iter[param.level]);
@@ -1392,14 +1399,11 @@ namespace quda
   {
     pushLevel(param.level);
 
-    // Extract eigensolver params from the size of the null space.
-    int nConv = param.B.size();
-    param.mg_global.eig_param[param.level]->nConv = nConv;
-    int nEv = param.B.size() + 10;
-    param.mg_global.eig_param[param.level]->nEv = nEv;
-    // int nKr = nEv + nEv / 2;
-    int nKr = 2 * nEv;
-    param.mg_global.eig_param[param.level]->nKr = nKr;
+    // Extract eigensolver params
+    int nEv = param.mg_global.eig_param[param.level]->nEv;
+    int nKr = param.mg_global.eig_param[param.level]->nKr;
+    bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
+    bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
     std::vector<Complex> evals(nEv, 0.0);
@@ -1417,10 +1421,32 @@ namespace quda
     ColorSpinorParam bParam(*param.B[0]);
     for (int i = 0; i < (int)param.B.size(); i++) delete param.B[i];
 
-    DiracMdagM *mdagm = new DiracMdagM(*diracResidual);
-    EigenSolver *eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mdagm, profile);
-    (*eig_solve)(B_evecs, evals);
-    delete eig_solve;
+    EigenSolver *eig_solve;
+    if (!normop && !dagger) {
+      DiracM *mat = new DiracM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
+    } else if (!normop && dagger) {
+      DiracMdag *mat = new DiracMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
+    } else if (normop && !dagger) {
+      DiracMdagM *mat = new DiracMdagM(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
+    } else if (normop && dagger) {
+      DiracMMdag *mat = new DiracMMdag(*diracResidual);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
+      (*eig_solve)(B_evecs, evals);
+      delete eig_solve;
+      delete mat;
+    }
 
     // now reallocate the B vectors copy in e-vectors
     for (int i = 0; i < (int)param.B.size(); i++) {
