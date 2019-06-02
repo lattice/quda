@@ -204,8 +204,10 @@ namespace quda {
 
   void CG::constructDeflationSpace()
   {
+    profile.TPSTOP(QUDA_PROFILE_INIT);
     // Deflation requested + first instance of solver
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(*rp);
@@ -221,7 +223,9 @@ namespace quda {
     param.evals.resize(param.eig_param.nEv);
     for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
 
+    profile.TPSTOP(QUDA_PROFILE_INIT);
     (*eig_solve)(param.evecs, param.evals);
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
     deflate_init = true;
   }
