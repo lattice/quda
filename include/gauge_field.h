@@ -30,7 +30,7 @@ namespace quda {
     // whether we need to compute the fat link maxima
     // FIXME temporary flag until we have a kernel that can do this, then we just do this in copy()
     // always set to false, requires external override
-    bool compute_fat_link_max; 
+    bool compute_fat_link_max;
 
     /** The staggered phase convention to use */
     QudaStaggeredPhase staggeredPhaseType;
@@ -60,7 +60,7 @@ namespace quda {
       anisotropy(1.0),
       tadpole(1.0),
       gauge(h_gauge),
-      create(QUDA_REFERENCE_FIELD_CREATE), 
+      create(QUDA_REFERENCE_FIELD_CREATE),
       geometry(QUDA_VECTOR_GEOMETRY),
       compute_fat_link_max(false),
       staggeredPhaseType(QUDA_STAGGERED_PHASE_NO),
@@ -74,7 +74,7 @@ namespace quda {
 
   GaugeFieldParam(const int *x, const QudaPrecision precision, const QudaReconstructType reconstruct,
 		  const int pad, const QudaFieldGeometry geometry,
-		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD) 
+		  const QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
     : LatticeFieldParam(4, x, pad, precision, ghostExchange),
       location(QUDA_INVALID_FIELD_LOCATION), nColor(3), nFace(0), reconstruct(reconstruct),
       order(QUDA_INVALID_GAUGE_ORDER), fixed(QUDA_GAUGE_FIXED_NO),
@@ -107,11 +107,11 @@ namespace quda {
 	    errorQuda("Error: invalid link type(%d)\n", link_type);
 	  }
 	}
-    
+
     /**
        @brief Helper function for setting the precision and corresponding
        field order for QUDA internal fields.
-       @param precision The precision to use 
+       @param precision The precision to use
      */
     void setPrecision(QudaPrecision precision, bool force_native=false) {
       // is the current status in native field order?
@@ -149,7 +149,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
   protected:
-    size_t bytes; // bytes allocated per full field 
+    size_t bytes; // bytes allocated per full field
     int phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
     int phase_bytes;  // bytes needed to store the phases
     int length;
@@ -265,12 +265,32 @@ namespace quda {
     const double& LinkMax() const { return fat_link_max; }
     int Nface() const { return nFace; }
 
+    /**
+       @brief This does routine will populate the border / halo region of a
+       gauge field that has been created using copyExtendedGauge.
+       @param R The thickness of the extended region in each dimension
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    virtual void exchangeExtendedGhost(const int *R, bool no_comms_fill=false) = 0;
+
+    /**
+       @brief This does routine will populate the border / halo region
+       of a gauge field that has been created using copyExtendedGauge.
+       Overloaded variant that will start and stop a comms profile.
+       @param R The thickness of the extended region in each dimension
+       @param profile TimeProfile intance which will record the time taken
+       @param no_comms_fill Do local exchange to fill out the extended
+       region in non-partitioned dimensions
+    */
+    virtual void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false) = 0;
+
     void checkField(const LatticeField &) const;
 
     /**
        This function returns true if the field is stored in an
        internal field order for the given precision.
-    */ 
+    */
     bool isNative() const;
 
     size_t Bytes() const { return bytes; }
@@ -455,7 +475,7 @@ namespace quda {
 
     /**
        @brief This does routine will populate the border / halo region of a
-       gauge field that has been created using copyExtendedGauge.  
+       gauge field that has been created using copyExtendedGauge.
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
        region in non-partitioned dimensions
@@ -514,7 +534,7 @@ namespace quda {
 
     const void* Gauge_p() const { return gauge; }
     const void* Even_p() const { return even; }
-    const void* Odd_p() const { return odd; }	
+    const void* Odd_p() const { return odd; }
 
 #ifdef USE_TEXTURE_OBJECTS
     const cudaTextureObject_t& Tex() const { return tex; }
@@ -579,7 +599,7 @@ namespace quda {
 
     /**
        @brief This does routine will populate the border / halo region of a
-       gauge field that has been created using copyExtendedGauge.  
+       gauge field that has been created using copyExtendedGauge.
 
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
@@ -588,13 +608,13 @@ namespace quda {
     void exchangeExtendedGhost(const int *R, bool no_comms_fill=false);
 
     /**
-       @brief This does routine will populate the border / halo region of a
-       gauge field that has been created using copyExtendedGauge.
+       @brief This does routine will populate the border / halo region
+       of a gauge field that has been created using copyExtendedGauge.
        Overloaded variant that will start and stop a comms profile.
        @param R The thickness of the extended region in each dimension
        @param profile TimeProfile intance which will record the time taken
        @param no_comms_fill Do local exchange to fill out the extended
-       region in non-partitioned dimenions
+       region in non-partitioned dimensions
     */
     void exchangeExtendedGhost(const int *R, TimeProfile &profile, bool no_comms_fill=false);
 
@@ -660,7 +680,7 @@ namespace quda {
      @param ghostIn The input ghost buffer (optional)
      @param type The type of copy we doing (0 body and ghost else ghost only)
   */
-  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, 
+  void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
 			void *Out=0, void *In=0, void **ghostOut=0, void **ghostIn=0, int type=0);
   /**
      This function is used for copying the gauge field into an
@@ -696,10 +716,10 @@ namespace quda {
      @param ghost The array where we want to pack/unpack the ghost zone into/from
      @param extract Whether we are extracting into ghost or injecting from ghost
   */
-  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R, 
+  void extractExtendedGaugeGhost(const GaugeField &u, int dim, const int *R,
 				 void **ghost, bool extract);
 
-  /** 
+  /**
      Apply the staggered phase factor to the gauge field.
      @param[in] u The gauge field to which we apply the staggered phase factors
   */
