@@ -784,6 +784,13 @@ namespace quda {
           make_double2(a, 0.0), make_double2(b, 1.0 - b), x, y, z, z, z);
     }
 
+				double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v) {
+      return uni_reduce<double4, QudaSumFloat4, quadrupleEigCGUpdate_, 1, 1, 0, 1, 1, false>(
+          make_double2(a, 0.0), make_double2(b, 0.0), x, y, z, w, v);
+    }
+
+
+
    } // namespace blas
 
 } // namespace quda

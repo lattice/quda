@@ -108,6 +108,7 @@ namespace quda {
     double doubleCG3InitNorm(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
     double doubleCG3UpdateNorm(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
+    double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
     // multi-blas kernels - defined in multi_blas.cu
 
@@ -129,7 +130,7 @@ namespace quda {
        @param x[in] Input matrix
        @param y[in,out] Computed output matrix
     */
-    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);				
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);
 
     /**
        @brief Compute the block "caxpy" with over the set of
