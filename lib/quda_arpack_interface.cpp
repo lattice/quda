@@ -76,45 +76,41 @@ namespace quda
     // ARPACK problem type to be solved
     char howmny = 'P';
     char bmat = 'I';
-    char *spectrum = nullptr;
+    char spectrum[3];
 
-    if (eig_param->use_poly_acc) {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("LI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("SI");
-    } else {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("SI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("LI");
+    // Part of the spectrum to be computed.
+    switch (eig_param->spectrum) {
+    case QUDA_SPECTRUM_SR_EIG:
+      strcpy(spectrum,"SR");
+      break;
+    case QUDA_SPECTRUM_LR_EIG:
+      strcpy(spectrum,"LR");
+      break;
+    case QUDA_SPECTRUM_SM_EIG:
+      strcpy(spectrum,"SM");
+      break;
+    case QUDA_SPECTRUM_LM_EIG:
+      strcpy(spectrum,"LM");
+      break;
+    case QUDA_SPECTRUM_SI_EIG:
+      strcpy(spectrum,"SI");
+      break;
+    case QUDA_SPECTRUM_LI_EIG:
+      strcpy(spectrum,"LI");
+      break;
+    default:
+      errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
     bool reverse = true;
-    const char *L = "L";
-    const char *S = "S";
-    if (strncmp(L, spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
       reverse = false;
-    } else if (strncmp(S, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = false;
-    } else if (strncmp(L, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      spectrum[0] = 'L';
+    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = false;
+      spectrum[0] = 'S';
     }
 
     double tol_ = eig_param->tol;
@@ -430,7 +426,6 @@ namespace quda
     host_free(w_workev_);
     host_free(w_rwork_);
     host_free(select_);
-    free(spectrum);
 
     delete h_v;
     delete h_v2;

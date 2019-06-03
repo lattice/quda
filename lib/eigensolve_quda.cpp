@@ -159,20 +159,15 @@ namespace quda
     if (eig_param->poly_deg == 0) { errorQuda("Polynomial acceleration requested with zero polynomial degree"); }
 
     // Compute the polynomial accelerated operator.
-    double delta, theta;
-    double sigma, sigma1, sigma_old;
-    double d1, d2, d3;
-
     double a = eig_param->a_min;
     double b = eig_param->a_max;
-
-    delta = (b - a) / 2.0;
-    theta = (b + a) / 2.0;
-
-    sigma1 = -delta / theta;
-
-    d1 = sigma1 / delta;
-    d2 = 1.0;
+    double delta = (b - a) / 2.0;
+    double theta = (b + a) / 2.0;
+    double sigma1 = -delta / theta;
+    double sigma;
+    double d1 = sigma1 / delta;
+    double d2 = 1.0;
+    double d3;
 
     // out = d2 * in + d1 * out
     // C_1(x) = x
@@ -193,17 +188,17 @@ namespace quda
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
-    sigma_old = sigma1;
+    double sigma_old = sigma1;
 
     // construct C_{m+1}(x)
     for (int i = 2; i < eig_param->poly_deg; i++) {
-
       sigma = 1.0 / (2.0 / sigma1 - sigma_old);
 
       d1 = 2.0 * sigma / delta;
       d2 = -d1 * theta;
       d3 = -sigma * sigma_old;
 
+      // FIXME - we could introduce a fused matVec + blas kernel here, eliminating one temporary
       // mat*C_{m}(x)
       matVec(mat, out, *tmp2);
 
