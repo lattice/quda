@@ -5389,18 +5389,14 @@ void set_kernel_pack_t_(int* pack)
 }
 
 
-
 void gaussGaugeQuda(long seed)
 {
-#ifdef GPU_GAUGE_TOOLS
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
   profileGauss.TPSTART(QUDA_PROFILE_INIT);
-  if (!gaugePrecise)
-    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+  if (!gaugePrecise)  errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
 
-  cudaGaugeField *data = nullptr;
-  data = gaugePrecise;
+  cudaGaugeField *data = gaugePrecise;
 
   profileGauss.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -5412,15 +5408,12 @@ void gaussGaugeQuda(long seed)
   delete randstates;
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
-
   if (extendedGaugeResident) {
-    extendedGaugeResident = gaugePrecise;
-    extendedGaugeResident -> exchangeExtendedGhost(R,profileGauss,redundant_comms);
+    *extendedGaugeResident = *gaugePrecise;
+    extendedGaugeResident -> exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
-#else
-  errorQuda("Gauge tools are not build");
-#endif
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
