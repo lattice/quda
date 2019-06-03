@@ -519,6 +519,16 @@ namespace quda {
       return components;
     };
 
+    ColorSpinorField& operator[](const int idx) const {return Component(idx);}
+    ColorSpinorField& operator[](const int idx) {return Component(idx);}
+
+    CompositeColorSpinorField Components(const int first_element, const int last_element){
+       return CompositeColorSpinorField(components.begin()+first_element, components.begin()+last_element) ;
+    };
+
+    CompositeColorSpinorField& operator()(void) {return components;}
+    CompositeColorSpinorField operator()(const int first_idx, const int second_idx) {return Components(first_idx, second_idx);}
+
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
 
     virtual void PrintVector(unsigned int x) const = 0;
@@ -839,6 +849,8 @@ namespace quda {
 
     cudaColorSpinorField& Component(const int idx) const;
     CompositeColorSpinorField& Components() const;
+    CompositeColorSpinorField Components(const int first_element, const int last_element) const;
+
     void CopySubset(cudaColorSpinorField& dst, const int range, const int first_element=0) const;
 
     void zero();
