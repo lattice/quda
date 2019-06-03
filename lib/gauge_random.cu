@@ -35,7 +35,8 @@ namespace quda {
   };
 
   template<typename real, typename Link>
-  __device__ __host__  Link genGaussSU3(cuRNGState &localState) {
+  __device__ __host__  Link genGaussSU3(cuRNGState &localState)
+  {
     Link ret;
     real rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
 
@@ -150,6 +151,7 @@ namespace quda {
       {
         typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge;
         genGauss<Float>(Gauge(U), U, rngstate);
+        break;
       }
     default: errorQuda("Reconstruction type %d of origin gauge field not supported", U.Reconstruct());
     }
