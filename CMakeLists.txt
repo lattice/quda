@@ -508,6 +508,8 @@ if(QUDA_ARPACK)
   set(ARPACK_MPI QUDA_MPI OR QUDA_QMP)
 
   if(QUDA_DOWNLOAD_ARPACK)
+    include(GNUInstallDirs)
+
     ExternalProject_Add(ARPACK-NG
       GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
       GIT_TAG 3.7.0
@@ -533,13 +535,13 @@ if(QUDA_ARPACK)
     #target_link_libraries(arpack-ng INTERFACE  -L${QUDA_ARPACK_HOME}/lib -larpack)
     target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
     set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/lib/libarpack.a)
+    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
     if(QUDA_MPI OR QUDA_QMP)
       add_library(parpack-ng STATIC IMPORTED)
       #target_link_libraries(arpack-ng INTERFACE -L${QUDA_ARPACK_HOME}/lib -lparpack)
       target_link_libraries(parpack-ng INTERFACE  arpack-ng MPI::MPI_Fortran)
       set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/lib/libparpack.a)
+      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
       # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
       #include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
     endif()
