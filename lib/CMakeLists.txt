@@ -219,7 +219,7 @@ if (QUDA_DOWNLOAD_EIGEN)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/../include/quda_define.h" DESTINATION include/)
 
 if(QUDA_JITIFY)
   configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
