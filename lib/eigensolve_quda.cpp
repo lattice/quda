@@ -67,26 +67,13 @@ namespace quda
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
-    case QUDA_SPECTRUM_SR_EIG:
-      strcpy(spectrum,"SR");
-      break;
-    case QUDA_SPECTRUM_LR_EIG:
-      strcpy(spectrum,"LR");
-      break;
-    case QUDA_SPECTRUM_SM_EIG:
-      strcpy(spectrum,"SM");
-      break;
-    case QUDA_SPECTRUM_LM_EIG:
-      strcpy(spectrum,"LM");
-      break;
-    case QUDA_SPECTRUM_SI_EIG:
-      strcpy(spectrum,"SI");
-      break;
-    case QUDA_SPECTRUM_LI_EIG:
-      strcpy(spectrum,"LI");
-      break;
-    default:
-      errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
+    case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
+    case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
+    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;
+    case QUDA_SPECTRUM_LM_EIG: strcpy(spectrum, "LM"); break;
+    case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
+    case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
+    default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
     // Deduce whether to reverse the sorting

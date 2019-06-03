@@ -921,10 +921,10 @@ namespace quda {
 	u64toa(size, y.size());
 	strcat(aux,size);
         u64toa(size, MAX_MULTI_BLAS_N);
-        strcat(aux,",multi-blas-n=");
+        strcat(aux, ",multi-blas-n=");
         strcat(aux, size);
 
-      	// before we do policy tuning we must ensure the kernel
+        // before we do policy tuning we must ensure the kernel
       	// constituents have been tuned since we can't do nested tuning
       	// FIXME this will break if the kernels are destructive - which they aren't here
 	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
