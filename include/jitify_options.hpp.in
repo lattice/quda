@@ -1,10 +1,10 @@
-#define JITIFY_OPTIONS -I${CMAKE_CURRENT_BINARY_DIR}/lib \
--I${CMAKE_CURRENT_BINARY_DIR}/include \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub/block \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub/warp \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub/block/specializations \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub/device/dispatch \
--I${CMAKE_CURRENT_BINARY_DIR}/include/externals/cub/device
+#define JITIFY_OPTIONS -I${CMAKE_BINARY_DIR}/lib \
+-I${CMAKE_BINARY_DIR}/include \
+-I${CMAKE_BINARY_DIR}/include/externals \
+-I${CMAKE_BINARY_DIR}/include/externals/cub \
+-I${CMAKE_BINARY_DIR}/include/externals/cub/block \
+-I${CMAKE_BINARY_DIR}/include/externals/cub/warp \
+-I${CMAKE_BINARY_DIR}/include/externals/cub/block/specializations \
+-I${CMAKE_BINARY_DIR}/include/externals/cub/device/dispatch \
+-I${CMAKE_BINARY_DIR}/include/externals/cub/device
 
