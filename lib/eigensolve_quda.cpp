@@ -600,9 +600,9 @@ namespace quda
     //---------------------------------------------------------------------------
     if (!converged) {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-                   "restart steps.\n",
-                   nConv, nEv, nKr, max_restarts);
+        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+		  "restart steps.",
+		  nConv, nEv, nKr, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
