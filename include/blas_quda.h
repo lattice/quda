@@ -112,6 +112,26 @@ namespace quda {
     // multi-blas kernels - defined in multi_blas.cu
 
     /**
+       @brief Compute the block "axpy" with over the set of
+              ColorSpinorFields.  E.g., it computes y = x * a + y
+              The dimensions of a can be rectangular, e.g., the width of x and y need not be same.
+       @param a[in] Matrix of real coefficients
+       @param x[in] vector of input ColorSpinorFields
+      @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy" with a
+       composite ColorSpinorField.  E.g., it computes
+       y = x * a + y
+       @param a[in] Matrix of real coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);				
+
+    /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
 
@@ -226,7 +246,7 @@ namespace quda {
 
        z = x * a + y
 
-       Where 'a' is assumed to be upper triangular. 
+       Where 'a' is assumed to be upper triangular.
 
        @param a[in] Matrix of coefficients
        @param x[in] vector of input ColorSpinorFields

@@ -1121,6 +1121,187 @@ namespace quda {
       }
     }
 
+
+    void axpy_recurse(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
+          int i_idx ,int j_idx, int upper) {
+
+        if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, recurse.
+      {
+        // We need to split up 'a' carefully since it's row-major.
+        double* tmpmajor = new double[x.size()*y.size()];
+        double* tmpmajor0 = &tmpmajor[0];
+        double* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
+        std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
+        std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
+
+        const unsigned int xlen = x.size();
+        const unsigned int ylen0 = y.size()/2;
+        const unsigned int ylen1 = y.size() - y.size()/2;
+
+        int count = 0, count0 = 0, count1 = 0;
+        for (unsigned int i = 0; i < xlen; i++)
+        {
+          for (unsigned int j = 0; j < ylen0; j++)
+            tmpmajor0[count0++] = a_[count++];
+          for (unsigned int j = 0; j < ylen1; j++)
+            tmpmajor1[count1++] = a_[count++];
+        }
+
+        axpy_recurse(tmpmajor0, x, y0, i_idx, 2*j_idx+0, upper);
+        axpy_recurse(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
+
+        delete[] tmpmajor;
+      }
+      else
+      {
+        // if at the bottom of recursion,
+        // return if on lower left for upper triangular,
+        // return if on upper right for lower triangular.
+        if (x.size() <= MAX_MULTI_BLAS_N) {
+          if (upper == 1 && j_idx < i_idx) { return; }
+          if (upper == -1 && j_idx > i_idx) { return; }
+        }
+
+        // mark true since we will copy the "a" matrix into constant memory
+        coeff_array<double> a(a_, true), b, c;
+
+        if (x[0]->Precision() == y[0]->Precision())
+        {
+          switch (x.size()) {
+          case 1: multiBlas<1, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 2
+          case 2: multiBlas<2, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 3
+          case 3: multiBlas<3, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 4
+          case 4: multiBlas<4, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 5
+          case 5: multiBlas<5, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 6
+          case 6: multiBlas<6, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 7
+          case 7: multiBlas<7, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 8
+          case 8: multiBlas<8, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 9
+          case 9: multiBlas<9, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 10
+          case 10: multiBlas<10, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 11
+          case 11: multiBlas<11, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 12
+          case 12: multiBlas<12, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 13
+          case 13: multiBlas<13, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 14
+          case 14: multiBlas<14, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 15
+          case 15: multiBlas<15, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 16
+          case 16: multiBlas<16, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #endif // 16
+    #endif // 15
+    #endif // 14
+    #endif // 13
+    #endif // 12
+    #endif // 11
+    #endif // 10
+    #endif // 9
+    #endif // 8
+    #endif // 7
+    #endif // 6
+    #endif // 5
+    #endif // 4
+    #endif // 3
+    #endif // 2
+            default:
+              // split the problem in half and recurse
+              const double *a0 = &a_[0];
+              const double *a1 = &a_[(x.size()/2)*y.size()];
+
+              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+              axpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
+              axpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
+              break;
+          }
+        }
+        else // precisions don't agree.
+        {
+          switch (x.size()) {
+          case 1: mixedMultiBlas<1, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 2
+          case 2: mixedMultiBlas<2, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 3
+          case 3: mixedMultiBlas<3, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 4
+          case 4: mixedMultiBlas<4, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 5
+          case 5: mixedMultiBlas<5, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 6
+          case 6: mixedMultiBlas<6, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 7
+          case 7: mixedMultiBlas<7, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 8
+          case 8: mixedMultiBlas<8, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 9
+          case 9: mixedMultiBlas<9, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 10
+          case 10: mixedMultiBlas<10, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 11
+          case 11: mixedMultiBlas<11, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 12
+          case 12: mixedMultiBlas<12, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 13
+          case 13: mixedMultiBlas<13, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 14
+          case 14: mixedMultiBlas<14, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 15
+          case 15: mixedMultiBlas<15, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #if MAX_MULTI_BLAS_N >= 16
+          case 16: mixedMultiBlas<16, multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
+    #endif // 16
+    #endif // 15
+    #endif // 14
+    #endif // 13
+    #endif // 12
+    #endif // 11
+    #endif // 10
+    #endif // 9
+    #endif // 8
+    #endif // 7
+    #endif // 6
+    #endif // 5
+    #endif // 4
+    #endif // 3
+    #endif // 2
+            default:
+              // split the problem in half and recurse
+              const double *a0 = &a_[0];
+              const double *a1 = &a_[(x.size()/2)*y.size()];
+
+              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+              axpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
+              axpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
+              break;
+          }
+        }
+      } // end if (y.size() > MAX_MULTI_BLAS_N)
+    }
+
+    void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
+      axpy_recurse(a_, x, y, 0, 0, 0);
+    }
+
+    // Composite field version
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x(), y()); }
+
+
   } // namespace blas
 
 } // namespace quda

@@ -273,6 +273,34 @@ namespace quda
       int flops() { return 8 * NXZ * NYW; }   //! flops per real element
     };
 
+    /**
+       Functor performing the operations: y[i] = a*x[i] + y[i]
+    */
+
+    template <int NXZ, typename Float2, typename FloatN>
+    struct multiaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      typedef typename scalar<Float2>::type real;
+      const int NYW;
+      // ignore parameter arrays since we place them in constant memory
+      multiaxpy_(const coeff_array<double> &a, const coeff_array<double> &b, const coeff_array<double> &c, int NYW) :
+        NYW(NYW){
+      }
+//Sub-optimal constant buffer usage since we're using a complex array to store real numbers
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      {
+#ifdef __CUDA_ARCH__
+        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_d); // fetch coefficient matrix from constant memory (implemented as a complex valued array)
+        y += a[MAX_MULTI_BLAS_N * j + i].x*x;
+#else
+        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_h);
+        y += a[NYW * j + i].x*x;
+#endif
+      }
+
+      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() { return 2 * NXZ * NYW; }         //! flops per real element
+    };
+
   } // namespace blas
 
 } // namespace quda
