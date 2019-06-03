@@ -633,108 +633,31 @@ namespace quda {
       }
     }
 
-    void reDotProduct(double* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
-#ifndef SSTEP
-    errorQuda("S-step code not built\n");
-#else
-    switch(x.size()){
-      case 1:
-        multiReduce<1, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 2:
-        multiReduce<2, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 3:
-        multiReduce<3, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 4:
-        multiReduce<4, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 5:
-        multiReduce<5, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 6:
-        multiReduce<6, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 7:
-        multiReduce<7, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 8:
-        multiReduce<8, double, QudaSumFloat, Dot, 0, 0, 0, 0, false>(
-            result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      /*case 9:
-        multiReduce<9,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 10:
-        multiReduce<10,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 11:
-        multiReduce<11,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 12:
-        multiReduce<12,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 13:
-        multiReduce<13,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 14:
-        multiReduce<14,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 15:
-        multiReduce<15,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;
-      case 16:
-        multiReduce<16,double,QudaSumFloat,Dot,0,0,0,0,false>
-        (result, make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, x, y);
-        break;*/
-      default:
-        errorQuda("Unsupported vector size");
-        break;
-    }
-#endif // SSTEP
-    // do a single multi-node reduction only once we have computed all local dot products
-    const int Nreduce = x.size()*y.size();
-    reduceDoubleArray((double*)result, Nreduce);
-  }
-
+    inline void transfer(double &out, double &in)   { out = in; }
+    inline void transfer(Complex &out, double2 &in) { out = Complex(in.x, in.y); }
 
     // This function does the outer product of dot products... in column major.
     // There's a function below called 'cDotProduct' that flips it to row major.
-    template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
-	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal>
-    void multiReduce_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
+    template <typename doubleN, typename ReduceType, template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
+	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal, typename T>
+    void multiReduce_recurse(T* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
 			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian, unsigned int tile_size) {
 
       if (y.size() > tile_size) // if greater than max single-kernel size, split and recurse
       {
         // Do the recurse first.
-        Complex* result0 = &result[0];
-        Complex* result1 = &result[x.size()*(y.size()/2)];
+        T* result0 = &result[0];
+        T* result1 = &result[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
         std::vector<ColorSpinorField*> w0(w.begin(), w.begin() + w.size()/2);
         std::vector<ColorSpinorField*> w1(w.begin() + w.size()/2, w.end());
-        multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i_idx, 2*j_idx+0, hermitian, tile_size);
-        multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i_idx, 2*j_idx+1, hermitian, tile_size);
+        multiReduce_recurse<doubleN,ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x, y0, z, w0, i_idx, 2*j_idx+0, hermitian, tile_size);
+        multiReduce_recurse<doubleN,ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x, y1, z, w1, i_idx, 2*j_idx+1, hermitian, tile_size);
       }
       else
       {
-        double2* cdot = new double2[x.size()*y.size()];
+        doubleN* tmp_dot = new doubleN[x.size()*y.size()];
 
 	// if at bottom of recursion, return if on lower left
 	if (x.size() <= tile_size && hermitian) {
@@ -746,83 +669,83 @@ namespace quda {
         if (x.size() <= tile_size) {
         switch(x.size()){ // COMMENT HERE FOR COMPILE TIME
         case 1:
-          multiReduce<1, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<1, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 2
         case 2:
-          multiReduce<2, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<2, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 3
         case 3:
-          multiReduce<3, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<3, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 4
         case 4:
-          multiReduce<4, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<4, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 5
         case 5:
-          multiReduce<5, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<5, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 6
         case 6:
-          multiReduce<6, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<6, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 7
         case 7:
-          multiReduce<7, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<7, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 8
         case 8:
-          multiReduce<8, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<8, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 9
 	case 9:
-          multiReduce<9, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<9, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 10
         case 10:
-          multiReduce<10, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<10, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 11
         case 11:
-          multiReduce<11, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<11, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 12
         case 12:
-          multiReduce<12, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<12, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 13
         case 13:
-          multiReduce<13, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<13, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 14
         case 14:
-          multiReduce<14, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<14, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 15
         case 15:
-          multiReduce<15, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<15, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 16
         case 16:
-          multiReduce<16, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          multiReduce<16, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #endif //16
 #endif //15
@@ -845,16 +768,16 @@ namespace quda {
           // memory reshuffling (unless y = 1).
           // Use a few temporary variables.
 
-          Complex* tmpmajor = new Complex[x.size()*y.size()];
-          Complex* result0 = &tmpmajor[0];
-          Complex* result1 = &tmpmajor[(x.size()/2)*y.size()];
+          T* tmpmajor = new T[x.size()*y.size()];
+          T* result0 = &tmpmajor[0];
+          T* result1 = &tmpmajor[(x.size()/2)*y.size()];
           std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
           std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
           std::vector<ColorSpinorField*> z0(z.begin(), z.begin() + z.size()/2);
           std::vector<ColorSpinorField*> z1(z.begin() + z.size()/2, z.end());
 
-          multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i_idx+0, j_idx, hermitian, tile_size);
-          multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i_idx+1, j_idx, hermitian, tile_size);
+          multiReduce_recurse<doubleN,ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result0, x0, y, z0, w, 2*i_idx+0, j_idx, hermitian, tile_size);
+          multiReduce_recurse<doubleN,ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>(result1, x1, y, z1, w, 2*i_idx+1, j_idx, hermitian, tile_size);
 
           const unsigned int xlen0 = x.size()/2;
           const unsigned int xlen1 = x.size() - xlen0;
@@ -880,20 +803,21 @@ namespace quda {
           const unsigned int ylen = y.size();
           for (unsigned int j = 0; j < xlen; j++)
             for (unsigned int i = 0; i < ylen; i++)
-              result[i*xlen+j] = Complex(cdot[j*ylen + i].x, cdot[j*ylen+i].y);
+              transfer(result[i*xlen+j], tmp_dot[j*ylen + i]);
+              //result[i*xlen+j] = Complex(tmp_dot[j*ylen + i].x, tmp_dot[j*ylen+i].y);
         }
-        delete[] cdot;
+        delete[] tmp_dot;
       }
     }
 
 
-    template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal,
+    template <typename doubleN,typename ReduceType,template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal,
 	      typename writeDiagonal,
 	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal,
-	      typename writeOffDiagonal>
+	      typename writeOffDiagonal, typename T>
     class TileSizeTune : public Tunable {
       typedef std::vector<ColorSpinorField*> vec;
-      Complex *result;
+      T *result;
       vec &x, &y, &z, &w;
       bool hermitian;
       bool Anorm;
@@ -904,7 +828,7 @@ namespace quda {
       unsigned int max_tile_size;
 
     public:
-      TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
+      TileSizeTune(T *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
 	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm), max_tile_size(1)
       {
       	strcpy(aux, "policy,");
@@ -936,7 +860,7 @@ namespace quda {
 
 	    // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size; tile_size++) {
-	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+	      multiReduce_recurse<doubleN, ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
@@ -955,14 +879,14 @@ namespace quda {
 	    // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size && tile_size <= x.size() &&
 		    (tile_size <= y.size() || y.size()==1) ; tile_size*=2) {
-	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+	      multiReduce_recurse<doubleN, ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
             // also test case using a single kernel if both dimensions
             // are less than MAX_MULTI_BLAS_N
             if (x.size() <= MAX_MULTI_BLAS_N && y.size() <= MAX_MULTI_BLAS_N) {
-	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+	      multiReduce_recurse<doubleN, ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, MAX_MULTI_BLAS_N);
             }
 
@@ -982,7 +906,7 @@ namespace quda {
         // it contains blocksize, grid size, etc. Since we're only tuning
         // a policy, we don't care about those sizes. That's why we only
         // tune "aux.x", which is the tile size.
-        multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+        multiReduce_recurse<doubleN, ReduceType,ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
           (result, x, y, z, w, 0, 0, hermitian, tp.aux.x);
       }
 
@@ -1051,7 +975,7 @@ namespace quda {
       // cDotProduct_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
       // switch this to row-major.
-      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, false);
+      TileSizeTune<double2,QudaSumFloat2, Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>, Complex > tile(result_tmp, x, y, x, y, false);
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1075,7 +999,7 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true, false); // last false is b/c L2 norm
+      TileSizeTune<double2,QudaSumFloat2, Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>, Complex> tile(result_tmp, x, y, x, y, true, false); // last false is b/c L2 norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1102,7 +1026,7 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true, true); // last true is b/c A norm
+      TileSizeTune<double2,QudaSumFloat2, Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>, Complex > tile(result_tmp, x, y, x, y, true, true); // last true is b/c A norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1133,7 +1057,7 @@ namespace quda {
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
       // When recursing, only the diagonal tiles will do the copy, the rest just do the outer product
-      TileSizeTune<CdotCopy,write<0,0,0,1>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, true);
+      TileSizeTune<double2,QudaSumFloat2, CdotCopy,write<0,0,0,1>,Cdot,write<0,0,0,0>, Complex > tile(result_tmp, x, y, x, y, true);
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1151,6 +1075,32 @@ namespace quda {
 #else
       errorQuda("cDotProductCopy not enabled");
 #endif
+    }
+
+    void reDotProduct(double* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
+      double* result_tmp = new double[x.size()*y.size()];
+      for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
+
+      // cDotProduct_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
+      TileSizeTune<double,QudaSumFloat,Dot,write<0,0,0,0>,Dot,write<0,0,0,0>, double > tile(result_tmp, x, y, x, y, false);
+      //tile.apply(0);//
+      tile.apply(*(blas::getStream()));
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = x.size()*y.size();
+      reduceDoubleArray(result_tmp, Nreduce);
+
+      // Switch from col-major to row-major
+      const unsigned int xlen = x.size();
+      const unsigned int ylen = y.size();
+      for (unsigned int j = 0; j < xlen; j++)
+        for (unsigned int i = 0; i < ylen; i++)
+          result[j*ylen+i] = result_tmp[i*xlen + j];
+
+      delete[] result_tmp;
     }
 
    } // namespace blas
