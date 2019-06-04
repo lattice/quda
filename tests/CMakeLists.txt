@@ -34,9 +34,6 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
 endif() 
 ENDMACRO()
 
-if(NOT QUDA_BUILD_ALL_TESTS)
-  set(BUILD_TESTING OFF)
-endif()
 
 if(QUDA_ARPACK)
   LIST(APPEND TEST_LIBS ${ARPACK})
@@ -58,7 +55,7 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   target_link_libraries(dslash_test ${TEST_LIBS} )
   target_link_libraries(dslash_ctest ${TEST_LIBS} )
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
-  QUDA_CHECKBUILDTEST(dslash_ctest BUILD_TESTING)
+  QUDA_CHECKBUILDTEST(dslash_ctest QUDA_BUILD_ALL_TESTS)
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
@@ -87,7 +84,7 @@ if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
-  QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
+  QUDA_CHECKBUILDTEST(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
 
   cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
