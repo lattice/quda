@@ -691,9 +691,9 @@ namespace quda
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
         typedef typename scalar<ReduceType>::type scalar;
-        x = x - a.x*y;
+        x -= a.x*y;
         norm2_<scalar>(sum.x, x);
-        w = w - a.x*z;
+        w -= a.x*z;
         y = w + b.x*y;
         norm2_<scalar>(sum.y, y);
         dot_<scalar>(sum.z, x, y);
@@ -701,7 +701,7 @@ namespace quda
         dot_<scalar>(sum.w, v, y);
       }
       static int streams() { return 9; } //! total number of input and output streams
-      static int flops() { return 8; }   //? flops per element
+      static int flops() { return 16; }  //! flops per element
     };
 
   } // namespace blas

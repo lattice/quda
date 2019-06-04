@@ -11,6 +11,8 @@
 
 namespace quda {
 
+  using ColorSpinorFieldSet = ColorSpinorField;
+
   /**
      SolverParam is the meta data used to define linear solvers.
    */
@@ -143,7 +145,7 @@ namespace quda {
 
     /**< The precision used by the QUDA sloppy operator */
     QudaPrecision precision_sloppy;
-    
+
     /**< The precision used by the QUDA sloppy operator for multishift refinement */
     QudaPrecision precision_refinement_sloppy;
 
@@ -752,48 +754,48 @@ namespace quda {
        The size of the Krylov space that BiCGstabL uses.
      */
     int nKrylov; // in the language of BiCGstabL, this is L.
-    
+
     // Various coefficients and params needed on each iteration.
-    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L. 
+    Complex rho0, rho1, alpha, omega, beta; // Various coefficients for the BiCG part of BiCGstab-L.
     Complex *gamma, *gamma_prime, *gamma_prime_prime; // Parameters for MR part of BiCGstab-L. (L+1) length.
     Complex **tau; // Parameters for MR part of BiCGstab-L. Tech. modified Gram-Schmidt coeffs. (L+1)x(L+1) length.
     double *sigma; // Parameters for MR part of BiCGstab-L. Tech. the normalization part of Gram-Scmidt. (L+1) length.
-    
+
     // pointers to fields to avoid multiple creation overhead
     // full precision fields
     ColorSpinorField *r_fullp;   //! Full precision residual.
     ColorSpinorField *yp;        //! Full precision temporary.
     // sloppy precision fields
-    ColorSpinorField *tempp;     //! Sloppy temporary vector. 
+    ColorSpinorField *tempp;     //! Sloppy temporary vector.
     std::vector<ColorSpinorField*> r; // Current residual + intermediate residual values, along the MR.
     std::vector<ColorSpinorField*> u; // Search directions.
-    
+
     // Saved, preallocated vectors. (may or may not get used depending on precision.)
     ColorSpinorField *x_sloppy_saved_p; //! Sloppy solution vector.
     ColorSpinorField *r0_saved_p;       //! Shadow residual, in BiCG language.
     ColorSpinorField *r_sloppy_saved_p; //! Current residual, in BiCG language.
-    
+
     /**
        Internal routine for reliable updates. Made to not conflict with BiCGstab's implementation.
      */
     int reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
-    
+
     /**
        Internal routines for pipelined Gram-Schmidt. Made to not conflict with GCR's implementation.
      */
     void computeTau(Complex **tau, double *sigma, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void updateR(Complex **tau, std::vector<ColorSpinorField*> r, int begin, int size, int j);
     void orthoDir(Complex **tau, double* sigma, std::vector<ColorSpinorField*> r, int j, int pipeline);
-    
+
     void updateUend(Complex* gamma, std::vector<ColorSpinorField*> u, int nKrylov);
     void updateXRend(Complex* gamma, Complex* gamma_prime, Complex* gamma_prime_prime,
                                 std::vector<ColorSpinorField*> r, ColorSpinorField& x, int nKrylov);
-    
+
     /**
        Solver uses lazy allocation: this flag determines whether we have allocated or not.
      */
-    bool init; 
-    
+    bool init;
+
     std::string solver_name; // holds BiCGstab-l, where 'l' literally equals nKrylov.
 
   public:
@@ -1119,7 +1121,7 @@ public:
     virtual ~MultiShiftCG();
 /**
  * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
- * 
+ *
  * @param out std::vector of pointer to solutions for all the shifts.
  * @param in right-hand side.
  * @param p std::vector of pointers to hold search directions. Note this will be resized as necessary.
@@ -1129,7 +1131,7 @@ public:
 
 /**
  * @brief Run multi-shift and return Krylov-space at the end of the solve in p and r2_old_arry.
- * 
+ *
  * @param out std::vector of pointer to solutions for all the shifts.
  * @param in right-hand side.
  */
@@ -1139,7 +1141,7 @@ public:
 
       (*this)(out, in, p, r2_old.get());
 
-      for (auto& pp : p) delete pp;   
+      for (auto& pp : p) delete pp;
     }
 
   };
@@ -1212,6 +1214,13 @@ public:
   //forward declaration
   class EigCGArgs;
 
+  typedef enum CAEigCGComputeTasks_s{ COMPUTE_EIGENV        = 1,
+                                      COMPUTE_QV            = 2,
+                                      COMPUTE_EIGENV_AND_QV = 3,
+                                      COMPUTE_ZAV           = 4,
+                                      COMPUTE_ALL           = 7
+                                    } CAEigCGComputeTasks;
+
   class IncEigCG : public Solver {
 
   private:
@@ -1219,21 +1228,23 @@ public:
     DiracMatrix &matSloppy;
     DiracMatrix &matPrecon;
 
-    Solver *K;
+    std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
     ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+    ColorSpinorFieldSet *V2k; //temp vector set
 
-    ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
-    ColorSpinorField* p;  // conjugate vector
-    ColorSpinorField* Ap; // mat * conjugate vector
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField* Az; // mat * conjugate vector from the previous iteration 
-    ColorSpinorField *r_pre;    //! residual passed to preconditioner
-    ColorSpinorField *p_pre;    //! preconditioner result
+    ColorSpinorField *rp;       // residual vector
+    ColorSpinorField *yp;       // high precision accumulator
+    ColorSpinorField* pp;       // conjugate vector
+    ColorSpinorField* Ap;       // mat * conjugate vector
+    ColorSpinorField *tmpp;     // temporary for mat-vec
+    ColorSpinorField* Az;       // mat * conjugate vector from the previous iteration
+    ColorSpinorField *r_pre;    // residual passed to preconditioner
+    ColorSpinorField *p_pre;    // preconditioner result
+    ColorSpinorFieldSet *work_space;  // a workspace to keep a number of temporary fields
 
-    EigCGArgs *eigcg_args;
+    std::shared_ptr<EigCGArgs> eigcg_args;
 
     TimeProfile &profile; // time profile for initCG solver
 
@@ -1244,20 +1255,18 @@ public:
 
     virtual ~IncEigCG();
 
-    /**
-       @brief Expands deflation space.
-       @param V Composite field container of new eigenvectors
-       @param nev number of vectors to load
-     */
-    void increment(ColorSpinorField &V, int nev);
-
-    void RestartVT(const double beta, const double rho);
-    void UpdateVm(ColorSpinorField &res, double beta, double sqrtr2); 
+    //compute task codes: 01 -> only Eigenproblem, 10 -> only QV product , 100 -> only block dot product  111 -> all
+    template <bool is_pipelined = false, CAEigCGComputeTasks compute_task_id = COMPUTE_ALL>
+    void RayleighRitz();
+    //Legacy routines
+    void SearchSpaceUpdate(ColorSpinorField &z, const double& lanczos_diag, const double& lanzos_offdiag, const double& beta, const double& resnorm);
+    //Pipelined routines:
+    void PipelinedSearchSpaceUpdate(const double& lanczos_diag, const double& lanzos_offdiag, const double& beta, const double& resnorm);
     //EigCG solver:
-    int eigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //InitCG solver:
-    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
-    //Incremental eigCG solver (for eigcg and initcg calls)
+    int EigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //communation optimized version
+    int CAEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //Incremental eigCG solver
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -1313,4 +1322,3 @@ public:
   };
 
 } // namespace quda
-
