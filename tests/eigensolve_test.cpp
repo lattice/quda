@@ -59,6 +59,7 @@ extern int pipeline;   // length of pipeline for fused operations in GCR or BiCG
 extern QudaVerbosity verbosity;
 
 extern QudaMatPCType matpc_type;
+extern QudaSolutionType solution_type;
 extern QudaSolveType solve_type;
 
 // Twisted mass flavor type
@@ -135,7 +136,7 @@ void display_test_info()
   return;
 }
 
-QudaPrecision &cpu_prec = prec;
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
@@ -247,8 +248,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-  // No Even-Odd PC for the moment...
-  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  inv_param.solution_type = solution_type;
   inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
 
   inv_param.matpc_type = matpc_type;

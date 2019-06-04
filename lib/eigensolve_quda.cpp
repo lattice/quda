@@ -66,49 +66,30 @@ namespace quda
     Qmat = (Complex *)safe_malloc(nEv * nKr * sizeof(Complex));
 
     // Part of the spectrum to be computed.
-    spectrum = strdup("SR"); // Initialised to stop the compiler warning.
-
-    if (eig_param->use_poly_acc) {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("LI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("SI");
-    } else {
-      if (eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)
-        spectrum = strdup("SR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LR_EIG)
-        spectrum = strdup("LR");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SM_EIG)
-        spectrum = strdup("SM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LM_EIG)
-        spectrum = strdup("LM");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_SI_EIG)
-        spectrum = strdup("SI");
-      else if (eig_param->spectrum == QUDA_SPECTRUM_LI_EIG)
-        spectrum = strdup("LI");
+    switch (eig_param->spectrum) {
+    case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
+    case QUDA_SPECTRUM_LR_EIG: strcpy(spectrum, "LR"); break;
+    case QUDA_SPECTRUM_SM_EIG: strcpy(spectrum, "SM"); break;
+    case QUDA_SPECTRUM_LM_EIG: strcpy(spectrum, "LM"); break;
+    case QUDA_SPECTRUM_SI_EIG: strcpy(spectrum, "SI"); break;
+    case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
+    default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
     // Deduce whether to reverse the sorting
-    const char *L = "L";
-    const char *S = "S";
-    if (strncmp(L, spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
       reverse = true;
-    } else if (strncmp(S, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
-    } else if (strncmp(L, spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      spectrum[0] = 'L';
+    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       reverse = true;
+      spectrum[0] = 'S';
     }
 
     // Print Eigensolver params
     if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("spectrum %s\n", spectrum);
       printfQuda("tol %.4e\n", tol);
       printfQuda("nConv %d\n", nConv);
       printfQuda("nEv %d\n", nEv);
@@ -165,20 +146,15 @@ namespace quda
     if (eig_param->poly_deg == 0) { errorQuda("Polynomial acceleration requested with zero polynomial degree"); }
 
     // Compute the polynomial accelerated operator.
-    double delta, theta;
-    double sigma, sigma1, sigma_old;
-    double d1, d2, d3;
-
     double a = eig_param->a_min;
     double b = eig_param->a_max;
-
-    delta = (b - a) / 2.0;
-    theta = (b + a) / 2.0;
-
-    sigma1 = -delta / theta;
-
-    d1 = sigma1 / delta;
-    d2 = 1.0;
+    double delta = (b - a) / 2.0;
+    double theta = (b + a) / 2.0;
+    double sigma1 = -delta / theta;
+    double sigma;
+    double d1 = sigma1 / delta;
+    double d2 = 1.0;
+    double d3;
 
     // out = d2 * in + d1 * out
     // C_1(x) = x
@@ -199,17 +175,17 @@ namespace quda
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
-    sigma_old = sigma1;
+    double sigma_old = sigma1;
 
     // construct C_{m+1}(x)
     for (int i = 2; i < eig_param->poly_deg; i++) {
-
       sigma = 1.0 / (2.0 / sigma1 - sigma_old);
 
       d1 = 2.0 * sigma / delta;
       d2 = -d1 * theta;
       d3 = -sigma * sigma_old;
 
+      // FIXME - we could introduce a fused matVec + blas kernel here, eliminating one temporary
       // mat*C_{m}(x)
       matVec(mat, out, *tmp2);
 
