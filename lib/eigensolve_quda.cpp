@@ -599,16 +599,15 @@ namespace quda
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-		  "restart steps.",
-		  nConv, nEv, nKr, max_restarts);
-      }
+      warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                  "restart steps.",
+                  nConv, nEv, nKr, max_restarts);
+
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", nConv,
                    restart_iter, iter);
-
+	
         // Dump all Ritz values and residua
         for (int i = 0; i < nEv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
