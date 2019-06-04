@@ -504,7 +504,11 @@ if(QUDA_ARPACK)
   enable_language(Fortran)
   add_definitions(-DARPACK_LIB)
   
-  set(ARPACK_MPI QUDA_MPI OR QUDA_QMP)
+  if(QUDA_MPI OR QUDA_QMP)
+    set(ARPACK_MPI ON)
+  else()
+    set(ARPACK_MPI OFF)
+  endif()
 
   if(QUDA_DOWNLOAD_ARPACK)
     include(GNUInstallDirs)
