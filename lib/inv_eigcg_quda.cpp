@@ -207,6 +207,14 @@ namespace quda {
 
    };
 
+   //helper for a smart pointer creation
+   
+   std::shared_ptr<ColorSpinorField> MakeSharedPtr(const ColorSpinorParam &param)
+   {
+     if (param.location == QUDA_CPU_FIELD_LOCATION )  return std::move(std::make_shared<cpuColorSpinorField>(param) );
+     else					      return std::move(std::make_shared<cudaColorSpinorField>(param));
+   }
+
   // set the required parameters for the inner solver
   static void fillEigCGInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
   {
@@ -252,7 +260,7 @@ namespace quda {
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), V2k(nullptr),
-    pp(nullptr), Ap(nullptr), Az(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+    work_space(nullptr), Az(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
 
     if (2 * param.nev >= param.m)
@@ -289,23 +297,7 @@ namespace quda {
     return;
   }
 
-  IncEigCG::~IncEigCG() {
-
-    if(init){
-      if(Vm)  delete Vm;
-      if(V2k)  delete V2k;
-
-      delete tmpp;
-      delete rp;
-      delete yp;
-      delete Az;
-
-      if(work_space) delete work_space;
-
-      if(r_pre)  delete r_pre;
-      if(p_pre)  delete p_pre;
-    }
-  }
+  IncEigCG::~IncEigCG() { }
 
   template <bool is_pipelined, CAEigCGComputeTasks compute_task_id>
   void IncEigCG::RayleighRitz()
@@ -352,10 +344,9 @@ namespace quda {
       ColorSpinorFieldSet &v2k = *V2k;
 
       std::vector<ColorSpinorField*> v2k_(v2k());
-
       std::vector<ColorSpinorField*> Az_;
 
-      Az_.push_back(Az);
+      Az_.push_back(Az.get());
 
       commGlobalReductionSet(!is_pipelined); //disable when is_pipelined is true
       blas::reDotProduct(args.s.data(), Az_, v2k_);
@@ -382,16 +373,17 @@ namespace quda {
     if(args.run_residual_correction) return;
 
     ColorSpinorFieldSet &vm  = *Vm;
+    ColorSpinorField    &Ap  = (*work_space)[0];
 
     args.SetLanczos(lanczos_diag, lanczos_offdiag);
 
-    if (args.id == (args.m-1)) blas::copy(*Az, *Ap);
+    if (args.id == (args.m-1)) blas::copy(*Az, Ap);
 
     // launch RR block for args.id == param.m, otherwise is nop
     if(args.id == args.m) {
       args.CacheNormR(normr);
       //Compute (update) Ap = Ap - beta*Ap_old:
-      blas::xpay(*Ap, -beta, *Az);
+      blas::xpay(Ap, -beta, *Az);
       RayleighRitz();
       args.RestartArgs();
     }
@@ -483,37 +475,30 @@ namespace quda {
     if (!init) {
       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, default_pipel);//need only deflation meta
 
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
-
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
-
-      Az = ColorSpinorField::Create(csParam);
-
-      tmpp = ColorSpinorField::Create(csParam);
+      rp   = MakeSharedPtr(csParam);
+      yp   = MakeSharedPtr(csParam);
+      Az   = MakeSharedPtr(csParam);
+      tmpp = MakeSharedPtr(csParam);
 
       csParam.is_composite  = true;
       csParam.composite_dim = 2;
       // An auxiliary work space:
-      work_space = ColorSpinorField::Create(csParam);
-      Ap = &(*work_space)[0];
-      pp = &(*work_space)[1];
+      work_space = MakeSharedPtr(csParam);
       //Create a search vector set:
       csParam.setPrecision(param.precision_ritz);
       csParam.composite_dim = param.m;
-      Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+      Vm         = MakeSharedPtr(csParam);
 
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
       csParam.composite_dim = (2*param.nev);
-
-      V2k = ColorSpinorFieldSet::Create(csParam);
+      V2k        = MakeSharedPtr(csParam);
 
       if (K && param.precision_precondition != param.precision_sloppy) {
         csParam.is_composite  = false;
 	csParam.setPrecision(param.precision_precondition);
-	p_pre = ColorSpinorField::Create(csParam);
-	r_pre = ColorSpinorField::Create(csParam);
+	p_pre = MakeSharedPtr(csParam);
+	r_pre = MakeSharedPtr(csParam);
       }
 
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
@@ -532,14 +517,15 @@ namespace quda {
 
     csParam.setPrecision(param.precision_sloppy);
     csParam.is_composite  = false;
-    //
-    ColorSpinorField *zp  = (K != nullptr) ? ColorSpinorField::Create(csParam) : rp;
+
+    std::shared_ptr<ColorSpinorField> zp  = (K != nullptr) ? MakeSharedPtr(csParam) : rp;
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
-    ColorSpinorField &p = *pp;
     ColorSpinorField &z = *zp;
     ColorSpinorField &tmp = *tmpp;
+				ColorSpinorField &Ap= (*work_space)[0];
+    ColorSpinorField &p = (*work_space)[1];
 
     // compute initial residual
     //
@@ -591,16 +577,16 @@ namespace quda {
 
     while ( !converged && k < param.maxiter ) {
 
-      matSloppy(*Ap, p, tmp);  // tmp as tmp
+      matSloppy(Ap, p, tmp);  // tmp as tmp
 
-      pAp           = blas::reDotProduct(p, *Ap);
+      pAp           = blas::reDotProduct(p, Ap);
       alpha_old_inv = alpha_inv;
       alpha         = rMinvr / pAp;
       alpha_inv     = 1.0 / alpha;
 
       SearchSpaceUpdate(z, lanczos_diag, lanczos_offdiag, beta, sqrt(r2));
 
-      r2 = blas::axpyNorm(-alpha, *Ap, r);
+      r2 = blas::axpyNorm(-alpha, Ap, r);
 
       if( K ) {//apply preconditioner
         ColorSpinorField &rPre = *r_pre;
@@ -704,30 +690,29 @@ namespace quda {
     if (!init) {
       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, caeigcg_pipe_l);
 
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
-      Az = ColorSpinorField::Create(csParam);
+      rp = MakeSharedPtr(csParam);
+      yp = MakeSharedPtr(csParam);
+      Az = MakeSharedPtr(csParam);
 
-      tmpp = ColorSpinorField::Create(csParam);
+      tmpp = MakeSharedPtr(csParam);
 
       csParam.is_composite  = true;
       csParam.composite_dim = 4;
 
       // auxiliary work space to keep w, p, s, u fields
-      work_space = ColorSpinorField::Create(csParam);
+      work_space = MakeSharedPtr(csParam);
 
       //Create a search vector set:
       csParam.composite_dim = param.m+tot_pipe_l;
       csParam.setPrecision(param.precision_ritz);//eigCG internal search space precision may not coincide with the solver precision!
 
-      Vm = ColorSpinorFieldSet::Create(csParam); //search space for Ritz vectors
+      Vm = MakeSharedPtr(csParam);
 
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
       csParam.composite_dim = (2*param.nev);
 
-      V2k = ColorSpinorFieldSet::Create(csParam);
+      V2k = MakeSharedPtr(csParam);
 
 
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
@@ -903,13 +888,14 @@ namespace quda {
      //If deflation space is complete: use initCG solver
      if( defl.is_complete() ) return;
 
-    //Start (incremental) eigCG solver:
+     //Start (incremental) eigCG solver:
      ColorSpinorParam csParam(in);
      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-     ColorSpinorField *ep = ColorSpinorField::Create(csParam);//full precision accumulator
+     std::shared_ptr<ColorSpinorField> ep = MakeSharedPtr(csParam);//full precision accumulator
+     std::shared_ptr<ColorSpinorField> rp = MakeSharedPtr(csParam);//full precision residual
+
      ColorSpinorField &e = *ep;
-     ColorSpinorField *rp = ColorSpinorField::Create(csParam);//full precision residual
      ColorSpinorField &r = *rp;
 
      //deflate initial guess ('out'-field):
@@ -919,9 +905,10 @@ namespace quda {
 
      csParam.setPrecision(param.precision_sloppy);
 
-     ColorSpinorField *ep_sloppy = ( mixed_prec ) ? ColorSpinorField::Create(csParam) : ep;
+     std::shared_ptr<ColorSpinorField> ep_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : ep;
+     std::shared_ptr<ColorSpinorField> rp_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : rp;
+
      ColorSpinorField &eSloppy = *ep_sloppy;
-     ColorSpinorField *rp_sloppy = ( mixed_prec ) ? ColorSpinorField::Create(csParam) : rp;
      ColorSpinorField &rSloppy = *rp_sloppy;
 
      const double stop = b2*param.tol*param.tol;
@@ -979,14 +966,6 @@ namespace quda {
        }
      } while ((r2 > stop) && mixed_prec);
 
-     delete ep;
-     delete rp;
-
-     if(mixed_prec){
-       delete ep_sloppy;
-       delete rp_sloppy;
-     }
-
      if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
        printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
        max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
@@ -1002,8 +981,6 @@ namespace quda {
 
      if(defl.is_complete()) {
        if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the requested deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
-       if(Vm) delete Vm;//safe some space
-       Vm = nullptr;
 
        const int max_nev = defl.size();//param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);

@@ -1231,18 +1231,16 @@ public:
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorFieldSet *Vm;  //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
-    ColorSpinorFieldSet *V2k; //temp vector set
+    std::shared_ptr<ColorSpinorFieldSet> Vm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+    std::shared_ptr<ColorSpinorFieldSet> V2k;         //temp vector set
+    std::shared_ptr<ColorSpinorFieldSet> work_space;  // a workspace to keep a number of temporary fields
 
-    ColorSpinorField *rp;       // residual vector
-    ColorSpinorField *yp;       // high precision accumulator
-    ColorSpinorField* pp;       // conjugate vector
-    ColorSpinorField* Ap;       // mat * conjugate vector
-    ColorSpinorField *tmpp;     // temporary for mat-vec
-    ColorSpinorField* Az;       // mat * conjugate vector from the previous iteration
-    ColorSpinorField *r_pre;    // residual passed to preconditioner
-    ColorSpinorField *p_pre;    // preconditioner result
-    ColorSpinorFieldSet *work_space;  // a workspace to keep a number of temporary fields
+    std::shared_ptr<ColorSpinorField> rp;       // residual vector
+    std::shared_ptr<ColorSpinorField> yp;       // high precision accumulator
+    std::shared_ptr<ColorSpinorField> tmpp;     // temporary for mat-vec
+    std::shared_ptr<ColorSpinorField> Az;       // mat * conjugate vector from the previous iteration
+    std::shared_ptr<ColorSpinorField> r_pre;    // residual passed to preconditioner
+    std::shared_ptr<ColorSpinorField> p_pre;    // preconditioner result
 
     std::shared_ptr<EigCGArgs> eigcg_args;
 
