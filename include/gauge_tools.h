@@ -1,5 +1,8 @@
 #include <random_quda.h>
-namespace quda {
+
+namespace quda
+{
+
   /**
      Compute the plaquette of the gauge field
 
@@ -11,12 +14,33 @@ namespace quda {
   double3 plaquette(const GaugeField &U);
 
   /**
-     Generate Gaussian distributed GaugeField
-     @param dataDs The GaugeField
+     Generate Gaussian distributed su(N) or SU(N) fields.  If U is a
+     momentum field, then we generate random Gaussian distributed
+     field in the Lie algebra using the anti-Hermitation convention.
+     If U is in the group then we create a Gaussian distributed su(n)
+     field and exponentiate it, e.g., U = exp(epsilon H), where H is
+     the distributed su(n) field
+
+     @param U The output gauge field
      @param rngstate random states
+     @param epsilon Rotation from unit gauge
   */
-  void gaugeGauss(GaugeField &dataDs, RNG &rngstate);
-  
+  void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
+
+  /**
+     Generate Gaussian distributed su(N) or SU(N) fields.  If U is a
+     momentum field, then we generate random Gaussian distributed
+     field in the Lie algebra using the anti-Hermitation convention.
+     If U is in the group then we create a Gaussian distributed su(n)
+     field and expoentiate it, e.g., U = exp(epsilon H), where H is
+     the distributed su(n) field
+
+     @param U The GaugeField
+     @param seed The seed used for the RNG
+     @param epsilon Rotation from unit gauge
+  */
+  void gaugeGauss(GaugeField &U, long seed, double epsilon);
+
   /**
      Apply APE smearing to the gauge field
 
@@ -82,7 +106,7 @@ namespace quda {
    * @param[in] Nsteps, maximum number of steps to perform gauge fixing
    * @param[in] verbose_interval, print gauge fixing info when iteration count is a multiple of this
    * @param[in] alpha, gauge fixing parameter of the method, most common value is 0.08
-   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value 
+   * @param[in] autotune, 1 to autotune the method, i.e., if the Fg inverts its tendency we decrease the alpha value
    * @param[in] tolerance, torelance value to stop the method, if this
    * value is zero then the method stops when iteration reachs the
    * maximum number of steps defined by Nsteps

@@ -5389,23 +5389,21 @@ void set_kernel_pack_t_(int* pack)
 }
 
 
-void gaussGaugeQuda(long seed)
+void gaussGaugeQuda(long seed, double epsilon)
 {
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
-  profileGauss.TPSTART(QUDA_PROFILE_INIT);
   if (!gaugePrecise)  errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
 
   cudaGaugeField *data = gaugePrecise;
 
-  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
+  GaugeFieldParam param(*data);
+  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField u(param);
 
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-  RNG* randstates = new RNG(data->Volume(), seed, data->X());
-  randstates->Init();
-  quda::gaugeGauss(*data, *randstates);
-  randstates->Release();
-  delete randstates;
+  quda::gaugeGauss(*data, seed, epsilon);
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (extendedGaugeResident) {

@@ -1188,10 +1188,15 @@ extern "C" {
                             QudaGaugeParam* param);
 
   /**
-   * Generate Gaussian distributed gauge field
-   * @param seed Seed
-   */
-  void gaussGaugeQuda(long seed);
+     Generate Gaussian distributed fields and store in the resident
+     gauge field.  We create a Gaussian-distributed su(n) field and
+     exponentiate it, e.g., U = exp(epsilon * H), where H is the
+     distributed su(n) field
+
+     @param seed The seed used for the RNG
+     @param epsilon Rotation from unit gauge
+  */
+  void gaussGaugeQuda(long seed, double epsilon);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
