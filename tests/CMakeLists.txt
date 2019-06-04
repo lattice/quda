@@ -117,6 +117,10 @@ if(QUDA_MULTIGRID)
 
 endif()
 
+cuda_add_executable(plaq_test plaq_test.cpp)
+target_link_libraries(plaq_test ${TEST_LIBS})
+QUDA_CHECKBUILDTEST(plaq_test QUDA_BUILD_ALL_TESTS)
+
 cuda_add_executable(su3_test su3_test.cpp)
 target_link_libraries(su3_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(su3_test QUDA_BUILD_ALL_TESTS)
