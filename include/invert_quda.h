@@ -542,8 +542,17 @@ namespace quda {
     */
     EigenSolver *eig_solve;
     bool deflate_init = false;
-    std::vector<ColorSpinorField *> defl_tmp;
+    std::vector<ColorSpinorField *> defl_tmp1;
+    std::vector<ColorSpinorField *> defl_tmp2;
 
+    /**
+       @brief Constructs the deflation space
+       @param[in] vec A sample ColorSpinorField with which to instantiate 
+       the eigensolver
+       @pram[in] mat The operator to eigensolve
+    */
+    void constructDeflationSpace(ColorSpinorField *vec, const DiracMatrix &mat);
+    
     /**
      * Return flops
      * @return flops expended by this operator
@@ -586,9 +595,7 @@ namespace quda {
      * @param r2_old_init [description]
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
-
-    void constructDeflationSpace();
-
+    
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
@@ -848,8 +855,9 @@ namespace quda {
     virtual ~GCR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    
   };
-
+  
   class MR : public Solver {
 
   private:

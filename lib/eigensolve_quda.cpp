@@ -284,6 +284,42 @@ namespace quda
     host_free(s);
   }
 
+    // Deflate vec, place result in vec_defl
+  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
+			       std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  {
+    // number of evecs
+    if ((eig_param->nConv)%2 != 0) errorQuda("Must pass equal number of left and right singular vectors");
+    int n_defl = eig_param->nConv/2;
+    
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
+    
+    // Perform Sum_i (L_i * (\sigma_i)^{-1} * (L_i)^dag) + (R_i * (\sigma_i)^{-1} * R_i)^dag) * vec = vec_defl
+    // for all i computed eigenvectors and values.
+    
+    // 1. Take block inner product: (R_i)^dag * vec = A_i
+    std::vector<ColorSpinorField *> left_vecs_ptr;
+    for (int i = n_defl; i < 2*n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
+    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    blas::cDotProduct(s, left_vecs_ptr, vec);
+
+    // 2. Perform block caxpy: L_i * (\sigma_i)^{-1} * A_i
+    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    blas::zero(*vec_defl[0]);
+    std::vector<ColorSpinorField *> right_vecs_ptr;
+    for (int i = 0; i < n_defl; i++) right_vecs_ptr.push_back(eig_vecs[i]);    
+    blas::caxpy(s, right_vecs_ptr, vec_defl);
+
+    // FIXME - we can optimize the zeroing out with a "multi-caxy"
+    // function that just writes over vec_defl and doesn't sum.  When
+    // we exceed the multi-blas limit this would deompose into caxy
+    // for the kernel call and caxpy for the subsequent ones
+
+    host_free(s);
+  }
+
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
@@ -864,7 +900,7 @@ namespace quda
       // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
       // array corresponds to the ith right(left) singular vector. We place the
       // computed left(right) singular vectors in the second half of the array. We
-      // assume, in the comments, that right vectors are given and we compute the left.
+      // assume that right vectors are given and we compute the left.
       //
       // As a cross check, we recompute the singular values from mat vecs rather
       // than make the direct relation (sigma_i)^2 = |lambda_i|

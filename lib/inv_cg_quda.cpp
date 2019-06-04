@@ -44,13 +44,7 @@ namespace quda {
         if (tmp2p && tmpp != tmp2p) delete tmp2p;
         if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
-      if (rnewp) delete rnewp;
-      if (deflate_init) {
-        for (auto veci : param.evecs)
-          if (veci) delete veci;
-        delete defl_tmp[0];
-      }
-
+      if (rnewp) delete rnewp;      
       init = false;
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -201,35 +195,7 @@ namespace quda {
     }
 
   }
-
-  void CG::constructDeflationSpace()
-  {
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    // Deflation requested + first instance of solver
-    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    // Clone from an existing vector
-    ColorSpinorParam csParam(*rp);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nKr);
-    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-
-    // Construct vectors to hold deflated RHS
-    defl_tmp.push_back(ColorSpinorField::Create(csParam));
-
-    param.evals.resize(param.eig_param.nEv);
-    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    (*eig_solve)(param.evecs, param.evals);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    deflate_init = true;
-  }
-
+  
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
@@ -298,8 +264,8 @@ namespace quda {
 
     // Once the CG operator is called, we are able to construct an appropriate
     // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(); }
-
+    if (param.deflate && !deflate_init) { constructDeflationSpace(rp, mat); }
+    
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -368,18 +334,18 @@ namespace quda {
       rhs.push_back(&x);
 
       // Deflate
-      eig_solve->deflate(defl_tmp, rhs, param.evecs, param.evals);
+      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp[0], tmp2, tmp3);
+      mat(r, *defl_tmp1[0], tmp2, tmp3);
       r2 = blas::xmyNorm(*rhs[0], r);
 
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         // defl_tmp1 and y must be added to the solution at the end
-        blas::axpy(1.0, *defl_tmp[0], y);
+        blas::axpy(1.0, *defl_tmp1[0], y);
       } else {
-        // Just add defl_tmp to y, which has been zeroed out
-        blas::copy(y, *defl_tmp[0]);
+        // Just add defl_tmp1 to y, which has been zeroed out
+        blas::copy(y, *defl_tmp1[0]);
       }
     }
 
