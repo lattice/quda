@@ -36,13 +36,16 @@ namespace quda {
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
     const Vector *B;
     template <typename... T>
-    BlockOrthoArg(ColorSpinorField &V,
-                  const int *fine_to_coarse, const int *coarse_to_fine,
-                  int parity, const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta,
-                  T... B) :
-      V(V), fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine),
-      spin_map(), parity(parity), nParity(meta.SiteSubset()), nBlockOrtho(n_block_ortho),
-      B( V.Location() == QUDA_CPU_FIELD_LOCATION ? reinterpret_cast<Vector*>(B_array_h) : nullptr)
+    BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
+                  const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
+      V(V),
+      fine_to_coarse(fine_to_coarse),
+      coarse_to_fine(coarse_to_fine),
+      spin_map(),
+      parity(parity),
+      nParity(meta.SiteSubset()),
+      nBlockOrtho(n_block_ortho),
+      B(V.Location() == QUDA_CPU_FIELD_LOCATION ? reinterpret_cast<Vector *>(B_array_h) : nullptr)
     {
       const Vector Btmp[nVec]{*B...};
       if (sizeof(Btmp) > MAX_MATRIX_SIZE) errorQuda("B array size (%lu) is larger than maximum allowed (%d)\n", sizeof(Btmp), MAX_MATRIX_SIZE);
@@ -107,9 +110,9 @@ namespace quda {
 
       // loop over number of block orthos
       for (int n = 0; n < arg.nBlockOrtho; n++) {
-        for (int j=0; j<nVec; j++) {
+        for (int j = 0; j < nVec; j++) {
 
-          for (int i=0; i<j; i++) {
+          for (int i = 0; i < j; i++) {
 
             // compute (j,i) block inner products
 
@@ -126,12 +129,14 @@ namespace quda {
                 complex<Float> v[nSpin][nColor];
 
                 if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
-                  for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+                  for (int s = 0; s < nSpin; s++)
+                    for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
                 } else {
-                  for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+                  for (int s = 0; s < nSpin; s++)
+                    for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
                 }
 
-                for (int s=0; s<nSpin; s++) {
+                for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
                   for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
                   colorInnerProduct<nColor>(dot[arg.spin_map(s, parity)], i, v[s], vis);
@@ -146,13 +151,17 @@ namespace quda {
               for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
                 int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
-                int x_cb = x - parity*arg.fineVolumeCB;
+                int x_cb = x - parity * arg.fineVolumeCB;
 
                 complex<Float> v[nSpin][nColor];
-                if (i==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-                else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+                if (i == 0)
+                  for (int s = 0; s < nSpin; s++)
+                    for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+                else
+                  for (int s = 0; s < nSpin; s++)
+                    for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
-                for (int s=0; s<nSpin; s++) {
+                for (int s = 0; s < nSpin; s++) {
                   complex<Float> vis[nColor];
                   for (int c = 0; c < nColor; c++) vis[c] = arg.V(parity, x_cb, s, c, i);
                   colorScaleSubtract<Float, nColor>(v[s], static_cast<complex<Float>>(dot[arg.spin_map(s, parity)]), vis);
@@ -169,14 +178,18 @@ namespace quda {
           for (int parity = 0; parity < arg.nParity; parity++) {
             parity = (arg.nParity == 2) ? parity : arg.parity;
 
-            for (int b=0; b<arg.geoBlockSizeCB; b++) {
+            for (int b = 0; b < arg.geoBlockSizeCB; b++) {
 
-              int x = arg.coarse_to_fine[ (x_coarse*2 + parity) * arg.geoBlockSizeCB + b];
-              int x_cb = x - parity*arg.fineVolumeCB;
+              int x = arg.coarse_to_fine[(x_coarse * 2 + parity) * arg.geoBlockSizeCB + b];
+              int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-              else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+              if (j == 0)
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+              else
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
               for (int s = 0; s < nSpin; s++) { colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s]); }
             }
@@ -193,8 +206,12 @@ namespace quda {
               int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j==0) for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
-              else for (int s=0; s<nSpin; s++) for (int c=0; c<nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
+              if (j == 0)
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
+              else
+                for (int s = 0; s < nSpin; s++)
+                  for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
 
               for (int s = 0; s < nSpin; s++) { colorScale<Float, nColor>(v[s], nrm[arg.spin_map(s, parity)]); }
 
@@ -211,10 +228,10 @@ namespace quda {
   }
 #endif
 
-  template <int block_size, typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec,
-            typename Arg>
-  __launch_bounds__(2*block_size)
-  __global__ void blockOrthoGPU(Arg arg) {
+  template <int block_size, typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin,
+            int nVec, typename Arg>
+  __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
+  {
 
     int x_coarse = blockIdx.x;
 #ifdef SWIZZLE
@@ -250,11 +267,11 @@ namespace quda {
     const Vector *B = reinterpret_cast<const Vector *>(B_array_d);
 
     // loop over number of block orthos
-    for (int n=0; n<arg.nBlockOrtho; n++) {
-      for (int j=0; j<nVec; j++) {
+    for (int n = 0; n < arg.nBlockOrtho; n++) {
+      for (int j = 0; j < nVec; j++) {
 
         complex<Float> v[spinBlock][nColor];
-        if (n==0) { // load from B on first Gram-Schmidt, otherwise V.
+        if (n == 0) { // load from B on first Gram-Schmidt, otherwise V.
 #pragma unroll
           for (int s = 0; s < spinBlock; s++)
 #pragma unroll
@@ -300,7 +317,7 @@ namespace quda {
 
         __syncthreads();
         nrm = normReduce(*norm_storage).Sum(nrm);
-        if (threadIdx.x==0 && threadIdx.y==0) *nrm_ = nrm;
+        if (threadIdx.x == 0 && threadIdx.y == 0) *nrm_ = nrm;
         __syncthreads();
         nrm = *nrm_;
 
@@ -315,7 +332,7 @@ namespace quda {
           for (int c = 0; c < nColor; c++) arg.V(parity, x_cb, chirality * spinBlock + s, c, j) = v[s][c];
 
       } // j
-    } // n
+    }   // n
   }
 
 } // namespace quda
