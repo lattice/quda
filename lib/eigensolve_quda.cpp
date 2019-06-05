@@ -654,21 +654,28 @@ namespace quda
                    restart_iter, iter);
 
         // Dump all Ritz values and residua
-        for (int i = 0; i < nEv; i++) {
+        for (int i = 0; i < nConv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals, nEv);
+      computeEvals(mat, kSpace, evals, nConv);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        for (int i = 0; i < nEv; i++) {
-          printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
-                     residua[i]);
-        }
+	if (eig_param->compute_svd) {
+	  for (int i = 0; i < nConv/2; i++) {
+	    printfQuda("SingValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+		       residua[i]);
+	  }
+	} else {
+	  for (int i = 0; i < nConv; i++) {
+	    printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+		       residua[i]);
+	  }
+	}
       }
-
-      // Compute SVD if requested
+      
+      // Compute left singular vectors if SVD is requested
       if (eig_param->compute_svd) { computeSVD(kSpace, evals); }
     }
 
@@ -889,6 +896,8 @@ namespace quda
       // As a cross check, we recompute the singular values from mat vecs rather
       // than make the direct relation (sigma_i)^2 = |lambda_i|
       //--------------------------------------------------------------------------
+
+      // Lambda already contains the square root of the eigenvalue of the norm op.
       Complex lambda = evals[i];
 
       // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
@@ -904,13 +913,8 @@ namespace quda
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
-                   sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
+                   sigma_tmp[i].imag(), sigma_tmp[i].real() - lambda.real());
       //--------------------------------------------------------------------------
-    }
-    
-    // Update the host evals array
-    for (int i = 0; i < nConv / 2; i++) {
-      evals[i] = sigma_tmp[i];
     }
   }
 } // namespace quda
