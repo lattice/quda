@@ -48,11 +48,11 @@ namespace quda {
       init = false;
 
       if (deflate_init) {
-	for (auto veci : param.evecs)
-	  if (veci) delete veci;
-	delete defl_tmp1[0];
-	delete defl_tmp2[0];            
-      }      
+        for (auto veci : param.evecs)
+          if (veci) delete veci;
+        delete defl_tmp1[0];
+        delete defl_tmp2[0];
+      }
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -69,7 +69,7 @@ namespace quda {
       init = false;
     }
   }
-  
+
   // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
   void CGNE::operator()(ColorSpinorField &x, ColorSpinorField &b) {
     if (param.maxiter == 0 || param.Nsteps == 0) {
@@ -205,11 +205,11 @@ namespace quda {
 
   void CG::constructDeflationSpace()
   {
-    // Deflation requested + first instance of solver    
+    // Deflation requested + first instance of solver
     profile.TPSTOP(QUDA_PROFILE_INIT);
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(*rp);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -217,11 +217,11 @@ namespace quda {
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nKr);
     for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-    
+
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-    
+
     param.evals.resize(param.eig_param.nEv);
     for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -230,7 +230,7 @@ namespace quda {
 
     deflate_init = true;
   }
-  
+
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
@@ -300,7 +300,7 @@ namespace quda {
     // Once the CG operator is called, we are able to construct an appropriate
     // Krylov space for deflation
     if (param.deflate && !deflate_init) { constructDeflationSpace(); }
-    
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;

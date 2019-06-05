@@ -233,20 +233,20 @@ namespace quda {
       for (auto veci : param.evecs)
         if (veci) delete veci;
       delete defl_tmp1[0];
-      delete defl_tmp2[0];            
+      delete defl_tmp2[0];
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   void GCR::constructDeflationSpace()
   {
-    // Deflation requested + first instance of solver    
+    // Deflation requested + first instance of solver
     profile.TPSTOP(QUDA_PROFILE_INIT);
     param.eig_param.compute_svd = QUDA_BOOLEAN_YES;
-    DiracMdagM mdagm(mat.Expose());	
+    DiracMdagM mdagm(mat.Expose());
     eig_solve = EigenSolver::create(&param.eig_param, mdagm, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(*p[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -254,11 +254,11 @@ namespace quda {
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nKr);
     for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-    
+
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-    
+
     param.evals.resize(param.eig_param.nEv);
     for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -267,7 +267,7 @@ namespace quda {
 
     deflate_init = true;
   }
-  
+
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
     if (nKrylov == 0) {
@@ -341,7 +341,7 @@ namespace quda {
       // rhs b. use `defl_tmp2` as a temp.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
-      
+
       // Deflate: Hardcoded to SVD
       eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
 
@@ -483,7 +483,7 @@ namespace quda {
         } else {
           resIncrease = 0;
         }
-	
+
         k_break = k;
         k = 0;
 

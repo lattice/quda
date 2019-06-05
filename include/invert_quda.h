@@ -600,7 +600,7 @@ namespace quda {
        @brief Constructs the deflation space for CG
     */
     void constructDeflationSpace();
-    
+
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
 
@@ -863,11 +863,10 @@ namespace quda {
        @brief Constructs the deflation space
     */
     void constructDeflationSpace();
-    
+
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-    
   };
-  
+
   class MR : public Solver {
 
   private:
@@ -954,6 +953,11 @@ namespace quda {
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
+    /**
+       @brief Constructs the deflation space for CG
+    */
+    void constructDeflationSpace();
+    
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -984,7 +988,7 @@ namespace quda {
   public:
     CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNR();
-
+    
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -1032,7 +1036,7 @@ namespace quda {
     */
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
-  public:
+public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 

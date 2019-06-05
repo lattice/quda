@@ -443,7 +443,7 @@ namespace quda
       param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-      // Coarse level deflation id triggered if the eig param structure exists
+      // Coarse level deflation is triggered if the eig param structure exists
       // on the coarsest level, and we are on the next to coarsest level.
       if (param.mg_global.use_eig_solver[param.Nlevel - 1] && (param.level == param.Nlevel - 2)) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
@@ -454,6 +454,13 @@ namespace quda
           param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
         }
 
+	// Deflation on the coarse is supported for 6 solvers only
+	if (param_coarse_solver->inv_type != QUDA_CA_CGNR_INVERTER && param_coarse_solver->inv_type != QUDA_CGNR_INVERTER &&
+	    param_coarse_solver->inv_type != QUDA_CA_CGNE_INVERTER && param_coarse_solver->inv_type != QUDA_CGNE_INVERTER &&
+	    param_coarse_solver->inv_type != QUDA_CA_GCR_INVERTER && param_coarse_solver->inv_type != QUDA_GCR_INVERTER) {
+	  errorQuda("Coarse grid deflation not supported with coarse solver %d", param_coarse_solver->inv_type);
+	}
+	  
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
             param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile);
