@@ -335,7 +335,8 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
       else texDesc.readMode = cudaReadModeElementType;
 
-      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
+          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
         errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
           resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
       }
@@ -363,7 +364,8 @@ namespace quda {
         resDesc.res.linear.desc = desc;
         resDesc.res.linear.sizeInBytes = norm_bytes;
 
-        if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
+        if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
+            || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
         	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
