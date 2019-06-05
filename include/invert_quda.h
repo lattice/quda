@@ -860,7 +860,7 @@ namespace quda {
     virtual ~GCR();
 
     /**
-       @brief Constructs the deflation space
+       @brief Constructs the deflation space for GCR
     */
     void constructDeflationSpace();
 
@@ -954,7 +954,7 @@ namespace quda {
     virtual ~CACG();
 
     /**
-       @brief Constructs the deflation space for CG
+       @brief Constructs the deflation space for CACG
     */
     void constructDeflationSpace();
     
@@ -1041,7 +1041,7 @@ public:
     virtual ~CAGCR();
 
     /**
-       @brief Constructs the deflation space for CG
+       @brief Constructs the deflation space for CAGCR
     */
     void constructDeflationSpace();
     
