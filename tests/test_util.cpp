@@ -1675,6 +1675,7 @@ QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
 
 int nu_pre[QUDA_MAX_MG_LEVEL] = { };
 int nu_post[QUDA_MAX_MG_LEVEL] = { };
+int n_block_ortho[QUDA_MAX_MG_LEVEL] = { };
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
@@ -1886,6 +1887,7 @@ void usage(char** argv )
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
+  printf("    --mg-n-block-ortho <level n>              # The number of times to run Gram-Schmidt during block orthonormalization (default 1)\n");
   printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
   printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
   printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
@@ -3129,6 +3131,27 @@ int process_command_line_option(int argc, char** argv, int* idx)
       exit(1);
     }
 
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--mg-n-block-ortho") == 0){
+    if (i+2 >= argc){
+      usage(argv);
+    }
+
+    int level = atoi(argv[i+1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d for number of block orthos", level);
+      usage(argv);
+    }
+    i++;
+
+    n_block_ortho[level] = atoi(argv[i+1]);
+    if (n_block_ortho[level] < 1) {
+      fprintf(stderr, "ERROR: invalid number %d of block orthonormalizations", n_block_ortho[level]);
+    }
     i++;
     ret = 0;
     goto out;
