@@ -50,11 +50,11 @@ namespace quda {
 
     if (deflate_init) {
       for (auto veci : param.evecs)
-	if (veci) delete veci;
+        if (veci) delete veci;
       delete defl_tmp1[0];
-      delete defl_tmp2[0];            
-    }      
-    
+      delete defl_tmp2[0];
+    }
+
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -264,7 +264,7 @@ namespace quda {
       // Once the CACG operator is called, we are able to construct an appropriate
       // Krylov space for deflation
       if (param.deflate && !deflate_init) { constructDeflationSpace(); }
-      
+
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
       tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -443,11 +443,11 @@ namespace quda {
 
   void CACG::constructDeflationSpace()
   {
-    // Deflation requested + first instance of solver    
+    // Deflation requested + first instance of solver
     profile.TPSTOP(QUDA_PROFILE_INIT);
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(*tmpp);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -455,11 +455,11 @@ namespace quda {
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nKr);
     for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-    
+
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-    
+
     param.evals.resize(param.eig_param.nEv);
     for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -468,7 +468,7 @@ namespace quda {
 
     deflate_init = true;
   }
-  
+
   /*
     The main CA-CG algorithm, which consists of three main steps:
     1. Build basis vectors q_k = A p_k for k = 1..Nkrlylov
@@ -527,15 +527,15 @@ namespace quda {
 
       // Deflate
       eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
-      
+
       // Compute r_defl = RHS - A * LHS
       mat(r_, *defl_tmp1[0], tmp, tmp2);
       r2 = blas::xmyNorm(*rhs[0], r_);
-      
+
       // defl_tmp1 must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);      
+      blas::axpy(1.0, *defl_tmp1[0], x);
     }
-    
+
     // Use power iterations to approx lambda_max
     auto &lambda_min = param.ca_lambda_min;
     auto &lambda_max = param.ca_lambda_max;

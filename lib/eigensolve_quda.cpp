@@ -303,7 +303,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *r[0], *evecs[i]);
-      
+
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *r[0]) / sqrt(blas::norm2(*evecs[i]));
 
@@ -417,7 +417,7 @@ namespace quda
     // profile.TPSTOP(QUDA_PROFILE_IO);
     // profile.TPSTART(QUDA_PROFILE_COMPUTE);
   }
-  
+
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
                                  std::vector<Complex> &evals)
   {
@@ -436,11 +436,15 @@ namespace quda
     computeEvals(mat, kSpace, evals, nConv);
     for (int i = 0; i < nConv; i++) {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        if (eig_param->compute_svd && i<nConv/2) printfQuda("SingValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
-	else printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+        if (eig_param->compute_svd && i < nConv / 2)
+          printfQuda("SingValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+                     residua[i]);
+        else
+          printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+                     residua[i]);
       }
     }
-    
+
     delete r[0];
   }
 
@@ -903,11 +907,10 @@ namespace quda
                    sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
       //--------------------------------------------------------------------------
     }
-
+    
     // Update the host evals array
     for (int i = 0; i < nConv / 2; i++) {
-      evals[2 * i + 0] = sigma_tmp[i];
-      evals[2 * i + 1] = sigma_tmp[i];
+      evals[i] = sigma_tmp[i];
     }
   }
 } // namespace quda

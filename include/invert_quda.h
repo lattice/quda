@@ -957,7 +957,7 @@ namespace quda {
        @brief Constructs the deflation space for CACG
     */
     void constructDeflationSpace();
-    
+
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -988,7 +988,7 @@ namespace quda {
   public:
     CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNR();
-    
+
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -1044,7 +1044,7 @@ public:
        @brief Constructs the deflation space for CAGCR
     */
     void constructDeflationSpace();
-    
+
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
