@@ -182,11 +182,12 @@ namespace quda {
 
     long long flops() const
     {
-      return nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
+      return n_block_ortho * nBlock * (geoBlockSize / 2) * (spinBlockSize == 0 ? 1 : 2 * spinBlockSize) / 2 * nColor
           * (nVec * ((nVec - 1) * (8l + 8l)) + 6l);
     }
 
-    long long bytes() const { return nVec * B[0]->Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes(); }
+    long long bytes() const { return nVec * B[0]->Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes() +
+          (n_block_ortho - 1) * (V.Bytes() + (nVec - 1) * nVec / 2 * V.Bytes() / nVec + V.Bytes()); }
 
     char *saveOut, *saveOutNorm;
 
