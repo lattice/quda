@@ -473,7 +473,7 @@ namespace quda
 
         if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
             param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0)) {
-          std::string vec_outfile(param.mg_global.vec_infile);
+          std::string vec_outfile(param.mg_global.vec_outfile);
           vec_outfile += "_level_";
           vec_outfile += std::to_string(param.level + 1);
           vec_outfile += "_defl_";
