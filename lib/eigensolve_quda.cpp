@@ -260,22 +260,23 @@ namespace quda
     host_free(s);
   }
 
-    // Deflate vec, place result in vec_defl
+  // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-			       std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+                               std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
   {
     // number of evecs
-    if ((eig_param->nConv)%2 != 0) errorQuda("Must pass equal number of left and right singular vectors");
-    int n_defl = eig_param->nConv/2;
-    
+    if ((eig_param->nConv) % 2 != 0)
+      errorQuda("Must pass equal number of left and right singular vectors: %d given", eig_param->nConv);
+    int n_defl = eig_param->nConv / 2;
+
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
-    
+
     // Perform Sum_i (L_i * (\sigma_i)^{-1} * (L_i)^dag) + (R_i * (\sigma_i)^{-1} * R_i)^dag) * vec = vec_defl
     // for all i computed eigenvectors and values.
-    
+
     // 1. Take block inner product: (R_i)^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs_ptr;
-    for (int i = n_defl; i < 2*n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
+    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
     Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
     blas::cDotProduct(s, left_vecs_ptr, vec);
 
@@ -285,7 +286,7 @@ namespace quda
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     std::vector<ColorSpinorField *> right_vecs_ptr;
-    for (int i = 0; i < n_defl; i++) right_vecs_ptr.push_back(eig_vecs[i]);    
+    for (int i = 0; i < n_defl; i++) right_vecs_ptr.push_back(eig_vecs[i]);
     blas::caxpy(s, right_vecs_ptr, vec_defl);
 
     // FIXME - we can optimize the zeroing out with a "multi-caxy"

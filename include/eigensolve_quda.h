@@ -123,7 +123,7 @@ public:
        @param[in] evals The singular values to use in deflation
     */
     void deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-		    std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
+                    std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
 
     /**
        @brief Compute eigenvalues and their residiua

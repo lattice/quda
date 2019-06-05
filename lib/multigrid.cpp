@@ -285,7 +285,7 @@ namespace quda
     param_presmooth->preserve_source = QUDA_PRESERVE_SOURCE_NO;
     param_presmooth->return_residual = true; // pre-smoother returns the residual vector for subsequent coarsening
     param_presmooth->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-    
+
     param_presmooth->precision = param.mg_global.invert_param->cuda_prec_sloppy;
     param_presmooth->precision_sloppy = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
     param_presmooth->precision_precondition = (param.level == 0) ? param.mg_global.invert_param->cuda_prec_precondition : param.mg_global.invert_param->cuda_prec_sloppy;
@@ -474,7 +474,7 @@ namespace quda
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
         }
       }
-      
+
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
       param_coarse_solver->compute_true_res = false;
