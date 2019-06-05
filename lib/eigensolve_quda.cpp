@@ -303,7 +303,7 @@ namespace quda
     for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *r[0], *evecs[i]);
-
+      
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
       evals[i] = blas::cDotProduct(*evecs[i], *r[0]) / sqrt(blas::norm2(*evecs[i]));
 
@@ -311,6 +311,7 @@ namespace quda
       Complex n_unit(-1.0, 0.0);
       blas::caxpby(evals[i], *evecs[i], n_unit, *r[0]);
       residua[i] = sqrt(blas::norm2(*r[0]));
+      if (eig_param->compute_svd) evals[i] = sqrt(abs(evals[i]));
     }
   }
 
@@ -416,7 +417,7 @@ namespace quda
     // profile.TPSTOP(QUDA_PROFILE_IO);
     // profile.TPSTART(QUDA_PROFILE_COMPUTE);
   }
-
+  
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
                                  std::vector<Complex> &evals)
   {
@@ -432,12 +433,14 @@ namespace quda
     r.push_back(ColorSpinorField::Create(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
-    computeEvals(mat, kSpace, evals, nEv);
-    for (int i = 0; i < nEv; i++) {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+    computeEvals(mat, kSpace, evals, nConv);
+    for (int i = 0; i < nConv; i++) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        if (eig_param->compute_svd && i<nConv/2) printfQuda("SingValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+	else printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+      }
     }
-
+    
     delete r[0];
   }
 
