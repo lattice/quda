@@ -467,6 +467,8 @@ extern "C" {
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
     //-------------------------------------------------
+    /** Whether deflation space is complete */
+    QudaBoolean is_complete;    
 
   } QudaEigParam;
 
@@ -761,7 +763,7 @@ extern "C" {
   void endQuda(void);
 
 /**
- * @brief update the radius for halos. 
+ * @brief update the radius for halos.
  * @details This should only be needed for automated testing when
  * different partitioning is applied within a single run.
  */
@@ -947,6 +949,14 @@ extern "C" {
    * sets the output filename prefix).
    */
   void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
+
+  /**
+   * @brief Updates the deflation space information
+   * @param[in] mg_instance Pointer to the instance of deflated solver
+   * @param param Contains all metadata regarding host and device
+   * storage etc.
+   */
+  void updateDeflationQuda(void *df_instance, QudaEigParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
@@ -1207,7 +1217,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1216,7 +1226,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param,
                              unsigned int nSteps, double alpha);
 
   /**

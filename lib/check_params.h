@@ -165,6 +165,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
+  P(is_complete, QUDA_BOOLEAN_INVALID);
 #else
   P(use_poly_acc, QUDA_BOOLEAN_INVALID);
   P(poly_deg, INVALID_INT);
@@ -187,6 +188,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
+  P(is_complete, QUDA_BOOLEAN_INVALID);  
 #endif
 
 #if defined INIT_PARAM

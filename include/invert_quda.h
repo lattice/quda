@@ -1063,33 +1063,22 @@ private:
     Solver *solver;
     const Dirac &dirac;
     const char *prefix;
+    const bool  apply_deflation;
 
 public:
     PreconditionedSolver(Solver &solver, const Dirac &dirac, SolverParam &param, TimeProfile &profile,
-                         const char *prefix) :
+                         const char *prefix, const bool apply_deflation = false) :
       Solver(param, profile),
       solver(&solver),
       dirac(dirac),
-      prefix(prefix)
+      prefix(prefix),
+      apply_deflation(apply_deflation)
     {
     }
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-    void operator()(ColorSpinorField &x, ColorSpinorField &b) {
-      setOutputPrefix(prefix);
-
-      QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
-
-      ColorSpinorField *out=nullptr;
-      ColorSpinorField *in=nullptr;
-
-      dirac.prepare(in, out, x, b, solution_type);
-      (*solver)(*out, *in);
-      dirac.reconstruct(x, b, solution_type);
-
-      setOutputPrefix("");
-    }
+    void operator()(ColorSpinorField &x, ColorSpinorField &b);
   };
 
   class MultiShiftSolver {

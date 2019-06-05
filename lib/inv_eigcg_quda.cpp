@@ -76,11 +76,10 @@ namespace quda {
 
        /** Pipeline specific parameters:
 	*/
-       Vector3i pipel_per_task;//pipeline length per compute task (for 3 tasks)
-       int      tot_pipel;     //total pipeline length
-       //
-       RealVector pipelanczos_diag;
-       RealVector pipelanczos_offdiag;
+       Vector3i task_offsets;//pipeline length per compute task (for 3 compute tasks, the last entry is the total pipeline length)
+       //Cached lanczos elements (diagonal and off-diagonal elements)
+       RealVectorSet lanczos_cached_elems;
+
        // C++ task-based object for the (asynchron.) RayleighRitz computations
        std::future<void> rr_task;
        /** Global reduction stuff:
@@ -107,12 +106,10 @@ namespace quda {
 	  run_residual_correction(false),
 	  inv_normr_m(0.0),
 	  s(RealVector::Zero(2*k)),
-	  pipel_per_task(pipe_l),
-	  tot_pipel(pipel_per_task.sum()),
-	  pipelanczos_diag(RealVector::Zero(tot_pipel == 0 ? 0 : tot_pipel)),
-	  pipelanczos_offdiag(RealVector::Zero(tot_pipel == 0 ? 0 : tot_pipel)),
-	  rr_task_recvbuff(RealVector::Zero(tot_pipel == 0 ? 0 : 2*k)),
-	  caeigcg_recvbuff(RealVector::Zero(tot_pipel == 0 ? 0 : 4))
+	  task_offsets(pipe_l),
+	  lanczos_cached_elems(RealVectorSet::Zero(task_offsets[2], 2)),
+	  rr_task_recvbuff(RealVector::Zero(2*k)),
+	  caeigcg_recvbuff(RealVector::Zero(4))
        { }
 
        ~EigCGArgs() { }
@@ -124,8 +121,8 @@ namespace quda {
 
 	 if(is_pipelined) {
            if(cid >= m) {//store lanczos coeff in the buffers
-             pipelanczos_diag[cid-m]    = diag_val;
-	     pipelanczos_offdiag[cid-m] = offdiag_val;
+             lanczos_cached_elems(cid-m,0)    = diag_val;
+	     lanczos_cached_elems(cid-m,1) = offdiag_val;
 	     return;
 	   }
 	 }
@@ -143,7 +140,7 @@ namespace quda {
 	 if(rr_task.valid()) rr_task.wait();
        }
 
-       inline void ResetSearchIdx() {  id = 2*k+tot_pipel;  restarts += 1; }
+       inline void ResetSearchIdx() {  id = 2*k+task_offsets[2];  restarts += 1; }
        inline void UpdateSearchIdx(){  id += 1; }
 
        template <bool is_pipelined = false>
@@ -156,17 +153,19 @@ namespace quda {
 	 Tm.col(2*k).segment(0, 2*k) = s;
 	 Tm.row(2*k).segment(0, 2*k) = s;
 
-	 id = 2*k+tot_pipel;  restarts += 1; s.setZero();
+  const int tot_pipe_l = task_offsets[2];
+
+	 id = 2*k+tot_pipe_l;  restarts += 1; s.setZero();
 
 	 if (!is_pipelined) return;
 
 	 rr_task_recvbuff.setZero();
 
          // For the pipelined version we need to restore cached coefficinets:
-	 for(int i = 0; i < tot_pipel; i++) {
-	   Tm.diagonal< 0>()[2*k+i] = pipelanczos_diag[i];
-	   Tm.diagonal<+1>()[2*k+i] = pipelanczos_offdiag[i];
-	   Tm.diagonal<-1>()[2*k+i] = pipelanczos_offdiag[i];
+	 for(int i = 0; i < tot_pipe_l; i++) {
+	   Tm.diagonal< 0>()[2*k+i] = lanczos_cached_elems(i,0);
+	   Tm.diagonal<+1>()[2*k+i] = lanczos_cached_elems(i,1);
+	   Tm.diagonal<-1>()[2*k+i] = lanczos_cached_elems(i,1);
 	 }
 
 	 return;
@@ -208,7 +207,7 @@ namespace quda {
    };
 
    //helper for a smart pointer creation
-   
+
    std::shared_ptr<ColorSpinorField> MakeSharedPtr(const ColorSpinorParam &param)
    {
      if (param.location == QUDA_CPU_FIELD_LOCATION )  return std::move(std::make_shared<cpuColorSpinorField>(param) );
@@ -320,7 +319,7 @@ namespace quda {
 
       blas::zero(v2k);
 
-      const int n_qv_updates = args.pipel_per_task[compute_qv_idx];
+      const int n_qv_updates = is_pipelined ? args.task_offsets[compute_qv_idx] : 1;
 
       const int block_size   = args.m / n_qv_updates;//WARNING args.n_updates < args.m
 
@@ -418,15 +417,15 @@ namespace quda {
       //args.rr_task = std::async(std::launch::async, &IncEigCG::RayleighRitz<is_pipelined, COMPUTE_EIGENV_AND_QV>, this);
       //ok, this works but does not launch a parallel task
       args.rr_task = std::async(std::launch::deferred, &IncEigCG::RayleighRitz<is_pipelined, COMPUTE_EIGENV_AND_QV>, this);
-    } else if (args.id == (args.m+args.tot_pipel-1)) {
+    } else if (args.id == (args.m+args.task_offsets[2]-1)) {
       //do synchronization first
       if(args.rr_task.valid()) args.rr_task.wait();
       else warningQuda("Tried to synchronize an invalid task...");
 
       RayleighRitz<is_pipelined, COMPUTE_ZAV>();
-    } else if (args.id == (args.m+args.tot_pipel)) {
+    } else if (args.id == (args.m+args.task_offsets[2])) {
       // load cached basis vectors (nop for the non-pipelined version)
-      for(int i = 0; i < args.tot_pipel; i++) blas::copy(vm[2*args.k + i], vm[args.m + i]);
+      for(int i = 0; i < args.task_offsets[3]; i++) blas::copy(vm[2*args.k + i], vm[args.m + i]);
       //
       EIGCG_MPI_CHECK_(MPI_Wait(&args.rr_task_request_handle, MPI_STATUS_IGNORE));
       if (comm_size() > 1) args.s = args.rr_task_recvbuff;
@@ -685,7 +684,7 @@ namespace quda {
 
     ColorSpinorParam csParam(x);
 
-    int caeigcg_pipe_l[3] = {rr_pipe_l, qv_pipe_l, zav_pipe_l};
+    int caeigcg_pipe_l[3] = {rr_pipe_l, rr_pipe_l+qv_pipe_l, rr_pipe_l+qv_pipe_l+zav_pipe_l};
 
     if (!init) {
       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, caeigcg_pipe_l);
@@ -981,6 +980,8 @@ namespace quda {
 
      if(defl.is_complete()) {
        if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the requested deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
+
+       Vm.reset(); V2k.reset();
 
        const int max_nev = defl.size();//param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
