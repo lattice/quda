@@ -41,6 +41,7 @@ namespace quda {
     enable_gpu(false),
     enable_cpu(false),
     use_gpu(true),
+    is_staggered(B[0]->Nspin() == 1),
     flops_(0),
     profile(profile)
   {
