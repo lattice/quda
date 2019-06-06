@@ -73,6 +73,7 @@ extern bool compute_clover;
 extern int eig_nEv;
 extern int eig_nKr;
 extern int eig_nConv;
+extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
 extern double eig_tol;
@@ -112,9 +113,10 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);  
   printfQuda(" - size of Krylov space %d\n", eig_nKr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");  
   if (eig_compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
@@ -302,6 +304,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
   eig_param.cuda_prec_ritz = cuda_prec;
