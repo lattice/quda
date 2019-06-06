@@ -193,7 +193,10 @@ namespace quda {
 
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
-
+#if CUDA_VERSION < 9000
+        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
+                                *getStream());
+#endif
         multiBlasKernel<FloatN, M, NXZ><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
       }
@@ -417,6 +420,7 @@ namespace quda {
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
             } else if (x[0]->Nspin() == 1) {
+
 #if defined(GPU_STAGGERED_DIRAC)
               const int M = 3;
               multiBlas<NXZ, double2, float2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
@@ -424,6 +428,7 @@ namespace quda {
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
             }
+
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
@@ -438,7 +443,9 @@ namespace quda {
 #else
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
+
             } else if (x[0]->Nspin() == 1) {
+
 #if defined(GPU_STAGGERED_DIRAC)
               const int M = 3;
               multiBlas<NXZ, double2, short2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
@@ -487,11 +494,38 @@ namespace quda {
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
 #endif
 
+          } else if (x[0]->Precision() == QUDA_QUARTER_PRECISION) {
+
+#if (QUDA_PRECISION & 1)
+            if (x[0]->Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+              const int M = 6;
+              multiBlas<NXZ, float4, char4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+
+            } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
+
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+              const int M = 3;
+              multiBlas<NXZ, float2, char2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+            } else {
+              errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
+            }
+
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
+#endif
+
           } else {
             errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());
           }
 #else
-          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+          errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y[0]->Precision());
 #endif
         } else {
           errorQuda("Precision combination x=%d y=%d not supported\n", x[0]->Precision(), y[0]->Precision());

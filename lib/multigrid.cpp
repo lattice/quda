@@ -148,7 +148,7 @@ namespace quda
       } else {
         // create transfer operator
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating transfer operator\n");
-        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize, 
+        transfer = new Transfer(param.B, param.Nvec, param.NblockOrtho, param.geoBlockSize, param.spinBlockSize,
                                 param.mg_global.precision_null[param.level], profile);
         for (int i=0; i<QUDA_MAX_MG_LEVEL; i++) param.mg_global.geo_block_size[param.level][i] = param.geoBlockSize[i];
 
@@ -453,13 +453,23 @@ namespace quda
       param_coarse_solver->return_residual = false; // coarse solver does need to return residual vector
 
       param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_NO;
-      if (param.mg_global.use_eig_solver[param.Nlevel - 1]) {
+      // Coarse level deflation is triggered if the eig param structure exists
+      // on the coarsest level, and we are on the next to coarsest level.
+      if (param.mg_global.use_eig_solver[param.Nlevel - 1] && (param.level == param.Nlevel - 2)) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
         param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
         // Due to coherence between these levels, an initial guess
         // might be beneficial.
         if (param.mg_global.coarse_guess == QUDA_BOOLEAN_YES) {
           param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        }
+
+        // Deflation on the coarse is supported for 6 solvers only
+        if (param_coarse_solver->inv_type != QUDA_CA_CGNR_INVERTER && param_coarse_solver->inv_type != QUDA_CGNR_INVERTER
+            && param_coarse_solver->inv_type != QUDA_CA_CGNE_INVERTER
+            && param_coarse_solver->inv_type != QUDA_CGNE_INVERTER && param_coarse_solver->inv_type != QUDA_CA_GCR_INVERTER
+            && param_coarse_solver->inv_type != QUDA_GCR_INVERTER) {
+          errorQuda("Coarse grid deflation not supported with coarse solver %d", param_coarse_solver->inv_type);
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
@@ -474,7 +484,7 @@ namespace quda
 
         if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
             param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0)) {
-          std::string vec_outfile(param.mg_global.vec_infile);
+          std::string vec_outfile(param.mg_global.vec_outfile);
           vec_outfile += "_level_";
           vec_outfile += std::to_string(param.level + 1);
           vec_outfile += "_defl_";
@@ -482,6 +492,7 @@ namespace quda
           strcpy(param_coarse_solver->eig_param.vec_outfile, vec_outfile.c_str());
         }
       }
+
       param_coarse_solver->tol = param.mg_global.coarse_solver_tol[param.level+1];
       param_coarse_solver->global_reduction = true;
       param_coarse_solver->compute_true_res = false;

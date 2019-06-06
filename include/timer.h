@@ -101,39 +101,40 @@ namespace quda {
 
   /**< Enumeration type used for writing a simple but extensible profiling framework. */
   enum QudaProfileType {
-    QUDA_PROFILE_H2D, /**< host -> device transfers */
-    QUDA_PROFILE_D2H, /**< The time in seconds for device -> host transfers */
-    QUDA_PROFILE_INIT, /**< The time in seconds taken for initiation */
+    QUDA_PROFILE_H2D,      /**< host -> device transfers */
+    QUDA_PROFILE_D2H,      /**< The time in seconds for device -> host transfers */
+    QUDA_PROFILE_INIT,     /**< The time in seconds taken for initiation */
     QUDA_PROFILE_PREAMBLE, /**< The time in seconds taken for any preamble */
-    QUDA_PROFILE_COMPUTE, /**< The time in seconds taken for the actual computation */
-    QUDA_PROFILE_COMMS, /**< synchronous communication */
+    QUDA_PROFILE_COMPUTE,  /**< The time in seconds taken for the actual computation */
+    QUDA_PROFILE_COMMS,    /**< synchronous communication */
     QUDA_PROFILE_EPILOGUE, /**< The time in seconds taken for any epilogue */
-    QUDA_PROFILE_FREE, /**< The time in seconds for freeing resources */
-    QUDA_PROFILE_IO, /**< time spent on file i/o */
-    QUDA_PROFILE_CHRONO, /**< time spent on chronology */
-    QUDA_PROFILE_EIGEN, /**< time spent on host-side Eigen */
+    QUDA_PROFILE_FREE,     /**< The time in seconds for freeing resources */
+    QUDA_PROFILE_IO,       /**< time spent on file i/o */
+    QUDA_PROFILE_CHRONO,   /**< time spent on chronology */
+    QUDA_PROFILE_EIGEN,    /**< time spent on host-side Eigen */
+    QUDA_PROFILE_ARPACK,   /**< time spent on host-side ARPACK */
 
     // lower level counters used in the dslash and api profiling
     QUDA_PROFILE_LOWER_LEVEL, /**< dummy timer to mark beginning of lower level timers which do not count towrads global time */
-    QUDA_PROFILE_PACK_KERNEL, /**< face packing kernel */
+    QUDA_PROFILE_PACK_KERNEL,   /**< face packing kernel */
     QUDA_PROFILE_DSLASH_KERNEL, /**< dslash kernel */
-    QUDA_PROFILE_GATHER, /**< gather (device -> host) */
-    QUDA_PROFILE_SCATTER, /**< scatter (host -> device) */
+    QUDA_PROFILE_GATHER,        /**< gather (device -> host) */
+    QUDA_PROFILE_SCATTER,       /**< scatter (host -> device) */
 
-    QUDA_PROFILE_LAUNCH_KERNEL, /**< cudaLaunchKernel */
-    QUDA_PROFILE_EVENT_RECORD, /**< cuda event record  */
-    QUDA_PROFILE_EVENT_QUERY, /**< cuda event querying */
-    QUDA_PROFILE_STREAM_WAIT_EVENT, /**< stream waiting for event completion */
+    QUDA_PROFILE_LAUNCH_KERNEL,      /**< cudaLaunchKernel */
+    QUDA_PROFILE_EVENT_RECORD,       /**< cuda event record  */
+    QUDA_PROFILE_EVENT_QUERY,        /**< cuda event querying */
+    QUDA_PROFILE_STREAM_WAIT_EVENT,  /**< stream waiting for event completion */
     QUDA_PROFILE_FUNC_SET_ATTRIBUTE, /**< set function attribute */
 
-    QUDA_PROFILE_EVENT_SYNCHRONIZE, /**< event synchronization */
+    QUDA_PROFILE_EVENT_SYNCHRONIZE,  /**< event synchronization */
     QUDA_PROFILE_STREAM_SYNCHRONIZE, /**< stream synchronization */
     QUDA_PROFILE_DEVICE_SYNCHRONIZE, /**< device synchronization */
 
-    QUDA_PROFILE_MEMCPY_D2D_ASYNC, /**< device to device async copy */
-    QUDA_PROFILE_MEMCPY_D2H_ASYNC, /**< device to host async copy */
+    QUDA_PROFILE_MEMCPY_D2D_ASYNC,   /**< device to device async copy */
+    QUDA_PROFILE_MEMCPY_D2H_ASYNC,   /**< device to host async copy */
     QUDA_PROFILE_MEMCPY2D_D2H_ASYNC, /**< device to host 2-d memcpy async copy*/
-    QUDA_PROFILE_MEMCPY_H2D_ASYNC, /**< host to device async copy */
+    QUDA_PROFILE_MEMCPY_H2D_ASYNC,   /**< host to device async copy */
 
     QUDA_PROFILE_COMMS_START, /**< initiating communication */
     QUDA_PROFILE_COMMS_QUERY, /**< querying communication */
@@ -141,7 +142,7 @@ namespace quda {
     QUDA_PROFILE_CONSTANT, /**< time spent setting CUDA constant parameters */
 
     QUDA_PROFILE_TOTAL, /**< The total time in seconds for the algorithm. Must be the penultimate type. */
-    QUDA_PROFILE_COUNT /**< The total number of timers we have.  Must be last enum type. */
+    QUDA_PROFILE_COUNT  /**< The total number of timers we have.  Must be last enum type. */
   };
 
 #ifdef INTERFACE_NVTX

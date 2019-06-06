@@ -1,5 +1,6 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
+  # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
@@ -96,8 +97,9 @@ endif()
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   if(GITVERSION)
     find_path(QUDA_GITDIR NAME HEAD PATHS ${CMAKE_SOURCE_DIR}/.git/logs NO_DEFAULT_PATH)
+    include(AddFileDependencies)
     if(QUDA_GITDIR)
-      set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/HEAD)
+      ADD_FILE_DEPENDENCIES(version.cpp ${QUDA_GITDIR}/HEAD)
     endif()
   endif()
   mark_as_advanced(QUDA_GITDIR)
@@ -219,11 +221,11 @@ if (QUDA_DOWNLOAD_EIGEN)
 endif()
 
 configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
 
 if(QUDA_JITIFY)
   configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
-  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory

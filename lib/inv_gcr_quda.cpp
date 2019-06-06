@@ -228,7 +228,44 @@ namespace quda {
     if (tmpp) delete tmpp;
     if (rp) delete rp;
     if (yp) delete yp;
+
+    if (deflate_init) {
+      for (auto veci : param.evecs)
+        if (veci) delete veci;
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+    }
     profile.TPSTOP(QUDA_PROFILE_FREE);
+  }
+
+  void GCR::constructDeflationSpace()
+  {
+    // Deflation requested + first instance of solver
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    param.eig_param.compute_svd = QUDA_BOOLEAN_YES;
+    DiracMdagM mdagm(mat.Expose());
+    eig_solve = EigenSolver::create(&param.eig_param, mdagm, profile);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    // Clone from an existing vector
+    ColorSpinorParam csParam(*p[0]);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    param.evecs.resize(param.eig_param.nKr);
+    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+
+    // Construct vectors to hold deflated RHS
+    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+
+    param.evals.resize(param.eig_param.nEv);
+    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    (*eig_solve)(param.evecs, param.evals);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    deflate_init = true;
   }
 
   void GCR::operator()(ColorSpinorField &x, ColorSpinorField &b)
@@ -252,7 +289,7 @@ namespace quda {
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i=0; i<nKrylov+1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i = 0; i < nKrylov + 1; i++) p[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
@@ -265,13 +302,17 @@ namespace quda {
       }
 
       if (param.precision_sloppy != x.Precision()) {
-	r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
+        r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
       } else {
-	r_sloppy = K ? rp : nullptr;
+        r_sloppy = K ? rp : nullptr;
       }
 
       init = true;
     }
+
+    // Once the GCR operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(); }
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
@@ -284,13 +325,34 @@ namespace quda {
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      // Compute r = b - A * x
       mat(r, x, y);
       r2 = blas::xmyNorm(b, r);
+      // x contains the original guess.
     } else {
       blas::copy(r, b);
       r2 = b2;
       blas::zero(x);
     }
+
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `defl_tmp2` as a temp.
+      blas::copy(*defl_tmp2[0], r);
+      rhs.push_back(defl_tmp2[0]);
+
+      // Deflate: Hardcoded to SVD
+      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0]);
+      r2 = blas::xmyNorm(*rhs[0], r);
+
+      // defl_tmp must be added to the solution at the end
+      blas::axpy(1.0, *defl_tmp1[0], x);
+    }
+
     blas::zero(y); // FIXME optimize first updates of y and ySloppy
     if (&y != &ySloppy) blas::zero(ySloppy);
 
@@ -385,7 +447,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k+1]);
+      r2 = blas::cabxpyzAxNorm(1.0 / gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k + 1]);
 
       k++;
       total_iter++;

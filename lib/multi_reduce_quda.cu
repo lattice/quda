@@ -57,6 +57,10 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
+#if CUDA_VERSION < 9000
+      cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
+                              *getStream());
+#endif
       LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
 #endif
@@ -916,8 +920,11 @@ namespace quda {
 	strcat(aux,",m=");
 	u64toa(size, y.size());
 	strcat(aux,size);
+        u64toa(size, MAX_MULTI_BLAS_N);
+        strcat(aux, ",multi-blas-n=");
+        strcat(aux, size);
 
-      	// before we do policy tuning we must ensure the kernel
+        // before we do policy tuning we must ensure the kernel
       	// constituents have been tuned since we can't do nested tuning
       	// FIXME this will break if the kernels are destructive - which they aren't here
 	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
@@ -982,7 +989,6 @@ namespace quda {
       // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-
 	if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
 
 	  param.aux.x++;
