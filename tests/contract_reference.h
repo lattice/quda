@@ -352,7 +352,7 @@ int contraction_reference(Float *spinorX, Float *spinorY, Float *d_result, QudaC
   // Apply gamma insertion on host spin elementals
   if (cType == QUDA_CONTRACT_TYPE_DR) contractDegrandRossi((Float *)h_result);
   if (cType == QUDA_CONTRACT_TYPE_DP) contractDiracPauli((Float *)h_result);
-  
+
   // compare each contraction
   for (int j = 0; j < 16; j++) {
     bool pass = true;

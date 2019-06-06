@@ -130,17 +130,17 @@ namespace quda {
       }
     };
 
-  /**
-     This is the specialization for Nspin=4.  For fields with four
-     spins we can define a spin projection operation.
-  */
-  template <typename Float, int Nc>
-    struct ColorSpinor<Float, Nc, 4> {
-    static constexpr int Ns = 4;
-    static constexpr int size = Nc * Ns;
-    complex<Float> data[size];
-    
-    __device__ __host__ inline ColorSpinor<Float, Nc, 4>() {
+    /**
+       This is the specialization for Nspin=4.  For fields with four
+       spins we can define a spin projection operation.
+    */
+    template <typename Float, int Nc> struct ColorSpinor<Float, Nc, 4> {
+      static constexpr int Ns = 4;
+      static constexpr int size = Nc * Ns;
+      complex<Float> data[size];
+
+      __device__ __host__ inline ColorSpinor<Float, Nc, 4>()
+      {
 #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
     }
@@ -453,7 +453,7 @@ namespace quda {
       ColorSpinor<Float,Nc,4> a;
       ColorSpinor<Float,Nc,4> &b = *this;
       complex<Float> j(0.0,1.0);
-      
+
       switch(mu) {
       case 0:
 	switch(nu) {
@@ -656,7 +656,7 @@ namespace quda {
       }
       *this = a;
     }
-    
+
     __device__ __host__ void print() const
     {
       for (int s=0; s<Ns; s++) {
@@ -995,8 +995,8 @@ namespace quda {
       for (int j = 0; j < Nc; j++) {
         // trace over spin (manual unroll for perf)
         out(j, i).real(a(0, j).real() * b(0, i).real());
-        out(j,i).real( out(j,i).real() + a(0,j).imag() * b(0,i).imag() );
-	out(j,i).imag(                   a(0,j).imag() * b(0,i).real() );
+        out(j, i).real(out(j, i).real() + a(0, j).imag() * b(0, i).imag());
+        out(j,i).imag(                   a(0,j).imag() * b(0,i).real() );
 	out(j,i).imag( out(j,i).imag() - a(0,j).real() * b(0,i).imag() );
 	//out(j,i) = a(0,j) * conj(b(0,i));
 

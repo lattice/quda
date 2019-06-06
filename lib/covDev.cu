@@ -268,7 +268,7 @@ namespace quda {
   };
 
   /**
-     Applies the off-diagonal part of the Laplace operator     
+     Applies the off-diagonal part of the Laplace operator
      @param[out] out The out result field
      @param[in] U The gauge field
      @param[in] kappa Kappa value
