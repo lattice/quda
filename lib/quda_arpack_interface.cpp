@@ -103,8 +103,6 @@ namespace quda
       spectrum[0] = 'L';
     }
 
-    printfQuda("reverse = %s, spectrum = %s\n", reverse ? "true" : "false", spectrum);
-
     double tol_ = eig_param->tol;
     double *mod_h_evals_sorted = (double *)safe_malloc(nKr_ * sizeof(double));
 
