@@ -209,7 +209,7 @@ namespace quda {
 
   void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type)
   {
-    RNG* randstates = new RNG(src.Volume(), seed, src.X());
+    RNG* randstates = new RNG(src, seed);
     randstates->Init();
     spinorNoise(src, *randstates, type);
     randstates->Release();

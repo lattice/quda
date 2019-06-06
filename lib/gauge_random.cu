@@ -191,7 +191,7 @@ namespace quda {
 
   void gaugeGauss(GaugeField &U, long seed, double epsilon)
   {
-    RNG* randstates = new RNG(U.Volume(), seed, U.X());
+    RNG* randstates = new RNG(U, seed);
     randstates->Init();
     quda::gaugeGauss(U, *randstates, epsilon);
     randstates->Release();
