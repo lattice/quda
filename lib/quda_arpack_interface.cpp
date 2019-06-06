@@ -27,13 +27,13 @@ namespace quda
 
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
-  
+
   void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile)
   {
     // Create Eigensolver object for member function use
     EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
-    
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
 // ARPACK logfile name
@@ -197,7 +197,7 @@ namespace quda
 
 #endif
 #endif
-    
+
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
     // Start ARPACK routines
@@ -262,7 +262,9 @@ namespace quda
       if (ido_ == -1 || ido_ == 1) {
 
         profile.TPSTART(QUDA_PROFILE_D2H);
-
+	
+	*d_v = *h_v;
+	
         profile.TPSTOP(QUDA_PROFILE_D2H);
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
