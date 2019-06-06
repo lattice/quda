@@ -439,12 +439,12 @@ namespace quda
         if (eig_param->compute_svd && i < nConv / 2)
           printfQuda("SingValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
                      residua[i]);
-        else
+        else if (!eig_param->compute_svd) 
           printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
                      residua[i]);
       }
     }
-
+    
     delete r[0];
   }
 
