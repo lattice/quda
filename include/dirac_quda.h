@@ -1254,16 +1254,17 @@ public:
     DiracProjMMdagProj(const Dirac &d) : DiracMatrix(d) { }
     DiracProjMMdagProj(const Dirac *d) : DiracMatrix(d) { }
 
+    // TODO: put Pv as attribute of this class
+
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
-      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      // Temporary buffer for the projection process
       std::vector<ColorSpinorField*> Pv;
       ColorSpinorParam csParamClone(out);
-      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-      Pv.push_back(ColorSpinorField::Create(csParamClone));
+      csParamClone.create = QUDA_COPY_FIELD_CREATE;
 
       // Apply projector ( I - QQ^ )
-      *Pv[0] = in;
+      Pv.push_back(ColorSpinorField::Create(in, csParamClone));
       int sizePS = projSpace.size();
       Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
       blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
@@ -1293,14 +1294,13 @@ public:
     {
       dirac->tmp1 = &tmp;
 
-      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      // Temporary buffer for the projection process
       std::vector<ColorSpinorField*> Pv;
       ColorSpinorParam csParamClone(out);
-      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-      Pv.push_back(ColorSpinorField::Create(csParamClone));
+      csParamClone.create = QUDA_COPY_FIELD_CREATE;
 
       // Apply projector ( I - QQ^ )
-      *Pv[0] = in;
+      Pv.push_back(ColorSpinorField::Create(in, csParamClone));
       int sizePS = projSpace.size();
       Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
       blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
@@ -1334,14 +1334,13 @@ public:
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
 
-      // Temporary buffer for the projection process -- TODO: avoid allocation of Pv[0] on each call to operator()
+      // Temporary buffer for the projection process
       std::vector<ColorSpinorField*> Pv;
       ColorSpinorParam csParamClone(out);
-      csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-      Pv.push_back(ColorSpinorField::Create(csParamClone));
+      csParamClone.create = QUDA_COPY_FIELD_CREATE;
 
       // Apply projector ( I - QQ^ )
-      *Pv[0] = in;
+      Pv.push_back(ColorSpinorField::Create(in, csParamClone));
       int sizePS = projSpace.size();
       Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
       blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));

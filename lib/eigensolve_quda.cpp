@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <invert_quda.h>
+
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
 #include <qio_field.h>
@@ -947,37 +949,507 @@ namespace quda
 
 
 
-  // JD eigensolver class
-  // --------------------------------
+  // --------------------------------------------------------------------------------------------------------------------------------
 
-  ///*
-  // Thick Restarted Lanczos Method constructor
+  // JD eigensolver class
+
+  // Jacobi-Davidson Method constructor
   JD::JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
     EigenSolver(eig_param, profile),
     mat(mat)
-  {
-
-    errorQuda("From the constructor of JD: eigensolver under construction !");
-
-    // Tridiagonal/Arrow matrix
-    //alpha = new double[nKr];
-    //beta = new double[nKr];
-    //for (int i = 0; i < nKr; i++) {
-    //  alpha[i] = 0.0;
-    //  beta[i] = 0.0;
-    //}
-
-    // Thick restart specific checks
-    //if (nKr < nEv + 6) errorQuda("nKr=%d must be greater than nEv+6=%d\n", nKr, nEv + 6);
-
-    //if (eig_param->eig_type == QUDA_EIG_LANCZOS
-    //    && !(eig_param->spectrum == QUDA_SPECTRUM_LR_EIG || eig_param->spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    //  errorQuda("Only real spectrum type (LR or SR) can be passed to the Lanczos solver");
-    //}
-  }
-
-  void JD::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   { }
+
+  void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
+  {
+    // TODO: switch from k to iter
+
+    int k=0, k_max, m=0, m_max, m_min;
+
+    k_max = eig_param->nConv;
+    max_restarts = eig_param->max_restarts;
+
+    // TODO: extract these from command line params in a more general way
+    m_max = eig_param->nKr;
+    m_min = eig_param->nEv;
+
+    // 'tau' is the <target> for the eigensolver
+    double theta, mu, tau=0;
+
+    // Check to see if we are loading eigenvectors
+    if (strcmp(eig_param->vec_infile, "") != 0) {
+      loadFromFile(mat, eigSpace, evals);
+      return;
+    }
+
+    // Test for an initial guess
+    double norm = sqrt(blas::norm2(*eigSpace[0]));
+    if (norm == 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
+      if (eigSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
+        eigSpace[0]->Source(QUDA_RANDOM_SOURCE);
+      } else {
+        RNG *rng = new RNG(eigSpace[0]->Volume(), 1234, eigSpace[0]->X());
+        rng->Init();
+        spinorNoise(*eigSpace[0], *rng, QUDA_NOISE_UNIFORM);
+        rng->Release();
+        delete rng;
+      }
+    }
+
+    // Clone eigSpace's CSF params
+    ColorSpinorParam csParam(*eigSpace[0]);
+
+    // Init a zero residual
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    r.push_back(ColorSpinorField::Create(csParam));
+
+    double t1 = clock();
+
+    // Convergence and locking criteria
+    double epsilon = DBL_EPSILON;
+    QudaPrecision prec = eigSpace[0]->Precision();
+    if (prec == QUDA_DOUBLE_PRECISION) {
+      epsilon = DBL_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
+    }
+    if (prec == QUDA_SINGLE_PRECISION) {
+      epsilon = FLT_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
+    }
+    if (prec == QUDA_HALF_PRECISION) {
+      epsilon = 2e-3;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
+    }
+    if (prec == QUDA_QUARTER_PRECISION) {
+      epsilon = 5e-2;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
+    }
+
+    // Begin JD Eigensolver computation
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("*****************************\n");
+      printfQuda("***** START JD SOLUTION *****\n");
+      printfQuda("*****************************\n");
+    }
+
+    // Create a temporary vector t, which will be used for storing the result of the
+    // inversion of the shifted-and-inverted version of MMdag
+    std::vector<ColorSpinorField *> t;
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    // Copying initial guess
+    t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+
+    // Reusing eigSpace to store the output null vectors
+    eigSpace.clear();
+
+    // Create the vector subspaces used for faster searchs of eigenpairs
+    std::vector<ColorSpinorField *> u, w, V, W, X_tilde;
+    // Buffer spinors
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    w.push_back(ColorSpinorField::Create(csParam));
+    u.push_back(ColorSpinorField::Create(csParam));
+
+    // Matrix with the compressed sub-space information to extract the eigenpairs
+    MatrixXcd H;
+    SelfAdjointEigenSolver<MatrixXcd> eigensolver;
+
+    // TODO: change these -- is the second one still necessary ?
+    eig_param->invert_param->verbosity = QUDA_SILENT;
+    eig_param->invert_param->tol = 1e-1;
+
+    // Main loop
+    while (restart_iter<max_restarts && k<k_max) {
+
+      // Compute: w = (D - tau*I)t, D = MMdag + shift
+      matVec(mat, *w[0], *t[0]);
+      if (tau != 0.0) blas::caxpy(-tau, const_cast<ColorSpinorField&>(*t[0]), *w[0]);
+
+      // TODO: call this in a modularized way
+      // Orthogonalization of w and t against W
+      for(int i=0; i<m; i++){
+        Complex gamma = blas::cDotProduct(*W[i], *w[0]);
+        blas::caxpy(-gamma, *W[i], *w[0]);
+        blas::caxpy(-gamma, *V[i], *t[0]);
+      }
+
+      m++;
+
+      // TODO: call this in a modularized way
+      // Normalisation of w and t, and push them into V and W
+      norm = sqrt(blas::norm2(*w[0]));
+      blas::ax(1.0 / norm, *w[0]);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      W.push_back(ColorSpinorField::Create(*w[0], csParam));
+      V.push_back(ColorSpinorField::Create(*t[0], csParam));
+      blas::ax(1.0 / norm, *V[m-1]);
+
+      // TODO: call this in a modularized way
+      // Construction of H = WdagV
+      H.conservativeResize(m,m);
+      for(int i=0; i<m-1; i++){
+        H(i,m-1) = blas::cDotProduct(*W[i], *V[m-1]);
+        H(m-1,i) = conj(H(i,m-1));
+      }
+      H(m-1,m-1) = blas::cDotProduct(*W[m-1], *V[m-1]);
+
+      // ith eigenvalue: eigensolver.eigenvalues()[i], ith eigenvector: eigensolver.eigenvectors().col(i)
+      eigensolver.compute(H);
+
+      // TODO: call this in a modularized way
+      // Moving the eigenpairs to a vector of std::pair to sort by eigenvalue
+      std::vector< std::pair < double, std::vector<Complex>* > > eigenpairs;
+      std::vector<Complex>* buffVec = 0;
+      for(int i=0; i<m; i++){
+        // TODO: switch to safe_malloc ?
+        buffVec = new std::vector<Complex>(eigensolver.eigenvectors().col(i).data(),
+                                           eigensolver.eigenvectors().col(i).data() + eigensolver.eigenvectors().col(i).size());
+        eigenpairs.push_back( std::make_pair( eigensolver.eigenvalues()[i], buffVec ) );
+      }
+
+      // Order the eigeninformation extracted from H in descending order of eigenvalues
+      // Using sort+reverse avoids declaration of extra sort-function. Not so good for large subspaces ?
+      std::sort(eigenpairs.begin(), eigenpairs.end());
+      std::reverse(std::begin(eigenpairs), std::end(eigenpairs));
+
+      // TODO: try to make the syntax more understandable
+      // Computing the residual
+      // u_tilde = V * s_1 -- lifting the first eigenvector through V
+      blas::zero(*u[0]);
+      for( int i=0; i<m; i++ ){
+        blas::caxpy( (*(eigenpairs[0].second))[i], *V[i], *u[0] );
+      }
+      // mu = norm( u_tilde )
+      norm = sqrt(blas::norm2(*u[0]));
+      // u = normalized u_tilde
+      blas::ax(1.0 / norm, *u[0]);
+      // theta_tilde = first eigenvalue / mu^2
+      theta = eigenpairs[0].first / (norm*norm);
+      // w_tilde = W * s_1
+      blas::zero(*r[0]);
+      for( int i=0; i<m; i++ ){
+        blas::caxpy( (*(eigenpairs[0].second))[i], *W[i], *r[0] );
+      }
+      // r = w_tilde / mu - theta * u
+      blas::ax(1.0 / norm, *r[0]);
+      blas::caxpy(-theta, *u[0], *r[0]);
+
+      // Loop while || r || < tol
+      norm = sqrt(blas::norm2(*r[0]));
+      // TODO: wrap this printfQuda with verbosity
+      printfQuda("\nNorm of the residual = %f\n", norm);
+      while(norm < tol){
+
+        printfQuda("\n\nOne of the residuals hit !\n\n\n");
+
+        // TODO !
+
+        //k++;
+
+        //X.push_back(new ColorSpinorField(*u[0]));
+        //evals.push_back(theta + tau);
+
+        //if(k == k_max){
+          //TODO: this has to be modularized... because this if statement has to return out of the whole JD
+          /*
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+            printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
+          iter_converged = i;
+          */
+        //}
+
+        //m--;
+
+        //H = MatrixXcf::Zero(m,m);
+
+        /*
+        for(int i=0; i<m; i++){
+
+          //blas::zero(*V[i]);
+          blas::caxpy(eigensolver.eigenvectors().col(i+1)[i], *V[i], *V[i]);
+          for( int j=0; j<m; j++ ){
+            if(i==j){ continue; }
+            blas::caxpy(eigensolver.eigenvectors().col(i+1)[j], *V[j], *V[i]);
+          }
+          //blas::zero(*W[i]);
+          blas::caxpy(eigensolver.eigenvectors().col(i+1)[i], *W[i], *W[i]);
+          for( int j=0; j<m; j++ ){
+            if(i==j){ continue; }
+            blas::caxpy(eigensolver.eigenvectors().col(i+1)[j], *W[j], *W[i]);
+          }
+
+          H(i,i) = eigensolver.eigenvalues()[i+1];
+
+          //set the first column of eigenvectors to be a unit vector
+          //TODO: change the following line for the appropriate one !
+          eigensolver.eigenvectors().col(i)[0] = 0;
+          for(int j=1; j<m; j++){
+            //TODO: change the following line for the appropriate one !
+            eigensolver.eigenvectors().col(i)[j] = 0;
+          }
+          //TODO: change the following line for the appropriate one !
+          eigensolver.eigenvalues()[i+1] = eigensolver.eigenvalues()[i];
+
+        }
+        */
+
+        //mu = sqrt(blas::norm2(*V[0]));
+
+        //theta = eigensolver.eigenvalues()[1] / (mu*mu);
+
+        //*u[0] = *V[0]);
+        //blas::ax(1.0 / mu, *V[0]);
+
+        //*r[0] = *W[0];
+        //blas::ax(1.0 / mu, *r[0]);
+        //blas::caxpy(-theta, *u[0], *r[0]);
+
+        // TODO: remove the following hardcoded exit
+        norm = 1.0;
+
+      }
+
+      // Restart: shrink the acceleration subspace
+      if(m >= m_max){
+        // TODO: change this section to a much more efficient way; mainly tmpV and tmpW ---> bring them to an outter scope
+
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        std::vector<ColorSpinorField*> tmpV, tmpW;
+
+        MatrixXcd tmpH = MatrixXcd::Zero(m_min,m_min);
+
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        for(int i=0; i<m_min; i++){
+          tmpV.push_back(ColorSpinorField::Create(csParam));
+          tmpW.push_back(ColorSpinorField::Create(csParam));
+          for( int j=0; j<m; j++ ){
+            blas::caxpy( (*(eigenpairs[i].second))[j], *V[j], *tmpV[i] );
+            blas::caxpy( (*(eigenpairs[i].second))[j], *W[j], *tmpW[i] );
+            tmpH(i,i) = eigenpairs[i].first;
+          }
+        }
+
+        m = m_min;
+
+        // Assign new values of H
+        // TODO: skip this resize() ?
+        H.resize(m_min,m_min);
+        H = tmpH;
+
+        // Assign new values of V and W
+        for (auto p : V){ delete p; }
+        for (auto p : W){ delete p; }
+        V = tmpV;
+        W = tmpW;
+
+        restart_iter++;
+      }
+
+      // Updating shift value
+      theta = theta + tau;
+
+      // Expansion of the projection space. The proj op is (I - QQdag), with Q eq to eigSpace
+      eigSpace.push_back( u[0] );
+
+      // TODO: change this. Make an appropriate use of profile
+      if(profile.isRunning(QUDA_PROFILE_COMPUTE)){ profile.TPSTOP(QUDA_PROFILE_COMPUTE); }
+
+      // TODO: simply remove these ?
+      QudaVerbosity verbTmp = getVerbosity();
+      setVerbosity(QUDA_SILENT);
+
+      // TODO: change this section to a much more efficient way; alloc/dealloc - ating Dirac stuff (m's and d's) too inefficient
+      // Proposing a new vector t through the solution of a shifted-and-projected MMdag
+      {
+        //The matrix solvers for the shifted-and-proj MMdag
+        DiracMatrix *mm, *mmSloppy;
+
+        double bareShift_mm, bareShift_mmSloppy;
+
+        Dirac *d = nullptr;
+        Dirac *dSloppy = nullptr;
+
+        // TODO: call this in a modularized way
+        // Create the dirac operator
+        {
+          bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+          DiracParam diracParam;
+          DiracParam diracSloppyParam;
+
+          quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
+          quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
+
+          d = Dirac::create(diracParam); // create the Dirac operator
+          dSloppy = Dirac::create(diracSloppyParam);
+        }
+
+        Dirac &dirac = *d;
+        Dirac &diracSloppy = *dSloppy;
+
+        mm = new DiracProjMMdagProj(dirac);
+        mm->projSpace = eigSpace;
+
+        mmSloppy = new DiracProjMMdagProj(diracSloppy);
+        mmSloppy->projSpace = eigSpace;
+
+        // Switching to the appropriate shift for JD
+        bareShift_mm = mm->shift;
+        mm->shift = bareShift_mm - theta;
+        bareShift_mmSloppy = mmSloppy->shift;
+        mmSloppy->shift = bareShift_mmSloppy - theta;
+
+        QudaInvertParam refineparam = *eig_param->invert_param;
+        refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+
+	SolverParam solverParam(refineparam);
+	solverParam.iter = 0;
+	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+	//solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
+	solverParam.tol = 1e0;
+	//solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+        solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
+
+        {
+          CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
+          cg(*t[0], *r[0]);
+        }
+
+        // Switching back the shift parameters
+        mm->shift = bareShift_mm;
+        mmSloppy->shift = bareShift_mmSloppy;
+
+        // Clearing allocated data
+        delete mm;
+        delete mmSloppy;
+        delete d;
+        delete dSloppy;
+
+        // TODO: call ?
+        // cache is written out even if a long benchmarking job gets interrupted
+        //saveTuneCache();
+      }
+
+      // TODO: simply remove this ?
+      setVerbosity(verbTmp);
+
+      eigSpace.pop_back();
+
+      //computeKeptRitz(kSpace); //TODO: will this be of any use??
+
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        // printfQuda("iter Conv = %d\n", iter_converged);
+        // printfQuda("iter Keep = %d\n", iter_keep);
+        // printfQuda("iter Lock = %d\n", iter_locked);
+        printfQuda("%04d converged eigenvalues at JD iter %04d\n", num_converged, m + 1);
+        // printfQuda("num_converged = %d\n", num_converged);
+        // printfQuda("num_keep = %d\n", num_keep);
+        // printfQuda("num_locked = %d\n", num_locked);
+      }
+
+      if (getVerbosity() >= QUDA_VERBOSE) {
+        //for (int i = 0; i < nKr; i++) {
+          // printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+        //}
+      }
+
+      // Clearing allocated memory for eigenpairs
+      for (auto p : eigenpairs){ delete p.second; }
+      eigenpairs.clear();
+
+      //reorder(kSpace); //TODO: is this line useful somehow ??
+    }
+
+    //TODO: is this pruning step necessary for JD ?
+    /*
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+      printfQuda("kSpace size at convergence/max restarts = %d\n", kSpace.size());
+    // Prune the Krylov space back to size when passed to eigensolver
+    for (int i = nKr; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(nKr);
+    */
+
+    // Post computation report
+
+    if (!converged) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        //printfQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+        //           "restart steps.\n",
+        //           nConv, nEv, nKr, max_restarts);
+        printfQuda("JD failed to compute the requested eigenpairs.\n");
+      }
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("JD computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", nConv,
+                   restart_iter, iter); //TODO: very important ---> get the values of iter counted properly in JD
+
+        // Dump all Ritz values and residua
+        //for (int i = 0; i < nEv; i++) {
+          //printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+          //TODO: how to print this in the case of JD ?? Is it really necessary to display/analyze ??
+        //}
+      }
+
+      // Compute eigenvalues //TODO: double-check that computeEvals(...) is general/applicable for JD
+      //computeEvals(mat, kSpace, evals, nEv);
+      //if (getVerbosity() >= QUDA_SUMMARIZE) {
+      //  for (int i = 0; i < nEv; i++) {
+      //    printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+      //               residua[i]);
+      //  }
+      //}
+
+      // Compute SVD if requested -- TODO: is this also usable in JD ??
+      /*
+      time_svd = -clock();
+      if (eig_param->compute_svd) computeSVD(kSpace, d_vecs_tmp, evals, reverse);
+      time_svd += clock();
+      */
+    }
+
+    double t2 = clock() - t1;
+    double total;
+
+    if (eig_param->compute_svd)
+      total = (time_e + time_mv + time_mb + time_svd) / CLOCKS_PER_SEC;
+    else
+      total = (time_e + time_mv + time_mb) / CLOCKS_PER_SEC;
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Time to solve problem using JD = %e\n", t2 / CLOCKS_PER_SEC);
+      printfQuda("Time spent using EIGEN           = %e  %.1f%%\n", time_e / CLOCKS_PER_SEC,
+                 100 * (time_e / CLOCKS_PER_SEC) / total);
+      printfQuda("Time spent in matVec             = %e  %.1f%%\n", time_mv / CLOCKS_PER_SEC,
+                 100 * (time_mv / CLOCKS_PER_SEC) / total);
+      printfQuda("Time spent in (multi)blas        = %e  %.1f%%\n", time_mb / CLOCKS_PER_SEC,
+                 100 * (time_mb / CLOCKS_PER_SEC) / total);
+      if (eig_param->compute_svd)
+        printfQuda("Time spent computing svd         = %e  %.1f%%\n", time_svd / CLOCKS_PER_SEC,
+                   100 * (time_svd / CLOCKS_PER_SEC) / total);
+    }
+
+    // Local clean-up
+    delete r[0];
+    delete t[0];
+    delete w[0];
+    delete u[0];
+    for (auto p : V){ delete p; }
+    for (auto p : W){ delete p; }
+
+    // Only save if outfile is defined -- exactly as in TRLM
+    if (strcmp(eig_param->vec_outfile, "") != 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
+      if(eigSpace.size()>0) { saveVectors(eigSpace, eig_param->vec_outfile); }
+    }
+
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    if(eigSpace.size() == 0) { eigSpace.push_back(ColorSpinorField::Create(csParam)); }
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("*****************************\n");
+      printfQuda("****** END JD SOLUTION ******\n");
+      printfQuda("*****************************\n");
+    }
+  }
 
   // Destructor
   JD::~JD()
@@ -987,37 +1459,6 @@ namespace quda
     //delete alpha;
     //delete beta;
   }
-  //*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 } // namespace quda

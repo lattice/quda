@@ -3112,7 +3112,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     delete solve;
   } else { // norm_error_solve
 
-    if(0){
+    //if(1){
+
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       cudaColorSpinorField tmp(*out);
       SolverParam solverParam(*param);
@@ -3121,10 +3122,13 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       dirac.Mdag(*out, tmp);  // x = M^dag y
       solverParam.updateInvertParam(*param);
       delete solve;
-    }
+
+    //}
+    // TODO: remove the following section -- which tests DiracProjMMdagProj for inversions
+    /*
     else{
 
-      // FIXME: hardcoded section, useful for testing (I - QQ^)(MM^ - shift)(I - QQ^)x = b
+      // Hardcoded section, useful for testing (I - QQ^)(MM^ - shift)(I - QQ^)x = b
 
       printfQuda("\n\nSolving for MM^ in shifted-and-projected form !\n\n\n");
       DiracProjMMdagProj m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -3187,16 +3191,19 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       SolverParam solverParam(*param);
       //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profileInvert);
-      (*solve)(tmp, *in); // y = (M M^\dag) b
-      dirac.Mdag(*out, tmp);  // x = M^dag y
+
+      (*solve)(*out, *in); // y = (M M^\dag) b
+
+      //(*solve)(tmp, *in); // y = (M M^\dag) b
+      //dirac.Mdag(*out, tmp);  // x = M^dag y
       solverParam.updateInvertParam(*param);
 
       // Deleting temp mem
       delete solve;
       for(int i=0; i<nrOfProjVecs; i++){ delete mSloppy.projSpace[i]; }
       delete buffProj[0];
-
     }
+    */
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){

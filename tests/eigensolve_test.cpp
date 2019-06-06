@@ -133,6 +133,29 @@ void display_test_info()
   return;
 }
 
+void display_test_info_JD()
+{
+  printfQuda("running the following test:\n");
+
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
+
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  //printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - maximum size of search space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+  return;
+}
+
 QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
@@ -277,6 +300,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
+
 }
 
 // Parameters defining the eigensolver
@@ -358,7 +382,7 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
 
   // All user inputs now defined
-  display_test_info();
+  display_test_info_JD();
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
