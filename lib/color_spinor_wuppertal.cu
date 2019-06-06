@@ -99,7 +99,7 @@ namespace quda {
 
   //out(x) = A in(x) + B computeNeighborSum(out, x)
   template <typename Float, int Ns, int Nc, typename Arg>
-  __device__ __host__ inline void computeWupperalStep(Arg &arg, int x_cb, int parity)
+  __device__ __host__ inline void computeWuppertalStep(Arg &arg, int x_cb, int parity)
   {
     typedef ColorSpinor<Float,Nc,Ns> Vector;
     Vector out;
@@ -109,7 +109,7 @@ namespace quda {
     Vector in;
     arg.in.load((Float*)in.data, x_cb, parity);
     out = arg.A*in + arg.B*out;
-    
+
     arg.out(x_cb, parity) = out;
   }
 
@@ -123,7 +123,7 @@ namespace quda {
       parity = (arg.nParity == 2) ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) { // 4-d volume
-        computeWupperalStep<Float,Ns,Nc>(arg, x_cb, parity);
+        computeWuppertalStep<Float,Ns,Nc>(arg, x_cb, parity);
       } // 4-d volumeCB
     } // parity
 
@@ -142,7 +142,7 @@ namespace quda {
     if (parity >= arg.nParity) return;
     parity = (arg.nParity == 2) ? parity : arg.parity;
 
-    computeWupperalStep<Float,Ns,Nc>(arg, x_cb, parity);
+    computeWuppertalStep<Float,Ns,Nc>(arg, x_cb, parity);
   }
 
   template <typename Float, int Ns, int Nc, typename Arg>
