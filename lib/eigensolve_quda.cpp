@@ -1257,77 +1257,9 @@ namespace quda
       QudaVerbosity verbTmp = getVerbosity();
       setVerbosity(QUDA_SILENT);
 
-      // TODO: change this section to a much more efficient way; alloc/dealloc - ating Dirac stuff (m's and d's) too inefficient
-      // Proposing a new vector t through the solution of a shifted-and-projected MMdag
-      {
-        //The matrix solvers for the shifted-and-proj MMdag
-        DiracMatrix *mm, *mmSloppy;
-
-        double bareShift_mm, bareShift_mmSloppy;
-
-        Dirac *d = nullptr;
-        Dirac *dSloppy = nullptr;
-
-        // TODO: call this in a modularized way
-        // Create the dirac operator
-        {
-          bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE);
-
-          DiracParam diracParam;
-          DiracParam diracSloppyParam;
-
-          quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
-          quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
-
-          d = Dirac::create(diracParam); // create the Dirac operator
-          dSloppy = Dirac::create(diracSloppyParam);
-        }
-
-        Dirac &dirac = *d;
-        Dirac &diracSloppy = *dSloppy;
-
-        mm = new DiracProjMMdagProj(dirac);
-        mm->projSpace = eigSpace;
-
-        mmSloppy = new DiracProjMMdagProj(diracSloppy);
-        mmSloppy->projSpace = eigSpace;
-
-        // Switching to the appropriate shift for JD
-        bareShift_mm = mm->shift;
-        mm->shift = bareShift_mm - theta;
-        bareShift_mmSloppy = mmSloppy->shift;
-        mmSloppy->shift = bareShift_mmSloppy - theta;
-
-        QudaInvertParam refineparam = *eig_param->invert_param;
-        refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
-
-	SolverParam solverParam(refineparam);
-	solverParam.iter = 0;
-	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	//solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
-	solverParam.tol = 1e0;
-	//solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
-        solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
-
-        {
-          CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
-          cg(*t[0], *r[0]);
-        }
-
-        // Switching back the shift parameters
-        mm->shift = bareShift_mm;
-        mmSloppy->shift = bareShift_mmSloppy;
-
-        // Clearing allocated data
-        delete mm;
-        delete mmSloppy;
-        delete d;
-        delete dSloppy;
-
-        // TODO: call ?
-        // cache is written out even if a long benchmarking job gets interrupted
-        //saveTuneCache();
-      }
+      // Invert the shifted-and-projected MMdag, with -r as rhs
+      invertProjMat(eigSpace, theta, mat, *t[0], *r[0]);
+      blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical runs the diff when using -t vs t
 
       // TODO: simply remove this ?
       setVerbosity(verbTmp);
@@ -1449,6 +1381,84 @@ namespace quda
       printfQuda("****** END JD SOLUTION ******\n");
       printfQuda("*****************************\n");
     }
+  }
+
+  // Inversion of (I - QQdag)(A - \theta I)(I - QQdag)
+  void JD::invertProjMat(std::vector<ColorSpinorField *> &qSpace, double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b){
+
+    // TODO: use <mat>
+
+    // TODO: change this section to a much more efficient way; alloc/dealloc - ating Dirac stuff (m's and d's) too inefficient
+    // Proposing a new vector t through the solution of a shifted-and-projected MMdag
+
+    //The matrix solvers for the shifted-and-proj MMdag
+    DiracMatrix *mm, *mmSloppy;
+
+    double bareShift_mm, bareShift_mmSloppy;
+
+    Dirac *d = nullptr;
+    Dirac *dSloppy = nullptr;
+
+    // TODO: call this in a modularized way
+    // Create the dirac operator
+    {
+      bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+      DiracParam diracParam;
+      DiracParam diracSloppyParam;
+
+      quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
+      quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
+
+      d = Dirac::create(diracParam); // create the Dirac operator
+      dSloppy = Dirac::create(diracSloppyParam);
+    }
+
+    Dirac &dirac = *d;
+    Dirac &diracSloppy = *dSloppy;
+
+    mm = new DiracProjMMdagProj(dirac);
+    mm->projSpace = qSpace;
+
+    mmSloppy = new DiracProjMMdagProj(diracSloppy);
+    mmSloppy->projSpace = qSpace;
+
+    // Switching to the appropriate shift for JD
+    bareShift_mm = mm->shift;
+    mm->shift = bareShift_mm - theta;
+    bareShift_mmSloppy = mmSloppy->shift;
+    mmSloppy->shift = bareShift_mmSloppy - theta;
+
+    QudaInvertParam refineparam = *eig_param->invert_param;
+    refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+
+    SolverParam solverParam(refineparam);
+    solverParam.iter = 0;
+    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    //solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
+    solverParam.tol = 1e0;
+    //solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
+    solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
+
+    {
+      CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
+      cg(x, b);
+    }
+
+    // Switching back the shift parameters
+    mm->shift = bareShift_mm;
+    mmSloppy->shift = bareShift_mmSloppy;
+
+    // Clearing allocated data
+    delete mm;
+    delete mmSloppy;
+    delete d;
+    delete dSloppy;
+
+    // TODO: call ?
+    // cache is written out even if a long benchmarking job gets interrupted
+    //saveTuneCache();
+
   }
 
   // Destructor

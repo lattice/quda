@@ -264,6 +264,14 @@ public:
 
     /**
        @brief Compute eigenpairs
+       @param[in] qSpace The projection vector space
+       @param[in] theta Shift parameter
+       @param[in] mat The original matrix to be inverted after shift-and-project
+    */
+    void invertProjMat(std::vector<ColorSpinorField *> &qSpace, double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
+
+    /**
+       @brief Compute eigenpairs
        @param[in] kSpace the "acceleration" vector space
        @param[in] evals Computed eigenvalues
     */
