@@ -27,13 +27,13 @@ namespace quda
 
   void arpackErrorHelpNAUPD();
   void arpackErrorHelpNEUPD();
-  
+
   void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile)
   {
     // Create Eigensolver object for member function use
     EigenSolver *eig_solver = EigenSolver::create(eig_param, mat, profile);
-    
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
 // ARPACK logfile name
@@ -82,7 +82,9 @@ namespace quda
     // ARPACK problem type to be solved
     char howmny = 'P';
     char bmat = 'I';
-    char spectrum[3];
+    char *spectrum;
+    spectrum = strdup("SR"); // Initialsed just to stop the compiler warning...
+    //char spectrum[2];
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
@@ -94,18 +96,17 @@ namespace quda
     case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
-
-    bool reverse = true;
-    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
-      reverse = false;
-    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = false;
+    
+    bool reverse = false;
+    if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      // Smallest eig requested by use, largest will requested from ARPACK
+      // due to poly acc
+      reverse = true;
       spectrum[0] = 'L';
-    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = false;
-      spectrum[0] = 'S';
     }
-
+    
+    printfQuda("reverse = %s, spectrum = %s\n", reverse ? "true" : "false", spectrum);
+    
     double tol_ = eig_param->tol;
     double *mod_h_evals_sorted = (double *)safe_malloc(nKr_ * sizeof(double));
 
@@ -197,7 +198,7 @@ namespace quda
 
 #endif
 #endif
-    
+
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
     // Start ARPACK routines
@@ -262,6 +263,8 @@ namespace quda
       if (ido_ == -1 || ido_ == 1) {
 
         profile.TPSTART(QUDA_PROFILE_D2H);
+
+        *d_v = *h_v;
 
         profile.TPSTOP(QUDA_PROFILE_D2H);
         profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -349,25 +352,27 @@ namespace quda
 
     // Sort the eigenvalues in absolute ascending order
     std::vector<std::pair<double, int>> evals_sorted;
-    for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j)); }
-
+    for (int j = 0; j < nconv; j++) {
+      evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j));
+    }
+    
     // Sort the array by value (first in the pair)
     // and the index (second in the pair) will come along
     // for the ride.
     std::sort(evals_sorted.begin(), evals_sorted.end());
     if (reverse) std::reverse(evals_sorted.begin(), evals_sorted.end());
-
+    
     // print out the computed Ritz values and their error estimates
     for (int j = 0; j < nconv; j++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[j]), imag(h_evals_[j]),
-                   std::abs(*(w_workl_ + ipntr_[10] - 1 + j)));
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]), imag(h_evals_[evals_sorted[j].second]),
+                   std::abs(*(w_workl_ + ipntr_[10] - 1 + evals_sorted[j].second)));
     }
-
-    // Compute Eigenvalues from Eigenvectors.
+    
+    // Compute Eigenvalues from Eigenvectors.    
     for (int i = 0; i < nconv; i++) {
-      int idx = nconv - 1 - evals_sorted[i].second;
-
+      int idx = evals_sorted[i].second;
+      
       profile.TPSTART(QUDA_PROFILE_D2H);
       *d_v = *h_evecs_arpack[idx];
       profile.TPSTOP(QUDA_PROFILE_D2H);
