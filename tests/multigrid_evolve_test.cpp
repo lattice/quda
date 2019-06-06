@@ -70,6 +70,7 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre[QUDA_MAX_MG_LEVEL];
 extern int nu_post[QUDA_MAX_MG_LEVEL];
+extern int n_block_ortho[QUDA_MAX_MG_LEVEL];
 extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
@@ -292,6 +293,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -580,6 +582,7 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+    n_block_ortho[i] = 1;
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
