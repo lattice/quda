@@ -82,9 +82,7 @@ namespace quda
     // ARPACK problem type to be solved
     char howmny = 'P';
     char bmat = 'I';
-    char *spectrum;
-    spectrum = strdup("SR"); // Initialsed just to stop the compiler warning...
-    //char spectrum[2];
+    char spectrum[3];
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
@@ -96,7 +94,7 @@ namespace quda
     case QUDA_SPECTRUM_LI_EIG: strcpy(spectrum, "LI"); break;
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
-    
+
     bool reverse = false;
     if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
       // Smallest eig requested by use, largest will requested from ARPACK
@@ -104,9 +102,7 @@ namespace quda
       reverse = true;
       spectrum[0] = 'L';
     }
-    
-    printfQuda("reverse = %s, spectrum = %s\n", reverse ? "true" : "false", spectrum);
-    
+
     double tol_ = eig_param->tol;
     double *mod_h_evals_sorted = (double *)safe_malloc(nKr_ * sizeof(double));
 
@@ -352,27 +348,26 @@ namespace quda
 
     // Sort the eigenvalues in absolute ascending order
     std::vector<std::pair<double, int>> evals_sorted;
-    for (int j = 0; j < nconv; j++) {
-      evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j));
-    }
-    
+    for (int j = 0; j < nconv; j++) { evals_sorted.push_back(std::make_pair(h_evals_[j].real(), j)); }
+
     // Sort the array by value (first in the pair)
     // and the index (second in the pair) will come along
     // for the ride.
     std::sort(evals_sorted.begin(), evals_sorted.end());
     if (reverse) std::reverse(evals_sorted.begin(), evals_sorted.end());
-    
+
     // print out the computed Ritz values and their error estimates
     for (int j = 0; j < nconv; j++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]), imag(h_evals_[evals_sorted[j].second]),
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]),
+                   imag(h_evals_[evals_sorted[j].second]),
                    std::abs(*(w_workl_ + ipntr_[10] - 1 + evals_sorted[j].second)));
     }
-    
-    // Compute Eigenvalues from Eigenvectors.    
+
+    // Compute Eigenvalues from Eigenvectors.
     for (int i = 0; i < nconv; i++) {
       int idx = evals_sorted[i].second;
-      
+
       profile.TPSTART(QUDA_PROFILE_D2H);
       *d_v = *h_evecs_arpack[idx];
       profile.TPSTOP(QUDA_PROFILE_D2H);
