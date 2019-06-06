@@ -866,9 +866,9 @@ namespace quda {
   {
     for (int dim = 0; dim < 4; dim++) {
       for (int dir = 0; dir < 2; dir++) {
-        ghost[2 * dim + dir] = static_cast<Float *>(ghost_[2 * dim + dir]);
-        ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(
-            static_cast<char *>(ghost_[2 * dim + dir]) + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
+        ghost[2 * dim + dir] = comm_dim_partitioned(dim) ? static_cast<Float *>(ghost_[2 * dim + dir]) : nullptr;
+        ghost_norm[2 * dim + dir] = !comm_dim_partitioned(dim) ? nullptr :
+          reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) + nParity * length_ghost * faceVolumeCB[dim] * sizeof(Float));
       }
     }
   }

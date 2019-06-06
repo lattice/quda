@@ -1,7 +1,9 @@
 # all files for quda -- needs some cleanup
 set (QUDA_OBJS
+  # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu
+  eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
@@ -59,14 +61,14 @@ set (QUDA_OBJS
   staggered_oprod.cu clover_trace_quda.cu ks_force_quda.cu
   hisq_paths_force_quda.cu
   unitarize_force_quda.cu unitarize_links_quda.cu milc_interface.cpp
-  extended_color_spinor_utilities.cu eig_lanczos_quda.cpp
-  ritz_quda.cpp eig_solver.cpp blas_cublas.cu blas_magma.cu
+  extended_color_spinor_utilities.cu
+  blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp quda_arpack_interface.cpp deflation.cpp checksum.cu version.cpp )
+  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 
 if(QUDA_LEGACY_DSLASH)
 LIST(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
@@ -94,8 +96,9 @@ endif()
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   if(GITVERSION)
     find_path(QUDA_GITDIR NAME HEAD PATHS ${CMAKE_SOURCE_DIR}/.git/logs NO_DEFAULT_PATH)
+    include(AddFileDependencies)
     if(QUDA_GITDIR)
-      set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/HEAD)
+      ADD_FILE_DEPENDENCIES(version.cpp ${QUDA_GITDIR}/HEAD)
     endif()
   endif()
   mark_as_advanced(QUDA_GITDIR)
@@ -156,7 +159,11 @@ endif()
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
 if(QUDA_QIO)
-  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QIO)
+    add_dependencies(quda_cpp QIO)
+  endif()
+  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
 endif()
 
 if(QUDA_QDPJIT)
@@ -164,6 +171,10 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QMP)
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QMP)
+    add_dependencies(quda_cpp QMP)
+  endif()
   target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
@@ -176,8 +187,17 @@ if(QUDA_MAGMA)
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda PRIVATE ${PARPACK_OR_ARPACK})
+  target_link_libraries(quda INTERFACE ${ARPACK})
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
+  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
+
+  if(QUDA_MPI OR QUDA_QMP)
+    target_link_libraries(quda INTERFACE ${PARPACK})
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
+    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
+  endif()
 endif()
+
 
 if(QUDA_NVML)
   target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
@@ -197,6 +217,14 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 if (QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
+endif()
+
+configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
+install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+
+if(QUDA_JITIFY)
+  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
+  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
 # until we define an install step copy the include directory to the build directory

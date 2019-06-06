@@ -26,7 +26,6 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern int niter;
 
-extern bool verify_results;
 extern int Nsrc;
 extern int Msrc;
 extern QudaSolveType solve_type;
@@ -112,11 +111,16 @@ void initFields(int prec)
 
   param.pad = 0; // padding must be zero for cpu fields
 
-  if (solve_type == QUDA_DIRECT_PC_SOLVE) {
+  switch (solve_type) {
+  case QUDA_DIRECT_PC_SOLVE:
+  case QUDA_NORMOP_PC_SOLVE:
     param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  } else if (solve_type == QUDA_DIRECT_SOLVE) {
+    break;
+  case QUDA_DIRECT_SOLVE:
+  case QUDA_NORMOP_SOLVE:
     param.siteSubset = QUDA_FULL_SITE_SUBSET;
-  } else {
+    break;
+  default:
     errorQuda("Unexpected solve_type=%d\n", solve_type);
   }
 
@@ -994,11 +998,9 @@ int main(int argc, char** argv)
   cudaGetLastError();
 
   // lastly check for correctness
-  if (verify_results) {
-    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    result = RUN_ALL_TESTS();
-  }
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  result = RUN_ALL_TESTS();
 
   endQuda();
 

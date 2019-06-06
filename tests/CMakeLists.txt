@@ -7,6 +7,17 @@ include_directories(. googletest/include googletest)
 #build a common library for all test utilities
 set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(quda_test QMP)
+endif()
+
+if(QUDA_QDPJIT)
+  target_link_libraries(quda INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+endif()
+
+if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(quda_test QMP)
+endif()
 
 set(TEST_LIBS quda quda_test )
 
@@ -14,10 +25,21 @@ MACRO (QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   IF(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
   ENDIF()
+
+if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(${mytarget} QIO)
+endif() 
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(${mytarget} QMP)
+endif() 
 ENDMACRO()
 
-if(NOT QUDA_BUILD_ALL_TESTS)
-  set(BUILD_TESTING OFF)
+
+if(QUDA_ARPACK)
+  LIST(APPEND TEST_LIBS ${ARPACK})
+  if(QUDA_MPI OR QUDA_QMP) 
+    LIST(APPEND TEST_LIBS ${PARPACK})
+  endif()
 endif()
 
 #define tests
@@ -33,12 +55,16 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
   target_link_libraries(dslash_test ${TEST_LIBS} )
   target_link_libraries(dslash_ctest ${TEST_LIBS} )
   QUDA_CHECKBUILDTEST(dslash_test QUDA_BUILD_ALL_TESTS)
-  QUDA_CHECKBUILDTEST(dslash_ctest BUILD_TESTING)
+  QUDA_CHECKBUILDTEST(dslash_ctest QUDA_BUILD_ALL_TESTS)
 
   cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(invert_test QUDA_BUILD_ALL_TESTS)
-  
+
+  cuda_add_executable(eigensolve_test eigensolve_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  target_link_libraries(eigensolve_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(eigensolve_test QUDA_BUILD_ALL_TESTS)
+
   if(QUDA_BLOCKSOLVER)
     cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})
@@ -58,7 +84,7 @@ if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   QUDA_CHECKBUILDTEST(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
-  QUDA_CHECKBUILDTEST(staggered_dslash_ctest BUILD_TESTING)
+  QUDA_CHECKBUILDTEST(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
 
   cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})

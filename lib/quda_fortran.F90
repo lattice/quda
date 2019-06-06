@@ -116,6 +116,8 @@ module quda_fortran
      integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
      integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
+     integer(4) :: max_hq_res_increase ! How many heavy-quark residual increases we tolerate when doing heavy-quark restarts
+     integer(4) :: max_hq_res_increase_total ! Total number of heavy-quark residual restarts we tolerate
      integer(4) :: heavy_quark_check ! After how many iterations shall the heavy quark residual be updated
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver

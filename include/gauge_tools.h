@@ -108,4 +108,12 @@ namespace quda {
      @return double The total topological charge
    */
   double computeQCharge(const GaugeField &Fmunu);
+
+  /**
+   Compute the topological charge density per lattice site
+   @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
+   @param[out] qDensity The topological charge at each lattice site
+   @return double The total topological charge
+  */
+  double computeQChargeDensity(const GaugeField &Fmunu, void *result);
 }

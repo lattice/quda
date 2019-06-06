@@ -35,14 +35,39 @@ namespace quda {
 
   }
 
-  std::string TimeProfile::pname[] = { "download",  "upload", "init", "preamble", "compute",
-				       "comms", "epilogue", "free", "file i/o", "chronology", "eigen",
-                                       "dummy", "pack kernel", "dslash kernel", "gather", "scatter",
-                                       "kernel launch", "event record",
-				       "event query", "stream wait event", "set func attribute",
-                                       "event synchronize", "stream synchronize", "device synchronize",
-                                       "memcpy d2d async", "memcpy d2h async", "memcpy2d d2h async",
-                                       "memcpy h2d async", "comms start", "comms query", "constant", "total" };
+  std::string TimeProfile::pname[] = {"download",
+                                      "upload",
+                                      "init",
+                                      "preamble",
+                                      "compute",
+                                      "comms",
+                                      "epilogue",
+                                      "free",
+                                      "file i/o",
+                                      "chronology",
+                                      "eigen",
+                                      "arpack",
+                                      "dummy",
+                                      "pack kernel",
+                                      "dslash kernel",
+                                      "gather",
+                                      "scatter",
+                                      "kernel launch",
+                                      "event record",
+                                      "event query",
+                                      "stream wait event",
+                                      "set func attribute",
+                                      "event synchronize",
+                                      "stream synchronize",
+                                      "device synchronize",
+                                      "memcpy d2d async",
+                                      "memcpy d2h async",
+                                      "memcpy2d d2h async",
+                                      "memcpy h2d async",
+                                      "comms start",
+                                      "comms query",
+                                      "constant",
+                                      "total"};
 
 #ifdef INTERFACE_NVTX
   const uint32_t TimeProfile::nvtx_colors[] = { 0xff00ff00, 0xff0000ff, 0xffffff00, 0xffff00ff, 0xff00ffff, 0xffff0000, 0xffffffff };

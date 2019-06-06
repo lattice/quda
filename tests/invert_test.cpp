@@ -54,6 +54,8 @@ extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaMatPCType matpc_type; // preconditioning type
+extern QudaSolutionType solution_type; // the solution we desire
+extern QudaSolveType solve_type;       // the solve type we want to find the solution
 
 extern double clover_coeff;
 extern bool compute_clover;
@@ -70,6 +72,7 @@ extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG s
 extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
+extern bool unit_gauge;
 
 extern void usage(char** );
 
@@ -104,6 +107,8 @@ int main(int argc, char **argv)
 {
 
   mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
+
+  if (multishift) solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // set a correct default for the multi-shift solver
 
   for (int i = 1; i < argc; i++){
     if(process_command_line_option(argc, argv, &i) == 0){
@@ -207,33 +212,13 @@ int main(int argc, char **argv)
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
   inv_param.inv_type = inv_type;
-  if (multishift) {
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
-	     dslash_type == QUDA_DOMAIN_WALL_DSLASH  || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-	     dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
-  } else {
-    inv_param.solution_type = QUDA_MATPC_SOLUTION;
-  }
-
+  inv_param.solution_type = solution_type;
+  inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-      dslash_type == QUDA_TWISTED_MASS_DSLASH || 
-      dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
-      multishift || inv_type == QUDA_CG_INVERTER ||
-      inv_type == QUDA_CG3_INVERTER || inv_type == QUDA_CA_CG_INVERTER) {
-    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-  } else {
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  }
 
 
   inv_param.pipeline = pipeline;
@@ -344,8 +329,14 @@ int main(int argc, char **argv)
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
