@@ -101,7 +101,8 @@ namespace quda {
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n");
 
-    std::unique_ptr<double, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(double)), pinned_deleter);
+    //std::unique_ptr<double, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(double)), pinned_deleter);
+    std::unique_ptr<double[] > projm(new double[param.ld*param.cur_dim]);
 
     Map<MatrixXd, Unaligned, DynamicStride> projm_(param.matProj, param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
     Map<MatrixXd, Unaligned, DynamicStride> evecs_(projm.get(), param.cur_dim, param.cur_dim, DynamicStride(param.ld, 1));
@@ -109,7 +110,7 @@ namespace quda {
     SelfAdjointEigenSolver<MatrixXd> es_projm( projm_ );
     evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
 
-		ColorSpinorFieldSet &rv = *param.RV;
+    ColorSpinorFieldSet &rv = *param.RV;
 
     std::vector<ColorSpinorField*> rv_(rv(0, param.cur_dim));
     std::vector<ColorSpinorField*> res_;
@@ -148,7 +149,7 @@ namespace quda {
 
     double check_nrm2 = norm2(b);
 
-		ColorSpinorFieldSet &rv = *param.RV;
+    ColorSpinorFieldSet &rv = *param.RV;
 
     printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
 
@@ -279,7 +280,8 @@ namespace quda {
      }
 
      std::unique_ptr<double[] > evals(new double[param.cur_dim]);
-     std::unique_ptr<double, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(double)), pinned_deleter);
+     //std::unique_ptr<double, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(double)), pinned_deleter);
+     std::unique_ptr<double[] > projm(new double[param.ld*param.cur_dim]);     
 
      ColorSpinorFieldSet &rv = *param.RV;
 

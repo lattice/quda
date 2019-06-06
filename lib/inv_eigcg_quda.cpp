@@ -61,8 +61,8 @@ namespace quda {
        //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
        RealVector Tmvals;//eigenvalues of T[m,  m  ] and T[m-1, m-1] (re-used)
 
-       int m;
-       int k;
+       const int m;
+       const int k;
        int id;//cuurent search spase index
 
        int restarts;
@@ -76,15 +76,15 @@ namespace quda {
 
        /** Pipeline specific parameters:
 	*/
-       Vector3i task_offsets;//pipeline length per compute task (for 3 compute tasks, the last entry is the total pipeline length)
+       const Vector3i task_offsets;//pipeline length per compute task (for 3 compute tasks, the last entry is the total pipeline length)
        //Cached lanczos elements (diagonal and off-diagonal elements)
        RealVectorSet lanczos_cached_elems;
 
        // C++ task-based object for the (asynchron.) RayleighRitz computations
        std::future<void> rr_task;
        /** Global reduction stuff:
-	 @rr_task_recvbuff recieve buffer for local dot product obtained in the RR block
-         @caeigcg_recvbuff recieve buffer for the eigcg internal local dot products
+	   @rr_task_recvbuff recieve buffer for local dot product obtained in the RR block
+           @caeigcg_recvbuff recieve buffer for the eigcg internal local dot products
        */
        RealVector rr_task_recvbuff;
        //
@@ -146,14 +146,14 @@ namespace quda {
        template <bool is_pipelined = false>
        void RestartArgs(){
          Tm.setZero();
-	 for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
+	 for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);
 
 	 s *= inv_normr_m;
 
 	 Tm.col(2*k).segment(0, 2*k) = s;
 	 Tm.row(2*k).segment(0, 2*k) = s;
 
-  const int tot_pipe_l = task_offsets[2];
+         const int tot_pipe_l = task_offsets[2];
 
 	 id = 2*k+tot_pipe_l;  restarts += 1; s.setZero();
 
@@ -256,7 +256,6 @@ namespace quda {
     inner.use_sloppy_partial_accumulator= false;//outer.use_sloppy_partial_accumulator;
   }
 
-
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), V2k(nullptr),
     work_space(nullptr), Az(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
@@ -302,15 +301,10 @@ namespace quda {
   void IncEigCG::RayleighRitz()
   {
     EigCGArgs &args = *eigcg_args;
-    if ( compute_task_id & COMPUTE_EIGENV ) {
-      args.ComputeEv();
-      //
-      if (compute_task_id == COMPUTE_EIGENV) return;
-    } // end compute task
 
+    if ( compute_task_id & COMPUTE_EIGENV )  args.ComputeEv();
 
-    if( compute_task_id & COMPUTE_QV ) {
-      constexpr int compute_qv_idx = COMPUTE_QV >> 1; //1
+    if ( compute_task_id & COMPUTE_QV ) {
       //Restart V task:
       ColorSpinorFieldSet &vm  = *Vm;
       ColorSpinorFieldSet &v2k = *V2k;
@@ -319,7 +313,7 @@ namespace quda {
 
       blas::zero(v2k);
 
-      const int n_qv_updates = is_pipelined ? args.task_offsets[compute_qv_idx] : 1;
+      const int n_qv_updates = is_pipelined ? args.task_offsets[0] : 1;
 
       const int block_size   = args.m / n_qv_updates;//WARNING args.n_updates < args.m
 
@@ -414,22 +408,26 @@ namespace quda {
       args.CacheNormR(normr);
       //Store updated Ap
       blas::copy(*Az, (*work_space)[0]);
-      //args.rr_task = std::async(std::launch::async, &IncEigCG::RayleighRitz<is_pipelined, COMPUTE_EIGENV_AND_QV>, this);
-      //ok, this works but does not launch a parallel task
-      args.rr_task = std::async(std::launch::deferred, &IncEigCG::RayleighRitz<is_pipelined, COMPUTE_EIGENV_AND_QV>, this);
-    } else if (args.id == (args.m+args.task_offsets[2]-1)) {
-      //do synchronization first
+						// launch async task
+      args.rr_task = std::async(std::launch::async, &IncEigCG::RayleighRitz<is_pipelined, COMPUTE_EIGENV>, this);
+    } else if (args.id == (args.m+args.task_offsets[0])) {
+      // do synchronization with EIGENV
       if(args.rr_task.valid()) args.rr_task.wait();
       else warningQuda("Tried to synchronize an invalid task...");
-
+      // launch QV task
+      RayleighRitz<is_pipelined, COMPUTE_QV>();
+    } else if (args.id == (args.m+args.task_offsets[1])) {
+      // launch ZAV task
       RayleighRitz<is_pipelined, COMPUTE_ZAV>();
     } else if (args.id == (args.m+args.task_offsets[2])) {
+      //  we've almost done
       // load cached basis vectors (nop for the non-pipelined version)
-      for(int i = 0; i < args.task_offsets[3]; i++) blas::copy(vm[2*args.k + i], vm[args.m + i]);
+						const int pipeline_length = args.task_offsets[2];
+      for(int i = 0; i < pipeline_length; i++) blas::copy(vm[2*args.k + i], vm[args.m + i]);
       //
       EIGCG_MPI_CHECK_(MPI_Wait(&args.rr_task_request_handle, MPI_STATUS_IGNORE));
       if (comm_size() > 1) args.s = args.rr_task_recvbuff;
-      //
+      // Restore Lanczos and update seach space index
       args.RestartArgs<is_pipelined>();
     }
 
@@ -659,6 +657,11 @@ namespace quda {
   constexpr int qv_pipe_l  = 8;
   constexpr int zav_pipe_l = 8;
 
+		// this is the Worker pointer that the dslash uses to launch the shifted updates
+  namespace dslash {
+    extern Worker* aux_worker;
+  }
+
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
     const int leftover_iters = 4;
@@ -769,18 +772,22 @@ namespace quda {
     double &delta = local_buffer.z;
     double &mu    = local_buffer.w;
 
+    commGlobalReductionSet(false);
     nu     = blas::norm2(r);
     gamma  = blas::norm2(s);
     delta  = blas::reDotProduct(r, s);
     mu     = blas::reDotProduct(p, s);
+    commGlobalReductionSet(true);
 
-    EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
+    if (comm_size() > 1) {
+
+      EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
 			            args.caeigcg_recvbuff.data(),
 				    4,
 				    MPI_DOUBLE,
 			    	    MPI_SUM, MPI_COMM_WORLD,
 				    &args.caeigcg_request_handle));
-
+    }
 
     matSloppy(u, s);
 
@@ -793,7 +800,7 @@ namespace quda {
 
     int k = 0;
 
-    PrintStats("pipeEigCG", k, nu, b2, heavy_quark_res);
+    PrintStats("\nCAEigCG", k, nu, b2, heavy_quark_res);
 
     const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-8;
     bool converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq);
@@ -801,12 +808,16 @@ namespace quda {
     constexpr int prediction_correction_interval = 16;
     int correction_count;
 
+    printfQuda("Running CA eigCG with %d correction interval\n", prediction_correction_interval);
+
     while ( !converged && k < param.maxiter ) {
       //Update search space
       PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
 
-      //EIGCG_MPI_CHECK_(MPI_Wait(&args.pipecg_task_request_handle, MPI_STATUS_IGNORE));
-      //memcpy(local_buffer.get(), args.pipecg_task_recvbuff.data(), 4*sizeof(double));
+      if (comm_size() > 1){
+        EIGCG_MPI_CHECK_(MPI_Wait(&args.caeigcg_request_handle, MPI_STATUS_IGNORE));
+        memcpy(reinterpret_cast<double*>(&local_buffer), args.caeigcg_recvbuff.data(), 4*sizeof(double));
+      }
 
       alpha_old_inv = alpha_inv;
       beta_old      = beta;
@@ -821,7 +832,18 @@ namespace quda {
       lanczos_offdiag  = (-sqrt(beta)*alpha_inv);
 
       blas::axpy(+alpha, p, y);
+	     commGlobalReductionSet(false);
       local_buffer = quadrupleEigCGUpdate(alpha, beta, r, s, u, w, p);
+	     commGlobalReductionSet(true);
+
+      if (comm_size() > 1){
+	EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
+				args.caeigcg_recvbuff.data(),
+				4,
+				MPI_DOUBLE,
+				MPI_SUM, MPI_COMM_WORLD,
+				&args.caeigcg_request_handle));
+      }
 
       matSloppy(u, s, tmp);
 
@@ -832,7 +854,7 @@ namespace quda {
 
       k++;
 
-      PrintStats("pipeEigCG", k, nu, b2, heavy_quark_res);
+      PrintStats("CAEigCG", k, nu, b2, heavy_quark_res);
       converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(gamma, heavy_quark_res, local_stop, param.tol_hq);
     }
 

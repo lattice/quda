@@ -91,6 +91,8 @@ extern QudaMemoryType    mem_type_ritz;
 extern QudaMassNormalization normalization; // mass normalization of Dirac operators
 extern QudaVerbosity verbosity;
 
+extern int pipeline;
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -263,6 +265,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type_precondition = precon_type;
   inv_param.gcrNkrylov = 6;
+
+  inv_param.pipeline = pipeline;  
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);

@@ -3095,7 +3095,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       delete dsolve;
     }
     solverParam.updateInvertParam(*param);
-    delete solve;
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
@@ -3150,7 +3149,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       delete dsolve;
     }
     solverParam.updateInvertParam(*param);
-    delete solve;
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
@@ -3166,7 +3164,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
     dirac.Mdag(*out, tmp);  // x = M^dag y
     solverParam.updateInvertParam(*param);
-    delete solve;
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
