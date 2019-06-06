@@ -493,6 +493,9 @@ extern "C" {
     /** Precision to store the null-space vectors in (post block orthogonalization) */
     QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
 
+    /** Number of times to repeat Gram-Schmidt in block orthogonalization */
+    int n_block_ortho[QUDA_MAX_MG_LEVEL];
+
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
 

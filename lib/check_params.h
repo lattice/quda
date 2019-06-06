@@ -676,6 +676,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_ca_lambda_max[i], INVALID_DOUBLE);
 #endif
 
+#ifdef INIT_PARAM
+    P(n_block_ortho[i], 1);
+#else
+    P(n_block_ortho[i], INVALID_INT);
+#endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
     P(coarse_solver_maxiter[i], INVALID_INT);
