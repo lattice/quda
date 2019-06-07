@@ -189,6 +189,12 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
   case 128:
     status = read_field<128>(infile, count, field_in, cpu_prec);
     break;
+  case 256:
+    status = read_field<256>(infile, count, field_in, cpu_prec);
+    break;
+  case 384:
+    status = read_field<384>(infile, count, field_in, cpu_prec);
+    break;
   default:
     errorQuda("Undefined %d", Ninternal);
   }
@@ -316,6 +322,12 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     break;
   case 128:
     status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    break;
+  case 256:
+    status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    break;
+  case 384:
+    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);

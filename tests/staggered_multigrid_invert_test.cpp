@@ -14,6 +14,7 @@
 #include <gauge_field.h>
 #include <covdev_reference.h>
 #include <unitarization_links.h>
+#include <random_quda.h>
 
 #if defined(QMP_COMMS)
 #include <qmp.h>
@@ -180,21 +181,6 @@ namespace quda {
   extern void setTransferGPU(bool);
 }
 
-template<typename Float>
-void constructSpinorField(Float *res) {
-  int vol = Vh;
-  for(int src=0; src<Nsrc; src++) {
-    for(int i = 0; i < vol; i++) {
-      for (int s = 0; s < 1; s++) {
-        for (int m = 0; m < 3; m++) {
-          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-          res[(src*vol + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
-        }
-      }
-    }
-  }
-}
-
 void
 display_test_info()
 {
@@ -305,7 +291,7 @@ void computePlaquetteQDPOrder(void** qdp_link, double plaq[3]) {
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   gauge_param.cuda_prec_sloppy = prec;
   gauge_param.reconstruct_sloppy = link_recon;
@@ -625,6 +611,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   // set file i/o parameters
   strcpy(mg_param.vec_infile, vec_infile);
   strcpy(mg_param.vec_outfile, vec_outfile);
+  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
+  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -1028,14 +1016,6 @@ int main(int argc, char **argv)
   ref = new cpuColorSpinorField(csParam);  
   tmp = new cpuColorSpinorField(csParam);  
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
-  rng->Init();
-
-  construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
-  
-  rng->Release();
-  delete rng;
-
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
   tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
@@ -1101,9 +1081,18 @@ int main(int argc, char **argv)
   // Test: create a dummy invert param just to make sure
   // we're setting up gauge fields and such correctly.
 
+  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  rng->Init();
 
+  for (int k = 0; k < Nsrc; k++) {
 
-  invertQuda(out->V(), in->V(), &inv_param);
+    construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+    invertQuda(out->V(), in->V(), &inv_param);
+
+  }
+  
+  rng->Release();
+  delete rng;
 
   // stop the timer
   time0 += clock();
