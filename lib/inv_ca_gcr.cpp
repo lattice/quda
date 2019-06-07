@@ -195,7 +195,7 @@ namespace quda {
 
     // Populate latter half of the array with left SV
     eig_solve->computeSVD(mdagm, param.evecs, param.evals);
-    
+
     deflate_init = true;
   }
 

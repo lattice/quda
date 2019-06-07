@@ -477,11 +477,10 @@ namespace quda
     computeEvals(mat, kSpace, evals, nConv);
     for (int i = 0; i < nConv; i++) {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-	printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
-		   residua[i]);
+        printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
       }
     }
-    
+
     delete r[0];
   }
 
@@ -553,11 +552,11 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParam = csParamClone;
     // Increase Krylov space to nKr+1 one vector, create residual
-    for (int i = nConv; i<nKr+1; i++) kSpace.push_back(ColorSpinorField::Create(csParam));
+    for (int i = nConv; i < nKr + 1; i++) kSpace.push_back(ColorSpinorField::Create(csParam));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
     // Increase evals space to nEv
-    for (int i = nConv; i<nEv; i++) evals.push_back(0.0);
+    for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
     //---------------------------------------------------------------------------
 
     // Convergence and locking criteria
@@ -658,7 +657,7 @@ namespace quda
 
       if (getVerbosity() >= QUDA_VERBOSE) {
         for (int i = 0; i < nKr; i++) {
-	  //printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          // printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
@@ -679,7 +678,7 @@ namespace quda
     for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(nConv);
     evals.resize(nConv);
-    
+
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
@@ -692,20 +691,20 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("TRLM computed the requested %d vectors in %d restart steps and %d OP*x operations.\n", nConv,
                    restart_iter, iter);
-	
+
         // Dump all Ritz values and residua
         for (int i = 0; i < nConv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
-      
+
       // Compute eigenvalues
       computeEvals(mat, kSpace, evals, nConv);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-	for (int i = 0; i < nConv; i++) {
-	  printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
-		     residua[i]);
-	}
+        for (int i = 0; i < nConv; i++) {
+          printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
+                     residua[i]);
+        }
       }
     }
 

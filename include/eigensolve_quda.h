@@ -132,7 +132,7 @@ public:
        @param[in] evals Computed eigenvalues of NormOp
     */
     void computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
-    
+
     /**
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
