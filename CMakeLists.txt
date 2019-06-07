@@ -126,6 +126,7 @@ set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
 
 # ARPACK
 set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
+set(QUDA_ARPACK_LOGGING OFF CACHE BOOL "enable ARPACK logging (not availible for NG)")
 
 # Interface options
 set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
@@ -221,6 +222,8 @@ mark_as_advanced(QUDA_BLOCKSOVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
+
+mark_as_advanced(QUDA_ARPACK_LOGGING)
 
 # ######################################################################################################################
 # everything below here is processing the setup
@@ -601,9 +604,7 @@ if(QUDA_ARPACK)
       # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI) include_directories(SYSTEM
       # ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
     endif()
-
-    # ARPACK-NG does not seem to suppport logging - we need to disable it
-    add_definitions(-DARPACK_NG)
+    
   else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
 
@@ -633,7 +634,13 @@ if(QUDA_ARPACK)
      include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
      include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
      include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
-  endif()
+   endif()
+
+   if(QUDA_ARPACK_LOGGING)
+     # ARPACK-NG does not suppport logging - we must warn the user
+     message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
+     add_definitions(-DARPACK_LOGGING)
+   endif()
 endif(QUDA_ARPACK)
 
 # set which precisions to enable

@@ -37,13 +37,13 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_INIT);
 
 // ARPACK logfile name
-#ifndef ARPACK_NG
+#ifdef ARPACK_LOGGING
     char *arpack_logfile = eig_param->arpack_logfile;
 #endif
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("**** START ARPACK SOLUTION ****\n");
-#ifdef ARPACK_NG
-      printfQuda("Arpack logging not supported with arpack-ng\n");
+#ifndef ARPACK_LOGGING
+      printfQuda("Arpack logging not enabled.\n");
 #else
       printfQuda("Output directed to %s\n", arpack_logfile);
 #endif
@@ -146,7 +146,7 @@ namespace quda
     ColorSpinorField *d_v2 = nullptr;
     ColorSpinorField *resid = nullptr;
 
-#ifndef ARPACK_NG
+#ifdef ARPACK_LOGGING
     // ARPACK log routines
     // Code added to print the log of ARPACK
     int arpack_log_u = 9999;
@@ -332,7 +332,7 @@ namespace quda
         errorQuda("Arnoldi update.\n");
       }
     }
-#ifndef ARPACK_NG
+#ifdef ARPACK_LOGGING
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     if (comm_rank() == 0) {
       if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
