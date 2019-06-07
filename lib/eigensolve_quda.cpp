@@ -17,6 +17,10 @@
 
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
+#include <Eigen/LU>
+
+// TODO: remove the following line
+#include <unistd.h>
 
 bool flags = true;
 
@@ -1257,9 +1261,16 @@ namespace quda
       QudaVerbosity verbTmp = getVerbosity();
       setVerbosity(QUDA_SILENT);
 
-      // Invert the shifted-and-projected MMdag, with -r as rhs
-      invertProjMat(eigSpace, theta, mat, *t[0], *r[0]);
-      blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical runs the diff when using -t vs t
+      // TODO: remove 6th param ?
+      // Proposing a new vector t through the solution of a shifted-and-projected MMdag
+
+      blas::ax(-1.0, *r[0]);
+
+      invertProjMat(eigSpace, theta, mat, *t[0], *r[0], 1);
+
+      blas::ax(-1.0, *r[0]);
+
+      //blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical runs the diff when using -t vs t
 
       // TODO: simply remove this ?
       setVerbosity(verbTmp);
@@ -1384,21 +1395,24 @@ namespace quda
   }
 
   // Inversion of (I - QQdag)(A - \theta I)(I - QQdag)
-  void JD::invertProjMat(std::vector<ColorSpinorField *> &qSpace, double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b){
+  void JD::invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, bool precJD){
 
     // TODO: use <mat>
 
+    // Clone x's CSF params
+    ColorSpinorParam csParam(x);
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
     // TODO: change this section to a much more efficient way; alloc/dealloc - ating Dirac stuff (m's and d's) too inefficient
-    // Proposing a new vector t through the solution of a shifted-and-projected MMdag
 
     //The matrix solvers for the shifted-and-proj MMdag
     DiracMatrix *mm, *mmSloppy;
 
+    // Buffers for the shifts of the matrix operators
     double bareShift_mm, bareShift_mmSloppy;
 
     Dirac *d = nullptr;
     Dirac *dSloppy = nullptr;
-
     // TODO: call this in a modularized way
     // Create the dirac operator
     {
@@ -1410,28 +1424,17 @@ namespace quda
       quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
       quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
 
-      d = Dirac::create(diracParam); // create the Dirac operator
+      d = Dirac::create(diracParam);
       dSloppy = Dirac::create(diracSloppyParam);
     }
 
     Dirac &dirac = *d;
     Dirac &diracSloppy = *dSloppy;
 
-    mm = new DiracProjMMdagProj(dirac);
-    mm->projSpace = qSpace;
-
-    mmSloppy = new DiracProjMMdagProj(diracSloppy);
-    mmSloppy->projSpace = qSpace;
-
-    // Switching to the appropriate shift for JD
-    bareShift_mm = mm->shift;
-    mm->shift = bareShift_mm - theta;
-    bareShift_mmSloppy = mmSloppy->shift;
-    mmSloppy->shift = bareShift_mmSloppy - theta;
-
+    // Solver (CG) params
+    // TODO: remove refinement
     QudaInvertParam refineparam = *eig_param->invert_param;
     refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
-
     SolverParam solverParam(refineparam);
     solverParam.iter = 0;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
@@ -1440,18 +1443,142 @@ namespace quda
     //solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
     solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
 
-    {
+    // Add projected-preconditioning to the inversion in the JD eigensolver
+    if(precJD){
+
+      // 1. solve for Qhat in K * Qhat = qSpace, with K a good preconditioner, mmSloppy for now
+
+      std::vector<ColorSpinorField*> Qhat;
+      int sizePS = qSpace.size();
+
+      // Full and sloppy Dirac Matrix, with qSpace for projections
+      mm = new DiracMMdag(dirac);
+      mmSloppy = new DiracMMdag(diracSloppy);
+
+      // Switching to the appropriate shift for JD
+      bareShift_mmSloppy = mmSloppy->shift;
+      mmSloppy->shift = bareShift_mmSloppy - theta;
+
       CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
-      cg(x, b);
+
+      //printfQuda("\n SIZE qSpace =  %d\n\n", qSpace.size());
+
+      //setVerbosity(QUDA_VERBOSE);
+
+      for(int i=0; i<qSpace.size(); i++){
+        // Take t[0] as initial guess
+        Qhat.push_back(ColorSpinorField::Create(b, csParam));
+        cg(*Qhat[i], *qSpace[i]);
+      }
+
+      //setVerbosity(QUDA_SILENT);
+
+      // Switching back the shift parameters
+      mmSloppy->shift = bareShift_mmSloppy;
+
+      // 2. M = qSpacedag * Qhat
+
+      Complex* resultDotProd = (Complex*) safe_malloc( sizePS*sizePS * sizeof(Complex) );
+      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(qSpace), const_cast<std::vector<ColorSpinorField*>&>(Qhat));
+
+      // 3. LU decomposition of M -- TODO: move the application of .fullPivLu() to this sub-section
+
+      // Init eigen object
+      MatrixXcd M = MatrixXcd::Zero(sizePS,sizePS);
+      for(int i=0; i<sizePS; i++){
+        for(int j=0; j<sizePS; j++){
+          M(i,j) = resultDotProd[i*sizePS + j];
+        }
+      }
+
+      // 4. r_tilde = Ktilde^-1 * r
+
+      // Switching to the appropriate shift for JD
+      bareShift_mmSloppy = mmSloppy->shift;
+      mmSloppy->shift = bareShift_mmSloppy - theta;
+
+      std::vector<ColorSpinorField*> r_tilde;
+      r_tilde.push_back(ColorSpinorField::Create(*qSpace[0], csParam));
+
+      cg(*r_tilde[0], b);
+
+      // Switching back the shift parameters
+      mmSloppy->shift = bareShift_mmSloppy;
+
+      MatrixXcd gamma(sizePS,1);
+      for(int i=0; i<sizePS; i++){
+        gamma(i,0) = blas::cDotProduct(*qSpace[i], *r_tilde[0]);
+      }
+
+      MatrixXcd alpha = M.fullPivLu().solve(gamma);
+
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-alpha(i), *Qhat[i], *r_tilde[0]);
+      }
+
+      // 5. solve: ( Ktilde^-1 * (I - QQdag)(A - \theta I)(I - QQdag) ) x = r_tilde
+
+      DiracMatrix* mmPrecProj = new DiracPrecProjMMdag(dirac);
+      mmPrecProj->projSpace = qSpace;
+      mmPrecProj->theta = theta;
+      mmPrecProj->profileFromCaller_ = &profile;
+      mmPrecProj->K_ = mmSloppy;
+      mmPrecProj->Mproj = M;
+      mmPrecProj->Qhat = Qhat;
+      mmPrecProj->solverParam_ = &solverParam;
+      mmPrecProj->cg_ = &cg;
+      mmPrecProj->cgApplier = &CG::operator();
+
+      CG cgPrec(*mmPrecProj, *mmPrecProj, solverParam, profile);
+
+      //setVerbosity(QUDA_VERBOSE);
+
+      //blas::zero(x);
+      cgPrec(x, *r_tilde[0]);
+
+      //setVerbosity(QUDA_SILENT);
+
+      // Release allocated mem
+      host_free(resultDotProd);
+
+      // FIXME: these de-allocations are failing !
+      //delete mmSloppy;
+      //delete mmPrecProj;
+
+      delete r_tilde[0];
+      for (auto p : Qhat){ delete p; }
+    }
+    else{
+      // Full and sloppy Dirac Matrix, with qSpace for projections
+      mm = new DiracProjMMdagProj(dirac);
+      mm->projSpace = qSpace;
+      mmSloppy = new DiracProjMMdagProj(diracSloppy);
+      mmSloppy->projSpace = qSpace;
+
+      // Switching to the appropriate shift for JD
+      bareShift_mm = mm->shift;
+      mm->shift = bareShift_mm - theta;
+      bareShift_mmSloppy = mmSloppy->shift;
+      mmSloppy->shift = bareShift_mmSloppy - theta;
+
+      //setVerbosity(QUDA_VERBOSE);
+
+      {
+        CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
+        cg(b, x);
+      }
+
+      //setVerbosity(QUDA_SILENT);
+
+      // Switching back the shift parameters
+      mm->shift = bareShift_mm;
+      mmSloppy->shift = bareShift_mmSloppy;
+
+      delete mm;
+      delete mmSloppy;
     }
 
-    // Switching back the shift parameters
-    mm->shift = bareShift_mm;
-    mmSloppy->shift = bareShift_mmSloppy;
-
     // Clearing allocated data
-    delete mm;
-    delete mmSloppy;
     delete d;
     delete dSloppy;
 

@@ -8,6 +8,9 @@
 namespace quda
 {
 
+  // FIXME: forward declaration
+  //class DiracMatrix;
+
   class EigenSolver
   {
 
@@ -263,12 +266,15 @@ public:
     JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
 
     /**
-       @brief Compute eigenpairs
+       @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
        @param[in] qSpace The projection vector space
        @param[in] theta Shift parameter
        @param[in] mat The original matrix to be inverted after shift-and-project
+       @param[in] x Ouput spinor
+       @param[in] b Input spinor
+       @param[in] precJD Use projected preconditioning or not
     */
-    void invertProjMat(std::vector<ColorSpinorField *> &qSpace, double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
+    void invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, bool precJD);
 
     /**
        @brief Compute eigenpairs

@@ -8,9 +8,19 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 
+//#include <invert_quda.h>
+//#include <Eigen/Eigenvalues>
+//#include <Eigen/Dense>
+#include <Eigen/LU>
+//#include <timer.h>
+
 #include <typeinfo>
 
 namespace quda {
+
+  // FIXME: Forward declarations
+  struct SolverParam;
+  class CG;
 
   class Transfer;
   class Dirac;
@@ -88,6 +98,7 @@ namespace quda {
   class DiracMMdag;
   class DiracMdag;
   class DiracProjMMdagProj;
+  class DiracPrecProjMMdag;
   //Forward declaration of multigrid Transfer class
   class Transfer;
 
@@ -100,6 +111,7 @@ namespace quda {
     friend class DiracMMdag;
     friend class DiracMdag;
     friend class DiracProjMMdagProj;
+    friend class DiracPrecProjMMdag;
 
   protected:
     cudaGaugeField *gauge;
@@ -1126,8 +1138,17 @@ public:
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
     double shift;
 
+    // FIXME: Params for DiracPrecProjMMdag
     // Orthonormal set used in the projection of MMdag
     std::vector<ColorSpinorField*> projSpace;
+    double theta;
+    TimeProfile *profileFromCaller_;
+    DiracMatrix *K_;
+    Eigen::MatrixXcd Mproj;
+    std::vector<ColorSpinorField*> Qhat;
+    SolverParam *solverParam_;
+    void (CG::*cgApplier)(ColorSpinorField&, ColorSpinorField&);
+    CG *cg_;
   };
 
   class DiracM : public DiracMatrix {
@@ -1341,6 +1362,7 @@ public:
 
       // Apply projector ( I - QQ^ )
       Pv.push_back(ColorSpinorField::Create(in, csParamClone));
+
       int sizePS = projSpace.size();
       Complex* resultDotProd = (Complex*) safe_malloc( sizePS * sizeof(Complex) );
       blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(projSpace), const_cast<std::vector<ColorSpinorField*>&>(Pv));
@@ -1374,6 +1396,154 @@ public:
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
+
+
+  class DiracPrecProjMMdag : public DiracMatrix {
+
+  public:
+    DiracPrecProjMMdag(const Dirac &d) : DiracMatrix(d) { }
+    DiracPrecProjMMdag(const Dirac *d) : DiracMatrix(d) { }
+
+    // TODO: put Pv as attribute of this class
+
+    // TODO: is K completely useless in this context? Due to CG::*cgApplier
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
+      TimeProfile &profileFromCaller = *profileFromCaller_;
+      DiracMatrix &K = *K_;
+      SolverParam &solverParam = *solverParam_;
+
+      ColorSpinorParam csParam(in);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+
+      // 1. y = (A - \theta I)v
+
+      dirac->MMdag(out, in);
+      if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+      // 2. y_hat = K^-1 * y
+
+      std::vector<ColorSpinorField*> y_hat;
+      y_hat.push_back(ColorSpinorField::Create(in, csParam));
+
+      (cg_->*cgApplier)(*y_hat[0], out);
+
+      int sizePS = projSpace.size();
+
+      Eigen::MatrixXcd gamma(sizePS,1);
+      for(int i=0; i<sizePS; i++){
+        gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+      }
+      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+      }
+
+      out = *y_hat[0];
+
+      // Removing temporary buffers
+      delete y_hat[0];
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      dirac->tmp1 = &tmp;
+
+      TimeProfile &profileFromCaller = *profileFromCaller_;
+      DiracMatrix &K = *K_;
+      SolverParam &solverParam = *solverParam_;
+
+      ColorSpinorParam csParam(in);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+
+      // 1. y = (A - \theta I)v
+
+      dirac->MMdag(out, in);
+      if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+      // 2. y_hat = K^-1 * y
+
+      std::vector<ColorSpinorField*> y_hat;
+      y_hat.push_back(ColorSpinorField::Create(in, csParam));
+
+      (cg_->*cgApplier)(*y_hat[0], out);
+
+      int sizePS = projSpace.size();
+
+      Eigen::MatrixXcd gamma(sizePS,1);
+      for(int i=0; i<sizePS; i++){
+        gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+      }
+      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+      }
+
+      out = *y_hat[0];
+
+      // Removing temporary buffers
+      delete y_hat[0];
+
+      dirac->tmp1 = NULL;
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      dirac->tmp1 = &Tmp1;
+      dirac->tmp2 = &Tmp2;
+
+      TimeProfile &profileFromCaller = *profileFromCaller_;
+      DiracMatrix &K = *K_;
+      SolverParam &solverParam = *solverParam_;
+
+      ColorSpinorParam csParam(in);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+
+      // 1. y = (A - \theta I)v
+
+      dirac->MMdag(out, in);
+      if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+      // 2. y_hat = K^-1 * y
+
+      std::vector<ColorSpinorField*> y_hat;
+      y_hat.push_back(ColorSpinorField::Create(in, csParam));
+
+      //setVerbosity(QUDA_SILENT);
+
+      (cg_->*cgApplier)(*y_hat[0], out);
+
+      //setVerbosity(QUDA_VERBOSE);
+
+      int sizePS = projSpace.size();
+
+      Eigen::MatrixXcd gamma(sizePS,1);
+      for(int i=0; i<sizePS; i++){
+        gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+      }
+      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+      for(int i=0; i<sizePS; i++){
+        blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+      }
+
+      out = *y_hat[0];
+
+      // Removing temporary buffers
+      delete y_hat[0];
+
+      dirac->tmp2 = NULL;
+      dirac->tmp1 = NULL;
+    }
+
+    int getStencilSteps() const
+    {
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+    }
+  };
+
+
 
 
   class DiracMdag : public DiracMatrix {

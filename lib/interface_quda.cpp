@@ -3112,7 +3112,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     delete solve;
   } else { // norm_error_solve
 
-    //if(1){
+    //if(0){
 
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       cudaColorSpinorField tmp(*out);
@@ -3138,7 +3138,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       csParamClone.create = QUDA_ZERO_FIELD_CREATE;
 
       // Dimensionality of the projection sub-space
-      int nrOfProjVecs = 4;
+      int nrOfProjVecs = 1;
 
       // Test case: using a dim=nrOfProjVecs projection space, for now populated with rands
       for(int i=0; i<nrOfProjVecs; i++){
@@ -3180,7 +3180,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       printfQuda("\nTesting orthonormality of projection vectors:\n\n");
       for(int i=0; i<nrOfProjVecs; i++){
         for(int j=0; j<nrOfProjVecs; j++){
-          if(i==j){ continue; }
+          //if(i==j){ continue; }
           printfQuda("%d * %d = %f\n", i, j, blas::cDotProduct( *mSloppy.projSpace[i], *mSloppy.projSpace[j] ));
         }
       }
@@ -3192,7 +3192,11 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profileInvert);
 
+      setVerbosity(QUDA_VERBOSE);
+
       (*solve)(*out, *in); // y = (M M^\dag) b
+
+      setVerbosity(QUDA_SILENT);
 
       //(*solve)(tmp, *in); // y = (M M^\dag) b
       //dirac.Mdag(*out, tmp);  // x = M^dag y

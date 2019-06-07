@@ -27,7 +27,9 @@ namespace quda {
   }
 
   CG::~CG() {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(!profile.isRunning(QUDA_PROFILE_FREE))
+      profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
       if (rp) delete rp;
@@ -53,7 +55,9 @@ namespace quda {
 
       init = false;
     }
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(profile.isRunning(QUDA_PROFILE_FREE))
+      profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
@@ -245,14 +249,18 @@ namespace quda {
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    // TODO: remove this if, bring the logic outside of CG
+    if(!profile.isRunning(QUDA_PROFILE_INIT))
+      profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      // TODO: remove this if, bring the logic outside of CG
+      if(profile.isRunning(QUDA_PROFILE_INIT))
+        profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -402,8 +410,12 @@ namespace quda {
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(profile.isRunning(QUDA_PROFILE_INIT))
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+    // TODO: remove this if, bring the logic outside of CG
+    if(!profile.isRunning(QUDA_PROFILE_PREAMBLE))
+      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -445,8 +457,12 @@ namespace quda {
     // only used if we use the heavy_quark_res
     bool L2breakdown = false;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(profile.isRunning(QUDA_PROFILE_PREAMBLE))
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(!profile.isRunning(QUDA_PROFILE_COMPUTE))
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
     blas::flops = 0;
 
     int k = 0;
@@ -723,8 +739,12 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(profile.isRunning(QUDA_PROFILE_COMPUTE))
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(!profile.isRunning(QUDA_PROFILE_EPILOGUE))
+      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
     double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
@@ -751,7 +771,9 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    // TODO: remove this if, bring the logic outside of CG
+    if(profile.isRunning(QUDA_PROFILE_EPILOGUE))
+      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
     return;
   }
@@ -767,7 +789,9 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_INIT))
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
   using Eigen::MatrixXcd;
 
@@ -779,7 +803,9 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
     b2[i]=blas::norm2(b.Component(i));
     b2avg += b2[i];
     if(b2[i] == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      // TODO: remove this if, bring the logic outside of CG
+      if(profile.isRunning(QUDA_PROFILE_INIT))
+        profile.TPSTOP(QUDA_PROFILE_INIT);
       errorQuda("Warning: inverting on zero-field source - undefined for block solver\n");
       x=b;
       param.true_res = 0.0;
@@ -874,8 +900,12 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
   if(use_heavy_quark_res) errorQuda("ERROR: heavy quark residual not supported in block solver");
 
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-  profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_INIT))
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_PREAMBLE))
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   double stop[QUDA_MAX_MULTI_SHIFT];
 
@@ -916,8 +946,12 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   nt steps_since_reliable = 1;
   */
 
-  profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profile.TPSTART(QUDA_PROFILE_COMPUTE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_PREAMBLE))
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_COMPUTE))
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::flops = 0;
 
   int k = 0;
@@ -1089,8 +1123,12 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::xpy(y.Component(i), xSloppy.Component(i));
   }
 
-  profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_COMPUTE))
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_EPILOGUE))
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
   double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
@@ -1119,11 +1157,17 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   mat.flops();
   matSloppy.flops();
 
-  profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profile.TPSTART(QUDA_PROFILE_FREE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_EPILOGUE))
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_FREE))
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
   delete[] AC;
-  profile.TPSTOP(QUDA_PROFILE_FREE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_FREE))
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
   return;
 
@@ -1147,7 +1191,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
   errorQuda("Not supported");
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_INIT))
+    profile.TPSTART(QUDA_PROFILE_INIT);
 
   using Eigen::MatrixXcd;
   MatrixXcd mPAP(param.num_src,param.num_src);
@@ -1163,7 +1209,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     b2[i]=blas::norm2(b.Component(i));
     b2avg += b2[i];
     if(b2[i] == 0){
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      // TODO: remove this if, bring the logic outside of CG
+      if(profile.isRunning(QUDA_PROFILE_INIT))
+        profile.TPSTOP(QUDA_PROFILE_INIT);
       errorQuda("Warning: inverting on zero-field source\n");
       x=b;
       param.true_res = 0.0;
@@ -1272,8 +1320,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
   bool heavy_quark_restart = false;
 
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-  profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_INIT))
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_PREAMBLE))
+    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   MatrixXcd r2_old(param.num_src, param.num_src);
   double heavy_quark_res[QUDA_MAX_MULTI_SHIFT] = {0.0};  // heavy quark res idual
@@ -1329,8 +1381,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   // only used if we use the heavy_quark_res
   bool L2breakdown = false;
 
-  profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-  profile.TPSTART(QUDA_PROFILE_COMPUTE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_PREAMBLE))
+    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_COMPUTE))
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
   blas::flops = 0;
 
   int k = 0;
@@ -1673,8 +1729,12 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     blas::xpy(y.Component(i), x.Component(i));
   }
 
-  profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_COMPUTE))
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_EPILOGUE))
+    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
   double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
@@ -1703,10 +1763,16 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   mat.flops();
   matSloppy.flops();
 
-  profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-  profile.TPSTART(QUDA_PROFILE_FREE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_EPILOGUE))
+    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(!profile.isRunning(QUDA_PROFILE_FREE))
+    profile.TPSTART(QUDA_PROFILE_FREE);
 
-  profile.TPSTOP(QUDA_PROFILE_FREE);
+  // TODO: remove this if, bring the logic outside of CG
+  if(profile.isRunning(QUDA_PROFILE_FREE))
+    profile.TPSTOP(QUDA_PROFILE_FREE);
 
   return;
 
