@@ -215,15 +215,15 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nKr);
-    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+    param.evecs.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
 
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
-    param.evals.resize(param.eig_param.nEv);
-    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
+    param.evals.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
     profile.TPSTOP(QUDA_PROFILE_INIT);
     (*eig_solve)(param.evecs, param.evals);
     profile.TPSTART(QUDA_PROFILE_INIT);

@@ -1411,13 +1411,12 @@ namespace quda
     pushLevel(param.level);
 
     // Extract eigensolver params
-    int nEv = param.mg_global.eig_param[param.level]->nEv;
-    int nKr = param.mg_global.eig_param[param.level]->nKr;
+    int nConv = param.mg_global.eig_param[param.level]->nConv;
     bool dagger = param.mg_global.eig_param[param.level]->use_dagger;
     bool normop = param.mg_global.eig_param[param.level]->use_norm_op;
 
     // Dummy array to keep the eigensolver happy.
-    std::vector<Complex> evals(nEv, 0.0);
+    std::vector<Complex> evals(nConv, 0.0);
 
     std::vector<ColorSpinorField *> B_evecs;
     ColorSpinorParam csParam(*param.B[0]);
@@ -1426,7 +1425,7 @@ namespace quda
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.mg_global.invert_param->cuda_prec_sloppy, QUDA_INVALID_PRECISION, true);
 
-    for (int i = 0; i < nKr; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
+    for (int i = 0; i < nConv; i++) B_evecs.push_back(ColorSpinorField::Create(csParam));
 
     // before entering the eigen solver, lets free the B vectors to save some memory
     ColorSpinorParam bParam(*param.B[0]);
