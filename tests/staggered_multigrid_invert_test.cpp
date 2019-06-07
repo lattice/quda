@@ -1103,9 +1103,9 @@ int main(int argc, char **argv)
 
   int len = 0;
   if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V*Nsrc;
+    len = V;
   } else {
-    len = Vh*Nsrc;
+    len = Vh;
   }
 
   // Check solution
