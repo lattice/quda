@@ -47,8 +47,8 @@ namespace quda {
   protected:
     size_t bytes; // bytes allocated per clover full field 
     size_t norm_bytes; // sizeof each norm full field
-    int length;
-    int real_length;
+    size_t length;
+    size_t real_length;
     int nColor;
     int nSpin;
 

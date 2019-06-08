@@ -150,10 +150,10 @@ namespace quda {
 
   protected:
     size_t bytes; // bytes allocated per full field 
-    int phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
-    int phase_bytes;  // bytes needed to store the phases
-    int length;
-    int real_length;
+    size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
+    size_t phase_bytes;  // bytes needed to store the phases
+    size_t length;
+    size_t real_length;
     int nColor;
     int nFace;
     QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
@@ -230,7 +230,7 @@ namespace quda {
     virtual void exchangeGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
     virtual void injectGhost(QudaLinkDirection = QUDA_LINK_BACKWARDS) = 0;
 
-    int Length() const { return length; }
+    size_t Length() const { return length; }
     int Ncolor() const { return nColor; }
     QudaReconstructType Reconstruct() const { return reconstruct; }
     QudaGaugeFieldOrder Order() const { return order; }
