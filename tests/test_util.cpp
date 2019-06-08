@@ -95,7 +95,7 @@ void initComms(int argc, char **argv, int *const commDims)
 
   // make sure the QMP logical ordering matches QUDA's
   if (rank_order == 0) {
-    int map[] = { 3, 1, 2, 0 };
+    int map[] = { 3, 2, 1, 0 };
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   } else {
     int map[] = { 0, 1, 2, 3 };
