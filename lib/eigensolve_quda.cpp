@@ -299,7 +299,8 @@ namespace quda
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
-                   sigma_tmp[i].imag(), sigma_tmp[i].real() - lambda.real());
+                   sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
+      evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
     }
   }
