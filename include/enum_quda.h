@@ -492,7 +492,6 @@ extern "C" {
   typedef enum QudaContractType_s {
     QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
     QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
-    QUDA_CONTRACT_TYPE_DP,   // DiracPauli
     QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 

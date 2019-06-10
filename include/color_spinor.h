@@ -143,7 +143,7 @@ namespace quda {
       {
 #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
-    }
+      }
 
     __device__ __host__ inline ColorSpinor<Float, Nc, 4>(const ColorSpinor<Float, Nc, 4> &a) {
 #pragma unroll
@@ -665,7 +665,7 @@ namespace quda {
 	}
       }
     }
-  };
+    };
 
   /**
      This is the specialization for Nspin=2.  For fields with two
@@ -996,8 +996,8 @@ namespace quda {
         // trace over spin (manual unroll for perf)
         out(j, i).real(a(0, j).real() * b(0, i).real());
         out(j, i).real(out(j, i).real() + a(0, j).imag() * b(0, i).imag());
-        out(j,i).imag(                   a(0,j).imag() * b(0,i).real() );
-	out(j,i).imag( out(j,i).imag() - a(0,j).real() * b(0,i).imag() );
+        out(j, i).imag(a(0, j).imag() * b(0, i).real());
+        out(j,i).imag( out(j,i).imag() - a(0,j).real() * b(0,i).imag() );
 	//out(j,i) = a(0,j) * conj(b(0,i));
 
 #pragma unroll

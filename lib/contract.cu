@@ -32,7 +32,6 @@ public:
       switch (cType) {
       case QUDA_CONTRACT_TYPE_OPEN: strcat(aux, "open,"); break;
       case QUDA_CONTRACT_TYPE_DR: strcat(aux, "degrand-rossi,"); break;
-      case QUDA_CONTRACT_TYPE_DP: strcat(aux, "dirac-pauli,"); break;
       default: errorQuda("Unexpected contraction type %d", cType);
       }
       strcat(aux, x.AuxString());
@@ -51,7 +50,6 @@ public:
         switch (cType) {
         case QUDA_CONTRACT_TYPE_OPEN: function_name = "quda::computeColorContraction"; break;
         case QUDA_CONTRACT_TYPE_DR: function_name = "quda::computeDegrandRossiContraction"; break;
-        case QUDA_CONTRACT_TYPE_DP: function_name = "quda::computeDiracPauliContraction"; break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
 
@@ -65,9 +63,6 @@ public:
         case QUDA_CONTRACT_TYPE_OPEN: computeColorContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
         case QUDA_CONTRACT_TYPE_DR:
           computeDegrandRossiContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-          break;
-        case QUDA_CONTRACT_TYPE_DP:
-          computeDiracPauliContraction<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
           break;
         default: errorQuda("Unexpected contraction type %d", cType);
         }
@@ -112,6 +107,9 @@ public:
   {
 #ifdef GPU_CONTRACT
     checkPrecision(x, y);
+
+    if (x.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS || y.GammaBasis() != QUDA_DEGRAND_ROSSI_GAMMA_BASIS)
+      errorQuda("Unexpected gamma basis x=%d y=%d", x.GammaBasis(), y.GammaBasis());
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 4) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
 

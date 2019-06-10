@@ -5824,6 +5824,9 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  // Quda uses Degrand-Rossi gamma basis for contractions and will
+  // automatically reorder data if necessary.
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
 
   std::vector<ColorSpinorField *> x, y;

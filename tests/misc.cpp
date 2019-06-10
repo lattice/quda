@@ -967,8 +967,6 @@ QudaContractType get_contract_type(char *s)
     ret = QUDA_CONTRACT_TYPE_OPEN;
   } else if (strcmp(s, "dr") == 0 || strcmp(s, "DR") == 0) {
     ret = QUDA_CONTRACT_TYPE_DR;
-  } else if (strcmp(s, "dp") == 0 || strcmp(s, "DP") == 0) {
-    ret = QUDA_CONTRACT_TYPE_DP;
   } else {
     fprintf(stderr, "Error: invalid contract type\n");
     exit(1);
@@ -983,7 +981,6 @@ const char *get_contract_str(QudaContractType type)
   switch (type) {
   case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
   case QUDA_CONTRACT_TYPE_DR: ret = "Degrand-Rossi"; break;
-  case QUDA_CONTRACT_TYPE_DP: ret = "Dirac-Pauli"; break;
   default: ret = "unknown"; break;
   }
 
@@ -1231,8 +1228,7 @@ QudaSolutionType get_solution_type(char *s)
   return ret;
 }
 
-QudaSchwarzType
-get_schwarz_type(char* s)
+QudaSchwarzType get_schwarz_type(char *s)
 {
   QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
 

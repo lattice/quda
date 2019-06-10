@@ -38,7 +38,7 @@ extern QudaPrecision prec_null;
 extern QudaContractType contract_type;
 
 // If you add a new contraction type, this must be updated++
-const int NcontractType = 3;
+const int NcontractType = 2;
 
 extern bool verify_results;
 
@@ -82,6 +82,9 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
+  // Quda performs contractions in Degrand-Rossi gamma basis,
+  // but the user may suppy vectors in any supported order.
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
 
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
@@ -91,7 +94,7 @@ const char *prec_str[] = {"single", "double"};
 
 // For googletest, names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore.
-const char *names[] = {"OpenSpin", "DegrandRossi", "DiracPauli"};
+const char *names[] = {"OpenSpin", "DegrandRossi"};
 
 int main(int argc, char **argv)
 {
@@ -194,7 +197,6 @@ void test(int contractionType, int Prec)
   switch (contractionType) {
   case 0: cType = QUDA_CONTRACT_TYPE_OPEN; break;
   case 1: cType = QUDA_CONTRACT_TYPE_DR; break;
-  case 2: cType = QUDA_CONTRACT_TYPE_DP; break;
   default: errorQuda("Undefined contraction type %d\n", contractionType);
   }
 
