@@ -126,6 +126,14 @@ public:
                     std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
 
     /**
+       @brief Computes Left/Right SVD from pre computed Right/Left
+       @param[in] mat Matrix operator
+       @param[in] evecs Computed eigenvectors of NormOp
+       @param[in] evals Computed eigenvalues of NormOp
+    */
+    void computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
+
+    /**
        @brief Compute eigenvalues and their residiua
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
@@ -221,12 +229,6 @@ public:
     */
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
-    /**
-       @brief Computes Left/Right SVD from pre computed Right/Left
-       @param[in] evecs Computed eigenvectors of NormOp
-       @param[in] evals Computed eigenvalues of NormOp
-    */
-    void computeSVD(std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
   };
 
   /**

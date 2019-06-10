@@ -166,7 +166,6 @@ namespace quda {
   {
     // Deflation requested + first instance of solver
     profile.TPSTOP(QUDA_PROFILE_INIT);
-    param.eig_param.compute_svd = QUDA_BOOLEAN_YES;
     DiracMdagM mdagm(mat.Expose());
     eig_solve = EigenSolver::create(&param.eig_param, mdagm, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -176,18 +175,26 @@ namespace quda {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nKr);
-    for (int i = 0; i < param.eig_param.nKr; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+    param.evecs.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
 
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
-    param.evals.resize(param.eig_param.nEv);
-    for (int i = 0; i < param.eig_param.nEv; i++) param.evals[i] = 0.0;
+    param.evals.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
     profile.TPSTOP(QUDA_PROFILE_INIT);
+    // Compute nConv eigenvectors of MdagM (right SV of M)
     (*eig_solve)(param.evecs, param.evals);
     profile.TPSTART(QUDA_PROFILE_INIT);
+
+    // Resize deflation space and compute left SV of M
+    for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++)
+      param.evecs.push_back(ColorSpinorField::Create(csParam));
+
+    // Populate latter half of the array with left SV
+    eig_solve->computeSVD(mdagm, param.evecs, param.evals);
 
     deflate_init = true;
   }
