@@ -36,11 +36,17 @@ namespace quda
 
     profile.TPSTART(QUDA_PROFILE_INIT);
 
-    // ARPACK logfile name
+// ARPACK logfile name
+#ifdef ARPACK_LOGGING
     char *arpack_logfile = eig_param->arpack_logfile;
+#endif
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("**** START ARPACK SOLUTION ****\n");
+#ifndef ARPACK_LOGGING
+      printfQuda("Arpack logging not enabled.\n");
+#else
       printfQuda("Output directed to %s\n", arpack_logfile);
+#endif
     }
 
     // Construct parameters and memory allocation
@@ -89,15 +95,12 @@ namespace quda
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
-    bool reverse = true;
-    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
-      reverse = false;
-    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = false;
+    bool reverse = false;
+    if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+      // Smallest eig requested by use, largest will requested from ARPACK
+      // due to poly acc
+      reverse = true;
       spectrum[0] = 'L';
-    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = false;
-      spectrum[0] = 'S';
     }
 
     double tol_ = eig_param->tol;
@@ -143,6 +146,7 @@ namespace quda
     ColorSpinorField *d_v2 = nullptr;
     ColorSpinorField *resid = nullptr;
 
+#ifdef ARPACK_LOGGING
     // ARPACK log routines
     // Code added to print the log of ARPACK
     int arpack_log_u = 9999;
@@ -189,17 +193,14 @@ namespace quda
     }
 
 #endif
+#endif
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
 
     // Start ARPACK routines
     //---------------------------------------------------------------------------------
 
-    double t1, t2;
-
     do {
-
-      t1 = -((double)clock());
 
       profile.TPSTART(QUDA_PROFILE_ARPACK);
 
@@ -257,8 +258,8 @@ namespace quda
 
       if (ido_ == -1 || ido_ == 1) {
 
-        t2 = -clock();
         profile.TPSTART(QUDA_PROFILE_D2H);
+
         *d_v = *h_v;
 
         profile.TPSTOP(QUDA_PROFILE_D2H);
@@ -273,7 +274,6 @@ namespace quda
         *h_v2 = *d_v2;
 
         profile.TPSTOP(QUDA_PROFILE_H2D);
-        t2 += clock();
       }
 
       if (getVerbosity() >= QUDA_VERBOSE)
@@ -332,13 +332,14 @@ namespace quda
         errorQuda("Arnoldi update.\n");
       }
     }
-
+#ifdef ARPACK_LOGGING
 #if (defined(QMP_COMMS) || defined(MPI_COMMS))
     if (comm_rank() == 0) {
       if (arpack_logfile != NULL) { ARPACK(finilog)(&arpack_log_u); }
     }
 #else
     if (arpack_logfile != NULL) ARPACK(finilog)(&arpack_log_u);
+#endif
 #endif
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");
@@ -358,13 +359,14 @@ namespace quda
     // print out the computed Ritz values and their error estimates
     for (int j = 0; j < nconv; j++) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[j]), imag(h_evals_[j]),
-                   std::abs(*(w_workl_ + ipntr_[10] - 1 + j)));
+        printfQuda("RitzValue[%04d] = %+.16e %+.16e Residual: %+.16e\n", j, real(h_evals_[evals_sorted[j].second]),
+                   imag(h_evals_[evals_sorted[j].second]),
+                   std::abs(*(w_workl_ + ipntr_[10] - 1 + evals_sorted[j].second)));
     }
 
     // Compute Eigenvalues from Eigenvectors.
     for (int i = 0; i < nconv; i++) {
-      int idx = nconv - 1 - evals_sorted[i].second;
+      int idx = evals_sorted[i].second;
 
       profile.TPSTART(QUDA_PROFILE_D2H);
       *d_v = *h_evecs_arpack[idx];
