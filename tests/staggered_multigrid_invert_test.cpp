@@ -824,9 +824,6 @@ int main(int argc, char **argv)
 
   setMultigridParam(mg_param);
 
-  // start the timer
-  double time0 = -((double)clock());
-
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -1083,20 +1080,22 @@ int main(int argc, char **argv)
 
   auto *rng = new quda::RNG(V, 1234, gauge_param.X);
   rng->Init();
+  double *time = new double[Nsrc];
+  double *gflops = new double[Nsrc];
 
   for (int k = 0; k < Nsrc; k++) {
 
     construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
     invertQuda(out->V(), in->V(), &inv_param);
 
+    time[i] = inv_params.secs;
+    gflops[i] = inv_param.gflops/inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+
   }
   
   rng->Release();
   delete rng;
-
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
 
   double nrm2=0;
   double src2=0;
@@ -1172,9 +1171,29 @@ int main(int argc, char **argv)
   printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
-  printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", 
-      time0, inv_param.secs, inv_param.iter, inv_param.secs,
-      inv_param.gflops/inv_param.secs);
+  // Compute timings
+  auto mean_time = 0.0;
+  auto mean_time2 = 0.0;
+  auto mean_gflops = 0.0;
+  auto mean_gflops2 = 0.0;
+  for (int i=0; i<Nsrc; i++) {
+    mean_time += time[i];
+    mean_time2 += time[i] * time[i];
+    mean_gflops += gflops[i];
+    mean_gflops2 += gflops[i] * gflops[i];
+  }
+
+  mean_time /= Nsrc;
+  mean_time2 /= Nsrc;
+  auto stddev_time = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_time2 - mean_time*mean_time) );
+  mean_gflops /= Nsrc;
+  mean_gflops2 /= Nsrc;
+  auto stddev_gflops = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_gflops2 - mean_gflops*mean_gflops) );
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n",
+             Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+
+  delete []time;
+  delete []gflops;
 
   // Clean up gauge fields, at least
   for (int dir = 0; dir < 4; dir++) {
