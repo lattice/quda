@@ -928,7 +928,7 @@ namespace quda {
         // constituents have been tuned since we can't do nested tuning
         // FIXME this will break if the kernels are destructive - which they aren't here
         if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-	  disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+          disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
 	  if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
 
@@ -970,7 +970,7 @@ namespace quda {
 
       	  enableProfileCount();
       	  setPolicyTuning(true);
-      	}
+        }
       }
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
