@@ -147,7 +147,7 @@ static inline __device__ double atomicMax(float *addr, float val){
   float old = *addr, assumed;
   do {
     assumed = old;
-    old = __int_as_float( atomicCAS((unsigned int*)addr,
+    old = __int_as_float( atomicCAS((unsigned long long int*)addr,
             __float_as_int(assumed),
             __float_as_int(val > assumed ? val : assumed)));
   } while ( __float_as_int(assumed) != __float_as_int(old) );

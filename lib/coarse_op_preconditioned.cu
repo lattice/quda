@@ -58,8 +58,11 @@ namespace quda {
         else CalculateYhatGPU<Float,n,false,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
         if (compute_max_only) {
-          qudaMemcpy(&arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost);
+          if (!activeTuning()) { // only do copy once tuning is done
+            qudaMemcpy(&arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost);
+          }
           pool_device_free(arg.max_d);
+
         }
       }
     }
@@ -155,7 +158,11 @@ namespace quda {
         yHat.setComputeMaxOnly(true);
         yHat.apply(0);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %f\n", arg.max_h);
+        double max_h_double = arg.max_h;
+        comm_allreduce_max(&max_h_double);
+        arg.max_h = static_cast<float>(max_h_double);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", arg.max_h);
 
         Yhat.Scale(arg.max_h);
         arg.Yhat.resetScale(arg.max_h);
@@ -164,9 +171,9 @@ namespace quda {
       yHat.apply(0);
 
       if (getVerbosity() >= QUDA_VERBOSE)
-	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
-					   Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
-					   Y.abs_max(d), Xinv.abs_max(0));
+        for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
+                                  Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
+                                  Y.abs_max(d), Xinv.abs_max(0));
 
     }
 
