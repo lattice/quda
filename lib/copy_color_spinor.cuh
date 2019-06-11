@@ -414,7 +414,7 @@ namespace quda {
       errorQuda("source and destination spins must match");
 
     if (dst.Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
       copyGenericColorSpinor<4,Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());

@@ -41,7 +41,6 @@ extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
-extern bool inv_deflate;
 extern double reliable_delta; // reliable update parameter
 extern bool alternative_reliable;
 extern QudaInverterType  precon_type;

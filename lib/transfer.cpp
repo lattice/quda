@@ -16,32 +16,33 @@ namespace quda {
   * for the staggered case, there is no spin blocking, 
   * however we do even-odd to preserve chirality (that is straightforward)
   */
-  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int *geo_bs, int spin_bs,
-      QudaPrecision null_precision, TimeProfile &profile) :
-      B(B),
-      Nvec(Nvec),
-      null_precision(null_precision),
-      V_h(nullptr),
-      V_d(nullptr),
-      fine_tmp_h(nullptr),
-      fine_tmp_d(nullptr),
-      coarse_tmp_h(nullptr),
-      coarse_tmp_d(nullptr),
-      geo_bs(nullptr),
-      fine_to_coarse_h(nullptr),
-      coarse_to_fine_h(nullptr),
-      fine_to_coarse_d(nullptr),
-      coarse_to_fine_d(nullptr),
-      spin_bs(spin_bs),
-      spin_map(0),
-      nspin_fine(B[0]->Nspin()),
-      site_subset(QUDA_FULL_SITE_SUBSET),
-      parity(QUDA_INVALID_PARITY),
-      enable_gpu(false),
-      enable_cpu(false),
-      use_gpu(true),
-      flops_(0),
-      profile(profile)
+  Transfer::Transfer(const std::vector<ColorSpinorField *> &B, int Nvec, int n_block_ortho, int *geo_bs, int spin_bs,
+                     QudaPrecision null_precision, TimeProfile &profile) :
+    B(B),
+    Nvec(Nvec),
+    NblockOrtho(n_block_ortho),
+    null_precision(null_precision),
+    V_h(nullptr),
+    V_d(nullptr),
+    fine_tmp_h(nullptr),
+    fine_tmp_d(nullptr),
+    coarse_tmp_h(nullptr),
+    coarse_tmp_d(nullptr),
+    geo_bs(nullptr),
+    fine_to_coarse_h(nullptr),
+    coarse_to_fine_h(nullptr),
+    fine_to_coarse_d(nullptr),
+    coarse_to_fine_d(nullptr),
+    spin_bs(spin_bs),
+    spin_map(0),
+    nspin_fine(B[0]->Nspin()),
+    site_subset(QUDA_FULL_SITE_SUBSET),
+    parity(QUDA_INVALID_PARITY),
+    enable_gpu(false),
+    enable_cpu(false),
+    use_gpu(true),
+    flops_(0),
+    profile(profile)
   {
     postTrace();
     int ndim = B[0]->Ndim();
@@ -186,14 +187,14 @@ namespace quda {
 
     if (B[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       if (!enable_gpu) errorQuda("enable_gpu = %d so cannot reset", enable_gpu);
-      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs);
+      BlockOrthogonalize(*V_d, B, fine_to_coarse_d, coarse_to_fine_d, geo_bs, spin_bs, NblockOrtho);
       if (enable_cpu) {
         *V_h = *V_d;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator back to CPU\n");
       }
     } else {
       if (!enable_cpu) errorQuda("enable_cpu = %d so cannot reset", enable_cpu);
-      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs);
+      BlockOrthogonalize(*V_h, B, fine_to_coarse_h, coarse_to_fine_h, geo_bs, spin_bs, NblockOrtho);
       if (enable_gpu) { // if the GPU fields has been initialized then we need to update
       	*V_d = *V_h;
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferred prolongator to GPU\n");

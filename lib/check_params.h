@@ -162,7 +162,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(eig_type, QUDA_EIG_LANCZOS);
+  P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
@@ -184,7 +184,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(eig_type, QUDA_INVALID_EIG);
+  P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
@@ -334,7 +334,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
-  P(max_hq_res_increase, 1); /**< Default is to allow one consecutive heavy-quark residual increase */
+  P(max_hq_res_increase, 1);     /**< Default is to allow one consecutive heavy-quark residual increase */
   P(max_hq_res_restart_total, 10); /**< Default is to allow ten heavy-quark restarts */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
@@ -648,6 +648,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
+    P(use_eig_solver[i], QUDA_BOOLEAN_NO);
+#else
+    P(use_eig_solver[i], QUDA_BOOLEAN_INVALID);
+#endif
+#ifdef INIT_PARAM
     P(setup_tol[i], 5e-6);
     P(setup_maxiter[i], 500);
     P(setup_maxiter_refresh[i], 0);
@@ -669,6 +674,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_ca_lambda_max[i], INVALID_DOUBLE);
 #endif
 
+#ifdef INIT_PARAM
+    P(n_block_ortho[i], 1);
+#else
+    P(n_block_ortho[i], INVALID_INT);
+#endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
     P(coarse_solver_maxiter[i], INVALID_INT);
@@ -755,9 +765,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(use_low_modes, QUDA_BOOLEAN_INVALID);
   P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
   P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
+
+#ifdef INIT_PARAM
+  P(coarse_guess, QUDA_BOOLEAN_NO);
+#else
+  P(coarse_guess, QUDA_BOOLEAN_INVALID);
+#endif
 
 #ifdef INIT_PARAM
   P(vec_load, QUDA_BOOLEAN_INVALID);

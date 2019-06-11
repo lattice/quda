@@ -67,6 +67,9 @@ extern "C" {
 
   const char *get_memory_type_str(QudaMemoryType type);
 
+  QudaContractType get_contract_type(char *s);
+  const char *get_contract_str(QudaContractType type);
+
 #ifdef __cplusplus
 }
 #endif

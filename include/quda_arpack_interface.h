@@ -90,35 +90,13 @@ extern int ARPACK(mcinitdebug)(int *, int *, int *, int *, int *, int *, int *, 
 #endif
 
 // ARPACK initlog and finilog routines for printing the ARPACK log
+#ifdef ARPACK_LOGGING
 extern int ARPACK(initlog)(int *, char *, int);
 extern int ARPACK(finilog)(int *);
-
+#endif
+  
 #ifdef __cplusplus
 }
 #endif
 
 #endif //ARPACK_LIB
-
-namespace quda
-{
-
-  /**
-   *  arpack_solve()
-   *
-   *  The QUDA interface function. One passes two allocated arrays to hold the
-   *  the eigenmode data, the problem matrix, the arpack parameters defining
-   *  what problem is to be solves, and a container for QUDA data structure
-   *  types.
-   *
-   *  @param[in/out] h_evecs       A pointer to eigenvector array.
-   *  @param[in/out] h_evals       A pointer to eigenvalue array.
-   *  @param[in]     mat           An explicit construction of the problem matrix.
-   *  @param[in]     param         Parameter container defining the how the matrix
-   *                               is to be solved.
-   *  @param[in]     local_dim     Parameter container with meta data for the
-   *                               QUDA color-spinor eigenvectors.
-   **/
-  void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
-                    ColorSpinorParam *cpuParam);
-
-} // end of namespace quda

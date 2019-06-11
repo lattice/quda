@@ -600,7 +600,7 @@ namespace quda {
     void setDimension(int dim_) { dim = dim_; }
 
     /**
-       Set which dimension we are working on (where applicable)
+       Set which direction we are working on (where applicable)
     */
     void setDirection(QudaDirection dir_) { dir = dir_; }
 
@@ -1003,7 +1003,7 @@ namespace quda {
 
     // work out what to set the scales to
     if (coarseGaugeAtomic::fixedPoint()) {
-      double max = 100.0; // FIXME - more accurate computation needed?
+      double max = 500.0; // Should be more than sufficient
       arg.Y_atomic.resetScale(max);
       arg.X_atomic.resetScale(max);
     }

@@ -13,24 +13,16 @@ namespace quda
 
 protected:
     QudaEigParam *eig_param;
-    TimeProfile profile;
-
-    // Timings for components of the eigensolver
-    //-----------------------------------------
-    double time_;
-    double time_e;   // time in Eigen
-    double time_mv;  // time in matVec
-    double time_mb;  // time in multiblas
-    double time_svd; // time to compute SVD
+    TimeProfile &profile;
 
     // Problem parameters
     //------------------
-    int nEv;        // Size of initial factorisation
-    int nKr;        // Size of Krylov space after extension
-    int nConv;      // Number of converged eigenvalues requested
-    double tol;     // Tolerance on eigenvalues
-    bool reverse;   // True if using polynomial acceleration
-    char *spectrum; // Part of the spectrum to be computed.
+    int nEv;          /** Size of initial factorisation */
+    int nKr;          /** Size of Krylov space after extension */
+    int nConv;        /** Number of converged eigenvalues requested */
+    double tol;       /** Tolerance on eigenvalues */
+    bool reverse;     /** True if using polynomial acceleration */
+    char spectrum[3]; /** Part of the spectrum to be computed */
 
     // Algorithm variables
     //--------------------
@@ -102,16 +94,6 @@ public:
        @param[in] in Input spinor
     */
     void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
-
-    /**
-       @brief Orthogonalise input vector r against
-       vector space v
-       @param[out] Sum of inner products
-       @param[in] v Vector space
-       @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
-    */
-    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
     /**
        @brief Orthogonalise input vector r against
@@ -238,14 +220,21 @@ public:
   };
 
   /**
-     @brief Computes eigen-decomposition using QUDA's arpack interface
-     @param[in] h_evecs host pointer to evecs
-     @param[in] h_evals host pointer to evals
-     @param[in] mat The operator
-     @param[in] eig_param parameter structure for all QUDA eigensolvers
-     @param[in] cpuParam parameter structure for creating device vectors
+     arpack_solve()
+
+     @brief The QUDA interface function. One passes two allocated arrays to
+     hold the the eigenmode data, the problem matrix, the arpack
+     parameters defining what problem is to be solves, and a container
+     for QUDA data structure types.
+     @param[out] h_evecs Host fields where the e-vectors will be copied to
+     @param[out] h_evals Where the e-values will be copied to
+     @param[in] mat An explicit construction of the problem matrix.
+     @param[in] param Parameter container defining the how the matrix
+     is to be solved.
+     @param[in] eig_param Parameter structure for all QUDA eigensolvers
+     @param[in,out] profile TimeProfile instance used for profiling
   */
-  void arpack_solve(void *h_evecs, void *h_evals, const DiracMatrix &mat, QudaEigParam *eig_param,
-                    ColorSpinorParam *cpuParam);
+  void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
+                    QudaEigParam *eig_param, TimeProfile &profile);
 
 } // namespace quda

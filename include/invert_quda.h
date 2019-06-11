@@ -542,8 +542,7 @@ namespace quda {
     */
     EigenSolver *eig_solve;
     bool deflate_init = false;
-    std::vector<ColorSpinorField *> defl_tmp1;
-    std::vector<ColorSpinorField *> defl_tmp2;
+    std::vector<ColorSpinorField *> defl_tmp;
 
     /**
      * Return flops
@@ -1247,7 +1246,7 @@ public:
 
     /**
        @brief Expands deflation space.
-       @param V container of new eigenvectors
+       @param V Composite field container of new eigenvectors
        @param nev number of vectors to load
      */
     void increment(ColorSpinorField &V, int nev);
