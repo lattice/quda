@@ -116,6 +116,12 @@ if(QUDA_DIRAC_STAGGERED)
   endif()
 endif()
 
+if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_MASS OR QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_STAGGERED)
+  cuda_add_executable(blas_test blas_test.cu)
+  target_link_libraries(blas_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
+endif()
+  
 if(QUDA_MULTIGRID)
   cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
                       domain_wall_dslash_reference.cpp blas_reference.cpp)
@@ -143,14 +149,16 @@ cuda_add_executable(pack_test pack_test.cpp)
 target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
 
-cuda_add_executable(blas_test blas_test.cu)
-target_link_libraries(blas_test ${TEST_LIBS})
-quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
-
 if(QUDA_COVDEV)
   cuda_add_executable(covdev_test covdev_test.cpp covdev_reference.cpp)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
+endif()
+
+if(QUDA_CONTRACT)
+  cuda_add_executable(contract_test contract_test.cpp)
+  target_link_libraries(contract_test ${TEST_LIBS})
+  QUDA_CHECKBUILDTEST(contract_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_LINK_ASQTAD OR QUDA_LINK_HISQ)
