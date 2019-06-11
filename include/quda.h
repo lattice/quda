@@ -406,7 +406,7 @@ extern "C" {
 
     /** If true, the solver will error out if the convergence criteria are not met **/
     QudaBoolean require_convergence;
-    
+
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 

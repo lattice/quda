@@ -170,7 +170,7 @@ display_test_info()
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-      printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");  
+      printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
       printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
                  mg_eig_use_normop[i] ? "true" : "false");
       if (mg_eig_use_poly_acc[i]) {
@@ -245,7 +245,7 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
   mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  
+
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];

@@ -113,10 +113,10 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);  
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
   printfQuda(" - size of Krylov space %d\n", eig_nKr);
   printfQuda(" - solver tolerance %e\n", eig_tol);
-  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");  
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
   if (eig_compute_svd) {
     printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
     printfQuda(" - ***********************************************************\n");
