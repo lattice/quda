@@ -50,6 +50,14 @@ namespace quda {
 
   QudaFieldLocation get_pointer_location(const void *ptr);
 
+  /**
+   * @return whether the pointer is aligned
+   */
+  static inline bool is_aligned(const void *ptr, size_t alignment)
+  {
+    return (reinterpret_cast<std::uintptr_t>(ptr) & (alignment - 1)) == 0;
+  }
+
 } // namespace quda
 
 #define device_malloc(size) quda::device_malloc_(__func__, quda::file_name(__FILE__), __LINE__, size)

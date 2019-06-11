@@ -90,9 +90,11 @@ extern int ARPACK(mcinitdebug)(int *, int *, int *, int *, int *, int *, int *, 
 #endif
 
 // ARPACK initlog and finilog routines for printing the ARPACK log
+#ifdef ARPACK_LOGGING
 extern int ARPACK(initlog)(int *, char *, int);
 extern int ARPACK(finilog)(int *);
-
+#endif
+  
 #ifdef __cplusplus
 }
 #endif
