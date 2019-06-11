@@ -17,6 +17,8 @@ namespace quda {
     Arg &arg;
     const LatticeField &meta;
 
+    bool compute_max_only;
+
     long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
     long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()) * n; }
 
@@ -25,7 +27,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
-    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4*n), arg(arg), meta(meta)
+    CalculateYhat(Arg &arg, const LatticeField &meta) : TunableVectorYZ(2*n,4*n), arg(arg), meta(meta), compute_max_only(false)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
@@ -40,18 +42,35 @@ namespace quda {
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-	CalculateYhatCPU<Float,n,Arg>(arg);
+
+        if (compute_max_only) CalculateYhatCPU<Float,n,true,Arg>(arg);
+        else CalculateYhatCPU<Float,n,false,Arg>(arg);
+
       } else {
+        if (compute_max_only) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::CalculateYhatGPU")
-          .instantiate(Type<Float>(),n,Type<Arg>())
+          .instantiate(Type<Float>(),n,compute_max_only,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-	CalculateYhatGPU<Float,n,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        if (compute_max_only) CalculateYhatGPU<Float,n,true,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        else CalculateYhatGPU<Float,n,false,Arg> <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
+        if (compute_max_only) {
+          if (!activeTuning()) { // only do copy once tuning is done
+            qudaMemcpy(&arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost);
+          }
+          pool_device_free(arg.max_d);
+
+        }
       }
     }
+
+    /**
+       Set if we're doing a max-only compute (fixed point only)
+    */
+    void setComputeMaxOnly(bool compute_max_only_) { compute_max_only = compute_max_only_; }
 
     // no locality in this kernel so no point in shared-memory tuning
     bool advanceSharedBytes(TuneParam &param) const { return false; }
@@ -64,6 +83,7 @@ namespace quda {
     TuneKey tuneKey() const {
       char Aux[TuneKey::aux_n];
       strcpy(Aux,aux);
+      if (compute_max_only) strcat(Aux,",compute_max_only");
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         strcat(Aux, meta.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
       } else if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -130,22 +150,30 @@ namespace quda {
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
-      typedef CalculateYhatArg<gPreconditionedCoarse,gCoarse,N> yHatArg;
+      typedef CalculateYhatArg<Float,gPreconditionedCoarse,gCoarse,N> yHatArg;
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
-      if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-	double max = 3.0 * Y.abs_max() * Xinv.abs_max();
-	Yhat.Scale(max);
-	arg.Yhat.resetScale(max);
-      }
-
       CalculateYhat<Float, N, yHatArg> yHat(arg, Y);
+      if (Yhat.Precision() == QUDA_HALF_PRECISION || Yhat.Precision() == QUDA_QUARTER_PRECISION) {
+        yHat.setComputeMaxOnly(true);
+        yHat.apply(0);
+
+        double max_h_double = arg.max_h;
+        comm_allreduce_max(&max_h_double);
+        arg.max_h = static_cast<float>(max_h_double);
+
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", arg.max_h);
+
+        Yhat.Scale(arg.max_h);
+        arg.Yhat.resetScale(arg.max_h);
+      }
+      yHat.setComputeMaxOnly(false);
       yHat.apply(0);
 
       if (getVerbosity() >= QUDA_VERBOSE)
-	for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
-					   Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
-					   Y.abs_max(d), Xinv.abs_max(0));
+        for (int d=0; d<8; d++) printfQuda("Yhat[%d] = %e (%e %e = %e x %e)\n", d, Yhat.norm2(d),
+                                  Yhat.abs_max(d), Y.abs_max(d) * Xinv.abs_max(0),
+                                  Y.abs_max(d), Xinv.abs_max(0));
 
     }
 
@@ -210,15 +238,15 @@ namespace quda {
 #endif
     } else if (precision == QUDA_SINGLE_PRECISION) {
       if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
-	calculateYhat<float,float>(Yhat, Xinv, Y, X);
+        calculateYhat<float,float>(Yhat, Xinv, Y, X);
       } else {
-	errorQuda("Unsupported precision %d\n", precision);
+        errorQuda("Unsupported precision %d\n", precision);
       }
     } else if (precision == QUDA_HALF_PRECISION) {
       if (Yhat.Precision() == QUDA_HALF_PRECISION) {
-	calculateYhat<short,float>(Yhat, Xinv, Y, X);
+        calculateYhat<short,float>(Yhat, Xinv, Y, X);
       } else {
-	errorQuda("Unsupported precision %d\n", precision);
+        errorQuda("Unsupported precision %d\n", precision);
       }
     } else {
       errorQuda("Unsupported precision %d\n", precision);

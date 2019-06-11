@@ -1250,6 +1250,18 @@ extern "C" {
   double qChargeQuda();
 
   /**
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   */
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+                    const int *X);
+
+  /**
      @brief Calculates the topological charge from gaugeSmeared, if it exist,
      or from gaugePrecise if no smeared fields are present.
      @param[out] qDensity array holding Q charge density

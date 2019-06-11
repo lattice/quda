@@ -269,14 +269,13 @@ namespace quda {
 
   /**
      Applies the off-diagonal part of the Laplace operator
-
      @param[out] out The out result field
-       @param[in] U The gauge field
-       @param[in] kappa Kappa value
-       @param[in] in The input field
-       @param[in] parity The site parity
-       @param[in] x_cb The checkerboarded site index
-     */
+     @param[in] U The gauge field
+     @param[in] kappa Kappa value
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
+  */
   template <typename Float, int nDim, int nColor, int mu, typename Vector, typename Arg>
   __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int x_cb, int parity) {
     typedef Matrix<complex<Float>,nColor> Link;
