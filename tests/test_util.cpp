@@ -1772,6 +1772,7 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1994,6 +1995,10 @@ void usage(char** argv )
   printf("    --heatbath-num-hb-per-step <n>            # Number of heatbath hits per heatbath step (default 5)\n");
   printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
   printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
+
+  printf("    --contraction-type <open/dr/dp>           # Whether to leave spin elemental open, or use a gamma basis "
+         "and contract on spin (default open)\n");
+
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv);
@@ -4316,6 +4321,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
 
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--contract-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    contract_type = get_contract_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;

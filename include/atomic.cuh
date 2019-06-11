@@ -117,4 +117,42 @@ static inline __device__ char2 atomicAdd(char2 *addr, char2 val){
   return old.s;
 }
 
+/**
+   @brief Implementation of double-precision atomic max using compare
+   and swap.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ double atomicMax(double *addr, double val){
+  double old = *addr, assumed;
+  do {
+    assumed = old;
+    old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
+            __double_as_longlong(assumed),
+            __double_as_longlong(val > assumed ? val : assumed)));
+  } while ( __double_as_longlong(assumed) != __double_as_longlong(old) );
+  
+  return old;
+}
+
+/**
+   @brief Implementation of single-precision atomic max using compare
+   and swap.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ double atomicMax(float *addr, float val){
+  float old = *addr, assumed;
+  do {
+    assumed = old;
+    old = __int_as_float( atomicCAS((unsigned long long int*)addr,
+            __float_as_int(assumed),
+            __float_as_int(val > assumed ? val : assumed)));
+  } while ( __float_as_int(assumed) != __float_as_int(old) );
+  
+  return old;
+}
+
 #endif
