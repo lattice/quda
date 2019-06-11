@@ -41,8 +41,8 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     if (x_cb >= arg.threads) return;
 
-    constexpr int nSpin = arg.nSpin;
-    constexpr int nColor = arg.nColor;
+    constexpr int nSpin = Arg::nSpin;
+    constexpr int nColor = Arg::nColor;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
 
     Vector x = arg.x(x_cb, parity);
