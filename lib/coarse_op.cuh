@@ -1041,8 +1041,8 @@ namespace quda {
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
-	y.apply(0);
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
+        y.apply(0);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
 
         // now convert from atomic to application computation format if necessary for Y[d]
         if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {

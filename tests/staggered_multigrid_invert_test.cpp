@@ -1088,8 +1088,8 @@ int main(int argc, char **argv)
     construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
     invertQuda(out->V(), in->V(), &inv_param);
 
-    time[i] = inv_params.secs;
-    gflops[i] = inv_param.gflops/inv_param.secs;
+    time[k] = inv_param.secs;
+    gflops[k] = inv_param.gflops/inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
 
   }

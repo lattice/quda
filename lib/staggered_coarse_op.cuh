@@ -163,6 +163,8 @@ namespace quda {
 
       	if (type == COMPUTE_VUV) {
 
+          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+
 #ifdef JITIFY
           using namespace jitify::reflection;
           jitify_error = program->kernel("quda::ComputeStaggeredVUVGPU")
@@ -231,7 +233,7 @@ namespace quda {
     void setDimension(int dim_) { dim = dim_; }
 
     /**
-       Set which dimension we are working on (where applicable)
+       Set which direction we are working on (where applicable)
     */
     void setDirection(QudaDirection dir_) { dir = dir_; }
 

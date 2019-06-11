@@ -131,7 +131,6 @@ namespace quda {
 
     const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
 
-
     if (!isDiagonal) {
       arg.Y_atomic(dim_index,coarse_parity,coarse_x_cb,s_c_row,s_c_col,c_row,c_col) = vuv;
     } else { // (isDiagonal)
