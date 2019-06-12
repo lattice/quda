@@ -37,7 +37,7 @@ extern double epsilon;
 extern bool verify_results;
 
 extern char latfile[];
-extern bool unit_gauge;
+extern double gaussian_beta;
 
 extern QudaVerbosity verbosity;
 
@@ -58,7 +58,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -77,7 +77,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 
@@ -97,9 +97,9 @@ void plaq_test(int argc, char **argv) {
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION) 
+  if (prec_sloppy == QUDA_INVALID_PRECISION)
     prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID)
     link_recon_sloppy = link_recon;
 
   setGaugeParam(gauge_param);
@@ -119,20 +119,16 @@ void plaq_test(int argc, char **argv) {
   // call srand() with a rank-dependent seed
   initRand();
 
+  bool load_gauge = strcmp(latfile,"");
   // load in the command line supplied gauge field
-  if (strcmp(latfile,"")) {  
+  if (load_gauge) {
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    }
   }
 
   loadGaugeQuda(gauge, &gauge_param);
 
-  gaussGaugeQuda(1234, epsilon);
+  if (!load_gauge) gaussGaugeQuda(1234, gaussian_beta);
 
   double plaq[3];
   plaqQuda(plaq);

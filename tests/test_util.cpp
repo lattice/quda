@@ -1628,6 +1628,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+double gaussian_beta = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
@@ -1824,6 +1825,7 @@ void usage(char** argv )
          "heatbath test only)\n");
   printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a "
          "random gauge is generated (default false)\n");
+  printf("    --gaussian-beta <beta>                    # Width of the Gaussian noise used for random gauge field contruction (default 0.2)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
   printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
@@ -4203,6 +4205,20 @@ int process_command_line_option(int argc, char** argv, int* idx)
     solution_accumulator_pipeline = atoi(argv[i+1]);
     if (solution_accumulator_pipeline < 0 || solution_accumulator_pipeline > 16){
       printf("ERROR: invalid solution pipeline length (%d)\n", solution_accumulator_pipeline);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--gaussian-beta") == 0){
+    if (i+1 >= argc){
+      usage(argv);
+    }
+    gaussian_beta = atof(argv[i+1]);
+    if (gaussian_beta < 0.0 || gaussian_beta > 1.0) {
+      printf("ERROR: invalid beta (%f)\n", gaussian_beta);
       usage(argv);
     }
     i++;
