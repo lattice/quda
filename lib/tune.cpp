@@ -392,7 +392,7 @@ namespace quda {
                     cache_path.c_str());
 
         if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-	getline(cache_file, line); // eat the blank line
+        getline(cache_file, line); // eat the blank line
 
 	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the description line
