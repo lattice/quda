@@ -203,34 +203,6 @@ namespace quda {
 
   }
 
-  void CG::constructDeflationSpace()
-  {
-    // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    // Clone from an existing vector
-    ColorSpinorParam csParam(*rp);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-
-    // Construct vectors to hold deflated RHS
-    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
-    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-
-    param.evals.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    (*eig_solve)(param.evecs, param.evals);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    deflate_init = true;
-  }
-
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
@@ -299,7 +271,7 @@ namespace quda {
 
     // Once the CG operator is called, we are able to construct an appropriate
     // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(); }
+    if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
