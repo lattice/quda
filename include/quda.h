@@ -404,6 +404,9 @@ extern "C" {
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
+    /** If true, the solver will error out if the convergence criteria are not met **/
+    QudaBoolean require_convergence;
+
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
