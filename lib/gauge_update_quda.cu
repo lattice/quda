@@ -54,9 +54,9 @@ namespace quda {
 	}
       } else {
 	mom = arg.dt * mom;
-	expsu3<Float>(mom);
+        expsu3<Float>(mom);
 
-	if (!conj_mom) {
+        if (!conj_mom) {
 	  link = mom * link;
 	} else {
 	  link = conj(mom) * link;

@@ -41,7 +41,7 @@ extern double gaussian_beta;
 
 extern QudaVerbosity verbosity;
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
@@ -70,25 +70,24 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
 #ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  int pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;
 #endif
 }
 
-extern void usage(char**);
+extern void usage(char **);
 
-void plaq_test(int argc, char **argv) {
+void plaq_test(int argc, char **argv)
+{
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
+  for (int i = 1; i < argc; i++) {
+    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
     printf("ERROR: Invalid option:%s\n", argv[i]);
     usage(argv);
   }
@@ -97,10 +96,8 @@ void plaq_test(int argc, char **argv) {
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  if (prec_sloppy == QUDA_INVALID_PRECISION)
-    prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID)
-    link_recon_sloppy = link_recon;
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
@@ -108,9 +105,7 @@ void plaq_test(int argc, char **argv) {
 
   void *gauge[4];
 
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
-  }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
 
   initQuda(device);
 
@@ -119,7 +114,7 @@ void plaq_test(int argc, char **argv) {
   // call srand() with a rank-dependent seed
   initRand();
 
-  bool load_gauge = strcmp(latfile,"");
+  bool load_gauge = strcmp(latfile, "");
   // load in the command line supplied gauge field
   if (load_gauge) {
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -132,20 +127,20 @@ void plaq_test(int argc, char **argv) {
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %16.15e (spatial = %16.15e, temporal = %16.15e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %16.15e (spatial = %16.15e, temporal = %16.15e)\n", plaq[0], plaq[1],
+             plaq[2]);
 
   freeGaugeQuda();
   endQuda();
 
   // release memory
-  for (int dir = 0; dir < 4; dir++) {
-    free(gauge[dir]);
-  }
+  for (int dir = 0; dir < 4; dir++) { free(gauge[dir]); }
 
   finalizeComms();
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 
   plaq_test(argc, argv);
 

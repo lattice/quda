@@ -11,9 +11,8 @@
 
 namespace quda {
 
-  template <typename Float, QudaReconstructType recon, bool group_>
-  struct GaugeGaussArg {
-    using Gauge = typename gauge_mapper<Float,recon>::type;
+  template <typename Float, QudaReconstructType recon, bool group_> struct GaugeGaussArg {
+    using Gauge = typename gauge_mapper<Float, recon>::type;
     using real = typename mapper<Float>::type;
     static constexpr bool group = group_;
     int threads; // number of active threads required
@@ -24,114 +23,109 @@ namespace quda {
     RNG rngstate;
     real beta; // where U = exp(beta * H)
 
-    GaugeGaussArg(const GaugeField &U, RNG &rngstate, double beta)
-      : U(U), rngstate(rngstate), beta(beta)
+    GaugeGaussArg(const GaugeField &U, RNG &rngstate, double beta) : U(U), rngstate(rngstate), beta(beta)
     {
       int R = 0;
-      for (int dir=0; dir<4; ++dir) {
-	border[dir] = U.R()[dir];
-	E[dir] = U.X()[dir];
-	X[dir] = U.X()[dir] - border[dir]*2;
-	R += border[dir];
+      for (int dir = 0; dir < 4; ++dir) {
+        border[dir] = U.R()[dir];
+        E[dir] = U.X()[dir];
+        X[dir] = U.X()[dir] - border[dir] * 2;
+        R += border[dir];
       }
       threads = X[0]*X[1]*X[2]*X[3]/2;
     }
   };
 
-  template<typename real, typename Link>
-  __device__ __host__  Link gauss_su3(cuRNGState &localState)
+  template <typename real, typename Link> __device__ __host__ Link gauss_su3(cuRNGState &localState)
   {
     Link ret;
     real rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
 
-    for (int i=0; i<4; ++i) {
+    for (int i = 0; i < 4; ++i) {
       rand1[i] = Random<real>(localState);
       rand2[i] = Random<real>(localState);
     }
 
-    for (int i=0; i<4; ++i) {
-      phi[i] = 2.0*M_PI*rand1[i];
-      radius[i] = sqrt( -log(rand2[i]) );
+    for (int i = 0; i < 4; ++i) {
+      phi[i] = 2.0 * M_PI * rand1[i];
+      radius[i] = sqrt(-log(rand2[i]));
       sincos(phi[i], &temp2[i], &temp1[i]);
       temp1[i] *= radius[i];
       temp2[i] *= radius[i];
     }
 
     // construct Anti-Hermitian matrix
-    ret(0,0) = complex<real>( 0.0, temp1[2] + rsqrt(3.0)*temp2[3] );
-    ret(1,1) = complex<real>( 0.0, -temp1[2] + rsqrt(3.0) * temp2[3]);
-    ret(2,2) = complex<real>( 0.0, - 2.0*rsqrt(3.0) * temp2[3]);
-    ret(0,1) = complex<real>( temp1[0], temp1[1]);
-    ret(1,0) = complex<real>( -temp1[0], temp1[1] );
-    ret(0,2) = complex<real>( temp1[3], temp2[0]);
-    ret(2,0) = complex<real>( -temp1[3], temp2[0] );
-    ret(1,2) = complex<real>( temp2[1], temp2[2] );
-    ret(2,1) = complex<real>( -temp2[1], temp2[2] );
+    ret(0, 0) = complex<real>(0.0, temp1[2] + rsqrt(3.0) * temp2[3]);
+    ret(1, 1) = complex<real>(0.0, -temp1[2] + rsqrt(3.0) * temp2[3]);
+    ret(2, 2) = complex<real>(0.0, -2.0 * rsqrt(3.0) * temp2[3]);
+    ret(0, 1) = complex<real>(temp1[0], temp1[1]);
+    ret(1, 0) = complex<real>(-temp1[0], temp1[1]);
+    ret(0, 2) = complex<real>(temp1[3], temp2[0]);
+    ret(2, 0) = complex<real>(-temp1[3], temp2[0]);
+    ret(1, 2) = complex<real>(temp2[1], temp2[2]);
+    ret(2, 1) = complex<real>(-temp2[1], temp2[2]);
 
     return ret;
   }
 
-
-  template<typename Float, typename Arg>
-  __global__ void computeGenGauss(Arg arg)
+  template <typename Float, typename Arg> __global__ void computeGenGauss(Arg arg)
   {
     using real = typename mapper<Float>::type;
-    using Link = Matrix<complex<real>,3>;
-    int x_cb = threadIdx.x + blockIdx.x*blockDim.x;
-    int parity = threadIdx.y + blockIdx.y*blockDim.y;
+    using Link = Matrix<complex<real>, 3>;
+    int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
     if (x_cb >= arg.threads) return;
 
     int x[4];
     getCoords(x, x_cb, arg.X, parity);
-    for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
+    for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
     if (arg.group && arg.beta == 0.0) {
       // if beta = 0 then we just set the output matrix to the identity and finish
       Link I;
       setIdentity(&I);
-      for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x,arg.E), parity) = I;
+      for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
     } else {
       for (int mu = 0; mu < 4; mu++) {
         cuRNGState localState = arg.rngstate.State()[parity * arg.threads + x_cb];
 
         // generate Gaussian distributed su(n) fiueld
-        Link u = gauss_su3<real,Link>(localState);
+        Link u = gauss_su3<real, Link>(localState);
         if (arg.group) {
           u = arg.beta * u;
           expsu3<real>(u);
         }
-        arg.U(mu, linkIndex(x,arg.E), parity) = u;
+        arg.U(mu, linkIndex(x, arg.E), parity) = u;
 
         arg.rngstate.State()[parity * arg.threads + x_cb] = localState;
       }
     }
   }
 
-  template<typename Float, typename Arg> class GaugeGauss : TunableVectorY {
+  template <typename Float, typename Arg> class GaugeGauss : TunableVectorY
+  {
     Arg &arg;
     const GaugeField &meta;
 
-  private:
+private:
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
 
-  public:
-    GaugeGauss(Arg &arg, GaugeField &meta)
-      : TunableVectorY(2), arg(arg), meta(meta) {}
-    ~GaugeGauss () { }
+public:
+    GaugeGauss(Arg &arg, GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {}
+    ~GaugeGauss() {}
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const cudaStream_t &stream)
+    {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        computeGenGauss<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        computeGenGauss<Float><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
       } else {
         errorQuda("Randomize GaugeFields on CPU not supported yet\n");
       }
     }
 
-    TuneKey tuneKey() const {
-      return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
-    }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
 
     long long flops() const { return 0; }
     long long bytes() const { return meta.Bytes(); }
@@ -140,31 +134,30 @@ namespace quda {
     void postTune() { arg.rngstate.restore(); }
   };
 
-  template<typename Float, QudaReconstructType recon, bool group>
-  void genGauss(GaugeField& U, RNG &rngstate, double beta)
+  template <typename Float, QudaReconstructType recon, bool group>
+  void genGauss(GaugeField &U, RNG &rngstate, double beta)
   {
-    GaugeGaussArg<Float,recon,group> arg(U, rngstate, beta);
-    GaugeGauss<Float,decltype(arg)> gaugeGauss(arg, U);
+    GaugeGaussArg<Float, recon, group> arg(U, rngstate, beta);
+    GaugeGauss<Float, decltype(arg)> gaugeGauss(arg, U);
     gaugeGauss.apply(0);
   }
 
-  template<typename Float> void gaugeGauss(GaugeField &U, RNG &rngstate, double beta)
+  template <typename Float> void gaugeGauss(GaugeField &U, RNG &rngstate, double beta)
   {
     if (U.LinkType() == QUDA_SU3_LINKS) { // generate Gaussian distributed SU(3) field
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Creating Gaussian distrbuted gauge field with beta = %e\n", beta);
       switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,true>(U, rngstate, beta); break;
-      case QUDA_RECONSTRUCT_12: genGauss<Float,QUDA_RECONSTRUCT_12,true>(U, rngstate, beta); break;
-      case QUDA_RECONSTRUCT_8: genGauss<Float,QUDA_RECONSTRUCT_8,true>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_NO: genGauss<Float, QUDA_RECONSTRUCT_NO, true>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_12: genGauss<Float, QUDA_RECONSTRUCT_12, true>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_8: genGauss<Float, QUDA_RECONSTRUCT_8, true>(U, rngstate, beta); break;
       default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
       }
     } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) { // generate Gaussian distributed su(3) field
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Creating Gaussian distrbuted momentum field\n");
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating Gaussian distrbuted momentum field\n");
       switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,false>(U, rngstate, beta); break;
-      case QUDA_RECONSTRUCT_10: genGauss<Float,QUDA_RECONSTRUCT_10,false>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_NO: genGauss<Float, QUDA_RECONSTRUCT_NO, false>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_10: genGauss<Float, QUDA_RECONSTRUCT_10, false>(U, rngstate, beta); break;
       default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
       }
     }
@@ -191,11 +184,10 @@ namespace quda {
 
   void gaugeGauss(GaugeField &U, long seed, double beta)
   {
-    RNG* randstates = new RNG(U, seed);
+    RNG *randstates = new RNG(U, seed);
     randstates->Init();
     quda::gaugeGauss(U, *randstates, beta);
     randstates->Release();
     delete randstates;
   }
-
 }

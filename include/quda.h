@@ -760,11 +760,11 @@ extern "C" {
    */
   void endQuda(void);
 
-/**
- * @brief update the radius for halos.
- * @details This should only be needed for automated testing when
- * different partitioning is applied within a single run.
- */
+  /**
+   * @brief update the radius for halos.
+   * @details This should only be needed for automated testing when
+   * different partitioning is applied within a single run.
+   */
   void updateR();
 
   /**
@@ -1223,8 +1223,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param,
-                             unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared

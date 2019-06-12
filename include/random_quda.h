@@ -22,17 +22,17 @@ typedef struct curandStateMRG32k3a cuRNGState;
 */
 class RNG {
 
- private:
-  cuRNGState *state;   /*! array with current curand rng state */
-  cuRNGState *backup_state;   /*! array for backup of current curand rng state */
-  int seed;   /*! initial rng seed */
-  int size;   /*! @brief number of curand states */
-  int size_cb;   /*! @brief number of curand states checkerboarded (equal to size if we have a single parity) */
-  int X[4];   /*! @brief local lattice dimensions */
-  void AllocateRNG();   /*! @brief allocate curand rng states array in device memory */
-  void INITRNG(int rng_sizes, int seedin, int offsetin);   /*! @brief CURAND array states initialization */
+  private:
+  cuRNGState *state;        /*! array with current curand rng state */
+  cuRNGState *backup_state; /*! array for backup of current curand rng state */
+  int seed;                 /*! initial rng seed */
+  int size;                 /*! @brief number of curand states */
+  int size_cb;        /*! @brief number of curand states checkerboarded (equal to size if we have a single parity) */
+  int X[4];           /*! @brief local lattice dimensions */
+  void AllocateRNG(); /*! @brief allocate curand rng states array in device memory */
+  void INITRNG(int rng_sizes, int seedin, int offsetin); /*! @brief CURAND array states initialization */
 
- public:
+  public:
   /**
      @brief Constructor that takes its metadata from a field
      @param[in] meta The field whose data we use
@@ -53,9 +53,9 @@ class RNG {
   /*! initialize curand rng states with seed */
   void Init();
 
-  int Seed(){ return seed; };
+  int Seed() { return seed; };
 
-  __host__ __device__ __inline__ cuRNGState* State(){ return state;};
+  __host__ __device__ __inline__ cuRNGState *State() { return state; };
 
   /*! @brief Restore CURAND array states initialization */
   void restore();

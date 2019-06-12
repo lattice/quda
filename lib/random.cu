@@ -48,15 +48,18 @@ namespace quda {
      @param size size of the CURAND RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
-  __global__ void kernel_random(cuRNGState *state, int seed, int size_cb, rngArg arg) {
+  __global__ void kernel_random(cuRNGState *state, int seed, int size_cb, rngArg arg)
+  {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     if (id < size_cb) {
       // Each thread gets same seed, a different sequence number, no offset
       int x[4];
       getCoords(x, id, arg.X, parity);
-      for (int i=0; i<4; i++) x[i] += arg.commCoord[i] * arg.X[i];
-      int idd = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1] ) * arg.commDim[0] * arg.X[0] + x[0];
+      for (int i = 0; i < 4; i++) x[i] += arg.commCoord[i] * arg.X[i];
+      int idd
+        = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
+        + x[0];
       curand_init(seed, idd, 0, &state[parity * size_cb + id]);
     }
   }
@@ -75,17 +78,14 @@ namespace quda {
     dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
     rngArg arg(X);
     nblocks.y = n_parity;
-    kernel_random<<<nblocks,nthreads>>>(state, seed, size_cb, arg);
+    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
     qudaDeviceSynchronize();
   }
 
-  RNG::RNG(const LatticeField &meta, int seedin)
-    : seed(seedin),
-      size(meta.Volume()),
-      size_cb(meta.VolumeCB())
+  RNG::RNG(const LatticeField &meta, int seedin) : seed(seedin), size(meta.Volume()), size_cb(meta.VolumeCB())
   {
     state = nullptr;
-    for (int i=0; i<4; i++) X[i] = meta.X()[i];
+    for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
 #if defined(XORWOW)
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
 #elif defined(RG32k3a)
@@ -95,13 +95,10 @@ namespace quda {
 #endif
   }
 
-  RNG::RNG(const LatticeFieldParam &param, int seedin) :
-    seed(seedin),
-    size(1),
-    size_cb(1)
+  RNG::RNG(const LatticeFieldParam &param, int seedin) : seed(seedin), size(1), size_cb(1)
   {
     state = nullptr;
-    for (int i=0; i<4; i++) {
+    for (int i = 0; i < 4; i++) {
       X[i] = param.x[i];
       size *= X[i];
     }
@@ -121,7 +118,7 @@ namespace quda {
   */
   void RNG::Init() {
     AllocateRNG();
-    launch_kernel_random(state, seed, size_cb, size/size_cb, X);
+    launch_kernel_random(state, seed, size_cb, size / size_cb, X);
   }
 
   /**
@@ -129,8 +126,8 @@ namespace quda {
   */
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
-      state = (cuRNGState*)device_malloc(size * sizeof(cuRNGState));
-      CUDA_SAFE_CALL(cudaMemset( state , 0 , size * sizeof(cuRNGState) ));
+      state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
+      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(cuRNGState)));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                    size * sizeof(cuRNGState) / (float)(1048576));
@@ -146,8 +143,7 @@ namespace quda {
     if (size > 0 && state != nullptr) {
       device_free(state);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Free array of random numbers with size: %.2f MB\n",
-                   size * sizeof(cuRNGState) / (float)(1048576));
+        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(cuRNGState) / (float)(1048576));
       size = 0;
       state = NULL;
     }
@@ -165,7 +161,7 @@ namespace quda {
 
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup() {
-    backup_state = (cuRNGState*) safe_malloc(size * sizeof(cuRNGState));
+    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
     cudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
       host_free(backup_state);

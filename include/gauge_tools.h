@@ -104,7 +104,6 @@ namespace quda
 		       const int reunit_interval,
 		       const int stopWtheta);
 
-
   /**
    * @brief Gauge fixing with Steepest descent method with FFTs with support for single GPU only.
    * @param[in,out] data, quda gauge field
@@ -146,4 +145,4 @@ namespace quda
    @return double The total topological charge
   */
   double computeQChargeDensity(const GaugeField &Fmunu, void *result);
-}
+} // namespace quda

@@ -5388,12 +5388,11 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-
 void gaussGaugeQuda(long seed, double beta)
 {
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
-  if (!gaugePrecise)  errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+  if (!gaugePrecise) errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
 
   cudaGaugeField *data = gaugePrecise;
 
@@ -5408,7 +5407,7 @@ void gaussGaugeQuda(long seed, double beta)
 
   if (extendedGaugeResident) {
     *extendedGaugeResident = *gaugePrecise;
-    extendedGaugeResident -> exchangeExtendedGhost(R, profileGauss, redundant_comms);
+    extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
 
   profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
