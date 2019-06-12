@@ -6,4 +6,5 @@
 namespace quda
 {
   void contractQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result, QudaContractType cType);
+  void sinkProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result);
 } // namespace quda

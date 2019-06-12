@@ -5861,54 +5861,62 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-/*
+
 void sinkProjectQuda(const void *hp_x, const void *hp_y, void *h_q, QudaInvertParam *param, const int *X)
 {
-  // DMH: Easiest way to construct ColorSpinorField? Do we require the user
-  //      to declare and fill and invert_param, or can it just be hacked?.
-  
   profileContract.TPSTART(QUDA_PROFILE_TOTAL);
   profileContract.TPSTART(QUDA_PROFILE_INIT);
   // wrap CPU host side pointers
-  ColorSpinorParam cpuParam((void *)hp_y, *param, X, false, param->input_location);
-  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
-
-  // Spin 1
-  cpuParam.v = (void *)hp_x;
-  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+  ColorSpinorParam cpuParamY((void *)hp_y, *param, X, false, param->input_location);
+  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParamY);
+  
+  // Spin 1 param
+  ColorSpinorParam cpuParamX((void *)hp_x, *param, X, false, param->input_location);
+  cpuParamX.nSpin=1;
+  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParamX);
 
   // Create device parameters
-  ColorSpinorParam cudaParam(cpuParam);
-  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  ColorSpinorParam cudaParamY(cpuParamY);
+  cudaParamY.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParamY.create = QUDA_NULL_FIELD_CREATE;
+  cudaParamY.setPrecision(cpuParamY.Precision(), cpuParamY.Precision(), true);
   // Quda uses Degrand-Rossi gamma basis for contractions and will
-  // automatically reorder data if necessary.
-  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
-
+  // automatically reorder transferred data to this basis if necessary.
+  cudaParamY.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  
+  // Create device parameters
+  ColorSpinorParam cudaParamX(cpuParamX);
+  cudaParamX.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParamX.create = QUDA_NULL_FIELD_CREATE;
+  cudaParamX.setPrecision(cpuParamX.Precision(), cpuParamX.Precision(), true);
+  
   std::vector<ColorSpinorField *> x, y;
-  x.push_back(ColorSpinorField::Create(cudaParam));
-  y.push_back(ColorSpinorField::Create(cudaParam));
-
-  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
-  void *d_result = pool_device_malloc(data_bytes);
+  x.push_back(ColorSpinorField::Create(cudaParamX));
+  y.push_back(ColorSpinorField::Create(cudaParamY));
+  
+  size_t data_bytes = y[0]->Volume() * y[0]->Nspin() * 2 * y[0]->Precision();
+  void *d_q = pool_device_malloc(data_bytes);
   profileContract.TPSTOP(QUDA_PROFILE_INIT);
 
+  // Host to device
   profileContract.TPSTART(QUDA_PROFILE_H2D);
   *x[0] = *h_x;
   *y[0] = *h_y;
   profileContract.TPSTOP(QUDA_PROFILE_H2D);
 
+  // Compute
   profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
-  contractQuda(*x[0], *y[0], d_result, cType);
+  sinkProjectQuda(*x[0], *y[0], d_q);
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
-
+  
+  // Device to Host
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_q, d_q, data_bytes, cudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
+  // Free memory
   profileContract.TPSTART(QUDA_PROFILE_FREE);
-  pool_device_free(d_result);
+  pool_device_free(d_q);
   delete x[0];
   delete y[0];
   delete h_y;
@@ -5917,7 +5925,7 @@ void sinkProjectQuda(const void *hp_x, const void *hp_y, void *h_q, QudaInvertPa
 
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-*/
+
 
 double qChargeQuda()
 {

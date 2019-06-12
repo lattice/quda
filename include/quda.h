@@ -1260,7 +1260,9 @@ extern "C" {
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
-
+  
+  void sinkProjectQuda(const void *x, const void *y, void *result, QudaInvertParam *param, const int *X);
+  
   /**
      @brief Calculates the topological charge from gaugeSmeared, if it exist,
      or from gaugePrecise if no smeared fields are present.
