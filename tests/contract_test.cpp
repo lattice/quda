@@ -173,17 +173,21 @@ void test(int contractionType, int Prec)
   size_t sSize = (testPrec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   void *spinorX = malloc(V * spinorSiteSize * sSize);
   void *spinorY = malloc(V * spinorSiteSize * sSize);
+  void *spinorZ = malloc(V * (spinorSiteSize/4) * sSize);
   void *d_result = malloc(2 * V * 16 * sSize);
+  void *d_q = malloc(2 * V * 4 * sSize);
 
   if (testPrec == QUDA_SINGLE_PRECISION) {
     for (int i = 0; i < V * spinorSiteSize; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
+      if (i < V * spinorSiteSize/4 ) ((float *)spinorZ)[i] = rand() / (float)RAND_MAX;
     }
   } else {
     for (int i = 0; i < V * spinorSiteSize; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
+      if (i < V * spinorSiteSize/4 ) ((double *)spinorZ)[i] = rand() / (double)RAND_MAX;
     }
   }
 
@@ -203,6 +207,9 @@ void test(int contractionType, int Prec)
   // Perform GPU contraction.
   contractQuda(spinorX, spinorY, d_result, cType, &inv_param, X);
 
+  // Perform GPU sinkProjection.
+  sinkProjectQuda(spinorZ, spinorY, d_q, &inv_param, X);
+  
   // Compare each site contraction from the host and device.
   // It returns the number of faults it detects.
   int faults = 0;
@@ -219,7 +226,9 @@ void test(int contractionType, int Prec)
 
   free(spinorX);
   free(spinorY);
+  free(spinorZ);
   free(d_result);
+  free(d_q);
 }
 
 // The following tests gets each contraction type and precision using google testing framework
