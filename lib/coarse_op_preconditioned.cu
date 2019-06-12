@@ -47,7 +47,13 @@ namespace quda {
         else CalculateYhatCPU<Float,n,false,Arg>(arg);
 
       } else {
-        if (compute_max_only) arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+        if (compute_max_only) {
+          arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+          if (!activeTuning())
+          {
+            cudaMemset(arg.max_d, 0, sizeof(Float));
+          }
+        }
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::CalculateYhatGPU")
