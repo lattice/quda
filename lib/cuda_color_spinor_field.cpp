@@ -418,10 +418,10 @@ namespace quda {
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-        	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-	cudaTextureDesc texDesc;
+        cudaTextureDesc texDesc;
 	memset(&texDesc, 0, sizeof(texDesc));
 	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
 	else texDesc.readMode = cudaReadModeElementType;
@@ -432,9 +432,9 @@ namespace quda {
 	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-        	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
-	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
+        cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
 
 	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
 	  cudaChannelFormatDesc desc;
@@ -455,7 +455,7 @@ namespace quda {
           }
 
           cudaTextureDesc texDesc;
-	  memset(&texDesc, 0, sizeof(texDesc));
+          memset(&texDesc, 0, sizeof(texDesc));
 	  texDesc.readMode = cudaReadModeElementType;
 
 	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
@@ -465,11 +465,11 @@ namespace quda {
             errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                       resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
           }
-          cudaCreateTextureObject(&ghostTexNorm[2+b], &resDesc, &texDesc, NULL);
+          cudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
         }
 
         ghost_field_tex[b] = ghost_recv_buffer_d[b];
-	ghost_field_tex[2+b] = ghost_pinned_recv_buffer_hd[b];
+        ghost_field_tex[2+b] = ghost_pinned_recv_buffer_hd[b];
       } // buffer index
 
       ghostTexInit = true;

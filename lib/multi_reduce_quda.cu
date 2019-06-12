@@ -930,7 +930,7 @@ namespace quda {
         if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
           disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
-	  if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
+          if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
 
 	    max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
 

@@ -149,7 +149,7 @@ namespace quda {
   class GaugeField : public LatticeField {
 
   protected:
-    size_t bytes; // bytes allocated per full field 
+    size_t bytes; // bytes allocated per full field
     size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
     size_t phase_bytes;  // bytes needed to store the phases
     size_t length;

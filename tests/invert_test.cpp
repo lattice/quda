@@ -398,8 +398,9 @@ int main(int argc, char **argv)
     }
 
     time[i] = inv_param.secs;
-    gflops[i] = inv_param.gflops/inv_param.secs;
-    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+    gflops[i] = inv_param.gflops / inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+               inv_param.gflops / inv_param.secs);
   }
 
   rng->Release();
@@ -409,7 +410,7 @@ int main(int argc, char **argv)
   auto mean_time2 = 0.0;
   auto mean_gflops = 0.0;
   auto mean_gflops2 = 0.0;
-  for (int i=0; i<Nsrc; i++) {
+  for (int i = 0; i < Nsrc; i++) {
     mean_time += time[i];
     mean_time2 += time[i] * time[i];
     mean_gflops += gflops[i];
@@ -418,15 +419,15 @@ int main(int argc, char **argv)
 
   mean_time /= Nsrc;
   mean_time2 /= Nsrc;
-  auto stddev_time = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_time2 - mean_time*mean_time) );
+  auto stddev_time = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time));
   mean_gflops /= Nsrc;
   mean_gflops2 /= Nsrc;
-  auto stddev_gflops = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_gflops2 - mean_gflops*mean_gflops) );
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n",
-             Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+  auto stddev_gflops = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops));
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
 
-  delete []time;
-  delete []gflops;
+  delete[] time;
+  delete[] gflops;
 
   if (multishift) {
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {

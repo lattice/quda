@@ -44,10 +44,10 @@ namespace quda {
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
 
-    real_length = 2*((size_t)volumeCB)*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
-    length = 2*((size_t)stride)*nColor*nColor*nSpin*nSpin/2;
+    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (72 reals)
+    length = 2 * ((size_t)stride) * nColor * nColor * nSpin * nSpin / 2;
 
-    bytes = length*precision;
+    bytes = length * precision;
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
@@ -229,7 +229,7 @@ namespace quda {
         }
 
         cudaTextureDesc texDesc;
-	memset(&texDesc, 0, sizeof(texDesc));
+        memset(&texDesc, 0, sizeof(texDesc));
 	texDesc.readMode = cudaReadModeElementType;
 	
 	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
