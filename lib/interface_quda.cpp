@@ -5861,6 +5861,64 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+/*
+void sinkProjectQuda(const void *hp_x, const void *hp_y, void *h_q, QudaInvertParam *param, const int *X)
+{
+  // DMH: Easiest way to construct ColorSpinorField? Do we require the user
+  //      to declare and fill and invert_param, or can it just be hacked?.
+  
+  profileContract.TPSTART(QUDA_PROFILE_TOTAL);
+  profileContract.TPSTART(QUDA_PROFILE_INIT);
+  // wrap CPU host side pointers
+  ColorSpinorParam cpuParam((void *)hp_y, *param, X, false, param->input_location);
+  ColorSpinorField *h_y = ColorSpinorField::Create(cpuParam);
+
+  // Spin 1
+  cpuParam.v = (void *)hp_x;
+  ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+
+  // Create device parameters
+  ColorSpinorParam cudaParam(cpuParam);
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  // Quda uses Degrand-Rossi gamma basis for contractions and will
+  // automatically reorder data if necessary.
+  cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  cudaParam.setPrecision(cpuParam.Precision(), cpuParam.Precision(), true);
+
+  std::vector<ColorSpinorField *> x, y;
+  x.push_back(ColorSpinorField::Create(cudaParam));
+  y.push_back(ColorSpinorField::Create(cudaParam));
+
+  size_t data_bytes = x[0]->Volume() * x[0]->Nspin() * x[0]->Nspin() * 2 * x[0]->Precision();
+  void *d_result = pool_device_malloc(data_bytes);
+  profileContract.TPSTOP(QUDA_PROFILE_INIT);
+
+  profileContract.TPSTART(QUDA_PROFILE_H2D);
+  *x[0] = *h_x;
+  *y[0] = *h_y;
+  profileContract.TPSTOP(QUDA_PROFILE_H2D);
+
+  profileContract.TPSTART(QUDA_PROFILE_COMPUTE);
+  contractQuda(*x[0], *y[0], d_result, cType);
+  profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  profileContract.TPSTART(QUDA_PROFILE_D2H);
+  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  profileContract.TPSTOP(QUDA_PROFILE_D2H);
+
+  profileContract.TPSTART(QUDA_PROFILE_FREE);
+  pool_device_free(d_result);
+  delete x[0];
+  delete y[0];
+  delete h_y;
+  delete h_x;
+  profileContract.TPSTOP(QUDA_PROFILE_FREE);
+
+  profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+*/
+
 double qChargeQuda()
 {
   profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);

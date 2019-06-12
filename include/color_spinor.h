@@ -971,7 +971,15 @@ namespace quda {
   __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, 1> &a,
                                                          const ColorSpinor<Float, Nc, Ns> &b, int s)
   {
-    return innerProduct(a, b, 0, s);
+    complex<Float> dot = 0;
+#pragma unroll
+    for (int c = 0; c < Nc; c++) {
+      dot.x += a(0, c).real() * b(s, c).real();
+      dot.x += a(0, c).imag() * b(s, c).imag();
+      dot.y += a(0, c).real() * b(s, c).imag();
+      dot.y -= a(0, c).imag() * b(s, c).real();
+    }
+    return dot;
   }
 
   /**

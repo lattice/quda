@@ -37,8 +37,8 @@ public:
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::qChargeComputeKernel")
-                         .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>())
-                         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+	  .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>())
+	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
 	LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
