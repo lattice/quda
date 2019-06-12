@@ -761,7 +761,7 @@ extern "C" {
   void endQuda(void);
 
 /**
- * @brief update the radius for halos. 
+ * @brief update the radius for halos.
  * @details This should only be needed for automated testing when
  * different partitioning is applied within a single run.
  */
@@ -1188,15 +1188,17 @@ extern "C" {
                             QudaGaugeParam* param);
 
   /**
-     Generate Gaussian distributed fields and store in the resident
-     gauge field.  We create a Gaussian-distributed su(n) field and
-     exponentiate it, e.g., U = exp(epsilon * H), where H is the
-     distributed su(n) field
+     @brief Generate Gaussian distributed fields and store in the
+     resident gauge field.  We create a Gaussian-distributed su(n)
+     field and exponentiate it, e.g., U = exp(beta * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and beta = 1 has
+     maximum disorder).
 
      @param seed The seed used for the RNG
-     @param epsilon Rotation from unit gauge
+     @param beta Width of Gaussian distrubution
   */
-  void gaussGaugeQuda(long seed, double epsilon);
+  void gaussGaugeQuda(long seed, double beta);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
@@ -1212,7 +1214,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1221,7 +1223,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param,
                              unsigned int nSteps, double alpha);
 
   /**

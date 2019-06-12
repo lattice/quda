@@ -22,10 +22,10 @@ namespace quda {
     int border[4];
     Gauge U;
     RNG rngstate;
-    real epsilon; // where U = exp(epsilon * H)
+    real beta; // where U = exp(beta * H)
 
-    GaugeGaussArg(const GaugeField &U, RNG &rngstate, double epsilon)
-      : U(U), rngstate(rngstate), epsilon(epsilon)
+    GaugeGaussArg(const GaugeField &U, RNG &rngstate, double beta)
+      : U(U), rngstate(rngstate), beta(beta)
     {
       int R = 0;
       for (int dir=0; dir<4; ++dir) {
@@ -85,8 +85,8 @@ namespace quda {
     getCoords(x, x_cb, arg.X, parity);
     for (int dr=0; dr<4; ++dr) x[dr] += arg.border[dr]; // extended grid coordinates
 
-    if (arg.group && arg.epsilon == 0.0) {
-      // if epsilon = 0 then we just set the output matrix to the identity and finish
+    if (arg.group && arg.beta == 0.0) {
+      // if beta = 0 then we just set the output matrix to the identity and finish
       Link I;
       setIdentity(&I);
       for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x,arg.E), parity) = I;
@@ -97,7 +97,7 @@ namespace quda {
         // generate Gaussian distributed su(n) fiueld
         Link u = gauss_su3<real,Link>(localState);
         if (arg.group) {
-          u = arg.epsilon * u;
+          u = arg.beta * u;
           expsu3<real>(u);
         }
         arg.U(mu, linkIndex(x,arg.E), parity) = u;
@@ -141,43 +141,43 @@ namespace quda {
   };
 
   template<typename Float, QudaReconstructType recon, bool group>
-  void genGauss(GaugeField& U, RNG &rngstate, double epsilon)
+  void genGauss(GaugeField& U, RNG &rngstate, double beta)
   {
-    GaugeGaussArg<Float,recon,group> arg(U, rngstate, epsilon);
+    GaugeGaussArg<Float,recon,group> arg(U, rngstate, beta);
     GaugeGauss<Float,decltype(arg)> gaugeGauss(arg, U);
     gaugeGauss.apply(0);
   }
 
-  template<typename Float> void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon)
+  template<typename Float> void gaugeGauss(GaugeField &U, RNG &rngstate, double beta)
   {
     if (U.LinkType() == QUDA_SU3_LINKS) { // generate Gaussian distributed SU(3) field
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Creating Gaussian distrbuted gauge field with epsilon = %e\n", epsilon);
+        printfQuda("Creating Gaussian distrbuted gauge field with beta = %e\n", beta);
       switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,true>(U, rngstate, epsilon); break;
-      case QUDA_RECONSTRUCT_12: genGauss<Float,QUDA_RECONSTRUCT_12,true>(U, rngstate, epsilon); break;
-      case QUDA_RECONSTRUCT_8: genGauss<Float,QUDA_RECONSTRUCT_8,true>(U, rngstate, epsilon); break;
+      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,true>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_12: genGauss<Float,QUDA_RECONSTRUCT_12,true>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_8: genGauss<Float,QUDA_RECONSTRUCT_8,true>(U, rngstate, beta); break;
       default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
       }
     } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) { // generate Gaussian distributed su(3) field
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Creating Gaussian distrbuted momentum field\n");
       switch (U.Reconstruct()) {
-      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,false>(U, rngstate, epsilon); break;
-      case QUDA_RECONSTRUCT_10: genGauss<Float,QUDA_RECONSTRUCT_10,false>(U, rngstate, epsilon); break;
+      case QUDA_RECONSTRUCT_NO: genGauss<Float,QUDA_RECONSTRUCT_NO,false>(U, rngstate, beta); break;
+      case QUDA_RECONSTRUCT_10: genGauss<Float,QUDA_RECONSTRUCT_10,false>(U, rngstate, beta); break;
       default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
       }
     }
   }
 
-  void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon)
+  void gaugeGauss(GaugeField &U, RNG &rngstate, double beta)
   {
     if (!U.isNative()) errorQuda("Order %d with %d reconstruct not supported", U.Order(), U.Reconstruct());
     if (U.Ncolor() != 3) errorQuda("Nc = %d not supported", U.Ncolor());
 
     switch (U.Precision()) {
-    case QUDA_DOUBLE_PRECISION: gaugeGauss<double>(U, rngstate, epsilon); break;
-    case QUDA_SINGLE_PRECISION: gaugeGauss<float>(U, rngstate, epsilon); break;
+    case QUDA_DOUBLE_PRECISION: gaugeGauss<double>(U, rngstate, beta); break;
+    case QUDA_SINGLE_PRECISION: gaugeGauss<float>(U, rngstate, beta); break;
     default: errorQuda("Precision %d not supported", U.Precision());
     }
 
@@ -189,11 +189,11 @@ namespace quda {
     }
   }
 
-  void gaugeGauss(GaugeField &U, long seed, double epsilon)
+  void gaugeGauss(GaugeField &U, long seed, double beta)
   {
     RNG* randstates = new RNG(U, seed);
     randstates->Init();
-    quda::gaugeGauss(U, *randstates, epsilon);
+    quda::gaugeGauss(U, *randstates, beta);
     randstates->Release();
     delete randstates;
   }

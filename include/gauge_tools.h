@@ -4,7 +4,7 @@ namespace quda
 {
 
   /**
-     Compute the plaquette of the gauge field
+     @brief Compute the plaquette of the gauge field
 
      @param U The gauge field upon which to compute the plaquette
      @return double3 variable returning (plaquette, spatial plaquette,
@@ -14,35 +14,41 @@ namespace quda
   double3 plaquette(const GaugeField &U);
 
   /**
-     Generate Gaussian distributed su(N) or SU(N) fields.  If U is a
-     momentum field, then we generate random Gaussian distributed
+     @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
+     is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
      If U is in the group then we create a Gaussian distributed su(n)
-     field and exponentiate it, e.g., U = exp(epsilon H), where H is
-     the distributed su(n) field
+     field and exponentiate it, e.g., U = exp(beta * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and beta = 1 has
+     maximum disorder).
 
      @param U The output gauge field
      @param rngstate random states
-     @param epsilon Rotation from unit gauge
+     @param beta Width of Gaussian distrubution
   */
+
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
 
   /**
-     Generate Gaussian distributed su(N) or SU(N) fields.  If U is a
-     momentum field, then we generate random Gaussian distributed
+     @brief Generate Gaussian distributed su(N) or SU(N) fields.  If U
+     is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
      If U is in the group then we create a Gaussian distributed su(n)
-     field and expoentiate it, e.g., U = exp(epsilon H), where H is
-     the distributed su(n) field
+     field and exponentiate it, e.g., U = exp(beta * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and beta = 1 has
+     maximum disorder).
 
      @param U The GaugeField
      @param seed The seed used for the RNG
-     @param epsilon Rotation from unit gauge
+     @param beta Wdith of the Gaussian distribution
   */
+
   void gaugeGauss(GaugeField &U, long seed, double epsilon);
 
   /**
-     Apply APE smearing to the gauge field
+     @brief Apply APE smearing to the gauge field
 
      @param dataDs Output smeared field
      @param dataOr Input gauge field
@@ -53,7 +59,7 @@ namespace quda
 		double alpha);
 
   /**
-     Apply STOUT smearing to the gauge field
+     @brief Apply STOUT smearing to the gauge field
 
      @param dataDs Output smeared field
      @param dataOr Input gauge field
@@ -64,7 +70,7 @@ namespace quda
 		  double rho);
 
   /**
-     Apply Over Improved STOUT smearing to the gauge field
+     @brief Apply Over Improved STOUT smearing to the gauge field
 
      @param dataDs Output smeared field
      @param dataOr Input gauge field
