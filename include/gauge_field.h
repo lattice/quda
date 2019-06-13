@@ -69,7 +69,8 @@ namespace quda {
       i_mu(0.0),
       site_offset(0),
       site_size(0)
-    { }
+    {
+    }
 
     GaugeFieldParam(const GaugeField &u);
 
@@ -95,7 +96,8 @@ namespace quda {
       i_mu(0.0),
       site_offset(0),
       site_size(0)
-    { }
+    {
+    }
 
   GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
     : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
@@ -153,8 +155,7 @@ namespace quda {
               QUDA_FLOAT2_GAUGE_ORDER :
               QUDA_FLOAT4_GAUGE_ORDER;
           }
-    }
-
+        }
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);

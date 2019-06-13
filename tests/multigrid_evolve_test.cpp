@@ -741,7 +741,7 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette(*gaugeEx);
 
-    Monte(*gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

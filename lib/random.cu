@@ -82,7 +82,10 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  RNG::RNG(const LatticeField &meta, unsigned long long seedin) : seed(seedin), size(meta.Volume()), size_cb(meta.VolumeCB())
+  RNG::RNG(const LatticeField &meta, unsigned long long seedin) :
+    seed(seedin),
+    size(meta.Volume()),
+    size_cb(meta.VolumeCB())
   {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];

@@ -57,12 +57,12 @@ namespace quda {
         expsu3<Float>(mom);
 
         if (!conj_mom) {
-	  link = mom * link;
-	} else {
-	  link = conj(mom) * link;
-	}
+          link = mom * link;
+        } else {
+          link = conj(mom) * link;
+        }
 
-	result = link;
+        result = link;
       }
 
       arg.out.save((Float*)(result.data), x, dir, parity);
