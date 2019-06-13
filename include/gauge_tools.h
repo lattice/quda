@@ -18,14 +18,14 @@ namespace quda
      is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
      If U is in the group then we create a Gaussian distributed su(n)
-     field and exponentiate it, e.g., U = exp(beta * H), where H is
-     the distributed su(n) field and beta is the width of the
-     distribution (beta = 0 results in a free field, and beta = 1 has
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
+     the distributed su(n) field and sigma is the width of the
+     distribution (sigma = 0 results in a free field, and sigma = 1 has
      maximum disorder).
 
      @param[out] U The output gauge field
      @param[in] rngstate random states
-     @param[in] beta Width of Gaussian distrubution
+     @param[in] sigma Width of Gaussian distrubution
   */
 
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
@@ -35,14 +35,14 @@ namespace quda
      is a momentum field, then we generate random Gaussian distributed
      field in the Lie algebra using the anti-Hermitation convention.
      If U is in the group then we create a Gaussian distributed su(n)
-     field and exponentiate it, e.g., U = exp(beta * H), where H is
-     the distributed su(n) field and beta is the width of the
-     distribution (beta = 0 results in a free field, and beta = 1 has
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
+     the distributed su(n) field and sigma is the width of the
+     distribution (sigma = 0 results in a free field, and sigma = 1 has
      maximum disorder).
 
      @param[out] U The GaugeField
      @param[in] seed The seed used for the RNG
-     @param[in] beta Wdith of the Gaussian distribution
+     @param[in] sigma Wdith of the Gaussian distribution
   */
 
   void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);

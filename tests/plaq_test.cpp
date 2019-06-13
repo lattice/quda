@@ -37,7 +37,7 @@ extern double epsilon;
 extern bool verify_results;
 
 extern char latfile[];
-extern double gaussian_beta;
+extern double gaussian_sigma;
 
 extern QudaVerbosity verbosity;
 
@@ -123,7 +123,7 @@ void plaq_test(int argc, char **argv)
 
   loadGaugeQuda(gauge, &gauge_param);
 
-  if (!load_gauge) gaussGaugeQuda(1234, gaussian_beta);
+  if (!load_gauge) gaussGaugeQuda(1234, gaussian_sigma);
 
   double plaq[3];
   plaqQuda(plaq);

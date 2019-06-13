@@ -3041,8 +3041,14 @@ namespace quda {
     if( g.Reconstruct() == QUDA_RECONSTRUCT_NO) {			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge; \
       func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_13){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
     } else if( g.Reconstruct() == QUDA_RECONSTRUCT_12){			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_9){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type Gauge; \
       func(Gauge(g), g, __VA_ARGS__);					\
     } else if( g.Reconstruct() == QUDA_RECONSTRUCT_8){			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge; \

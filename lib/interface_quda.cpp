@@ -5388,7 +5388,7 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-void gaussGaugeQuda(unsigned long long seed, double beta)
+void gaussGaugeQuda(unsigned long long seed, double sigma)
 {
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5402,7 +5402,7 @@ void gaussGaugeQuda(unsigned long long seed, double beta)
   cudaGaugeField u(param);
 
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-  quda::gaugeGauss(*data, seed, beta);
+  quda::gaugeGauss(*data, seed, sigma);
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   if (extendedGaugeResident) {

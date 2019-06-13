@@ -1190,15 +1190,15 @@ extern "C" {
   /**
      @brief Generate Gaussian distributed fields and store in the
      resident gauge field.  We create a Gaussian-distributed su(n)
-     field and exponentiate it, e.g., U = exp(beta * H), where H is
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
      the distributed su(n) field and beta is the width of the
-     distribution (beta = 0 results in a free field, and beta = 1 has
+     distribution (beta = 0 results in a free field, and sigma = 1 has
      maximum disorder).
 
      @param seed The seed used for the RNG
-     @param beta Width of Gaussian distrubution
+     @param sigma Width of Gaussian distrubution
   */
-  void gaussGaugeQuda(unsigned long long seed, double beta);
+  void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
