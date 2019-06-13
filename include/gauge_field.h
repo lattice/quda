@@ -134,7 +134,8 @@ namespace quda {
           bool native = force_native ? true : false;
           if (precision == QUDA_DOUBLE_PRECISION) {
             if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-          } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION) {
+          } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
+                     || precision == QUDA_QUARTER_PRECISION) {
             if (reconstruct == QUDA_RECONSTRUCT_NO) {
               if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
             } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
