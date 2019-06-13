@@ -599,10 +599,14 @@ namespace quda
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-                   "restart steps.\n",
-                   nConv, nEv, nKr, max_restarts);
+      if (eig_param->require_convergence) {
+        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                  "restart steps. Exiting.",
+                  nConv, nEv, nKr, max_restarts);
+      } else {
+        warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                    "restart steps. Continuing with current lanczos factorisation.",
+                    nConv, nEv, nKr, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {

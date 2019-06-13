@@ -145,8 +145,9 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = (isPhase ? phase_bytes : bytes) / (!full ? 2 : 1);
 
-      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
-	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
+          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
+        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
 		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
       }
 

@@ -152,6 +152,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
+  P(require_convergence, QUDA_BOOLEAN_YES);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
@@ -174,6 +175,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
+  P(require_convergence, QUDA_BOOLEAN_INVALID);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
@@ -336,7 +338,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
-  P(max_hq_res_increase, 1); /**< Default is to allow one consecutive heavy-quark residual increase */
+  P(max_hq_res_increase, 1);     /**< Default is to allow one consecutive heavy-quark residual increase */
   P(max_hq_res_restart_total, 10); /**< Default is to allow ten heavy-quark restarts */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else

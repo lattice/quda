@@ -1728,6 +1728,7 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
+bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
@@ -1752,6 +1753,7 @@ char eig_vec_outfile[256] = "";
 bool mg_eig[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_nEv[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_nKr[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = {};
 double mg_eig_tol[QUDA_MAX_MG_LEVEL] = {};
@@ -1772,6 +1774,7 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1931,6 +1934,8 @@ void usage(char** argv )
   printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
   printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
+  printf("    --eig-require-convergence  <true/false>   # If true, the solver will error out if convergence is not "
+         "attained. If false, a warning will be given (default true)\n");
   printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in "
          "the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
   printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the eigensolver\n");
@@ -1961,6 +1966,8 @@ void usage(char** argv )
          "eigensolver\n");
   printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
          "eigensolver\n");
+  printf("    --mg-eig-require-convergence <level> <true/false> # If true, the solver will error out if convergence is "
+         "not attained. If false, a warning will be given (default true)\n");
   printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth "
          "restart/iteration (only used in Implicit Restart types)\n");
   printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver "
@@ -1994,6 +2001,10 @@ void usage(char** argv )
   printf("    --heatbath-num-hb-per-step <n>            # Number of heatbath hits per heatbath step (default 5)\n");
   printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
   printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
+
+  printf("    --contraction-type <open/dr/dp>           # Whether to leave spin elemental open, or use a gamma basis "
+         "and contract on spin (default open)\n");
+
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv);
@@ -3682,6 +3693,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_require_convergence = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_require_convergence = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for require-convergence (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if (strcmp(argv[i], "--eig-check-interval") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     eig_check_interval = atoi(argv[i + 1]);
@@ -3912,6 +3940,29 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     mg_eig_nKr[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_require_convergence[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_require_convergence[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-require-convergence %d (true/false)\n", level);
+      exit(1);
+    }
 
     i++;
     ret = 0;
@@ -4316,6 +4367,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
 
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--contract-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    contract_type = get_contract_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;
