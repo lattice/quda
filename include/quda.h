@@ -1205,13 +1205,26 @@ extern "C" {
    */
   void plaqQuda(double plaq[3]);
 
-  /*
+  /**
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externalGaugeResident cudaGaugeField
    * @param Location of gauge field
    */
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
+  /**
+   * Performs Gaussian smearing on a given spinor using the gauge field 
+   * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
+   * @param h_out  Result spinor field
+   * @param h_in   Input spinor field
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param nSteps Number of steps to apply.
+   * @param sigma  Sigma coefficient for Gaussian smearing.
+   */
+  void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
+			    unsigned int nSteps, double sigma);
+  
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field 
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.

@@ -204,6 +204,9 @@ static TimeProfile profileHISQForce("computeHISQForceQuda");
 //!<Profiler for plaqQuda
 static TimeProfile profilePlaq("plaqQuda");
 
+//!< Profiler for gaussianQuda
+static TimeProfile profileGaussian("gaussianQuda");
+
 //!< Profiler for wuppertalQuda
 static TimeProfile profileWuppertal("wuppertalQuda");
 
@@ -5470,6 +5473,92 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
 
   //profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
   return;
+}
+
+void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double sigma)
+{
+  profileGaussian.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+  
+  pushVerbosity(inv_param->verbosity);
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
+
+  cudaGaugeField *precise = nullptr;
+
+  if (gaugeSmeared != nullptr) {
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugeSmeared\n");
+    GaugeFieldParam gParam(*gaugePrecise);
+    gParam.create = QUDA_NULL_FIELD_CREATE;
+    precise = new cudaGaugeField(gParam);
+    copyExtendedGauge(*precise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
+    precise->exchangeGhost();
+  } else {
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Gaussian smearing done with gaugePrecise\n");
+    precise = gaugePrecise;
+  }
+  
+  ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaColorSpinorField in(*in_h, cudaParam);
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*in_h);
+    double gpu = blas::norm2(in);
+    printfQuda("In CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
+  cudaColorSpinorField out(in, cudaParam);
+
+  // Gaussian smearing is applied by using A Laplace type Dirac.
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+
+  // create the dirac operator
+  // The `kappa` value is sigma/(4*nSteps)
+  inv_param->kappa = sigma*sigma/(4*nSteps);
+  createDirac(d, dSloppy, dPre, *inv_param, false);
+  
+  Dirac &dirac = *d;
+     
+  for (unsigned int i=0; i<nSteps; i++) {
+    if(i>0) in = out;
+    dirac.M(out, in);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      double norm = blas::norm2(out);
+      printfQuda("Step %d, vector norm %e\n", i, norm);
+    }
+  }
+  
+  cpuParam.v = h_out;
+  cpuParam.location = inv_param->output_location;
+  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  *out_h = out;
+
+  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+    double cpu = blas::norm2(*out_h);
+    double gpu = blas::norm2(out);
+    printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
+  }
+
+  if (gaugeSmeared != nullptr)
+    delete precise;
+
+  delete out_h;
+  delete in_h;
+
+  delete d;
+  delete dSloppy;
+  delete dPre; 
+  
+  popVerbosity();
+
+  profileGaussian.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)
