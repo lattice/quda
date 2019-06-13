@@ -5480,7 +5480,7 @@ void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, u
   profileGaussian.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
-  
+
   pushVerbosity(inv_param->verbosity);
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(inv_param);
 
@@ -5494,11 +5494,10 @@ void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, u
     copyExtendedGauge(*precise, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
     precise->exchangeGhost();
   } else {
-    if (getVerbosity() >= QUDA_VERBOSE)
-      printfQuda("Gaussian smearing done with gaugePrecise\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Gaussian smearing done with gaugePrecise\n");
     precise = gaugePrecise;
   }
-  
+
   ColorSpinorParam cpuParam(h_in, *inv_param, precise->X(), false, inv_param->input_location);
   ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
@@ -5520,21 +5519,23 @@ void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, u
   Dirac *dPre = nullptr;
 
   // create the dirac operator
-  // The `kappa` value is sigma/(4*nSteps)
-  inv_param->kappa = sigma*sigma/(4*nSteps);
+  // The `kappa` value is sigma/(4*nSteps) and we do not
+  // smear in the temporal direction.
+  inv_param->kappa = sigma * sigma / (4 * nSteps);
+  inv_param->laplace3D = 3;
   createDirac(d, dSloppy, dPre, *inv_param, false);
-  
+
   Dirac &dirac = *d;
-     
-  for (unsigned int i=0; i<nSteps; i++) {
-    if(i>0) in = out;
+
+  for (unsigned int i = 0; i < nSteps; i++) {
+    if (i > 0) in = out;
     dirac.M(out, in);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
     }
   }
-  
+
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
   ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
@@ -5546,16 +5547,15 @@ void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, u
     printfQuda("Out CPU %e CUDA %e\n", cpu, gpu);
   }
 
-  if (gaugeSmeared != nullptr)
-    delete precise;
+  if (gaugeSmeared != nullptr) delete precise;
 
   delete out_h;
   delete in_h;
 
   delete d;
   delete dSloppy;
-  delete dPre; 
-  
+  delete dPre;
+
   popVerbosity();
 
   profileGaussian.TPSTOP(QUDA_PROFILE_TOTAL);

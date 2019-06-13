@@ -1213,7 +1213,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Gaussian smearing on a given spinor using the gauge field 
+   * Performs Gaussian smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1222,9 +1222,8 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param sigma  Sigma coefficient for Gaussian smearing.
    */
-  void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param,
-			    unsigned int nSteps, double sigma);
-  
+  void performGaussiannStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double sigma);
+
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field 
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
