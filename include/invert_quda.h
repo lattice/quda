@@ -1203,13 +1203,6 @@ public:
   //forward declaration
   class EigCGArgs;
 
-  typedef enum CAEigCGComputeTasks_s{ COMPUTE_EIGENV        = 1,
-                                      COMPUTE_QV            = 2,
-                                      COMPUTE_EIGENV_AND_QV = 3,
-                                      COMPUTE_ZAV           = 4,
-                                      COMPUTE_ALL           = 7
-                                    } CAEigCGComputeTasks;
-
   class IncEigCG : public Solver {
 
   private:
@@ -1220,14 +1213,8 @@ public:
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    std::shared_ptr<ColorSpinorFieldSet> Vm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
-    std::shared_ptr<ColorSpinorFieldSet> V2k;         //temp vector set
     std::shared_ptr<ColorSpinorFieldSet> work_space;  // a workspace to keep a number of temporary fields
 
-    std::shared_ptr<ColorSpinorField> rp;       // residual vector
-    std::shared_ptr<ColorSpinorField> yp;       // high precision accumulator
-    std::shared_ptr<ColorSpinorField> tmpp;     // temporary for mat-vec
-    std::shared_ptr<ColorSpinorField> Az;       // mat * conjugate vector from the previous iteration
     std::shared_ptr<ColorSpinorField> r_pre;    // residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    // preconditioner result
 
@@ -1242,14 +1229,12 @@ public:
 
     virtual ~IncEigCG();
 
-    //compute task codes: 01 -> only Eigenproblem, 10 -> only QV product , 100 -> only block dot product  111 -> all
-    template <bool is_pipelined = false, CAEigCGComputeTasks compute_task_id = COMPUTE_ALL>
-    void RayleighRitz();
-    //Legacy routines
-    void SearchSpaceUpdate(ColorSpinorField &z, const double& lanczos_diag, const double& lanzos_offdiag, const double& beta, const double& resnorm);
+    void EigenSolve();
+    //
+    void LegacySearchSpaceUpdate(const double& lanczos_diag, const double& lanzos_offdiag, const double &beta, const double &resnorm);
     //Pipelined routines:
     void PipelinedSearchSpaceUpdate(const double& lanczos_diag, const double& lanzos_offdiag, const double& beta, const double& resnorm);
-    //EigCG solver:
+    // legacy EigCG solver:
     int EigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //communation optimized version
     int CAEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
