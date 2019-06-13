@@ -48,7 +48,7 @@ namespace quda {
      @param size size of the CURAND RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
-  __global__ void kernel_random(cuRNGState *state, int seed, int size_cb, rngArg arg)
+  __global__ void kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, rngArg arg)
   {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -72,7 +72,7 @@ namespace quda {
      @param n_parity Number of parities (1 or 2)
      @param X array of lattice dimensions
   */
-  void launch_kernel_random(cuRNGState *state, int seed, int size_cb, int n_parity, int X[4])
+  void launch_kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
   {
     dim3 nthreads(128,1,1);
     dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
@@ -82,7 +82,7 @@ namespace quda {
     qudaDeviceSynchronize();
   }
 
-  RNG::RNG(const LatticeField &meta, int seedin) : seed(seedin), size(meta.Volume()), size_cb(meta.VolumeCB())
+  RNG::RNG(const LatticeField &meta, unsigned long long seedin) : seed(seedin), size(meta.Volume()), size_cb(meta.VolumeCB())
   {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
@@ -95,7 +95,7 @@ namespace quda {
 #endif
   }
 
-  RNG::RNG(const LatticeFieldParam &param, int seedin) : seed(seedin), size(1), size_cb(1)
+  RNG::RNG(const LatticeFieldParam &param, unsigned long long seedin) : seed(seedin), size(1), size_cb(1)
   {
     state = nullptr;
     for (int i = 0; i < 4; i++) {

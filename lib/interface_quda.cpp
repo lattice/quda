@@ -5388,7 +5388,7 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-void gaussGaugeQuda(long seed, double beta)
+void gaussGaugeQuda(unsigned long long seed, double beta)
 {
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 

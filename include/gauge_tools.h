@@ -6,7 +6,7 @@ namespace quda
   /**
      @brief Compute the plaquette of the gauge field
 
-     @param U The gauge field upon which to compute the plaquette
+     @param[in] U The gauge field upon which to compute the plaquette
      @return double3 variable returning (plaquette, spatial plaquette,
      temporal plaquette) site averages normalized such that each
      plaquette is in the range [0,1]
@@ -23,9 +23,9 @@ namespace quda
      distribution (beta = 0 results in a free field, and beta = 1 has
      maximum disorder).
 
-     @param U The output gauge field
-     @param rngstate random states
-     @param beta Width of Gaussian distrubution
+     @param[out] U The output gauge field
+     @param[in] rngstate random states
+     @param[in] beta Width of Gaussian distrubution
   */
 
   void gaugeGauss(GaugeField &U, RNG &rngstate, double epsilon);
@@ -40,47 +40,40 @@ namespace quda
      distribution (beta = 0 results in a free field, and beta = 1 has
      maximum disorder).
 
-     @param U The GaugeField
-     @param seed The seed used for the RNG
-     @param beta Wdith of the Gaussian distribution
+     @param[out] U The GaugeField
+     @param[in] seed The seed used for the RNG
+     @param[in] beta Wdith of the Gaussian distribution
   */
 
-  void gaugeGauss(GaugeField &U, long seed, double epsilon);
+  void gaugeGauss(GaugeField &U, unsigned long long seed, double epsilon);
 
   /**
      @brief Apply APE smearing to the gauge field
 
-     @param dataDs Output smeared field
-     @param dataOr Input gauge field
-     @param alpha smearing parameter
+     @param[out] dataDs Output smeared field
+     @param[in] dataOr Input gauge field
+     @param[in] alpha smearing parameter
   */
-  void APEStep (GaugeField &dataDs,
-		const GaugeField& dataOr,
-		double alpha);
+  void APEStep(GaugeField &dataDs, const GaugeField& dataOr, double alpha);
 
   /**
      @brief Apply STOUT smearing to the gauge field
 
-     @param dataDs Output smeared field
-     @param dataOr Input gauge field
-     @param rho smearing parameter
+     @param[out] dataDs Output smeared field
+     @param[in] dataOr Input gauge field
+     @param[in] rho smearing parameter
   */
-  void STOUTStep (GaugeField &dataDs,
-		  const GaugeField& dataOr,
-		  double rho);
+  void STOUTStep(GaugeField &dataDs, const GaugeField& dataOr, double rho);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
 
-     @param dataDs Output smeared field
-     @param dataOr Input gauge field
-     @param rho smearing parameter
-     @param epsilon smearing parameter
+     @param[out] dataDs Output smeared field
+     @param[in] dataOr Input gauge field
+     @param[in] rho smearing parameter
+     @param[in] epsilon smearing parameter
   */
-  void OvrImpSTOUTStep (GaugeField &dataDs,
-			const GaugeField& dataOr,
-			double rho, double epsilon);
-
+  void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField& dataOr, double rho, double epsilon);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -124,25 +117,27 @@ namespace quda
 		       const int autotune,
                        const double tolerance,
 		       const int stopWtheta);
+
   /**
-     Compute the Fmunu tensor
-     @param Fmunu The Fmunu tensor
-     @param gauge The gauge field upon which to compute the Fmnu tensor
+     @brief Compute the Fmunu tensor
+     @param[out] Fmunu The Fmunu tensor
+     @param[in] gauge The gauge field upon which to compute the Fmnu tensor
    */
   void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge);
 
   /**
-     Compute the topological charge
-     @param Fmunu The Fmunu tensor, usually calculated from a smeared configuration
+     @brief Compute the topological charge
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
      @return double The total topological charge
    */
   double computeQCharge(const GaugeField &Fmunu);
 
   /**
-   Compute the topological charge density per lattice site
-   @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-   @param[out] qDensity The topological charge at each lattice site
-   @return double The total topological charge
+     @brief Compute the topological charge density per lattice site
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
+     @param[out] qDensity The topological charge at each lattice site
+     @return double The total topological charge
   */
   double computeQChargeDensity(const GaugeField &Fmunu, void *result);
+
 } // namespace quda

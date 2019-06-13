@@ -182,7 +182,7 @@ public:
     }
   }
 
-  void gaugeGauss(GaugeField &U, long seed, double beta)
+  void gaugeGauss(GaugeField &U, unsigned long long seed, double beta)
   {
     RNG *randstates = new RNG(U, seed);
     randstates->Init();

@@ -1198,7 +1198,7 @@ extern "C" {
      @param seed The seed used for the RNG
      @param beta Width of Gaussian distrubution
   */
-  void gaussGaugeQuda(long seed, double beta);
+  void gaussGaugeQuda(unsigned long long seed, double beta);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
