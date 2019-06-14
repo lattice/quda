@@ -96,9 +96,10 @@ namespace quda {
 
        /** Pipeline specific parameters:
 	*/
-       const int pipe_l;
 
-       const int ev_task_offset;//pipeline length per compute task (for 3 compute tasks, the last entry is the total pipeline length)
+       const int pipe_l; // total pipeline length
+
+       const int ev_task_offset;//pipeline length for the eigenvec computations
 
        const int n_update;
 
@@ -223,7 +224,7 @@ namespace quda {
 	 id = 2*k+pipe_l;  restarts += 1; s.setZero();
 
        	 // Reset compute tasks:
-	 
+
 	 ctask_id = EigCGComputeTasks::COMPUTE_QV;
 
 	 return;
@@ -286,9 +287,11 @@ namespace quda {
 
      	 static int count = 0;
 
-	 const int tot_n_updates     = pipe_l ? n_update * (pipe_l - ev_task_offset) : 2;
-	 
-	 const int n_subtask_updates = std::max(tot_n_updates / 2, 1);
+	 const int tot_n_updates         =  pipe_l ? n_update * (pipe_l - ev_task_offset) : 2;
+		//Think about this:
+		const int n_zav_subtask_updates =  tot_n_updates > 2 ? 2 : 1;
+	 const int n_qv_subtask_updates  =  tot_n_updates - n_zav_subtask_updates;
+
 
      	 if (ctask_id == EigCGComputeTasks::COMPUTE_QV)
 	 {
@@ -296,9 +299,9 @@ namespace quda {
 
 	   if(count == 0) blas::zero(v2k);
 
-	   const int bsize   = m / n_subtask_updates;
+	   const int bsize   = m / n_qv_subtask_updates;
 
-       	   const int wsize = (count < (n_subtask_updates -1)) ? bsize : m - count*bsize;
+       	   const int wsize = (count < (n_qv_subtask_updates -1)) ? bsize : m - count*bsize;
 
        	   const int offset    = count*bsize;
 
@@ -308,7 +311,7 @@ namespace quda {
 
        	   blas::axpy( Alpha.data(), vm_ , v2k_);
 
-     	   if(++count == n_subtask_updates) {
+     	   if(++count == n_qv_subtask_updates) {
 	     count = 0;
 	     ctask_id = EigCGComputeTasks::COMPUTE_ZAV;
 	   }
@@ -317,25 +320,24 @@ namespace quda {
 
 	   Az_.push_back(Az.get());
 
-	   const int bsize             = 2*k / n_subtask_updates;//WARNING args.n_updates < args.m
+	   const int bsize  = std::max(2*k / n_zav_subtask_updates, 1);//WARNING args.n_updates < args.m
 
-	   const int wsize  = (count < (n_subtask_updates -1)) ? bsize : 2*k - count*bsize;
+	   const int wsize  = (count < (n_zav_subtask_updates -1)) ? bsize : 2*k - count*bsize;
 
 	   const int offset = count*bsize;
 
 	   std::vector<ColorSpinorField*> v2k_(v2k(offset, offset + wsize));
 
 	   for(int j = offset; j < offset+wsize; j++)  blas::copy(vm[j], v2k[j]);
-
 	   commGlobalReductionSet(pipe_l ? false : true); //disable when is_pipelined is true
 	   blas::reDotProduct(s.segment(offset, wsize).data(), Az_, v2k_);
 	   commGlobalReductionSet(true);
 
-	   if(++count == n_subtask_updates) {
+	   if(++count == n_zav_subtask_updates) {
 	     count = 0;
 	     ctask_id = EigCGComputeTasks::COMPUTE_NOTHING;
 	     //Start async communications:
-	     
+
 	     if( (pipe_l != 0) && (comm_size() > 1) ) {
 		EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(s.data()),
 				                reinterpret_cast<double*>(rr_task_recvbuff.data()),
@@ -454,10 +456,11 @@ namespace quda {
 	args.CacheNormR(rnorm);
 	//Compute (update) Ap = Ap - beta*Ap_old
 	blas::xpay(Ap, -beta, *args.Az);
-	
-	args.ComputeEv();
 
+	args.ComputeEv();
+        // apply QV task:
 	args.apply(0);
+	// apply ZAV task:
 	args.apply(0);
 
 	args.RestartArgs();
@@ -492,7 +495,7 @@ namespace quda {
       dslash::aux_worker = eigcg_args.get();
       //args.apply(0);
     } else if (args.id == (args.m+args.pipe_l)) {
-	    
+
       dslash::aux_worker = nullptr;
       args.RestartArgs();
     }
@@ -700,7 +703,7 @@ namespace quda {
 
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
-    const int ev_task_offset  = 8;
+    const int ev_task_offset  = 16;
     const int tot_pipe_l      = std::min((param.m-2*param.nev), ev_task_offset+param.pipeline);
 
     if(tot_pipe_l < param.nev) errorQuda("Pipeline length is too short (%d).", tot_pipe_l);
@@ -883,6 +886,7 @@ namespace quda {
 
     blas::zero(*args.V2k);
 
+    dslash::aux_worker = nullptr;
     args.CleanArgs();
 
     blas::xpy(y, x);
