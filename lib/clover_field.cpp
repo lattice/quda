@@ -231,8 +231,8 @@ namespace quda {
         cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = cudaReadModeElementType;
-	
-	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+
+        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
       }
     }

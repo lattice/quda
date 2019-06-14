@@ -423,7 +423,7 @@ namespace quda {
 
         cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
 	else texDesc.readMode = cudaReadModeElementType;
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
@@ -437,7 +437,7 @@ namespace quda {
         cudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
 
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-	  cudaChannelFormatDesc desc;
+          cudaChannelFormatDesc desc;
 	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
 	  desc.f = cudaChannelFormatKindFloat;
 	  desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
@@ -458,7 +458,7 @@ namespace quda {
           memset(&texDesc, 0, sizeof(texDesc));
           texDesc.readMode = cudaReadModeElementType;
 
-	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
+          cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 
 	  resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
