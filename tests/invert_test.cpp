@@ -383,8 +383,7 @@ int main(int argc, char **argv)
 
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
-
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
   for (int i = 0; i < Nsrc; i++) {

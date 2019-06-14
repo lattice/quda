@@ -413,9 +413,6 @@ namespace quda {
   };
 
 
-
-
-
   template<typename Float, int NCOLORS, typename Gauge>
   void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate) {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
@@ -426,8 +423,6 @@ namespace quda {
 
     data.exchangeExtendedGhost(data.R(),false);
   }
-
-
 
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {

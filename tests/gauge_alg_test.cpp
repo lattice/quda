@@ -172,7 +172,6 @@ class GaugeAlgTest : public ::testing::Test {
     gParam.reconstruct = param.reconstruct;
     gParam.order       = (param.cuda_prec == QUDA_DOUBLE_PRECISION || param.reconstruct == QUDA_RECONSTRUCT_NO ) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
 
-
 #ifdef MULTI_GPU
     int y[4];
     int R[4] = {0,0,0,0};
@@ -191,10 +190,8 @@ class GaugeAlgTest : public ::testing::Test {
 #else
     cudaInGauge = new cudaGaugeField(gParam);
 #endif
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
-    printfQuda("xdim=%d\tydim=%d\tzdim=%d\ttdim=%d\trng_size=%d\n",xdim,ydim,zdim,tdim,halfvolume);
     // CURAND random generator initialization
-    randstates = new RNG(halfvolume, 1234, param.X);
+    randstates = new RNG(gParam, 1234);
     randstates->Init();
 
     nsteps = 10;
@@ -202,8 +199,6 @@ class GaugeAlgTest : public ::testing::Test {
     novrsteps = 4;
     coldstart = false;
     beta_value = 6.2;
-
-
 
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);

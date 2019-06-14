@@ -538,7 +538,7 @@ namespace quda
       if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
         kSpace[0]->Source(QUDA_RANDOM_SOURCE);
       } else {
-        RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
+        RNG *rng = new RNG(*kSpace[0], 1234);
         rng->Init();
         spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
         rng->Release();

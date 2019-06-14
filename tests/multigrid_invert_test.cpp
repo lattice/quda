@@ -784,7 +784,7 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];

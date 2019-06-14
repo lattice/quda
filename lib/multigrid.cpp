@@ -73,7 +73,7 @@ namespace quda
       }
     }
 
-    rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+    rng = new RNG(*param.B[0], 1234);
     rng->Init();
 
     if (param.level < param.Nlevel-1) {

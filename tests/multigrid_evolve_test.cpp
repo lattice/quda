@@ -726,9 +726,8 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
     // CURAND random generator initialization
-    RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
+    RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
 
     int nsteps = 10;
@@ -745,7 +744,7 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette(*gaugeEx);
 
-    Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
