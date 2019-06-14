@@ -627,20 +627,11 @@ if(QUDA_ARPACK)
     endif()
   endif(QUDA_DOWNLOAD_ARPACK)
 
-   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
-   include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
-  if(ARPACK_MPI)
-     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
-     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
-     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
-     include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
-   endif()
-
-   if(QUDA_ARPACK_LOGGING)
-     # ARPACK-NG does not suppport logging - we must warn the user
-     message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
-     add_definitions(-DARPACK_LOGGING)
-   endif()
+  if(QUDA_ARPACK_LOGGING)
+    # ARPACK-NG does not suppport logging - we must warn the user
+    message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
+    add_definitions(-DARPACK_LOGGING)
+  endif()
 endif(QUDA_ARPACK)
 
 # set which precisions to enable
