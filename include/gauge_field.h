@@ -149,79 +149,79 @@ namespace quda {
   class GaugeField : public LatticeField {
 
   protected:
-    size_t bytes; // bytes allocated per full field
-    size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
-    size_t phase_bytes;  // bytes needed to store the phases
-    size_t length;
-    size_t real_length;
-    int nColor;
-    int nFace;
-    QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
+      size_t bytes;        // bytes allocated per full field
+      size_t phase_offset; // offset in bytes to gauge phases - useful to keep track of texture alignment
+      size_t phase_bytes;  // bytes needed to store the phases
+      size_t length;
+      size_t real_length;
+      int nColor;
+      int nFace;
+      QudaFieldGeometry geometry; // whether the field is a scale, vector or tensor
 
-    QudaReconstructType reconstruct;
-    int nInternal; // number of degrees of freedom per link matrix
-    QudaGaugeFieldOrder order;
-    QudaGaugeFixed fixed;
-    QudaLinkType link_type;
-    QudaTboundary t_boundary;
+      QudaReconstructType reconstruct;
+      int nInternal; // number of degrees of freedom per link matrix
+      QudaGaugeFieldOrder order;
+      QudaGaugeFixed fixed;
+      QudaLinkType link_type;
+      QudaTboundary t_boundary;
 
-    double anisotropy;
-    double tadpole;
-    double fat_link_max;
+      double anisotropy;
+      double tadpole;
+      double fat_link_max;
 
-    QudaFieldCreate create; // used to determine the type of field created
+      QudaFieldCreate create; // used to determine the type of field created
 
-    mutable void *ghost[2*QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
+      mutable void *ghost[2 * QUDA_MAX_DIM]; // stores the ghost zone of the gauge field (non-native fields only)
 
-    mutable int ghostFace[QUDA_MAX_DIM];// the size of each face
+      mutable int ghostFace[QUDA_MAX_DIM]; // the size of each face
 
-    /**
-       The staggered phase convention to use
-    */
-    QudaStaggeredPhase staggeredPhaseType;
+      /**
+         The staggered phase convention to use
+      */
+      QudaStaggeredPhase staggeredPhaseType;
 
-    /**
-       Whether the staggered phase factor has been applied
-    */
-    bool staggeredPhaseApplied;
+      /**
+         Whether the staggered phase factor has been applied
+      */
+      bool staggeredPhaseApplied;
 
-    /**
-       @brief Exchange the buffers across all dimensions in a given direction
-       @param[out] recv Receive buffer
-       @param[in] send Send buffer
-       @param[in] dir Direction in which we are sending (forwards OR backwards only)
-    */
-    void exchange(void **recv, void **send, QudaDirection dir) const;
+      /**
+         @brief Exchange the buffers across all dimensions in a given direction
+         @param[out] recv Receive buffer
+         @param[in] send Send buffer
+         @param[in] dir Direction in which we are sending (forwards OR backwards only)
+      */
+      void exchange(void **recv, void **send, QudaDirection dir) const;
 
-    /**
-       Imaginary chemical potential
-    */
-    double i_mu;
+      /**
+         Imaginary chemical potential
+      */
+      double i_mu;
 
-    /**
-       Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
-    */
-    size_t site_offset;
+      /**
+         Offset into MILC site struct to the desired matrix field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+      */
+      size_t site_offset;
 
-    /**
-       Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
-    */
-    size_t site_size;
+      /**
+         Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+      */
+      size_t site_size;
 
-    /**
-       Compute the required extended ghost zone sizes and offsets
-       @param[in] R Radius of the ghost zone
-       @param[in] no_comms_fill If true we create a full halo
-       regardless of partitioning
-       @param[in] bidir Is this a bi-directional exchange - if not
-       then we alias the fowards and backwards offsetss
-    */
-    void createGhostZone(const int *R, bool no_comms_fill, bool bidir=true) const;
+      /**
+         Compute the required extended ghost zone sizes and offsets
+         @param[in] R Radius of the ghost zone
+         @param[in] no_comms_fill If true we create a full halo
+         regardless of partitioning
+         @param[in] bidir Is this a bi-directional exchange - if not
+         then we alias the fowards and backwards offsetss
+      */
+      void createGhostZone(const int *R, bool no_comms_fill, bool bidir = true) const;
 
-    /**
-       @brief Set the vol_string and aux_string for use in tuning
-    */
-    void setTuningString();
+      /**
+         @brief Set the vol_string and aux_string for use in tuning
+      */
+      void setTuningString();
 
   public:
     GaugeField(const GaugeFieldParam &param);

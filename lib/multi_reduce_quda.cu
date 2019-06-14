@@ -930,9 +930,9 @@ namespace quda {
         if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
           disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
-          if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
+          if (x.size() == 1 || y.size() == 1) { // 1-d reduction
 
-	    max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
+            max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
 
 	    // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size; tile_size++) {
@@ -940,9 +940,9 @@ namespace quda {
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
-	  } else { // 2-d reduction
+          } else { // 2-d reduction
 
-	    // max_tile_size should be set to the largest power of 2 less than
+            // max_tile_size should be set to the largest power of 2 less than
 	    // MAX_MULTI_BLAS_N, since we have a requirement that the
 	    // tile size is a power of 2.
 	    unsigned int max_count = 0;
@@ -965,10 +965,9 @@ namespace quda {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, MAX_MULTI_BLAS_N);
             }
-
           }
 
-      	  enableProfileCount();
+          enableProfileCount();
       	  setPolicyTuning(true);
         }
       }

@@ -314,22 +314,24 @@ namespace quda
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
 
-    // Perform Sum_i (L_i * (\sigma_i)^{-1} * (L_i)^dag) + (R_i * (\sigma_i)^{-1} * R_i)^dag) * vec = vec_defl
+    // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
 
-    // 1. Take block inner product: (R_i)^dag * vec = A_i
+    // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs_ptr;
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
     Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
     blas::cDotProduct(s, left_vecs_ptr, vec);
 
-    // 2. Perform block caxpy: L_i * (\sigma_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
-    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    // 2. Perform block caxpy
+    //    A_i -> (\sigma_i)^{-1} * A_i
+    //    vec_defl = Sum_i (R_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
     std::vector<ColorSpinorField *> right_vecs_ptr;
-    for (int i = 0; i < n_defl; i++) right_vecs_ptr.push_back(eig_vecs[i]);
+    for (int i = 0; i < n_defl; i++) {
+      right_vecs_ptr.push_back(eig_vecs[i]);
+      s[i] /= evals[i].real();
+    }
     blas::caxpy(s, right_vecs_ptr, vec_defl);
 
     // FIXME - we can optimize the zeroing out with a "multi-caxy"

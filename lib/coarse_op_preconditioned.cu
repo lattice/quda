@@ -37,10 +37,10 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/coarse_op_preconditioned.cuh");
 #endif
-      }
+        }
       strcpy(aux, compile_type_str(meta));
       strcat(aux, comm_dim_partitioned_string());
-    }
+      }
     virtual ~CalculateYhat() { }
 
     void apply(const cudaStream_t &stream) {
