@@ -384,7 +384,7 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
   for (int k = 0; k < Nsrc; k++) {

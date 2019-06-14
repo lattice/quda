@@ -69,11 +69,12 @@ public:
     inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
         const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
-      constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
-      constexpr bool improved = false;
 
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
 #ifdef BUILD_MILC_INTERFACE
+        constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+        constexpr bool improved = false;
+
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
             out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
@@ -87,6 +88,9 @@ public:
 #endif
       } else if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_TIFR) {
 #ifdef BUILD_TIFR_INTERFACE
+        constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+        constexpr bool improved = false;
+
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
             out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
