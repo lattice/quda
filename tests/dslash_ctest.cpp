@@ -1129,7 +1129,6 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
   return ss.str();
 }
 
-#ifndef USE_LEGACY_DSLASH
 #ifdef MULTI_GPU
 INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
     Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
@@ -1139,18 +1138,4 @@ INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
     Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
         ::testing::Values(0)),
     getdslashtestname);
-#endif
-
-#else
-
-#ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-    Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
-    getdslashtestname);
-#else
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-    Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-        ::testing::Values(0)),
-    getdslashtestname);
-#endif
 #endif

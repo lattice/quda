@@ -25,10 +25,6 @@ set (QUDA_OBJS
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
-  dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
-  dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
-  dslash_twisted_clover.cu dslash_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu
   dslash4_staggered.cu dslash4_improved_staggered.cu
   dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
   dslash4_wilson_clover_preconditioned.cu 
@@ -36,7 +32,7 @@ set (QUDA_OBJS
   dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
   dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
   dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
-  dslash_pack.cu dslash_pack2.cu
+  dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
@@ -71,10 +67,6 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 # cmake-format: on
-
-if(QUDA_LEGACY_DSLASH)
-  list(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
-endif()
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
@@ -123,7 +115,6 @@ else()
 endif()
 
 # include_directories
-target_include_directories(quda PRIVATE dslash_core)
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
@@ -249,10 +240,6 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.
 export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
 set(ConfigPackageLocation lib/cmake/quda/)
 install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
-
-add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                  COMMENT "Generating dslash_core files")
 
 add_custom_target(mpi_nvtx ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

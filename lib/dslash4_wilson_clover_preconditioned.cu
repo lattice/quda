@@ -1,5 +1,3 @@
-#ifndef USE_LEGACY_DSLASH
-
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 #include <clover_field.h>
@@ -179,5 +177,3 @@ public:
   }
 
 } // namespace quda
-
-#endif

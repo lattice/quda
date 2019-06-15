@@ -1,5 +1,3 @@
-#ifndef USE_LEGACY_DSLASH
-
 #include <dslash.h>
 #include <worker.h>
 #include <dslash_helper.cuh>
@@ -211,5 +209,3 @@ public:
   }
 
 } // namespace quda
-
-#endif

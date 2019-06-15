@@ -784,12 +784,7 @@ namespace quda {
       }
     }
 
-#ifdef USE_LEGACY_DSLASH
-    const int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
-    packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
-#else
     PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, *stream);
-#endif
 
 #else
     errorQuda("packGhost not built on single-GPU build");
