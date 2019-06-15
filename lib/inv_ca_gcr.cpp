@@ -27,6 +27,13 @@ namespace quda {
       if (rp) delete rp;
     }
 
+    if (deflate_init) {
+      for (auto veci : param.evecs)
+        if (veci) delete veci;
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+    }
+
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -75,6 +82,10 @@ namespace quda {
           q[i] = ColorSpinorField::Create(csParam);
         }
       }
+
+      // Once the GCR operator is called, we are able to construct an appropriate
+      // Krylov space for deflation
+      if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
 
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -197,6 +208,24 @@ namespace quda {
       r2 = b2;
       blas::copy(r, b);
       blas::zero(x);
+    }
+
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `defl_tmp2` as a temp.
+      blas::copy(*defl_tmp2[0], r);
+      rhs.push_back(defl_tmp2[0]);
+
+      // Deflate: Hardcoded to SVD
+      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0]);
+      r2 = blas::xmyNorm(*rhs[0], r);
+
+      // defl_tmp must be added to the solution at the end
+      blas::axpy(1.0, *defl_tmp1[0], x);
     }
 
     // Check to see that we're not trying to invert on a zero-field source

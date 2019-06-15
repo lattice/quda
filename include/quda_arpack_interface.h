@@ -94,7 +94,7 @@ extern int ARPACK(mcinitdebug)(int *, int *, int *, int *, int *, int *, int *, 
 extern int ARPACK(initlog)(int *, char *, int);
 extern int ARPACK(finilog)(int *);
 #endif
-  
+
 #ifdef __cplusplus
 }
 #endif

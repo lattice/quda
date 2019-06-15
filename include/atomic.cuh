@@ -127,7 +127,6 @@ static inline __device__ char2 atomicAdd(char2 *addr, char2 val){
    @brief Implementation of single-precision atomic max using compare
    and swap. May not support NaNs properly...
 
-
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
