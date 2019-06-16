@@ -25,13 +25,13 @@ set (QUDA_OBJS
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
-  dslash4_staggered.cu dslash4_improved_staggered.cu
-  dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
-  dslash4_wilson_clover_preconditioned.cu 
-  dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
-  dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
-  dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
-  dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
+  dslash_staggered.cu dslash_improved_staggered.cu
+  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
+  dslash_wilson_clover_preconditioned.cu 
+  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
+  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
+  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
+  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
