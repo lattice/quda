@@ -88,7 +88,8 @@ namespace quda
           }
         }
         if (param.mg_global.num_setup_iter[param.level] > 0) {
-          if (strcmp(param.mg_global.vec_infile[param.level], "") != 0) { // only load if infile is defined and not computing
+          if (strcmp(param.mg_global.vec_infile[param.level], "")
+              != 0) { // only load if infile is defined and not computing
             loadVectors(param.B);
           } else if (param.mg_global.use_eig_solver[param.level]) {
             generateEigenVectors(); // Run the eigensolver
@@ -96,7 +97,8 @@ namespace quda
             generateNullVectors(param.B);
           }
         }
-      } else if (strcmp(param.mg_global.vec_infile[param.level], "") != 0) { // only load if infile is defined and not computing
+      } else if (strcmp(param.mg_global.vec_infile[param.level], "")
+                 != 0) { // only load if infile is defined and not computing
         if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
       } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
 
@@ -463,7 +465,8 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
-            param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile[param.level + 1], "") != 0)) {
+            param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_YES
+            && (strcmp(param.mg_global.vec_infile[param.level + 1], "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile[param.level + 1]);
           vec_infile += "_level_";
           vec_infile += std::to_string(param.level + 1);
@@ -473,7 +476,8 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
-            param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile[param.level + 1], "") != 0)) {
+            param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_YES
+            && (strcmp(param.mg_global.vec_outfile[param.level + 1], "") != 0)) {
           std::string vec_outfile(param.mg_global.vec_outfile[param.level + 1]);
           vec_outfile += "_level_";
           vec_outfile += std::to_string(param.level + 1);

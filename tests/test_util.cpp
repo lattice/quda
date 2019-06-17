@@ -1912,7 +1912,8 @@ void usage(char** argv )
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
-  printf("    --mg-load-vec <level file>                # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
+  printf("    --mg-load-vec <level file>                # Load the vectors \"file\" for the multigrid_test (requires "
+         "QIO)\n");
   printf("    --mg-save-vec <level file>                # Save the generated null-space vectors \"file\" from the "
          "multigrid_test (requires QIO)\n");
   printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
@@ -3524,17 +3525,15 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-load-vec") == 0){
-    if (i+2 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
+    if (i + 2 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
     if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
       printf("ERROR: invalid multigrid level %d", level);
       usage(argv);
     }
     i++;
 
-    strcpy(mg_vec_infile[level], argv[i+1]);
+    strcpy(mg_vec_infile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3544,13 +3543,13 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    int level = atoi(argv[i+1]);
+    int level = atoi(argv[i + 1]);
     if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
       printf("ERROR: invalid multigrid level %d", level);
       usage(argv);
     }
     i++;
-    strcpy(mg_vec_outfile[level], argv[i+1]);
+    strcpy(mg_vec_outfile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;

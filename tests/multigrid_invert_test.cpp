@@ -491,11 +491,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  for (int i=0; i<mg_param.n_level; i++) {
+  for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
     strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i],"")!=0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
-    if (strcmp(mg_param.vec_outfile[i],"")!=0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
   }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
