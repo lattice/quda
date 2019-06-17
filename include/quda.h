@@ -624,19 +624,19 @@ extern "C" {
     QudaBoolean run_oblique_proj_check;
 
     /** Whether to load the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_load;
+    QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix where to load the null-space vectors */
-    char vec_infile[256];
+    char vec_infile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to store the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_store;
+    QudaBoolean vec_store[QUDA_MAX_MG_LEVEL];
+
+    /** Filename prefix for where to save the null-space vectors */
+    char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
-
-    /** Filename prefix for where to save the null-space vectors */
-    char vec_outfile[256];
 
     /** The Gflops rate of the multigrid solver setup */
     double gflops;

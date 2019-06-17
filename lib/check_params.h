@@ -776,13 +776,15 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
 #endif
 
+  for (int i = 0; i < n_level - 1; i++) {
 #ifdef INIT_PARAM
-  P(vec_load, QUDA_BOOLEAN_INVALID);
-  P(vec_store, QUDA_BOOLEAN_INVALID);
+    P(vec_load[i], QUDA_BOOLEAN_INVALID);
+    P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #else
-  P(vec_load, QUDA_BOOLEAN_NO);
-  P(vec_store, QUDA_BOOLEAN_NO);
+    P(vec_load[i], QUDA_BOOLEAN_NO);
+    P(vec_store[i], QUDA_BOOLEAN_NO);
 #endif
+  }
 
 #ifdef INIT_PARAM
   P(gflops, 0.0);
