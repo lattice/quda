@@ -41,9 +41,9 @@ protected:
 
 public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_wilson.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_wilson.cuh"),
+      arg(arg),
+      in(in)
     {
     }
 
@@ -65,15 +65,15 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
 
     inline WilsonApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       WilsonArg<Float, nColor, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
       Wilson<Float, nDim, nColor, WilsonArg<Float, nColor, recon>> wilson(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(
+        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
       policy.apply(0);
 
       checkCudaError();
@@ -84,7 +84,7 @@ public:
   // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the a normalization for the Wilson operator.
   void ApplyWilson(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                   const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_WILSON_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");

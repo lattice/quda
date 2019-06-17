@@ -37,9 +37,9 @@ protected:
 
 public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
+      arg(arg),
+      in(in)
     {
     }
 
@@ -90,8 +90,8 @@ public:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (2 * num_dir * mv_flops + // SU(3) matrix-vector multiplies
-                     (2 * num_dir - 1) * 2 * in.Ncolor() * in.Nspin())
-            * sites;                                // accumulation
+                  (2 * num_dir - 1) * 2 * in.Ncolor() * in.Nspin())
+          * sites;                                  // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites; // axpy is always on interior
 
         if (arg.kernel_type == KERNEL_POLICY) break;
@@ -114,8 +114,8 @@ public:
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
       int ghost_bytes = 3 * (spinor_bytes + gauge_bytes_long) + (spinor_bytes + gauge_bytes_fat)
-          + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
-      int num_dir = 2 * 4;        // set to 4-d since we take care of 5-d fermions in derived classes where necessary
+        + 3 * 2 * spinor_bytes; // last term is the accumulator load/store through the face
+      int num_dir = 2 * 4;      // set to 4-d since we take care of 5-d fermions in derived classes where necessary
 
       long long bytes_ = 0;
 
@@ -133,9 +133,9 @@ public:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * (gauge_bytes_fat + gauge_bytes_long) + // gauge reads
-                     num_dir * 2 * spinor_bytes +                  // spinor reads
-                     spinor_bytes)
-            * sites; // spinor write
+                  num_dir * 2 * spinor_bytes +                     // spinor reads
+                  spinor_bytes)
+          * sites; // spinor write
         if (arg.xpay) bytes_ += spinor_bytes;
 
         if (arg.kernel_type == KERNEL_POLICY) break;
@@ -160,8 +160,8 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
 
     inline ImprovedStaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
-        const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-        TimeProfile &profile)
+                                  const GaugeField &U, double a, const ColorSpinorField &x, int parity, bool dagger,
+                                  const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
       constexpr bool improved = true;
@@ -169,17 +169,18 @@ public:
       StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
       Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(
+        staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
       policy.apply(0);
 
       checkCudaError();
     }
   };
 
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                              const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
+                              const int *comm_override, TimeProfile &profile)
   {
 
 #ifdef GPU_STAGGERED_DIRAC
@@ -196,13 +197,13 @@ public:
     for (int i = 0; i < 4; i++) {
       if (comm_dim_partitioned(i) && (U.X()[i] < 6)) {
         errorQuda(
-            "ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
+          "ERROR: partitioned dimension with local size less than 6 is not supported in improved staggered dslash\n");
       }
     }
 
     // L must be first gauge field argument since we template on long reconstruct
-    instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(
-        out, in, L, U, a, x, parity, dagger, comm_override, profile);
+    instantiate<ImprovedStaggeredApply, StaggeredReconstruct>(out, in, L, U, a, x, parity, dagger, comm_override,
+                                                              profile);
 #else
     errorQuda("Staggered dslash has not been built");
 #endif

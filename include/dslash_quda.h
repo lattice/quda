@@ -479,7 +479,7 @@ namespace quda {
      @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
   */
   void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-		      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Apply the improved staggered dslash operator to a color-spinor field.
@@ -493,8 +493,9 @@ namespace quda {
      @param[in] dagger Whether we are applying the dagger or not
      @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
   */
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-			      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                              const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
+                              const int *comm_override, TimeProfile &profile);
 
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.
