@@ -1012,7 +1012,7 @@ namespace quda {
      @param seed Seed
      @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
-  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type);
+  void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Helper function for determining if the preconditioning

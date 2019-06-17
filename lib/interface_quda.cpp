@@ -2463,9 +2463,9 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
   cudaParam.setPrecision(eig_param->cuda_prec_ritz, eig_param->cuda_prec_ritz, true);
 
-  std::vector<Complex> evals(eig_param->nEv, 0.0);
+  std::vector<Complex> evals(eig_param->nConv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
+  for (int i = 0; i < eig_param->nConv; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
 
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
@@ -2530,7 +2530,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   delete d;
   delete dSloppy;
   delete dPre;
-  for (int i = 0; i < eig_param->nKr; i++) delete kSpace[i];
+  for (int i = 0; i < eig_param->nConv; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
@@ -5429,39 +5429,29 @@ void set_kernel_pack_t_(int* pack)
   setKernelPackT(pack_);
 }
 
-
-
-void gaussGaugeQuda(long seed)
+void gaussGaugeQuda(unsigned long long seed, double sigma)
 {
-#ifdef GPU_GAUGE_TOOLS
   profileGauss.TPSTART(QUDA_PROFILE_TOTAL);
 
-  profileGauss.TPSTART(QUDA_PROFILE_INIT);
-  if (!gaugePrecise)
-    errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
+  if (!gaugePrecise) errorQuda("Cannot generate Gauss GaugeField as there is no resident gauge field");
 
-  cudaGaugeField *data = nullptr;
-  data = gaugePrecise;
+  cudaGaugeField *data = gaugePrecise;
 
-  profileGauss.TPSTOP(QUDA_PROFILE_INIT);
+  GaugeFieldParam param(*data);
+  param.reconstruct = QUDA_RECONSTRUCT_12;
+  param.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField u(param);
 
   profileGauss.TPSTART(QUDA_PROFILE_COMPUTE);
-  RNG* randstates = new RNG(data->Volume(), seed, data->X());
-  randstates->Init();
-  quda::gaugeGauss(*data, *randstates);
-  randstates->Release();
-  delete randstates;
+  quda::gaugeGauss(*data, seed, sigma);
   profileGauss.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
-
   if (extendedGaugeResident) {
-    extendedGaugeResident = gaugePrecise;
-    extendedGaugeResident -> exchangeExtendedGhost(R,profileGauss,redundant_comms);
+    *extendedGaugeResident = *gaugePrecise;
+    extendedGaugeResident->exchangeExtendedGhost(R, profileGauss, redundant_comms);
   }
-#else
-  errorQuda("Gauge tools are not build");
-#endif
+
+  profileGauss.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 

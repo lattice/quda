@@ -463,6 +463,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined INIT_PARAM
   P(inv_type_precondition, QUDA_INVALID_INVERTER);
   P(preconditioner, 0);
+  P(deflation_op, 0);
   P(tol_precondition, INVALID_DOUBLE);
   P(maxiter_precondition, INVALID_INT);
   P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
@@ -778,13 +779,15 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
 #endif
 
+  for (int i = 0; i < n_level - 1; i++) {
 #ifdef INIT_PARAM
-  P(vec_load, QUDA_BOOLEAN_INVALID);
-  P(vec_store, QUDA_BOOLEAN_INVALID);
+    P(vec_load[i], QUDA_BOOLEAN_INVALID);
+    P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #else
-  P(vec_load, QUDA_BOOLEAN_NO);
-  P(vec_store, QUDA_BOOLEAN_NO);
+    P(vec_load[i], QUDA_BOOLEAN_NO);
+    P(vec_store[i], QUDA_BOOLEAN_NO);
 #endif
+  }
 
 #ifdef INIT_PARAM
   P(gflops, 0.0);

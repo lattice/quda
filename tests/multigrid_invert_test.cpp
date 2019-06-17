@@ -99,8 +99,8 @@ extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -491,10 +491,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
-  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+  }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
@@ -652,6 +654,9 @@ int main(int argc, char **argv)
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    strcpy(mg_vec_infile[i], "");
+    strcpy(mg_vec_outfile[i], "");
   }
   reliable_delta = 1e-4;
 
@@ -764,9 +769,6 @@ int main(int argc, char **argv)
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorOut = malloc(V * spinorSiteSize * sSize * inv_param.Ls);
 
-  // start the timer
-  double time0 = -((double)clock());
-
   // initialize the QUDA library
   initQuda(device);
 
@@ -787,12 +789,19 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
+  double *time = new double[Nsrc];
+  double *gflops = new double[Nsrc];
 
   for (int i = 0; i < Nsrc; i++) {
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     invertQuda(spinorOut, spinorIn, &inv_param);
+
+    time[i] = inv_param.secs;
+    gflops[i] = inv_param.gflops / inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+               inv_param.gflops / inv_param.secs);
   }
 
   rng->Release();
@@ -801,15 +810,28 @@ int main(int argc, char **argv)
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
 
+  auto mean_time = 0.0;
+  auto mean_time2 = 0.0;
+  auto mean_gflops = 0.0;
+  auto mean_gflops2 = 0.0;
+  for (int i = 0; i < Nsrc; i++) {
+    mean_time += time[i];
+    mean_time2 += time[i] * time[i];
+    mean_gflops += gflops[i];
+    mean_gflops2 += gflops[i] * gflops[i];
+  }
 
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
+  mean_time /= Nsrc;
+  mean_time2 /= Nsrc;
+  auto stddev_time = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time));
+  mean_gflops /= Nsrc;
+  mean_gflops2 /= Nsrc;
+  auto stddev_gflops = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops));
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
 
-  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
-             inv_param.gflops / inv_param.secs, 0.0);
+  delete[] time;
+  delete[] gflops;
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 

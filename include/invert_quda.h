@@ -544,7 +544,17 @@ namespace quda {
     */
     EigenSolver *eig_solve;
     bool deflate_init = false;
-    std::vector<ColorSpinorField *> defl_tmp;
+    std::vector<ColorSpinorField *> defl_tmp1;
+    std::vector<ColorSpinorField *> defl_tmp2;
+
+    /**
+       @brief Constructs the deflation space
+       @param[in] meta A sample ColorSpinorField with which to instantiate
+       the eigensolver
+       @param[in] mat The operator to eigensolve
+       @param[in] Whether to compute the SVD
+    */
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd);
 
     /**
      * Return flops
@@ -588,8 +598,6 @@ namespace quda {
      * @param r2_old_init [description]
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
-
-    void constructDeflationSpace();
 
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
@@ -844,9 +852,9 @@ namespace quda {
 
     /**
        @param K Preconditioner
-     */
-    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	SolverParam &param, TimeProfile &profile);
+    */
+    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+        TimeProfile &profile);
     virtual ~GCR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1016,7 +1024,7 @@ namespace quda {
     */
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
-  public:
+public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 

@@ -697,10 +697,6 @@ namespace quda {
     return k;
   }
 
-  constexpr int qv_pipe_l  = 8;
-  constexpr int zav_pipe_l = 8;
-
-
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
     const int ev_task_offset  = 16;

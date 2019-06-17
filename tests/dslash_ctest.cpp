@@ -88,7 +88,7 @@ const char *recon_str[] = {"r18", "r12", "r8"};
 double getTolerance(QudaPrecision prec)
 {
   switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 5e-2;
+  case QUDA_QUARTER_PRECISION: return 1e-1;
   case QUDA_HALF_PRECISION: return 1e-3;
   case QUDA_SINGLE_PRECISION: return 1e-4;
   case QUDA_DOUBLE_PRECISION: return 1e-11;
@@ -1129,7 +1129,6 @@ std::string getdslashtestname(testing::TestParamInfo<::testing::tuple<int, int, 
   return ss.str();
 }
 
-#ifndef USE_LEGACY_DSLASH
 #ifdef MULTI_GPU
 INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
     Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
@@ -1139,18 +1138,4 @@ INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
     Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
         ::testing::Values(0)),
     getdslashtestname);
-#endif
-
-#else
-
-#ifdef MULTI_GPU
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-    Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
-    getdslashtestname);
-#else
-INSTANTIATE_TEST_SUITE_P(QUDA, DslashTest,
-    Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-        ::testing::Values(0)),
-    getdslashtestname);
-#endif
 #endif

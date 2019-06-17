@@ -418,12 +418,12 @@ namespace quda {
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-        	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-	cudaTextureDesc texDesc;
-	memset(&texDesc, 0, sizeof(texDesc));
-	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+        cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
 	else texDesc.readMode = cudaReadModeElementType;
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
@@ -432,12 +432,12 @@ namespace quda {
 	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-        	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
-	cudaCreateTextureObject(&ghostTex[2+b], &resDesc, &texDesc, NULL);
+        cudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
 
-	if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-	  cudaChannelFormatDesc desc;
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
+          cudaChannelFormatDesc desc;
 	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
 	  desc.f = cudaChannelFormatKindFloat;
 	  desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
@@ -455,21 +455,21 @@ namespace quda {
           }
 
           cudaTextureDesc texDesc;
-	  memset(&texDesc, 0, sizeof(texDesc));
-	  texDesc.readMode = cudaReadModeElementType;
+          memset(&texDesc, 0, sizeof(texDesc));
+          texDesc.readMode = cudaReadModeElementType;
 
-	  cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
+          cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 
 	  resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
             errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                       resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
           }
-          cudaCreateTextureObject(&ghostTexNorm[2+b], &resDesc, &texDesc, NULL);
+          cudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
         }
 
         ghost_field_tex[b] = ghost_recv_buffer_d[b];
-	ghost_field_tex[2+b] = ghost_pinned_recv_buffer_hd[b];
+        ghost_field_tex[2 + b] = ghost_pinned_recv_buffer_hd[b];
       } // buffer index
 
       ghostTexInit = true;
@@ -784,12 +784,7 @@ namespace quda {
       }
     }
 
-#ifdef USE_LEGACY_DSLASH
-    const int face_num = (dir == QUDA_BACKWARDS) ? 0 : (dir == QUDA_FORWARDS) ? 1 : 2;
-    packFace(packBuffer, *this, location_label, nFace, dagger, parity, dim, face_num, *stream, a, b);
-#else
     PackGhost(packBuffer, *this, location_label, nFace, dagger, parity, spin_project, a, b, c, *stream);
-#endif
 
 #else
     errorQuda("packGhost not built on single-GPU build");

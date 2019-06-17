@@ -1,5 +1,3 @@
-#ifndef USE_LEGACY_DSLASH
-
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
@@ -299,5 +297,3 @@ public:
   }
 
 } // namespace quda
-
-#endif

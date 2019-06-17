@@ -626,19 +626,19 @@ extern "C" {
     QudaBoolean run_oblique_proj_check;
 
     /** Whether to load the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_load;
+    QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix where to load the null-space vectors */
-    char vec_infile[256];
+    char vec_infile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to store the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_store;
+    QudaBoolean vec_store[QUDA_MAX_MG_LEVEL];
+
+    /** Filename prefix for where to save the null-space vectors */
+    char vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
-
-    /** Filename prefix for where to save the null-space vectors */
-    char vec_outfile[256];
 
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
@@ -768,11 +768,11 @@ extern "C" {
    */
   void endQuda(void);
 
-/**
- * @brief update the radius for halos.
- * @details This should only be needed for automated testing when
- * different partitioning is applied within a single run.
- */
+  /**
+   * @brief update the radius for halos.
+   * @details This should only be needed for automated testing when
+   * different partitioning is applied within a single run.
+   */
   void updateR();
 
   /**
@@ -1204,10 +1204,17 @@ extern "C" {
                             QudaGaugeParam* param);
 
   /**
-   * Generate Gaussian distributed gauge field
-   * @param seed Seed
-   */
-  void gaussGaugeQuda(long seed);
+     @brief Generate Gaussian distributed fields and store in the
+     resident gauge field.  We create a Gaussian-distributed su(n)
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and sigma = 1 has
+     maximum disorder).
+
+     @param seed The seed used for the RNG
+     @param sigma Width of Gaussian distrubution
+  */
+  void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
@@ -1232,8 +1239,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param,
-                             unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
