@@ -545,9 +545,7 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
 
-  // printfQuda("Fat links sending...");
   loadGaugeQuda(milc_fatlink_gpu, &gaugeParam);
-  // printfQuda("Fat links sent\n");
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
 
@@ -558,11 +556,11 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-        QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
-  }
+      QUDA_RECONSTRUCT_13 :
+      (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
 
-  // printfQuda("Sending fields to GPU...");
+    loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
+  }
 
   ColorSpinorParam csParam;
   csParam.nColor = 3;
