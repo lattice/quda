@@ -52,17 +52,8 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDomainWall4D(out, in, *gauge, 0.0, 0.0, nullptr, nullptr, in, parity, dagger, commDim, profile);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 0, profile);
-#endif
+
     flops += 1320LL*(long long)in.Volume();
   }
   
@@ -72,17 +63,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS_PRE);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 1, profile);
-#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -97,17 +78,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, DSLASH5_MOBIUS);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 2, profile);
-#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -123,17 +94,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, x, parity, dagger, commDim, profile);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, &static_cast<const cudaColorSpinorField &>(x), mass, k, b5_, c5_, m5, commDim, 0, profile);
-#endif
 
     flops += (1320LL+48LL)*(long long)in.Volume();
   }
@@ -145,17 +106,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS_PRE);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, &static_cast<const cudaColorSpinorField &>(x), mass, k, b5_, c5_, m5, commDim, 1, profile);
-#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -171,17 +122,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, DSLASH5_MOBIUS);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, &static_cast<const cudaColorSpinorField &>(x), mass, k, b5_, c5_, m5, commDim, 2, profile);
-#endif
 
     long long Ls = in.X(4);
     long long bulk = (Ls-2)*(in.Volume()/Ls);
@@ -198,7 +139,6 @@ namespace quda {
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
 
-#ifndef USE_LEGACY_DSLASH
     ColorSpinorField *tmp = nullptr;
     if (tmp2 && tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET) tmp = tmp2;
     bool reset = newTmp(&tmp, in);
@@ -214,26 +154,6 @@ namespace quda {
     flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall; // pre
     flops += 1320LL * (long long)in.Volume();                            // dslash4
     flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall; // dslash5
-#else
-    ColorSpinorField *tmp = nullptr;
-    if (tmp2) {
-      if (tmp2->SiteSubset() == QUDA_FULL_SITE_SUBSET)
-        tmp = &(tmp2->Even());
-      else
-        tmp = tmp2;
-    }
-    bool reset = newTmp(&tmp, in.Even());
-
-    Dslash4pre(out.Odd(), in.Even(), QUDA_EVEN_PARITY);
-    Dslash4(*tmp, out.Odd(), QUDA_ODD_PARITY);
-    Dslash5(out.Odd(), in.Odd(), QUDA_ODD_PARITY);
-    blas::axpy(-kappa_b, *tmp, out.Odd());
-
-    Dslash4pre(out.Even(), in.Odd(), QUDA_ODD_PARITY);
-    Dslash4(*tmp, out.Even(), QUDA_EVEN_PARITY);
-    Dslash5(out.Even(), in.Even(), QUDA_EVEN_PARITY);
-    blas::axpy(-kappa_b, *tmp, out.Even());
-#endif
 
     deleteTmp(&tmp, reset);
   }
@@ -288,17 +208,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, in, mass, m5, b_5, c_5, 0.0, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, 0, mass, 0, b5_, c5_, m5, commDim, 3, profile);
-#endif
 
     if (0) {
       // M5 = 1 + 0.5*kappa_b/kappa_c * D5
@@ -321,17 +231,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyDslash5(out, in, x, mass, m5, b_5, c_5, k, dagger, zMobius ? M5_INV_ZMOBIUS : M5_INV_MOBIUS);
-#else
-    double b5_[QUDA_MAX_DWF_LS], c5_[QUDA_MAX_DWF_LS];
-    for (int i = 0; i < Ls; i++) {
-      b5_[i] = b_5[i].real();
-      c5_[i] = c_5[i].real();
-    }
-    MDWFDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, &static_cast<const cudaColorSpinorField &>(in),
-        parity, dagger, &static_cast<const cudaColorSpinorField &>(x), mass, k, b5_, c5_, m5, commDim, 3, profile);
-#endif
 
     long long Ls = in.X(4);
     flops +=  (144LL*Ls + 48LL)*(long long)in.Volume() + 3LL*Ls*(Ls-1LL);

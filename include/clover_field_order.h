@@ -353,6 +353,40 @@ namespace quda {
       }
     };
 
+    /*
+      FIXME the below is the old optimization used for reading the
+      clover field, making use of the symmetry to reduce the number of
+      reads.  Also note the rho scaling on the diagonal which needed
+      for BQCD
+
+#define READ_CLOVER2_DOUBLE_STR(clover_, chi)                           \
+    double2 C0, C1, C2, C3, C4, C5, C6, C7, C8, C9;                       \
+    double2 C10, C11, C12, C13, C14, C15, C16, C17;                       \
+    double2* clover = (double2*)clover_;                                  \
+    load_streaming_double2(C0, &clover[sid + (18*chi+0)*param.cl_stride]); \
+    load_streaming_double2(C1, &clover[sid + (18*chi+1)*param.cl_stride]); \
+    double diag = 0.5*(C0.x + C1.y);                                      \
+    double diag_inv = 1.0/diag;                                           \
+    C2 = make_double2(diag*(2-C0.y*diag_inv), diag*(2-C1.x*diag_inv));    \
+    load_streaming_double2(C3, &clover[sid + (18*chi+3)*param.cl_stride]);        \
+    load_streaming_double2(C4, &clover[sid + (18*chi+4)*param.cl_stride]);        \
+    load_streaming_double2(C5, &clover[sid + (18*chi+5)*param.cl_stride]);        \
+    load_streaming_double2(C6, &clover[sid + (18*chi+6)*param.cl_stride]);        \
+    load_streaming_double2(C7, &clover[sid + (18*chi+7)*param.cl_stride]);        \
+    load_streaming_double2(C8, &clover[sid + (18*chi+8)*param.cl_stride]);        \
+    load_streaming_double2(C9, &clover[sid + (18*chi+9)*param.cl_stride]);        \
+    load_streaming_double2(C10, &clover[sid + (18*chi+10)*param.cl_stride]);      \
+    load_streaming_double2(C11, &clover[sid + (18*chi+11)*param.cl_stride]);      \
+    load_streaming_double2(C12, &clover[sid + (18*chi+12)*param.cl_stride]);      \
+    load_streaming_double2(C13, &clover[sid + (18*chi+13)*param.cl_stride]);      \
+    load_streaming_double2(C14, &clover[sid + (18*chi+14)*param.cl_stride]); \
+    C15 = make_double2(-C3.x,-C3.y);                                      \
+    C16 = make_double2(-C4.x,-C4.y);                                      \
+    C17 = make_double2(-C8.x,-C8.y);                                      \
+    C0.x += param.rho; C0.y += param.rho; C1.x += param.rho;              \
+    C1.y += param.rho; C2.x += param.rho; C2.y += param.rho;
+    */
+
     /**
        This is a template driven generic clover field accessor.  To
        deploy for a specifc field ordering, the two operator()

@@ -3,8 +3,6 @@
 #include <iostream>
 #include <multigrid.h>
 
-#define NEW_DSLASH
-
 namespace quda {
 
   DiracTwistedMass::DiracTwistedMass(const DiracParam &param, const int nDim) :
@@ -51,25 +49,12 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // this would really just be a Wilson dslash (not actually instantiated at present)
-#ifndef USE_LEGACY_DSLASH
       ApplyTwistedMass(out, in, *gauge, 0.0, 2 * mu * kappa, in, parity, dagger, commDim, profile);
-#else
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, 0, QUDA_DEG_DSLASH_TWIST_XPAY, 2 * kappa * mu,
-          -kappa, 0.0, 0.0, commDim, profile);
-#endif
       flops += 1392ll * in.Volume();
     } else {
       // this would really just be a 2-way vectorized Wilson dslash (not actually instantiated at present)
-#ifndef USE_LEGACY_DSLASH
       ApplyNdegTwistedMass(
           out, in, *gauge, 0.0, 2 * mu * kappa, -2 * kappa * epsilon, in, parity, dagger, commDim, profile);
-
-#else
-      ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, 0, QUDA_NONDEG_DSLASH, -2.0 * kappa * mu,
-          -2.0 * kappa * epsilon, 1.0, 0.0, commDim, profile);
-#endif
       flops += (1440ll) * in.Volume();
     }
   }
@@ -80,24 +65,11 @@ namespace quda {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
-#ifndef USE_LEGACY_DSLASH
       ApplyTwistedMass(out, in, *gauge, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
-#else
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, &static_cast<const cudaColorSpinorField &>(x),
-          QUDA_DEG_DSLASH_TWIST_XPAY, 2 * kappa * mu, k, 0.0, 0.0, commDim, profile);
-#endif
       flops += 1416ll * in.Volume();
     } else {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5*tau_3 - 2*epsilon*kappa*tau_1) * x
-#ifndef USE_LEGACY_DSLASH
       ApplyNdegTwistedMass(out, in, *gauge, k, 2 * mu * kappa, -2 * kappa * epsilon, x, parity, dagger, commDim, profile);
-
-#else
-      ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, &static_cast<const cudaColorSpinorField &>(x),
-          QUDA_NONDEG_DSLASH, -2.0 * kappa * mu, -2.0 * kappa * epsilon, 1.0, k, commDim, profile);
-#endif
       flops += (1464ll) * in.Volume();
     }
   }
@@ -113,7 +85,6 @@ namespace quda {
       errorQuda("Twist flavor not set %d\n", in.TwistFlavor());
     }
 
-#ifndef USE_LEGACY_DSLASH
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       ApplyTwistedMass(out, in, *gauge, -kappa, 2 * mu * kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       flops += 1416ll * in.Volume();
@@ -122,10 +93,6 @@ namespace quda {
           dagger, commDim, profile);
       flops += (1464ll) * in.Volume();
     }
-#else
-    DiracTwistedMass::DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DiracTwistedMass::DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
-#endif
   }
 
   void DiracTwistedMass::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -202,50 +169,20 @@ namespace quda {
       double a = -2.0 * kappa * mu; // for inverse twist
       double b = 1.0 / (1.0 + a * a);
 
-#ifndef USE_LEGACY_DSLASH
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, false, in, parity, dagger, asymmetric, commDim, profile);
-#else
-      auto type
-          = (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ?
-          QUDA_DEG_DSLASH_TWIST_INV :
-          QUDA_DEG_TWIST_INV_DSLASH;
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, 0, type, a, b, 0.0, 0.0, commDim, profile);
-#endif
       flops += 1392ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     } else {//TWIST doublet :
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
       double c = 1.0 / (1.0 + a * a - b * b);
 
-#ifndef USE_LEGACY_DSLASH
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, c, -2.0 * mu * kappa, 2.0 * kappa * epsilon, false, in,
           parity, dagger, asymmetric, commDim, profile);
-#else
-      if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-        ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-            &static_cast<const cudaColorSpinorField &>(in), parity, dagger, 0, QUDA_NONDEG_DSLASH, a, b, c, 0.0,
-            commDim, profile);
-      } else {
-        ColorSpinorField *doubletTmp = 0;
-        bool reset = newTmp(&doubletTmp, in);
-
-        ApplyTwistGamma(*doubletTmp, in, 4, kappa, mu, epsilon, dagger, QUDA_TWIST_GAMMA5_INVERSE);
-
-        // this is just a vectorized Wilson dslash
-        ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-            &static_cast<const cudaColorSpinorField &>(*doubletTmp), parity, dagger, 0, QUDA_NONDEG_DSLASH, 0.0, 0.0,
-            1.0, 0.0, commDim, profile);
-
-        deleteTmp(&doubletTmp, reset);
-      }
-#endif
-      flops += (1440ll)
-          * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
+      flops += (1440ll) * in.Volume(); // flops are approx. since they will vary depending on the dagger or not
     }
   }
 
@@ -263,45 +200,20 @@ namespace quda {
     if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       double a = -2.0 * kappa * mu; // for inverse twist
       double b = k / (1.0 + a * a);
-#ifndef USE_LEGACY_DSLASH
       // asymmetric should never be true here since we never need to apply 1 + k * A^{-1} D^\dagger
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyTwistedMassPreconditioned(out, in, *gauge, b, a, true, x, parity, dagger, asymmetric, commDim, profile);
-#else
-      auto type = !dagger ? QUDA_DEG_DSLASH_TWIST_INV : QUDA_DEG_TWIST_INV_DSLASH;
-      twistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, &static_cast<const cudaColorSpinorField &>(x),
-          type, a, b, 0.0, 0.0, commDim, profile);
-#endif
       flops += 1416ll * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     } else {//TWIST_DOUBLET:
       double a = 2.0 * kappa * mu;
       double b = 2.0 * kappa * epsilon;
       double c = 1.0 / (1.0 + a * a - b * b);
 
-#ifndef USE_LEGACY_DSLASH
       bool asymmetric
           = (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) && dagger;
       ApplyNdegTwistedMassPreconditioned(out, in, *gauge, k * c, -2 * mu * kappa, 2 * kappa * epsilon, true, x, parity,
           dagger, asymmetric, commDim, profile);
-#else
-      if (!dagger) {
-        ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-            &static_cast<const cudaColorSpinorField &>(in), parity, dagger,
-            &static_cast<const cudaColorSpinorField &>(x), QUDA_NONDEG_DSLASH, a, b, k * c, 0.0, commDim, profile);
-      } else {
-        ColorSpinorField *doubletTmp = 0;
-        bool reset = newTmp(&doubletTmp, in);
-	ApplyTwistGamma(*doubletTmp, in, 4, kappa, mu, epsilon, dagger, QUDA_TWIST_GAMMA5_INVERSE);
-
-	// this is just a vectorized Wilson dslash
-        ndegTwistedMassDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge,
-            &static_cast<const cudaColorSpinorField &>(*doubletTmp), parity, dagger,
-            &static_cast<const cudaColorSpinorField &>(x), QUDA_NONDEG_DSLASH, 0.0, 0.0, k, 0.0, commDim, profile);
-        deleteTmp(&doubletTmp, reset);
-      }
-#endif
       flops += (1464ll)
           * in.Volume(); // flops numbers are approximate since they will vary depending on the dagger or not
     }

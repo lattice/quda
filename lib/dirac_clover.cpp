@@ -40,19 +40,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not implemented");
-    }
-#endif
-
     flops += 1872ll*in.Volume();
   }
 
@@ -60,19 +48,15 @@ namespace quda {
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1872ll * in.Volume();
-#else
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
-#endif
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -136,6 +120,7 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
@@ -149,18 +134,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, 0.0, in, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1824ll*in.Volume();
   }
 
@@ -172,19 +146,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1872ll*in.Volume();
   }
 
