@@ -68,7 +68,7 @@ namespace quda {
   {
     checkFullSpinor(out, in);
     ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1158ll*in.Volume();
+    flops += 1158ll * in.Volume();
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

@@ -37,9 +37,9 @@ protected:
 
 public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
+      arg(arg),
+      in(in)
     {
     }
 
@@ -65,7 +65,8 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {
 
     inline StaggeredApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                          const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                          TimeProfile &profile)
     {
 
       if (U.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
@@ -74,12 +75,12 @@ public:
         constexpr bool improved = false;
 
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
-            out, in, U, U, a, x, parity, dagger, comm_override);
+          out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
-            const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-            in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(
+          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
         policy.apply(0);
 #else
         errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
@@ -90,12 +91,12 @@ public:
         constexpr bool improved = false;
 
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
-            out, in, U, U, a, x, parity, dagger, comm_override);
+          out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-        dslash::DslashPolicyTune<decltype(staggered)> policy(staggered,
-            const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-            in.GhostFaceCB(), profile);
+        dslash::DslashPolicyTune<decltype(staggered)> policy(
+          staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
         policy.apply(0);
 #else
         errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
@@ -109,7 +110,7 @@ public:
   };
 
   void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 
 #ifdef GPU_STAGGERED_DIRAC

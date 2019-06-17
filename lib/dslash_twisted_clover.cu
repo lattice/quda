@@ -38,9 +38,9 @@ protected:
 
 public:
     TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"),
+      arg(arg),
+      in(in)
     {
     }
 
@@ -100,16 +100,16 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {
 
     inline TwistedCloverApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-        const CloverField &C, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-        const int *comm_override, TimeProfile &profile)
+                              const CloverField &C, double a, double b, const ColorSpinorField &x, int parity,
+                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       WilsonCloverArg<Float, nColor, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
       TwistedClover<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, true>> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-          in.GhostFaceCB(), profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(
+        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
       policy.apply(0);
 
       checkCudaError();
@@ -120,8 +120,8 @@ public:
   // out(x) = M*in = (A + i*b*gamma_5)*in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   // Uses the kappa normalization for the Wilson operator, with a = -kappa.
   void ApplyTwistedClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &C,
-      double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-      TimeProfile &profile)
+                          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
+                          const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_CLOVER_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");

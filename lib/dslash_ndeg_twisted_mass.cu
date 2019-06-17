@@ -38,9 +38,9 @@ protected:
 
 public:
     NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass.cuh"),
+      arg(arg),
+      in(in)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
     }
@@ -83,16 +83,16 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassApply {
 
     inline NdegTwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        double b, double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
-        TimeProfile &profile)
+                                double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+                                const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       NdegTwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
       NdegTwistedMass<Float, nDim, nColor, NdegTwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(
+        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
       checkCudaError();
@@ -100,7 +100,8 @@ public:
   };
 
   void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-      double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+                            double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                            TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");

@@ -39,9 +39,9 @@ protected:
 
 public:
     DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_domain_wall_4d.cuh"),
-        arg(arg),
-        in(in)
+      Dslash<Float>(arg, out, in, "kernels/dslash_domain_wall_4d.cuh"),
+      arg(arg),
+      in(in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
@@ -58,13 +58,13 @@ public:
       using namespace jitify::reflection;
       const auto kernel = DomainWall4DLaunch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
       auto instance = Dslash<Float>::program_->kernel(kernel).instantiate(
-          Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay, arg.kernel_type, Type<Arg>());
-      cuMemcpyHtoDAsync(
-          instance.get_constant_ptr("quda::mobius_d"), mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>), stream);
+        Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay, arg.kernel_type, Type<Arg>());
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>),
+                        stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(
-          mobius_d, mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
+      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
+                              streams[Nstream - 1]);
       Dslash<Float>::template instantiate<DomainWall4DLaunch, nDim, nColor>(tp, arg, stream);
 #endif
     }
@@ -78,16 +78,16 @@ public:
   template <typename Float, int nColor, QudaReconstructType recon> struct DomainWall4DApply {
 
     inline DomainWall4DApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-        double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
-        const int *comm_override, TimeProfile &profile)
+                             double m_5, const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity,
+                             bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
       DomainWall4DArg<Float, nColor, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger, comm_override);
       DomainWall4D<Float, nDim, nColor, DomainWall4DArg<Float, nColor, recon>> twisted(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(twisted)> policy(
+        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
       checkCudaError();
@@ -97,8 +97,8 @@ public:
   // Apply the 4-d preconditioned domain-wall Dslash operator
   // out(x) = M*in = in(x) + a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
   void ApplyDomainWall4D(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-      const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
-      const int *comm_override, TimeProfile &profile)
+                         const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
+                         const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
     if (in.V() == out.V()) errorQuda("Aliasing pointers");

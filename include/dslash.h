@@ -242,7 +242,8 @@ public:
         nDimComms(4),
         dslashParam(arg)
     {
-      if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU Fields not supported in Dslash framework yet");
+      if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
+        errorQuda("CPU Fields not supported in Dslash framework yet");
 
       // this sets the communications pattern for the packing kernel
       setPackComms(arg.commDim);
