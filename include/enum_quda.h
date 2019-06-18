@@ -130,10 +130,23 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_LANCZOS, //Normal Lanczos eigen solver
-    QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
-    QUDA_INVALID_TYPE = QUDA_INVALID_ENUM
+    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
+
+  /** S=smallest L=largest
+      R=real M=modulus I=imaniary **/
+  typedef enum QudaEigSpectrumType_s {
+    QUDA_SPECTRUM_SR_EIG,
+    QUDA_SPECTRUM_LR_EIG,
+    QUDA_SPECTRUM_SM_EIG,
+    QUDA_SPECTRUM_LM_EIG,
+    QUDA_SPECTRUM_SI_EIG,
+    QUDA_SPECTRUM_LI_EIG,
+    QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
+  } QudaEigSpectrumType;
 
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
@@ -420,6 +433,12 @@ extern "C" {
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaDeflatedGuess_s {
+    QUDA_DEFLATED_GUESS_NO,
+    QUDA_DEFLATED_GUESS_YES,
+    QUDA_DEFLATED_GUESS_INVALID = QUDA_INVALID_ENUM
+  } QudaDeflatedGuess;
+
   typedef enum QudaComputeNullVector_s {
     QUDA_COMPUTE_NULL_VECTOR_NO,
     QUDA_COMPUTE_NULL_VECTOR_YES,
@@ -474,19 +493,32 @@ extern "C" {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT,
-    QUDA_CONTRACT_PLUS,
-    QUDA_CONTRACT_MINUS,
-    QUDA_CONTRACT_GAMMA5,
-    QUDA_CONTRACT_GAMMA5_PLUS,
-    QUDA_CONTRACT_GAMMA5_MINUS,
-    QUDA_CONTRACT_TSLICE,
-    QUDA_CONTRACT_TSLICE_PLUS,
-    QUDA_CONTRACT_TSLICE_MINUS,
-    QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
+    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 
-  //Allows to choose an appropriate external library
+  typedef enum QudaContractGamma_s {
+    QUDA_CONTRACT_GAMMA_I = 0,
+    QUDA_CONTRACT_GAMMA_G1 = 1,
+    QUDA_CONTRACT_GAMMA_G2 = 2,
+    QUDA_CONTRACT_GAMMA_G3 = 3,
+    QUDA_CONTRACT_GAMMA_G4 = 4,
+    QUDA_CONTRACT_GAMMA_G5 = 5,
+    QUDA_CONTRACT_GAMMA_G1G5 = 6,
+    QUDA_CONTRACT_GAMMA_G2G5 = 7,
+    QUDA_CONTRACT_GAMMA_G3G5 = 8,
+    QUDA_CONTRACT_GAMMA_G4G5 = 9,
+    QUDA_CONTRACT_GAMMA_S12 = 10,
+    QUDA_CONTRACT_GAMMA_S13 = 11,
+    QUDA_CONTRACT_GAMMA_S14 = 12,
+    QUDA_CONTRACT_GAMMA_S21 = 13,
+    QUDA_CONTRACT_GAMMA_S23 = 14,
+    QUDA_CONTRACT_GAMMA_S34 = 15,
+    QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
+  } QudaContractGamma;
+
+  // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,
     QUDA_EIGEN_EXTLIB,

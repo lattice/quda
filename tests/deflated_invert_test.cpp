@@ -50,6 +50,7 @@ extern double epsilon;
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
+extern bool unit_gauge;
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
 extern int nvec[];
@@ -60,8 +61,8 @@ extern QudaInverterType precon_type;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char eig_vec_infile[];
+extern char eig_vec_outfile[];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -297,8 +298,8 @@ void setDeflationParam(QudaEigParam &df_param) {
   df_param.mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, vec_infile);
-  strcpy(df_param.vec_outfile, vec_outfile);
+  strcpy(df_param.vec_infile, eig_vec_infile);
+  strcpy(df_param.vec_outfile, eig_vec_outfile);
 }
 
 int main(int argc, char **argv)
@@ -393,11 +394,14 @@ int main(int argc, char **argv)
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    //generate a random SU(3) field
-    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    //generate a unit SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {

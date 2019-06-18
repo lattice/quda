@@ -1213,7 +1213,6 @@ namespace quda {
 
       //[25]
       theta  = acos(c0/c0_max);
-
       //[23]
       u_p = sqrt(c1*inv3)*cos(theta*inv3);
 
@@ -1309,6 +1308,84 @@ namespace quda {
       return;
     }
 
+    /**
+       Direct port of the TIFR expsu3 algorithm
+    */
+    template <typename Float> __device__ __host__ void expsu3(Matrix<complex<Float>, 3> &q)
+    {
+      typedef complex<Float> Complex;
+
+      Complex a2 = (q(3) * q(1) + q(7) * q(5) + q(6) * q(2) - (q(0) * q(4) + (q(0) + q(4)) * q(8))) / (Float)3.0;
+      Complex a3 = q(0) * q(4) * q(8) + q(1) * q(5) * q(6) + q(2) * q(3) * q(7) - q(6) * q(4) * q(2)
+        - q(3) * q(1) * q(8) - q(0) * q(7) * q(5);
+
+      Complex sg2h3 = sqrt(a3 * a3 - (Float)4. * a2 * a2 * a2);
+      Complex cp = exp(log((Float)0.5 * (a3 + sg2h3)) / (Float)3.0);
+      Complex cm = a2 / cp;
+
+      Complex r1 = exp(Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
+      Complex r2 = exp(-Complex(0.0, 1.0) * (Float)(2.0 * M_PI / 3.0));
+
+      Complex w1[3];
+
+      w1[0] = cm + cp;
+      w1[1] = r1 * cp + r2 * cm;
+      w1[2] = r2 * cp + r1 * cm;
+      Complex z1 = q(1) * q(6) - q(0) * q(7);
+      Complex z2 = q(3) * q(7) - q(4) * q(6);
+
+      Complex al = w1[0];
+      Complex wr21 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr31 = (al - q(0) - wr21 * q(3)) / q(6);
+
+      al = w1[1];
+      Complex wr22 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr32 = (al - q(0) - wr22 * q(3)) / q(6);
+
+      al = w1[2];
+      Complex wr23 = (z1 + al * q(7)) / (z2 + al * q(6));
+      Complex wr33 = (al - q(0) - wr23 * q(3)) / q(6);
+
+      z1 = q(3) * q(2) - q(0) * q(5);
+      z2 = q(1) * q(5) - q(4) * q(2);
+
+      al = w1[0];
+      Complex wl21 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl31 = conj((al - q(0) - conj(wl21) * q(1)) / q(2));
+
+      al = w1[1];
+      Complex wl22 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl32 = conj((al - q(0) - conj(wl22) * q(1)) / q(2));
+
+      al = w1[2];
+      Complex wl23 = conj((z1 + al * q(5)) / (z2 + al * q(2)));
+      Complex wl33 = conj((al - q(0) - conj(wl23) * q(1)) / q(2));
+
+      Complex xn1 = (Float)1. + wr21 * conj(wl21) + wr31 * conj(wl31);
+      Complex xn2 = (Float)1. + wr22 * conj(wl22) + wr32 * conj(wl32);
+      Complex xn3 = (Float)1. + wr23 * conj(wl23) + wr33 * conj(wl33);
+
+      Complex d1 = exp(w1[0]);
+      Complex d2 = exp(w1[1]);
+      Complex d3 = exp(w1[2]);
+      Complex y11 = d1 / xn1;
+      Complex y12 = d2 / xn2;
+      Complex y13 = d3 / xn3;
+      Complex y21 = wr21 * d1 / xn1;
+      Complex y22 = wr22 * d2 / xn2;
+      Complex y23 = wr23 * d3 / xn3;
+      Complex y31 = wr31 * d1 / xn1;
+      Complex y32 = wr32 * d2 / xn2;
+      Complex y33 = wr33 * d3 / xn3;
+      q(0) = y11 + y12 + y13;
+      q(1) = y21 + y22 + y23;
+      q(2) = y31 + y32 + y33;
+      q(3) = y11 * conj(wl21) + y12 * conj(wl22) + y13 * conj(wl23);
+      q(4) = y21 * conj(wl21) + y22 * conj(wl22) + y23 * conj(wl23);
+      q(5) = y31 * conj(wl21) + y32 * conj(wl22) + y33 * conj(wl23);
+      q(6) = y11 * conj(wl31) + y12 * conj(wl32) + y13 * conj(wl33);
+      q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
+      q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
+    }
 
 } // end namespace quda
-

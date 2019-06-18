@@ -126,9 +126,19 @@
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
-#define QUDA_LANCZOS 0 //Normal Lanczos eigen solver
-#define QUDA_IMP_RST_LANCZOS 1 //implicit restarted lanczos solver
-#define QUDA_INVALID_TYPE QUDA_INVALID_ENUM
+#define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
+#define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_INVALID QUDA_INVALID_ENUM
+
+#define QudaEigSpectrumType integer(4)
+#define QUDA_SPECTRUM_SR_EIG 0
+#define QUDA_SPECTRUM_LR_EIG 1
+#define QUDA_SPECTRUM_SM_EIG 2
+#define QUDA_SPECTRUM_LM_EIG 3
+#define QUDA_SPECTRUM_SI_EIG 4
+#define QUDA_SPECTRUM_LI_EIG 5
+#define QUDA_SPECTRUM_INVALID QUDA_INVALID_ENUM
 
 #define QudaSolutionType integer(4)
 #define QUDA_MAT_SOLUTION 0 
@@ -425,16 +435,29 @@
 #define QUDA_STAGGERED_PHASE_INVALID QUDA_INVALID_ENUM
 
 #define QudaContractType integer(4)
-#define QUDA_CONTRACT 0
-#define QUDA_CONTRACT_PLUS 1
-#define QUDA_CONTRACT_MINUS 2
-#define QUDA_CONTRACT_GAMMA5 3
-#define QUDA_CONTRACT_GAMMA5_PLUS 4
-#define QUDA_CONTRACT_GAMMA5_MINUS 5
-#define QUDA_CONTRACT_TSLICE 6
-#define QUDA_CONTRACT_TSLICE_PLUS 7
-#define QUDA_CONTRACT_TSLICE_MINUS 8
-#define QUDA_CONTRACT_INVALID QUDA_INVALID_ENUM
+#define QUDA_CONTRACT_TYPE_OPEN ,
+#define QUDA_CONTRACT_TYPE_DR ,
+#define QUDA_CONTRACT_TYPE_DP ,
+#define QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
+
+#define QudaContractGamma integer(4)
+#define QUDA_CONTRACT_GAMMA_I 0
+#define QUDA_CONTRACT_GAMMA_G1 1
+#define QUDA_CONTRACT_GAMMA_G2 2
+#define QUDA_CONTRACT_GAMMA_G3 3
+#define QUDA_CONTRACT_GAMMA_G4 4
+#define QUDA_CONTRACT_GAMMA_G5 5
+#define QUDA_CONTRACT_GAMMA_G1G5 6
+#define QUDA_CONTRACT_GAMMA_G2G5 7
+#define QUDA_CONTRACT_GAMMA_G3G5 8
+#define QUDA_CONTRACT_GAMMA_G4G5 9
+#define QUDA_CONTRACT_GAMMA_S12 10
+#define QUDA_CONTRACT_GAMMA_S13 11
+#define QUDA_CONTRACT_GAMMA_S14 12
+#define QUDA_CONTRACT_GAMMA_S21 13
+#define QUDA_CONTRACT_GAMMA_S23 14
+#define QUDA_CONTRACT_GAMMA_S34 15
+#define QUDA_CONTRACT_GAMMA_INVALID QUDA_INVALID_ENUM
 
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0

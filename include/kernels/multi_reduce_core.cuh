@@ -25,6 +25,13 @@ namespace quda
     static signed char *Bmatrix_h;
     static signed char *Cmatrix_h;
 
+#if CUDA_VERSION < 9000
+    // as a performance work around we put the argument struct into
+    // __constant__ memory to prevent the compiler from spilling
+    // registers on older CUDA
+    static __constant__ signed char arg_buffer[MAX_MATRIX_SIZE];
+#endif
+
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z,V
@@ -64,23 +71,32 @@ namespace quda
       }
     };
 
-    // 'sum' should be an array of length NXZ...?
-    template <int k, int NXZ, typename FloatN, int M, typename ReduceType, typename Arg>
-    __device__ inline void compute(vector_type<ReduceType, NXZ> &sum, Arg &arg, int idx, int parity)
+#ifdef WARP_MULTI_REDUCE
+    template <typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
+#else
+    template <int block_size, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
+#endif
+    __global__ void multiReduceKernel(Arg arg_)
     {
+#if CUDA_VERSION >= 9000
+      Arg &arg = arg_;
+#else
+      Arg &arg = *((Arg *)arg_buffer);
+#endif
+      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
+      unsigned int parity = blockIdx.z;
 
-      constexpr int kmod = k;
-      // there's an old warning about silencing an out-of-bounds compiler warning,
-      // but I never seem to get it, and I'd need to compare against NYW anyway,
-      // which we can't really get at here b/c it's not a const, and I don't want
-      // to fix that. It works fine based on the switch in the function below.
+      if (k >= arg.NYW) return; // safe since k are different thread blocks
+
+      vector_type<ReduceType, NXZ> sum;
 
       while (idx < arg.length) {
 
         FloatN x[M], y[M], z[M], w[M];
 
-        arg.Y[kmod].load(y, idx, parity);
-        arg.W[kmod].load(w, idx, parity);
+        arg.Y[k].load(y, idx, parity);
+        arg.W[k].load(w, idx, parity);
 
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
@@ -98,75 +114,10 @@ namespace quda
           arg.r.post(sum[l]);
         }
 
-        arg.Y[kmod].save(y, idx, parity);
-        arg.W[kmod].save(w, idx, parity);
+        arg.Y[k].save(y, idx, parity);
+        arg.W[k].save(w, idx, parity);
 
         idx += gridDim.x * blockDim.x;
-      }
-    }
-
-#ifdef WARP_MULTI_REDUCE
-    template <typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-#else
-    template <int block_size, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-#endif
-    __global__ void multiReduceKernel(Arg arg)
-    {
-      unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-      unsigned int parity = blockIdx.z;
-
-      if (k >= arg.NYW) return; // safe since k are different thread blocks
-
-      vector_type<ReduceType, NXZ> sum;
-
-      switch (k) {
-      case 0: compute<0, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 2
-      case 1: compute<1, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 3
-      case 2: compute<2, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 4
-      case 3: compute<3, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 5
-      case 4: compute<4, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 6
-      case 5: compute<5, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 7
-      case 6: compute<6, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 8
-      case 7: compute<7, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 9
-      case 8: compute<8, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 10
-      case 9: compute<9, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 11
-      case 10: compute<10, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 12
-      case 11: compute<11, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 13
-      case 12: compute<12, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 14
-      case 13: compute<13, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 15
-      case 14: compute<14, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 16
-      case 15: compute<15, NXZ, FloatN, M, ReduceType>(sum, arg, i, parity); break;
-#endif // 16
-#endif // 15
-#endif // 14
-#endif // 13
-#endif // 12
-#endif // 11
-#endif // 10
-#endif // 9
-#endif // 8
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 4
-#endif // 3
-#endif // 2
       }
 
 #ifdef WARP_MULTI_REDUCE
@@ -174,7 +125,6 @@ namespace quda
 #else
       ::quda::reduce<block_size, vector_type<ReduceType, NXZ>>(arg, sum, arg.NYW * parity + k);
 #endif
-
     } // multiReduceKernel
 
     template <typename T> struct coeff_array {

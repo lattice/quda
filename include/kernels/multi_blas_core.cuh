@@ -22,6 +22,13 @@ namespace quda
     static signed char *Bmatrix_h;
     static signed char *Cmatrix_h;
 
+#if CUDA_VERSION < 9000
+    // as a performance work around we put the argument struct into
+    // __constant__ memory to prevent the compiler from spilling
+    // registers on older CUDA
+    static __constant__ signed char arg_buffer[MAX_MATRIX_SIZE];
+#endif
+
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z
@@ -58,9 +65,26 @@ namespace quda
       }
     };
 
-    template <int k, int NXZ, typename FloatN, int M, typename Arg>
-    __device__ inline void compute(Arg &arg, int idx, int parity)
+    /**
+       @brief Generic multi-blas kernel with four loads and up to four stores.
+       @param[in,out] arg Argument struct with required meta data
+       (input/output fields, functor, etc.)
+    */
+    template <typename FloatN, int M, int NXZ, typename Arg> __global__ void multiBlasKernel(Arg arg_)
     {
+#if CUDA_VERSION >= 9000
+      Arg &arg = arg_;
+#else
+      Arg &arg = *((Arg *)arg_buffer);
+#endif
+
+      // use i to loop over elements in kernel
+      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
+      unsigned int parity = blockIdx.z;
+
+      arg.f.init();
+      if (k >= arg.NYW) return;
 
       while (idx < arg.length) {
 
@@ -80,72 +104,6 @@ namespace quda
         arg.W[k].save(w, idx, parity);
 
         idx += gridDim.x * blockDim.x;
-      }
-    }
-
-    /**
-       @brief Generic multi-blas kernel with four loads and up to four stores.
-       @param[in,out] arg Argument struct with required meta data
-       (input/output fields, functor, etc.)
-    */
-    template <typename FloatN, int M, int NXZ, typename Arg> __global__ void multiBlasKernel(Arg arg)
-    {
-
-      // use i to loop over elements in kernel
-      unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-      unsigned int parity = blockIdx.z;
-
-      arg.f.init();
-      if (k >= arg.NYW) return;
-
-      switch (k) {
-      case 0: compute<0, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 2
-      case 1: compute<1, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 3
-      case 2: compute<2, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 4
-      case 3: compute<3, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 5
-      case 4: compute<4, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 6
-      case 5: compute<5, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 7
-      case 6: compute<6, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 8
-      case 7: compute<7, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 9
-      case 8: compute<8, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 10
-      case 9: compute<9, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 11
-      case 10: compute<10, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 12
-      case 11: compute<11, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 13
-      case 12: compute<12, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 14
-      case 13: compute<13, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 15
-      case 14: compute<14, NXZ, FloatN, M>(arg, i, parity); break;
-#if MAX_MULTI_BLAS_N >= 16
-      case 15: compute<15, NXZ, FloatN, M>(arg, i, parity); break;
-#endif // 16
-#endif // 15
-#endif // 14
-#endif // 13
-#endif // 12
-#endif // 11
-#endif // 10
-#endif // 9
-#endif // 8
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 4
-#endif // 3
-#endif // 2
       }
     }
 

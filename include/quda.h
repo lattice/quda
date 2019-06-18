@@ -250,8 +250,7 @@ extern "C" {
     double gflops;                         /**< The Gflops rate of the solver */
     double secs;                           /**< The time taken by the solver */
 
-    QudaTune tune;                          /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
-
+    QudaTune tune; /**< Enable auto-tuning? (default = QUDA_TUNE_YES) */
 
     /** Number of steps in s-step algorithms */
     int Nsteps;
@@ -275,6 +274,9 @@ extern "C" {
 
     /** Deflation instance */
     void *deflation_op;
+
+    /** defines deflation */
+    void *eig_param;
 
     /**
       Dirac Dslash used in preconditioner
@@ -370,31 +372,74 @@ extern "C" {
 
   } QudaInvertParam;
 
-
-  // Parameter set for solving the eigenvalue problems.
-  // Eigen problems are tightly related with Ritz algorithm.
-  // And the Lanczos algorithm use the Ritz operator.
-  // For Ritz matrix operation,
-  // we need to know about the solution type of dirac operator.
-  // For acceleration, we are also using chevisov polynomial method.
-  // And nk, np values are needed Implicit Restart Lanczos method
-  // which is optimized form of Lanczos algorithm
+  // Parameter set for solving eigenvalue problems.
   typedef struct QudaEigParam_s {
 
+    // EIGENSOLVER PARAMS
+    //-------------------------------------------------
+    /** Used to store information pertinent to the operator **/
     QudaInvertParam *invert_param;
-//specific for Lanczos method:
-    QudaSolutionType  RitzMat_lanczos;
-    QudaSolutionType  RitzMat_Convcheck;
+
+    /** Type of eigensolver algorithm to employ **/
     QudaEigType eig_type;
 
-    double *MatPoly_param;
-    int NPoly;
-    double Stp_residual;
+    /** Use Polynomial Acceleration **/
+    QudaBoolean use_poly_acc;
+
+    /** Degree of the Chebysev polynomial **/
+    int poly_deg;
+
+    /** Range used in polynomial acceleration **/
+    double a_min;
+    double a_max;
+
+    /** What type of Dirac operator we are using **/
+    /** If !(use_norm_op) && !(use_dagger) use M. **/
+    /** If use_dagger, use Mdag **/
+    /** If use_norm_op, use MdagM **/
+    /** If use_norm_op && use_dagger use MMdag. **/
+    QudaBoolean use_dagger;
+    QudaBoolean use_norm_op;
+
+    /** Performs an MdagM solve, then constructs the left and right SVD. **/
+    QudaBoolean compute_svd;
+
+    /** If true, the solver will error out if the convergence criteria are not met **/
+    QudaBoolean require_convergence;
+
+    /** Which part of the spectrum to solve **/
+    QudaEigSpectrumType spectrum;
+
+    /** Size of the eigenvector search space **/
+    int nEv;
+    /** Total size of Krylov space **/
+    int nKr;
+    /** Max number of locked eigenpairs (deduced at runtime) **/
+    int nLockedMax;
+    /** Number of requested converged eigenvectors **/
+    int nConv;
+    /** Tolerance on the least well known eigenvalue's residual **/
+    double tol;
+    /** For IRLM/IRAM, check every nth restart **/
+    int check_interval;
+    /** For IRLM/IRAM, quit after n restarts **/
+    int max_restarts;
+
+    /** In the test function, cross check the device result against ARPACK **/
+    QudaBoolean arpack_check;
+    /** For Arpack cross check, name of the Arpack logfile **/
+    char arpack_logfile[512];
+
+    /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
+    char QUDA_logfile[512];
+
+    //-------------------------------------------------
+
+    // EIG-CG PARAMS
+    //-------------------------------------------------
     int nk;
     int np;
-    int f_size;
-    double eigen_shift;
-//more general stuff:
+
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
@@ -416,21 +461,23 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
-    /** The Gflops rate of the multigrid solver setup */
+    /** The Gflops rate of the eigensolver setup */
     double gflops;
 
-    /**< The time taken by the multigrid solver setup */
+    /**< The time taken by the eigensolver setup */
     double secs;
 
     /** Which external library to use in the deflation operations (MAGMA or Eigen) */
     QudaExtLibType extlib_type;
+    //-------------------------------------------------
 
   } QudaEigParam;
-
 
   typedef struct QudaMultigridParam_s {
 
     QudaInvertParam *invert_param;
+
+    QudaEigParam *eig_param[QUDA_MAX_MG_LEVEL];
 
     /** Number of multigrid levels */
     int n_level;
@@ -446,6 +493,9 @@ extern "C" {
 
     /** Precision to store the null-space vectors in (post block orthogonalization) */
     QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
+    /** Number of times to repeat Gram-Schmidt in block orthogonalization */
+    int n_block_ortho[QUDA_MAX_MG_LEVEL];
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
@@ -550,6 +600,9 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use eigenvectors for the nullspace or, if the coarsest instance deflate*/
+    QudaBoolean use_eig_solver[QUDA_MAX_MG_LEVEL];
+
     /** Minimize device memory allocations during the adaptive setup,
         placing temporary fields in mapped memory instad of device
         memory */
@@ -557,24 +610,33 @@ extern "C" {
 
     /** Whether to compute the null vectors or reload them */
     QudaComputeNullVector compute_null_vector;
- 
+
     /** Whether to generate on all levels or just on level 0 */
-    QudaBoolean generate_all_levels; 
+    QudaBoolean generate_all_levels;
 
     /** Whether to run the verification checks once set up is complete */
     QudaBoolean run_verify;
 
+    /** Whether to run null Vs eigen vector overlap checks once set up is complete */
+    QudaBoolean run_low_mode_check;
+
+    /** Whether to run null vector oblique checks once set up is complete */
+    QudaBoolean run_oblique_proj_check;
+
     /** Whether to load the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_load;
+    QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix where to load the null-space vectors */
-    char vec_infile[256];
+    char vec_infile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to store the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_store;
+    QudaBoolean vec_store[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix for where to save the null-space vectors */
-    char vec_outfile[256];
+    char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+
+    /** Whether to use and initial guess during coarse grid deflation */
+    QudaBoolean coarse_guess;
 
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
@@ -704,11 +766,11 @@ extern "C" {
    */
   void endQuda(void);
 
-/**
- * @brief update the radius for halos. 
- * @details This should only be needed for automated testing when
- * different partitioning is applied within a single run.
- */
+  /**
+   * @brief update the radius for halos.
+   * @details This should only be needed for automated testing when
+   * different partitioning is applied within a single run.
+   */
   void updateR();
 
   /**
@@ -814,8 +876,18 @@ extern "C" {
    * @param param  Contains all metadata regarding host and device
    *               storage and solver parameters
    */
-  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V,
-                   void *hp_alpha, void *hp_beta, QudaEigParam *eig_param);
+  void lanczosQuda(int k0, int m, void *hp_Apsi, void *hp_r, void *hp_V, void *hp_alpha, void *hp_beta,
+                   QudaEigParam *eig_param);
+
+  /**
+   * Perform the eigensolve. The problem matrix is defined by the invert param, the
+   * mode of solution is specified by the eig param. It is assumed that the gauge
+   * field has already been loaded via  loadGaugeQuda().
+   * @param h_evecs  Array of pointers to application eigenvectors
+   * @param h_evals  Host side eigenvalues
+   * @param param Contains all metadata regarding the type of solve.
+   */
+  void eigensolveQuda(void **h_evecs, double_complex *h_evals, QudaEigParam *param);
 
   /**
    * Perform the solve, according to the parameters set in param.  It
@@ -838,7 +910,6 @@ extern "C" {
    *               storage and solver parameters
    */
   void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param);
-
 
   /**
    * Solve for multiple shifts (e.g., masses).
@@ -1123,10 +1194,17 @@ extern "C" {
                             QudaGaugeParam* param);
 
   /**
-   * Generate Gaussian distributed gauge field
-   * @param seed Seed
-   */
-  void gaussGaugeQuda(long seed);
+     @brief Generate Gaussian distributed fields and store in the
+     resident gauge field.  We create a Gaussian-distributed su(n)
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and sigma = 1 has
+     maximum disorder).
+
+     @param seed The seed used for the RNG
+     @param sigma Width of Gaussian distrubution
+  */
+  void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
@@ -1142,7 +1220,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1151,8 +1229,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
-                             unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
@@ -1180,6 +1257,18 @@ extern "C" {
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeQuda();
+
+  /**
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   */
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+                    const int *X);
 
   /**
      @brief Calculates the topological charge from gaugeSmeared, if it exist,

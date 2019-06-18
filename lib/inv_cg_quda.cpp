@@ -15,6 +15,7 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <eigensolve_quda.h>
 
 namespace quda {
 
@@ -23,10 +24,10 @@ namespace quda {
     rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
     rSloppyp(nullptr), xSloppyp(nullptr), init(false)
   {
-
   }
 
-  CG::~CG() {
+  CG::~CG()
+  {
     profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
@@ -34,18 +35,24 @@ namespace quda {
       if (pp) delete pp;
       if (yp) delete yp;
       if (App) delete App;
-      if(param.precision != param.precision_sloppy) {
-	if (rSloppyp) delete rSloppyp;
-	if (xSloppyp) delete xSloppyp;
+      if (param.precision != param.precision_sloppy) {
+        if (rSloppyp) delete rSloppyp;
+        if (xSloppyp) delete xSloppyp;
       }
       if (tmpp) delete tmpp;
-      if(!mat.isStaggered()) {
-	if (tmp2p && tmpp != tmp2p) delete tmp2p;
-	if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+      if (!mat.isStaggered()) {
+        if (tmp2p && tmpp != tmp2p) delete tmp2p;
+        if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
       }
       if (rnewp) delete rnewp;
-
       init = false;
+
+      if (deflate_init) {
+        for (auto veci : param.evecs)
+          if (veci) delete veci;
+        delete defl_tmp1[0];
+        delete defl_tmp2[0];
+      }
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -157,7 +164,6 @@ namespace quda {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       bp = ColorSpinorField::Create(csParam);
-
       init = true;
     }
 
@@ -197,7 +203,8 @@ namespace quda {
 
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField* p_init, double r2_old_init) {
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -262,6 +269,10 @@ namespace quda {
       init = true;
     }
 
+    // Once the CG operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -290,9 +301,9 @@ namespace quda {
     const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
-    double d_new =0 ;
-    double d =0 ;
-    double dinit =0;
+    double d_new = 0;
+    double d = 0;
+    double dinit = 0;
     double xNorm = 0;
     double xnorm = 0;
     double pnorm = 0;
@@ -310,15 +321,41 @@ namespace quda {
     // compute initial residual
     double r2 = 0.0;
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      // Compute r = b - A * x
       mat(r, x, y, tmp3);
       r2 = blas::xmyNorm(b, r);
       if (b2 == 0) b2 = r2;
+      // y contains the original guess.
       blas::copy(y, x);
     } else {
       if (&r != &b) blas::copy(r, b);
       r2 = b2;
       blas::zero(y);
     }
+
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `x` as a temp.
+      blas::copy(x, r);
+      rhs.push_back(&x);
+
+      // Deflate
+      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0], tmp2, tmp3);
+      r2 = blas::xmyNorm(*rhs[0], r);
+
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        // defl_tmp1 and y must be added to the solution at the end
+        blas::axpy(1.0, *defl_tmp1[0], y);
+      } else {
+        // Just add defl_tmp1 to y, which has been zeroed out
+        blas::copy(y, *defl_tmp1[0]);
+      }
+    }
+
     blas::zero(x);
     if (&x != &xSloppy) blas::zero(xSloppy);
     blas::copy(rSloppy,r);
@@ -328,9 +365,10 @@ namespace quda {
       p.resize(Np);
       ColorSpinorParam csParam(rSloppy);
       csParam.create = QUDA_COPY_FIELD_CREATE;
-        for (auto &pi : p) pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
+      for (auto &pi : p)
+        pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
     } else {
-        for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
+      for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
 
     double r2_old=0.0;
@@ -378,7 +416,8 @@ namespace quda {
 
     // this means when using heavy quarks we will switch to simple hq restarts as soon as the reliable strategy fails
     const int hqmaxresIncrease = param.max_hq_res_increase;
-    const int hqmaxresRestartTotal = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
+    const int hqmaxresRestartTotal
+      = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
@@ -465,8 +504,8 @@ namespace quda {
       } else {
         if (rNorm > maxrx) maxrx = rNorm;
         if (rNorm > maxrr) maxrr = rNorm;
-        updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+        updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
@@ -559,8 +598,7 @@ namespace quda {
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
           d_new = dinit;
-        }
-        else{
+        } else {
           rNorm = sqrt(r2);
           maxrr = rNorm;
           maxrx = rNorm;
@@ -573,8 +611,9 @@ namespace quda {
         if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), r0Norm, resIncreaseTotal);
+          warningQuda(
+            "CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), r0Norm, resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
@@ -591,11 +630,12 @@ namespace quda {
         if (use_heavy_quark_res and L2breakdown) {
           hqresRestartTotal++; // count the number of heavy quark restarts we've done
           delta = 0;
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)", hqresRestartTotal);
+          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)",
+                      hqresRestartTotal);
           heavy_quark_restart = true;
 
           if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
-            hqresIncrease++; // count the number of consecutive increases
+            hqresIncrease++;                           // count the number of consecutive increases
             warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
                         heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
@@ -700,7 +740,6 @@ namespace quda {
     return;
   }
 
-
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
@@ -773,7 +812,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;
@@ -1166,7 +1205,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;

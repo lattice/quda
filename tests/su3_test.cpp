@@ -36,6 +36,7 @@ extern double anisotropy;
 extern bool verify_results;
 
 extern char latfile[];
+extern bool unit_gauge;
 
 extern QudaVerbosity verbosity;
 
@@ -125,11 +126,14 @@ void SU3test(int argc, char **argv) {
   if (strcmp(latfile,"")) {  
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { 
-    // generate a random SU(3) field
-    printfQuda("Randomizing fields...");
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    printfQuda("done.\n");
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   loadGaugeQuda(gauge, &gauge_param);

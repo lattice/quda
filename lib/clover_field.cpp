@@ -32,7 +32,7 @@ namespace quda {
     pad = a.Pad();
     siteSubset = QUDA_FULL_SITE_SUBSET;
     for (int dir = 0; dir < nDim; ++dir) x[dir] = a.X()[dir];
-      }
+  }
 
   CloverField::CloverField(const CloverFieldParam &param) :
     LatticeField(param), bytes(0), norm_bytes(0), nColor(3), nSpin(4), 
@@ -44,10 +44,10 @@ namespace quda {
     if (order == QUDA_QDPJIT_CLOVER_ORDER && create != QUDA_REFERENCE_FIELD_CREATE)
       errorQuda("QDPJIT ordered clover fields only supported for reference fields");
 
-    real_length = 2*volumeCB*nColor*nColor*nSpin*nSpin/2;  // block-diagonal Hermitian (72 reals)
-    length = 2*stride*nColor*nColor*nSpin*nSpin/2;
+    real_length = 2 * ((size_t)volumeCB) * nColor * nColor * nSpin * nSpin / 2; // block-diagonal Hermitian (72 reals)
+    length = 2 * ((size_t)stride) * nColor * nColor * nSpin * nSpin / 2;
 
-    bytes = (size_t)length*precision;
+    bytes = length * precision;
     if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
       norm_bytes = sizeof(float)*2*stride*2; // 2 chirality
@@ -187,10 +187,11 @@ namespace quda {
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
-      
-      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0) {
-	errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
-		  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+
+      if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
+          || !is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
+        errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+                  resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
       }
 
       unsigned long texels = resDesc.res.linear.sizeInBytes / texel_size;
@@ -221,12 +222,17 @@ namespace quda {
 	resDesc.res.linear.devPtr = norm;
 	resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
-	
-	cudaTextureDesc texDesc;
-	memset(&texDesc, 0, sizeof(texDesc));
-	texDesc.readMode = cudaReadModeElementType;
-	
-	cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+
+        if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
+          errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
+                    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
+        }
+
+        cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.readMode = cudaReadModeElementType;
+
+        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
       }
     }

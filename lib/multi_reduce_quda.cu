@@ -57,6 +57,10 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
+#if CUDA_VERSION < 9000
+      cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
+                              *getStream());
+#endif
       LAUNCH_KERNEL_LOCAL_PARITY(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ);
 #endif
 #endif
@@ -916,29 +920,32 @@ namespace quda {
 	strcat(aux,",m=");
 	u64toa(size, y.size());
 	strcat(aux,size);
+        u64toa(size, MAX_MULTI_BLAS_N);
+        strcat(aux, ",multi-blas-n=");
+        strcat(aux, size);
 
-      	// before we do policy tuning we must ensure the kernel
-      	// constituents have been tuned since we can't do nested tuning
-      	// FIXME this will break if the kernels are destructive - which they aren't here
-	if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-	  disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+        // before we do policy tuning we must ensure the kernel
+        // constituents have been tuned since we can't do nested tuning
+        // FIXME this will break if the kernels are destructive - which they aren't here
+        if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+          disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
-	  if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
+          if (x.size() == 1 || y.size() == 1) { // 1-d reduction
 
-	    max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
+            max_tile_size = std::min(MAX_MULTI_BLAS_N, (int)std::max(x.size(), y.size()));
 
-	    // Make sure constituents are tuned.
+            // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size; tile_size++) {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
-	  } else { // 2-d reduction
+          } else { // 2-d reduction
 
-	    // max_tile_size should be set to the largest power of 2 less than
-	    // MAX_MULTI_BLAS_N, since we have a requirement that the
-	    // tile size is a power of 2.
-	    unsigned int max_count = 0;
+            // max_tile_size should be set to the largest power of 2 less than
+            // MAX_MULTI_BLAS_N, since we have a requirement that the
+            // tile size is a power of 2.
+            unsigned int max_count = 0;
 	    unsigned int tile_size_tmp = MAX_MULTI_BLAS_N;
 	    while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
 	    tile_size_tmp = 1;
@@ -958,12 +965,11 @@ namespace quda {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, MAX_MULTI_BLAS_N);
             }
-
           }
 
-      	  enableProfileCount();
-      	  setPolicyTuning(true);
-      	}
+          enableProfileCount();
+          setPolicyTuning(true);
+        }
       }
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
@@ -982,7 +988,6 @@ namespace quda {
       // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-
 	if ( x.size()==1 || y.size()==1 ) { // 1-d reduction
 
 	  param.aux.x++;

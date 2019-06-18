@@ -2932,6 +2932,10 @@ namespace quda {
     typedef gauge::FloatNOrder<double, N, 2, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<double, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<double, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<double, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
     typedef gauge::FloatNOrder<double, N, 2, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
@@ -2952,6 +2956,10 @@ namespace quda {
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
     typedef gauge::FloatNOrder<float, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<float, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<float, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<float, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
@@ -2976,6 +2984,10 @@ namespace quda {
     typedef gauge::FloatNOrder<short, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<short, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<short, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
     typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
@@ -2996,6 +3008,10 @@ namespace quda {
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_12, N, stag, huge_alloc, ghostExchange, use_inphase> {
     typedef gauge::FloatNOrder<char, N, 4, 12, stag, huge_alloc, ghostExchange, use_inphase> type;
+  };
+  template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  struct gauge_mapper<char, QUDA_RECONSTRUCT_10, N, stag, huge_alloc, ghostExchange, use_inphase> {
+    typedef gauge::FloatNOrder<char, N, 2, 11, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase> {
@@ -3025,8 +3041,14 @@ namespace quda {
     if( g.Reconstruct() == QUDA_RECONSTRUCT_NO) {			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge; \
       func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_13){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
     } else if( g.Reconstruct() == QUDA_RECONSTRUCT_12){			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge; \
+      func(Gauge(g), g, __VA_ARGS__);					\
+    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_9){			\
+      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type Gauge; \
       func(Gauge(g), g, __VA_ARGS__);					\
     } else if( g.Reconstruct() == QUDA_RECONSTRUCT_8){			\
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge; \

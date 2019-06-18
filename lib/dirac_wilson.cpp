@@ -28,17 +28,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1320ll*in.Volume();
   }
 
@@ -49,31 +39,16 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      wilsonDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1368ll*in.Volume();
   }
 
   void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-#ifndef USE_LEGACY_DSLASH
+
     ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1368ll * in.Volume();
-#else
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
-#endif
   }
 
   void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
