@@ -3112,7 +3112,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     delete solve;
   } else { // norm_error_solve
 
-    //if(0){
+    //if(1){
 
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       cudaColorSpinorField tmp(*out);
@@ -3130,7 +3130,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
       // Hardcoded section, useful for testing (I - QQ^)(MM^ - shift)(I - QQ^)x = b
 
-      printfQuda("\n\nSolving for MM^ in shifted-and-projected form !\n\n\n");
+      printfQuda("\n\nSolving for MMdag in shifted-and-projected form !\n\n\n");
       DiracProjMMdagProj m(dirac), mSloppy(diracSloppy), mPre(diracPre);
 
       // Cloning params for the creation of new spinors

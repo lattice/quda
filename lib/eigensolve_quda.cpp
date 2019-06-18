@@ -1039,12 +1039,16 @@ namespace quda
     // Create a temporary vector t, which will be used for storing the result of the
     // inversion of the shifted-and-inverted version of MMdag
     std::vector<ColorSpinorField *> t;
-    csParam.create = QUDA_COPY_FIELD_CREATE;
+    //csParam.create = QUDA_COPY_FIELD_CREATE;
     // Copying initial guess
-    t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+    //t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+    t.push_back(eigSpace[0]);
 
     // Reusing eigSpace to store the output null vectors
-    eigSpace.clear();
+    //ColorSpinorField *tmpEigSpace = eigSpace[0];
+    //for (auto p : eigSpace){ delete p; }
+    //delete eigSpace[0];
+    eigSpace.resize(0);
 
     // Create the vector subspaces used for faster searchs of eigenpairs
     std::vector<ColorSpinorField *> u, w, V, W, X_tilde;
@@ -1059,7 +1063,7 @@ namespace quda
 
     // TODO: change these -- is the second one still necessary ?
     eig_param->invert_param->verbosity = QUDA_SILENT;
-    eig_param->invert_param->tol = 1e-1;
+    eig_param->invert_param->tol = 1e-8;
 
     // Main loop
     while (restart_iter<max_restarts && k<k_max) {
@@ -1246,6 +1250,8 @@ namespace quda
         W = tmpW;
 
         restart_iter++;
+
+        printfQuda("\n\nRESTART !!!\n\n\n");
       }
 
       // Updating shift value
@@ -1264,13 +1270,9 @@ namespace quda
       // TODO: remove 6th param ?
       // Proposing a new vector t through the solution of a shifted-and-projected MMdag
 
-      blas::ax(-1.0, *r[0]);
+      invertProjMat(eigSpace, theta, mat, *t[0], *r[0], 0);
 
-      invertProjMat(eigSpace, theta, mat, *t[0], *r[0], 1);
-
-      blas::ax(-1.0, *r[0]);
-
-      //blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical runs the diff when using -t vs t
+      blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical tests the behaviour when using -t vs t
 
       // TODO: simply remove this ?
       setVerbosity(verbTmp);
@@ -1439,7 +1441,7 @@ namespace quda
     solverParam.iter = 0;
     solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
     //solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
-    solverParam.tol = 1e0;
+    solverParam.tol = 1e-6;
     //solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
     solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
 
@@ -1463,15 +1465,23 @@ namespace quda
 
       //printfQuda("\n SIZE qSpace =  %d\n\n", qSpace.size());
 
-      //setVerbosity(QUDA_VERBOSE);
+      setVerbosity(QUDA_VERBOSE);
+
+      for(int i=0; i<qSpace.size(); i++){
+        Qhat.push_back(ColorSpinorField::Create(b, csParam));
+        invertShifted(*Qhat[i], *qSpace[i], 0, qSpace, theta);
+      }
 
       for(int i=0; i<qSpace.size(); i++){
         // Take t[0] as initial guess
-        Qhat.push_back(ColorSpinorField::Create(b, csParam));
-        cg(*Qhat[i], *qSpace[i]);
+        //Qhat.push_back(ColorSpinorField::Create(b, csParam));
+        //cg(*Qhat[i], *qSpace[i]);
       }
 
-      //setVerbosity(QUDA_SILENT);
+      setVerbosity(QUDA_SILENT);
+
+      //printfQuda("\nDimensionality of projection space = %d\n\n", qSpace.size());
+      //errorQuda("\nUNDER CONSTRUCTION...\n\n");
 
       // Switching back the shift parameters
       mmSloppy->shift = bareShift_mmSloppy;
@@ -1549,33 +1559,13 @@ namespace quda
       for (auto p : Qhat){ delete p; }
     }
     else{
-      // Full and sloppy Dirac Matrix, with qSpace for projections
-      mm = new DiracProjMMdagProj(dirac);
-      mm->projSpace = qSpace;
-      mmSloppy = new DiracProjMMdagProj(diracSloppy);
-      mmSloppy->projSpace = qSpace;
 
-      // Switching to the appropriate shift for JD
-      bareShift_mm = mm->shift;
-      mm->shift = bareShift_mm - theta;
-      bareShift_mmSloppy = mmSloppy->shift;
-      mmSloppy->shift = bareShift_mmSloppy - theta;
+      // Invert the shifted operator with low tolerance
 
-      //setVerbosity(QUDA_VERBOSE);
-
-      {
-        CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
-        cg(b, x);
-      }
-
-      //setVerbosity(QUDA_SILENT);
-
-      // Switching back the shift parameters
-      mm->shift = bareShift_mm;
-      mmSloppy->shift = bareShift_mmSloppy;
-
-      delete mm;
-      delete mmSloppy;
+      double tolBuff = eig_param->invert_param->tol;
+      eig_param->invert_param->tol = 0.5;
+      invertShifted(x, b, 1, qSpace, theta);
+      eig_param->invert_param->tol = tolBuff;
     }
 
     // Clearing allocated data
@@ -1597,5 +1587,137 @@ namespace quda
     //delete beta;
   }
 
+
+  void JD::invertShifted(ColorSpinorField &x_, ColorSpinorField &b_, bool usePrj, std::vector<ColorSpinorField*> qSpace, double theta){
+
+    // Input spinors
+    ColorSpinorField *b = &b_;
+    ColorSpinorField *x = &x_;
+
+    // Simpler call to the parameters for the inverter
+    QudaInvertParam *param = eig_param->invert_param;
+
+    // TODO: check which of the following vars are still necessary
+    bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
+      (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+    bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+      (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
+      (param->solution_type ==  QUDA_MATPC_SOLUTION);
+    bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
+      (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+    bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
+      (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+    // TODO: is this re-set necessary?
+    param->secs = 0;
+    param->gflops = 0;
+    param->iter = 0;
+
+    // Dirac objects ---> for the construction of the Dirac matrices
+    Dirac *d = nullptr;
+    Dirac *dSloppy = nullptr;
+
+    // Create the dirac operator
+    {
+      bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE);
+
+      DiracParam diracParam;
+      DiracParam diracSloppyParam;
+
+      quda::setDiracParam(diracParam, param, pc_solve);
+      quda::setDiracSloppyParam(diracSloppyParam, param, pc_solve);
+
+      d = Dirac::create(diracParam);
+      dSloppy = Dirac::create(diracSloppyParam);
+    }
+
+    Dirac &dirac = *d;
+    Dirac &diracSloppy = *dSloppy;
+
+    // Spinors to be used in the actual call of the solver/inverter
+    ColorSpinorField *in = nullptr;
+    ColorSpinorField *out = nullptr;
+
+    // In case of the rhs being zero, throw a hard error
+    double nb = blas::norm2(*b);
+    if (nb==0.0) errorQuda("Source has zero norm");
+
+    // TODO: consider enabling the following line, to improve numerical stability
+    // rescale the source and solution vectors to help prevent the onset of underflow
+    //if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
+    //  blas::ax(1.0/sqrt(nb), *b);
+    //  blas::ax(1.0/sqrt(nb), *x);
+    //}
+    //massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
+
+    // Set in and out to the input spinors (i.e. to b and x)
+    dirac.prepare(in, out, *x, *b, param->solution_type);
+
+    // TODO: enable the following section ?
+    /*
+    if (mat_solution && !direct_solve && !norm_error_solve) { // prepare source: b' = A^dag b
+      cudaColorSpinorField tmp(*in);
+      dirac.Mdag(*in, tmp);
+    } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
+      DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      SolverParam solverParam(*param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      (*solve)(*out, *in);
+      blas::copy(*in, *out);
+      solverParam.updateInvertParam(*param);
+      delete solve;
+    }
+    */
+
+    // Solving the system
+
+    SolverParam solverParam(*param);
+
+    // TODO: reduce the code within the follow if-else
+
+    if(usePrj){
+      DiracProjMMdagProj m(dirac), mSloppy(diracSloppy);
+      m.projSpace = qSpace;
+      mSloppy.projSpace = qSpace;
+
+      // Shift the Dirac operator
+      double bareShift_m = m.shift;
+      m.shift = bareShift_m - theta;
+      double bareShift_mSloppy = mSloppy.shift;
+      mSloppy.shift = bareShift_mSloppy - theta;
+
+      Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profile);
+      (*solve)(*out, *in);
+      delete solve;
+
+      // Switching back the shift parameters
+      m.shift = bareShift_m;
+      mSloppy.shift = bareShift_mSloppy;
+    }
+    else{
+      DiracMMdag m(dirac), mSloppy(diracSloppy);
+
+      // Shift the Dirac operator
+      double bareShift_m = m.shift;
+      m.shift = bareShift_m - theta;
+      double bareShift_mSloppy = mSloppy.shift;
+      mSloppy.shift = bareShift_mSloppy - theta;
+
+      Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profile);
+      (*solve)(*out, *in);
+      delete solve;
+
+      // Switching back the shift parameters
+      m.shift = bareShift_m;
+      mSloppy.shift = bareShift_mSloppy;
+    }
+
+    // TODO: enable?
+    //solverParam.updateInvertParam(*param);
+
+    delete d;
+    delete dSloppy;
+  }
 
 } // namespace quda

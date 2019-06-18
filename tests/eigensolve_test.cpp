@@ -58,6 +58,10 @@ extern int pipeline;   // length of pipeline for fused operations in GCR or BiCG
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
+extern QudaInverterType  inv_type;
+extern QudaSolutionType solution_type;
+extern QudaInverterType  inv_type;
+extern QudaInverterType  precon_type;
 
 // Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -226,7 +230,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
 
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  // Enabled for inversions called from Jacobi-Davidson
+  //inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -377,7 +383,14 @@ int main(int argc, char **argv)
   // inv_param structure inside the eig_param structure
   // to avoid any confusion
   QudaInvertParam eig_inv_param = newQudaInvertParam();
+
   setInvertParam(eig_inv_param);
+  eig_inv_param.inv_type = inv_type;
+  eig_inv_param.solution_type = solution_type;
+  eig_inv_param.solve_type = solve_type;
+  eig_inv_param.matpc_type = matpc_type;
+  eig_inv_param.inv_type_precondition = precon_type;
+
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
 

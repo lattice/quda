@@ -277,6 +277,16 @@ public:
     void invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, bool precJD);
 
     /**
+       @brief Gateway to call solver within EigenSolver
+       @param[in] x Input spinor
+       @param[in] b rhs
+       @param[in] usePrj Invert the operator in simple or projected form
+       @param[in] qSpace The projection space, in case of needed (by usePrj)
+       @param[in] theta The shift of the operator
+    */
+    void invertShifted(ColorSpinorField &x, ColorSpinorField &b, bool usePrj, std::vector<ColorSpinorField*> qSpace, double theta);
+
+    /**
        @brief Compute eigenpairs
        @param[in] kSpace the "acceleration" vector space
        @param[in] evals Computed eigenvalues
