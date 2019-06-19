@@ -71,7 +71,7 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 0.9.0 LANGUAGES)
+project("QUDA" VERSION 1.0.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -95,8 +95,8 @@ message(STATUS "")
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
+    CACHE STRING "set the GPU architecture (sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -176,7 +176,7 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
-set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
+set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 
 # NVTX options
