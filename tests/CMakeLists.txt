@@ -16,6 +16,10 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(quda_test QIO)
+endif()
+
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -108,6 +112,11 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
+  cuda_add_executable(bielefeld_psibarpsi bielefeld_psibarpsi.cpp staggered_dslash_reference.cpp blas_reference.cpp
+                      llfat_reference.cpp)
+  target_link_libraries(bielefeld_psibarpsi ${TEST_LIBS})
+  quda_checkbuildtest(bielefeld_psibarpsi QUDA_BUILD_ALL_TESTS)
+
   if(QUDA_BLOCKSOLVER)
     cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp
                         blas_reference.cpp)
@@ -119,7 +128,7 @@ endif()
 if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIRAC_TWISTED_CLOVER OR QUDA_DIRAC_NDEG_TWISTED_MASS OR QUDA_DIRAC_DOMAIN_WALL OR QUDA_DIRAC_STAGGERED)
   cuda_add_executable(blas_test blas_test.cu)
   target_link_libraries(blas_test ${TEST_LIBS})
-  QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
+  quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
 endif()
   
 if(QUDA_MULTIGRID)
