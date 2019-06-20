@@ -14,7 +14,6 @@
 #include <util_quda.h>
 #include <random_quda.h>
 
-
 #include <misc.h>
 #include <test_util.h>
 #include <dslash_util.h>
@@ -205,8 +204,6 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
 
   inv_param->Nsteps = 2;
 
- 
-
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param->gcrNkrylov = gcrNkrylov;
 
@@ -235,7 +232,7 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
   inv_param->input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param->output_location = QUDA_CPU_FIELD_LOCATION;
 
- // domain decomposition preconditioner parameters
+  // domain decomposition preconditioner parameters
   inv_param->inv_type_precondition = QUDA_SD_INVERTER;
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
@@ -250,26 +247,25 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
 }
 
 // Wrap everything for the GPU construction of fat/long links here
-void computeHISQLinksGPU(void** fatlink, void** longlink,
-        void** fatlink_eps, void** longlink_eps,
-        void** inlink, void* qudaGaugeParamPtr,
-        double** act_path_coeffs, double eps_naik) {
+void computeHISQLinksGPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **inlink,
+                         void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik)
+{
 
-  QudaGaugeParam gauge_param = *(reinterpret_cast<QudaGaugeParam*>(qudaGaugeParamPtr));
+  QudaGaugeParam gauge_param = *(reinterpret_cast<QudaGaugeParam *>(qudaGaugeParamPtr));
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // inlink in different format
-  void *inlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize);
-  reorderQDPtoMILC(inlink_milc,inlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
+  void *inlink_milc = pinned_malloc(4 * V * gaugeSiteSize * gSize);
+  reorderQDPtoMILC(inlink_milc, inlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   // Paths for step 1:
-  void* vlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
-  void* wlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
-  
+  void *vlink_milc = pinned_malloc(4 * V * gaugeSiteSize * gSize); // V links
+  void *wlink_milc = pinned_malloc(4 * V * gaugeSiteSize * gSize); // W links
+
   // Paths for step 2:
-  void* fatlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
-  void* longlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
-  
+  void *fatlink_milc = pinned_malloc(4 * V * gaugeSiteSize * gSize);  // final fat ("X") links
+  void *longlink_milc = pinned_malloc(4 * V * gaugeSiteSize * gSize); // final long links
+
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
   computeKSLinkQuda(vlink_milc, nullptr, wlink_milc, inlink_milc, act_path_coeffs[0], &gauge_param);
 
@@ -277,8 +273,8 @@ void computeHISQLinksGPU(void** fatlink, void** longlink,
   computeKSLinkQuda(fatlink_milc, longlink_milc, nullptr, wlink_milc, act_path_coeffs[1], &gauge_param);
 
   // Copy back
-  reorderMILCtoQDP(fatlink,fatlink_milc,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-  reorderMILCtoQDP(longlink,longlink_milc,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
+  reorderMILCtoQDP(fatlink, fatlink_milc, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderMILCtoQDP(longlink, longlink_milc, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   // Clean up GPU compute links
   host_free(inlink_milc);
@@ -286,21 +282,21 @@ void computeHISQLinksGPU(void** fatlink, void** longlink,
   host_free(wlink_milc);
   host_free(fatlink_milc);
   host_free(longlink_milc);
-
 }
 
-namespace quda{
+namespace quda
+{
   // these are functions from interface quda
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param);
 
-}
-  quda::cudaGaugeField *checkGauge(QudaInvertParam *param);
+} // namespace quda
+quda::cudaGaugeField *checkGauge(QudaInvertParam *param);
 
 using namespace quda;
-void psibarpsiQuda(QudaInvertParam *param)
+void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
 {
-  
+
   // profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
   // if (!initialized) errorQuda("QUDA not initialized");
@@ -317,16 +313,13 @@ void psibarpsiQuda(QudaInvertParam *param)
   // solve_type and solution_type, rather than in separate members of QudaInvertParam.  We're stuck with it
   // for now, though, so here we factorize everything for convenience.
 
-  bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) ||
-    (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
-    (param->solve_type == QUDA_NORMOP_PC_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) ||
-    (param->solution_type ==  QUDA_MATPC_SOLUTION);
-  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) ||
-    (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
-    (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool pc_solution
+    = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE)
+    || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+  bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+  bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+  bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
 
   param->secs = 0;
   param->gflops = 0;
@@ -348,28 +341,29 @@ void psibarpsiQuda(QudaInvertParam *param)
 
   // rofileInvert.TPSTART(QUDA_PROFILE_H2D);
 
-  ColorSpinorField *b = nullptr;
-  ColorSpinorField *x = nullptr;
+  // ColorSpinorField *b = nullptr;
+  // ColorSpinorField *x = nullptr;
   ColorSpinorField *in = nullptr;
   ColorSpinorField *out = nullptr;
-
   const int *X = cudaGauge->X();
 
   // download source
   ColorSpinorParam cpuParam(nullptr, *param, X, pc_solution, param->input_location);
   ColorSpinorParam cudaParam(cpuParam, *param);
-  cudaParam.create = QUDA_NULL_FIELD_CREATE;;
+  cudaParam.create = QUDA_NULL_FIELD_CREATE;
 
-  b = new cudaColorSpinorField(cudaParam);
+  auto bb = std::make_unique<cudaColorSpinorField>(cudaParam);
+  auto b = bb.get();
+  auto xx = std::make_unique<cudaColorSpinorField>(cudaParam);
+  auto x = xx.get();
   unsigned long long seed = 12345;
-  spinorNoise(*b, seed, QUDA_NOISE_GAUSS);
-  x = new cudaColorSpinorField(cudaParam);
+  spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
   blas::zero(*x);
 
   // profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
   double nb = blas::norm2(*b);
-  if (nb==0.0) errorQuda("Source has zero norm");
+  if (nb == 0.0) errorQuda("Source has zero norm");
 
   if (getVerbosity() >= QUDA_VERBOSE) {
     // double nh_b = blas::norm2(*h_b);
@@ -383,11 +377,11 @@ void psibarpsiQuda(QudaInvertParam *param)
 
   // rescale the source and solution vectors to help prevent the onset of underflow
   if (param->solver_normalization == QUDA_SOURCE_NORMALIZATION) {
-    blas::ax(1.0/sqrt(nb), *b);
-    blas::ax(1.0/sqrt(nb), *x);
+    blas::ax(1.0 / sqrt(nb), *b);
+    blas::ax(1.0 / sqrt(nb), *x);
   }
 
-  massRescale(*static_cast<cudaColorSpinorField*>(b), *param);
+  massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
 
   dirac.prepare(in, out, *x, *b, param->solution_type);
 
@@ -424,23 +418,19 @@ void psibarpsiQuda(QudaInvertParam *param)
   // taken care of by Dirac::prepare() and Dirac::reconstruct(),
   // respectively.
 
-  if (pc_solution && !pc_solve) {
-    errorQuda("Preconditioned (PC) solution_type requires a PC solve_type");
-  }
+  if (pc_solution && !pc_solve) { errorQuda("Preconditioned (PC) solution_type requires a PC solve_type"); }
 
   if (!mat_solution && !pc_solution && pc_solve) {
     errorQuda("Unpreconditioned MATDAG_MAT solution_type requires an unpreconditioned solve_type");
   }
 
-  if (!mat_solution && norm_error_solve) {
-    errorQuda("Normal-error solve requires Mat solution");
-  }
+  if (!mat_solution && norm_error_solve) { errorQuda("Normal-error solve requires Mat solution"); }
 
   if (param->inv_type_precondition == QUDA_MG_INVERTER && (!direct_solve || !mat_solution)) {
     errorQuda("Multigrid preconditioning only supported for direct solves");
   }
 
-  if (param->chrono_use_resident && ( norm_error_solve) ){
+  if (param->chrono_use_resident && (norm_error_solve)) {
     errorQuda("Chronological forcasting only presently supported for M^dagger M solver");
   }
 
@@ -479,15 +469,15 @@ void psibarpsiQuda(QudaInvertParam *param)
     cudaColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(tmp, *in); // y = (M M^\dag) b
-    dirac.Mdag(*out, tmp);  // x = M^dag y
+    (*solve)(tmp, *in);    // y = (M M^\dag) b
+    dirac.Mdag(*out, tmp); // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
   }
 
-  if (getVerbosity() >= QUDA_VERBOSE){
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double nx = blas::norm2(*x);
-    printfQuda("Solution = %g\n",nx);
+    printfQuda("Solution = %g\n", nx);
   }
 
   // profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -503,33 +493,27 @@ void psibarpsiQuda(QudaInvertParam *param)
   // profileInvert.TPSTART(QUDA_PROFILE_EPILOGUE);
 
   Complex action = blas::cDotProduct(*b, *x);
-  param->action[0] = action.real();
-  param->action[1] = action.imag();
-  
+  action /= static_cast<double>(X[0] * X[1] * X[2] * X[3]);
 
-  if (getVerbosity() >= QUDA_VERBOSE){
+  printfQuda("PsiBarPsi (%g,%g)\n", action.real(), action.imag());
+
+  if (getVerbosity() >= QUDA_VERBOSE) {
     double nx = blas::norm2(*x);
-    // double nh_x = blas::norm2(*h_x);
     printfQuda("Reconstructed: CUDA solution = %g\n", nx);
   }
   // profileInvert.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
   // profileInvert.TPSTART(QUDA_PROFILE_FREE);
 
- 
-  delete b;
-  delete x;
   delete d;
   delete dSloppy;
   delete dPre;
-  // delete cudaGauge;
 
   // profileInvert.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
 
   // profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
 }
 
 int invert_test(void)
@@ -579,22 +563,22 @@ int invert_test(void)
     // createSiteLinkCPU(inlink, gaugeParam.cpu_prec, 0); // 0 for no phases
   }
 
-// #ifdef GPU_GAUGE_TOOLS
-//   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-//   printfQuda("gaugePrecise: %lu\n", (unsigned long)gaugePrecise);
-//   double plaq[3];
-//   loadGaugeQuda(qdp_inlink, &gaugeParam);
-//   plaqQuda(plaq);
-//   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  // #ifdef GPU_GAUGE_TOOLS
+  //   gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  //   printfQuda("gaugePrecise: %lu\n", (unsigned long)gaugePrecise);
+  //   double plaq[3];
+  //   loadGaugeQuda(qdp_inlink, &gaugeParam);
+  //   plaqQuda(plaq);
+  //   gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
-//   if (dslash_type != QUDA_LAPLACE_DSLASH) {
-//     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-//     plaq[1] = -plaq[1];
-//     plaq[2] = -plaq[2];
-//   }
+  //   if (dslash_type != QUDA_LAPLACE_DSLASH) {
+  //     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+  //     plaq[1] = -plaq[1];
+  //     plaq[2] = -plaq[2];
+  //   }
 
-//   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-// #endif
+  //   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  // #endif
 
   compute_fatlong = true;
   if (compute_fatlong) {
@@ -688,27 +672,26 @@ int invert_test(void)
 
   } // fat long
 
-// #ifdef GPU_GAUGE_TOOLS
-//   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-//     gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-//     double plaq[3];
-//     loadGaugeQuda(qdp_fatlink, &gaugeParam);
-//     plaqQuda(plaq);
-//     gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  // #ifdef GPU_GAUGE_TOOLS
+  //   if (dslash_type == QUDA_ASQTAD_DSLASH) {
+  //     gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  //     double plaq[3];
+  //     loadGaugeQuda(qdp_fatlink, &gaugeParam);
+  //     plaqQuda(plaq);
+  //     gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
 
-//     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-//     plaq[1] = -plaq[1];
-//     plaq[2] = -plaq[2];
+  //     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
+  //     plaq[1] = -plaq[1];
+  //     plaq[2] = -plaq[2];
 
-//     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-//   }
-// #endif
+  //     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  //   }
+  // #endif
 
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gaugeSiteSize, gaugeParam.cpu_prec, gaugeParam.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gaugeSiteSize, gaugeParam.cpu_prec, gaugeParam.cpu_prec);
-
 
   // parameters for color spinor fields
   ColorSpinorParam csParam;
@@ -727,7 +710,7 @@ int invert_test(void)
   csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
-  
+
   // these are currently all cpu fields
   // in = new cpuColorSpinorField(csParam);
   // out = new cpuColorSpinorField(csParam);
@@ -794,6 +777,9 @@ int invert_test(void)
   // double nrm2 = 0;
   // double src2 = 0;
   int ret = 0;
+  unsigned long long seed = 12345;
+  auto rng = std::make_unique<quda::RNG>(gaugeParam, seed);
+  rng->Init();
 
   int len = 0;
   if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
@@ -807,11 +793,10 @@ int invert_test(void)
   case 1: // solving prec system, reconstructing
   case 2:
 
-    psibarpsiQuda(&inv_param);
+    for (int i = 0; i < 10; i++) psibarpsiQuda(&inv_param, rng.get());
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
-
 
     break;
 
@@ -823,26 +808,25 @@ int invert_test(void)
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
 
-
     break;
 
   default: errorQuda("Unsupported test type");
 
   } // switch
 
-/*
-  if (test_type <= 4) {
+  /*
+    if (test_type <= 4) {
 
-    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-    double l2r = sqrt(nrm2 / src2);
+      double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+      double l2r = sqrt(nrm2 / src2);
 
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+      printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+                 inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
-               inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
-  }
-*/
+      printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
+                 inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+    }
+  */
 
   // Clean up gauge fields, at least
   for (int dir = 0; dir < 4; dir++) {
@@ -883,12 +867,10 @@ int invert_test(void)
   // delete out;
   // delete ref;
   // delete tmp;
-
-  endQuda();  
+  rng->Release();
+  endQuda();
   return ret;
 }
-
-
 
 void display_test_info()
 {
@@ -924,7 +906,7 @@ void usage_extra(char **argv)
   return;
 }
 
-// main 
+// main
 int main(int argc, char **argv)
 {
 
@@ -955,36 +937,34 @@ int main(int argc, char **argv)
     warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
- 
 
-    // if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER)
-    //     && solve_type != QUDA_NORMOP_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
-    //   warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to BiCGstab.\n");
-    //   inv_type = QUDA_BICGSTAB_INVERTER;
-    // }
+  // if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER)
+  //     && solve_type != QUDA_NORMOP_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
+  //   warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to
+  //   BiCGstab.\n"); inv_type = QUDA_BICGSTAB_INVERTER;
+  // }
 
-    if (solve_type == QUDA_INVALID_SOLVE) {
-      // if (test_type == 0) {
-        // solve_type = QUDA_DIRECT_SOLVE;
-      // } else {
-        solve_type = QUDA_DIRECT_PC_SOLVE;
-      // }
-    }
-
-    // if (test_type == 1 || test_type == 3 || test_type == 5) {
-      matpc_type = QUDA_MATPC_EVEN_EVEN;
-    // } else if (test_type == 2 || test_type == 4 || test_type == 6) {
-    //   matpc_type = QUDA_MATPC_ODD_ODD;
-    // } else if (test_type == 0) {
-    //   matpc_type = QUDA_MATPC_EVEN_EVEN; // it doesn't matter
-    // }
-
-    // if (test_type == 0 || test_type == 1 || test_type == 2) {
-      solution_type = QUDA_MAT_SOLUTION;
+  if (solve_type == QUDA_INVALID_SOLVE) {
+    // if (test_type == 0) {
+    // solve_type = QUDA_DIRECT_SOLVE;
     // } else {
-      // solution_type = QUDA_MATPC_SOLUTION;
+    solve_type = QUDA_DIRECT_PC_SOLVE;
     // }
-  
+  }
+
+  // if (test_type == 1 || test_type == 3 || test_type == 5) {
+  matpc_type = QUDA_MATPC_EVEN_EVEN;
+  // } else if (test_type == 2 || test_type == 4 || test_type == 6) {
+  //   matpc_type = QUDA_MATPC_ODD_ODD;
+  // } else if (test_type == 0) {
+  //   matpc_type = QUDA_MATPC_EVEN_EVEN; // it doesn't matter
+  // }
+
+  // if (test_type == 0 || test_type == 1 || test_type == 2) {
+  solution_type = QUDA_MAT_SOLUTION;
+  // } else {
+  // solution_type = QUDA_MATPC_SOLUTION;
+  // }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) { prec_sloppy = prec; }
 
