@@ -36,8 +36,6 @@ namespace quda {
   void createDslashEvents();
   void destroyDslashEvents();
 
-#ifndef USE_LEGACY_DSLASH
-
   /**
      @brief Driver for applying the Wilson stencil
 
@@ -458,67 +456,6 @@ namespace quda {
   void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity,
                    bool dagger, const int *comm_override, TimeProfile &profile);
 
-#else
-
-  // plain Wilson Dslash
-  void wilsonDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile);
-
-  // clover Dslash
-  void cloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			const FullClover &cloverInv, const cudaColorSpinorField *in,
-			const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			const double &k, const int *commDim, TimeProfile &profile);
-
-  // clover Dslash
-  void asymCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			    const FullClover &cloverInv, const cudaColorSpinorField *in,
-			    const int oddBit, const int daggerBit, const cudaColorSpinorField *x,
-			    const double &k, const int *commDim, TimeProfile &profile);
-
-  // twisted mass Dslash
-  void twistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
-      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
-      TimeProfile &profile);
-
-  // twisted mass Dslash
-  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-      const int parity, const int dagger, const cudaColorSpinorField *x, const QudaTwistDslashType type,
-      const double &kappa, const double &mu, const double &epsilon, const double &k, const int *commDim,
-      TimeProfile &profile);
-
-  // twisted clover Dslash
-  void twistedCloverDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const FullClover *clover,
-      const FullClover *cloverInv, const cudaColorSpinorField *in, const int parity, const int dagger,
-      const cudaColorSpinorField *x, const QudaTwistCloverDslashType type, const double &kappa, const double &mu,
-      const double &epsilon, const double &k, const int *commDim, TimeProfile &profile);
-
-  // domain wall Dslash
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			    const int parity, const int dagger, const cudaColorSpinorField *x,
-			    const double &m_f, const double &k, const int *commDim, TimeProfile &profile);
-
-  // Added for 4d EO preconditioning in DWF
-  void domainWallDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-			    const int parity, const int dagger, const cudaColorSpinorField *x,
-			    const double &m_f, const double &a, const double &b,
-			    const int *commDim, const int DS_type, TimeProfile &profile);
-
-  // Added for 4d EO preconditioning in Mobius DWF
-  void MDWFDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, const cudaColorSpinorField *in,
-		      const int parity, const int dagger, const cudaColorSpinorField *x, const double &m_f, const double &k,
-		      const double *b5, const double *c_5, const double &m5,
-                      const int *commDim, const int DS_type, TimeProfile &profile);
-
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double kappa,
-                    const ColorSpinorField *x, int parity);
-
-  void ApplyCovDev(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int parity, int mu);
-
-#endif
-
   /**
      @brief Apply clover-matrix field to a color-spinor field
      @param[out] out Result color-spinor field
@@ -529,20 +466,7 @@ namespace quda {
   */
   void ApplyClover(
       ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover, bool inverse, int parity);
-#ifdef USE_LEGACY_DSLASH
-  // staggered Dslash
-  void staggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge,
-			   const cudaColorSpinorField *in, const int parity, const int dagger,
-			   const cudaColorSpinorField *x, const double &k,
-			   const int *commDim, TimeProfile &profile);
 
-  // improved staggered Dslash
-  void improvedStaggeredDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &fatGauge, const cudaGaugeField &longGauge,
-				   const cudaColorSpinorField *in, const int parity, const int dagger,
-				   const cudaColorSpinorField *x, const double &k,
-				   const int *commDim, TimeProfile &profile);
-
-#else
   /**
      @brief Apply the staggered dslash operator to a color-spinor field.
      @param[out] out Result color-spinor field
@@ -555,24 +479,24 @@ namespace quda {
      @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
   */
   void ApplyStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
-   @brief Apply the improved staggered dslash operator to a color-spinor field.
-   @param[out] out Result color-spinor field
-   @param[in] in Input color-spinor field
-   @param[in] U Gauge-Link (1-link or fat-link)
-   @param[in] L Long-Links for asqtad
-   @param[in] a xpay parameter (set to 0.0 for non-xpay version)
-   @param[in] x Vector field we accumulate onto to
-   @param[in] parity parity parameter
-   @param[in] dagger Whether we are applying the dagger or not
-   @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
-*/
-  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L,
-      double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+     @brief Apply the improved staggered dslash operator to a color-spinor field.
+     @param[out] out Result color-spinor field
+     @param[in] in Input color-spinor field
+     @param[in] U Gauge-Link (1-link or fat-link)
+     @param[in] L Long-Links for asqtad
+     @param[in] a xpay parameter (set to 0.0 for non-xpay version)
+     @param[in] x Vector field we accumulate onto to
+     @param[in] parity parity parameter
+     @param[in] dagger Whether we are applying the dagger or not
+     @param[in] improved whether to apply the standard-staggered (false) or asqtad (true) operator
+  */
+  void ApplyImprovedStaggered(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                              const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
+                              const int *comm_override, TimeProfile &profile);
 
-#endif
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.
      @param[out] out Result color-spinor field
@@ -604,25 +528,6 @@ namespace quda {
   void ApplyTwistClover(ColorSpinorField &out, const ColorSpinorField &in, const CloverField &clover,
 			double kappa, double mu, double epsilon, int parity, int dagger, QudaTwistGamma5Type twist);
 
-#ifdef USE_LEGACY_DSLASH
-  /**
-     @brief Dslash face packing routine
-     @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
-     @param[in] in Input ColorSpinorField to be packed
-     @param[in] location Locations where the packed fields are (Device, Host and/or Remote)
-     @param[in] nFace Depth of halo
-     @param[in] dagger Whether this is for the dagger operator
-     @param[in] parity Field parity
-     @param[in] dim Which dimensions we are packing
-     @param[in] face_num Are we packing backwards (0), forwards (1) or both directions (2)
-     @param[in] stream Which stream are we executing in
-     @param[in] a Packing coefficient (twisted-mass only)
-     @param[in] b Packing coefficient (twisted-mass only)
-  */
-  void packFace(void *ghost_buf[2*QUDA_MAX_DIM], cudaColorSpinorField &in, MemoryLocation location,
-		const int nFace, const int dagger, const int parity, const int dim, const int face_num,
-		const cudaStream_t &stream, const double a=0.0, const double b=0.0);
-#else
   /**
      @brief Dslash face packing routine
      @param[out] ghost_buf Array of packed halos, order is [2*dim+dir]
@@ -639,7 +544,6 @@ namespace quda {
   */
   void PackGhost(void *ghost[2 * QUDA_MAX_DIM], const ColorSpinorField &field, MemoryLocation location, int nFace,
                  bool dagger, int parity, bool spin_project, double a, double b, double c, const cudaStream_t &stream);
-#endif
 
   /**
      @brief Applies a gamma5 matrix to a spinor (wrapper to ApplyGamma)

@@ -73,7 +73,7 @@ namespace quda
       }
     }
 
-    rng = new RNG(param.B[0]->Volume(), 1234, param.B[0]->X());
+    rng = new RNG(*param.B[0], 1234);
     rng->Init();
 
     if (param.level != 0 || param.is_staggered == QUDA_BOOLEAN_NO) {
@@ -89,7 +89,7 @@ namespace quda
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
-            if (strcmp(param.mg_global.vec_infile, "") != 0) { // only load if infile is defined and not computing
+            if (strcmp(param.mg_global.vec_infile[param.level], "") != 0) { // only load if infile is defined and not computing
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
               generateEigenVectors(); // Run the eigensolver
@@ -97,10 +97,9 @@ namespace quda
               generateNullVectors(param.B);
             }
           }
-        } else if (strcmp(param.mg_global.vec_infile, "") != 0) { // only load if infile is defined and not computing
+        } else if (strcmp(param.mg_global.vec_infile[param.level], "") != 0) { // only load if infile is defined and not computing
           if ( param.mg_global.num_setup_iter[param.level] > 0 ) generateNullVectors(param.B);
-        } else if (param.mg_global.vec_load == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
-
+        } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
           loadVectors(param.B);
         } else { // generate free field vectors
           buildFreeVectors(param.B);
@@ -473,8 +472,9 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
-            param.mg_global.vec_load == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_infile, "") != 0)) {
-          std::string vec_infile(param.mg_global.vec_infile);
+            param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_YES
+            && (strcmp(param.mg_global.vec_infile[param.level + 1], "") != 0)) {
+          std::string vec_infile(param.mg_global.vec_infile[param.level + 1]);
           vec_infile += "_level_";
           vec_infile += std::to_string(param.level + 1);
           vec_infile += "_defl_";
@@ -483,8 +483,9 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
-            param.mg_global.vec_store == QUDA_BOOLEAN_YES && (strcmp(param.mg_global.vec_outfile, "") != 0)) {
-          std::string vec_outfile(param.mg_global.vec_outfile);
+            param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_YES
+            && (strcmp(param.mg_global.vec_outfile[param.level + 1], "") != 0)) {
+          std::string vec_outfile(param.mg_global.vec_outfile[param.level + 1]);
           vec_outfile += "_level_";
           vec_outfile += std::to_string(param.level + 1);
           vec_outfile += "_defl_";
@@ -799,7 +800,7 @@ namespace quda
     if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
       // check eo
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Checking Doe of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
+        printfQuda("Checking Deo of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
       static_cast<DiracCoarse *>(diracCoarseResidual)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarse *>(diracCoarseResidual)->CloverInv(x_coarse->Even(), r_coarse->Even(), QUDA_EVEN_PARITY);
       static_cast<DiracCoarsePC *>(diracCoarseSmoother)->Dslash(r_coarse->Even(), tmp_coarse->Odd(), QUDA_EVEN_PARITY);
@@ -1059,7 +1060,7 @@ namespace quda
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
-    std::string vec_infile(param.mg_global.vec_infile);
+    std::string vec_infile(param.mg_global.vec_infile[param.level]);
     vec_infile += "_level_";
     vec_infile += std::to_string(param.level);
     vec_infile += "_nvec_";
@@ -1075,7 +1076,7 @@ namespace quda
     profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
-    std::string vec_outfile(param.mg_global.vec_outfile);
+    std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
     vec_outfile += "_level_";
     vec_outfile += std::to_string(param.level);
     vec_outfile += "_nvec_";
@@ -1273,7 +1274,7 @@ namespace quda
       diracSmootherSloppy->setCommDim(commDim);
     }
 
-    if (param.mg_global.vec_store == QUDA_BOOLEAN_YES) { // conditional store of null vectors
+    if (param.mg_global.vec_store[param.level] == QUDA_BOOLEAN_YES) { // conditional store of null vectors
       saveVectors(B);
     }
 
@@ -1520,7 +1521,7 @@ namespace quda
     for (auto b : B_evecs) { delete b; }
 
     // only save if outfile is defined
-    if (strcmp(param.mg_global.vec_outfile, "") != 0) { saveVectors(param.B); }
+    if (strcmp(param.mg_global.vec_outfile[param.level], "") != 0) { saveVectors(param.B); }
 
     popLevel(param.level);
   }

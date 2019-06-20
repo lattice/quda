@@ -547,11 +547,12 @@ namespace quda {
 
     /**
        @brief Constructs the deflation space
-       @param[in] vec A sample ColorSpinorField with which to instantiate
+       @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver
-       @pram[in] mat The operator to eigensolve
+       @param[in] mat The operator to eigensolve
+       @param[in] Whether to compute the SVD
     */
-    void constructDeflationSpace(ColorSpinorField *vec, const DiracMatrix &mat);
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd);
 
     /**
      * Return flops
@@ -595,11 +596,6 @@ namespace quda {
      * @param r2_old_init [description]
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
-
-    /**
-       @brief Constructs the deflation space for CG
-    */
-    void constructDeflationSpace();
 
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
@@ -859,11 +855,6 @@ namespace quda {
         TimeProfile &profile);
     virtual ~GCR();
 
-    /**
-       @brief Constructs the deflation space for GCR
-    */
-    void constructDeflationSpace();
-
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -953,11 +944,6 @@ namespace quda {
     CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
-    /**
-       @brief Constructs the deflation space for CACG
-    */
-    void constructDeflationSpace();
-
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
@@ -1039,11 +1025,6 @@ namespace quda {
 public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
-
-    /**
-       @brief Constructs the deflation space for CAGCR
-    */
-    void constructDeflationSpace();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };

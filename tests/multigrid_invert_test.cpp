@@ -99,8 +99,8 @@ extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -121,6 +121,7 @@ extern bool oblique_proj_check;
 extern bool mg_eig[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_nEv[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_nKr[QUDA_MAX_MG_LEVEL];
+extern bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
 extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
 extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
@@ -170,6 +171,7 @@ display_test_info()
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+      printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
       printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
                  mg_eig_use_normop[i] ? "true" : "false");
       if (mg_eig_use_poly_acc[i]) {
@@ -243,6 +245,7 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
@@ -491,10 +494,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.is_staggered = QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
-  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+  }
 
   mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
@@ -628,19 +633,10 @@ int main(int argc, char **argv)
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
 
-    setup_ca_basis[i] = QUDA_POWER_BASIS;
-    setup_ca_basis_size[i] = 4;
-    setup_ca_lambda_min[i] = 0.0;
-    setup_ca_lambda_max[i] = -1.0; // use power iterations
-
-    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-    coarse_solver_ca_basis_size[i] = 4;
-    coarse_solver_ca_lambda_min[i] = 0.0;
-    coarse_solver_ca_lambda_max[i] = -1.0;
-
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_YES;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
@@ -651,6 +647,19 @@ int main(int argc, char **argv)
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = 5.0;
+
+    setup_ca_basis[i] = QUDA_POWER_BASIS;
+    setup_ca_basis_size[i] = 4;
+    setup_ca_lambda_min[i] = 0.0;
+    setup_ca_lambda_max[i] = -1.0; // use power iterations
+
+    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    coarse_solver_ca_basis_size[i] = 4;
+    coarse_solver_ca_lambda_min[i] = 0.0;
+    coarse_solver_ca_lambda_max[i] = -1.0;
+
+    strcpy(mg_vec_infile[i], "");
+    strcpy(mg_vec_outfile[i], "");
   }
   reliable_delta = 1e-4;
 
@@ -783,7 +792,7 @@ int main(int argc, char **argv)
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
@@ -793,8 +802,9 @@ int main(int argc, char **argv)
     invertQuda(spinorOut, spinorIn, &inv_param);
 
     time[i] = inv_param.secs;
-    gflops[i] = inv_param.gflops/inv_param.secs;
-    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+    gflops[i] = inv_param.gflops / inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+               inv_param.gflops / inv_param.secs);
   }
 
   rng->Release();
@@ -807,7 +817,7 @@ int main(int argc, char **argv)
   auto mean_time2 = 0.0;
   auto mean_gflops = 0.0;
   auto mean_gflops2 = 0.0;
-  for (int i=0; i<Nsrc; i++) {
+  for (int i = 0; i < Nsrc; i++) {
     mean_time += time[i];
     mean_time2 += time[i] * time[i];
     mean_gflops += gflops[i];
@@ -816,15 +826,15 @@ int main(int argc, char **argv)
 
   mean_time /= Nsrc;
   mean_time2 /= Nsrc;
-  auto stddev_time = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_time2 - mean_time*mean_time) );
+  auto stddev_time = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time));
   mean_gflops /= Nsrc;
   mean_gflops2 /= Nsrc;
-  auto stddev_gflops = sqrt( (Nsrc/((double)Nsrc-1.0)) *  (mean_gflops2 - mean_gflops*mean_gflops) );
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n",
-             Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+  auto stddev_gflops = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops));
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
 
-  delete []time;
-  delete []gflops;
+  delete[] time;
+  delete[] gflops;
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 

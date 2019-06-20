@@ -29,6 +29,7 @@ extern int niter;
 extern int Nsrc;
 extern int Msrc;
 extern QudaSolveType solve_type;
+extern QudaVerbosity verbosity;
 
 extern void usage(char** );
 
@@ -987,7 +988,7 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
-  setVerbosity(QUDA_SILENT);
+  setVerbosity(verbosity);
 
   // clear the error state
   cudaGetLastError();

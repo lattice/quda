@@ -116,8 +116,8 @@ extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -477,10 +477,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.is_staggered = QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
-  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+  }
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -659,6 +661,10 @@ int main(int argc, char **argv)
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = 5.0;
+
+    strcpy(mg_vec_infile[i], "");
+    strcpy(mg_vec_outfile[i], "");
+
   }
   reliable_delta = 1e-4;
 
@@ -799,9 +805,8 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
     // CURAND random generator initialization
-    RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
+    RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
 
     int nsteps = 10;
@@ -818,7 +823,7 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette(*gaugeEx);
 
-    Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

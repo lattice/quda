@@ -152,6 +152,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
+  P(require_convergence, QUDA_BOOLEAN_YES);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
@@ -173,6 +174,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
+  P(require_convergence, QUDA_BOOLEAN_INVALID);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
@@ -774,13 +776,15 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
 #endif
 
+  for (int i = 0; i < n_level - 1; i++) {
 #ifdef INIT_PARAM
-  P(vec_load, QUDA_BOOLEAN_INVALID);
-  P(vec_store, QUDA_BOOLEAN_INVALID);
+    P(vec_load[i], QUDA_BOOLEAN_INVALID);
+    P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #else
-  P(vec_load, QUDA_BOOLEAN_NO);
-  P(vec_store, QUDA_BOOLEAN_NO);
+    P(vec_load[i], QUDA_BOOLEAN_NO);
+    P(vec_store[i], QUDA_BOOLEAN_NO);
 #endif
+  }
 
 #ifdef INIT_PARAM
   P(gflops, 0.0);
