@@ -672,24 +672,6 @@ int invert_test(void)
 
   } // fat long
 
-  // #ifdef GPU_GAUGE_TOOLS
-  //   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-  //     gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  //     double plaq[3];
-  //     loadGaugeQuda(qdp_fatlink, &gaugeParam);
-  //     plaqQuda(plaq);
-  //     gaugeParam.gauge_order = QUDA_MILC_GAUGE_ORDER;
-
-  //     plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-  //     plaq[1] = -plaq[1];
-  //     plaq[2] = -plaq[2];
-
-  //     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  //   }
-  // #endif
-
-  // Alright, we've created all the void** links.
-  // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gaugeSiteSize, gaugeParam.cpu_prec, gaugeParam.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gaugeSiteSize, gaugeParam.cpu_prec, gaugeParam.cpu_prec);
 
@@ -711,18 +693,6 @@ int invert_test(void)
   csParam.gammaBasis = inv_param.gamma_basis;
   csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-  // these are currently all cpu fields
-  // in = new cpuColorSpinorField(csParam);
-  // out = new cpuColorSpinorField(csParam);
-  // ref = new cpuColorSpinorField(csParam);
-  // tmp = new cpuColorSpinorField(csParam);
-
-  // put some data in the cpu fields
-  // if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-  //   constructSpinorField((float *)in->V());
-  // } else {
-  //   constructSpinorField((double *)in->V());
-  // }
 
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
@@ -781,12 +751,12 @@ int invert_test(void)
   auto rng = std::make_unique<quda::RNG>(gaugeParam, seed);
   rng->Init();
 
-  int len = 0;
-  if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V * Nsrc;
-  } else {
-    len = Vh * Nsrc;
-  }
+  // int len = 0;
+  // if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+  //   len = V * Nsrc;
+  // } else {
+  //   len = Vh * Nsrc;
+  // }
 
   switch (test_type) {
   case 0: // full parity solution
@@ -814,19 +784,6 @@ int invert_test(void)
 
   } // switch
 
-  /*
-    if (test_type <= 4) {
-
-      double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-      double l2r = sqrt(nrm2 / src2);
-
-      printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-                 inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
-
-      printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
-                 inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
-    }
-  */
 
   // Clean up gauge fields, at least
   for (int dir = 0; dir < 4; dir++) {
@@ -863,10 +820,7 @@ int invert_test(void)
   }
 #endif
 
-  // delete in;
-  // delete out;
-  // delete ref;
-  // delete tmp;
+
   rng->Release();
   endQuda();
   return ret;
@@ -913,6 +867,7 @@ int main(int argc, char **argv)
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
 
+
   for (int i = 1; i < argc; i++) {
     if (process_command_line_option(argc, argv, &i) == 0) { continue; }
 
@@ -926,45 +881,14 @@ int main(int argc, char **argv)
     usage(argv);
   }
 
+
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
-
-  // Ensure a reasonable default
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
-    dslash_type = QUDA_ASQTAD_DSLASH;
-  }
-
-  // if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER)
-  //     && solve_type != QUDA_NORMOP_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
-  //   warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to
-  //   BiCGstab.\n"); inv_type = QUDA_BICGSTAB_INVERTER;
-  // }
-
-  if (solve_type == QUDA_INVALID_SOLVE) {
-    // if (test_type == 0) {
-    // solve_type = QUDA_DIRECT_SOLVE;
-    // } else {
-    solve_type = QUDA_DIRECT_PC_SOLVE;
-    // }
-  }
-
-  // if (test_type == 1 || test_type == 3 || test_type == 5) {
+  test_type = dslash_type = QUDA_ASQTAD_DSLASH;
+  solve_type = QUDA_DIRECT_PC_SOLVE;
   matpc_type = QUDA_MATPC_EVEN_EVEN;
-  // } else if (test_type == 2 || test_type == 4 || test_type == 6) {
-  //   matpc_type = QUDA_MATPC_ODD_ODD;
-  // } else if (test_type == 0) {
-  //   matpc_type = QUDA_MATPC_EVEN_EVEN; // it doesn't matter
-  // }
-
-  // if (test_type == 0 || test_type == 1 || test_type == 2) {
   solution_type = QUDA_MAT_SOLUTION;
-  // } else {
-  // solution_type = QUDA_MATPC_SOLUTION;
-  // }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) { prec_sloppy = prec; }
 
