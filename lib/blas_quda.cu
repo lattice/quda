@@ -24,6 +24,13 @@ namespace quda {
 
     static cudaStream_t *blasStream;
 
+    static cudaStream_t *auxBlasStream;
+
+    static cudaEvent_t auxBlasEvent;
+
+    static bool run_aux_blas_stream;
+
+
     template <typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename SpinorV, typename Functor>
     class BlasCuda : public Tunable
@@ -480,18 +487,76 @@ namespace quda {
     void initReduce();
     void endReduce();
 
+    void createAuxBlasStream()
+    {
+      if(!auxBlasStream) auxBlasStream = new cudaStream_t;
+      else errorQuda("Concurrent stream was already created.");
+
+    #if (CUDA_VERSION >= 5050)
+      int greatestPriority;
+      int leastPriority;
+      cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+      cudaStreamCreateWithPriority(auxBlasStream, cudaStreamDefault, leastPriority);
+    #else
+      cudaStreamCreate(auxBlasStream);
+    #endif
+      run_aux_blas_stream = true;
+
+      cudaEventCreate(&auxBlasEvent, cudaEventDisableTiming);
+
+      checkCudaError();
+    }
+
+    void registerAuxBlasStream() {
+      if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
+      qudaEventRecord(auxBlasEvent, *auxBlasStream);
+      run_aux_blas_stream = true;
+    }
+
+    void unregisterAuxBlasStream(bool sync_flag) {
+      if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
+      if(sync_flag) qudaStreamSynchronize(*auxBlasStream);
+      run_aux_blas_stream = false;
+    }
+
+    void synchronizeAuxBlasStream() {
+      if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
+      qudaStreamWaitEvent(*auxBlasStream, auxBlasEvent, 0);
+      //qudaStreamSynchronize(*auxBlasStream);
+    }
+
+
+    void destroyAuxBlasStream(){
+      run_aux_blas_stream = false;
+      if(!auxBlasStream) errorQuda("Cannot destroy concurrent stream.");
+      //
+      qudaStreamSynchronize(*auxBlasStream);
+      cudaStreamDestroy(*auxBlasStream);
+      cudaEventDestroy(auxBlasEvent);
+      delete auxBlasStream;
+      auxBlasStream = nullptr;
+
+      checkCudaError();
+    }
+
     void init()
     {
       blasStream = &streams[Nstream-1];
       initReduce();
+      // by default no extra concurrent streams, everything is using the legacy blasSream
+      run_aux_blas_stream = false;
+      auxBlasStream = nullptr;
     }
 
     void end(void)
     {
       endReduce();
+      //delete extra concurrent streams
+      if(auxBlasStream) destroyAuxBlasStream();
     }
 
-    cudaStream_t* getStream() { return blasStream; }
+    cudaStream_t* getStream() { return !run_aux_blas_stream ? blasStream : auxBlasStream; }
+
 
     void axpbyz(double a, ColorSpinorField &x, double b,
                 ColorSpinorField &y, ColorSpinorField &z) {

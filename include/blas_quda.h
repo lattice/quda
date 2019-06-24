@@ -14,6 +14,15 @@ namespace quda {
     void init();
     void end(void);
 
+    // creates and destroys additional copy stream
+    void createAuxBlasStream();
+    void destroyAuxBlasStream();
+    // Activate/deactivate (and synchronize) aux stream handle
+    void registerAuxBlasStream();
+    void unregisterAuxBlasStream(bool sync = true);
+    // Synchronize aux blas stream
+    void synchronizeAuxBlasStream();
+
     void* getDeviceReduceBuffer();
     void* getMappedHostReduceBuffer();
     void* getHostReduceBuffer();

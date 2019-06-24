@@ -816,7 +816,7 @@ namespace quda {
 
     int k = 0;
 
-    const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-8;
+    const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
     bool converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq);
 
     constexpr int prediction_correction_interval = 16;
@@ -830,6 +830,8 @@ namespace quda {
     }
 
     dslash::aux_worker = nullptr;
+
+    blas::createAuxBlasStream();
 
     while ( !converged && k < param.maxiter ) {
       //Update search space
@@ -863,12 +865,19 @@ namespace quda {
 				&iallreduce_request_handle));
       }
 
+      if(dslash::aux_worker) {
+	 blas::synchronizeAuxBlasStream();     
+	 blas::registerAuxBlasStream();
+      }
+
       matSloppy(u, s, tmp);
 
       if (k % prediction_correction_interval == 0){
         matSloppy(w, r, tmp);
 	correction_count += 1;
       }
+
+      if(dslash::aux_worker) blas::unregisterAuxBlasStream();
 
       if (comm_size() > 1){
         EIGCG_MPI_CHECK_(MPI_Wait(&iallreduce_request_handle, MPI_STATUS_IGNORE));
@@ -883,6 +892,8 @@ namespace quda {
     blas::zero(*args.V2k);
 
     dslash::aux_worker = nullptr;
+    blas::destroyAuxBlasStream();
+
     args.CleanArgs();
 
     blas::xpy(y, x);
