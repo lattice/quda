@@ -19,6 +19,7 @@ namespace quda {
     HOST,
     PINNED,
     MAPPED,
+    MANAGED,
     N_ALLOC_TYPE
   };
 
@@ -62,6 +63,8 @@ namespace quda {
 
   long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
 
+  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
+
   long host_allocated_peak() { return max_total_bytes[HOST]; }
 
   static void print_trace (void) {
@@ -84,7 +87,7 @@ namespace quda {
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
@@ -294,6 +297,30 @@ namespace quda {
 
 
   /**
+   * Perform a standard cudaMallocManaged() with error-checking.  This
+   * function should only be called via the managed_malloc() macro,
+   * defined in malloc_quda.h
+   */
+  void *managed_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr;
+
+    a.size = a.base_size = size;
+
+    cudaError_t err = cudaMallocManaged(&ptr, size);
+    if (err != cudaSuccess) {
+      errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
+    track_malloc(MANAGED, a, ptr);
+#ifdef HOST_DEBUG
+    cudaMemset(ptr, 0xff, size);
+#endif
+    return ptr;
+  }
+
+
+  /**
    * Free device memory allocated with device_malloc().  This function
    * should only be called via the device_free() macro, defined in
    * malloc_quda.h
@@ -333,6 +360,23 @@ namespace quda {
     CUresult err = cuMemFree((CUdeviceptr)ptr);
     if (err != CUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
+  }
+
+
+  /**
+   * Free device memory allocated with device_malloc().  This function
+   * should only be called via the device_free() macro, defined in
+   * malloc_quda.h
+   */
+  void managed_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
+    if (!alloc[MANAGED].count(ptr)) {
+      errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
+    }
+    cudaError_t err = cudaFree(ptr);
+    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    track_free(MANAGED, ptr);
   }
 
 
