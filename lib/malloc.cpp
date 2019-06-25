@@ -164,6 +164,23 @@ namespace quda {
   }
 
 
+  static bool use_managed_memory() {
+    static bool managed = false;
+    static bool init = false;
+
+    if (!init) {
+      char *enable_managed_memory = getenv("QUDA_ENABLE_MANAGED_MEMORY");
+      if (enable_managed_memory && strcmp(enable_managed_memory, "1") == 0) {
+        warningQuda("Using managed memory for CUDA allocations");
+        managed = true;
+      }
+
+      init = true;
+    }
+
+    return managed;
+  }
+
   /**
    * Perform a standard cudaMalloc() with error-checking.  This
    * function should only be called via the device_malloc() macro,
@@ -171,7 +188,9 @@ namespace quda {
    */
   void *device_malloc_(const char *func, const char *file, int line, size_t size)
   {
- #ifndef QDP_USE_CUDA_MANAGED_MEMORY
+    if (use_managed_memory()) return managed_malloc_(func, file, line, size);
+
+#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -327,6 +346,11 @@ namespace quda {
    */
   void device_free_(const char *func, const char *file, int line, void *ptr)
   {
+    if (use_managed_memory()) {
+      managed_free_(func, file, line, ptr);
+      return;
+    }
+
 #ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
@@ -420,6 +444,7 @@ namespace quda {
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1<<20));
     printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1<<20));
+    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1<<20));
     printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
     printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
   }
