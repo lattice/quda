@@ -27,7 +27,7 @@ namespace quda {
     Dirac::checkParitySpinor(out, in);
 
     if (out.Volume() != clover.VolumeCB()) {
-      errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d",
+      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu",
 		out.Volume(), clover.VolumeCB());
     }
   }

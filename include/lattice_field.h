@@ -145,12 +145,12 @@ namespace quda {
 
   protected:
     /** Lattice volume */
-    int volume;
+    size_t volume;
 
     /** Checkerboarded volume */
-    int volumeCB;
+    size_t volumeCB;
 
-    int stride;
+    size_t stride;
     int pad;
 
     size_t total_bytes;
@@ -501,12 +501,12 @@ namespace quda {
     /**
        @return The full-field volume
     */
-    int Volume() const { return volume; }
+    size_t Volume() const { return volume; }
     
     /**
        @return The single-parity volume
     */
-    int VolumeCB() const { return volumeCB; }
+    size_t VolumeCB() const { return volumeCB; }
     
     /**
        @param i The dimension of the requested surface 
@@ -523,7 +523,7 @@ namespace quda {
     /**
        @return The single-parity stride of the field     
     */
-    int Stride() const { return stride; }
+    size_t Stride() const { return stride; }
     
     /**
        @return The field padding
