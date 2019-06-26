@@ -47,7 +47,7 @@ namespace quda {
 	nParity(out.SiteSubset()), nFace(1), X0h( ((3-nParity) * out.X(0)) /2),
 	dim{ (3-nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1 },
       commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB(out.VolumeCB()/dim[4])
+	volumeCB((unsigned int)out.VolumeCB()/dim[4])
     {  }
   };
 
