@@ -619,6 +619,7 @@ namespace quda {
           if((use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop){
             if (use_heavy_quark_res) {
               L2breakdown = true;
+              warningQuda("CG: L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps );
             } else {
               if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
                 warningQuda("CG: solver exiting due to too many true residual norm increases");
@@ -644,7 +645,7 @@ namespace quda {
                         heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
-              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
+              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)", hqresIncrease ,hqmaxresIncrease);
               break;
             }
           } else {
@@ -652,7 +653,7 @@ namespace quda {
           }
 
           if (hqresRestartTotal > hqmaxresRestartTotal) {
-            warningQuda("CG: solver exiting due to too many heavy quark residual restarts");
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts (%i/%i)", hqresRestartTotal, hqmaxresRestartTotal );
             break;
           }
         }
