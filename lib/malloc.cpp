@@ -165,6 +165,8 @@ namespace quda {
       if (enable_managed_memory && strcmp(enable_managed_memory, "1") == 0) {
         warningQuda("Using managed memory for CUDA allocations");
         managed = true;
+
+        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
       }
 
       init = true;
