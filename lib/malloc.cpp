@@ -13,15 +13,7 @@
 
 namespace quda {
 
-  enum AllocType {
-    DEVICE,
-    DEVICE_PINNED,
-    HOST,
-    PINNED,
-    MAPPED,
-    MANAGED,
-    N_ALLOC_TYPE
-  };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
 
   class MemAlloc {
 
@@ -163,8 +155,8 @@ namespace quda {
     return ptr;
   }
 
-
-  static bool use_managed_memory() {
+  static bool use_managed_memory()
+  {
     static bool managed = false;
     static bool init = false;
 
@@ -312,8 +304,7 @@ namespace quda {
     memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
-  }  
-
+  }
 
   /**
    * Perform a standard cudaMallocManaged() with error-checking.  This
@@ -337,7 +328,6 @@ namespace quda {
 #endif
     return ptr;
   }
-
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -386,7 +376,6 @@ namespace quda {
     track_free(DEVICE_PINNED, ptr);
   }
 
-
   /**
    * Free device memory allocated with device_malloc().  This function
    * should only be called via the device_free() macro, defined in
@@ -402,7 +391,6 @@ namespace quda {
     if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(MANAGED, ptr);
   }
-
 
   /**
    * Free host memory allocated with safe_malloc(), pinned_malloc(),
@@ -444,7 +432,7 @@ namespace quda {
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1<<20));
     printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1<<20));
-    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1<<20));
+    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
     printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
   }
