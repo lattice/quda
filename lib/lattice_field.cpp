@@ -645,7 +645,8 @@ namespace quda {
 	if (x[i]-2*r[i] != a.x[i]) errorQuda("x[%d] does not match %d %d", i, x[i]-2*r[i], a.x[i]);
 	this_volume_interior *= x[i] - 2*r[i];
       }
-      if (this_volume_interior != a.volume) errorQuda("Interior volume does not match %lu %lu", this_volume_interior, a.volume);
+      if (this_volume_interior != a.volume)
+        errorQuda("Interior volume does not match %lu %lu", this_volume_interior, a.volume);
     } else {
       if (a.volume != volume) errorQuda("Volume does not match %lu %lu", volume, a.volume);
       if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %lu %lu", volumeCB, a.volumeCB);

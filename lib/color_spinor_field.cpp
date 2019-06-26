@@ -274,8 +274,8 @@ namespace quda {
     {
       int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Ns=%d,Nc=%d",
-                           volume, stride, precision, nSpin, nColor);
+      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Ns=%d,Nc=%d", volume, stride,
+                           precision, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
         strcpy(aux_tmp, aux_string);
