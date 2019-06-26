@@ -134,7 +134,7 @@ namespace quda {
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
 
     if (dst.Volume() != src.Volume())
-      errorQuda("Volumes %d %d don't match", dst.Volume(), src.Volume());
+      errorQuda("Volumes %lu %lu don't match", dst.Volume(), src.Volume());
 
     if (!( dst.SiteOrder() == src.SiteOrder() ||
 	   (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER &&
