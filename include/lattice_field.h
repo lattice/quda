@@ -395,7 +395,7 @@ namespace quda {
         case QUDA_DOUBLE_PRECISION: break;
         default: errorQuda("Unknown precision %d\n", precision);
         }
-    }
+      }
 
     mutable char *backup_h;
     mutable char *backup_norm_h;
