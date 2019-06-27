@@ -616,7 +616,8 @@ namespace quda {
             "CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2), r0Norm, resIncreaseTotal);
 
-          if((use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop){
+          if ((use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > maxResIncrease
+              or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
             } else {
