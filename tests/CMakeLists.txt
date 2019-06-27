@@ -16,6 +16,9 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(quda_test QIO)
+endif()
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
   add_dependencies(quda_test QMP)
 endif()
 
