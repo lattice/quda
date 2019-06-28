@@ -145,257 +145,257 @@ namespace quda {
 
   protected:
     /** Lattice volume */
-      size_t volume;
+    size_t volume;
 
-      /** Checkerboarded volume */
-      size_t volumeCB;
+    /** Checkerboarded volume */
+    size_t volumeCB;
 
-      size_t stride;
-      int pad;
+    size_t stride;
+    int pad;
 
-      size_t total_bytes;
+    size_t total_bytes;
 
-      /** Number of field dimensions */
-      int nDim;
+    /** Number of field dimensions */
+    int nDim;
 
-      /** Array storing the length of dimension */
-      int x[QUDA_MAX_DIM];
+    /** Array storing the length of dimension */
+    int x[QUDA_MAX_DIM];
 
-      int surface[QUDA_MAX_DIM];
-      int surfaceCB[QUDA_MAX_DIM];
+    int surface[QUDA_MAX_DIM];
+    int surfaceCB[QUDA_MAX_DIM];
 
-      /** The extended lattice radius (if applicable) */
-      int r[QUDA_MAX_DIM];
+    /** The extended lattice radius (if applicable) */
+    int r[QUDA_MAX_DIM];
 
-      /** Precision of the field */
-      QudaPrecision precision;
+    /** Precision of the field */
+    QudaPrecision precision;
 
-      /** Precision of the ghost */
-      mutable QudaPrecision ghost_precision;
+    /** Precision of the ghost */
+    mutable QudaPrecision ghost_precision;
 
-      /** Bool which is triggered if the ghost precision is reset */
-      mutable bool ghost_precision_reset;
-
-      /** For fixed-point fields that need a global scaling factor */
-      double scale;
-
-      /** Whether the field is full or single parity */
-      QudaSiteSubset siteSubset;
+    /** Bool which is triggered if the ghost precision is reset */
+    mutable bool ghost_precision_reset;
+
+    /** For fixed-point fields that need a global scaling factor */
+    double scale;
+
+    /** Whether the field is full or single parity */
+    QudaSiteSubset siteSubset;
 
-      /** Type of ghost exchange to perform */
-      QudaGhostExchange ghostExchange;
+    /** Type of ghost exchange to perform */
+    QudaGhostExchange ghostExchange;
 
-      // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
-
-      /** The number of dimensions we partition for communication */
-      int nDimComms;
+    // The below are additions for inter-GPU communication (merging FaceBuffer functionality)
+
+    /** The number of dimensions we partition for communication */
+    int nDimComms;
 
-      /*
-         The need for persistent message handlers (for GPUDirect support)
-         means that we allocate different message handlers for each number of
-         faces we can send.
-      */
+    /*
+       The need for persistent message handlers (for GPUDirect support)
+       means that we allocate different message handlers for each number of
+       faces we can send.
+    */
 
-      /**
-         Double buffered static GPU halo send buffer
-      */
-      static void *ghost_send_buffer_d[2];
+    /**
+       Double buffered static GPU halo send buffer
+    */
+    static void *ghost_send_buffer_d[2];
 
-      /**
-         Double buffered static GPU halo receive buffer
-       */
-      static void *ghost_recv_buffer_d[2];
+    /**
+       Double buffered static GPU halo receive buffer
+     */
+    static void *ghost_recv_buffer_d[2];
 
-      /**
-         Double buffered static pinned send buffers
-      */
-      static void *ghost_pinned_send_buffer_h[2];
-
-      /**
-         Double buffered static pinned recv buffers
-      */
-      static void *ghost_pinned_recv_buffer_h[2];
+    /**
+       Double buffered static pinned send buffers
+    */
+    static void *ghost_pinned_send_buffer_h[2];
+
+    /**
+       Double buffered static pinned recv buffers
+    */
+    static void *ghost_pinned_recv_buffer_h[2];
 
-      /**
-         Mapped version of pinned send buffers
-      */
-      static void *ghost_pinned_send_buffer_hd[2];
+    /**
+       Mapped version of pinned send buffers
+    */
+    static void *ghost_pinned_send_buffer_hd[2];
 
-      /**
-         Mapped version of pinned recv buffers
-      */
-      static void *ghost_pinned_recv_buffer_hd[2];
+    /**
+       Mapped version of pinned recv buffers
+    */
+    static void *ghost_pinned_recv_buffer_hd[2];
 
-      /**
-         Remove ghost pointer for sending to
-      */
-      static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
+    /**
+       Remove ghost pointer for sending to
+    */
+    static void *ghost_remote_send_buffer_d[2][QUDA_MAX_DIM][2];
 
-      /**
-         The current size of the static ghost allocation
-      */
-      static size_t ghostFaceBytes;
+    /**
+       The current size of the static ghost allocation
+    */
+    static size_t ghostFaceBytes;
 
-      /**
-         Whether the ghost buffers have been initialized
-      */
-      static bool initGhostFaceBuffer;
+    /**
+       Whether the ghost buffers have been initialized
+    */
+    static bool initGhostFaceBuffer;
 
-      /**
-         Size in bytes of this ghost field
-      */
-      mutable size_t ghost_bytes;
+    /**
+       Size in bytes of this ghost field
+    */
+    mutable size_t ghost_bytes;
 
-      /**
-         Size in bytes of prior ghost allocation
-      */
-      mutable size_t ghost_bytes_old;
+    /**
+       Size in bytes of prior ghost allocation
+    */
+    mutable size_t ghost_bytes_old;
 
-      /**
-         Size in bytes of the ghost in each dimension
-      */
-      mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
+    /**
+       Size in bytes of the ghost in each dimension
+    */
+    mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
 
-      /**
-         Real-number offsets to each ghost zone
-      */
-      mutable int ghostOffset[QUDA_MAX_DIM][2];
+    /**
+       Real-number offsets to each ghost zone
+    */
+    mutable int ghostOffset[QUDA_MAX_DIM][2];
 
-      /**
-         Real-number (in floats) offsets to each ghost zone for norm field
-      */
-      mutable int ghostNormOffset[QUDA_MAX_DIM][2];
+    /**
+       Real-number (in floats) offsets to each ghost zone for norm field
+    */
+    mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
-      /**
-         Pinned memory buffer used for sending messages
-      */
-      void *my_face_h[2];
+    /**
+       Pinned memory buffer used for sending messages
+    */
+    void *my_face_h[2];
 
-      /**
-         Mapped version of my_face_h
-      */
-      void *my_face_hd[2];
+    /**
+       Mapped version of my_face_h
+    */
+    void *my_face_hd[2];
 
-      /**
-         Device memory buffer for sending messages
-       */
-      void *my_face_d[2];
+    /**
+       Device memory buffer for sending messages
+     */
+    void *my_face_d[2];
 
-      /** Local pointers to the pinned my_face buffer */
-      void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the pinned my_face buffer */
+    void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
 
-      /** Local pointers to the mapped my_face buffer */
-      void *my_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the mapped my_face buffer */
+    void *my_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
 
-      /** Local pointers to the device ghost_send buffer */
-      void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the device ghost_send buffer */
+    void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-      /**
-         Memory buffer used for receiving all messages
-      */
-      void *from_face_h[2];
+    /**
+       Memory buffer used for receiving all messages
+    */
+    void *from_face_h[2];
 
-      /**
-         Mapped version of from_face_h
-      */
-      void *from_face_hd[2];
+    /**
+       Mapped version of from_face_h
+    */
+    void *from_face_hd[2];
 
-      /**
-         Device memory buffer for receiving messages
-       */
-      void *from_face_d[2];
+    /**
+       Device memory buffer for receiving messages
+     */
+    void *from_face_d[2];
 
-      /** Local pointers to the pinned from_face buffer */
-      void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the pinned from_face buffer */
+    void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
 
-      /** Local pointers to the mapped from_face buffer */
-      void *from_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the mapped from_face buffer */
+    void *from_face_dim_dir_hd[2][QUDA_MAX_DIM][2];
 
-      /** Local pointers to the device ghost_recv buffer */
-      void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
+    /** Local pointers to the device ghost_recv buffer */
+    void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-      /** Message handles for receiving from forwards */
-      MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
+    /** Message handles for receiving from forwards */
+    MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
 
-      /** Message handles for receiving from backwards */
-      MsgHandle *mh_recv_back[2][QUDA_MAX_DIM];
+    /** Message handles for receiving from backwards */
+    MsgHandle *mh_recv_back[2][QUDA_MAX_DIM];
 
-      /** Message handles for sending forwards */
-      MsgHandle *mh_send_fwd[2][QUDA_MAX_DIM];
+    /** Message handles for sending forwards */
+    MsgHandle *mh_send_fwd[2][QUDA_MAX_DIM];
 
-      /** Message handles for sending backwards */
-      MsgHandle *mh_send_back[2][QUDA_MAX_DIM];
+    /** Message handles for sending backwards */
+    MsgHandle *mh_send_back[2][QUDA_MAX_DIM];
 
-      /** Message handles for rdma receiving from forwards */
-      MsgHandle *mh_recv_rdma_fwd[2][QUDA_MAX_DIM];
+    /** Message handles for rdma receiving from forwards */
+    MsgHandle *mh_recv_rdma_fwd[2][QUDA_MAX_DIM];
 
-      /** Message handles for rdma receiving from backwards */
-      MsgHandle *mh_recv_rdma_back[2][QUDA_MAX_DIM];
+    /** Message handles for rdma receiving from backwards */
+    MsgHandle *mh_recv_rdma_back[2][QUDA_MAX_DIM];
 
-      /** Message handles for rdma sending to forwards */
-      MsgHandle *mh_send_rdma_fwd[2][QUDA_MAX_DIM];
+    /** Message handles for rdma sending to forwards */
+    MsgHandle *mh_send_rdma_fwd[2][QUDA_MAX_DIM];
 
-      /** Message handles for rdma sending to backwards */
-      MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
+    /** Message handles for rdma sending to backwards */
+    MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
 
-      /** Peer-to-peer message handler for signaling event posting */
-      static MsgHandle *mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle *mh_send_p2p_fwd[2][QUDA_MAX_DIM];
 
-      /** Peer-to-peer message handler for signaling event posting */
-      static MsgHandle *mh_send_p2p_back[2][QUDA_MAX_DIM];
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle *mh_send_p2p_back[2][QUDA_MAX_DIM];
 
-      /** Peer-to-peer message handler for signaling event posting */
-      static MsgHandle *mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle *mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
 
-      /** Peer-to-peer message handler for signaling event posting */
-      static MsgHandle *mh_recv_p2p_back[2][QUDA_MAX_DIM];
+    /** Peer-to-peer message handler for signaling event posting */
+    static MsgHandle *mh_recv_p2p_back[2][QUDA_MAX_DIM];
 
-      /** Buffer used by peer-to-peer message handler */
-      static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
 
-      /** Buffer used by peer-to-peer message handler */
-      static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_fwd[2][QUDA_MAX_DIM];
 
-      /** Buffer used by peer-to-peer message handler */
-      static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_send_p2p_back[2][QUDA_MAX_DIM];
 
-      /** Buffer used by peer-to-peer message handler */
-      static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
+    /** Buffer used by peer-to-peer message handler */
+    static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
-      /** Local copy of event used for peer-to-peer synchronization */
-      static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    /** Local copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
-      /** Remote copy of event used for peer-to-peer synchronization */
-      static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    /** Remote copy of event used for peer-to-peer synchronization */
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
-      /** Whether we have initialized communication for this field */
-      bool initComms;
+    /** Whether we have initialized communication for this field */
+    bool initComms;
 
-      /** Whether we have initialized peer-to-peer communication */
-      static bool initIPCComms;
+    /** Whether we have initialized peer-to-peer communication */
+    static bool initIPCComms;
 
-      /** Used as a label in the autotuner */
-      char vol_string[TuneKey::volume_n];
+    /** Used as a label in the autotuner */
+    char vol_string[TuneKey::volume_n];
 
-      /** used as a label in the autotuner */
-      char aux_string[TuneKey::aux_n];
+    /** used as a label in the autotuner */
+    char aux_string[TuneKey::aux_n];
 
-      /** Sets the vol_string for use in tuning */
-      virtual void setTuningString();
+    /** Sets the vol_string for use in tuning */
+    virtual void setTuningString();
 
-      /** The type of allocation we are going to do for this field */
-      QudaMemoryType mem_type;
+    /** The type of allocation we are going to do for this field */
+    QudaMemoryType mem_type;
 
-      void precisionCheck()
-      {
-        switch (precision) {
-        case QUDA_QUARTER_PRECISION:
-        case QUDA_HALF_PRECISION:
-        case QUDA_SINGLE_PRECISION:
-        case QUDA_DOUBLE_PRECISION: break;
-        default: errorQuda("Unknown precision %d\n", precision);
-        }
+    void precisionCheck()
+    {
+      switch (precision) {
+      case QUDA_QUARTER_PRECISION:
+      case QUDA_HALF_PRECISION:
+      case QUDA_SINGLE_PRECISION:
+      case QUDA_DOUBLE_PRECISION: break;
+      default: errorQuda("Unknown precision %d\n", precision);
       }
+    }
 
     mutable char *backup_h;
     mutable char *backup_norm_h;
@@ -496,7 +496,7 @@ namespace quda {
        @return The pointer to the lattice-dimension array
     */
     const int* X() const { return x; }
-    
+
     /**
        @return The full-field volume
     */
@@ -518,9 +518,9 @@ namespace quda {
        @return The single-parity surface of dimension i
     */
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
-    
+
     /**
-       @return The single-parity stride of the field     
+       @return The single-parity stride of the field
     */
     size_t Stride() const { return stride; }
 
