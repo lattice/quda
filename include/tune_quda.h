@@ -55,6 +55,11 @@ namespace quda {
     }
   };
 
+  /**
+   * @brief Returns a reference to the tunecache map
+   * @return tunecache reference
+   */
+  const std::map<TuneKey, TuneParam> &getTuneCache();
 
   class Tunable {
 
@@ -268,6 +273,21 @@ namespace quda {
 
     /** This is the return result from kernels launched using jitify */
     CUresult jitify_error;
+
+    /**
+       @brief Whether the present instance has already been tuned or not
+       @return True if tuned, false if not
+    */
+    bool tuned()
+    {
+      // not tuning is equivalent to already tuned
+      if (!getTuning()) return true;
+
+      TuneKey key = tuneKey();
+      if (use_managed_memory()) strcat(key.aux, ",managed");
+      // if key is present in cache then already tuned
+      return getTuneCache().find(key) != getTuneCache().end();
+    }
 
   public:
     Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
@@ -558,12 +578,6 @@ namespace quda {
    * @brief Post an event in the trace, recording where it was posted
    */
   void postTrace_(const char *func, const char *file, int line);
-
-  /**
-   * @brief Returns a reference to the tunecache map
-   * @return tunecache reference
-   */
-  const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
    * @brief Enable the profile kernel counting

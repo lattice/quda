@@ -155,7 +155,7 @@ namespace quda {
     return ptr;
   }
 
-  static bool use_managed_memory()
+  bool use_managed_memory()
   {
     static bool managed = false;
     static bool init = false;

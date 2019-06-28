@@ -29,6 +29,11 @@ namespace quda {
    */
   long host_allocated_peak();
 
+  /**
+     @return are we using managed memory for device allocations
+  */
+  bool use_managed_memory();
+
   /*
    * The following functions should not be called directly.  Use the
    * macros below instead.

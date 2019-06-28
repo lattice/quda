@@ -692,7 +692,7 @@ namespace quda {
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning
-      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+      if (!tuned()) {
 	disableProfileCount();
 	for (auto &i : policies) if(i!= DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) dslash(i);
 	enableProfileCount();
