@@ -1330,7 +1330,7 @@ namespace quda {
     }
 
     // Composite field version
-    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x(), y()); }
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
 
 
   } // namespace blas
