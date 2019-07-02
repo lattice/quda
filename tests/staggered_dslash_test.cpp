@@ -870,13 +870,28 @@ int main(int argc, char **argv)
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  for (int i=1 ;i < argc; i++){
-
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  add_eigen_option_group(app);
+  add_deflation_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
+  // auto rc = process_options(argc, argv);
+
+  // std::cout << "RETURN " << rc << std::endl;
+  // return rc;
+  // for (int i=1 ;i < argc; i++){
+
+  //   if (process_command_line_option(argc, argv, &i) == 0) { continue; }
+
+  //   fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+  //   usage(argv);
+  // }
 
   initComms(argc, argv, gridsize_from_cmdline);
 

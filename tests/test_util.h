@@ -3,6 +3,7 @@
 
 #include <quda.h>
 #include <random_quda.h>
+#include <externals/CLI11.hpp>
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
@@ -95,7 +96,11 @@
   int fullLatticeIndex_5d(int i, int oddBit);
   int fullLatticeIndex_5d_4dpc(int i, int oddBit);
   int process_command_line_option(int argc, char** argv, int* idx);
+  int process_options(int argc, char** argv);
 
+  std::shared_ptr<CLI::App> make_app(std::string app_description = "QUDA internal test", std::string app_name = "");
+void add_eigen_option_group(std::shared_ptr<CLI::App> quda_app);
+void add_deflation_option_group(std::shared_ptr<CLI::App> quda_app);
   // use for some profiling
   void stopwatchStart();
   double stopwatchReadSeconds();

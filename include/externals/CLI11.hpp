@@ -1060,10 +1060,17 @@ constexpr const char *type_name() {
 }
 
 template <typename T,
-          enable_if_t<std::is_integral<T>::value && std::is_unsigned<T>::value, detail::enabler> = detail::dummy>
+          enable_if_t<is_bool<T>::value, detail::enabler> = detail::dummy>
+constexpr const char *type_name() {
+    return "BOOL";
+}
+
+template <typename T,
+          enable_if_t<std::is_integral<T>::value && std::is_unsigned<T>::value && !is_bool<T>::value, detail::enabler> = detail::dummy>
 constexpr const char *type_name() {
     return "UINT";
 }
+
 
 template <typename T, enable_if_t<std::is_floating_point<T>::value, detail::enabler> = detail::dummy>
 constexpr const char *type_name() {
