@@ -48,16 +48,18 @@ namespace quda {
     {
 
   private:
+      typedef typename scalar<FloatN>::type Float;
+      typedef typename vector<Float, 2>::type Float2;
+      static constexpr int NYW_max = max_YW_size<NXZ, Float2>();
       const int NYW;
       const int nParity;
       mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
       const coeff_array<T> &a, &b, &c;
-
       std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
       // host pointers used for backing up fields when tuning
       // don't curry into the Spinors to minimize parameter size
-      char *Y_h[MAX_MULTI_BLAS_N], *W_h[MAX_MULTI_BLAS_N], *Ynorm_h[MAX_MULTI_BLAS_N], *Wnorm_h[MAX_MULTI_BLAS_N];
+      char *Y_h[NYW_max], *W_h[NYW_max], *Ynorm_h[NYW_max], *Wnorm_h[NYW_max];
 
       bool tuneSharedBytes() const { return false; }
 
@@ -114,90 +116,73 @@ namespace quda {
 
         typedef typename scalar<FloatN>::type Float;
         typedef typename vector<Float, 2>::type Float2;
+
 #ifdef JITIFY
         using namespace jitify::reflection;
         auto instance
             = program->kernel("quda::blas::multiBlasKernel").instantiate(Type<FloatN>(), M, NXZ, Type<decltype(arg)>());
 
-        // FIXME - if NXZ=1 no need to copy entire array
-        // FIXME - do we really need strided access here?
-        if (a.data && a.use_const) {
+        if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+              A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
           auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
           cuMemcpyHtoDAsync(Amatrix_d, A, MAX_MATRIX_SIZE, *getStream());
         }
 
-        if (b.data && b.use_const) {
+        if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+              B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
           auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
           cuMemcpyHtoDAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, *getStream());
         }
 
-        if (c.data && c.use_const) {
+        if (c.data) {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
-
+              C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
           cuMemcpyHtoDAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, *getStream());
         }
 
         jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-        // FIXME - if NXZ=1 no need to copy entire array
-        // FIXME - do we really need strided access here?
-        if (a.data && a.use_const) {
+        if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              A[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
-
+              A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
           cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 
-        if (b.data && b.use_const) {
+        if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              B[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
-
+              B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
           cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
         }
 
-        if (c.data && c.use_const) {
+        if (c.data) {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
-          // since the kernel doesn't know the width of them matrix at compile
-          // time we stride it and copy the padded matrix to GPU
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
-              C[MAX_MULTI_BLAS_N * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
-
+              C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
-        }
-#if CUDA_VERSION < 9000
-        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
-                                *getStream());
-#endif
+	}
+
+#ifdef CONSTANT_ARG
+	cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, stream);
+        multiBlasKernel<FloatN, M, NXZ, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>();
+#else
         multiBlasKernel<FloatN, M, NXZ><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+#endif
 #endif
       }
 
@@ -246,22 +231,25 @@ namespace quda {
         std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
         std::vector<ColorSpinorField *> &w, int length)
     {
-      const int NYW = y.size();
-
-      const int N = NXZ > NYW ? NXZ : NYW;
-      if (N > MAX_MULTI_BLAS_N) errorQuda("Spinor vector length exceeds max size (%d > %d)", N, MAX_MULTI_BLAS_N);
-
-      if (NXZ * NYW * sizeof(Complex) > MAX_MATRIX_SIZE)
-        errorQuda("A matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Complex), MAX_MATRIX_SIZE);
-
       typedef typename scalar<RegType>::type Float;
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
+      constexpr int NYW_max = max_YW_size<NXZ, Float2>();
+      printfQuda("NXZ = %d max NYW = %d\n", NXZ, NYW_max);
+      const int NYW = y.size();
+
+      if (NXZ > MAX_MULTI_BLAS_N) errorQuda("NXZ exceeds max size (%d > %d)", NXZ, MAX_MULTI_BLAS_N);
+
+      if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
+
+      if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
+        errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
+
       SpinorTexture<RegType, StoreType, M> X[NXZ];
-      Spinor<RegType, yType, M, write::Y> Y[MAX_MULTI_BLAS_N];
+      Spinor<RegType, yType, M, write::Y> Y[NYW_max];
       SpinorTexture<RegType, StoreType, M> Z[NXZ];
-      Spinor<RegType, StoreType, M, write::W> W[MAX_MULTI_BLAS_N];
+      Spinor<RegType, StoreType, M, write::W> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {
         X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -274,7 +262,7 @@ namespace quda {
 
       // if block caxpy is an 'outer product of caxpy' where 'x'
 
-      Functor<NXZ, Float2, RegType> f(a, b, c, NYW);
+      Functor<NXZ, Float2, RegType> f(NYW);
 
       MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
                 SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
@@ -291,7 +279,7 @@ namespace quda {
        Driver for generic blas routine with four loads and two store.
     */
     template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
-    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+    void uniMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
         CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
         CompositeColorSpinorField &w)
     {
@@ -535,11 +523,128 @@ namespace quda {
       }
     }
 
+    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+		   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+		   CompositeColorSpinorField &w)
+    {
+      if (x[0]->Precision() != y[0]->Precision()) {
+	mixedMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+      } else {
+	uniMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+      }
+    }
+
+    template <template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
+		   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+		   CompositeColorSpinorField &w)
+    {
+      // instantiate the loop unrolling template
+      switch (x.size()) {
+      case 1: multiBlas<1, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 2
+      case 2: multiBlas<2, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 3
+      case 3: multiBlas<3, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 4
+      case 4: multiBlas<4, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 5
+      case 5: multiBlas<5, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 6
+      case 6: multiBlas<6, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 7
+      case 7: multiBlas<7, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 8
+      case 8: multiBlas<8, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 9
+      case 9: multiBlas<9, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 10
+      case 10: multiBlas<10, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 11
+      case 11: multiBlas<11, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 12
+      case 12: multiBlas<12, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 13
+      case 13: multiBlas<13, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 14
+      case 14: multiBlas<14, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 15
+      case 15: multiBlas<15, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 16
+      case 16: multiBlas<16, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 17
+      case 17: multiBlas<17, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 18
+      case 18: multiBlas<18, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 19
+      case 19: multiBlas<19, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 20
+      case 20: multiBlas<20, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 21
+      case 21: multiBlas<21, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 22
+      case 22: multiBlas<22, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 23
+      case 23: multiBlas<23, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 24
+      case 24: multiBlas<24, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 25
+      case 25: multiBlas<25, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 26
+      case 26: multiBlas<26, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 27
+      case 27: multiBlas<27, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 28
+      case 28: multiBlas<28, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 29
+      case 29: multiBlas<29, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 30
+      case 30: multiBlas<30, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 31
+      case 31: multiBlas<31, Functor, write>(a, b, c, x, y, x, w); break;
+#if MAX_MULTI_BLAS_N >= 32
+      case 32: multiBlas<32, Functor, write>(a, b, c, x, y, x, w); break;
+#endif // 32
+#endif // 31
+#endif // 30
+#endif // 29
+#endif // 28
+#endif // 27
+#endif // 26
+#endif // 25
+#endif // 24
+#endif // 23
+#endif // 22
+#endif // 21
+#endif // 20
+#endif // 19
+#endif // 18
+#endif // 17
+#endif // 16
+#endif // 15
+#endif // 14
+#endif // 13
+#endif // 12
+#endif // 11
+#endif // 10
+#endif // 9
+#endif // 8
+#endif // 7
+#endif // 6
+#endif // 5
+#endif // 4
+#endif // 3
+#endif // 2
+      default:
+	errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+      }
+    }
+
     void caxpy_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
           int i_idx ,int j_idx, int upper) {
 
-      if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, recurse.
-      {
+      if (y.size() > max_YW_size(x.size(), 2*y[0]->Precision())) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -564,145 +669,29 @@ namespace quda {
         caxpy_recurse(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
 
         delete[] tmpmajor;
-      }
-      else
-      {
+      } else {
         // if at the bottom of recursion,
         // return if on lower left for upper triangular,
         // return if on upper right for lower triangular.
         if (x.size() <= MAX_MULTI_BLAS_N) {
           if (upper == 1 && j_idx < i_idx) { return; }
           if (upper == -1 && j_idx > i_idx) { return; }
-        }
 
-        // mark true since we will copy the "a" matrix into constant memory
-        coeff_array<Complex> a(a_, true), b, c;
+	  // mark true since we will copy the "a" matrix into constant memory
+	  coeff_array<Complex> a(a_), b, c;
+	  multiBlas<multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
+	} else {
+	  // split the problem in half and recurse
+	  const Complex *a0 = &a_[0];
+	  const Complex *a1 = &a_[(x.size()/2)*y.size()];
 
-        if (x[0]->Precision() == y[0]->Precision())
-        {
-          switch (x.size()) {
-          case 1: multiBlas<1, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: multiBlas<2, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: multiBlas<3, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: multiBlas<4, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: multiBlas<5, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: multiBlas<6, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: multiBlas<7, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: multiBlas<8, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: multiBlas<9, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: multiBlas<10, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: multiBlas<11, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: multiBlas<12, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: multiBlas<13, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: multiBlas<14, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: multiBlas<15, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: multiBlas<16, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
+	  std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+	  std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
-              caxpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
-              break;
-          }
-        }
-        else // precisions don't agree.
-        {
-          switch (x.size()) {
-          case 1: mixedMultiBlas<1, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: mixedMultiBlas<2, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: mixedMultiBlas<3, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: mixedMultiBlas<4, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: mixedMultiBlas<5, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: mixedMultiBlas<6, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: mixedMultiBlas<7, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: mixedMultiBlas<8, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: mixedMultiBlas<9, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: mixedMultiBlas<10, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: mixedMultiBlas<11, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: mixedMultiBlas<12, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: mixedMultiBlas<13, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: mixedMultiBlas<14, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: mixedMultiBlas<15, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: mixedMultiBlas<16, multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y); break;
-#endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
-
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
-              caxpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
-              break;
-          }
-        }
-      } // end if (y.size() > MAX_MULTI_BLAS_N)
+	  caxpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
+	  caxpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
+	}
+      } // end if (y.size() > max_YW_size())
     }
 
     void caxpy(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -745,8 +734,7 @@ namespace quda {
 
     void caxpyz_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass, int upper) {
 
-      if (y.size() > MAX_MULTI_BLAS_N) // if greater than max single-kernel size, recurse.
-      {
+      if (y.size() > max_YW_size(x.size(), 2*y[0]->Precision())) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -774,152 +762,34 @@ namespace quda {
         caxpyz_recurse(tmpmajor1, x, y1, z1, i, 2*j+1, pass, upper);
 
         delete[] tmpmajor;
-      }
-      else
-      {
+      } else {
       	// if at bottom of recursion check where we are
       	if (x.size() <= MAX_MULTI_BLAS_N) {
       	  if (pass==1) {
-      	    if (i!=j)
-            {
+	    if (i!=j) {
               if (upper == 1 && j < i) { return; } // upper right, don't need to update lower left.
               if (upper == -1 && i < j) { return; } // lower left, don't need to update upper right.
               caxpy(a_, x, z); return;  // off diagonal
             }
       	    return;
       	  } else {
-      	    if (i!=j) return; // We're on the first pass, so we only want to update the diagonal.
+	    if (i!=j) return; // We're on the first pass, so we only want to update the diagonal.
       	  }
-      	}
 
-        // mark true since we will copy the "a" matrix into constant memory
-        coeff_array<Complex> a(a_, true), b, c;
+	  coeff_array<Complex> a(a_), b, c;
+	  multiBlas<multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z);
+	} else {
+	  // split the problem in half and recurse
+	  const Complex *a0 = &a_[0];
+	  const Complex *a1 = &a_[(x.size()/2)*y.size()];
 
-        if (x[0]->Precision() == y[0]->Precision())
-        {
-          switch (x.size()) {
-          case 1: multiBlas<1, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: multiBlas<2, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: multiBlas<3, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: multiBlas<4, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: multiBlas<5, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: multiBlas<6, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: multiBlas<7, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: multiBlas<8, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: multiBlas<9, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: multiBlas<10, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: multiBlas<11, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: multiBlas<12, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: multiBlas<13, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: multiBlas<14, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: multiBlas<15, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: multiBlas<16, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
+	  std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+	  std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpyz_recurse(a0, x0, y, z, 2*i+0, j, pass, upper);
-              caxpyz_recurse(a1, x1, y, z, 2*i+1, j, pass, upper); // b/c we don't want to re-zero z.
-              break;
-          }
-        }
-        else // precisions don't agree.
-        {
-          switch (x.size()) {
-          case 1: mixedMultiBlas<1, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: mixedMultiBlas<2, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: mixedMultiBlas<3, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: mixedMultiBlas<4, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: mixedMultiBlas<5, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: mixedMultiBlas<6, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: mixedMultiBlas<7, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: mixedMultiBlas<8, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: mixedMultiBlas<9, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: mixedMultiBlas<10, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: mixedMultiBlas<11, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: mixedMultiBlas<12, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: mixedMultiBlas<13, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: mixedMultiBlas<14, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: mixedMultiBlas<15, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: mixedMultiBlas<16, multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z); break;
-#endif // 16
-  #endif // 15
-  #endif // 14
-  #endif // 13
-  #endif // 12
-  #endif // 11
-  #endif // 10
-  #endif // 9
-  #endif // 8
-  #endif // 7
-  #endif // 6
-  #endif // 5
-  #endif // 4
-  #endif // 3
-  #endif // 2
-            default:
-              // split the problem in half and recurse
-              const Complex *a0 = &a_[0];
-              const Complex *a1 = &a_[(x.size()/2)*y.size()];
-
-              std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-              std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
-
-              caxpyz_recurse(a0, x0, y, z, 2*i+0, j, pass, upper);
-              caxpyz_recurse(a1, x1, y, z, 2*i+1, j, pass, upper);
-              break;
-          }
-        }
-      } // end if (y.size() > MAX_MULTI_BLAS_N)
+	  caxpyz_recurse(a0, x0, y, z, 2*i+0, j, pass, upper);
+	  caxpyz_recurse(a1, x1, y, z, 2*i+1, j, pass, upper);
+	}
+      } // end if (y.size() > max_YW_size())
     }
 
     void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
@@ -959,9 +829,9 @@ namespace quda {
     }
 
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
-		   const double *b_, ColorSpinorField &z_, const double *c_) {
-
-      if (y_.size() <= MAX_MULTI_BLAS_N) {
+		   const double *b_, ColorSpinorField &z_, const double *c_)
+    {
+      if (y_.size() <= max_YW_size(1, 2*y_[0]->Precision())) {
 	// swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -972,14 +842,8 @@ namespace quda {
 	std::vector<ColorSpinorField*> x;
 	x.push_back(&z_);
 
-	// we will curry the parameter arrays into the functor
-	coeff_array<double> a(a_,false), b(b_,false), c(c_,false);
-
-	if (x[0]->Precision() != y[0]->Precision() ) {
-          mixedMultiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
-        } else {
-          multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
-        }
+	coeff_array<double> a(a_), b(b_), c(c_);
+	multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
       } else {
 	// split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -1005,9 +869,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-
-      const int xsize = x_.size();
-      if (xsize <= MAX_MULTI_BLAS_N) // only swizzle if we have to.
+      if (x_.size() <= MAX_MULTI_BLAS_N) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
@@ -1021,119 +883,8 @@ namespace quda {
         // we're reading from x
         std::vector<ColorSpinorField*> &x = x_;
 
-        // put a and b into constant space
-        coeff_array<Complex> a(a_,true), b(b_,true), c;
-
-        if (x[0]->Precision() != y[0]->Precision() )
-        {
-          switch(xsize)
-          {
-          case 1: mixedMultiBlas<1, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: mixedMultiBlas<2, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: mixedMultiBlas<3, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: mixedMultiBlas<4, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: mixedMultiBlas<5, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: mixedMultiBlas<6, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: mixedMultiBlas<7, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: mixedMultiBlas<8, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: mixedMultiBlas<9, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: mixedMultiBlas<10, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: mixedMultiBlas<11, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: mixedMultiBlas<12, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: mixedMultiBlas<13, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: mixedMultiBlas<14, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: mixedMultiBlas<15, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: mixedMultiBlas<16, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#endif // 16
-#endif // 15
-#endif // 14
-#endif // 13
-#endif // 12
-#endif // 11
-#endif // 10
-#endif // 9
-#endif // 8
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 4
-#endif // 3
-#endif // 2
-            default:
-              // we can't hit the default, it ends up in the else below.
-              break;
-          }
-        }
-        else
-        {
-          switch(xsize)
-          {
-          case 1: multiBlas<1, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 2
-          case 2: multiBlas<2, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 3
-          case 3: multiBlas<3, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 4
-          case 4: multiBlas<4, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 5
-          case 5: multiBlas<5, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 6
-          case 6: multiBlas<6, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 7
-          case 7: multiBlas<7, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 8
-          case 8: multiBlas<8, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 9
-          case 9: multiBlas<9, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 10
-          case 10: multiBlas<10, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 11
-          case 11: multiBlas<11, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 12
-          case 12: multiBlas<12, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 13
-          case 13: multiBlas<13, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 14
-          case 14: multiBlas<14, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 15
-          case 15: multiBlas<15, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 16
-          case 16: multiBlas<16, multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w); break;
-#endif // 16
-#endif // 15
-#endif // 14
-#endif // 13
-#endif // 12
-#endif // 11
-#endif // 10
-#endif // 9
-#endif // 8
-#endif // 7
-#endif // 6
-#endif // 5
-#endif // 4
-#endif // 3
-#endif // 2
-            default:
-              // we can't hit the default, it ends up in the else below.
-              break;
-            }
-        }
+        coeff_array<Complex> a(a_), b(b_), c;
+	multiBlas<multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];

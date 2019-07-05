@@ -4,7 +4,6 @@
 
 template <typename OutputType, typename InputType> class Texture
 {
-
   typedef typename quda::mapper<InputType>::type RegType;
 
   private:
@@ -48,7 +47,6 @@ template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned in
 
 template <typename OutputType, typename InputType> class Texture
 {
-
   typedef typename quda::mapper<InputType>::type RegType;
 
   private:
@@ -68,12 +66,14 @@ template <typename OutputType, typename InputType> class Texture
     return *this;
   }
 
-  __device__ inline OutputType operator[](unsigned int idx)
+  __device__ __host__ inline OutputType operator[](unsigned int idx)
   {
     OutputType out;
     copyFloatN(out, spinor[idx]);
     return out;
   }
+
+  __device__ __host__ inline InputType* Spinor() const { return const_cast<InputType*>(spinor); }
 };
 
 #endif
@@ -129,32 +129,37 @@ __device__ inline float store_norm(float *norm, FloatN x[M], int i)
 */
 template <typename RegType, typename StoreType, int N> class SpinorTexture
 {
-
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
 
   protected:
   Texture<InterType, StoreType> tex;
-  Texture<InterType, StoreType> ghostTex;
   float *norm; // always use direct reads for norm
 
   int stride;
   unsigned int cb_offset;
   unsigned int cb_norm_offset;
 #ifndef BLAS_SPINOR
+  Texture<InterType, StoreType> ghostTex;
   int ghost_stride[4];
 #endif
 
   public:
-  SpinorTexture() : tex(), ghostTex(), norm(0), stride(0), cb_offset(0), cb_norm_offset(0) {} // default constructor
+  SpinorTexture() : tex(), norm(0), stride(0), cb_offset(0), cb_norm_offset(0)
+#ifndef BLAS_SPINOR
+    ,ghostTex()
+#endif
+    {} // default constructor
 
   // Spinor must only ever called with cudaColorSpinorField references!!!!
   SpinorTexture(const ColorSpinorField &x, int nFace = 1) :
       tex(&(static_cast<const cudaColorSpinorField &>(x))),
-      ghostTex(&(static_cast<const cudaColorSpinorField &>(x)), true),
       norm((float *)x.Norm()),
       stride(x.Stride()),
       cb_offset(x.Bytes() / (2 * sizeof(StoreType))),
       cb_norm_offset(x.NormBytes() / (2 * sizeof(float)))
+#ifndef BLAS_SPINOR
+      ,ghostTex(&(static_cast<const cudaColorSpinorField &>(x)), true)
+#endif
   {
     checkTypes<RegType, InterType, StoreType>();
 #ifndef BLAS_SPINOR
@@ -164,11 +169,13 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
 
   SpinorTexture(const SpinorTexture &st) :
       tex(st.tex),
-      ghostTex(st.ghostTex),
       norm(st.norm),
       stride(st.stride),
       cb_offset(st.cb_offset),
       cb_norm_offset(st.cb_norm_offset)
+#ifndef BLAS_SPINOR
+      ,ghostTex(st.ghostTex)
+#endif
   {
 #ifndef BLAS_SPINOR
     for (int d = 0; d < 4; d++) ghost_stride[d] = st.ghost_stride[d];
@@ -179,12 +186,12 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
   {
     if (&src != this) {
       tex = src.tex;
-      ghostTex = src.ghostTex;
       norm = src.norm;
       stride = src.stride;
       cb_offset = src.cb_offset;
       cb_norm_offset = src.cb_norm_offset;
 #ifndef BLAS_SPINOR
+      ghostTex = src.ghostTex;
       for (int d = 0; d < 4; d++) ghost_stride[d] = src.ghost_stride[d];
 #endif
     }
@@ -194,12 +201,12 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
   void set(const cudaColorSpinorField &x, int nFace = 1)
   {
     tex = Texture<InterType, StoreType>(&x);
-    ghostTex = Texture<InterType, StoreType>(&x, true);
     norm = (float *)x.Norm();
     stride = x.Stride();
     cb_offset = x.Bytes() / (2 * sizeof(StoreType));
     cb_norm_offset = x.NormBytes() / (2 * sizeof(float));
 #ifndef BLAS_SPINOR
+    ghostTex = Texture<InterType, StoreType>(&x, true);
     for (int d = 0; d < 4; d++) ghost_stride[d] = nFace * x.SurfaceCB(d);
 #endif
     checkTypes<RegType, InterType, StoreType>();
@@ -283,33 +290,45 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
 template <typename RegType, typename StoreType, int N, int write>
 class Spinor : public SpinorTexture<RegType, StoreType, N>
 {
-
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorTexture<RegType, StoreType, N> ST;
 
   private:
+#ifdef USE_TEXTURE_OBJECTS
   StoreType *spinor;
-  StoreType *ghost_spinor;
+#endif
 
-  public:
-  Spinor() : ST(), spinor(0), ghost_spinor(0) {} // default constructor
+ public:
+  Spinor() : ST()
+#ifdef USE_TEXTURE_OBJECTS
+    , spinor(0)
+#endif
+  {
+  } // default constructor
 
   // Spinor must only ever called with cudaColorSpinorField references!!!!
   Spinor(const ColorSpinorField &x, int nFace = 1) :
-      ST(x, nFace),
-      spinor((StoreType *)x.V()),
-      ghost_spinor((StoreType *)x.Ghost2())
+      ST(x, nFace)
+#ifdef USE_TEXTURE_OBJECTS
+      , spinor((StoreType *)x.V())
+#endif
   {
   }
 
-  Spinor(const Spinor &st) : ST(st), spinor(st.spinor), ghost_spinor(st.ghost_spinor) {}
+  Spinor(const Spinor &st) : ST(st)
+#ifdef USE_TEXTURE_OBJECTS
+        , spinor(st.spinor)
+#endif
+  {
+  }
 
   Spinor &operator=(const Spinor &src)
   {
     ST::operator=(src);
     if (&src != this) {
+#ifdef USE_TEXTURE_OBJECTS
       spinor = src.spinor;
-      ghost_spinor = src.ghost_spinor;
+#endif
     }
     return *this;
   }
@@ -317,8 +336,9 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
   void set(const cudaColorSpinorField &x)
   {
     ST::set(x);
+#ifdef USE_TEXTURE_OBJECTS
     spinor = (StoreType *)x.V();
-    ghost_spinor = (StoreType *)x.Ghost2();
+#endif
   }
 
   ~Spinor() {}
@@ -327,6 +347,9 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
   __device__ inline void save(RegType x[], int i, const int parity = 0)
   {
     if (write) {
+#ifndef USE_TEXTURE_OBJECTS
+      StoreType *spinor = ST::tex.Spinor();
+#endif
       constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
       InterType y[M];
       convert<InterType, RegType>(y, x, M);
@@ -346,6 +369,9 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
   void backup(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
   {
     if (write) {
+#ifndef USE_TEXTURE_OBJECTS
+      StoreType *spinor = ST::tex.Spinor();
+#endif
       *spinor_h = new char[bytes];
       cudaMemcpy(*spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
       if (norm_bytes > 0) {
@@ -360,6 +386,9 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
   void restore(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
   {
     if (write) {
+#ifndef USE_TEXTURE_OBJECTS
+      StoreType *spinor = ST::tex.Spinor();
+#endif
       cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
       if (norm_bytes > 0) {
         cudaMemcpy(ST::norm, *norm_h, norm_bytes, cudaMemcpyHostToDevice);
@@ -372,6 +401,12 @@ class Spinor : public SpinorTexture<RegType, StoreType, N>
     }
   }
 
-  void *V() { return (void *)spinor; }
+  void *V() {
+#ifndef USE_TEXTURE_OBJECTS
+    StoreType *spinor = ST::tex.Spinor();
+#endif
+    return (void *)spinor;
+  }
+
   float *Norm() { return ST::norm; }
 };

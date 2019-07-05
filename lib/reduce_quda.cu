@@ -38,7 +38,7 @@ namespace quda {
            blocks = 2 x SM count
 
 	 - multi-reductions where we are reducing to a matrix of size
-	   of size MAX_MULTI_BLAS_N^2 of vectors (max length 4), with
+	   of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4), with
 	   possible parity dimension, and a grid-stride loop with
 	   maximum number of blocks = 2 x SM count
       */
@@ -47,7 +47,7 @@ namespace quda {
       const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
 
       const int max_reduce = 2 * max_reduce_blocks * reduce_size;
-      const int max_multi_reduce = 2 * MAX_MULTI_BLAS_N * MAX_MULTI_BLAS_N * max_reduce_blocks * reduce_size;
+      const int max_multi_reduce = 2 * QUDA_MAX_MULTI_REDUCE * max_reduce_blocks * reduce_size;
 
       // reduction buffer size
       size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
