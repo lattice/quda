@@ -147,8 +147,6 @@ void initFields(int prec)
   // xmH = new cpuColorSpinorField(param);
   // ymH = new cpuColorSpinorField(param);
 
-
-
   xmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
   ymH.reserve(Msrc);
@@ -217,7 +215,7 @@ void initFields(int prec)
   param.is_composite = true;
   param.is_component = false;
 
-// create composite fields
+  // create composite fields
   param.composite_dim = Nsrc;
   xmD = new cudaColorSpinorField(param);
 
@@ -249,6 +247,7 @@ void initFields(int prec)
                                 low_aux_prec == QUDA_QUARTER_PRECISION || mid_aux_prec == QUDA_QUARTER_PRECISION) );
 
   if ( flag ) {
+
     *vD = *vH;
     *wD = *wH;
     *xD = *xH;
@@ -257,6 +256,7 @@ void initFields(int prec)
     *hD = *hH;
     *mD = *mH;
     *lD = *lH;
+
     // for (int i=0; i < Nsrc; i++){
     //   xmD->Component(i) = *(xmH[i]);
     //   ymD->Component(i) = *(ymH[i]);
@@ -1015,15 +1015,19 @@ using ::testing::Combine;
 class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
 protected:
   ::testing::tuple<int, int> param;
+  const int &prec;
+  const int &kernel;
 
-public:
+ public:
+  BlasTest() :
+    param(GetParam()),
+    prec(::testing::get<0>(param)),
+    kernel(::testing::get<1>(param)) { }
   virtual ~BlasTest() { }
   virtual void SetUp() {
-    param = GetParam();
-    initFields(::testing::get<0>(GetParam()));
+    if (!skip_kernel(prec, kernel)) initFields(prec);
   }
-  virtual void TearDown() { freeFields(); }
-
+  virtual void TearDown() { if (!skip_kernel(prec, kernel)) freeFields();}
 };
 
 
