@@ -6,7 +6,7 @@
 
 //#define WARP_MULTI_REDUCE
 
-#if CUDA_VERSION < 90000
+#if CUDA_VERSION < 9000
 #define CONSTANT_ARG
 #endif
 
@@ -45,7 +45,7 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    template <int NXZ, typename RegType> inline constexpr int max_YW_size()
+    template <int NXZ, typename RegType, bool use_z, bool use_w> inline constexpr int max_YW_size()
     {
       // the size of the accessor doesn't change with precision just instantiate some precision
       using SpinorX = SpinorTexture<float4,short4,6>;
@@ -57,11 +57,13 @@ namespace quda
       constexpr int arg_size = (MAX_ARG_SIZE
                                 - sizeof(int)           // NYW parameter
                                 - sizeof(SpinorX[NXZ])  // SpinorX array
-                                - sizeof(SpinorZ[NXZ])  // SpinorW array
+                                - (use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ*)) // SpinorZ array
                                 - sizeof(int)           // functor NYW member
                                 - sizeof(int)           // length parameter
-                                - 3*sizeof(void*) - 16) // 3 pointers in ReduceArg
-        / (sizeof(SpinorY) + sizeof(SpinorW));
+                                - (!use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
+                                - 3*sizeof(void*)      // pointers for reduction buffers
+                                - 16)                  // there seems to be 16 bytes other argument space we need
+        / (sizeof(SpinorY) + (use_w ? sizeof(SpinorW) : 0) );
 
       // this is the maximum size limit imposed by the coefficient arrays
       constexpr int coeff_size = MAX_MATRIX_SIZE / (NXZ * sizeof(RegType));
@@ -76,7 +78,7 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    inline int max_YW_size(int NXZ, int precision)
+    inline int max_YW_size(int NXZ, int precision, bool use_z, bool use_w)
     {
       // ensure NXZ is a valid size
       NXZ = std::min(NXZ, MAX_MULTI_BLAS_N);
@@ -91,16 +93,44 @@ namespace quda
       int arg_size = (MAX_ARG_SIZE
                       - sizeof(int)         // NYW parameter
                       - NXZ*sizeof(SpinorX) // SpinorX array
-                      - NXZ*sizeof(SpinorZ) // SpinorW array
+                      - (use_z ? NXZ*sizeof(SpinorZ) : sizeof(SpinorZ*)) // SpinorZ array
                       - sizeof(int)         // functor NYW member
                       - sizeof(int)         // length parameter
+                      - (!use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
+                      - 3*sizeof(void*)     // pointers for reduction buffers
                       - 16)                 // there seems to be 16 bytes other argument space we need
-        / (sizeof(SpinorY) + sizeof(SpinorW));
+        / (sizeof(SpinorY) + (use_w ? sizeof(SpinorW) : 0) );
 
       int coeff_size = MAX_MATRIX_SIZE / (NXZ * precision);
 
       return std::min(arg_size, coeff_size);
     }
+
+    template <int NXZ, typename SpinorX, typename SpinorZ, bool> struct SpinorXZ
+    {
+      SpinorX X[NXZ];
+      SpinorZ *Z;
+      SpinorXZ() : Z(reinterpret_cast<SpinorZ*>(X)) { }
+    };
+
+    template <int NXZ, typename SpinorX, typename SpinorZ> struct SpinorXZ<NXZ,SpinorX,SpinorZ,true>
+    {
+      SpinorX X[NXZ];
+      SpinorZ Z[NXZ];
+    };
+
+    template <int NYW, typename SpinorY, typename SpinorW, bool> struct SpinorYW
+    {
+      SpinorY Y[NYW];
+      SpinorW *W;
+      SpinorYW() : W(reinterpret_cast<SpinorW*>(Y)) { }
+    };
+
+    template <int NYW, typename SpinorY, typename SpinorW> struct SpinorYW<NYW,SpinorY,SpinorW,true>
+    {
+      SpinorY Y[NYW];
+      SpinorW W[NYW];
+    };
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -115,13 +145,13 @@ namespace quda
     */
     template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename Reducer>
-    struct MultiReduceArg : public ReduceArg<vector_type<ReduceType, NXZ>> {
-      static constexpr int NYW_max = max_YW_size<NXZ, typename Reducer::type>();
+    struct MultiReduceArg :
+      public ReduceArg<vector_type<ReduceType, NXZ>>,
+      SpinorXZ<NXZ,SpinorX,SpinorZ,Reducer::use_z>,
+      SpinorYW<max_YW_size<NXZ, typename Reducer::type, Reducer::use_z, Reducer::use_w>(), SpinorY, SpinorW, Reducer::use_w>
+    {
+      static constexpr int NYW_max = max_YW_size<NXZ, typename Reducer::type, Reducer::use_z, Reducer::use_w>();
       const int NYW;
-      SpinorX X[NXZ];
-      SpinorY Y[NYW_max];
-      SpinorZ Z[NXZ];
-      SpinorW W[NYW_max];
       Reducer r;
       const int length;
 
@@ -134,12 +164,12 @@ namespace quda
 
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
-          this->Z[i] = Z[i];
+          if (Reducer::use_z) this->Z[i] = Z[i];
         }
 
         for (int i = 0; i < NYW; ++i) {
           this->Y[i] = Y[i];
-          this->W[i] = W[i];
+          if (Reducer::use_w) this->W[i] = W[i];
         }
       }
     };
@@ -279,6 +309,8 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct Dot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
       typedef typename scalar<Float2>::type real;
       using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       Dot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
@@ -330,6 +362,8 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct Cdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
       typedef typename scalar<Float2>::type real;
       using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       Cdot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
@@ -347,6 +381,8 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
       typedef typename scalar<Float2>::type real;
       using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       CdotCopy(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :

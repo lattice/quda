@@ -41,7 +41,7 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    template <int NXZ, typename RegType> inline constexpr int max_YW_size()
+    template <int NXZ, typename RegType, bool use_z, bool use_w> inline constexpr int max_YW_size()
     {
       // the size of the accessor doesn't change with precision just instantiate some precision
       using SpinorX = SpinorTexture<float4,short4,6>;
@@ -53,11 +53,12 @@ namespace quda
       constexpr int arg_size = (MAX_ARG_SIZE
                                 - sizeof(int)          // NYW parameter
                                 - sizeof(SpinorX[NXZ]) // SpinorX array
-                                - sizeof(SpinorZ[NXZ]) // SpinorW array
+                                - (use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ*)) // SpinorZ array
                                 - sizeof(int)          // functor NYW member
                                 - sizeof(int) - 16     // length parameter
+                                - (!use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
                                 - 16)                  // there seems to be 16 bytes other argument space we need
-        / (sizeof(SpinorY) + sizeof(SpinorW));
+        / (sizeof(SpinorY) + (use_w ? sizeof(SpinorW) : 0) );
 
       // this is the maximum size limit imposed by the coefficient arrays
       constexpr int coeff_size = MAX_MATRIX_SIZE / (NXZ * sizeof(RegType));
@@ -72,7 +73,7 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    inline int max_YW_size(int NXZ, int precision)
+    inline int max_YW_size(int NXZ, int precision, bool use_z, bool use_w)
     {
       // ensure NXZ is a valid size
       NXZ = std::min(NXZ, MAX_MULTI_BLAS_N);
@@ -87,16 +88,43 @@ namespace quda
       int arg_size = (MAX_ARG_SIZE
                       - sizeof(int)         // NYW parameter
                       - NXZ*sizeof(SpinorX) // SpinorX array
-                      - NXZ*sizeof(SpinorZ) // SpinorW array
+                      - (use_z ? NXZ*sizeof(SpinorZ) : sizeof(SpinorZ*)) // SpinorZ array
                       - sizeof(int)         // functor NYW member
-                      - sizeof(int) - 16     // length parameter
+                      - sizeof(int)         // length parameter
+                      - (!use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
                       - 16)                  // there seems to be 16 bytes other argument space we need
-        / (sizeof(SpinorY) + sizeof(SpinorW));
+        / (sizeof(SpinorY) + (use_w ? sizeof(SpinorW) : 0) );
 
       int coeff_size = MAX_MATRIX_SIZE / (NXZ * precision);
 
       return std::min(arg_size, coeff_size);
     }
+
+    template <int NXZ, typename SpinorX, typename SpinorZ, bool> struct SpinorXZ
+    {
+      SpinorX X[NXZ];
+      SpinorZ *Z;
+      SpinorXZ() : Z(reinterpret_cast<SpinorZ*>(X)) { }
+    };
+
+    template <int NXZ, typename SpinorX, typename SpinorZ> struct SpinorXZ<NXZ,SpinorX,SpinorZ,true>
+    {
+      SpinorX X[NXZ];
+      SpinorZ Z[NXZ];
+    };
+
+    template <int NYW, typename SpinorY, typename SpinorW, bool> struct SpinorYW
+    {
+      SpinorY Y[NYW];
+      SpinorW *W;
+      SpinorYW() : W(reinterpret_cast<SpinorW*>(Y)) { }
+    };
+
+    template <int NYW, typename SpinorY, typename SpinorW> struct SpinorYW<NYW,SpinorY,SpinorW,true>
+    {
+      SpinorY Y[NYW];
+      SpinorW W[NYW];
+    };
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -109,13 +137,12 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
-    struct MultiBlasArg {
-      static constexpr int NYW_max = max_YW_size<NXZ, typename Functor::type>();
+    struct MultiBlasArg :
+      SpinorXZ<NXZ,SpinorX,SpinorZ,Functor::use_z>,
+      SpinorYW<max_YW_size<NXZ, typename Functor::type, Functor::use_z, Functor::use_w>(), SpinorY, SpinorW, Functor::use_w>
+    {
+      static constexpr int NYW_max = max_YW_size<NXZ, typename Functor::type, Functor::use_z, Functor::use_w>();
       const int NYW;
-      SpinorX X[NXZ];
-      SpinorY Y[NYW_max];
-      SpinorZ Z[NXZ];
-      SpinorW W[NYW_max];
       Functor f;
       const int length;
 
@@ -128,11 +155,11 @@ namespace quda
 
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
-          this->Z[i] = Z[i];
+          if (Functor::use_z) this->Z[i] = Z[i];
         }
         for (int i = 0; i < NYW; ++i) {
           this->Y[i] = Y[i];
-          this->W[i] = W[i];
+          if (Functor::use_w) this->W[i] = W[i];
         }
       }
     };
@@ -254,6 +281,8 @@ namespace quda
 
     template <int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       multicaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
@@ -274,6 +303,8 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multicaxpyz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       multicaxpyz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
@@ -295,6 +326,8 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
@@ -318,6 +351,8 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
