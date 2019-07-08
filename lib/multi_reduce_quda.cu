@@ -130,7 +130,7 @@ namespace quda {
   private:
       typedef typename scalar<FloatN>::type Float;
       typedef typename vector<Float, 2>::type Float2;
-      static constexpr int NYW_max = max_YW_size<NXZ, Float2>();
+      static constexpr int NYW_max = max_YW_size<NXZ, Reducer>();
       const int NYW;
       int nParity;
       MultiReduceArg<NXZ, ReduceType, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer> arg;
@@ -176,6 +176,8 @@ namespace quda {
           Ynorm_h(),
           Wnorm_h()
       {
+        if (sizeof(arg) > MAX_MATRIX_SIZE) errorQuda("Kernel argument size %lu greater than maximum %d", sizeof(arg), MAX_MATRIX_SIZE);
+
         strcpy(aux, "policy_kernel,");
         strcat(aux, x[0]->AuxString());
 
@@ -298,7 +300,7 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
-      constexpr int NYW_max = max_YW_size<NXZ, Float2>();
+      constexpr int NYW_max = max_YW_size<NXZ, Reducer<NXZ, ReduceType, Float2, RegType> >();
       const int NYW = y.size();
 
       memset(result, 0, NXZ * NYW * sizeof(doubleN));
@@ -999,7 +1001,7 @@ namespace quda {
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
 	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
-        NYW_max = max_YW_size(x.size(), 2*y[0]->Precision());
+        NYW_max = max_YW_size(x.size(), 2*y[0]->Precision(), false, false, true);
         max_tile_size = make_int2(1,1);
 
       	strcpy(aux, "policy,");
@@ -1247,6 +1249,7 @@ namespace quda {
 			 std::vector<ColorSpinorField*>&z){
 
 #if 0
+      // FIXME - if this is enabled we need to ensure that use_w is enabled above
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       if (y.size() != z.size()) errorQuda("Cannot copy input y of size %lu into z of size %lu\n", y.size(), z.size());
 
