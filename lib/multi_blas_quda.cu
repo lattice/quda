@@ -52,6 +52,8 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
       const int NYW;
+      static constexpr int max_warp_split = std::min(NXZ, 8); // don't split the warp more than we need
+      mutable int warp_split; // helper used to keep track of current warp splitting
       const int nParity;
       mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
       const coeff_array<T> &a, &b, &c;
@@ -70,6 +72,7 @@ namespace quda {
           int NYW, int length) :
           TunableVectorY(NYW),
           NYW(NYW),
+          warp_split(1),
           nParity(x[0]->SiteSubset()),
           arg(X, Y, Z, W, f, NYW, length / nParity),
           a(a),
@@ -177,12 +180,27 @@ namespace quda {
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
 	}
 
+        tp.block.x *= tp.aux.x; // include warp-split factor
+
 #ifdef CONSTANT_ARG
 	cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, stream);
-        multiBlasKernel<FloatN, M, NXZ, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>();
+        switch (tp.aux.x) {
+        case 1: multiBlasKernel<FloatN, M, NXZ, 1, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 2: multiBlasKernel<FloatN, M, NXZ, 2, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 4: multiBlasKernel<FloatN, M, NXZ, 4, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 8: multiBlasKernel<FloatN, M, NXZ, 8, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+        }
 #else
-        multiBlasKernel<FloatN, M, NXZ><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        switch (tp.aux.x) {
+        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 8: multiBlasKernel<FloatN, M, NXZ, 8><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
+        }
 #endif
+        tp.block.x /= tp.aux.x; // restore block size
 #endif
       }
 
@@ -202,16 +220,41 @@ namespace quda {
         }
       }
 
+      bool advanceAux(TuneParam &param) const
+      {
+#ifdef WARP_SPLIT
+        if (2*param.aux.x <= max_warp_split) {
+          param.aux.x *= 2;
+          warp_split = param.aux.x;
+          return true;
+        } else {
+          param.aux.x = 1;
+          warp_split = param.aux.x;
+          // reset the block dimension manually here to pick up the warp_split parameter
+          resetBlockDim(param);
+          return false;
+        }
+#else
+        warp_split = 1;
+        return false;
+#endif
+      }
+
+      int blockStep() const { return deviceProp.warpSize / warp_split; }
+      int blockMin() const { return deviceProp.warpSize / warp_split; }
+
       void initTuneParam(TuneParam &param) const
       {
         TunableVectorY::initTuneParam(param);
         param.grid.z = nParity;
+        param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       void defaultTuneParam(TuneParam &param) const
       {
         TunableVectorY::defaultTuneParam(param);
         param.grid.z = nParity;
+        param.aux = make_int4(1, 0, 0, 0); // warp-split parameter
       }
 
       long long flops() const { return arg.f.flops() * vec_length<FloatN>::value * (long)arg.length * nParity * M; }
@@ -259,8 +302,6 @@ namespace quda {
         Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
         W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
       }
-
-      // if block caxpy is an 'outer product of caxpy' where 'x'
 
       MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
                 SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>

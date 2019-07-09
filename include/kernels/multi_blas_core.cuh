@@ -2,7 +2,14 @@
 
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+
 #include <multi_blas_helper.cuh>
+#include <float_vector.h>
+
+#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
+#define WARP_SPLIT
+#include <generics/shfl.h>
+#endif
 
 #if CUDA_VERSION < 9000
 #define CONSTANT_ARG
@@ -52,45 +59,94 @@ namespace quda
       }
     };
 
+    template <int M, int warp_split, typename FloatN> __device__ __host__ void warp_combine(FloatN x[M])
+    {
+#ifdef WARP_SPLIT
+      constexpr int warp_size = 32;
+      if (warp_split > 1) {
+#pragma unroll
+        for (int j = 0; j < M; j++) {
+          // reduce down to the first group of column-split threads
+#pragma unroll
+          for (int offset = warp_size/2; offset >= warp_size/warp_split; offset /= 2) {
+#if (__CUDACC_VER_MAJOR__ >= 9)
+#define WARP_CONVERGED 0xffffffff // we know warp should be converged here
+            x[j] += __shfl_down_sync(WARP_CONVERGED, x[j], offset);
+#else
+            x[j] += __shfl_down(x[j], offset);
+#endif
+          }
+        }
+      }
+
+#endif // WARP_SPLIT
+    }
+
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
 #ifndef CONSTANT_ARG
-    template <typename FloatN, int M, int NXZ, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
     {
 #else
-    template <typename FloatN, int M, int NXZ, typename Arg> __global__ void multiBlasKernel()
+    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel()
     {
       Arg &arg = *((Arg *)arg_buffer);
 #endif
 
       // use i to loop over elements in kernel
-      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-      unsigned int parity = blockIdx.z;
+      const int k = blockIdx.y * blockDim.y + threadIdx.y;
+      const int parity = blockIdx.z;
+
+      // partition the warp between grid points and the NXZ update
+      constexpr int warp_size = 32;
+      constexpr int vector_site_width = warp_size / warp_split;
+      const int lane_id = threadIdx.x % warp_size;
+      const int warp_id = threadIdx.x / warp_size;
+      unsigned int idx = blockIdx.x*(blockDim.x/warp_split) + warp_id*(warp_size/warp_split) + lane_id % vector_site_width;
+      const int l_idx = lane_id / vector_site_width;
 
       if (k >= arg.NYW) return;
 
       while (idx < arg.length) {
 
         FloatN x[M], y[M], z[M], w[M];
-        arg.Y[k].load(y, idx, parity);
-        arg.W[k].load(w, idx, parity);
 
 #pragma unroll
-        for (int l = 0; l < NXZ; l++) {
-          arg.X[l].load(x, idx, parity);
-          arg.Z[l].load(z, idx, parity);
+       for (int m = 0; m < M; m++) {
+         ::quda::zero(y[m]);
+         ::quda::zero(w[m]);
+       }
+
+       if (l_idx == 0 || warp_size == 1) {
+         arg.Y[k].load(y, idx, parity);
+         arg.W[k].load(w, idx, parity);
+       }
 
 #pragma unroll
-          for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+        for (int l_ = 0; l_ < NXZ; l_+=warp_split) {
+          const int l = l_ + l_idx;
+          if (l < NXZ || warp_split == 1) {
+            arg.X[l].load(x, idx, parity);
+            arg.Z[l].load(z, idx, parity);
+
+#pragma unroll
+            for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+          }
         }
-        arg.Y[k].save(y, idx, parity);
-        arg.W[k].save(w, idx, parity);
 
-        idx += gridDim.x * blockDim.x;
+        // now combine the results across the warp if needed
+        warp_combine<M,warp_split>(y);
+        warp_combine<M,warp_split>(w);
+
+        if (l_idx == 0 || warp_split == 1) {
+          arg.Y[k].save(y, idx, parity);
+          arg.W[k].save(w, idx, parity);
+        }
+
+        idx += gridDim.x * blockDim.x / warp_split;
       }
     }
 
