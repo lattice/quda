@@ -130,7 +130,7 @@ namespace quda {
   private:
       typedef typename scalar<FloatN>::type Float;
       typedef typename vector<Float, 2>::type Float2;
-      static constexpr int NYW_max = max_YW_size<NXZ, Reducer>();
+      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>();
       const int NYW;
       int nParity;
       MultiReduceArg<NXZ, ReduceType, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer> arg;
@@ -300,7 +300,7 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
-      constexpr int NYW_max = max_YW_size<NXZ, Reducer<NXZ, ReduceType, Float2, RegType> >();
+      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, Reducer<NXZ, ReduceType, Float2, RegType> >();
       const int NYW = y.size();
 
       memset(result, 0, NXZ * NYW * sizeof(doubleN));
@@ -998,13 +998,14 @@ namespace quda {
       int2 max_tile_size;
 
     public:
-      TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
+      TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false,
+                   bool nested_policy = false)
 	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
-        NYW_max = max_YW_size(x.size(), 2*y[0]->Precision(), false, false, true);
+        NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, false, true);
         max_tile_size = make_int2(1,1);
 
-      	strcpy(aux, "policy,");
+        strcpy(aux, nested_policy ? "nested_policy," : "policy,");
       	strcat(aux, x[0]->AuxString());
       	strcat(aux, ",");
       	strcat(aux, y[0]->AuxString());
@@ -1025,7 +1026,7 @@ namespace quda {
         // constituents have been tuned since we can't do nested tuning
         // FIXME this will break if the kernels are destructive - which they aren't here
         if (!tuned()) {
-          disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+          if (!nested_policy) disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
           if (x.size() == 1) { // 1-d reduction
             max_tile_size = make_int2(1, std::min(NYW_max, (int)y.size()));
@@ -1074,7 +1075,7 @@ namespace quda {
             }
           }
 
-          enableProfileCount();
+          if (!nested_policy) enableProfileCount();
           setPolicyTuning(true);
         }
       }
@@ -1126,7 +1127,7 @@ namespace quda {
             param.aux.y *= 2;
 	    return true;
 	  } else if (x.size() <= MAX_MULTI_BLAS_N && y.size() <= NYW_max &&
-                     param.aux.x != x.size() && param.aux.y != y.size()) {
+                     (param.aux.x != x.size() || param.aux.y != y.size()) ) {
             // we've run out of power of two tiles to try, but before
             // we finish, try a single kernel if it fits
             param.aux.x = x.size();
@@ -1145,14 +1146,133 @@ namespace quda {
       bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
 
       void initTuneParam(TuneParam &param) const  {
-      	Tunable::initTuneParam(param);
+        Tunable::initTuneParam(param);
         param.aux.x = 1; param.aux.y = 1; param.aux.z = 0; param.aux.w = 0;
       }
 
       void defaultTuneParam(TuneParam &param) const  {
-      	Tunable::defaultTuneParam(param); // default is max tile size
+        Tunable::defaultTuneParam(param); // default is max tile size
         // max_tile_size is MAX_MULTI_BLAS_N rounded down to the nearest power of 2.
         param.aux.x = max_tile_size.x; param.aux.y = max_tile_size.y; param.aux.z = 0; param.aux.w = 0;
+      }
+
+      TuneKey tuneKey() const {
+        return TuneKey(x[0]->VolString(), typeid(*this).name(), aux);
+      }
+
+      long long flops() const { return 0; } // FIXME
+      long long bytes() const { return 0; } // FIXME
+
+      void preTune() { } // FIXME - use write to determine what needs to be saved
+      void postTune() { } // FIXME - use write to determine what needs to be saved
+    };
+
+    template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal,
+	      typename writeDiagonal,
+	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal,
+	      typename writeOffDiagonal>
+    class TransposeTune : public Tunable {
+      using TileTuner = TileSizeTune<ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal>;
+      typedef std::vector<ColorSpinorField*> vec;
+      Complex *result;
+      vec &x, &y, &z, &w;
+      bool hermitian;
+      bool Anorm;
+
+      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+
+    public:
+      TransposeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false)
+	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
+      {
+        strcpy(aux, "policy,");
+        strcat(aux, x[0]->AuxString());
+        strcat(aux, ",");
+        strcat(aux, y[0]->AuxString());
+        if (hermitian) strcat(aux, ",hermitian");
+        if (Anorm) strcat(aux, ",Anorm");
+	strcat(aux,",n=");
+	char size[8];
+	u64toa(size, x.size());
+	strcat(aux,size);
+	strcat(aux,",m=");
+	u64toa(size, y.size());
+	strcat(aux,size);
+        u64toa(size, MAX_MULTI_BLAS_N);
+        strcat(aux, ",multi-blas-n=");
+        strcat(aux, size);
+
+        // before we do policy tuning we must ensure the kernel
+        // constituents have been tuned since we can't do nested tuning
+        if (!tuned()) {
+          disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
+
+          { // tune regular inner product
+            TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+            tile.apply(0);
+          }
+
+          { // tune transpose inner product
+            TileTuner tile(result, y, z, w, z, hermitian, Anorm, true);
+            tile.apply(0);
+          }
+
+          enableProfileCount();
+          setPolicyTuning(true);
+        }
+      }
+
+      virtual ~TransposeTune() { setPolicyTuning(false); }
+
+      void apply(const cudaStream_t &stream) {
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+
+        if (tp.aux.x == 0) {
+          TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+          tile.apply(stream);
+        } else if (tp.aux.x == 1){
+          Complex *result_trans = new Complex[x.size()*y.size()];
+
+          // swap (x<->y and w<-z> when doing transpose calculation)
+          TileTuner tile(result_trans, y, x, w, z, hermitian, Anorm, true);
+          tile.apply(stream);
+
+          // tranpose the result if we are doing the transpose calculation
+          const auto xlen = x.size();
+          const auto ylen = y.size();
+          for (unsigned int j = 0; j < xlen; j++)
+            for (unsigned int i = 0; i < ylen; i++)
+              result[i*xlen+j] = conj(result_trans[j*ylen+i]);
+
+          delete []result_trans;
+        } else {
+          errorQuda("Unexpected transpose parameter %d", tp.aux.x);
+        }
+      }
+
+      // aux.x is the tile size
+      bool advanceAux(TuneParam &param) const
+      {
+        if (param.aux.x == 0) {
+          param.aux.x = 1;
+          return true;
+        } else {
+          param.aux.x = 0;
+          return false;
+        }
+      }
+
+      bool advanceTuneParam(TuneParam &param) const { return advanceAux(param); }
+
+      void initTuneParam(TuneParam &param) const  {
+        Tunable::initTuneParam(param);
+        param.aux = make_int4(0, 0, 0, 0);
+      }
+
+      void defaultTuneParam(TuneParam &param) const  {
+        Tunable::defaultTuneParam(param);
+        param.aux = make_int4(0, 0, 0, 0); // default is not to transpose
       }
 
       TuneKey tuneKey() const {
@@ -1174,8 +1294,8 @@ namespace quda {
       // cDotProduct_recurse returns a column-major matrix.
       // To be consistent with the multi-blas functions, we should
       // switch this to row-major.
-      TileSizeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > tile(result_tmp, x, y, x, y, false);
-      tile.apply(0);
+      TransposeTune<Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0> > trans(result_tmp, x, y, x, y, false);
+      trans.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();

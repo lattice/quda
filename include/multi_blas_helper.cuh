@@ -1,3 +1,5 @@
+#include <register_traits.h>
+
 namespace quda
 {
 
@@ -32,13 +34,12 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    template <int NXZ, typename Functor> inline constexpr int max_YW_size()
+    template <int NXZ, typename xType, typename yType, typename Functor> inline constexpr int max_YW_size()
     {
-      // the size of the accessor doesn't change with precision just instantiate some precision
-      using SpinorX = SpinorTexture<float4,short4,6>;
-      using SpinorY = Spinor<float4,short4,6,1>;
+      using SpinorX = SpinorTexture<typename mapper<xType>::type,xType,6>;
+      using SpinorY = Spinor<typename mapper<yType>::type,yType,6,1>;
       using SpinorZ = SpinorX;
-      using SpinorW = SpinorY;
+      using SpinorW = Spinor<typename mapper<xType>::type,xType,6,1>;
 
       // compute the size remaining for the Y and W accessors
       constexpr int arg_size = (MAX_ARG_SIZE
@@ -65,30 +66,31 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    inline int max_YW_size(int NXZ, int precision, bool use_z, bool use_w, bool reduce)
+    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, size_t scalar_size,
+                           bool use_z, bool use_w, bool reduce)
     {
       // ensure NXZ is a valid size
       NXZ = std::min(NXZ, MAX_MULTI_BLAS_N);
 
-      // the size of the accessor doesn't change with precision just instantiate some precision
-      using SpinorX = SpinorTexture<float4,short4,6>;
-      using SpinorY = Spinor<float4,short4,6,1>;
-      using SpinorZ = SpinorX;
-      using SpinorW = SpinorY;
+      size_t spinor_x_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(SpinorTexture<float4,short4,6>) :
+        sizeof(SpinorTexture<float4,float4,6>);
+      size_t spinor_y_size = y_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_z_size = spinor_x_size;
+      size_t spinor_w_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
 
       // compute the size remaining for the Y and W accessors
       int arg_size = (MAX_ARG_SIZE
                       - sizeof(int)         // NYW parameter
-                      - NXZ*sizeof(SpinorX) // SpinorX array
-                      - (use_z ? NXZ*sizeof(SpinorZ) : sizeof(SpinorZ*)) // SpinorZ array
+                      - NXZ*sizeof(spinor_x_size) // SpinorX array
+                      - (use_z ? NXZ*sizeof(spinor_z_size) : sizeof(void*)) // SpinorZ array (else dummy pointer)
                       - sizeof(int)         // functor NYW member
                       - sizeof(int)         // length parameter
-                      - (!use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
+                      - (!use_w ? sizeof(void*) : 0) // subtract dummy pointer if not using W
                       - (reduce ? 3 * sizeof(void*) : 0) // reduction buffers
                       - 16)                  // there seems to be 16 bytes other argument space we need
-        / (sizeof(SpinorY) + (use_w ? sizeof(SpinorW) : 0) );
+        / (spinor_y_size + (use_w ? spinor_w_size : 0) );
 
-      int coeff_size = MAX_MATRIX_SIZE / (NXZ * precision);
+      int coeff_size = MAX_MATRIX_SIZE / (NXZ * scalar_size);
 
       return std::min(arg_size, coeff_size);
     }

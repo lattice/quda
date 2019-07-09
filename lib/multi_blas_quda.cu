@@ -50,7 +50,7 @@ namespace quda {
   private:
       typedef typename scalar<FloatN>::type Float;
       typedef typename vector<Float, 2>::type Float2;
-      static constexpr int NYW_max = max_YW_size<NXZ, Functor>();
+      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
       const int NYW;
       const int nParity;
       mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
@@ -235,9 +235,9 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
-      constexpr int NYW_max = max_YW_size<NXZ, Functor<NXZ, Float2, RegType>>();
-      printfQuda("NXZ = %d max NYW = %d\n", NXZ, NYW_max);
       const int NYW = y.size();
+      Functor<NXZ, Float2, RegType> f(NYW);
+      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
 
       if (NXZ > MAX_MULTI_BLAS_N) errorQuda("NXZ exceeds max size (%d > %d)", NXZ, MAX_MULTI_BLAS_N);
 
@@ -261,8 +261,6 @@ namespace quda {
       }
 
       // if block caxpy is an 'outer product of caxpy' where 'x'
-
-      Functor<NXZ, Float2, RegType> f(NYW);
 
       MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
                 SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
@@ -644,7 +642,7 @@ namespace quda {
     void caxpy_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
           int i_idx ,int j_idx, int upper) {
 
-      if (y.size() > max_YW_size(x.size(), 2*y[0]->Precision(), false, false, false)) { // if greater than max single-kernel size, recurse.
+      if (y.size() > max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, false, false)) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -734,7 +732,7 @@ namespace quda {
 
     void caxpyz_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass, int upper) {
 
-      if (y.size() > max_YW_size(x.size(), 2*y[0]->Precision(), false, true, false)) { // if greater than max single-kernel size, recurse.
+      if (y.size() > max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, true, false)) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -831,7 +829,7 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
 		   const double *b_, ColorSpinorField &z_, const double *c_)
     {
-      if (y_.size() <= max_YW_size(1, 2*y_[0]->Precision(), false, true, false)) {
+      if (y_.size() <= max_YW_size(1, z_.Precision(), y_[0]->Precision(), 2*y_[0]->Precision(), false, true, false)) {
 	// swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.

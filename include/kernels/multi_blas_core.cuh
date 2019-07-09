@@ -27,9 +27,9 @@ namespace quda
     template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
     struct MultiBlasArg :
       SpinorXZ<NXZ,SpinorX,SpinorZ,Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ, Functor>(), SpinorY, SpinorW, Functor::use_w>
+      SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>(), SpinorY, SpinorW, Functor::use_w>
     {
-      static constexpr int NYW_max = max_YW_size<NXZ, Functor>();
+      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
       const int NYW;
       Functor f;
       const int length;
@@ -117,17 +117,17 @@ namespace quda
 
       __device__ __host__ inline Float2 b(int i, int j) const {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i*NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i*NYW + j];
 #endif
       }
 
       __device__ __host__ inline Float2 c(int i, int j) const {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i*NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i*NYW + j];
 #endif
       }
 

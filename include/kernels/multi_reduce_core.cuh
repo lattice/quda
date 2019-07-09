@@ -33,9 +33,9 @@ namespace quda
     struct MultiReduceArg :
       public ReduceArg<vector_type<ReduceType, NXZ>>,
       SpinorXZ<NXZ,SpinorX,SpinorZ,Reducer::use_z>,
-      SpinorYW<max_YW_size<NXZ, Reducer>(), SpinorY, SpinorW, Reducer::use_w>
+      SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>(), SpinorY, SpinorW, Reducer::use_w>
     {
-      static constexpr int NYW_max = max_YW_size<NXZ, Reducer>();
+      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>();
       const int NYW;
       Reducer r;
       const int length;
@@ -143,17 +143,17 @@ namespace quda
 
       __device__ __host__ inline Float2 b(int i, int j) const {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i*NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i*NYW + j];
 #endif
       }
 
       __device__ __host__ inline Float2 c(int i, int j) const {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i*NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i*NYW + j];
 #endif
       }
 
