@@ -1795,13 +1795,13 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
 
   std::map<std::string, QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
   quda_app->add_option("--ca-basis-type", ca_basis, "The basis to use for CA-CG (default power)")
-    ->transform(CLI::CheckedTransformer(ca_basis_map));
+    ->transform(CLI::QUDACheckedTransformer(ca_basis_map));
   quda_app->add_option(
     "--cheby-basis-eig-max",
     ca_lambda_max, "Conservative estimate of largest eigenvalue for Chebyshev basis CA-CG (default is to guess with power iterations)");
   quda_app->add_option("--cheby-basis-eig-min", ca_lambda_min,
                        "Conservative estimate of smallest eigenvalue for Chebyshev basis CA-CG (default 0)");
-  quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient (default 1.0)");
+  quda_app->add_option("--clover-coeff", clover_coeff, "Clover coefficient")->capture_default_str();
   quda_app->add_option("--compute-clover", compute_clover,
                        "Compute the clover field or use random numbers (default false)");
   quda_app->add_option("--compute-fat-long", compute_fatlong,
@@ -1812,7 +1812,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
-    ->transform(CLI::CheckedTransformer(contract_type_map));
+    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
   ;
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
@@ -1831,7 +1831,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
-    ->transform(CLI::CheckedTransformer(dslash_type_map));
+    ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
 
   quda_app->add_option("--epsilon", epsilon, "Twisted-Mass flavor twist of Dirac operator (default 0.01)");
   quda_app->add_option("--epsilon-naik", eps_naik, "Epsilon factor on Naik term (default 0.0, suggested non-zero -0.1)");
@@ -1842,7 +1842,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   quda_app
     ->add_option("--flavor", twist_flavor,
                  "Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)")
-    ->transform(CLI::CheckedTransformer(twist_flavor_map));
+    ->transform(CLI::QUDACheckedTransformer(twist_flavor_map));
   ;
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
                        "Width of the Gaussian noise used for random gauge field contruction (default 0.2)");
@@ -1887,7 +1887,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
                                                       {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
-    ->transform(CLI::CheckedTransformer(inv_type_map));
+    ->transform(CLI::QUDACheckedTransformer(inv_type_map));
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -1901,14 +1901,14 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
     {"mass", QUDA_MASS_NORMALIZATION},
     {"asym-mass", QUDA_ASYMMETRIC_MASS_NORMALIZATION}};
   quda_app->add_option("--mass-normalization", normalization, "Mass normalization (kappa (default) / mass / asym-mass)")
-    ->transform(CLI::CheckedTransformer(mass_normalization_type_map));
+    ->transform(CLI::QUDACheckedTransformer(mass_normalization_type_map));
   CLI::TransformPairs<QudaMatPCType> matpc_type_map {{"even-even", QUDA_MATPC_EVEN_EVEN},
                                                      {"odd-odd", QUDA_MATPC_ODD_ODD},
                                                      {"even-even-asym", QUDA_MATPC_EVEN_EVEN_ASYMMETRIC},
                                                      {"odd-odd-asym", QUDA_MATPC_ODD_ODD_ASYMMETRIC}};
   quda_app
     ->add_option("--matpc", matpc_type, "Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym)")
-    ->transform(CLI::CheckedTransformer(matpc_type_map));
+    ->transform(CLI::QUDACheckedTransformer(matpc_type_map));
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
@@ -1927,7 +1927,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   std::map<std::string, QudaPrecision> prec_map(
     {{"double", QUDA_DOUBLE_PRECISION}, {"single", QUDA_SINGLE_PRECISION}, {"half", QUDA_HALF_PRECISION}});
 
-  CLI::CheckedTransformer prec_transform(prec_map);
+  CLI::QUDACheckedTransformer prec_transform(prec_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
   quda_app->add_option("--prec-precondition", precon_type, "Preconditioner precision in GPU")->transform(prec_transform);
   ;
@@ -1942,7 +1942,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   ;
 
   quda_app->add_option("--precon-type", prec_precondition, "The type of solver to use (default none (=unspecified)).")
-    ->transform(CLI::CheckedTransformer(inv_type_map));
+    ->transform(CLI::QUDACheckedTransformer(inv_type_map));
 
   quda_app->add_option(
     "--rank-order", rank_order,
@@ -1953,11 +1953,11 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
                                                            {"12", QUDA_RECONSTRUCT_12},
                                                            {"9", QUDA_RECONSTRUCT_9},
                                                            {"8", QUDA_RECONSTRUCT_8}};
-  quda_app->add_option("--recon", link_recon, "Link reconstruction type")->transform(CLI::CheckedTransformer(recon_type_map));
+  quda_app->add_option("--recon", link_recon, "Link reconstruction type")->transform(CLI::QUDACheckedTransformer(recon_type_map));
   quda_app->add_option("--recon-precondition", link_recon_precondition, "Preconditioner link reconstruction type")
-    ->transform(CLI::CheckedTransformer(recon_type_map));
+    ->transform(CLI::QUDACheckedTransformer(recon_type_map));
   quda_app->add_option("--recon-sloppy", link_recon_sloppy, "Sloppy link reconstruction type")
-    ->transform(CLI::CheckedTransformer(recon_type_map));
+    ->transform(CLI::QUDACheckedTransformer(recon_type_map));
 
   quda_app->add_option("--reliable-delta", reliable_delta, "Set reliable update delta factor");
   quda_app->add_option("--save-gauge", gauge_outfile,
@@ -1975,7 +1975,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
     ->add_option(
       "--solution-type", solution_type,
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
-    ->transform(CLI::CheckedTransformer(solution_type_map));
+    ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   CLI::TransformPairs<QudaSolveType> solve_type_map {
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},
@@ -1984,10 +1984,10 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   quda_app
     ->add_option("--solve-type", solve_type,
                  "The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc)")
-    ->transform(CLI::CheckedTransformer(solve_type_map));
+    ->transform(CLI::QUDACheckedTransformer(solve_type_map));
   quda_app
     ->add_option("--solver-ext-lib-type", solver_ext_lib, "Set external library for the solvers  (default Eigen library)")
-    ->transform(CLI::CheckedTransformer(
+    ->transform(CLI::QUDACheckedTransformer(
       CLI::TransformPairs<QudaExtLibType> {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}}));
   quda_app->add_option("--tadpole-coeff", tadpole_factor,
                        "Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)");
@@ -2001,7 +2001,7 @@ std::shared_ptr<CLI::App> make_app(std::string app_description, std::string app_
   CLI::TransformPairs<QudaVerbosity> verbosity_map {
     {"silent", QUDA_SILENT}, {"summarize", QUDA_SUMMARIZE}, {"verbose", QUDA_VERBOSE}, {"debug", QUDA_DEBUG_VERBOSE}};
   quda_app->add_option("--verbosity", verbosity, "The the verbosity on the top level of QUDA( default summarize)")
-    ->transform(CLI::CheckedTransformer(verbosity_map));
+    ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--verify", verify_results, "Verify the GPU results using CPU results (default true)");
 
   quda_app->add_option("--xdim", xdim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512));
@@ -2061,11 +2061,11 @@ void add_eigen_option_group(std::shared_ptr<CLI::App> quda_app)
   
   std::map<std::string,QudaEigSpectrumType>  spectrum_map {{"SR",QUDA_SPECTRUM_SR_EIG},{"LR",QUDA_SPECTRUM_LR_EIG},{"SM",QUDA_SPECTRUM_SM_EIG},{"LM",QUDA_SPECTRUM_LM_EIG},{"SI",QUDA_SPECTRUM_SI_EIG},{"LI",QUDA_SPECTRUM_LI_EIG}};
   
-  opgroup->add_option("--eig-spectrum", eig_spectrum,  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")->transform(CLI::CheckedTransformer(spectrum_map));
+  opgroup->add_option("--eig-spectrum", eig_spectrum,  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")->transform(CLI::QUDACheckedTransformer(spectrum_map));
   opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver");
   
   std::map<std::string,QudaEigType> type_map{{"trlm",QUDA_EIG_TR_LANCZOS},{"irlm",QUDA_EIG_IR_LANCZOS},{"iram",QUDA_EIG_IR_ARNOLDI}} ;
-  opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")->transform(CLI::CheckedTransformer(type_map));
+  opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")->transform(CLI::QUDACheckedTransformer(type_map));
 
   opgroup->add_option("--eig-use-dagger", eig_use_dagger,
                           "Solve the Mdag  problem instead of M (MMdag if eig-use-normop == true) (default false)");

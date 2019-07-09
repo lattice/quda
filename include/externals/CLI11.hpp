@@ -2261,6 +2261,74 @@ class CheckedTransformer : public Validator {
                              other...) {}
 };
 
+
+
+/// translate named items to other or a value set
+class QUDACheckedTransformer : public CLI::Validator {
+
+  public:
+    using filter_fn_t = std::function<std::string(std::string)>;
+
+    /// This allows in-place construction
+    template <typename... Args>
+    explicit QUDACheckedTransformer(std::initializer_list<std::pair<std::string, std::string>> values, Args &&... args)
+        : QUDACheckedTransformer(TransformPairs<std::string>(values), std::forward<Args>(args)...) {}
+
+    /// direct map of std::string to std::string
+    template <typename T> explicit QUDACheckedTransformer(T mapping) : QUDACheckedTransformer(std::move(mapping), nullptr) {}
+
+    /// This checks to see if an item is in a set: pointer or copy version. You can pass in a function that will filter
+    /// both sides of the comparison before computing the comparison.
+    template <typename T, typename F> explicit QUDACheckedTransformer(T mapping, F filter_function) {
+
+        static_assert(detail::pair_adaptor<typename detail::element_type<T>::type>::value,
+                      "mapping must produce value pairs");
+        // Get the type of the contained item - requires a container have ::value_type
+        // if the type does not have first_type and second_type, these are both value_type
+        using element_t = typename detail::element_type<T>::type;            // Removes (smart) pointers if needed
+        using item_t = typename detail::pair_adaptor<element_t>::first_type; // Is value_type if not a map
+        using local_item_t = typename IsMemberType<item_t>::type;            // This will convert bad types to good ones
+                                                                             // (const char * to std::string)
+        using iteration_type_t = typename detail::pair_adaptor<element_t>::value_type; // the type of the object pair //
+                                                                                       // the type of the object pair
+
+        // Make a local copy of the filter function, using a std::function if not one already
+        std::function<local_item_t(local_item_t)> filter_fn = filter_function;
+
+        auto tfunc = [mapping]() {
+            std::string out("value in ");
+            out += "{";
+            out += detail::join(
+                detail::smart_deref(mapping),
+                [](const iteration_type_t &v) { return detail::as_string(detail::pair_adaptor<element_t>::first(v)); },
+                ",");
+            out.push_back('}');
+            return out;
+        };
+
+        desc_function_ = tfunc;
+
+        func_ = [mapping, tfunc, filter_fn](std::string &input) {
+            local_item_t b;
+            bool converted = detail::lexical_cast(input, b);
+            if(converted) {
+                if(filter_fn) {
+                    b = filter_fn(b);
+                }
+                auto res = detail::search(mapping, b, filter_fn);
+                if(res.first) {
+                    
+                    input = detail::as_string(detail::pair_adaptor<element_t>::second(*res.second));
+                    return std::string{};
+                }
+            }
+
+            return "Check " + input + " " + tfunc() + " FAILED";
+        };
+    }
+};
+
+
 /// Helper function to allow ignore_case to be passed to IsMember or Transform
 inline std::string ignore_case(std::string item) { return detail::to_lower(item); }
 
