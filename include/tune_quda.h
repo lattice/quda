@@ -338,7 +338,6 @@ namespace quda {
       param.shared_bytes = sharedBytesPerThread()*nthreads > sharedBytesPerBlock(param) ?
 	sharedBytesPerThread()*nthreads : sharedBytesPerBlock(param);
 
-      param.aux = make_int4(0, 0, 0, 0);
     }
 
     /** sets default values for when tuning is disabled */
@@ -346,7 +345,6 @@ namespace quda {
     {
       initTuneParam(param);
       if (tuneGridDim()) param.grid = dim3(128,1,1);
-      param.aux = make_int4(0, 0, 0, 0);
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
