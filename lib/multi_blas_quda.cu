@@ -282,10 +282,12 @@ namespace quda {
       Functor<NXZ, Float2, RegType> f(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
 
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
+                                            f.use_z, f.use_w, false);
+
+      if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
       if (!is_valid_NXZ(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
-
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
 

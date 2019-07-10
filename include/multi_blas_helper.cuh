@@ -72,11 +72,12 @@ namespace quda
                                 - sizeof(SpinorX[NXZ]) // SpinorX array
                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ*)) // SpinorZ array
                                 - sizeof(int)          // functor NYW member
-                                - sizeof(int) - 16     // length parameter
+                                - sizeof(bool)         // functor reducer parameter
+                                - sizeof(int)          // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
                                 - (Functor::reducer ? 3 * sizeof(void*) : 0) // reduction buffers
                                 - 16)                  // there seems to be 16 bytes other argument space we need
-        / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0) );
+        / ( sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0) );
 
       // this is the maximum size limit imposed by the coefficient arrays
       constexpr int coeff_size = MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::type));
@@ -99,22 +100,26 @@ namespace quda
 
       size_t spinor_x_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(SpinorTexture<float4,short4,6>) :
         sizeof(SpinorTexture<float4,float4,6>);
-      size_t spinor_y_size = y_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_y_size = y_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) :
+        sizeof(Spinor<float4,float4,6,1>);
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_w_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) :
+        sizeof(Spinor<float4,float4,6,1>);
 
       // compute the size remaining for the Y and W accessors
       int arg_size = (MAX_ARG_SIZE
                       - sizeof(int)         // NYW parameter
-                      - NXZ*sizeof(spinor_x_size) // SpinorX array
-                      - (use_z ? NXZ*sizeof(spinor_z_size) : sizeof(void*)) // SpinorZ array (else dummy pointer)
+                      - NXZ*spinor_x_size // SpinorX array
+                      - (use_z ? NXZ*spinor_z_size : sizeof(void*)) // SpinorZ array (else dummy pointer)
                       - sizeof(int)         // functor NYW member
+                      - sizeof(bool)        // functor reducer parameter
                       - sizeof(int)         // length parameter
                       - (!use_w ? sizeof(void*) : 0) // subtract dummy pointer if not using W
                       - (reduce ? 3 * sizeof(void*) : 0) // reduction buffers
                       - 16)                  // there seems to be 16 bytes other argument space we need
-        / (spinor_y_size + (use_w ? spinor_w_size : 0) );
+        / ( spinor_y_size + (use_w ? spinor_w_size : 0) );
 
+      // this is the maximum size limit imposed by the coefficient arrays
       int coeff_size = MAX_MATRIX_SIZE / (NXZ * scalar_size);
 
       return std::min(arg_size, coeff_size);

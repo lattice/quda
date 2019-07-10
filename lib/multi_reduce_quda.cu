@@ -294,19 +294,23 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       typedef vector<Float, 2> vec2;
 
-      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, Reducer<NXZ, ReduceType, Float2, RegType> >();
       const int NYW = y.size();
+      Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
+      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(r)>();
 
       memset(result, 0, NXZ * NYW * sizeof(doubleN));
 
-      const int N_MIN = NXZ < NYW ? NXZ : NYW;
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
+                                            r.use_z, r.use_w, true);
 
+      if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
       if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE) errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
       if (!is_valid_NXZ(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
 
+      const int N_MIN = NXZ < NYW ? NXZ : NYW;
       for (int i = 0; i < N_MIN; i++) {
         checkSpinor(*x[i], *y[i]);
         checkSpinor(*x[i], *z[i]);
@@ -373,8 +377,6 @@ namespace quda {
         Y[i].set(*dynamic_cast<cudaColorSpinorField *>(y[i]));
         W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
       }
-
-      Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
 
       MultiReduce<NXZ, doubleN, ReduceType, RegType, M, SpinorTexture<RegType, StoreType, M>,
                   Spinor<RegType, yType, M, write::Y>, SpinorTexture<RegType, StoreType, M>,
