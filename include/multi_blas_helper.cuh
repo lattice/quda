@@ -27,6 +27,31 @@ namespace quda
     static __constant__ signed char arg_buffer[MAX_ARG_SIZE];
 #endif
 
+    // all powers of two less than or equal to 64 are valid
+    inline constexpr int max_NXZ_power2() { return 64; }
+
+    template <typename T> inline constexpr bool is_power2(T x)
+    {
+      return (x != 0) && ((x & (x - 1)) == 0);
+    }
+
+    /**
+       @brief Return if the requested nxz parameter is valid or
+       not.  E.g., a valid power of two, or is less than the the
+       MAX_MULTI_BLAS_N parameter.
+       @param[in] nxz Requested nxz parameter
+       @return True if valid, false if not
+     */
+    inline bool is_valid_NXZ(int nxz)
+    {
+      if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
+          ( is_power2(nxz) && nxz <= max_NXZ_power2()) ) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
@@ -70,7 +95,7 @@ namespace quda
                            bool use_z, bool use_w, bool reduce)
     {
       // ensure NXZ is a valid size
-      NXZ = std::min(NXZ, MAX_MULTI_BLAS_N);
+      NXZ = is_valid_NXZ(NXZ) ? NXZ : MAX_MULTI_BLAS_N;
 
       size_t spinor_x_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(SpinorTexture<float4,short4,6>) :
         sizeof(SpinorTexture<float4,float4,6>);

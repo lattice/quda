@@ -282,7 +282,7 @@ namespace quda {
       Functor<NXZ, Float2, RegType> f(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
 
-      if (NXZ > MAX_MULTI_BLAS_N) errorQuda("NXZ exceeds max size (%d > %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
 
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
 
@@ -581,21 +581,22 @@ namespace quda {
     {
       // instantiate the loop unrolling template
       switch (x.size()) {
+      // by default all powers of two <= 64 are instantiated
       case 1: multiBlas<1, Functor, write>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 2
       case 2: multiBlas<2, Functor, write>(a, b, c, x, y, x, w); break;
+      case 4: multiBlas<4, Functor, write>(a, b, c, x, y, x, w); break;
+      case 8: multiBlas<8, Functor, write>(a, b, c, x, y, x, w); break;
+      case 16: multiBlas<16, Functor, write>(a, b, c, x, y, x, w); break;
+      case 32: multiBlas<32, Functor, write>(a, b, c, x, y, x, w); break;
+      case 64: multiBlas<64, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 3
       case 3: multiBlas<3, Functor, write>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 4
-      case 4: multiBlas<4, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 5
       case 5: multiBlas<5, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 6
       case 6: multiBlas<6, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 7
       case 7: multiBlas<7, Functor, write>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 8
-      case 8: multiBlas<8, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 9
       case 9: multiBlas<9, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 10
@@ -610,8 +611,6 @@ namespace quda {
       case 14: multiBlas<14, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 15
       case 15: multiBlas<15, Functor, write>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 16
-      case 16: multiBlas<16, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 17
       case 17: multiBlas<17, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 18
@@ -642,9 +641,6 @@ namespace quda {
       case 30: multiBlas<30, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 31
       case 31: multiBlas<31, Functor, write>(a, b, c, x, y, x, w); break;
-#if MAX_MULTI_BLAS_N >= 32
-      case 32: multiBlas<32, Functor, write>(a, b, c, x, y, x, w); break;
-#endif // 32
 #endif // 31
 #endif // 30
 #endif // 29
@@ -660,7 +656,6 @@ namespace quda {
 #endif // 19
 #endif // 18
 #endif // 17
-#endif // 16
 #endif // 15
 #endif // 14
 #endif // 13
@@ -668,13 +663,10 @@ namespace quda {
 #endif // 11
 #endif // 10
 #endif // 9
-#endif // 8
 #endif // 7
 #endif // 6
 #endif // 5
-#endif // 4
 #endif // 3
-#endif // 2
       default:
 	errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
@@ -712,7 +704,7 @@ namespace quda {
         // if at the bottom of recursion,
         // return if on lower left for upper triangular,
         // return if on upper right for lower triangular.
-        if (x.size() <= MAX_MULTI_BLAS_N) {
+        if ( is_valid_NXZ(x.size()) ) {
           if (upper == 1 && j_idx < i_idx) { return; }
           if (upper == -1 && j_idx > i_idx) { return; }
 
@@ -803,7 +795,7 @@ namespace quda {
         delete[] tmpmajor;
       } else {
       	// if at bottom of recursion check where we are
-      	if (x.size() <= MAX_MULTI_BLAS_N) {
+        if ( is_valid_NXZ(x.size()) ) {
       	  if (pass==1) {
 	    if (i!=j) {
               if (upper == 1 && j < i) { return; } // upper right, don't need to update lower left.
@@ -908,7 +900,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if (x_.size() <= MAX_MULTI_BLAS_N) // only swizzle if we have to.
+      if ( is_valid_NXZ(x_.size()) ) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
