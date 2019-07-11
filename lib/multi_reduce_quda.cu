@@ -927,7 +927,7 @@ namespace quda {
         // before we do policy tuning we must ensure the kernel
         // constituents have been tuned since we can't do nested tuning
         // FIXME this will break if the kernels are destructive - which they aren't here
-        if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
+        if (!tuned()) {
           disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
           if (x.size() == 1 || y.size() == 1) { // 1-d reduction
