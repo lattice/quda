@@ -28,18 +28,27 @@ namespace quda
 #endif
 
     /**
+       @param[in] x Value we are testing
+       @return True if x is a power of two
+    */
+    template <typename T> inline constexpr bool is_power2(T x)
+    {
+      return (x != 0) && ((x & (x - 1)) == 0);
+    }
+
+    /**
        @brief Return the maximum power of two enabled by default for
        multi-blas.  We set a lower limit for multi-reductions, since
        we can just transpose the inner product for free, and a high
        NXZ unroll for multi-reductions lead to poor performance due to
        register spilling.
+       @param[in] reducer Whether we using a reducer
+       @param[in] fixed Whether we are using fixed point
        @return Max power of two
     */
-    template <bool reducer> inline constexpr int max_NXZ_power2() { return reducer ? 16 : 64; }
-
-    template <typename T> inline constexpr bool is_power2(T x)
+    inline int max_NXZ_power2(bool reducer, bool fixed = false)
     {
-      return (x != 0) && ((x & (x - 1)) == 0);
+      return reducer ? 16 : (fixed ? 64 : 128);
     }
 
     /**
@@ -49,10 +58,10 @@ namespace quda
        @param[in] nxz Requested nxz parameter
        @return True if valid, false if not
      */
-    template <bool reducer> inline bool is_valid_NXZ(int nxz)
+    inline bool is_valid_NXZ(int nxz, bool reducer, bool fixed = false)
     {
       if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
-          ( is_power2(nxz) && nxz <= max_NXZ_power2<reducer>()) ) {
+          ( is_power2(nxz) && nxz <= max_NXZ_power2(reducer, fixed)) ) {
         return true;
       } else {
         return false;
@@ -101,16 +110,15 @@ namespace quda
     inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, size_t scalar_size,
                            bool use_z, bool use_w, bool reduce)
     {
+      bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
+      bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
       // ensure NXZ is a valid size
-      NXZ = (reduce ? is_valid_NXZ<true>(NXZ) : is_valid_NXZ<false>(NXZ)) ?  NXZ : MAX_MULTI_BLAS_N;
-
-      size_t spinor_x_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(SpinorTexture<float4,short4,6>) :
+      NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ?  NXZ : MAX_MULTI_BLAS_N;
+      size_t spinor_x_size = x_fixed ? sizeof(SpinorTexture<float4,short4,6>) :
         sizeof(SpinorTexture<float4,float4,6>);
-      size_t spinor_y_size = y_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) :
-        sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(Spinor<float4,short4,6,1>) :
-        sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_w_size = x_fixed ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
 
       // compute the size remaining for the Y and W accessors
       int arg_size = (MAX_ARG_SIZE

@@ -268,7 +268,7 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <int NXZ, typename RegType, typename StoreType, typename yType, int M,
+    template <int NXZ_, typename RegType, typename StoreType, typename yType, int M,
         template <int, typename, typename> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
         std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
@@ -279,14 +279,17 @@ namespace quda {
       typedef vector<Float, 2> vec2;
 
       const int NYW = y.size();
+      // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
+      constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
       Functor<NXZ, Float2, RegType> f(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
 
       const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
                                             f.use_z, f.use_w, false);
 
+      if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
+        errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
-      if (!is_valid_NXZ<false>(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
@@ -591,6 +594,7 @@ namespace quda {
       case 16: multiBlas<16, Functor, write>(a, b, c, x, y, x, w); break;
       case 32: multiBlas<32, Functor, write>(a, b, c, x, y, x, w); break;
       case 64: multiBlas<64, Functor, write>(a, b, c, x, y, x, w); break;
+      case 128: multiBlas<128, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 3
       case 3: multiBlas<3, Functor, write>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 5
@@ -706,7 +710,7 @@ namespace quda {
         // if at the bottom of recursion,
         // return if on lower left for upper triangular,
         // return if on upper right for lower triangular.
-        if ( is_valid_NXZ<false>(x.size()) ) {
+        if ( is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION) ) {
           if (upper == 1 && j_idx < i_idx) { return; }
           if (upper == -1 && j_idx > i_idx) { return; }
 
@@ -797,7 +801,7 @@ namespace quda {
         delete[] tmpmajor;
       } else {
       	// if at bottom of recursion check where we are
-        if ( is_valid_NXZ<false>(x.size()) ) {
+        if ( is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION) ) {
       	  if (pass==1) {
 	    if (i!=j) {
               if (upper == 1 && j < i) { return; } // upper right, don't need to update lower left.
@@ -902,7 +906,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if ( is_valid_NXZ<false>(x_.size()) ) // only swizzle if we have to.
+      if ( is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION) ) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
