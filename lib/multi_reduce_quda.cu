@@ -98,24 +98,6 @@ namespace quda {
       }
     }
 
-    namespace detail
-    {
-      template <unsigned... digits> struct to_chars {
-        static const char value[];
-      };
-
-      template <unsigned... digits> const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
-
-      template <unsigned rem, unsigned... digits> struct explode : explode<rem / 10, rem % 10, digits...> {
-      };
-
-      template <unsigned... digits> struct explode<0, digits...> : to_chars<digits...> {
-      };
-    } // namespace detail
-
-    template <unsigned num> struct num_to_string : detail::explode<num / 10, num % 10> {
-    };
-
     template <int NXZ, typename doubleN, typename ReduceType, typename FloatN, int M, typename SpinorX,
         typename SpinorY, typename SpinorZ, typename SpinorW, typename Reducer>
     class MultiReduce : public Tunable
@@ -714,7 +696,7 @@ namespace quda {
     template <template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerDiagonal, typename writeDiagonal,
 	      template <int MXZ, typename ReducerType, typename Float, typename FloatN> class ReducerOffDiagonal, typename writeOffDiagonal>
     void multiReduce_recurse(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y,
-			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian, int2 tile_size) {
+			     std::vector<ColorSpinorField*>&z, std::vector<ColorSpinorField*>&w, int i_idx, int j_idx, bool hermitian, uint2 tile_size) {
 
       if (y.size() > tile_size.y) // if greater than max single-kernel size, split and recurse
       {
@@ -989,7 +971,7 @@ namespace quda {
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       int NYW_max;
-      int2 max_tile_size;
+      uint2 max_tile_size;
 
     public:
       TileSizeTune(Complex *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false,
@@ -997,7 +979,7 @@ namespace quda {
 	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
         NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, false, true);
-        max_tile_size = make_int2(1,1);
+        max_tile_size = make_uint2(1,1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
       	strcat(aux, x[0]->AuxString());
@@ -1023,20 +1005,20 @@ namespace quda {
           if (!nested_policy) disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
           if (x.size() == 1) { // 1-d reduction
-            max_tile_size = make_int2(1, std::min(NYW_max, (int)y.size()));
+            max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
 
             // Make sure constituents are tuned.
-            int2 tile_size = make_int2(1,1);
+            uint2 tile_size = make_uint2(1,1);
 	    for ( tile_size.y=1; tile_size.y <= max_tile_size.y; tile_size.y++) {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, tile_size);
 	    }
 
           } else if (y.size() == 1) { // 1-d reduction
-            max_tile_size = make_int2(std::min(max_NXZ_power2(true), (int)x.size()), 1);
+            max_tile_size = make_uint2(std::min((size_t)max_NXZ_power2(true), x.size()), 1);
 
             // Make sure constituents are tuned.
-            int2 tile_size = make_int2(1,1);
+            uint2 tile_size = make_uint2(1,1);
 	    for ( tile_size.x=1; tile_size.x <= max_tile_size.x; tile_size.x++) {
               if (is_valid_NXZ(tile_size.x, true)) {
                 multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
@@ -1056,21 +1038,21 @@ namespace quda {
 	    while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
 	    tile_size_tmp = 1;
 	    for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
-	    max_tile_size = make_int2(tile_size_tmp, tile_size_tmp);
+	    max_tile_size = make_uint2(tile_size_tmp, tile_size_tmp);
 #endif
-            max_tile_size = make_int2(max_NXZ_power2(true), max_NXZ_power2(true));
+            max_tile_size = make_uint2(max_NXZ_power2(true), max_NXZ_power2(true));
 
 	    // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size.x && tile_size <= x.size() &&
 		    (tile_size <= y.size() || y.size()==1) ; tile_size*=2) {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-		(result, x, y, z, w, 0, 0, hermitian, make_int2(tile_size, tile_size));
+		(result, x, y, z, w, 0, 0, hermitian, make_uint2(tile_size, tile_size));
 	    }
 
             // also test case using a single kernel if both dimensions are less than max
-            if ( is_valid_NXZ(x.size(), true) && y.size() <= NYW_max) {
+            if ( is_valid_NXZ(x.size(), true) && y.size() <= (unsigned int)NYW_max) {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-		(result, x, y, z, w, 0, 0, hermitian, make_int2(x.size(), y.size()));
+		(result, x, y, z, w, 0, 0, hermitian, make_uint2(x.size(), y.size()));
             }
           }
 
@@ -1089,7 +1071,7 @@ namespace quda {
         // a policy, we don't care about those sizes. That's why we only
         // tune "aux.x", which is the tile size.
         multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-          (result, x, y, z, w, 0, 0, hermitian, make_int2(tp.aux.x, tp.aux.y));
+          (result, x, y, z, w, 0, 0, hermitian, make_uint2(tp.aux.x, tp.aux.y));
       }
 
       // aux.x is the tile size
@@ -1109,7 +1091,7 @@ namespace quda {
 
 	  do {
             param.aux.x++;
-          } while (!is_valid_NXZ(param.aux.x, true) && param.aux.x <= max_tile_size.x);
+          } while (!is_valid_NXZ(param.aux.x, true) && (size_t)param.aux.x <= max_tile_size.x);
 
 	  if ( (unsigned int)param.aux.x <= max_tile_size.x ) {
 	    return true;
@@ -1128,8 +1110,8 @@ namespace quda {
             param.aux.x *= 2;
             param.aux.y *= 2;
 	    return true;
-	  } else if ( is_valid_NXZ(x.size(), true) && y.size() <= NYW_max &&
-                      (param.aux.x != x.size() || param.aux.y != y.size()) ) {
+	  } else if ( is_valid_NXZ(x.size(), true) && y.size() <= (size_t)NYW_max &&
+                      ((size_t)param.aux.x != x.size() || (size_t)param.aux.y != y.size()) ) {
             // we've run out of power of two tiles to try, but before
             // we finish, try a single kernel if it fits
             param.aux.x = x.size();

@@ -24,24 +24,6 @@ namespace quda {
       static constexpr int W = writeW;
     };
 
-    namespace detail
-    {
-      template <unsigned... digits> struct to_chars {
-        static const char value[];
-      };
-
-      template <unsigned... digits> const char to_chars<digits...>::value[] = {('0' + digits)..., 0};
-
-      template <unsigned rem, unsigned... digits> struct explode : explode<rem / 10, rem % 10, digits...> {
-      };
-
-      template <unsigned... digits> struct explode<0, digits...> : to_chars<digits...> {
-      };
-    } // namespace detail
-
-    template <unsigned num> struct num_to_string : detail::explode<num / 10, num % 10> {
-    };
-
     template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename Functor, typename T>
     class MultiBlas : public TunableVectorY
@@ -681,7 +663,8 @@ namespace quda {
     void caxpy_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
           int i_idx ,int j_idx, int upper) {
 
-      if (y.size() > max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, false, false)) { // if greater than max single-kernel size, recurse.
+      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
+                                         false, false, false)) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -771,7 +754,8 @@ namespace quda {
 
     void caxpyz_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass, int upper) {
 
-      if (y.size() > max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, true, false)) { // if greater than max single-kernel size, recurse.
+      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
+                                         false, true, false)) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -868,7 +852,8 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
 		   const double *b_, ColorSpinorField &z_, const double *c_)
     {
-      if (y_.size() <= max_YW_size(1, z_.Precision(), y_[0]->Precision(), 2*y_[0]->Precision(), false, true, false)) {
+      if (y_.size() <= (size_t)max_YW_size(1, z_.Precision(), y_[0]->Precision(), 2*y_[0]->Precision(),
+                                           false, true, false)) {
 	// swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
