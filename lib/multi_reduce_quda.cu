@@ -1005,41 +1005,23 @@ namespace quda {
           if (!nested_policy) disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
           if (x.size() == 1) { // 1-d reduction
-            max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
 
-            // Make sure constituents are tuned.
-            uint2 tile_size = make_uint2(1,1);
-	    for ( tile_size.y=1; tile_size.y <= max_tile_size.y; tile_size.y++) {
-	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-		(result, x, y, z, w, 0, 0, hermitian, tile_size);
-	    }
+            max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
+            multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+              (result, x, y, z, w, 0, 0, hermitian, max_tile_size);
 
           } else if (y.size() == 1) { // 1-d reduction
-            max_tile_size = make_uint2(std::min((size_t)max_NXZ_power2(true), x.size()), 1);
 
-            // Make sure constituents are tuned.
-            uint2 tile_size = make_uint2(1,1);
-	    for ( tile_size.x=1; tile_size.x <= max_tile_size.x; tile_size.x++) {
-              if (is_valid_NXZ(tile_size.x, true)) {
-                multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
-                  (result, x, y, z, w, 0, 0, hermitian, tile_size);
-              }
-	    }
+            max_tile_size = make_uint2(std::min((size_t)max_NXZ_power2(true), x.size()), 1);
+            multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
+              (result, x, y, z, w, 0, 0, hermitian, max_tile_size);
 
           } else { // 2-d reduction
 
-#if 0
             // max_tile_size should be set to the largest power of 2,
             // since we have a requirement that the tile size is a
             // power of 2.
             // FIXME - we only do simple square tiling here
-            unsigned int max_count = 0;
-	    unsigned int tile_size_tmp = MAX_MULTI_BLAS_N
-	    while (tile_size_tmp != 1) { tile_size_tmp = tile_size_tmp >> 1; max_count++; }
-	    tile_size_tmp = 1;
-	    for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
-	    max_tile_size = make_uint2(tile_size_tmp, tile_size_tmp);
-#endif
             max_tile_size = make_uint2(max_NXZ_power2(true), max_NXZ_power2(true));
 
 	    // Make sure constituents are tuned.
@@ -1077,29 +1059,9 @@ namespace quda {
       // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-	if ( x.size()==1 ) { // 1-d reduction
-
-	  param.aux.y++;
-	  if ( (unsigned int)param.aux.y <= max_tile_size.y ) {
-	    return true;
-	  } else {
-	    param.aux.y = 1;
-	    return false;
-	  }
-
-        } else if ( y.size()==1 ) { // 1-d reduction
-
-	  do {
-            param.aux.x++;
-          } while (!is_valid_NXZ(param.aux.x, true) && (size_t)param.aux.x <= max_tile_size.x);
-
-	  if ( (unsigned int)param.aux.x <= max_tile_size.x ) {
-	    return true;
-	  } else {
-	    param.aux.x = 1;
-	    return false;
-	  }
-
+        // for 1-d reductions we don't do any tuning and just use the largest tile
+        if (x.size()==1 || y.size()==1) {
+          return false;
 	} else { // 2-d reduction
 
 	  if ( (unsigned int)(2*param.aux.x) <= max_tile_size.x &&
@@ -1123,7 +1085,6 @@ namespace quda {
             param.aux.y = 1;
 	    return false;
 	  }
-
 	}
       }
 
@@ -1131,12 +1092,23 @@ namespace quda {
 
       void initTuneParam(TuneParam &param) const  {
         Tunable::initTuneParam(param);
-        param.aux.x = 1; param.aux.y = 1; param.aux.z = 0; param.aux.w = 0;
+        if (x.size() == 1 || y.size() == 1) {
+          param.aux.x = max_tile_size.x;
+          param.aux.y = max_tile_size.y;
+        } else { // only do non-trivial tuning for 2-d reductions
+          param.aux.x = 1;
+          param.aux.y = 1;
+        }
+        param.aux.z = 0;
+        param.aux.w = 0;
       }
 
       void defaultTuneParam(TuneParam &param) const  {
         Tunable::defaultTuneParam(param); // default is max tile size
-        param.aux.x = max_tile_size.x; param.aux.y = max_tile_size.y; param.aux.z = 0; param.aux.w = 0;
+        param.aux.x = max_tile_size.x;
+        param.aux.y = max_tile_size.y;
+        param.aux.z = 0;
+        param.aux.w = 0;
       }
 
       TuneKey tuneKey() const {
