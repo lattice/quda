@@ -376,9 +376,10 @@ template <typename RegType, typename StoreType_, int N> struct SpinorTexture :
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType_, int N, int write>
+template <typename RegType, typename StoreType_, int N, int write_>
 struct Spinor : public SpinorTexture<RegType, StoreType_, N>
 {
+  static constexpr bool write = write_;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorTexture<RegType, StoreType, N> ST;

@@ -138,8 +138,8 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        warp_combine<M,warp_split>(y);
-        warp_combine<M,warp_split>(w);
+        if (arg.Y[k].write) warp_combine<M,warp_split>(y);
+        if (arg.W[k].write) warp_combine<M,warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           arg.Y[k].save(y, idx, parity);
