@@ -480,6 +480,19 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
       break;
 
+    case 40:
+      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+      break;
+
+    case 41:
+      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+      break;
+      
+    case 42:
+      for (int i=0; i < niter; ++i) blas::axpy((double*)A, xmD->Components(), zmD->Components());
+      break;
+
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -511,6 +524,7 @@ double test(int kernel) {
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   quda::Complex * B2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+
   for(int i=0; i < Nsrc*Msrc; i++){
     A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
     B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
@@ -895,6 +909,53 @@ double test(int kernel) {
     error /= Nsrc*Msrc;
     break;
 
+  case 40:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) { 
+      for (int j = 0; j < Nsrc; j++) {
+        ((double*)B2)[i*Nsrc+j] = blas::reDotProduct(xmD->Component(i), xmD->Component(j));
+        error += std::abs(((double*)A2)[i*Nsrc+j] - ((double*)B2)[i*Nsrc+j])/std::abs(((double*)B2)[i*Nsrc+j]);
+      }
+    }
+    error /= Nsrc*Nsrc;
+    break;
+
+  case 41:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+    blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) { 
+      for (int j = 0; j < Msrc; j++) {
+        ((double*)B)[i*Msrc+j] = blas::reDotProduct(xmD->Component(i), ymD->Component(j));
+        error += std::abs(((double*)A)[i*Msrc+j] - ((double*)B)[i*Msrc+j])/std::abs(((double*)B)[i*Msrc+j]);
+      }
+    }
+    error /= Nsrc*Msrc;
+    break;
+
+  case 42:
+    for (int i=0; i < Nsrc; i++) {
+      xmD->Component(i) = *(xmH[i]);
+      zmD->Component(i) = *(zmH[i]);
+    }
+
+    blas::axpy((double*)A, xmD->Components(), zmD->Components());
+
+    for (int i=0; i<Nsrc; i++) {
+      blas::axpy(((double*)A)[i], *xmH[i], *zmH[i]);
+    }
+
+    error = 0;
+    for (int i=0; i < Nsrc; i++){
+      error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
+    }
+    error/= Nsrc;
+    break;
+
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -952,6 +1013,8 @@ const char *names[] = {
   "caxpyBzpx",
   "cDotProductNorm_block",
   "cDotProduct_block",
+  "reDotProduct_block",
+  "axpy_block",  
 };
 
 int main(int argc, char** argv)
