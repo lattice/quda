@@ -648,7 +648,8 @@ namespace quda {
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
 #endif
 
-    const TuneKey key = tunable.tuneKey();
+    TuneKey key = tunable.tuneKey();
+    if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
     static TuneParam param;
 
