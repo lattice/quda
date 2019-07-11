@@ -286,7 +286,7 @@ namespace quda {
                                             f.use_z, f.use_w, false);
 
       if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
-      if (!is_valid_NXZ(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ<false>(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
@@ -706,7 +706,7 @@ namespace quda {
         // if at the bottom of recursion,
         // return if on lower left for upper triangular,
         // return if on upper right for lower triangular.
-        if ( is_valid_NXZ(x.size()) ) {
+        if ( is_valid_NXZ<false>(x.size()) ) {
           if (upper == 1 && j_idx < i_idx) { return; }
           if (upper == -1 && j_idx > i_idx) { return; }
 
@@ -797,7 +797,7 @@ namespace quda {
         delete[] tmpmajor;
       } else {
       	// if at bottom of recursion check where we are
-        if ( is_valid_NXZ(x.size()) ) {
+        if ( is_valid_NXZ<false>(x.size()) ) {
       	  if (pass==1) {
 	    if (i!=j) {
               if (upper == 1 && j < i) { return; } // upper right, don't need to update lower left.
@@ -902,7 +902,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if ( is_valid_NXZ(x_.size()) ) // only swizzle if we have to.
+      if ( is_valid_NXZ<false>(x_.size()) ) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the

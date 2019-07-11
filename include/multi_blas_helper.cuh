@@ -27,8 +27,15 @@ namespace quda
     static __constant__ signed char arg_buffer[MAX_ARG_SIZE];
 #endif
 
-    // all powers of two less than or equal to 64 are valid
-    inline constexpr int max_NXZ_power2() { return 64; }
+    /**
+       @brief Return the maximum power of two enabled by default for
+       multi-blas.  We set a lower limit for multi-reductions, since
+       we can just transpose the inner product for free, and a high
+       NXZ unroll for multi-reductions lead to poor performance due to
+       register spilling.
+       @return Max power of two
+    */
+    template <bool reducer> inline constexpr int max_NXZ_power2() { return reducer ? 16 : 64; }
 
     template <typename T> inline constexpr bool is_power2(T x)
     {
@@ -42,10 +49,10 @@ namespace quda
        @param[in] nxz Requested nxz parameter
        @return True if valid, false if not
      */
-    inline bool is_valid_NXZ(int nxz)
+    template <bool reducer> inline bool is_valid_NXZ(int nxz)
     {
       if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
-          ( is_power2(nxz) && nxz <= max_NXZ_power2()) ) {
+          ( is_power2(nxz) && nxz <= max_NXZ_power2<reducer>()) ) {
         return true;
       } else {
         return false;
@@ -72,7 +79,6 @@ namespace quda
                                 - sizeof(SpinorX[NXZ]) // SpinorX array
                                 - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ*)) // SpinorZ array
                                 - sizeof(int)          // functor NYW member
-                                - sizeof(bool)         // functor reducer parameter
                                 - sizeof(int)          // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
                                 - (Functor::reducer ? 3 * sizeof(void*) : 0) // reduction buffers
@@ -96,7 +102,7 @@ namespace quda
                            bool use_z, bool use_w, bool reduce)
     {
       // ensure NXZ is a valid size
-      NXZ = is_valid_NXZ(NXZ) ? NXZ : MAX_MULTI_BLAS_N;
+      NXZ = (reduce ? is_valid_NXZ<true>(NXZ) : is_valid_NXZ<false>(NXZ)) ?  NXZ : MAX_MULTI_BLAS_N;
 
       size_t spinor_x_size = x_prec < QUDA_SINGLE_PRECISION ? sizeof(SpinorTexture<float4,short4,6>) :
         sizeof(SpinorTexture<float4,float4,6>);
@@ -112,7 +118,6 @@ namespace quda
                       - NXZ*spinor_x_size // SpinorX array
                       - (use_z ? NXZ*spinor_z_size : sizeof(void*)) // SpinorZ array (else dummy pointer)
                       - sizeof(int)         // functor NYW member
-                      - sizeof(bool)        // functor reducer parameter
                       - sizeof(int)         // length parameter
                       - (!use_w ? sizeof(void*) : 0) // subtract dummy pointer if not using W
                       - (reduce ? 3 * sizeof(void*) : 0) // reduction buffers

@@ -305,7 +305,7 @@ namespace quda {
 
       if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
       if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE) errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
-      if (!is_valid_NXZ(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
+      if (!is_valid_NXZ<true>(NXZ)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
@@ -733,13 +733,13 @@ namespace quda {
         double2* cdot = new double2[x.size()*y.size()];
 
 	// if at bottom of recursion, return if on lower left
-	if (x.size() <= tile_size.x && is_valid_NXZ(x.size()) && hermitian) {
+	if (x.size() <= tile_size.x && is_valid_NXZ<true>(x.size()) && hermitian) {
 	  if (j_idx < i_idx) { return; }
 	}
 
         coeff_array<Complex> a, b, c;
 
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size())) {
+        if (x.size() <= tile_size.x && is_valid_NXZ<true>(x.size())) {
         switch(x.size()){ // COMMENT HERE FOR COMPILE TIME
         case 1:
           multiReduce<1, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
@@ -759,14 +759,6 @@ namespace quda {
           break;
         case 16:
           multiReduce<16, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-        case 32:
-          multiReduce<32, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
-              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
-          break;
-        case 64:
-          multiReduce<64, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
               cdot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
 #if MAX_MULTI_BLAS_N >= 3
@@ -899,6 +891,12 @@ namespace quda {
           multiReduce<31, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
               cdot, a, b, c, x, y, z, w, i_idx, j_idx);
           break;
+#if MAX_MULTI_BLAS_N >= 32
+        case 32:
+          multiReduce<32, double2, QudaSumFloat2, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
+              cdot, a, b, c, x, y, z, w, i_idx, j_idx);
+          break;
+#endif //32
 #endif //31
 #endif //30
 #endif //29
@@ -962,7 +960,7 @@ namespace quda {
         }
 
 	// we are at the leaf of the binary tree (e.g., we ran the kernel): perform the row-to-column-major transpose here.
-        if (x.size() <= tile_size.x && is_valid_NXZ(x.size()))
+        if (x.size() <= tile_size.x && is_valid_NXZ<true>(x.size()))
         {
           const unsigned int xlen = x.size();
           const unsigned int ylen = y.size();
@@ -1034,12 +1032,12 @@ namespace quda {
 	    }
 
           } else if (y.size() == 1) { // 1-d reduction
-            max_tile_size = make_int2(std::min(max_NXZ_power2(), (int)x.size()), 1);
+            max_tile_size = make_int2(std::min(max_NXZ_power2<true>(), (int)x.size()), 1);
 
             // Make sure constituents are tuned.
             int2 tile_size = make_int2(1,1);
 	    for ( tile_size.x=1; tile_size.x <= max_tile_size.x; tile_size.x++) {
-              if (is_valid_NXZ(tile_size.x)) {
+              if (is_valid_NXZ<true>(tile_size.x)) {
                 multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
                   (result, x, y, z, w, 0, 0, hermitian, tile_size);
               }
@@ -1059,7 +1057,7 @@ namespace quda {
 	    for (unsigned int i = 0; i < max_count; i++) { tile_size_tmp = tile_size_tmp << 1; }
 	    max_tile_size = make_int2(tile_size_tmp, tile_size_tmp);
 #endif
-            max_tile_size = make_int2(max_NXZ_power2(), max_NXZ_power2());;
+            max_tile_size = make_int2(max_NXZ_power2<true>(), max_NXZ_power2<true>());;
 
 	    // Make sure constituents are tuned.
 	    for ( unsigned int tile_size=1; tile_size <= max_tile_size.x && tile_size <= x.size() &&
@@ -1069,7 +1067,7 @@ namespace quda {
 	    }
 
             // also test case using a single kernel if both dimensions are less than max
-            if ( is_valid_NXZ(x.size()) && y.size() <= NYW_max) {
+            if ( is_valid_NXZ<true>(x.size()) && y.size() <= NYW_max) {
 	      multiReduce_recurse<ReducerDiagonal,writeDiagonal,ReducerOffDiagonal,writeOffDiagonal>
 		(result, x, y, z, w, 0, 0, hermitian, make_int2(x.size(), y.size()));
             }
@@ -1110,7 +1108,7 @@ namespace quda {
 
 	  do {
             param.aux.x++;
-          } while (!is_valid_NXZ(param.aux.x) && param.aux.x <= max_tile_size.x);
+          } while (!is_valid_NXZ<true>(param.aux.x) && param.aux.x <= max_tile_size.x);
 
 	  if ( (unsigned int)param.aux.x <= max_tile_size.x ) {
 	    return true;
@@ -1129,7 +1127,7 @@ namespace quda {
             param.aux.x *= 2;
             param.aux.y *= 2;
 	    return true;
-	  } else if ( is_valid_NXZ(x.size()) && y.size() <= NYW_max &&
+	  } else if ( is_valid_NXZ<true>(x.size()) && y.size() <= NYW_max &&
                      (param.aux.x != x.size() || param.aux.y != y.size()) ) {
             // we've run out of power of two tiles to try, but before
             // we finish, try a single kernel if it fits
