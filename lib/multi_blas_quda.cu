@@ -105,7 +105,7 @@ namespace quda {
 #ifdef JITIFY
         using namespace jitify::reflection;
         auto instance
-            = program->kernel("quda::blas::multiBlasKernel").instantiate(Type<FloatN>(), M, NXZ, Type<decltype(arg)>());
+          = program->kernel("quda::blas::multiBlasKernel").instantiate(Type<FloatN>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
         if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
@@ -114,7 +114,7 @@ namespace quda {
               A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
           auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
-          cuMemcpyHtoDAsync(Amatrix_d, A, MAX_MATRIX_SIZE, *getStream());
+          cuMemcpyHtoDAsync(Amatrix_d, A, NXZ*NYW*sizeof(decltype(A[0])), stream);
         }
 
         if (b.data) {
@@ -124,7 +124,7 @@ namespace quda {
               B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
           auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
-          cuMemcpyHtoDAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, *getStream());
+          cuMemcpyHtoDAsync(Bmatrix_d, B, NXZ*NYW*sizeof(decltype(B[0])), stream);
         }
 
         if (c.data) {
@@ -133,17 +133,19 @@ namespace quda {
             for (int j = 0; j < NYW; j++)
               C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
-          cuMemcpyHtoDAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, *getStream());
+          cuMemcpyHtoDAsync(Cmatrix_d, C, NXZ*NYW*sizeof(decltype(C[0])), stream);
         }
 
+        tp.block.x *= tp.aux.x; // include warp-split factor
         jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+        tp.block.x /= tp.aux.x; // restore block size
 #else
         if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
               A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+          cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ*NYW*sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (b.data) {
@@ -151,7 +153,7 @@ namespace quda {
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
               B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+          cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ*NYW*sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (c.data) {
@@ -159,7 +161,7 @@ namespace quda {
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++)
               C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+          cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ*NYW*sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
 	}
 
         tp.block.x *= tp.aux.x; // include warp-split factor

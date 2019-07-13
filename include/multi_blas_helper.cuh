@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <register_traits.h>
 
 namespace quda
@@ -8,6 +9,10 @@ namespace quda
 
 #define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
+
+#if __CUDACC_VER_MAJOR__ < 9
+#define CONSTANT_ARG
+#endif
 
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192

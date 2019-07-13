@@ -11,10 +11,6 @@
 #include <generics/shfl.h>
 #endif
 
-#if CUDA_VERSION < 9000
-#define CONSTANT_ARG
-#endif
-
 namespace quda
 {
 

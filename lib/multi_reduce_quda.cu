@@ -290,7 +290,7 @@ namespace quda {
       if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE) errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient  matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
+        errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
 
       const int N_MIN = NXZ < NYW ? NXZ : NYW;
       for (int i = 0; i < N_MIN; i++) {
@@ -308,8 +308,6 @@ namespace quda {
       if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #endif
 
-      // FIXME - if NXZ=1 no need to copy entire array
-      // FIXME - do we really need strided access here?
       if (a.data) {
         Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
         // since the kernel doesn't know the width of them matrix at compile
@@ -318,7 +316,7 @@ namespace quda {
           for (int j = 0; j < NYW; j++)
             A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Amatrix_d, A, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ*NYW*sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, *getStream());
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
       }
 
@@ -330,7 +328,7 @@ namespace quda {
           for (int j = 0; j < NYW; j++)
             B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Bmatrix_d, B, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ*NYW*sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, *getStream());
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
       }
 
@@ -342,7 +340,7 @@ namespace quda {
           for (int j = 0; j < NYW; j++)
             C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Cmatrix_d, C, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, *getStream());
+        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ*NYW*sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, *getStream());
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
 

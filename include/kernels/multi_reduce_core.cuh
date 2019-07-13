@@ -7,10 +7,6 @@
 
 //#define WARP_MULTI_REDUCE
 
-#if CUDA_VERSION < 9000
-#define CONSTANT_ARG
-#endif
-
 namespace quda
 {
 
@@ -91,19 +87,18 @@ namespace quda
         // Each NYW owns its own thread.
         // The NXZ's are all in the same thread block,
         // so they can share the same memory.
-#pragma unroll NXZ
+#pragma unroll
         for (int l = 0; l < NXZ; l++) {
           arg.X[l].load(x, idx, parity);
           arg.Z[l].load(z, idx, parity);
 
           arg.r.pre();
 
-#pragma unroll M
+#pragma unroll
           for (int j = 0; j < M; j++) arg.r(sum[l], x[j], y[j], z[j], w[j], k, l);
 
           arg.r.post(sum[l]);
         }
-
         arg.Y[k].save(y, idx, parity);
         arg.W[k].save(w, idx, parity);
 
