@@ -636,14 +636,14 @@ invert_test(void)
   }
 
   switch(test_type){
-    case 0: // full parity solution
-    case 1: // solving prec system, reconstructing
-    case 2:
-
+  case 0: // full parity solution
+  case 1: // solving prec system, reconstructing
+  case 2:
+    
       invertQuda(out->V(), in->V(), &inv_param);
       time0 += clock(); // stop the timer
       time0 /= CLOCKS_PER_SEC;
-
+      
       //In QUDA, the full staggered operator has the sign convention
       //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
       //have the minus sign. Passing in QUDA_DAG_YES solves this
@@ -685,7 +685,7 @@ invert_test(void)
       src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 
       break;
-
+      
     case 3: //even
     case 4:
 
@@ -711,7 +711,7 @@ invert_test(void)
 
     case 5: //multi mass CG, even
     case 6:
-
+      
 #define NUM_OFFSETS 12
 
     {
@@ -778,7 +778,7 @@ invert_test(void)
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
     } break;
-
+    
     default:
       errorQuda("Unsupported test type");
 
@@ -857,8 +857,7 @@ usage_extra(char** argv )
 
   return ;
 }
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
 
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
@@ -887,15 +886,15 @@ int main(int argc, char** argv)
     errorQuda("Test type %d is outside the valid range.\n", test_type);
   }
 
-// Ensure a reasonable default
-    // ensure that the default is improved staggered
+  // Ensure a reasonable default
+  // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH &&
       dslash_type != QUDA_ASQTAD_DSLASH &&
       dslash_type != QUDA_LAPLACE_DSLASH) {
     warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
-
+  
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (test_type != 0) {
       errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);

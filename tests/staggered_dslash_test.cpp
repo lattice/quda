@@ -125,10 +125,10 @@ double getTolerance(QudaPrecision prec)
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
-        void** qdp_fatlink_eps, void** qdp_longlink_eps,
-        void** qdp_inlink, void* qudaGaugeParamPtr,
-        double** act_path_coeffs, double eps_naik) {
-
+			 void** qdp_fatlink_eps, void** qdp_longlink_eps,
+			 void** qdp_inlink, void* qudaGaugeParamPtr,
+			 double** act_path_coeffs, double eps_naik) {
+  
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // inlink in different format
