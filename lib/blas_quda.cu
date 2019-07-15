@@ -502,14 +502,11 @@ namespace quda {
     #endif
       run_aux_blas_stream = true;
 
-      cudaEventCreate(&auxBlasEvent, cudaEventDisableTiming);
-
       checkCudaError();
     }
 
     void registerAuxBlasStream() {
       if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
-      qudaEventRecord(auxBlasEvent, *auxBlasStream);
       run_aux_blas_stream = true;
     }
 
@@ -521,8 +518,7 @@ namespace quda {
 
     void synchronizeAuxBlasStream() {
       if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
-      qudaStreamWaitEvent(*auxBlasStream, auxBlasEvent, 0);
-      //qudaStreamSynchronize(*auxBlasStream);
+      qudaStreamSynchronize(*auxBlasStream);
     }
 
 
@@ -532,7 +528,6 @@ namespace quda {
       //
       qudaStreamSynchronize(*auxBlasStream);
       cudaStreamDestroy(*auxBlasStream);
-      cudaEventDestroy(auxBlasEvent);
       delete auxBlasStream;
       auxBlasStream = nullptr;
 

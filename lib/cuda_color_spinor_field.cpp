@@ -12,6 +12,8 @@ static bool zeroCopy = false;
 
 namespace quda {
 
+  namespace blas { cudaStream_t* getStream(); }	
+
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
       ColorSpinorField(param),
       alloc(false),
@@ -64,11 +66,11 @@ namespace quda {
       ghost_field_tex {nullptr, nullptr, nullptr, nullptr}
   {
     // can only overide if we are not using a reference or parity special case
-    if (param.create != QUDA_REFERENCE_FIELD_CREATE || 
-	(param.create == QUDA_REFERENCE_FIELD_CREATE && 
-	 src.SiteSubset() == QUDA_FULL_SITE_SUBSET && 
-	 param.siteSubset == QUDA_PARITY_SITE_SUBSET && 
-	 typeid(src) == typeid(cudaColorSpinorField) ) || 
+    if (param.create != QUDA_REFERENCE_FIELD_CREATE ||
+	(param.create == QUDA_REFERENCE_FIELD_CREATE &&
+	 src.SiteSubset() == QUDA_FULL_SITE_SUBSET &&
+	 param.siteSubset == QUDA_PARITY_SITE_SUBSET &&
+	 typeid(src) == typeid(cudaColorSpinorField) ) ||
          (param.create == QUDA_REFERENCE_FIELD_CREATE && (param.is_composite || param.is_component))) {
       reset(param);
     } else {
@@ -84,10 +86,10 @@ namespace quda {
 	errorQuda("Cannot reference a non-cuda field");
       }
 
-      if (composite_descr.is_component && !(src.SiteSubset() == QUDA_FULL_SITE_SUBSET && this->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) 
+      if (composite_descr.is_component && !(src.SiteSubset() == QUDA_FULL_SITE_SUBSET && this->SiteSubset() == QUDA_PARITY_SITE_SUBSET))
       {//setup eigenvector form the set
-        v    = (void*)((char*)v    + composite_descr.id*bytes);         
-        norm = (void*)((char*)norm + composite_descr.id*norm_bytes);         
+        v    = (void*)((char*)v    + composite_descr.id*bytes);
+        norm = (void*)((char*)norm + composite_descr.id*norm_bytes);
       }
     }
 
@@ -190,7 +192,7 @@ namespace quda {
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       if(composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
 	if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
-	  
+
         ColorSpinorParam param;
         param.siteSubset = QUDA_FULL_SITE_SUBSET;
         param.nDim = nDim;
@@ -229,7 +231,7 @@ namespace quda {
 
         // need this hackery for the moment (need to locate the odd pointers half way into the full field)
         (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) 
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
 	  (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
 
 #ifdef USE_TEXTURE_OBJECTS
@@ -242,7 +244,7 @@ namespace quda {
     } else { //siteSubset == QUDA_PARITY_SITE_SUBSET
 
       //! setup an object for selected eigenvector (the 1st one as a default):
-      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
+      if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE))
       {
          if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
          //if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the eigenvector set... Object size is : %u bytes\n", bytes);
@@ -298,14 +300,14 @@ namespace quda {
 
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 ) {
       if (texInit) errorQuda("Already bound textures");
-      
+
       // create the texture for the field components
-      
+
       cudaChannelFormatDesc desc;
       memset(&desc, 0, sizeof(cudaChannelFormatDesc));
       if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
       else desc.f = cudaChannelFormatKindSigned; // quarter is char, half is short, double is int2
-      
+
       // staggered and coarse fields in half and single are always two component
       int texel_size = 1;
       // all FLOAT2-ordred fields that are not double precision
@@ -322,14 +324,14 @@ namespace quda {
         desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
         texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
-      
+
       cudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
       resDesc.resType = cudaResourceTypeLinear;
       resDesc.res.linear.devPtr = v;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes;
-      
+
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
@@ -378,7 +380,7 @@ namespace quda {
 
         checkCudaError();
       }
-      
+
       texInit = true;
 
       checkCudaError();
@@ -517,11 +519,11 @@ namespace quda {
     }
 
 
-    if (composite_descr.is_composite) 
+    if (composite_descr.is_composite)
     {
        CompositeColorSpinorField::iterator vec;
        for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
-    } 
+    }
 
     if ( siteSubset == QUDA_FULL_SITE_SUBSET && (!composite_descr.is_composite || composite_descr.is_component) ) {
       delete even;
@@ -565,8 +567,8 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    cudaMemsetAsync(v, 0, bytes);
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes);
+    cudaMemsetAsync(v, 0, bytes, *blas::getStream());
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, *blas::getStream());
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -625,9 +627,9 @@ namespace quda {
   }
 
   void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src) {
-    
+
     // src is on the device and is native
-    if (typeid(src) == typeid(cudaColorSpinorField) && 
+    if (typeid(src) == typeid(cudaColorSpinorField) &&
 	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative() &&
 	this->GammaBasis() == src.GammaBasis()) {
       copy(dynamic_cast<const cudaColorSpinorField&>(src));
@@ -638,7 +640,7 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
-  } 
+  }
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
@@ -790,15 +792,15 @@ namespace quda {
     errorQuda("packGhost not built on single-GPU build");
 #endif
   }
- 
+
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, 
-				       const QudaDirection dir, const int dagger, 
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim,
+				       const QudaDirection dir, const int dagger,
 				       cudaStream_t *stream) {
 
 #ifdef MULTI_GPU
     if (precision != ghost_precision) { pushKernelPackT(true); }
-    
+
     if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single cudaMemcpy
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
@@ -819,7 +821,7 @@ namespace quda {
       } else if (nSpin == 4) {
 	// !dagger: send lower components backwards, send upper components forwards
 	// dagger: send upper components backwards, send lower components forwards
-	bool upper = dagger ? true : false; // Fwd is !Back  
+	bool upper = dagger ? true : false; // Fwd is !Back
 	if (dir == QUDA_FORWARDS) upper = !upper;
 	int lower_spin_offset = Npad*stride;
 	if (upper) offset = (dir == QUDA_BACKWARDS ? 0 : Nt_minus1_offset);
@@ -830,9 +832,9 @@ namespace quda {
       size_t dpitch = x4*len;
       size_t spitch = stride*Nvec*ghost_precision;
 
-      // QUDA Memcpy NPad's worth. 
-      //  -- Dest will point to the right beginning PAD. 
-      //  -- Each Pad has size Nvec*Vsh Floats. 
+      // QUDA Memcpy NPad's worth.
+      //  -- Dest will point to the right beginning PAD.
+      //  -- Each Pad has size Nvec*Vsh Floats.
       //  --  There is Nvec*Stride Floats from the start of one PAD to the start of the next
 
       for (int parity = 0; parity < nParity; parity++) {
@@ -863,12 +865,12 @@ namespace quda {
   }
 
 
-  void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace, 
-					 const int dim, const QudaDirection dir, 
-					 const int dagger, cudaStream_t* stream) 
+  void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace,
+					 const int dim, const QudaDirection dir,
+					 const int dagger, cudaStream_t* stream)
   {
     const void *src = ghost_spinor;
-  
+
     int ghost_offset = (dir == QUDA_BACKWARDS) ? ghostOffset[dim][0] : ghostOffset[dim][1];
     void *ghost_dst = (char*)ghost_recv_buffer_d[bufferIndex] + ghost_precision*ghost_offset;
 
@@ -887,7 +889,7 @@ namespace quda {
 
   // copy data from host buffer into boundary region of device field
   void cudaColorSpinorField::unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-                                                 const int dim, const QudaDirection dir, 
+                                                 const int dim, const QudaDirection dir,
                                                  const int dagger, cudaStream_t* stream, bool zero_copy)
   {
     errorQuda("not implemented");
@@ -946,14 +948,14 @@ namespace quda {
               spin_project, a, b, c);
   }
 
-  void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, 
+  void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity,
                                           const int dagger, const int dim,
                                           cudaStream_t *stream_p, const bool zero_copy)
   {
     createComms(nFace); // must call this first
 
     stream = stream_p;
- 
+
     packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[zero_copy ? 0 : (Nstream-1)], zero_copy);
   }
 
@@ -1286,7 +1288,7 @@ namespace quda {
     if (!commDimPartitioned(dim)) return;
     unpackGhostExtended(from_face_dim_dir_h[bufferIndex][dim][dir], nFace, static_cast<QudaParity>(parity), dim, dir == 0 ? QUDA_BACKWARDS : QUDA_FORWARDS, dagger, &stream[2*dim/*+0*/], zero_copy);
   }
- 
+
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
 					   QudaPrecision ghost_precision_)  const {
@@ -1443,10 +1445,10 @@ namespace quda {
 
 //! for composite fields:
   cudaColorSpinorField& cudaColorSpinorField::Component(const int idx) const {
-    
+
     if (this->IsComposite()) {
       if (idx < this->CompositeDim()) {//setup eigenvector form the set
-        return *(dynamic_cast<cudaColorSpinorField*>(components[idx])); 
+        return *(dynamic_cast<cudaColorSpinorField*>(components[idx]));
       }
       else{
         errorQuda("Incorrect component index...");
@@ -1457,62 +1459,24 @@ namespace quda {
   }
 
 //copyCuda currently cannot not work with set of spinor fields..
-  void cudaColorSpinorField::CopySubset(cudaColorSpinorField &dst, const int range, const int first_element) const{
-#if 0
+  void cudaColorSpinorField::CopySubset(ColorSpinorField &src, const int range, const int first_element){
+
+    if ( !this->IsComposite() || !src.IsComposite() ) errorQuda("Tried to copy a subset of non-composite field.");
     if (first_element < 0) errorQuda("\nError: trying to set negative first element.\n");
-    if (siteSubset == QUDA_PARITY_SITE_SUBSET && this->EigvId() == -1) {
-      if (first_element == 0 && range == this->EigvDim())
-      {
-        if (range != dst.EigvDim())errorQuda("\nError: eigenvector range to big.\n");
-        checkField(dst, *this);
-        copyCuda(dst, *this);
-      }
-      else if ((first_element+range) < this->EigvDim()) 
-      {//setup eigenvector subset
 
-        cudaColorSpinorField *eigv_subset;
+    const int src_copy_components = src.CompositeDim() - first_element;
+    const int dst_copy_components = this->CompositeDim() - first_element;
 
-        ColorSpinorParam param;
+    if ( src_copy_components <= 0 || range > src_copy_components || dst_copy_components <= 0 || range > dst_copy_components ) errorQuda("Incorrect copy range.\n");
 
-        param.nColor = nColor;
-        param.nSpin = nSpin;
-        param.twistFlavor = twistFlavor;
-        param.precision = precision;
-        param.nDim = nDim;
-        param.pad = pad;
-        param.siteSubset = siteSubset;
-        param.siteOrder = siteOrder;
-        param.fieldOrder = fieldOrder;
-        param.gammaBasis = gammaBasis;
-        memcpy(param.x, x, nDim*sizeof(int));
-        param.create = QUDA_REFERENCE_FIELD_CREATE;
- 
-        param.eigv_dim  = range;
-        param.eigv_id   = -1;
-        param.v = (void*)((char*)v + first_element*eigv_bytes);
-        param.norm = (void*)((char*)norm + first_element*eigv_norm_bytes);
+    this->CompositeSubset(first_element, range);
+    src.CompositeSubset(first_element, range);
 
-        eigv_subset = new cudaColorSpinorField(param);
+    blas::copy(*this, src);
 
-        //Not really needed:
-        eigv_subset->eigenvectors.reserve(param.eigv_dim);
-        for (int id = first_element; id < (first_element+range); id++)
-        {
-            param.eigv_id = id;
-            eigv_subset->eigenvectors.push_back(new cudaColorSpinorField(*this, param));
-        }
-        checkField(dst, *eigv_subset);
-        copyCuda(dst, *eigv_subset);
+    this->FlushCompositeSubset();
+    src.FlushCompositeSubset();
 
-        delete eigv_subset;
-      } else {
-        errorQuda("Incorrect eigenvector dimension...");
-      }
-    } else{
-      errorQuda("Eigenvector must be a parity spinor");
-      exit(-1);
-    }
-#endif
   }
 
   void cudaColorSpinorField::getTexObjectInfo() const

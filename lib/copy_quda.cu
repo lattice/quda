@@ -4,12 +4,14 @@
 #include <register_traits.h>
 
 // For kernels with precision conversion built in
-#define checkSpinorLength(a, b)                                                                                        \
-  {                                                                                                                    \
-    if (a.Length() != b.Length()) errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length());                  \
-    if (a.Stride() != b.Stride()) errorQuda("strides do not match: %lu %lu", a.Stride(), b.Stride());                  \
-    if (a.GammaBasis() != b.GammaBasis())                                                                              \
-      errorQuda("gamma basis does not match: %d %d", a.GammaBasis(), b.GammaBasis());                                  \
+#define checkSpinorLength(a, b)						\
+  {									\
+    if (a.Length() != b.Length())					\
+      errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
+    if (a.Stride() != b.Stride())					\
+      errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
+    if (a.GammaBasis() != b.GammaBasis())				\
+      errorQuda("gamma basis does not match: %d %d", a.GammaBasis(), b.GammaBasis());	\
   }
 
 namespace quda {
@@ -108,6 +110,11 @@ namespace quda {
 
 	checkSpinorLength(dst, src);
 
+        if (src.IsCompositeSubset()) {
+	  if( dst.Precision() != src.Precision() ) errorQuda("Composite subsets do not have matching precisions. \n");
+	  if (dst.CompositeSubsetLength() != src.CompositeSubsetLength())	errorQuda("lengths do not match: %lu %lu", dst.CompositeSubsetLength(), src.CompositeSubsetLength());
+	}
+
 	blasStrings.vol_str = src.VolString();
 	char tmp[256];
 	strcpy(tmp, "dst=");
@@ -122,16 +129,33 @@ namespace quda {
 	// For a given dst precision, there are two non-trivial possibilities for the
 	// src precision.
 
-	blas::bytes += (unsigned long long)src.RealLength()*(src.Precision() + dst.Precision());
+	blas::bytes += (unsigned long long) (src.IsCompositeSubset() ? src.CompositeSubsetRealLength() : src.RealLength() )*(src.Precision() + dst.Precision());
 
-	int partitions = (src.IsComposite() ? src.CompositeDim() : 1) * (src.SiteSubset());
+	int partitions = (src.IsComposite() ? ( src.IsCompositeSubset() ? src.CompositeSubsetRange() : src.CompositeDim()) : 1) * (src.SiteSubset());
 
 	if (dst.Precision() == src.Precision()) {
-	  if (src.Bytes() != dst.Bytes()) errorQuda("Precisions match, but bytes do not");
-	  qudaMemcpyAsync(dst.V(), src.V(), dst.Bytes(), cudaMemcpyDeviceToDevice, *blas::getStream());
+
+	  auto src_bytes = src.IsCompositeSubset() ? src.CompositeSubsetBytes() : src.Bytes();
+	  auto dst_bytes = dst.IsCompositeSubset() ? dst.CompositeSubsetBytes() : dst.Bytes();
+
+	  if (src_bytes != dst_bytes) errorQuda("Precisions match, but bytes do not");
+
+	  const void *src_ptr = src.IsCompositeSubset() ? src.CompositeSubsetBegin().V() : src.V();
+	  void *dst_ptr = dst.IsCompositeSubset() ? dst.CompositeSubsetBegin().V() : dst.V();
+
+	  qudaMemcpyAsync(dst_ptr, src_ptr, dst_bytes, cudaMemcpyDeviceToDevice, *blas::getStream());
+
 	  if (dst.Precision() == QUDA_HALF_PRECISION || dst.Precision() == QUDA_QUARTER_PRECISION) {
-	    qudaMemcpyAsync(dst.Norm(), src.Norm(), dst.NormBytes(), cudaMemcpyDeviceToDevice, *blas::getStream());
-	    blas::bytes += 2*(unsigned long long)dst.RealLength()*sizeof(float);
+
+	    auto src_norm_bytes = src.IsCompositeSubset() ? src.CompositeSubsetNormBytes() : src.NormBytes();
+	    auto dst_norm_bytes = dst.IsCompositeSubset() ? dst.CompositeSubsetNormBytes() : dst.NormBytes();
+
+	    const void *src_norm_ptr = src.IsCompositeSubset() ? src.CompositeSubsetBegin().Norm() : src.Norm();
+	    void *dst_norm_ptr = dst.IsCompositeSubset() ? dst.CompositeSubsetBegin().Norm() : dst.Norm();
+
+	    qudaMemcpyAsync(dst_norm_ptr, src_norm_ptr, dst_norm_bytes, cudaMemcpyDeviceToDevice, *blas::getStream());
+
+	    blas::bytes += 2*(unsigned long long)(dst.IsCompositeSubset() ? dst.CompositeSubsetRealLength() : dst.RealLength() )*sizeof(float);
 	  }
 	} else if (dst.Precision() == QUDA_DOUBLE_PRECISION && src.Precision() == QUDA_SINGLE_PRECISION) {
 	  if (src.Nspin() == 4){
@@ -343,7 +367,7 @@ namespace quda {
     }
   } else {
 	  errorQuda("Invalid precision combination dst=%d and src=%d", dst.Precision(), src.Precision());
-	}
+  }
 
 	checkCudaError();
       }
