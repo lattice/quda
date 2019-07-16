@@ -21,15 +21,12 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
 			 void** qdp_fatlink_eps, void** qdp_longlink_eps,
 			 void** qdp_inlink, QudaGaugeParam &gauge_param,
 			 double** act_path_coeffs, double eps_naik,
 			 size_t gSize, int n_naiks) {
-  
-  //gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   
   // inlink in different format
   void *milc_inlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
@@ -186,9 +183,9 @@ void computeFatLong(void** qdp_fatlink, void** qdp_longlink,
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink[dir],qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-          memcpy(qdp_longlink[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-          free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
-          free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
+      memcpy(qdp_longlink[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
+      free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
+      free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
     }
   }  
 }

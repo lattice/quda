@@ -41,7 +41,9 @@ namespace quda
     char *arpack_logfile = eig_param->arpack_logfile;
 #endif
     if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("*******************************\n");
       printfQuda("**** START ARPACK SOLUTION ****\n");
+      printfQuda("*******************************\n");
 #ifndef ARPACK_LOGGING
       printfQuda("Arpack logging not enabled.\n");
 #else
