@@ -449,7 +449,7 @@ namespace quda {
     DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac);
     virtual ~DiracCloverHasenbuschTwist();
     DiracCloverHasenbuschTwist& operator=(const DiracCloverHasenbuschTwist &dirac);
-
+	double Mu()const override {return mu;}
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -477,6 +477,7 @@ namespace quda {
      DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac);
      virtual ~DiracCloverHasenbuschTwistPC();
      DiracCloverHasenbuschTwistPC& operator=(const DiracCloverHasenbuschTwistPC &dirac);
+	 double Mu()const override {return mu;}
 
      // Clover is inherited from parent
 
@@ -484,8 +485,10 @@ namespace quda {
 
      // Dslash is defined as A_pp^{-1} D_p\bar{p} and is inherited
 
-     // DslashXPay is inherited (for reconstructs and such)
-
+     // DslashXPay is override to do the D_c = P^\dagger D P check in multigrid
+	 void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+		    const QudaParity parity, const ColorSpinorField &x, const double &k) const override;
+	 
      // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
      void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
          				 const QudaParity parity, const ColorSpinorField &x,
@@ -502,7 +505,7 @@ namespace quda {
 
      // squared op
      void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-
+    
      /**
       * @brief Create the coarse even-odd preconditioned clover
       * operator.  Unlike the Wilson operator, the coarsening of the

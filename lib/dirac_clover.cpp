@@ -148,7 +148,6 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
@@ -429,7 +428,7 @@ namespace quda {
 
     DiracCloverHasenbuschTwistPC& DiracCloverHasenbuschTwistPC::operator=(const DiracCloverHasenbuschTwistPC &dirac)
     {
-      if (&dirac != this) {
+	  if (&dirac != this) {
         DiracCloverPC::operator=(dirac);
         mu = dirac.mu;
       }
@@ -463,7 +462,21 @@ namespace quda {
          //    DiracCloverPC.DslashXPay -/+ mu ( i gamma_5 )
          flops += (1872ll+48)*in.Volume();
        }
+  
+	void DiracCloverHasenbuschTwistPC::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+				 const QudaParity parity, const ColorSpinorField &x,
+				 const double &k) const
+	{
+		checkParitySpinor(in, out);
+		checkSpinorAlias(in, out);
 
+		if(parity == QUDA_EVEN_PARITY){
+			DiracCloverPC::DslashXpay(out, in, parity, x, k); 
+		}else if(parity == QUDA_ODD_PARITY){
+			DslashXpayTwistClovInv(out, in, parity, x, k, mu);
+		}
+		flops += 1872ll*in.Volume();
+	}
 
     // Apply the even-odd preconditioned clover-improved Dirac operator
     void DiracCloverHasenbuschTwistPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -492,10 +505,8 @@ namespace quda {
       } else if (!dagger) { // symmetric preconditioning
         // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
         // where A is actually a clover inverse.
-
         // This is the non-dag case: AD
-        Dslash(*tmp1, in, parity[0]);
-
+		Dslash(*tmp1, in, parity[0]);
         // Then x + AD (AD)
         DslashXpayTwistClovInv(out, *tmp1, parity[1], in, kappa2, mu);
       } else { // symmetric preconditioning, dagger
@@ -525,10 +536,8 @@ namespace quda {
 
     void DiracCloverHasenbuschTwistPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
   				     double kappa, double mass, double mu, double mu_factor) const {
-      //double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-      //CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor,QUDA_CLOVERPC_DIRAC, matpcType);
-
-      errorQuda("Not yet implemented\n");
+	  if(matpcType != QUDA_MATPC_ODD_ODD){errorQuda("currently only support QUDA_MATPC_ODD_ODD");}
+	  CoarseOp(Y, X, T, *gauge, &clover, kappa, 0.5*mu, mu_factor, QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC, matpcType);
     }
 
 
