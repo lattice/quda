@@ -28,16 +28,16 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
 #define mySpinorSiteSize 6
 
-extern void usage(char** argv);
+extern void usage(char **argv);
 
-void** ghost_fatlink, **ghost_longlink;
+void **ghost_fatlink, **ghost_longlink;
 
 extern int device;
 
@@ -54,27 +54,27 @@ extern int tdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
 extern QudaPrecision prec;
-extern QudaPrecision  prec_sloppy;
-extern QudaPrecision  prec_refinement_sloppy;
+extern QudaPrecision prec_sloppy;
+extern QudaPrecision prec_refinement_sloppy;
 extern QudaReconstructType link_recon_sloppy;
 extern double mass; // the mass of the Dirac operator
 extern double kappa;
 extern int laplace3D;
-extern double tol; // tolerance for inverter
+extern double tol;    // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
 extern char latfile[];
 extern int Nsrc; // number of spinors to apply to simultaneously
 extern int niter;
 extern int gcrNkrylov;
-extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
+extern int pipeline;                      // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
-extern QudaCABasis ca_basis; // basis for CA-CG solves
-extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
-extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
+extern QudaCABasis ca_basis;              // basis for CA-CG solves
+extern double ca_lambda_min;              // minimum eigenvalue for scaling Chebyshev CA-CG solves
+extern double ca_lambda_max;              // maximum eigenvalue for scaling Chebyshev CA-CG solves
 
 // Dirac operator type
 extern QudaDslashType dslash_type;
-extern QudaMatPCType matpc_type; // preconditioning type
+extern QudaMatPCType matpc_type;       // preconditioning type
 extern QudaSolutionType solution_type; // solution type
 extern QudaSolveType solve_type;
 
@@ -88,7 +88,7 @@ static int n_naiks = 1;
 
 // For loading the gauge fields
 int argc_copy;
-char** argv_copy;
+char **argv_copy;
 
 // eigensolver params
 extern int eig_nEv;
@@ -116,53 +116,59 @@ extern char eig_vec_outfile[];
 
 extern bool verify_results;
 
-
 int X[4];
 
-void display_test_info() {
+void display_test_info()
+{
   printfQuda("running the following test:\n");
 
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon test_type  S_dimension T_dimension\n");
-  printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec), get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
-  
+  printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
+             get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-	     dimPartitioned(3));
-  
-  return;  
+             dimPartitioned(3));
+
+  return;
 }
 
-void usage_extra(char** argv ) {
+void usage_extra(char **argv)
+{
   printfQuda("Extra options:\n");
   printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
   printfQuda("                                                0: Full parity inverter\n");
-  printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
+  printfQuda(
+    "                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
+  printfQuda(
+    "                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
   printfQuda("                                                3: Even even spinor CG inverter\n");
   printfQuda("                                                4: Odd odd spinor CG inverter\n");
   printfQuda("                                                5: Even even spinor multishift CG inverter\n");
   printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
   printfQuda("    --cpu_prec <double/single/half>             # Set CPU precision\n");
-  
-  return ;
+
+  return;
 }
 
-template<typename Float>
-void constructSpinorField(Float *res) {
+template <typename Float> void constructSpinorField(Float *res)
+{
   const int vol = (solution_type == QUDA_MAT_SOLUTION) ? V : Vh;
-  for(int src=0; src<Nsrc; src++) {
-    for(int i = 0; i < vol; i++) {
+  for (int src = 0; src < Nsrc; src++) {
+    for (int i = 0; i < vol; i++) {
       for (int s = 0; s < 1; s++) {
         for (int m = 0; m < 3; m++) {
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
+          res[(src * Vh + i) * (1 * 3 * 2) + s * (3 * 2) + m * (2) + 0] = rand() / (Float)RAND_MAX;
+          res[(src * Vh + i) * (1 * 3 * 2) + s * (3 * 2) + m * (2) + 1] = rand() / (Float)RAND_MAX;
         }
       }
     }
   }
 }
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {  
+void setGaugeParam(QudaGaugeParam &gauge_param)
+{
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
@@ -175,24 +181,20 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
 
-  if (dslash_type != QUDA_ASQTAD_DSLASH &&
-      dslash_type != QUDA_STAGGERED_DSLASH &&
-      dslash_type != QUDA_LAPLACE_DSLASH)
+  if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
-  
+
   gauge_param.anisotropy = 1.0;
-  
+
   // For HISQ, this must always be set to 1.0, since the tadpole
   // correction is baked into the coefficients for the first fattening.
   // The tadpole doesn't mean anything for the second fattening
   // since the input fields are unitarized.
   gauge_param.tadpole_coeff = 1.0;
-  
+
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0/24.0;
-    if (eps_naik != 0) {
-      gauge_param.scale *= (1.0+eps_naik);
-    }
+    gauge_param.scale = -1.0 / 24.0;
+    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
   } else {
     gauge_param.scale = 1.0;
   }
@@ -205,16 +207,15 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.ga_pad = 0;
 
 #ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  int pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;
 #endif
-  
 }
 
 void setInvertParam(QudaInvertParam &inv_param)
@@ -222,11 +223,11 @@ void setInvertParam(QudaInvertParam &inv_param)
   // Solver params
   inv_param.verbosity = QUDA_VERBOSE;
   inv_param.mass = mass;
-  inv_param.kappa = kappa = 1.0/(8.0 + mass); // for Laplace operator
-  inv_param.laplace3D = laplace3D;            // for Laplace operator
+  inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
+  inv_param.laplace3D = laplace3D;              // for Laplace operator
 
   // outer solver parameters
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER; //Dummy setting
+  inv_param.inv_type = QUDA_BICGSTAB_INVERTER; // Dummy setting
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
@@ -238,14 +239,18 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.Ls = Nsrc;
 
-  if(tol_hq == 0 && tol == 0){
+  if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
   }
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType_s>(0);
-  inv_param.residual_type = (tol != 0) ? static_cast<QudaResidualType_s> ( inv_param.residual_type | QUDA_L2_RELATIVE_RESIDUAL) : inv_param.residual_type;
-  inv_param.residual_type = (tol_hq != 0) ? static_cast<QudaResidualType_s> (inv_param.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) : inv_param.residual_type;
+  inv_param.residual_type = (tol != 0) ?
+    static_cast<QudaResidualType_s>(inv_param.residual_type | QUDA_L2_RELATIVE_RESIDUAL) :
+    inv_param.residual_type;
+  inv_param.residual_type = (tol_hq != 0) ?
+    static_cast<QudaResidualType_s>(inv_param.residual_type | QUDA_HEAVY_QUARK_RESIDUAL) :
+    inv_param.residual_type;
   inv_param.heavy_quark_check = (inv_param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL ? 5 : 0);
 
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
@@ -287,9 +292,9 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  int tmpint = MAX(X[1]*X[2]*X[3], X[0]*X[2]*X[3]);
-  tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
-  tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
+  int tmpint = MAX(X[1] * X[2] * X[3], X[0] * X[2] * X[3]);
+  tmpint = MAX(tmpint, X[0] * X[1] * X[3]);
+  tmpint = MAX(tmpint, X[0] * X[1] * X[2]);
 
   inv_param.sp_pad = tmpint;
 }
@@ -344,11 +349,11 @@ void setEigParam(QudaEigParam &eig_param)
 /*
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
-			 void** qdp_fatlink_eps, void** qdp_longlink_eps,
-			 void** qdp_inlink, QudaGaugeParam &gauge_param,
-			 double** act_path_coeffs, double eps_naik,
-			 size_t gSize, int n_naiks) {
-  
+                         void** qdp_fatlink_eps, void** qdp_longlink_eps,
+                         void** qdp_inlink, QudaGaugeParam &gauge_param,
+                         double** act_path_coeffs, double eps_naik,
+                         size_t gSize, int n_naiks) {
+
   // inlink in different format
   void *milc_inlink = pinned_malloc(4*V*gaugeSiteSize*gSize);
   reorderQDPtoMILC(milc_inlink,qdp_inlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
@@ -416,11 +421,12 @@ void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
   }
 }
 */
-void eigensolve_test() {
-  
-  QudaGaugeParam gauge_param = newQudaGaugeParam();  
+void eigensolve_test()
+{
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
-  
+
   QudaEigParam eig_param = newQudaEigParam();
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
@@ -431,32 +437,32 @@ void eigensolve_test() {
   setInvertParam(eig_inv_param);
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
-  
+
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
-  
+
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X,Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
-  void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* milc_fatlink = nullptr;
-  void* milc_longlink = nullptr;
+  void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void *milc_fatlink = nullptr;
+  void *milc_longlink = nullptr;
 
   gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  
+
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_inlink[dir] = malloc(V * gaugeSiteSize * gSize);
+    qdp_fatlink[dir] = malloc(V * gaugeSiteSize * gSize);
+    qdp_longlink[dir] = malloc(V * gaugeSiteSize * gSize);
   }
-  milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
-  milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
+  milc_fatlink = malloc(4 * V * gaugeSiteSize * gSize);
+  milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
 
   // load a field WITHOUT PHASES
-  if (strcmp(latfile,"")) {
+  if (strcmp(latfile, "")) {
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
@@ -465,20 +471,21 @@ void eigensolve_test() {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       construct_gauge_field(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec,&gauge_param,compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
+                                     compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
-    //createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
+    // createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
   }
 
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V*gaugeSiteSize*gSize);
-      memset(qdp_longlink[dir], 0, V*gaugeSiteSize*gSize);
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gaugeSiteSize * gSize);
+      memset(qdp_longlink[dir], 0, V * gaugeSiteSize * gSize);
     }
   } else { // QUDA_ASQTAD_DSLASH
-    
+
     if (compute_fatlong) {
       /*
       ///////////////////////////
@@ -495,12 +502,12 @@ void eigensolve_test() {
 
       // First path: create V, W links
       double act_path_coeff_1[6] = {
-	( 1.0/8.0),                    // one link 
-        u2*( 0.0),                     // Naik 
-        u2*(-1.0/8.0)*0.5,             // simple staple 
-        u4*( 1.0/8.0)*0.25*0.5,        // displace link in two directions 
-        u6*(-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions 
-        u4*( 0.0)                      // Lepage term 
+        ( 1.0/8.0),                    // one link
+        u2*( 0.0),                     // Naik
+        u2*(-1.0/8.0)*0.5,             // simple staple
+        u4*( 1.0/8.0)*0.25*0.5,        // displace link in two directions
+        u6*(-1.0/8.0)*0.125*(1.0/6.0), // displace link in three directions
+        u4*( 0.0)                      // Lepage term
       };
 
       // Second path: create X, long links
@@ -531,11 +538,11 @@ void eigensolve_test() {
       ////////////////////////////////////
 
       setUnitarizeLinksConstants(unitarize_eps,
-				 max_allowed_error,
-				 reunit_allow_svd,
-				 reunit_svd_only,
-				 svd_rel_error,
-				 svd_abs_error);
+                                 max_allowed_error,
+                                 reunit_allow_svd,
+                                 reunit_svd_only,
+                                 svd_rel_error,
+                                 svd_abs_error);
 
       ///////////////////////////////////////////////////////////////////////
       // Create some temporary space if we want to test the epsilon fields //
@@ -556,13 +563,13 @@ void eigensolve_test() {
 
       // Skip eps field for now
 
-      // Skip eps field for now  
+      // Skip eps field for now
       // Note: GPU link creation only works for single and double precision
       computeHISQLinksGPU(qdp_fatlink, qdp_longlink,
-			  (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-			  (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
-			  qdp_inlink, gauge_param, act_paths, eps_naik, gSize, n_naiks);
-      
+                          (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+                          (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
+                          qdp_inlink, gauge_param, act_paths, eps_naik, gSize, n_naiks);
+
       if (n_naiks == 2) {
         // Override the naik fields into the fat/long link fields
         for (int dir = 0; dir < 4; dir++) {
@@ -571,54 +578,55 @@ void eigensolve_test() {
           free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
           free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
         }
-      }    
-      */
-      computeFatLong(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param,
-		     gSize, n_naiks, eps_naik);
-    } else { 
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
       }
+      */
+      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
+    } else {
+      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gaugeSiteSize * gSize); }
     }
   }
-  
+
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
 #ifdef MULTI_GPU
-  int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
-  tmp_value = MAX(tmp_value, xdim*ydim*tdim/2);
-  tmp_value = MAX(tmp_value, xdim*ydim*zdim/2);
-  
+  int tmp_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
+  tmp_value = MAX(tmp_value, xdim * ydim * tdim / 2);
+  tmp_value = MAX(tmp_value, xdim * ydim * zdim / 2);
+
   int fat_pad = tmp_value;
-  int link_pad =  3*tmp_value;
+  int link_pad = 3 * tmp_value;
 
   // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField *cpuFat = new cpuGaugeField(cpuFatParam);
-  ghost_fatlink = (void**)cpuFat->Ghost();
+  ghost_fatlink = (void **)cpuFat->Ghost();
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField *cpuLong = new cpuGaugeField(cpuLongParam);
-  ghost_longlink = (void**)cpuLong->Ghost();
+  ghost_longlink = (void **)cpuLong->Ghost();
 
 #else
   int fat_pad = 0;
   int link_pad = 0;
 #endif
 
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
   gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct= gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
   gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
   gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
@@ -628,87 +636,106 @@ void eigensolve_test() {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct= (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    gauge_param.reconstruct_sloppy = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon_sloppy;
+    gauge_param.reconstruct
+      = (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
+    gauge_param.reconstruct_sloppy
+      = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 :
+                                                                                                link_recon_sloppy;
     gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
     gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 
-  switch(test_type){
+  switch (test_type) {
   case 0: // full parity solution
   case 1: // solving prec system, reconstructing
   case 2:
-  case 3: //even
-  case 4:
-    {
-      // QUDA eigensolver test
-      //----------------------------------------------------------------------------
-      
-      // Host side arrays to store the eigenpairs computed by QUDA
-      void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
-      for (int i = 0; i < eig_nConv; i++) {
-	host_evecs[i] = (void *)malloc(V * mySpinorSiteSize * eig_inv_param.cpu_prec);
-      }
-      double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
-      
-      // This function returns the host_evecs and host_evals pointers, populated with
-      // the requested data, at the requested prec. All the information needed to
-      // perfom the solve is in the eig_param container.
-      // If eig_param.arpack_check == true and precision is double, the routine will
-      // use ARPACK rather than the GPU.
-      double time = -((double)clock());
-      if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
-	errorQuda("ARPACK check only available in double precision");
-      }
-      
-      eigensolveQuda(host_evecs, host_evals, &eig_param);
-      time += (double)clock();
-      printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
-      
-      // Deallocate host memory
-      for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
-      free(host_evecs);
-      free(host_evals);
-      
+  case 3: // even
+  case 4: {
+    // QUDA eigensolver test
+    //----------------------------------------------------------------------------
+
+    // Host side arrays to store the eigenpairs computed by QUDA
+    void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
+    for (int i = 0; i < eig_nConv; i++) {
+      host_evecs[i] = (void *)malloc(V * mySpinorSiteSize * eig_inv_param.cpu_prec);
     }
-    break;
+    double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+
+    // This function returns the host_evecs and host_evals pointers, populated with
+    // the requested data, at the requested prec. All the information needed to
+    // perfom the solve is in the eig_param container.
+    // If eig_param.arpack_check == true and precision is double, the routine will
+    // use ARPACK rather than the GPU.
+    double time = -((double)clock());
+    if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
+      errorQuda("ARPACK check only available in double precision");
+    }
+
+    eigensolveQuda(host_evecs, host_evals, &eig_param);
+    time += (double)clock();
+    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
+
+    // Deallocate host memory
+    for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
+    free(host_evecs);
+    free(host_evals);
+
+  } break;
   case 5:
   case 6:
-  default:
-    errorQuda("Unsupported test type");
-  } //switch
-  
+  default: errorQuda("Unsupported test type");
+  } // switch
+
   // Clean up gauge fields.
   for (int dir = 0; dir < 4; dir++) {
-    if (qdp_inlink[dir] != nullptr) { free(qdp_inlink[dir]); qdp_inlink[dir] = nullptr; }
-    if (qdp_fatlink[dir] != nullptr) { free(qdp_fatlink[dir]); qdp_fatlink[dir] = nullptr; }
-    if (qdp_longlink[dir] != nullptr) { free(qdp_longlink[dir]); qdp_longlink[dir] = nullptr; }
+    if (qdp_inlink[dir] != nullptr) {
+      free(qdp_inlink[dir]);
+      qdp_inlink[dir] = nullptr;
+    }
+    if (qdp_fatlink[dir] != nullptr) {
+      free(qdp_fatlink[dir]);
+      qdp_fatlink[dir] = nullptr;
+    }
+    if (qdp_longlink[dir] != nullptr) {
+      free(qdp_longlink[dir]);
+      qdp_longlink[dir] = nullptr;
+    }
   }
-  if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
-  if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
-  
-#ifdef MULTI_GPU
-  if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
-  if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
-#endif
+  if (milc_fatlink != nullptr) {
+    free(milc_fatlink);
+    milc_fatlink = nullptr;
+  }
+  if (milc_longlink != nullptr) {
+    free(milc_longlink);
+    milc_longlink = nullptr;
+  }
 
+#ifdef MULTI_GPU
+  if (cpuFat != nullptr) {
+    delete cpuFat;
+    cpuFat = nullptr;
+  }
+  if (cpuLong != nullptr) {
+    delete cpuLong;
+    cpuLong = nullptr;
+  }
+#endif
 }
 
-int main(int argc, char** argv) {
-  
+int main(int argc, char **argv)
+{
+
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
 
   for (int i = 1; i < argc; i++) {
-    
+
     if (process_command_line_option(argc, argv, &i) == 0) { continue; }
 
-    if( strcmp(argv[i], "--cpu_prec") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      cpu_prec= get_prec(argv[i+1]);
+    if (strcmp(argv[i], "--cpu_prec") == 0) {
+      if (i + 1 >= argc) { usage(argv); }
+      cpu_prec = get_prec(argv[i + 1]);
       i++;
       continue;
     }
@@ -719,25 +746,19 @@ int main(int argc, char** argv) {
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-  
-  if (test_type < 0 || test_type > 6) {
-    errorQuda("Test type %d is outside the valid range.\n", test_type);
-  }
+
+  if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
 
   // Ensure a reasonable default
   // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH &&
-      dslash_type != QUDA_ASQTAD_DSLASH &&
-      dslash_type != QUDA_LAPLACE_DSLASH) {
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
     warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     // LAPLACE operator path
-    if (test_type != 0) {
-      errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
-    }
+    if (test_type != 0) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }
     solve_type = QUDA_DIRECT_SOLVE;
     solution_type = QUDA_MAT_SOLUTION;
     matpc_type = QUDA_MATPC_EVEN_EVEN; // doesn't matter
@@ -750,7 +771,7 @@ int main(int argc, char** argv) {
         solve_type = QUDA_DIRECT_PC_SOLVE;
       }
     }
-    
+
     if (test_type == 1 || test_type == 3 || test_type == 5) {
       matpc_type = QUDA_MATPC_EVEN_EVEN;
     } else if (test_type == 2 || test_type == 4 || test_type == 6) {
@@ -766,16 +787,10 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (prec_sloppy == QUDA_INVALID_PRECISION) {
-    prec_sloppy = prec;
-  }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) { prec_sloppy = prec; }
 
-  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION){
-    prec_refinement_sloppy = prec_sloppy;
-  }
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
-    link_recon_sloppy = link_recon;
-  }
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) { prec_refinement_sloppy = prec_sloppy; }
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) { link_recon_sloppy = link_recon; }
 
   // Set n_naiks to 2 if eps_naik != 0.0
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -800,10 +815,9 @@ int main(int argc, char** argv) {
   argv_copy = argv;
 
   eigensolve_test();
-  
+
   endQuda();
-  
+
   // finalize the communications layer
   finalizeComms();
-  
 }

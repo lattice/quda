@@ -12,12 +12,14 @@ using namespace quda;
 void setDims(int *);
 
 // Wrap everything for the GPU construction of fat/long links here
-void computeHISQLinksGPU(void** qdp_fatlink, void** qdp_longlink,
-			 void** qdp_fatlink_eps, void** qdp_longlink_eps,
-			 void** qdp_inlink, QudaGaugeParam &gauge_param,
-			 double** act_path_coeffs, double eps_naik,
-			 size_t gSize, int n_naiks);
+void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
+                         void **qdp_inlink, QudaGaugeParam &gauge_param, double **act_path_coeffs, double eps_naik,
+                         size_t gSize, int n_naiks);
 
-void computeFatLong(void** qdp_fatlink, void** qdp_longlink,
-		    void** qdp_inlink, QudaGaugeParam &gauge_param,
-		    size_t gSize, int n_naiks, double eps_naik);
+void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
+                       size_t gSize, int n_naiks, double eps_naik);
+
+void computeFatLongGPUandCPU(void** qdp_fatlink_gpu, void** qdp_longlink_gpu,
+			     void** qdp_fatlink_cpu, void** qdp_longlink_cpu,
+			     void** qdp_inlink, QudaGaugeParam &gauge_param,
+			     size_t gSize, int n_naiks, double eps_naik);

@@ -42,8 +42,9 @@ void display_link_internal(Float* link)
 }
 
 template <typename sFloat, typename gFloat>
-void dslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink, gFloat **ghostLonglink, sFloat *spinorField, sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc,
-		     QudaDslashType dslash_type)
+void dslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink, gFloat **ghostLonglink,
+                     sFloat *spinorField, sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit,
+                     int nSrc, QudaDslashType dslash_type)
 {
   for (int i=0; i<Vh*mySpinorSiteSize*nSrc; i++) res[i] = 0.0;
 
@@ -201,6 +202,5 @@ void matdagmat(cpuColorSpinorField *out, void **fatlink, void **longlink, void *
     axmy((double*)in->V(), (double)msq_x4, (double*)out->V(), out->X(4)*Vh*mySpinorSiteSize);
   }else{
     axmy((float*)in->V(), (float)msq_x4, (float*)out->V(), out->X(4)*Vh*mySpinorSiteSize);
-  } 
-  
+  }
 }
