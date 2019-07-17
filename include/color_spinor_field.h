@@ -883,6 +883,7 @@ namespace quda {
     CompositeColorSpinorField Components(const int first_element, const int last_element) const;
 
     void CopySubset(ColorSpinorField& src, const int range, const int first_element);
+    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src);    
 
     void zero();
 

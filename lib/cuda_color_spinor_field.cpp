@@ -12,7 +12,7 @@ static bool zeroCopy = false;
 
 namespace quda {
 
-  namespace blas { cudaStream_t* getStream(); }	
+  namespace blas { cudaStream_t* getStream(); }
 
   cudaColorSpinorField::cudaColorSpinorField(const ColorSpinorParam &param) :
       ColorSpinorField(param),
@@ -1458,7 +1458,6 @@ namespace quda {
     exit(-1);
   }
 
-//copyCuda currently cannot not work with set of spinor fields..
   void cudaColorSpinorField::CopySubset(ColorSpinorField &src, const int range, const int first_element){
 
     if ( !this->IsComposite() || !src.IsComposite() ) errorQuda("Tried to copy a subset of non-composite field.");
@@ -1471,6 +1470,26 @@ namespace quda {
 
     this->CompositeSubset(first_element, range);
     src.CompositeSubset(first_element, range);
+
+    blas::copy(*this, src);
+
+    this->FlushCompositeSubset();
+    src.FlushCompositeSubset();
+
+  }
+
+		void cudaColorSpinorField::CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src){
+
+    if ( !this->IsComposite() || !src.IsComposite() ) errorQuda("Tried to copy a subset of non-composite field.");
+    if (first_element_dst < 0 || first_element_src < 0) errorQuda("\nError: trying to set a negative first element.\n");
+
+    const int src_copy_components = src.CompositeDim() - first_element_src;
+    const int dst_copy_components = this->CompositeDim() - first_element_dst;
+
+    if ( src_copy_components <= 0 || range > src_copy_components || dst_copy_components <= 0 || range > dst_copy_components ) errorQuda("Incorrect copy range.\n");
+
+    this->CompositeSubset(first_element_dst, range);
+    src.CompositeSubset(first_element_src, range);
 
     blas::copy(*this, src);
 
