@@ -1478,7 +1478,7 @@ namespace quda {
 
   }
 
-		void cudaColorSpinorField::CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src){
+  void cudaColorSpinorField::CopySubset(ColorSpinorField &src, const int range, const int first_element_dst, const int first_element_src){
 
     if ( !this->IsComposite() || !src.IsComposite() ) errorQuda("Tried to copy a subset of non-composite field.");
     if (first_element_dst < 0 || first_element_src < 0) errorQuda("\nError: trying to set a negative first element.\n");

@@ -15,6 +15,8 @@
 #include <util_quda.h>
 #include <deflation.h>
 
+#include <cuda_profiler_api.h>
+
 #include <Eigen/Dense>
 
 #include <mpi.h>
@@ -42,13 +44,14 @@ namespace quda {
    using namespace blas;
    using namespace Eigen;
 
-   using DynamicStride   = Stride<Dynamic, Dynamic>;
-   using RealDenseMatrix     = MatrixXd;
+   using DynamicStride       = Stride<Dynamic, Dynamic>;
+   using RealMatrix          = MatrixXd;
    using RealVectorSet       = MatrixXd;
    using RealVector          = VectorXd;
+   using RealDiagonalMatrix  = DiagonalMatrix<double, Dynamic>;
 
 //special types needed for compatibility with QUDA blas:
-   using RowMajorRealDenseMatrix = Matrix<double, Dynamic, Dynamic, RowMajor>;
+   using RowMajorRealMatrix = Matrix<double, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
@@ -60,22 +63,15 @@ namespace quda {
      else					      return std::move(std::make_shared<cudaColorSpinorField>(param));
    }
 
-   using EigCGComputeTasks = enum EigCGComputeTasks_s { COMPUTE_NOTHING   = 0,
-	                                                COMPUTE_QV        = 1,
-							COMPUTE_ZAV       = 2,
-							COMPUTE_ALL       = 3
-   };
+   int Lm = 0;
+   int L2kE = 0;
+   int L2kO = 0;
 
-   // this is the Worker pointer that the dslash uses to launch the shifted updates
-   namespace dslash {
-     extern Worker* aux_worker;
-   }
-
-   class EigCGArgs : public Worker {
+   class EigCGArgs {
 
      public:
        //host Lanczos matrice, and its eigenvalue/vector arrays:
-       RealDenseMatrix Tm;//VH A V,
+       RealMatrix Tm;//VH A V,
        //eigenvectors:
        RealVectorSet eigenVecs;//array of  (m)  ritz and of m length
        //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
@@ -83,274 +79,299 @@ namespace quda {
 
        const int m;
        const int k;
-       int id;//cuurent search spase index
+       int id;//current search spase index
 
        int restarts;
        double global_stop;
 
        bool run_residual_correction;//used in mixed precision cycles
        //Cached invert residual norm:
-       double inv_normr_m;
+       RealDiagonalMatrix inv_normr_m;
        //Array of (local) dot products
        RealVector s;
 
-       /** Pipeline specific parameters:
-	*/
-
+       /** Pipeline specific parameters:	*/
        const int pipe_l; // total pipeline length
+       const bool is_host_location; // where to perform computations (host or device)
 
-       const int ev_task_offset;//pipeline length for the eigenvec computations
-
-       const int n_update;
+       // pipeline shifts
+       int shift;
 
        //Cached lanczos elements (diagonal and off-diagonal elements)
-       RealVectorSet lanczos_cached_elems;
+       RealVectorSet cached_lanczos_elems;
+
+       //Cached inverse residual norms:
+       RealVector cached_inv_normr;
 
        // C++ task-based object for the (asynchron.) RayleighRitz computations
        std::future<void> rr_task;
-       /** Global reduction stuff:
-	   @rr_task_recvbuff recieve buffer for local dot product obtained in the RR block
-           @caeigcg_recvbuff recieve buffer for the eigcg internal local dot products
-       */
-       RealVector rr_task_recvbuff;
-       //
-       MPI_Request rr_task_request_handle;
 
        std::shared_ptr<ColorSpinorField> Az;       // mat * conjugate vector from the previous iteration
+       std::shared_ptr<ColorSpinorFieldSet> Vm;           //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+       std::shared_ptr<ColorSpinorFieldSet> V2k;          //temp vector set
 
-       std::shared_ptr<ColorSpinorFieldSet> Vm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
+       std::shared_ptr<ColorSpinorField> hAz;             // mat * conjugate vector from the previous iteration
+       std::shared_ptr<ColorSpinorFieldSet> hVm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-       std::shared_ptr<ColorSpinorFieldSet> V2k;         //temp vector set
+       EigCGArgs(const int m, const int k, const int pipe_l, const ColorSpinorField &meta, const QudaPrecision search_space_prec, const bool is_host_location = false) :
+          Tm(RealMatrix::Zero(m,m)),
+          eigenVecs(RealVectorSet::Zero(m,m)),
+          Tmvals(m),
+          m(m),
+          k(k),
+          id(0),
+          restarts(0),
+          global_stop(0.0),
+          run_residual_correction(false),
+          inv_normr_m(m),
+          s(RealVector::Zero(2*k)),
+          pipe_l(pipe_l),
+          is_host_location(is_host_location),
+          shift(0),
+          cached_lanczos_elems(RealVectorSet::Zero(pipe_l, 2)),
+          cached_inv_normr(RealVector::Zero(pipe_l+1)),
+          Az(nullptr),
+          Vm(nullptr),
+          V2k(nullptr),
+          hAz(nullptr),
+          hVm(nullptr)
+          {
+            ColorSpinorParam csParam(meta);
+            csParam.create        = QUDA_ZERO_FIELD_CREATE;
+            //
+            Az = MakeSharedPtr(csParam);
 
-       EigCGComputeTasks ctask_id;
+            csParam.is_composite  = true;
+            csParam.composite_dim = is_host_location ? 2*pipe_l : m + pipe_l;//pipe_l = 0 for the legacy version
+            //csParam.composite_dim = m;
+            csParam.setPrecision(search_space_prec);//eigCG internal search space precision may not coincide with the solver precision!
 
-       EigCGArgs(const int m, const int k, const int pipe_l, const int ev_task_offset, const int n_update, const ColorSpinorField &meta, QudaPrecision search_space_prec ) :
-	  Tm(RealDenseMatrix::Zero(m,m)),
-	  eigenVecs(RealVectorSet::Zero(m,m)),
-	  Tmvals(m),
-	  m(m),
-	  k(k),
-	  id(0),
-	  restarts(0),
-	  global_stop(0.0),
-	  run_residual_correction(false),
-	  inv_normr_m(0.0),
-	  s(RealVector::Zero(2*k)),
-	  pipe_l(pipe_l),
-	  ev_task_offset(ev_task_offset),
-	  n_update(n_update),
-	  lanczos_cached_elems(RealVectorSet::Zero(pipe_l, 2)),
-	  rr_task_recvbuff(RealVector::Zero(2*k)),
-	  Az(nullptr),
-	  Vm(nullptr),
-	  V2k(nullptr),
-	  ctask_id(EigCGComputeTasks::COMPUTE_QV)
-	  {
-	    ColorSpinorParam csParam(meta);
-	    csParam.create        = QUDA_ZERO_FIELD_CREATE;
-	    //
-	    Az = MakeSharedPtr(csParam);
+            //Create a search vector set:
+            Vm = MakeSharedPtr(csParam);
 
-	    csParam.is_composite  = true;
-	    csParam.composite_dim = m+pipe_l;
-	    csParam.setPrecision(search_space_prec);//eigCG internal search space precision may not coincide with the solver precision!
+            char *enabled_managed_memory = getenv("QUDA_ENABLE_MANAGED_MEMORY");
+            if (enabled_managed_memory && strcmp(enabled_managed_memory, "1") == 0) {
+            }
 
-	    //Create a search vector set:
-	    Vm = MakeSharedPtr(csParam);
-	    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
-	    csParam.composite_dim = (2*k);
-	    //Create a search vector set:
-	    V2k = MakeSharedPtr(csParam);
-	  }
+            //csParam.mem_type      = pipe_l != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
+            csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+            csParam.composite_dim = (2*k);
+            //Create a search vector set:
+            V2k = MakeSharedPtr(csParam);
+
+            if( pipe_l != 0 ) {
+              csParam.composite_dim = m;
+              csParam.setPrecision(search_space_prec);//eigCG internal search space precision may not coincide with the solver precision!
+              //Create a search vector set:
+              hVm = MakeSharedPtr(csParam);
+              //
+              csParam.is_composite  = false;
+              csParam.composite_dim = 1;
+              hAz = MakeSharedPtr(csParam);
+            }
+
+            Eigen::initParallel();	    
+          }
+
+
 
        virtual ~EigCGArgs() { }
 
        template <bool is_pipelined = false>
        inline void UpdateLanczosMatrix(double diag_val, double offdiag_val) {
          if(run_residual_correction || id == 0) return;
-	 const int cid = id - 1;
+         const int cid = id - 1;
 
-	 if(is_pipelined) {
+         if(is_pipelined) {
            if(cid >= m) {//store lanczos coeff in the buffers
-             lanczos_cached_elems(cid-m,0)    = diag_val;
-	     lanczos_cached_elems(cid-m,1) = offdiag_val;
-	     return;
-	   }
-	 }
-	 //Load Lanczos off-diagonals:
-	 if (cid < (m-1)) { Tm.diagonal<+1>()[cid] = offdiag_val; Tm.diagonal<-1>()[cid] = offdiag_val;}
-	 if (cid < m)       Tm.diagonal< 0>()[cid] = diag_val;
+             cached_lanczos_elems(cid-m,0) = diag_val;
+             cached_lanczos_elems(cid-m,1) = offdiag_val;
+             return;
+           }
+         }
+         //Load Lanczos off-diagonals:
+         if (cid < (m-1)) { Tm.diagonal<+1>()[cid] = offdiag_val; Tm.diagonal<-1>()[cid] = offdiag_val;}
+         if (cid < m)       Tm.diagonal< 0>()[cid] = diag_val;
 
-	 return;
+         return;
        }
 
-       inline void CacheNormR(const double &normr) {inv_normr_m = 1.0/normr;}
+       inline void CacheInvRNorm(const double &normr) {
+         if(id < m) inv_normr_m.diagonal()[id] = 1.0 / normr;
+         // store in the intermediate buffer otherwise:
+         else       cached_inv_normr[(id % m)] = 1.0 / normr;
+       }
 
        inline void CleanArgs() {
-	 id = 0; Tm.setZero(); Tmvals.setZero(); eigenVecs.setZero();
-	 if(rr_task.valid()) rr_task.wait();
+         id = 0; Tm.setZero(); Tmvals.setZero(); eigenVecs.setZero();
+         if(rr_task.valid()) rr_task.wait();
+       }
+
+       inline void UpdateShift() {
+         if ( id == m ) shift = Lm;
+         else           shift = restarts & 1 ? L2kE : L2kO;
        }
 
        void RestartArgs(){
          Tm.setZero();
-	 for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);
+         inv_normr_m.setIdentity();
+
+         for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);
 
          if(pipe_l != 0) { //need to finish global reduction and restore search space for the pipelined version
 
-           //for(int i = 0; i < pipe_l; i++) blas::copy(vm[2*args.k + i], vm[args.m + i]);
-	   ColorSpinorFieldSet &vm = *Vm;
-
            for(int i = 0; i < pipe_l; i++) {
-             blas::copy(vm[2*k + i], vm[m + i]);
-             Tm.diagonal< 0>()[2*k+i] = lanczos_cached_elems(i,0);
-             Tm.diagonal<+1>()[2*k+i] = lanczos_cached_elems(i,1);
-             Tm.diagonal<-1>()[2*k+i] = lanczos_cached_elems(i,1);
+             Tm.diagonal< 0>()[2*k+i] = cached_lanczos_elems(i,0);
+             Tm.diagonal<+1>()[2*k+i] = cached_lanczos_elems(i,1);
+             Tm.diagonal<-1>()[2*k+i] = cached_lanczos_elems(i,1);
+             inv_normr_m.diagonal()[2*k+i] = cached_inv_normr[i];
            }
+         }
+         inv_normr_m.diagonal()[2*k+pipe_l] = cached_inv_normr[pipe_l];//extra term even for the non-pipelined version
 
-	   if (comm_size() > 1) {
-             EIGCG_MPI_CHECK_(MPI_Wait(&rr_task_request_handle, MPI_STATUS_IGNORE));
+         s *= cached_inv_normr[0];//this correspond to the residual norm for the first after the (postponed) restart
 
-             s = rr_task_recvbuff;//?
-	     rr_task_recvbuff.setZero();
-	   }
+         Tm.col(2*k).segment(0, 2*k) = s;
+         Tm.row(2*k).segment(0, 2*k) = s;
 
-	 }
+         id = 2*k+pipe_l;  restarts += 1; s.setZero();
 
-	 s *= inv_normr_m;
-
-	 Tm.col(2*k).segment(0, 2*k) = s;
-	 Tm.row(2*k).segment(0, 2*k) = s;
-
-	 id = 2*k+pipe_l;  restarts += 1; s.setZero();
-
-       	 // Reset compute tasks:
-
-	 ctask_id = EigCGComputeTasks::COMPUTE_QV;
-
-	 return;
+         return;
        }
 
+       void RayleighRitz() {
+         //1.Solve m dim eigenproblem:
+         SelfAdjointEigenSolver<MatrixXd> es_tm(Tm);
 
-       void ComputeEv() {
-         //Solve m dim eigenproblem:
-	 SelfAdjointEigenSolver<MatrixXd> es_tm(Tm);
+         eigenVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
 
-	 eigenVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
+         //2.Solve m-1 dim eigenproblem:
+         SelfAdjointEigenSolver<MatrixXd> es_tm1(Map<MatrixXd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
 
-	 //Solve m-1 dim eigenproblem:
-	 SelfAdjointEigenSolver<MatrixXd> es_tm1(Map<MatrixXd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
+         Block<MatrixXd>(eigenVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
 
-	 Block<MatrixXd>(eigenVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+         eigenVecs.block(m-1, k, 1, k).setZero();
 
-	 eigenVecs.block(m-1, k, 1, k).setZero();
+         MatrixXd Q2k(MatrixXd::Identity(m, 2*k));
 
-	 MatrixXd Q2k(MatrixXd::Identity(m, 2*k));
+         HouseholderQR<MatrixXd> eigenVecs2k_qr( Map<MatrixXd, Unaligned >(eigenVecs.data(), m, 2*k) );
 
-	 HouseholderQR<MatrixXd> eigenVecs2k_qr( Map<MatrixXd, Unaligned >(eigenVecs.data(), m, 2*k) );
+         Q2k.applyOnTheLeft( eigenVecs2k_qr.householderQ() );
 
- 	 Q2k.applyOnTheLeft( eigenVecs2k_qr.householderQ() );
+         //3. Construct H = QH*Tm*Q :
+         RealMatrix H2k2 = Q2k.transpose()*Tm*Q2k;
 
-	 //2. Construct H = QH*Tm*Q :
-	 RealDenseMatrix H2k2 = Q2k.transpose()*Tm*Q2k;
+         /* solve the small evecm1 2nev x 2nev eigenproblem */
+         SelfAdjointEigenSolver<MatrixXd> es_h2k(H2k2);
 
-	 /* solve the small evecm1 2nev x 2nev eigenproblem */
-	 SelfAdjointEigenSolver<MatrixXd> es_h2k(H2k2);
+         //Block<MatrixXd>(eigenVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
+         RealMatrix Qm2k = Q2k * es_h2k.eigenvectors();
 
-	 Block<MatrixXd>(eigenVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
+         Tmvals.segment(0,2*k) = es_h2k.eigenvalues();
 
-	 Tmvals.segment(0,2*k) = es_h2k.eigenvalues();
+         //4. Rescale eigenvectors since we did not rescale Vm
+         Block<MatrixXd>(eigenVecs.derived(), 0, 0, m, 2*k) = inv_normr_m * Qm2k;
 
-	 return;
+         //5. Synchronize an aux compute stream for the pipelined version:
+         if(is_host_location) blas::synchronizeAuxBlasStream();
+
+         //6. Compute VQ
+         ColorSpinorFieldSet &v2k = *V2k;
+         ColorSpinorFieldSet &vm  = is_host_location ? *hVm : *Vm;
+
+         if(is_host_location) {
+           ColorSpinorFieldSet &haz = *hAz;
+
+           Map<MatrixXd, Unaligned > eigenv2kmat(static_cast<double*>(v2k.V()), v2k[0].RealLength(), 2*k);
+           Map<MatrixXd, Unaligned > eigenvmmat(static_cast<double*>(vm.V()), vm[0].RealLength(), m);
+
+           RealMatrix Alpha(eigenVecs.block(0,0, m, 2*k));
+
+           eigenv2kmat.setZero();
+           eigenv2kmat.noalias() += eigenvmmat * Alpha;
+
+           Map<VectorXd, Unaligned > az(static_cast<double*>(haz.V()), haz.RealLength());
+
+           s.setZero();
+           s.noalias() += eigenv2kmat.adjoint()*az;
+
+         } else {
+           std::vector<ColorSpinorField*> v2k_(v2k());
+
+           blas::zero(v2k);
+
+           std::vector<ColorSpinorField*> vm_(vm(0, m));
+
+           RowMajorRealMatrix Alpha(eigenVecs.block(0, 0, m, 2*k));
+
+           blas::axpy( Alpha.data(), vm_ , v2k_);
+
+           std::vector<ColorSpinorField*> Az_;
+
+           Az_.push_back(Az.get());
+
+           blas::reDotProduct(s.data(), Az_, v2k_);
+         }
+
+         for(int j = 0; j < 2*k; j++)  blas::copy(vm[j], v2k[j]);
+
+         return;
        }
+
+       inline void StagedPrefetch(const ColorSpinorField &w0){
+
+          if(id == 0) return;
+
+          static int ref_pnt    = 0;
+
+          const bool last_stage = (id == m);//ready for the restart, before that we need to prefech leftover basis vectors
+          const int cid = id % (m+1) + (id > m ? 2*k : 0);
+          const int  d  = (cid - ref_pnt) % pipe_l;
+
+          if(last_stage) {
+            blas::copy(*Az.get(), w0);        //using a regular stream
+            if(ref_pnt == 0) ref_pnt = 2*k;//redefine the reference point...
+          }
+
+          if(!is_host_location) return;//nothing to prefetch
+
+          const int l = (id + shift) % Vm->CompositeDim();
+
+          if((d == 0 && (cid-ref_pnt) != 0) || last_stage) { //prefetch gpu vectors on the host:
+
+            ColorSpinorFieldSet &vm  = *Vm;
+            ColorSpinorFieldSet &hvm = *hVm;
+
+            const int elements = d == 0 ? pipe_l : d;//might be d for the last copy stage
+            //
+            blas::registerAuxBlasStream();
+
+            const int dst_offset = cid-elements;
+            const int src_offset = l-elements+(l == 0 ? Vm->CompositeDim() : 0);
+
+            hvm.CopySubset(vm, elements, dst_offset, src_offset);
+
+            if(last_stage) blas::copy(*hAz.get(), *Az.get());
+            blas::unregisterAuxBlasStream();
+            //
+          }
+
+          return;
+       }
+
 
        inline void UpdateLanczosBasisAndSearchIdx(const ColorSpinorField &r, const double rnorm){
-	  ColorSpinorFieldSet &vm = *Vm;
-	  //load Lanczos basis vector:
-
-	  blas::copy(vm[id], r);//convert arrays
-	  //rescale the vector
-
-	  blas::ax(1.0 / rnorm, vm[id]);
-          //
+          ColorSpinorFieldSet &vm = *Vm;
+          //load Lanczos basis vector:
+          const int cid  = (id+shift) % vm.CompositeDim();
+	  
+          blas::copy(vm[cid], r);//convert arrays
+          
           id += 1;
 
-	  return;
+          return;
        }
 
-
-       // Using worker framework:
-
-       void apply(const cudaStream_t &stream) {
-
-	 ColorSpinorFieldSet &vm  = *Vm;
-  	 ColorSpinorFieldSet &v2k = *V2k;
-
-     	 static int count = 0;
-
-	 const int tot_n_updates         =  pipe_l ? n_update * (pipe_l - ev_task_offset) : 2;
-		//Think about this:
-		const int n_zav_subtask_updates =  tot_n_updates > 2 ? 2 : 1;
-	 const int n_qv_subtask_updates  =  tot_n_updates - n_zav_subtask_updates;
-
-
-     	 if (ctask_id == EigCGComputeTasks::COMPUTE_QV)
-	 {
-	   std::vector<ColorSpinorField*> v2k_(v2k());
-
-	   if(count == 0) blas::zero(v2k);
-
-	   const int bsize   = m / n_qv_subtask_updates;
-
-       	   const int wsize = (count < (n_qv_subtask_updates -1)) ? bsize : m - count*bsize;
-
-       	   const int offset    = count*bsize;
-
-       	   std::vector<ColorSpinorField*> vm_(vm(offset, offset + wsize));
-
-       	   RowMajorRealDenseMatrix Alpha(eigenVecs.block(count*bsize,0,wsize, 2*k));//args.m->work_sz
-
-       	   blas::axpy( Alpha.data(), vm_ , v2k_);
-
-     	   if(++count == n_qv_subtask_updates) {
-	     count = 0;
-	     ctask_id = EigCGComputeTasks::COMPUTE_ZAV;
-	   }
-     	 } else if(ctask_id == EigCGComputeTasks::COMPUTE_ZAV) {
-	   std::vector<ColorSpinorField*> Az_;
-
-	   Az_.push_back(Az.get());
-
-	   const int bsize  = std::max(2*k / n_zav_subtask_updates, 1);//WARNING args.n_updates < args.m
-
-	   const int wsize  = (count < (n_zav_subtask_updates -1)) ? bsize : 2*k - count*bsize;
-
-	   const int offset = count*bsize;
-
-	   std::vector<ColorSpinorField*> v2k_(v2k(offset, offset + wsize));
-
-	   for(int j = offset; j < offset+wsize; j++)  blas::copy(vm[j], v2k[j]);
-	   commGlobalReductionSet(pipe_l ? false : true); //disable when is_pipelined is true
-	   blas::reDotProduct(s.segment(offset, wsize).data(), Az_, v2k_);
-	   commGlobalReductionSet(true);
-
-	   if(++count == n_zav_subtask_updates) {
-	     count = 0;
-	     ctask_id = EigCGComputeTasks::COMPUTE_NOTHING;
-	     //Start async communications:
-
-	     if( (pipe_l != 0) && (comm_size() > 1) ) {
-		EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(s.data()),
-				                reinterpret_cast<double*>(rr_task_recvbuff.data()),
-						2*k,
-						MPI_DOUBLE,
-						MPI_SUM, MPI_COMM_WORLD,
-						&rr_task_request_handle));
-	     }
-	   }
-	 }
-
-	 return;
-       }
    };
 
   // set the required parameters for the inner solver
@@ -437,7 +458,7 @@ namespace quda {
   IncEigCG::~IncEigCG() { }
 
 
-  void IncEigCG::EigenSolve() { eigcg_args->ComputeEv(); }
+  void IncEigCG::EigenSolve() { eigcg_args->RayleighRitz(); }//!
 
   void IncEigCG::LegacySearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &beta, const double &rnorm) {
 
@@ -449,21 +470,17 @@ namespace quda {
      ColorSpinorField &z  = (*work_space)[r_idx];
 
      args.UpdateLanczosMatrix(lanczos_diag, lanczos_offdiag);
+     args.CacheInvRNorm(rnorm);
 
      if (args.id == (args.m-1)) blas::copy(*args.Az, Ap);
      //run RR block:
      else if(args.id == args.m) {
-	args.CacheNormR(rnorm);
-	//Compute (update) Ap = Ap - beta*Ap_old
-	blas::xpay(Ap, -beta, *args.Az);
+        //Compute (update) Ap = Ap - beta*Ap_old
+        blas::xpay(Ap, -beta, *args.Az);
 
-	args.ComputeEv();
-        // apply QV task:
-	args.apply(0);
-	// apply ZAV task:
-	args.apply(0);
+        args.RayleighRitz();
 
-	args.RestartArgs();
+        args.RestartArgs();
      }
 
      args.UpdateLanczosBasisAndSearchIdx(z, rnorm);
@@ -480,31 +497,36 @@ namespace quda {
     if(args.run_residual_correction) return;
 
     args.UpdateLanczosMatrix<is_pipelined>(lanczos_diag, lanczos_offdiag);
+    args.CacheInvRNorm(normr);
+    args.StagedPrefetch((*work_space)[0]);
 
     // launch RR block for args.id == param.m, otherwise is nop
     if(args.id == args.m) {
-      args.CacheNormR(normr);
-      //Store updated Ap
-      blas::copy(*args.Az, (*work_space)[0]);
-						// launch async task
+
+      // launch async task
       args.rr_task = std::async(std::launch::async, &IncEigCG::EigenSolve, this);
-    } else if (args.id == (args.m+args.ev_task_offset)) {
+      printfQuda("Start RR task.\n");
+
+      if (args.restarts == 0) args.UpdateShift();
+      printfQuda("SHIFT %d\n", args.shift);
+
+    } else if (args.id == (args.m+args.pipe_l)) {
+
       // do synchronization with EIGENV
       if(args.rr_task.valid()) args.rr_task.wait();
       else warningQuda("Tried to synchronize an invalid task...");
-      dslash::aux_worker = eigcg_args.get();
-      //args.apply(0);
-    } else if (args.id == (args.m+args.pipe_l)) {
-
-      dslash::aux_worker = nullptr;
+      printfQuda("Stop RR task.\n");
+      args.UpdateShift();
+      //
       args.RestartArgs();
+      //
+      args.StagedPrefetch((*work_space)[0]);
     }
 
     args.UpdateLanczosBasisAndSearchIdx((*work_space)[4], normr);
 
     return;
   }
-
 
 /*
  * This is a solo precision solver.
@@ -532,19 +554,20 @@ namespace quda {
     ColorSpinorParam csParam(x);
 
     if (!init) {
-      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, 0, 0, matSloppy.getStencilSteps(), x, param.precision_ritz);//need only deflation meta
+      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, 0, x, param.precision_ritz);//need only deflation meta
 
       csParam.create        = QUDA_ZERO_FIELD_CREATE;
       csParam.is_composite  = true;
       csParam.composite_dim = K ? 6 : 5;//an extra field for the preconditioned version
+      if (!matSloppy.isStaggered()) csParam.composite_dim += 1; //an extra tmp field for the wilson-like dslash
       // An auxiliary work space:
       work_space = MakeSharedPtr(csParam);
 
       if (K) {
         csParam.is_composite  = false;
-	csParam.setPrecision(param.precision_precondition);
-	p_pre = MakeSharedPtr(csParam);
-	r_pre = MakeSharedPtr(csParam);
+        csParam.setPrecision(param.precision_precondition);
+        p_pre = MakeSharedPtr(csParam);
+        r_pre = MakeSharedPtr(csParam);
       }
 
       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
@@ -567,10 +590,11 @@ namespace quda {
     ColorSpinorField &y   = (*work_space)[3];
     ColorSpinorField &tmp = (*work_space)[4];
     ColorSpinorField &z   = K ? (*work_space)[5] : r;
+    ColorSpinorField &tmp2 = !matSloppy.isStaggered() ? (*work_space)[ K ? 6 : 5] : tmp;
 
     // compute initial residual
     //
-    matSloppy(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
     double r2 = blas::xmyNorm(b, r);
 
     if( K ) {//apply preconditioner
@@ -617,7 +641,7 @@ namespace quda {
 
     while ( !converged && k < param.maxiter ) {
 
-      matSloppy(Ap, p, tmp);  // tmp as tmp
+      matSloppy(Ap, p, tmp, tmp2);  // tmp as tmp
 
       pAp           = blas::reDotProduct(p, Ap);
       alpha_old_inv = alpha_inv;
@@ -631,15 +655,15 @@ namespace quda {
       if( K ) {//apply preconditioner
         ColorSpinorField &rPre = *r_pre;
 
-	ColorSpinorField &pPre = *p_pre;
+        ColorSpinorField &pPre = *p_pre;
 
-	blas::copy(rPre, r);
+        blas::copy(rPre, r);
 
-	commGlobalReductionSet(false);
-	(*K)(pPre, rPre);
-	commGlobalReductionSet(true);
+        commGlobalReductionSet(false);
+        (*K)(pPre, rPre);
+        commGlobalReductionSet(true);
 
-	blas::copy(z, pPre);
+        blas::copy(z, pPre);
       }
       //
 
@@ -680,7 +704,7 @@ namespace quda {
 	    warningQuda("Exceeded maximum iterations %d", param.maxiter);
 
     // compute the true residuals
-    matSloppy(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
@@ -699,10 +723,9 @@ namespace quda {
 
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
-    const int ev_task_offset  = 16;
-    const int tot_pipe_l      = std::min((param.m-2*param.nev), ev_task_offset+param.pipeline);
+    if(param.pipeline < 4) warningQuda("Pipeline length is too short (%d).", param.pipeline);
 
-    if(tot_pipe_l < param.nev) errorQuda("Pipeline length is too short (%d).", tot_pipe_l);
+    if( ((param.m - 2*param.nev) % param.pipeline != 0) || ((param.m - 2*param.nev) < param.pipeline) )  errorQuda("Pipeline length %d is not supported.", param.pipeline);
 
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)  errorQuda("Not supported");
 
@@ -722,11 +745,38 @@ namespace quda {
     ColorSpinorParam csParam(x);
 
     if (!init) {
-      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, tot_pipe_l, ev_task_offset, matSloppy.getStencilSteps(), x, param.precision_ritz);
+      // set up pipelined shifts:
+      int leftover_elems  = (param.m - (param.m / param.pipeline) * param.pipeline);
+      // adjust Lm shift:
+      if ( leftover_elems != 0 ) Lm = (param.pipeline - leftover_elems);
+
+      const int am  = ((param.m+Lm) / param.pipeline) & 1;
+
+      // Adjust Odd cycle shift
+      leftover_elems = (2*param.nev - ((2*param.nev) / param.pipeline) * param.pipeline);
+
+      if ( leftover_elems != 0 ) L2kO = (param.pipeline - leftover_elems);
+
+      const int a2k  = ((2*param.nev + param.pipeline + L2kO) / param.pipeline) & 1;
+
+      L2kO = am == 0 ? L2kO + (1-a2k)*param.pipeline : L2kO + a2k*param.pipeline;
+
+      // Adjust Even cycle shift:
+      const int am2k = ((param.m - 2*param.nev - param.pipeline) / param.pipeline) & 1;
+
+      if(am2k == 0) {
+        L2kE = am == 0 ? L2kE + a2k*param.pipeline  : L2kE + (1-a2k)*param.pipeline;
+      } else {
+        L2kE = L2kO;
+      }
+
+      printfQuda("\nPipeline shift parameters : Lm = % d, L2kO = %d, L2kE = %d\n", Lm, L2kO, L2kE);
+
+      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, x, param.precision_ritz, true);
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.is_composite  = true;
-      csParam.composite_dim = 7;
+      csParam.composite_dim = !matSloppy.isStaggered() ? 8 : 7;
       // auxiliary work space to keep w, p, s, u fields
       work_space = MakeSharedPtr(csParam);
 
@@ -749,11 +799,12 @@ namespace quda {
     ColorSpinorField &s = (*work_space)[3];
     ColorSpinorField &r = (*work_space)[4];
     ColorSpinorField &y = (*work_space)[5];
-    ColorSpinorField &tmp = (*work_space)[6];
+    ColorSpinorField &tmp  = (*work_space)[6];
+    ColorSpinorField &tmp2 = !matSloppy.isStaggered() ? (*work_space)[7] : tmp;
 
     // compute initial residual
 
-    matSloppy(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
     blas::xpay(b, -1.0, r); //r2
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -770,7 +821,7 @@ namespace quda {
 
     blas::zero(y);
 
-    matSloppy(w, r);
+    matSloppy(w, r, tmp, tmp2);
     p = r;
     matSloppy(s, p);
     double alpha    = 0.0;
@@ -805,7 +856,7 @@ namespace quda {
 				    &iallreduce_request_handle));
     }
 
-    matSloppy(u, s);
+    matSloppy(u, s, tmp, tmp2);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -829,9 +880,9 @@ namespace quda {
       memcpy(reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4*sizeof(double));
     }
 
-    dslash::aux_worker = nullptr;
-
     blas::createAuxBlasStream();
+
+    cudaProfilerStart();
 
     while ( !converged && k < param.maxiter ) {
       //Update search space
@@ -857,27 +908,20 @@ namespace quda {
       commGlobalReductionSet(true);
 
       if (comm_size() > 1){
-	EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
-				recvbuff.get(),
-				4,
-				MPI_DOUBLE,
-				MPI_SUM, MPI_COMM_HANDLE,
-				&iallreduce_request_handle));
+        EIGCG_MPI_CHECK_(MPI_Iallreduce(reinterpret_cast<double*>(&local_buffer),
+                                recvbuff.get(),
+                                4,
+                                MPI_DOUBLE,
+                                MPI_SUM, MPI_COMM_HANDLE,
+                                &iallreduce_request_handle));
       }
 
-      if(dslash::aux_worker) {
-	 blas::synchronizeAuxBlasStream();     
-	 blas::registerAuxBlasStream();
-      }
-
-      matSloppy(u, s, tmp);
+      matSloppy(u, s, tmp, tmp2);
 
       if (k % prediction_correction_interval == 0){
-        matSloppy(w, r, tmp);
-	correction_count += 1;
+        matSloppy(w, r, tmp, tmp2);
+        correction_count += 1;
       }
-
-      if(dslash::aux_worker) blas::unregisterAuxBlasStream();
 
       if (comm_size() > 1){
         EIGCG_MPI_CHECK_(MPI_Wait(&iallreduce_request_handle, MPI_STATUS_IGNORE));
@@ -889,9 +933,12 @@ namespace quda {
       converged = convergence(nu, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(nu, heavy_quark_res, local_stop, param.tol_hq);
     }
 
-    blas::zero(*args.V2k);
+    cudaProfilerStop();
 
-    dslash::aux_worker = nullptr;
+    //blas::zero(*args.V2k);
+
+    for(int i = 0; i < args.k; i++) blas::copy( (*args.Vm.get())[i], (*args.hVm.get())[i] );
+
     blas::destroyAuxBlasStream();
 
     args.CleanArgs();
@@ -902,6 +949,9 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+
+    printfQuda("Compute time is %1.8le\n", param.secs);
+
     double gflops = (blas::flops + matSloppy.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
@@ -911,7 +961,7 @@ namespace quda {
 
     // compute the true residuals
 
-    matSloppy(r, x, y);
+    matSloppy(r, x, tmp, tmp2);
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
@@ -990,7 +1040,7 @@ namespace quda {
 
        int iters = param.pipeline == 0 ? EigCGsolve(eSloppy, rSloppy) : CAEigCGsolve(eSloppy, rSloppy);
 
-       bool update_ritz = !dcg_cycle && (eigcg_args->restarts > 1) && !defl.is_complete(); //too uglyyy
+       bool update_ritz = !dcg_cycle && (eigcg_args->restarts >= 1) && !defl.is_complete(); //too uglyyy
 
        if( update_ritz ) {
 
@@ -1017,7 +1067,7 @@ namespace quda {
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
        if( getVerbosity() >= QUDA_VERBOSE ) {
-         if( !dcg_cycle &&  (eigcg_args->restarts > 1) && !defl.is_complete() ) defl.verify();
+         if( !dcg_cycle &&  (eigcg_args->restarts >= 1) && !defl.is_complete() ) defl.verify();
        }
      } while ((r2 > stop) && mixed_prec);
 
@@ -1037,7 +1087,7 @@ namespace quda {
      if(defl.is_complete()) {
        if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the requested deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
 
-       eigcg_args->Vm.reset(); eigcg_args->V2k.reset();
+       eigcg_args->Vm.reset(); eigcg_args->V2k.reset(); eigcg_args->hVm.reset();
 
        const int max_nev = defl.size();//param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);

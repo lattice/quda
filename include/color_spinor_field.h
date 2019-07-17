@@ -608,6 +608,7 @@ namespace quda {
                                  QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
     virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element) = 0;
+    virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) = 0;    
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -1000,6 +1001,8 @@ namespace quda {
     void restore() const;
 
     void CopySubset(ColorSpinorField& src, const int range, const int first_element) {errorQuda("Not implemented yet..\n"); }
+    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) {errorQuda("Not implemented yet..\n"); }
+
   };
 
   void copyGenericColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,

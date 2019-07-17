@@ -8,7 +8,7 @@
   {									\
     if (!a.IsCompositeSubset() && (a.Length() != b.Length()))					\
       errorQuda("lengths do not match: %lu %lu", a.Length(), b.Length()); \
-    if (a.Stride() != b.Stride())					\
+    if (!a.IsCompositeSubset() && (a.Stride() != b.Stride()))					\
       errorQuda("strides do not match: %d %d", a.Stride(), b.Stride());	\
     if (a.GammaBasis() != b.GammaBasis())				\
       errorQuda("gamma basis does not match: %d %d", a.GammaBasis(), b.GammaBasis());	\
