@@ -711,7 +711,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
-      P(n_vec[i], INVALID_INT);
 #ifdef INIT_PARAM
       P(precision_null[i], QUDA_SINGLE_PRECISION);
 #else
@@ -722,6 +721,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
+
+#ifdef INIT_PARAM
+    if (i<QUDA_MAX_MG_LEVEL) {
+          P(n_vec[i], INVALID_INT);
+    }
+#else
+    if (i<n_level-1) {
+      P(n_vec[i], INVALID_INT);
+    }
+#endif
 
 #ifdef INIT_PARAM
     P(mu_factor[i], 1);
