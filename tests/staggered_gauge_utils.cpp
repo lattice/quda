@@ -111,12 +111,12 @@ void setActionPaths(double *act_paths[3])
 
   // First path: create V, W links
   double act_path_coeff_1[6] = {
-    (1.0 / 8.0),                             /* one link */
-    u2 * (0.0),                              /* Naik */
-    u2 * (-1.0 / 8.0) * 0.5,                 /* simple staple */
-    u4 * (1.0 / 8.0) * 0.25 * 0.5,           /* displace link in two directions */
-    u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0), /* displace link in three directions */
-    u4 * (0.0)                               /* Lepage term */
+    (1.0 / 8.0),                             // one link
+    u2 * (0.0),                              // Naik
+    u2 * (-1.0 / 8.0) * 0.5,                 // simple staple
+    u4 * (1.0 / 8.0) * 0.25 * 0.5,           // displace link in two directions
+    u6 * (-1.0 / 8.0) * 0.125 * (1.0 / 6.0), // displace link in three directions
+    u4 * (0.0)                               // Lepage term
   };
   act_paths[0] = act_path_coeff_1;
 
@@ -186,74 +186,74 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
     for (int dir = 0; dir < 4; dir++) {
       memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
       memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
-      free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
-      free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
+      free(qdp_fatlink_naik_temp[dir]);
+      qdp_fatlink_naik_temp[dir] = nullptr;
+      free(qdp_longlink_naik_temp[dir]);
+      qdp_longlink_naik_temp[dir] = nullptr;
     }
   }
 }
 
-void computeFatLongGPUandCPU(void** qdp_fatlink_gpu, void** qdp_longlink_gpu,
-			     void** qdp_fatlink_cpu, void** qdp_longlink_cpu,
-			     void** qdp_inlink, QudaGaugeParam &gauge_param,
-			     size_t gSize, int n_naiks, double eps_naik){
+void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
+                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
+                             int n_naiks, double eps_naik)
+{
 
-  double* act_paths[3];
-  setActionPaths(act_paths);  
-  
+  double *act_paths[3];
+  setActionPaths(act_paths);
+
   ///////////////////////////////////////////////////////////////////////
   // Create some temporary space if we want to test the epsilon fields //
   ///////////////////////////////////////////////////////////////////////
-  
-  void* qdp_fatlink_naik_temp[4];
-  void* qdp_longlink_naik_temp[4];
+
+  void *qdp_fatlink_naik_temp[4];
+  void *qdp_longlink_naik_temp[4];
   if (n_naiks == 2) {
     for (int dir = 0; dir < 4; dir++) {
-      qdp_fatlink_naik_temp[dir] = malloc(V*gaugeSiteSize*gSize);
-      qdp_longlink_naik_temp[dir] = malloc(V*gaugeSiteSize*gSize);
-      memset(qdp_fatlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
-      memset(qdp_longlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
+      qdp_fatlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
+      qdp_longlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
+      memset(qdp_fatlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
+      memset(qdp_longlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
     }
   }
-  
+
   //////////////////////////
   // Create the CPU links //
   //////////////////////////
-  
+
   // defined in "llfat_reference.cpp"
-  computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu,
-		      (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-		      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
-		      qdp_inlink, &gauge_param, act_paths, eps_naik);
-  
+  computeHISQLinksCPU(qdp_fatlink_cpu, qdp_longlink_cpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, &gauge_param, act_paths, eps_naik);
+
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-      memcpy(qdp_longlink_cpu[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-      memset(qdp_fatlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
-      memset(qdp_longlink_naik_temp[dir],0,V*gaugeSiteSize*gSize);
+      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      memcpy(qdp_longlink_cpu[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      memset(qdp_fatlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
+      memset(qdp_longlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
     }
-  }  
-  
-  
+  }
+
   //////////////////////////
   // Create the GPU links //
   //////////////////////////
 
-  // Skip eps field for now  
+  // Skip eps field for now
   // Note: GPU link creation only works for single and double precision
-  computeHISQLinksGPU(qdp_fatlink_gpu, qdp_longlink_gpu,
-		      (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
-		      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr,
-		      qdp_inlink, gauge_param, act_paths, eps_naik, gSize, n_naiks);
-  
+  computeHISQLinksGPU(qdp_fatlink_gpu, qdp_longlink_gpu, (n_naiks == 2) ? qdp_fatlink_naik_temp : nullptr,
+                      (n_naiks == 2) ? qdp_longlink_naik_temp : nullptr, qdp_inlink, gauge_param, act_paths, eps_naik,
+                      gSize, n_naiks);
+
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir],qdp_fatlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-      memcpy(qdp_longlink_gpu[dir],qdp_longlink_naik_temp[dir], V*gaugeSiteSize*gSize);
-      free(qdp_fatlink_naik_temp[dir]); qdp_fatlink_naik_temp[dir] = nullptr;
-      free(qdp_longlink_naik_temp[dir]); qdp_longlink_naik_temp[dir] = nullptr;
+      memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      free(qdp_fatlink_naik_temp[dir]);
+      qdp_fatlink_naik_temp[dir] = nullptr;
+      free(qdp_longlink_naik_temp[dir]);
+      qdp_longlink_naik_temp[dir] = nullptr;
     }
-  }  
+  }
 }

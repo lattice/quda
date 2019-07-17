@@ -99,7 +99,8 @@ const char *recon_str[] = {"r18", "r13", "r9"};
 int argc_copy;
 char** argv_copy;
 
-double getTolerance(QudaPrecision prec) {
+double getTolerance(QudaPrecision prec)
+{
   switch (prec) {
   case QUDA_QUARTER_PRECISION: return 1e-1;
   case QUDA_HALF_PRECISION: return 1e-3;
@@ -111,7 +112,7 @@ double getTolerance(QudaPrecision prec) {
 }
 
 void init(int precision, QudaReconstructType link_recon, int partition) {
-  
+
   auto prec = getPrecision(precision);
 
   setVerbosity(QUDA_SUMMARIZE);
@@ -133,7 +134,7 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
     dslash_type != QUDA_LAPLACE_DSLASH) {
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
-  
+
   gaugeParam.anisotropy = 1.0;
 
   // For HISQ, this must always be set to 1.0, since the tadpole
@@ -166,7 +167,7 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
   inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
   inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
   inv_param.dslash_type = dslash_type;
-  
+
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
@@ -176,11 +177,11 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 
   gaugeParam.ga_pad = tmpint;
   inv_param.sp_pad = tmpint;
-    
+
   setDims(gaugeParam.X);
-  dw_setDims(gaugeParam.X,Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gaugeParam.X, Nsrc); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(staggeredSpinorSiteSize);
-  
+
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // Allocate a lot of memory because I'm very confused
@@ -242,20 +243,17 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
   } else { // QUDA_ASQTAD_DSLASH
 
     if (compute_fatlong) {
-      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu,
-			      qdp_fatlink_cpu, qdp_longlink_cpu,
-			      qdp_inlink, gaugeParam,
-			      gSize, n_naiks, eps_naik);      
-    } else {       
+      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
+                              gaugeParam, gSize, n_naiks, eps_naik);
+    } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
         memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
         memcpy(qdp_longlink_gpu[dir],qdp_longlink_cpu[dir],V*gaugeSiteSize*gSize);
       }
     }
-    
   }
-  
+
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink_gpu,qdp_fatlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
@@ -352,10 +350,10 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
   cudaSpinorOut = new cudaColorSpinorField(csParam);
   *cudaSpinor = *spinor;
   tmp = new cudaColorSpinorField(csParam);
-  
+
   cudaDeviceSynchronize();
   checkCudaError();
-  
+
   bool pc = (test_type == 1); // For test_type 0, can use either pc or not pc
                               // because both call the same "Dslash" directly.
   DiracParam diracParam;
@@ -378,12 +376,13 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
   return;
 }
 
-void end(void) {
+void end(void)
+{
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_fatlink_cpu[dir] != nullptr) { free(qdp_fatlink_cpu[dir]); qdp_fatlink_cpu[dir] = nullptr; }
     if (qdp_longlink_cpu[dir] != nullptr) { free(qdp_longlink_cpu[dir]); qdp_longlink_cpu[dir] = nullptr; }
   }
-  
+
   if (dirac != nullptr) {
     delete dirac;
     dirac = nullptr;
@@ -476,8 +475,9 @@ DslashTime dslashCUDA(int niter) {
   return dslash_time;
 }
 
-void staggeredDslashRef() {
-  
+void staggeredDslashRef()
+{
+
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
   fflush(stdout);
@@ -510,13 +510,14 @@ void staggeredDslashRef() {
   }
 }
 
-void display_test_info(int precision, QudaReconstructType link_recon) {
+void display_test_info(int precision, QudaReconstructType link_recon)
+{
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon), test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
+             test_type, dagger, xdim, ydim, zdim, tdim);
   return ;
-  
 }
 
 using ::testing::TestWithParam;
@@ -525,8 +526,8 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-
-void usage_extra(char** argv ) {
+void usage_extra(char **argv)
+{
   printfQuda("Extra options:\n");
   printfQuda("    --test <0/1>                             # Test method\n");
   printfQuda("                                                0: Even destination spinor\n");
@@ -541,19 +542,20 @@ using ::testing::Range;
 using ::testing::Combine;
 
 class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
- protected:
+protected:
   ::testing::tuple<int, int, int> param;
 
-  bool skip() {
+  bool skip()
+  {
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
-    
+
     if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0
         || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
       return true;
     }
 
     if (dslash_type == QUDA_ASQTAD_DSLASH && compute_fatlong
-        && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)){
+        && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
       warningQuda("Fixed precision unsupported in fat/long compute, skipping...");
       return true;
     }
@@ -562,7 +564,7 @@ class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int
       warningQuda("Reconstruct 9 unsupported in fat/long compute, skipping...");
       return true;
     }
-    
+
     if (dslash_type == QUDA_LAPLACE_DSLASH && (::testing::get<0>(GetParam()) == 0 || ::testing::get<0>(GetParam()) == 1)) {
       warningQuda("Fixed precision unsupported for Laplace operator, skipping...");
       return true;
@@ -571,7 +573,6 @@ class StaggeredDslashTest : public ::testing::TestWithParam<::testing::tuple<int
   }
 
 public:
-  
   virtual ~StaggeredDslashTest() { }
   virtual void SetUp() {
     int prec = ::testing::get<0>(GetParam());
@@ -607,7 +608,8 @@ public:
     display_test_info(prec, recon);
   }
 
-  virtual void TearDown() {
+  virtual void TearDown()
+  {
     if (skip()) GTEST_SKIP();
     end();
   }
@@ -628,34 +630,34 @@ public:
  TEST_P(StaggeredDslashTest, verify) {
    double deviation = 1.0;
    double tol = getTolerance(inv_param.cuda_prec);
-   
+
    bool failed = false; // for the nan catch
-   
+
    // check for skip_kernel
    if (spinorRef != nullptr) {
-     
+
      { // warm-up run
        // printfQuda("Tuning...\n");
        dslashCUDA(1);
      }
-     
+
      dslashCUDA(2);
-     
+
      *spinorOut = *cudaSpinorOut;
 
      staggeredDslashRef();
-     
+
      double spinor_ref_norm2 = blas::norm2(*spinorRef);
      double spinor_out_norm2 = blas::norm2(*spinorOut);
-     
+
      // for verification
-     //printfQuda("\n\nCUDA: %f\n\n", ((double*)(spinorOut->V()))[0]);
-     //printfQuda("\n\nCPU:  %f\n\n", ((double*)(spinorRef->V()))[0]);
-     
+     // printfQuda("\n\nCUDA: %f\n\n", ((double*)(spinorOut->V()))[0]);
+     // printfQuda("\n\nCPU:  %f\n\n", ((double*)(spinorRef->V()))[0]);
+
      // Catching nans is weird.
      if (std::isnan(spinor_ref_norm2)) { failed = true; }
      if (std::isnan(spinor_out_norm2)) { failed = true; }
-     
+
      double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
      printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
      deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
@@ -665,7 +667,7 @@ public:
  }
 
 TEST_P(StaggeredDslashTest, benchmark) {
-  
+
   { // warm-up run
     // printfQuda("Tuning...\n");
     dslashCUDA(1);
@@ -673,7 +675,7 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
   // reset flop counter
   dirac->Flops();
-  
+
   DslashTime dslash_time = dslashCUDA(niter);
 
   *spinorOut = *cudaSpinorOut;
@@ -693,17 +695,18 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
   printfQuda("Effective halo bi-directional bandwidth (GB/s) GPU = %f ( CPU = %f, min = %f , max = %f ) for aggregate "
              "message size %lu bytes\n",
-	     1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
-	     1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
-	     1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_max,
-	     1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * cudaSpinor->GhostBytes());
+             1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.event_time,
+             1.0e-9 * 2 * cudaSpinor->GhostBytes() * niter / dslash_time.cpu_time,
+             1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_max,
+             1.0e-9 * 2 * cudaSpinor->GhostBytes() / dslash_time.cpu_min, 2 * cudaSpinor->GhostBytes());
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   // hack for loading gauge fields
   argc_copy = argc;
   argv_copy = argv;
-  
+
   // initialize CPU field backup
 #ifdef MULTI_GPU
   for (int p = 0; p < 16; p++) {
@@ -716,19 +719,19 @@ int main(int argc, char **argv) {
         qdp_inlink_backup[p][d] = nullptr;
       }
     }
-    
+
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
     for (int i=1 ;i < argc; i++){
-      
+
       if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-      
+
       fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
       usage(argv);
     }
-    
+
     initComms(argc, argv, gridsize_from_cmdline);
-    
+
     // Ensure that the default is improved staggered
     if (dslash_type != QUDA_STAGGERED_DSLASH &&
         dslash_type != QUDA_ASQTAD_DSLASH &&
@@ -736,13 +739,14 @@ int main(int argc, char **argv) {
       warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
       dslash_type = QUDA_ASQTAD_DSLASH;
     }
-    
-    // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't ask to build the fat/long links... it doesn't make sense.
+
+    // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't ask to build the
+    // fat/long links... it doesn't make sense.
     if (strcmp(latfile,"") && !compute_fatlong && dslash_type == QUDA_ASQTAD_DSLASH) {
       errorQuda("Cannot load a gauge field and test the ASQTAD/HISQ operator without setting \"--compute-fat-long true\".\n");
       compute_fatlong = true;
     }
-    
+
     // Set n_naiks to 2 if eps_naik != 0.0
     if (dslash_type == QUDA_ASQTAD_DSLASH) {
       if (eps_naik != 0.0) {
@@ -757,39 +761,45 @@ int main(int argc, char **argv) {
         printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
       }
     }
-    
+
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       if (test_type != 2) {
         errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
       }
     }
-    
+
     // return result of RUN_ALL_TESTS
     int test_rc = RUN_ALL_TESTS();
-    
+
     // Clean up loaded gauge field
     for (int dir = 0; dir < 4; dir++) {
       if (qdp_inlink[dir] != nullptr) { free(qdp_inlink[dir]); qdp_inlink[dir] = nullptr; }
     }
-    
+
     // Clean up per-partition backup
     int pmax = 1;
 #ifdef MULTI_GPU
     pmax = 16;
 #endif
-    for (int p = 0; p < pmax; p++) {      
+    for (int p = 0; p < pmax; p++) {
       for (int d = 0; d < 4; d++) {
-	if (qdp_inlink_backup[p][d] != nullptr) { free(qdp_inlink_backup[p][d]); qdp_inlink_backup[p][d] = nullptr; }
-	if (qdp_fatlink_cpu_backup[p][d] != nullptr) { free(qdp_fatlink_cpu_backup[p][d]); qdp_fatlink_cpu_backup[p][d] = nullptr; }
+        if (qdp_inlink_backup[p][d] != nullptr) {
+          free(qdp_inlink_backup[p][d]);
+          qdp_inlink_backup[p][d] = nullptr;
+        }
+        if (qdp_fatlink_cpu_backup[p][d] != nullptr) {
+          free(qdp_fatlink_cpu_backup[p][d]);
+          qdp_fatlink_cpu_backup[p][d] = nullptr;
+        }
         if (qdp_longlink_cpu_backup[p][d] != nullptr) { free(qdp_longlink_cpu_backup[p][d]); qdp_longlink_cpu_backup[p][d] = nullptr; }
       }
     }
-    
+
     finalizeComms();
-    
+
     return test_rc;
-  }
-  
+}
+
   std::string getstaggereddslashtestname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
     const int prec = ::testing::get<0>(param.param);
     const int recon = ::testing::get<1>(param.param);
@@ -801,15 +811,17 @@ int main(int argc, char **argv) {
     ss << "_partition" << part;
     return ss.str();
   }
-  
+
 #ifdef MULTI_GPU
   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-			   Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
-			   getstaggereddslashtestname);
+                           Combine(Range(0, 4),
+                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                   Range(0, 16)),
+                           getstaggereddslashtestname);
 #else
   INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-			   Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-				   ::testing::Values(0)),
-			   getstaggereddslashtestname);
+                           Combine(Range(0, 4),
+                                   ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
+                                   ::testing::Values(0)),
+                           getstaggereddslashtestname);
 #endif
-  
