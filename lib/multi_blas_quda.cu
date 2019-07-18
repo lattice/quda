@@ -662,15 +662,16 @@ namespace quda {
       }
     }
 
-    void caxpy_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
-          int i_idx ,int j_idx, int upper) {
+    template < template <int MXZ, typename Float, typename FloatN> class Functor, typename T>
+    void axpy_recurse(const T *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
+                      int i_idx ,int j_idx, int upper) {
 
       if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
                                          false, false, false)) { // if greater than max single-kernel size, recurse.
         // We need to split up 'a' carefully since it's row-major.
-        Complex* tmpmajor = new Complex[x.size()*y.size()];
-        Complex* tmpmajor0 = &tmpmajor[0];
-        Complex* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
+        T* tmpmajor = new T[x.size()*y.size()];
+        T* tmpmajor0 = &tmpmajor[0];
+        T* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
@@ -687,8 +688,8 @@ namespace quda {
             tmpmajor1[count1++] = a_[count++];
         }
 
-        caxpy_recurse(tmpmajor0, x, y0, i_idx, 2*j_idx+0, upper);
-        caxpy_recurse(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
+        axpy_recurse<Functor>(tmpmajor0, x, y0, i_idx, 2*j_idx+0, upper);
+        axpy_recurse<Functor>(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
 
         delete[] tmpmajor;
       } else {
@@ -700,18 +701,18 @@ namespace quda {
           if (upper == -1 && j_idx > i_idx) { return; }
 
 	  // mark true since we will copy the "a" matrix into constant memory
-	  coeff_array<Complex> a(a_), b, c;
-	  multiBlas<multicaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
+	  coeff_array<T> a(a_), b, c;
+	  multiBlas<Functor, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
 	} else {
 	  // split the problem in half and recurse
-	  const Complex *a0 = &a_[0];
-	  const Complex *a1 = &a_[(x.size()/2)*y.size()];
+	  const T *a0 = &a_[0];
+	  const T *a1 = &a_[(x.size()/2)*y.size()];
 
 	  std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
 	  std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
 
-	  caxpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
-	  caxpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
+	  axpy_recurse<Functor>(a0, x0, y, 2*i_idx+0, j_idx, upper);
+	  axpy_recurse<Functor>(a1, x1, y, 2*i_idx+1, j_idx, upper);
 	}
       } // end if (y.size() > max_YW_size())
     }
@@ -719,7 +720,7 @@ namespace quda {
     void caxpy(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
-      caxpy_recurse(a_, x, y, 0, 0, 0);
+      axpy_recurse<multicaxpy_>(a_, x, y, 0, 0, 0);
     }
 
     void caxpy_U(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -731,7 +732,7 @@ namespace quda {
         errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead.\n");
         return;
       }
-      caxpy_recurse(a_, x, y, 0, 0, 1);
+      axpy_recurse<multicaxpy_>(a_, x, y, 0, 0, 1);
     }
 
     void caxpy_L(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -743,7 +744,7 @@ namespace quda {
         errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead.\n");
         return;
       }
-      caxpy_recurse(a_, x, y, 0, 0, -1);
+      axpy_recurse<multicaxpy_>(a_, x, y, 0, 0, -1);
     }
 
 
@@ -926,6 +927,71 @@ namespace quda {
         caxpyBxpz(a1, x1, y_, b1, z_);
       }
     }
+
+#if 0
+    void axpy_recurse(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
+          int i_idx ,int j_idx, int upper) {
+
+      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(),
+                                         false, false, false)) { // if greater than max single-kernel size, recurse.
+        // We need to split up 'a' carefully since it's row-major.
+        double* tmpmajor = new double[x.size()*y.size()];
+        double* tmpmajor0 = &tmpmajor[0];
+        double* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
+        std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
+        std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
+
+        const unsigned int xlen = x.size();
+        const unsigned int ylen0 = y.size()/2;
+        const unsigned int ylen1 = y.size() - y.size()/2;
+
+        int count = 0, count0 = 0, count1 = 0;
+        for (unsigned int i = 0; i < xlen; i++)
+        {
+          for (unsigned int j = 0; j < ylen0; j++)
+            tmpmajor0[count0++] = a_[count++];
+          for (unsigned int j = 0; j < ylen1; j++)
+            tmpmajor1[count1++] = a_[count++];
+        }
+
+        axpy_recurse(tmpmajor0, x, y0, i_idx, 2*j_idx+0, upper);
+        axpy_recurse(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
+
+        delete[] tmpmajor;
+      } else {
+        // if at the bottom of recursion,
+        // return if on lower left for upper triangular,
+        // return if on upper right for lower triangular.
+        if ( is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION) ) {
+          if (upper == 1 && j_idx < i_idx) { return; }
+          if (upper == -1 && j_idx > i_idx) { return; }
+
+          // mark true since we will copy the "a" matrix into constant memory
+          coeff_array<double> a(a_), b, c;
+	  multiBlas<multiaxpy_, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
+        } else {
+          // split the problem in half and recurse
+          const double *a0 = &a_[0];
+          const double *a1 = &a_[(x.size()/2)*y.size()];
+
+          std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
+          std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+
+          axpy_recurse(a0, x0, y, 2*i_idx+0, j_idx, upper);
+          axpy_recurse(a1, x1, y, 2*i_idx+1, j_idx, upper);
+        }
+      } // end if (y.size() > MAX_MULTI_BLAS_N)
+    }
+#endif
+    void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
+      axpy_recurse<multiaxpy_>(a_, x, y, 0, 0, 0);
+    }
+
+    // Composite field version
+    void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
+
 
   } // namespace blas
 

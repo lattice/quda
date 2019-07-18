@@ -184,13 +184,31 @@ namespace quda
       }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
           = 0;
     };
 
     /**
-       Functor to perform the operation y += a * x  (complex-valued)
+       Functor performing the operations: y[i] = a*x[i] + y[i]
     */
+    template <int NXZ, typename Float2, typename FloatN>
+    struct multiaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      multiaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
+      {
+      }
+
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
+      {
+        y += a(j,i).x*x; //Sub-optimal constant buffer usage since we're using a complex array to store real numbers
+      }
+
+      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() { return 2 * NXZ * NYW; }         //! flops per real element
+    };
 
     __device__ __host__ inline void _caxpy(const float2 &a, const float4 &x, float4 &y)
     {
@@ -220,6 +238,9 @@ namespace quda
       y.y += a.x * x.y;
     }
 
+    /**
+       Functor to perform the operation y += a * x  (complex-valued)
+    */
     template <int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
       static constexpr bool use_z = false;
@@ -230,7 +251,7 @@ namespace quda
       {
       }
 
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
         _caxpy(a(j,i), x, y);
       }
@@ -252,7 +273,7 @@ namespace quda
       {
       }
 
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
         if (j == 0) w = y;
         _caxpy(a(j,i), x, w);
@@ -277,7 +298,7 @@ namespace quda
       {
       }
 
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
         y += a(0,i).x * w;
         w = b(0,i).x * x + c(0,i).x * w;
@@ -302,7 +323,7 @@ namespace quda
       }
 
       // i loops over NYW, j loops over NXZ
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
         _caxpy(a(0,j), x, y);
         _caxpy(b(0,j), x, w); // b/c we swizzled z into w.
