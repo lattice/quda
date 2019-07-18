@@ -998,7 +998,7 @@ namespace quda {
         out(j, i).real(out(j, i).real() + a(0, j).imag() * b(0, i).imag());
         out(j, i).imag(a(0, j).imag() * b(0, i).real());
         out(j, i).imag(out(j, i).imag() - a(0, j).real() * b(0, i).imag());
-        //out(j,i) = a(0,j) * conj(b(0,i));
+        // out(j,i) = a(0,j) * conj(b(0,i));
 
 #pragma unroll
 	for (int s=1; s<Ns; s++) {

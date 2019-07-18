@@ -538,20 +538,14 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 
   gaugeParam.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
   if (dslash_type == QUDA_STAGGERED_DSLASH) {
-#ifdef USE_LEGACY_DSLASH
-    gaugeParam.reconstruct = link_recon;
-#else
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
         QUDA_RECONSTRUCT_13 :
         (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
-#endif
   } else {
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
   }
 
-  // printfQuda("Fat links sending...");
   loadGaugeQuda(milc_fatlink_gpu, &gaugeParam);
-  // printfQuda("Fat links sent\n");
 
   gaugeParam.type = QUDA_ASQTAD_LONG_LINKS;
 
@@ -560,20 +554,13 @@ void init(int precision, QudaReconstructType link_recon, int partition) {
 #endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-#ifndef USE_LEGACY_DSLASH
     gaugeParam.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
-        QUDA_RECONSTRUCT_13 :
-        (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
-#endif
-    gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = (link_recon==QUDA_RECONSTRUCT_12) ? QUDA_RECONSTRUCT_13 : (link_recon==QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    // printfQuda("Long links sending...");
+      QUDA_RECONSTRUCT_13 :
+      (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
+
     loadGaugeQuda(milc_longlink_gpu, &gaugeParam);
-    // printfQuda("Long links sent...\n");
-
   }
-
-  // printfQuda("Sending fields to GPU...");
 
   ColorSpinorParam csParam;
   csParam.nColor = 3;
@@ -1102,7 +1089,6 @@ for (int p = 0; p < 16; p++) {
    return ss.str();
  }
 
-#ifndef USE_LEGACY_DSLASH
 #ifdef MULTI_GPU
  INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
      Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
@@ -1112,18 +1098,4 @@ for (int p = 0; p < 16; p++) {
      Combine(Range(0, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
          ::testing::Values(0)),
      getstaggereddslashtestname);
-#endif
-
-#else
-
-#ifdef MULTI_GPU
- INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-     Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8), Range(0, 16)),
-     getstaggereddslashtestname);
-#else
- INSTANTIATE_TEST_SUITE_P(QUDA, StaggeredDslashTest,
-     Combine(Range(1, 4), ::testing::Values(QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8),
-         ::testing::Values(0)),
-     getstaggereddslashtestname);
-#endif
 #endif

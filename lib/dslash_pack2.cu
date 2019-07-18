@@ -1,5 +1,3 @@
-#ifndef USE_LEGACY_DSLASH
-
 #include <color_spinor_field.h>
 
 // STRIPED - spread the blocks throughout the workload to ensure we
@@ -391,5 +389,3 @@ public:
   }
 
 } // namespace quda
-
-#endif // USE_LEGACY_DSLASH

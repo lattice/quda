@@ -61,8 +61,8 @@ extern QudaInverterType precon_type;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char eig_vec_infile[];
+extern char eig_vec_outfile[];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -298,8 +298,8 @@ void setDeflationParam(QudaEigParam &df_param) {
   df_param.mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, vec_infile);
-  strcpy(df_param.vec_outfile, vec_outfile);
+  strcpy(df_param.vec_infile, eig_vec_infile);
+  strcpy(df_param.vec_outfile, eig_vec_outfile);
 }
 
 int main(int argc, char **argv)

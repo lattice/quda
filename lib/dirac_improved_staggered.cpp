@@ -31,10 +31,6 @@ namespace quda {
       errorQuda("Input and output spinor precisions don't match in dslash_quda");
     }
 
-    if (in.Stride() != out.Stride()) {
-      errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
@@ -42,25 +38,15 @@ namespace quda {
 
     if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	(out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge.VolumeCB());
+      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
     }
   }
 
   void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-#ifdef USE_LEGACY_DSLASH
-      improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
-				  &static_cast<const cudaColorSpinorField&>(in), parity, 
-				  dagger, 0, 0, commDim, profile);
-#else
-      ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, parity, dagger, commDim, profile);
-#endif
-    } else {
-      errorQuda("Not supported");
-    }  
 
+    ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, parity, dagger, commDim, profile);
     flops += 1146ll*in.Volume();
   }
 
@@ -69,31 +55,16 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-#ifdef USE_LEGACY_DSLASH
-      improvedStaggeredDslashCuda(&static_cast<cudaColorSpinorField&>(out), fatGauge, longGauge,
-			  &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			  &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-#else
-      ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
-#endif
-    } else {
-      errorQuda("Not supported");
-    }  
-
+    ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
     flops += 1158ll*in.Volume();
   }
 
   // Full staggered operator
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-#ifdef USE_LEGACY_DSLASH
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), 2*mass);  
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), 2*mass);
-#else
     checkFullSpinor(out, in);
     ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-#endif
+    flops += 1158ll * in.Volume();
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

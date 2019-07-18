@@ -260,6 +260,88 @@ namespace quda
     host_free(s);
   }
 
+  void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+  {
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
+
+    int nConv = eig_param->nConv;
+    if (evecs.size() != (unsigned int)(2 * nConv))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
+
+    Complex sigma_tmp[nConv];
+
+    for (int i = 0; i < nConv; i++) {
+
+      // This function assumes that you have computed the eigenvectors
+      // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
+      // array corresponds to the ith right(left) singular vector. We place the
+      // computed left(right) singular vectors in the second half of the array. We
+      // assume that right vectors are given and we compute the left.
+      //
+      // As a cross check, we recompute the singular values from mat vecs rather
+      // than make the direct relation (sigma_i)^2 = |lambda_i|
+      //--------------------------------------------------------------------------
+
+      // Lambda already contains the square root of the eigenvalue of the norm op.
+      Complex lambda = evals[i];
+
+      // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
+      mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
+
+      // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
+      Complex sigma_sq = blas::cDotProduct(*evecs[nConv + i], *evecs[nConv + i]);
+      sigma_tmp[i] = Complex(sqrt(sigma_sq.real()), sqrt(abs(sigma_sq.imag())));
+
+      // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
+      double norm = sqrt(blas::norm2(*evecs[nConv + i]));
+      blas::ax(1.0 / norm, *evecs[nConv + i]);
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
+                   sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
+      evals[i] = sigma_tmp[i];
+      //--------------------------------------------------------------------------
+    }
+  }
+
+  // Deflate vec, place result in vec_defl
+  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
+                               std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  {
+    // number of evecs
+    int n_defl = eig_param->nConv;
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
+
+    // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
+    // for all i computed eigenvectors and values.
+
+    // 1. Take block inner product: L_i^dag * vec = A_i
+    std::vector<ColorSpinorField *> left_vecs_ptr;
+    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
+    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    blas::cDotProduct(s, left_vecs_ptr, vec);
+
+    // 2. Perform block caxpy
+    //    A_i -> (\sigma_i)^{-1} * A_i
+    //    vec_defl = Sum_i (R_i)^{-1} * A_i
+    blas::zero(*vec_defl[0]);
+    std::vector<ColorSpinorField *> right_vecs_ptr;
+    for (int i = 0; i < n_defl; i++) {
+      right_vecs_ptr.push_back(eig_vecs[i]);
+      s[i] /= evals[i].real();
+    }
+    blas::caxpy(s, right_vecs_ptr, vec_defl);
+
+    // FIXME - we can optimize the zeroing out with a "multi-caxy"
+    // function that just writes over vec_defl and doesn't sum.  When
+    // we exceed the multi-blas limit this would deompose into caxy
+    // for the kernel call and caxpy for the subsequent ones
+
+    host_free(s);
+  }
+
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
@@ -395,10 +477,11 @@ namespace quda
     r.push_back(ColorSpinorField::Create(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
-    computeEvals(mat, kSpace, evals, nEv);
-    for (int i = 0; i < nEv; i++) {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
+    computeEvals(mat, kSpace, evals, nConv);
+    for (int i = 0; i < nConv; i++) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
+      }
     }
 
     delete r[0];
@@ -455,7 +538,7 @@ namespace quda
       if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
         kSpace[0]->Source(QUDA_RANDOM_SOURCE);
       } else {
-        RNG *rng = new RNG(kSpace[0]->Volume(), 1234, kSpace[0]->X());
+        RNG *rng = new RNG(*kSpace[0], 1234);
         rng->Init();
         spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
         rng->Release();
@@ -471,10 +554,12 @@ namespace quda
     // the kSpace passed to the function.
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParam = csParamClone;
-    // Increase Krylov space by one vector
-    kSpace.push_back(ColorSpinorField::Create(csParam));
+    // Increase Krylov space to nKr+1 one vector, create residual
+    for (int i = nConv; i < nKr + 1; i++) kSpace.push_back(ColorSpinorField::Create(csParam));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
+    // Increase evals space to nEv
+    for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
     //---------------------------------------------------------------------------
 
     // Convergence and locking criteria
@@ -593,16 +678,21 @@ namespace quda
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("kSpace size at convergence/max restarts = %d\n", (int)kSpace.size());
     // Prune the Krylov space back to size when passed to eigensolver
-    for (unsigned int i = nKr; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(nKr);
+    for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
+    kSpace.resize(nConv);
+    evals.resize(nConv);
 
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
-                   "restart steps.\n",
-                   nConv, nEv, nKr, max_restarts);
+      if (eig_param->require_convergence) {
+        errorQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                  "restart steps. Exiting.",
+                  nConv, nEv, nKr, max_restarts);
+      } else {
+        warningQuda("TRLM failed to compute the requested %d vectors with a %d search space and %d Krylov space in %d "
+                    "restart steps. Continuing with current lanczos factorisation.",
+                    nConv, nEv, nKr, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -610,22 +700,19 @@ namespace quda
                    restart_iter, iter);
 
         // Dump all Ritz values and residua
-        for (int i = 0; i < nEv; i++) {
+        for (int i = 0; i < nConv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
         }
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals, nEv);
+      computeEvals(mat, kSpace, evals, nConv);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        for (int i = 0; i < nEv; i++) {
+        for (int i = 0; i < nConv; i++) {
           printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
                      residua[i]);
         }
       }
-
-      // Compute SVD if requested
-      if (eig_param->compute_svd) { computeSVD(kSpace, evals); }
     }
 
     // Local clean-up
@@ -824,50 +911,5 @@ namespace quda
     *kSpace[num_locked + iter_keep] = *kSpace[nKr];
 
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
-  }
-
-  void TRLM::computeSVD(std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
-  {
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
-
-    int nConv = eig_param->nConv;
-    Complex sigma_tmp[nConv / 2];
-
-    for (int i = 0; i < nConv / 2; i++) {
-
-      // This function assumes that you have computed the eigenvectors
-      // of MdagM(MMdag), ie, the right(left) SVD of M. The ith eigen vector in the
-      // array corresponds to the ith right(left) singular vector. We place the
-      // computed left(right) singular vectors in the second half of the array. We
-      // assume, in the comments, that right vectors are given and we compute the left.
-      //
-      // As a cross check, we recompute the singular values from mat vecs rather
-      // than make the direct relation (sigma_i)^2 = |lambda_i|
-      //--------------------------------------------------------------------------
-      Complex lambda = evals[i];
-
-      // M*Rev_i = M*Rsv_i = sigma_i Lsv_i
-      mat.Expose()->M(*evecs[nConv / 2 + i], *evecs[i]);
-
-      // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      Complex sigma_sq = blas::cDotProduct(*evecs[nConv / 2 + i], *evecs[nConv / 2 + i]);
-      sigma_tmp[i] = Complex(sqrt(sigma_sq.real()), sqrt(abs(sigma_sq.imag())));
-
-      // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*evecs[nConv / 2 + i]));
-      blas::ax(1.0 / norm, *evecs[nConv / 2 + i]);
-
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
-                   sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
-      //--------------------------------------------------------------------------
-    }
-
-    // Update the host evals array
-    for (int i = 0; i < nConv / 2; i++) {
-      evals[2 * i + 0] = sigma_tmp[i];
-      evals[2 * i + 1] = sigma_tmp[i];
-    }
   }
 } // namespace quda

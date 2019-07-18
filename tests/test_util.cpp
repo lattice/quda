@@ -95,7 +95,7 @@ void initComms(int argc, char **argv, int *const commDims)
 
   // make sure the QMP logical ordering matches QUDA's
   if (rank_order == 0) {
-    int map[] = { 3, 1, 2, 0 };
+    int map[] = {3, 2, 1, 0};
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   } else {
     int map[] = { 0, 1, 2, 3 };
@@ -1628,6 +1628,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+double gaussian_sigma = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
@@ -1640,8 +1641,8 @@ int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
-char vec_infile[256] = "";
-char vec_outfile[256] = "";
+char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
@@ -1728,6 +1729,7 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
+bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
@@ -1752,6 +1754,7 @@ char eig_vec_outfile[256] = "";
 bool mg_eig[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_nEv[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_nKr[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = {};
 double mg_eig_tol[QUDA_MAX_MG_LEVEL] = {};
@@ -1826,6 +1829,8 @@ void usage(char** argv )
          "heatbath test only)\n");
   printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a "
          "random gauge is generated (default false)\n");
+  printf("    --gaussian-sigma <sigma>                    # Width of the Gaussian noise used for random gauge field "
+         "contruction (default 0.2)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
   printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
@@ -1907,8 +1912,9 @@ void usage(char** argv )
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
-  printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
-  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the "
+  printf("    --mg-load-vec <level file>                # Load the vectors \"file\" for the multigrid_test (requires "
+         "QIO)\n");
+  printf("    --mg-save-vec <level file>                # Save the generated null-space vectors \"file\" from the "
          "multigrid_test (requires QIO)\n");
   printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
          "summarize)\n");
@@ -1932,6 +1938,8 @@ void usage(char** argv )
   printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
   printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
+  printf("    --eig-require-convergence  <true/false>   # If true, the solver will error out if convergence is not "
+         "attained. If false, a warning will be given (default true)\n");
   printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in "
          "the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
   printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the eigensolver\n");
@@ -1962,6 +1970,8 @@ void usage(char** argv )
          "eigensolver\n");
   printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
          "eigensolver\n");
+  printf("    --mg-eig-require-convergence <level> <true/false> # If true, the solver will error out if convergence is "
+         "not attained. If false, a warning will be given (default true)\n");
   printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth "
          "restart/iteration (only used in Implicit Restart types)\n");
   printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver "
@@ -3515,10 +3525,15 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-load-vec") == 0){
-    if (i+1 >= argc){
+    if (i + 2 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
       usage(argv);
     }
-    strcpy(vec_infile, argv[i+1]);
+    i++;
+
+    strcpy(mg_vec_infile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3528,7 +3543,13 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    strcpy(vec_outfile, argv[i+1]);
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+    strcpy(mg_vec_outfile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3682,6 +3703,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if (strcmp(argv[i], "--eig-nConv") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     eig_nConv = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_require_convergence = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_require_convergence = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for require-convergence (true/false)\n");
+      exit(1);
+    }
+
     i++;
     ret = 0;
     goto out;
@@ -3917,6 +3955,29 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     mg_eig_nKr[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_require_convergence[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_require_convergence[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-require-convergence %d (true/false)\n", level);
+      exit(1);
+    }
 
     i++;
     ret = 0;
@@ -4230,6 +4291,18 @@ int process_command_line_option(int argc, char** argv, int* idx)
     solution_accumulator_pipeline = atoi(argv[i+1]);
     if (solution_accumulator_pipeline < 0 || solution_accumulator_pipeline > 16){
       printf("ERROR: invalid solution pipeline length (%d)\n", solution_accumulator_pipeline);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--gaussian-sigma") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    gaussian_sigma = atof(argv[i + 1]);
+    if (gaussian_sigma < 0.0 || gaussian_sigma > 1.0) {
+      printf("ERROR: invalid sigma (%f)\n", gaussian_sigma);
       usage(argv);
     }
     i++;

@@ -15,21 +15,27 @@
 #if __COMPUTE_CAPABILITY__ < 600
 /**
    @brief Implementation of double-precision atomic addition using compare
-   and swap.
+   and swap. Taken from the CUDA programming guide.
 
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-static inline __device__ double atomicAdd(double *addr, double val){
-  double old = *addr, assumed;
+static inline __device__ double atomicAdd(double* address, double val)
+{
+  unsigned long long int* address_as_ull =
+                            (unsigned long long int*)address;
+  unsigned long long int old = *address_as_ull, assumed;
+
   do {
     assumed = old;
-    old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-					  __double_as_longlong(assumed),
-					  __double_as_longlong(val + assumed)));
-  } while ( __double_as_longlong(assumed) != __double_as_longlong(old) );
-  
-  return old;
+    old = atomicCAS(address_as_ull, assumed,
+                    __double_as_longlong(val +
+                           __longlong_as_double(assumed)));
+
+    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+  } while (assumed != old);
+
+  return __longlong_as_double(old);
 }
 #endif
 
@@ -118,41 +124,24 @@ static inline __device__ char2 atomicAdd(char2 *addr, char2 val){
 }
 
 /**
-   @brief Implementation of double-precision atomic max using compare
-   and swap.
-
-   @param addr Address that stores the atomic variable to be updated
-   @param val Value to be added to the atomic
-*/
-static inline __device__ double atomicMax(double *addr, double val){
-  double old = *addr, assumed;
-  do {
-    assumed = old;
-    old = __longlong_as_double( atomicCAS((unsigned long long int*)addr,
-            __double_as_longlong(assumed),
-            __double_as_longlong(val > assumed ? val : assumed)));
-  } while ( __double_as_longlong(assumed) != __double_as_longlong(old) );
-  
-  return old;
-}
-
-/**
    @brief Implementation of single-precision atomic max using compare
-   and swap.
+   and swap. May not support NaNs properly...
 
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-static inline __device__ double atomicMax(float *addr, float val){
-  float old = *addr, assumed;
+static inline __device__ float atomicMax(float *addr, float val){
+  unsigned int old = __float_as_uint(*addr), assumed;
   do {
     assumed = old;
-    old = __int_as_float( atomicCAS((unsigned long long int*)addr,
-            __float_as_int(assumed),
-            __float_as_int(val > assumed ? val : assumed)));
-  } while ( __float_as_int(assumed) != __float_as_int(old) );
-  
-  return old;
+    if (__uint_as_float(old) >= val) break;
+
+    old = atomicCAS((unsigned int*)addr,
+           assumed,
+           __float_as_uint(val));
+  } while ( assumed != old );
+
+  return __uint_as_float(old);
 }
 
 #endif
