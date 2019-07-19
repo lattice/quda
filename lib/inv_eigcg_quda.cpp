@@ -46,8 +46,10 @@ namespace quda {
 
    using DynamicStride       = Stride<Dynamic, Dynamic>;
    using RealMatrix          = MatrixXd;
+   using RealMatrixF         = MatrixXf;
    using RealVectorSet       = MatrixXd;
    using RealVector          = VectorXd;
+   using RealVectorF         = VectorXf;
    using RealDiagonalMatrix  = DiagonalMatrix<double, Dynamic>;
 
 //special types needed for compatibility with QUDA blas:
@@ -154,12 +156,36 @@ namespace quda {
             }
 
             //csParam.mem_type      = pipe_l != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
-            csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+            csParam.setPrecision(search_space_prec);
             csParam.composite_dim = (2*k);
             //Create a search vector set:
             V2k = MakeSharedPtr(csParam);
 
-            if( pipe_l != 0 ) {
+            if( pipe_l != 0 && is_host_location ) {
+              // set up pipelined shifts:
+              int leftover_elems  = (m - (m / pipe_l) * pipe_l);
+              // adjust Lm shift:
+              if ( leftover_elems != 0 ) Lm = (pipe_l - leftover_elems);
+
+              const int am  = ((m+Lm) / pipe_l) & 1;
+
+              // Adjust Odd cycle shift
+              leftover_elems = (2*k - ((2*k) / pipe_l) * pipe_l);
+
+              if ( leftover_elems != 0 ) L2kO = (pipe_l - leftover_elems);
+
+              const int a2k  = ((2*k + pipe_l + L2kO) / pipe_l) & 1;
+
+              L2kO = am == 0 ? L2kO + (1-a2k)*pipe_l : L2kO + a2k*pipe_l;
+
+              // Adjust Even cycle shift:
+              const int am2k = ((m - 2*k - pipe_l) / pipe_l) & 1;
+
+              if(am2k == 0) L2kE = am == 0 ? L2kE + a2k*pipe_l  : L2kE + (1-a2k)*pipe_l;
+              else          L2kE = L2kO;
+
+              printfQuda("\nPipeline shift parameters : Lm = % d, L2kO = %d, L2kE = %d\n", Lm, L2kO, L2kE);
+
               csParam.composite_dim = m;
               csParam.setPrecision(search_space_prec);//eigCG internal search space precision may not coincide with the solver precision!
               //Create a search vector set:
@@ -170,7 +196,7 @@ namespace quda {
               hAz = MakeSharedPtr(csParam);
             }
 
-            Eigen::initParallel();	    
+            Eigen::initParallel();
           }
 
 
@@ -203,11 +229,13 @@ namespace quda {
        }
 
        inline void CleanArgs() {
-         id = 0; Tm.setZero(); Tmvals.setZero(); eigenVecs.setZero();
+         id = 0; Tm.setZero(); Tmvals.setZero(); eigenVecs.setZero(); shift = 0;
          if(rr_task.valid()) rr_task.wait();
        }
 
        inline void UpdateShift() {
+         if(!is_host_location) return;
+
          if ( id == m ) shift = Lm;
          else           shift = restarts & 1 ? L2kE : L2kO;
        }
@@ -246,15 +274,15 @@ namespace quda {
          eigenVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
 
          //2.Solve m-1 dim eigenproblem:
-         SelfAdjointEigenSolver<MatrixXd> es_tm1(Map<MatrixXd, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
+         SelfAdjointEigenSolver<RealMatrix> es_tm1(Map<RealMatrix, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
 
-         Block<MatrixXd>(eigenVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+         Block<RealMatrix>(eigenVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
 
          eigenVecs.block(m-1, k, 1, k).setZero();
 
-         MatrixXd Q2k(MatrixXd::Identity(m, 2*k));
+         MatrixXd Q2k(RealMatrix::Identity(m, 2*k));
 
-         HouseholderQR<MatrixXd> eigenVecs2k_qr( Map<MatrixXd, Unaligned >(eigenVecs.data(), m, 2*k) );
+         HouseholderQR<RealMatrix> eigenVecs2k_qr( Map<RealMatrix, Unaligned >(eigenVecs.data(), m, 2*k) );
 
          Q2k.applyOnTheLeft( eigenVecs2k_qr.householderQ() );
 
@@ -262,7 +290,7 @@ namespace quda {
          RealMatrix H2k2 = Q2k.transpose()*Tm*Q2k;
 
          /* solve the small evecm1 2nev x 2nev eigenproblem */
-         SelfAdjointEigenSolver<MatrixXd> es_h2k(H2k2);
+         SelfAdjointEigenSolver<RealMatrix> es_h2k(H2k2);
 
          //Block<MatrixXd>(eigenVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
          RealMatrix Qm2k = Q2k * es_h2k.eigenvectors();
@@ -270,7 +298,7 @@ namespace quda {
          Tmvals.segment(0,2*k) = es_h2k.eigenvalues();
 
          //4. Rescale eigenvectors since we did not rescale Vm
-         Block<MatrixXd>(eigenVecs.derived(), 0, 0, m, 2*k) = inv_normr_m * Qm2k;
+         Block<RealMatrix>(eigenVecs.derived(), 0, 0, m, 2*k) = inv_normr_m * Qm2k;
 
          //5. Synchronize an aux compute stream for the pipelined version:
          if(is_host_location) blas::synchronizeAuxBlasStream();
@@ -282,18 +310,35 @@ namespace quda {
          if(is_host_location) {
            ColorSpinorFieldSet &haz = *hAz;
 
-           Map<MatrixXd, Unaligned > eigenv2kmat(static_cast<double*>(v2k.V()), v2k[0].RealLength(), 2*k);
-           Map<MatrixXd, Unaligned > eigenvmmat(static_cast<double*>(vm.V()), vm[0].RealLength(), m);
-
            RealMatrix Alpha(eigenVecs.block(0,0, m, 2*k));
 
-           eigenv2kmat.setZero();
-           eigenv2kmat.noalias() += eigenvmmat * Alpha;
+           if(vm.Precision()  == QUDA_DOUBLE_PRECISION) {
+             Map<RealMatrix, Unaligned > eigenv2kmat( static_cast<double*>(v2k.V()), v2k[0].RealLength(), 2*k);
+             Map<RealMatrix, Unaligned > eigenvmmat( static_cast<double*>(vm.V()),  vm[0].RealLength(),  m);
 
-           Map<VectorXd, Unaligned > az(static_cast<double*>(haz.V()), haz.RealLength());
+             eigenv2kmat.setZero();
+             eigenv2kmat.noalias() += eigenvmmat * Alpha;
 
-           s.setZero();
-           s.noalias() += eigenv2kmat.adjoint()*az;
+             Map<RealVector, Unaligned > az(static_cast<double*>(haz.V()), haz.RealLength());
+
+             s.setZero();
+             s.noalias() += eigenv2kmat.adjoint()*az;
+           } else {
+             Map<RealMatrixF, Unaligned > eigenv2kmat( static_cast<float*>(v2k.V()), v2k[0].RealLength(), 2*k);
+             Map<RealMatrixF, Unaligned > eigenvmmat( static_cast<float*>(vm.V()),  vm[0].RealLength(),  m);
+
+             RealMatrixF AlphaF(m, 2*k);
+             for(int row = 0; row < m; row++ ) for( int col = 0; col < 2*k; col++ ) AlphaF(row, col) = Alpha(row, col);
+
+             eigenv2kmat.setZero();
+             eigenv2kmat.noalias() += eigenvmmat * AlphaF;
+
+             Map<RealVectorF, Unaligned > az(static_cast<float*>(haz.V()), haz.RealLength());
+
+             RealVectorF sf(RealVectorF::Zero(2*k));
+             sf.noalias() += eigenv2kmat.adjoint()*az;
+             for( int el = 0; el < 2*k; el++ ) s(el) = sf(el);
+           }
 
          } else {
            std::vector<ColorSpinorField*> v2k_(v2k());
@@ -320,9 +365,9 @@ namespace quda {
 
        inline void StagedPrefetch(const ColorSpinorField &w0){
 
-          if(id == 0) return;
-
           static int ref_pnt    = 0;
+
+          if(id == 0) {ref_pnt = 0; return;}
 
           const bool last_stage = (id == m);//ready for the restart, before that we need to prefech leftover basis vectors
           const int cid = id % (m+1) + (id > m ? 2*k : 0);
@@ -360,13 +405,13 @@ namespace quda {
        }
 
 
-       inline void UpdateLanczosBasisAndSearchIdx(const ColorSpinorField &r, const double rnorm){
+       inline void UpdateLanczosBasisAndSearchIdx(const ColorSpinorField &r){
           ColorSpinorFieldSet &vm = *Vm;
           //load Lanczos basis vector:
           const int cid  = (id+shift) % vm.CompositeDim();
-	  
+
           blas::copy(vm[cid], r);//convert arrays
-          
+
           id += 1;
 
           return;
@@ -502,16 +547,13 @@ namespace quda {
 
     // launch RR block for args.id == param.m, otherwise is nop
     if(args.id == args.m) {
-
       // launch async task
       args.rr_task = std::async(std::launch::async, &IncEigCG::EigenSolve, this);
       printfQuda("Start RR task.\n");
 
       if (args.restarts == 0) args.UpdateShift();
-      printfQuda("SHIFT %d\n", args.shift);
 
     } else if (args.id == (args.m+args.pipe_l)) {
-
       // do synchronization with EIGENV
       if(args.rr_task.valid()) args.rr_task.wait();
       else warningQuda("Tried to synchronize an invalid task...");
@@ -523,7 +565,7 @@ namespace quda {
       args.StagedPrefetch((*work_space)[0]);
     }
 
-    args.UpdateLanczosBasisAndSearchIdx((*work_space)[4], normr);
+    args.UpdateLanczosBasisAndSearchIdx((*work_space)[4]);
 
     return;
   }
@@ -745,32 +787,6 @@ namespace quda {
     ColorSpinorParam csParam(x);
 
     if (!init) {
-      // set up pipelined shifts:
-      int leftover_elems  = (param.m - (param.m / param.pipeline) * param.pipeline);
-      // adjust Lm shift:
-      if ( leftover_elems != 0 ) Lm = (param.pipeline - leftover_elems);
-
-      const int am  = ((param.m+Lm) / param.pipeline) & 1;
-
-      // Adjust Odd cycle shift
-      leftover_elems = (2*param.nev - ((2*param.nev) / param.pipeline) * param.pipeline);
-
-      if ( leftover_elems != 0 ) L2kO = (param.pipeline - leftover_elems);
-
-      const int a2k  = ((2*param.nev + param.pipeline + L2kO) / param.pipeline) & 1;
-
-      L2kO = am == 0 ? L2kO + (1-a2k)*param.pipeline : L2kO + a2k*param.pipeline;
-
-      // Adjust Even cycle shift:
-      const int am2k = ((param.m - 2*param.nev - param.pipeline) / param.pipeline) & 1;
-
-      if(am2k == 0) {
-        L2kE = am == 0 ? L2kE + a2k*param.pipeline  : L2kE + (1-a2k)*param.pipeline;
-      } else {
-        L2kE = L2kO;
-      }
-
-      printfQuda("\nPipeline shift parameters : Lm = % d, L2kO = %d, L2kE = %d\n", Lm, L2kO, L2kE);
 
       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, x, param.precision_ritz, true);
 
