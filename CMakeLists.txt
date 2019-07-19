@@ -182,6 +182,7 @@ set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
@@ -191,6 +192,7 @@ set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
 set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requested by QUDA_ARPACK")
+
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -904,7 +906,12 @@ mark_as_advanced(CMAKE_F_FLAGS)
 
 set(BUILDNAME ${HASH})
 include(CTest)
-# add tests and quda library
+
+if(QUDA_BACKWARDS)
+  #add_subdirectory(include/externals/backward-cpp)
+  include(include/externals/backward-cpp/BackwardConfig.cmake)
+endif()
+  # add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)

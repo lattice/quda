@@ -303,10 +303,7 @@ void comm_barrier(void)
 }
 
 
-void comm_abort(int status)
+void comm_abort_(int status)
 {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
   QMP_abort(status);
 }

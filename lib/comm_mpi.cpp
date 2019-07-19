@@ -20,7 +20,6 @@
   }                                                 \
 } while (0)
 
-
 struct MsgHandle_s {
   /**
      The persistant MPI communicator handle that is created with
@@ -325,10 +324,7 @@ void comm_broadcast(void *data, size_t nbytes)
 
 void comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
 
-void comm_abort(int status)
+void comm_abort_(int status)
 {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
   MPI_Abort(MPI_COMM_HANDLE, status);
 }
