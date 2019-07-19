@@ -114,7 +114,6 @@ else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
-
 # include_directories
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
@@ -149,16 +148,12 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
-# backwards stuff here
 if(QUDA_BACKWARDS)
-  target_include_directories(quda PRIVATE ${BACKWARD_INCLUDE_DIRS})
-  set_property(TARGET quda_cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
-  # set_property(TARGET quda APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY INCLUDE_DIRECTORIES ${BACKWARD_INCLUDE_DIRS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
-  target_compile_definitions(quda_cpp PRIVATE -DQUDA_BACKWARDSCPP)
-
 endif()
-  # end backwards stuff
 
 if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD)

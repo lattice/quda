@@ -41,7 +41,7 @@ set(STACK_DETAILS_BFD FALSE CACHE BOOL
 set(STACK_DETAILS_DWARF FALSE CACHE BOOL
 	"Use libdwarf/libelf to read debug info")
 
-set(BACKWARD_TESTS FALSE CACHE BOOL "Enable tests")
+#set(BACKWARD_TESTS FALSE CACHE BOOL "Enable tests")
 
 ###############################################################################
 # CONFIGS

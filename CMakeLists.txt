@@ -179,10 +179,11 @@ set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
 
+option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
+
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
 set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
-option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 # features in development
 set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
@@ -212,6 +213,8 @@ mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
+
+mark_as_advanced(QUDA_BACKWARDS)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
