@@ -112,13 +112,12 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, size_t scalar_size,
-                           bool use_z, bool use_w, bool reduce)
+    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, bool reduce)
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      // ensure NXZ is a valid size
-      NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ?  NXZ : MAX_MULTI_BLAS_N;
+      size_t scalar_size = 2 * std::max( {x_prec, y_prec, QUDA_SINGLE_PRECISION} );
+      NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ?  NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size = x_fixed ? sizeof(SpinorTexture<float4,short4,6>) :
         sizeof(SpinorTexture<float4,float4,6>);
       size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);

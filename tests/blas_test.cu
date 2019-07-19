@@ -944,17 +944,17 @@ double test(int kernel) {
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
     blas::axpy(Ar, *xmD, *ymD);
-    for (int i=0; i < Nsrc; i++){
-      for(int j=0; j < Msrc; j++){
+    for (int i=0; i < Nsrc; i++) {
+      for(int j=0; j < Msrc; j++) {
 	blas::axpy(Ar[Msrc*i+j], *(xmH[i]), *(ymH[j]));
       }
     }
 
     error = 0;
-    for (int i=0; i < Nsrc; i++){
+    for (int i=0; i < Msrc; i++) {
       error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
-    error/= Nsrc;
+    error/= Msrc;
     break;
 
   default:

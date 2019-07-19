@@ -282,8 +282,7 @@ namespace quda {
 
       memset(result, 0, NXZ * NYW * sizeof(doubleN));
 
-      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), sizeof(Float2),
-                                            r.use_z, r.use_w, true);
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), r.use_z, r.use_w, true);
 
       if (!is_valid_NXZ(NXZ, true)) errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max_check, NYW_max);
@@ -895,7 +894,7 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
                    bool nested_policy = false)
 	: result(result), x(x), y(y), z(z), w(w), hermitian(hermitian), Anorm(Anorm)
       {
-        NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), 2*y[0]->Precision(), false, false, true);
+        NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
         max_tile_size = make_uint2(1,1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
