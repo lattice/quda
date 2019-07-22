@@ -633,7 +633,7 @@ usage_extra(char** argv )
   printfQuda("                                                4: Odd odd spinor CG inverter\n");
   printfQuda("                                                5: Even even spinor multishift CG inverter\n");
   printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu_prec <double/single/half>             # Set CPU precision\n");
+  printfQuda("    --cpu-prec <double/single/half>             # Set CPU precision\n");
 
   return ;
 }
@@ -647,7 +647,7 @@ int main(int argc, char **argv)
 
     if (process_command_line_option(argc, argv, &i) == 0) { continue; }
 
-    if( strcmp(argv[i], "--cpu_prec") == 0){
+    if( strcmp(argv[i], "--cpu-prec") == 0){
       if (i+1 >= argc){
         usage(argv);
       }
