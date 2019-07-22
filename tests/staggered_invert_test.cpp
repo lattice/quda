@@ -647,7 +647,7 @@ int main(int argc, char **argv)
 
     if (process_command_line_option(argc, argv, &i) == 0) { continue; }
 
-    if( strcmp(argv[i], "--cpu-prec") == 0){
+    if (strcmp(argv[i], "--cpu-prec") == 0) {
       if (i+1 >= argc){
         usage(argv);
       }

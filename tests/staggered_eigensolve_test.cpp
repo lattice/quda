@@ -78,7 +78,7 @@ extern QudaMatPCType matpc_type;       // preconditioning type
 extern QudaSolutionType solution_type; // solution type
 extern QudaSolveType solve_type;
 
-extern bool compute_fatlong;  // build the true fat/long links or use random numbers
+extern bool compute_fatlong; // build the true fat/long links or use random numbers
 // relativistic correction for naik term
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
