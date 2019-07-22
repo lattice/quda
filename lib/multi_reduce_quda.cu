@@ -1079,14 +1079,24 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
         if (!tuned()) {
           disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
-          { // tune regular inner product
+          if (x.size() == 1) {
             TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
             tile.apply(0);
-          }
-
-          { // tune transpose inner product
+          } else if (y.size() == 1) {
             TileTuner tile(result, y, z, w, z, hermitian, Anorm, true);
             tile.apply(0);
+          } else {
+
+            { // tune regular inner product
+              TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+              tile.apply(0);
+            }
+
+            { // tune transpose inner product
+              TileTuner tile(result, y, z, w, z, hermitian, Anorm, true);
+              tile.apply(0);
+            }
+
           }
 
           enableProfileCount();
@@ -1122,15 +1132,18 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
         }
       }
 
-      // aux.x is the tile size
       bool advanceAux(TuneParam &param) const
       {
-        if (param.aux.x == 0) {
-          param.aux.x = 1;
-          return true;
-        } else {
-          param.aux.x = 0;
+        if (x.size() == 1 || y.size() == 1) {
           return false;
+        } else {
+          if (param.aux.x == 0) {
+            param.aux.x = 1;
+            return true;
+          } else {
+            param.aux.x = 0;
+            return false;
+          }
         }
       }
 
@@ -1138,12 +1151,16 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
 
       void initTuneParam(TuneParam &param) const  {
         Tunable::initTuneParam(param);
-        param.aux = make_int4(0, 0, 0, 0);
+        if (x.size() == 1)
+          param.aux = make_int4(0, 0, 0, 0);
+        else if (y.size() == 1)
+          param.aux = make_int4(1, 0, 0, 0);
+        else
+          param.aux = make_int4(0, 0, 0, 0); // default is not to transpose
       }
 
-      void defaultTuneParam(TuneParam &param) const  {
-        Tunable::defaultTuneParam(param);
-        param.aux = make_int4(0, 0, 0, 0); // default is not to transpose
+      void defaultTuneParam(TuneParam &param) const {
+        initTuneParam(param);
       }
 
       TuneKey tuneKey() const {
