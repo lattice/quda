@@ -34,7 +34,7 @@ namespace quda {
       typedef typename vector<Float, 2>::type Float2;
       static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
       const int NYW;
-      static constexpr int max_warp_split = std::min(NXZ, 8); // don't split the warp more than we need
+      int max_warp_split;
       mutable int warp_split; // helper used to keep track of current warp splitting
       const int nParity;
       mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
@@ -69,6 +69,17 @@ namespace quda {
           Ynorm_h(),
           Wnorm_h()
       {
+        // heuristic for enabling if we need the warp-splitting optimization
+        const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
+        switch (gpu_size/x[0]->Length()) {
+        case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
+        case 1: max_warp_split = 2; break; // double the thread count
+        case 2:                            // quadruple the thread count
+        default:
+          max_warp_split = 4;
+        }
+        max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
+
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
@@ -172,7 +183,6 @@ namespace quda {
         case 1: multiBlasKernel<FloatN, M, NXZ, 1, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 2: multiBlasKernel<FloatN, M, NXZ, 2, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 4: multiBlasKernel<FloatN, M, NXZ, 4, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 8: multiBlasKernel<FloatN, M, NXZ, 8, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 #else
@@ -180,7 +190,6 @@ namespace quda {
         case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 8: multiBlasKernel<FloatN, M, NXZ, 8><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 #endif
