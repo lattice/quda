@@ -2746,7 +2746,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 0 || Nsrc > 256){ // allow 0 for testing setup in isolation
+    if (Nsrc < 0 || Nsrc > 2048){ // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -2760,7 +2760,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Msrc = atoi(argv[i+1]);
-    if (Msrc < 1 || Msrc > 256){
+    if (Msrc < 1 || Msrc > 2048){
       printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }
