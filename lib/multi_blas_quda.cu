@@ -47,7 +47,10 @@ namespace quda {
 
       bool tuneSharedBytes() const { return false; }
 
-  public:
+      // for these streaming kernels, there is no need to tune the grid size, just use max
+      unsigned int minGridSize() const { return maxGridSize(); }
+
+    public:
       MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
           const coeff_array<T> &b, const coeff_array<T> &c, std::vector<ColorSpinorField *> &x,
           std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
@@ -71,7 +74,7 @@ namespace quda {
       {
         // heuristic for enabling if we need the warp-splitting optimization
         const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
-        switch (gpu_size/x[0]->Length()) {
+        switch (gpu_size/(x[0]->Length() * NYW)) {
         case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
         case 1: max_warp_split = 2; break; // double the thread count
         case 2:                            // quadruple the thread count
