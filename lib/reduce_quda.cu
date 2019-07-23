@@ -32,15 +32,15 @@ namespace quda {
     {
       /* we have these different reductions to cater for:
 
-	 - regular reductions (reduce_quda.cu) where are reducing to a
+         - regular reductions (reduce_quda.cu) where are reducing to a
            single vector type (max length 4 presently), with possibly
            parity dimension, and a grid-stride loop with max number of
            blocks = 2 x SM count
 
-	 - multi-reductions where we are reducing to a matrix of size
-	   of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4), with
-	   possible parity dimension, and a grid-stride loop with
-	   maximum number of blocks = 2 x SM count
+         - multi-reductions where we are reducing to a matrix of size
+           of size QUDA_MAX_MULTI_REDUCE of vectors (max length 4), with
+           possible parity dimension, and a grid-stride loop with
+           maximum number of blocks = 2 x SM count
       */
 
       const int reduce_size = 4 * sizeof(QudaSumFloat);

@@ -30,68 +30,67 @@ namespace quda {
     {
 
   private:
-      typedef typename scalar<FloatN>::type Float;
-      typedef typename vector<Float, 2>::type Float2;
-      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
-      const int NYW;
-      int max_warp_split;
-      mutable int warp_split; // helper used to keep track of current warp splitting
-      const int nParity;
-      mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
-      const coeff_array<T> &a, &b, &c;
-      std::vector<ColorSpinorField *> &x, &y, &z, &w;
+    typedef typename scalar<FloatN>::type Float;
+    typedef typename vector<Float, 2>::type Float2;
+    static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
+    const int NYW;
+    int max_warp_split;
+    mutable int warp_split; // helper used to keep track of current warp splitting
+    const int nParity;
+    mutable MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> arg;
+    const coeff_array<T> &a, &b, &c;
+    std::vector<ColorSpinorField *> &x, &y, &z, &w;
 
-      // host pointers used for backing up fields when tuning
-      // don't curry into the Spinors to minimize parameter size
-      char *Y_h[NYW_max], *W_h[NYW_max], *Ynorm_h[NYW_max], *Wnorm_h[NYW_max];
+    // host pointers used for backing up fields when tuning
+    // don't curry into the Spinors to minimize parameter size
+    char *Y_h[NYW_max], *W_h[NYW_max], *Ynorm_h[NYW_max], *Wnorm_h[NYW_max];
 
-      bool tuneSharedBytes() const { return false; }
+    bool tuneSharedBytes() const { return false; }
 
-      // for these streaming kernels, there is no need to tune the grid size, just use max
-      unsigned int minGridSize() const { return maxGridSize(); }
+    // for these streaming kernels, there is no need to tune the grid size, just use max
+    unsigned int minGridSize() const { return maxGridSize(); }
 
-    public:
-      MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
-          const coeff_array<T> &b, const coeff_array<T> &c, std::vector<ColorSpinorField *> &x,
-          std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w,
-          int NYW, int length) :
-          TunableVectorY(NYW),
-          NYW(NYW),
-          warp_split(1),
-          nParity(x[0]->SiteSubset()),
-          arg(X, Y, Z, W, f, NYW, length / nParity),
-          a(a),
-          b(b),
-          c(c),
-          x(x),
-          y(y),
-          z(z),
-          w(w),
-          Y_h(),
-          W_h(),
-          Ynorm_h(),
-          Wnorm_h()
-      {
-        // heuristic for enabling if we need the warp-splitting optimization
-        const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
-        switch (gpu_size/(x[0]->Length() * NYW)) {
-        case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
-        case 1: max_warp_split = 2; break; // double the thread count
-        case 2:                            // quadruple the thread count
-        default:
-          max_warp_split = 4;
-        }
-        max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
+  public:
+    MultiBlas(SpinorX X[], SpinorY Y[], SpinorZ Z[], SpinorW W[], Functor &f, const coeff_array<T> &a,
+              const coeff_array<T> &b, const coeff_array<T> &c, std::vector<ColorSpinorField *> &x,
+              std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
+              std::vector<ColorSpinorField *> &w, int NYW, int length) :
+      TunableVectorY(NYW),
+      NYW(NYW),
+      warp_split(1),
+      nParity(x[0]->SiteSubset()),
+      arg(X, Y, Z, W, f, NYW, length / nParity),
+      a(a),
+      b(b),
+      c(c),
+      x(x),
+      y(y),
+      z(z),
+      w(w),
+      Y_h(),
+      W_h(),
+      Ynorm_h(),
+      Wnorm_h()
+    {
+      // heuristic for enabling if we need the warp-splitting optimization
+      const int gpu_size = 2 * deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount;
+      switch (gpu_size / (x[0]->Length() * NYW)) {
+      case 0: max_warp_split = 1; break; // we have plenty of work, no need to split
+      case 1: max_warp_split = 2; break; // double the thread count
+      case 2:                            // quadruple the thread count
+      default: max_warp_split = 4;
+      }
+      max_warp_split = std::min(NXZ, max_warp_split); // ensure we only split if valid
 
-        Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
-        Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
-        Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
+      Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
+      Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
+      Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
 
-        strcpy(aux, x[0]->AuxString());
-        if (x[0]->Precision() != y[0]->Precision()) {
-          strcat(aux, ",");
-          strcat(aux, y[0]->AuxString());
-        }
+      strcpy(aux, x[0]->AuxString());
+      if (x[0]->Precision() != y[0]->Precision()) {
+        strcat(aux, ",");
+        strcat(aux, y[0]->AuxString());
+      }
 
 #ifdef JITIFY
         ::quda::create_jitify_program("kernels/multi_blas_core.cuh");
@@ -118,36 +117,33 @@ namespace quda {
 
 #ifdef JITIFY
         using namespace jitify::reflection;
-        auto instance
-          = program->kernel("quda::blas::multiBlasKernel").instantiate(Type<FloatN>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
+        auto instance = program->kernel("quda::blas::multiBlasKernel")
+                          .instantiate(Type<FloatN>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
         if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
           auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
-          cuMemcpyHtoDAsync(Amatrix_d, A, NXZ*NYW*sizeof(decltype(A[0])), stream);
+          cuMemcpyHtoDAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), stream);
         }
 
         if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
           auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
-          cuMemcpyHtoDAsync(Bmatrix_d, B, NXZ*NYW*sizeof(decltype(B[0])), stream);
+          cuMemcpyHtoDAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), stream);
         }
 
         if (c.data) {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
-          cuMemcpyHtoDAsync(Cmatrix_d, C, NXZ*NYW*sizeof(decltype(C[0])), stream);
+          cuMemcpyHtoDAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), stream);
         }
 
         tp.block.x *= tp.aux.x; // include warp-split factor
@@ -157,35 +153,39 @@ namespace quda {
         if (a.data) {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ*NYW*sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+          cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ*NYW*sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
+            for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+          cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (c.data) {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++)
-              C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
-          cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ*NYW*sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
-	}
+            for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+          cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
+        }
 
         tp.block.x *= tp.aux.x; // include warp-split factor
 
 #ifdef CONSTANT_ARG
-	cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, stream);
+        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
+                                stream);
         switch (tp.aux.x) {
-        case 1: multiBlasKernel<FloatN, M, NXZ, 1, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 2: multiBlasKernel<FloatN, M, NXZ, 2, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 4: multiBlasKernel<FloatN, M, NXZ, 4, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 1:
+          multiBlasKernel<FloatN, M, NXZ, 1, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          break;
+        case 2:
+          multiBlasKernel<FloatN, M, NXZ, 2, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          break;
+        case 4:
+          multiBlasKernel<FloatN, M, NXZ, 4, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+          break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 #else
@@ -219,7 +219,7 @@ namespace quda {
       bool advanceAux(TuneParam &param) const
       {
 #ifdef WARP_SPLIT
-        if (2*param.aux.x <= max_warp_split) {
+        if (2 * param.aux.x <= max_warp_split) {
           param.aux.x *= 2;
           warp_split = param.aux.x;
           return true;
@@ -265,10 +265,10 @@ namespace quda {
     };
 
     template <int NXZ_, typename RegType, typename StoreType, typename yType, int M,
-        template <int, typename, typename> class Functor, typename write, typename T>
+              template <int, typename, typename> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-        std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, std::vector<ColorSpinorField *> &z,
-        std::vector<ColorSpinorField *> &w, int length)
+                   std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
+                   std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
     {
       typedef typename scalar<RegType>::type Float;
       typedef typename vector<Float, 2>::type Float2;
@@ -318,8 +318,8 @@ namespace quda {
     */
     template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
     void uniMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-        CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-        CompositeColorSpinorField &w)
+                      CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                      CompositeColorSpinorField &w)
     {
 
       if (checkLocation(*x[0], *y[0], *z[0], *w[0]) == QUDA_CUDA_FIELD_LOCATION) {
@@ -563,20 +563,20 @@ namespace quda {
 
     template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-		   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-		   CompositeColorSpinorField &w)
+                   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                   CompositeColorSpinorField &w)
     {
       if (x[0]->Precision() != y[0]->Precision()) {
-	mixedMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+        mixedMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
       } else {
-	uniMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+        uniMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
       }
     }
 
     template <template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
-		   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
-		   CompositeColorSpinorField &w)
+                   CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
+                   CompositeColorSpinorField &w)
     {
       // instantiate the loop unrolling template
       switch (x.size()) {
@@ -667,21 +667,21 @@ namespace quda {
 #endif // 6
 #endif // 5
 #endif // 3
-      default:
-	errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
+      default: errorQuda("x.size %lu greater than MAX_MULTI_BLAS_N %d", x.size(), MAX_MULTI_BLAS_N);
       }
     }
 
-    template < template <int MXZ, typename Float, typename FloatN> class Functor, typename T>
-    void axpy_recurse(const T *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y,
-                      int i_idx ,int j_idx, int upper) {
+    template <template <int MXZ, typename Float, typename FloatN> class Functor, typename T>
+    void axpy_recurse(const T *a_, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, int i_idx,
+                      int j_idx, int upper)
+    {
 
       // if greater than max single-kernel size, recurse
       if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, false)) {
         // We need to split up 'a' carefully since it's row-major.
-        T* tmpmajor = new T[x.size()*y.size()];
-        T* tmpmajor0 = &tmpmajor[0];
-        T* tmpmajor1 = &tmpmajor[x.size()*(y.size()/2)];
+        T *tmpmajor = new T[x.size() * y.size()];
+        T *tmpmajor0 = &tmpmajor[0];
+        T *tmpmajor1 = &tmpmajor[x.size() * (y.size() / 2)];
         std::vector<ColorSpinorField*> y0(y.begin(), y.begin() + y.size()/2);
         std::vector<ColorSpinorField*> y1(y.begin() + y.size()/2, y.end());
 
@@ -698,32 +698,32 @@ namespace quda {
             tmpmajor1[count1++] = a_[count++];
         }
 
-        axpy_recurse<Functor>(tmpmajor0, x, y0, i_idx, 2*j_idx+0, upper);
-        axpy_recurse<Functor>(tmpmajor1, x, y1, i_idx, 2*j_idx+1, upper);
+        axpy_recurse<Functor>(tmpmajor0, x, y0, i_idx, 2 * j_idx + 0, upper);
+        axpy_recurse<Functor>(tmpmajor1, x, y1, i_idx, 2 * j_idx + 1, upper);
 
         delete[] tmpmajor;
       } else {
         // if at the bottom of recursion,
         // return if on lower left for upper triangular,
         // return if on upper right for lower triangular.
-        if ( is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION) ) {
+        if (is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION)) {
           if (upper == 1 && j_idx < i_idx) { return; }
           if (upper == -1 && j_idx > i_idx) { return; }
 
-	  // mark true since we will copy the "a" matrix into constant memory
-	  coeff_array<T> a(a_), b, c;
-	  multiBlas<Functor, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
-	} else {
-	  // split the problem in half and recurse
-	  const T *a0 = &a_[0];
-	  const T *a1 = &a_[(x.size()/2)*y.size()];
+          // mark true since we will copy the "a" matrix into constant memory
+          coeff_array<T> a(a_), b, c;
+          multiBlas<Functor, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
+        } else {
+          // split the problem in half and recurse
+          const T *a0 = &a_[0];
+          const T *a1 = &a_[(x.size() / 2) * y.size()];
 
-	  std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-	  std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+          std::vector<ColorSpinorField *> x0(x.begin(), x.begin() + x.size() / 2);
+          std::vector<ColorSpinorField *> x1(x.begin() + x.size() / 2, x.end());
 
-	  axpy_recurse<Functor>(a0, x0, y, 2*i_idx+0, j_idx, upper);
-	  axpy_recurse<Functor>(a1, x1, y, 2*i_idx+1, j_idx, upper);
-	}
+          axpy_recurse<Functor>(a0, x0, y, 2 * i_idx + 0, j_idx, upper);
+          axpy_recurse<Functor>(a1, x1, y, 2 * i_idx + 1, j_idx, upper);
+        }
       } // end if (y.size() > max_YW_size())
     }
 
@@ -797,32 +797,32 @@ namespace quda {
 
         delete[] tmpmajor;
       } else {
-      	// if at bottom of recursion check where we are
-        if ( is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION) ) {
-      	  if (pass==1) {
-	    if (i!=j) {
+        // if at bottom of recursion check where we are
+        if (is_valid_NXZ(x.size(), false, x[0]->Precision() < QUDA_SINGLE_PRECISION)) {
+          if (pass==1) {
+            if (i != j) {
               if (upper == 1 && j < i) { return; } // upper right, don't need to update lower left.
               if (upper == -1 && i < j) { return; } // lower left, don't need to update upper right.
               caxpy(a_, x, z); return;  // off diagonal
             }
-      	    return;
+            return;
       	  } else {
-	    if (i!=j) return; // We're on the first pass, so we only want to update the diagonal.
-      	  }
+            if (i != j) return; // We're on the first pass, so we only want to update the diagonal.
+          }
 
-	  coeff_array<Complex> a(a_), b, c;
-	  multiBlas<multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z);
-	} else {
-	  // split the problem in half and recurse
-	  const Complex *a0 = &a_[0];
-	  const Complex *a1 = &a_[(x.size()/2)*y.size()];
+          coeff_array<Complex> a(a_), b, c;
+          multiBlas<multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z);
+        } else {
+          // split the problem in half and recurse
+          const Complex *a0 = &a_[0];
+          const Complex *a1 = &a_[(x.size() / 2) * y.size()];
 
-	  std::vector<ColorSpinorField*> x0(x.begin(), x.begin() + x.size()/2);
-	  std::vector<ColorSpinorField*> x1(x.begin() + x.size()/2, x.end());
+          std::vector<ColorSpinorField *> x0(x.begin(), x.begin() + x.size() / 2);
+          std::vector<ColorSpinorField *> x1(x.begin() + x.size() / 2, x.end());
 
-	  caxpyz_recurse(a0, x0, y, z, 2*i+0, j, pass, upper);
-	  caxpyz_recurse(a1, x1, y, z, 2*i+1, j, pass, upper);
-	}
+          caxpyz_recurse(a0, x0, y, z, 2 * i + 0, j, pass, upper);
+          caxpyz_recurse(a1, x1, y, z, 2 * i + 1, j, pass, upper);
+        }
       } // end if (y.size() > max_YW_size())
     }
 
@@ -862,11 +862,11 @@ namespace quda {
       caxpyz_L(a, x.Components(), y.Components(), z.Components());
     }
 
-    void axpyBzpcx(const double *a_, std::vector<ColorSpinorField*> &x_, std::vector<ColorSpinorField*> &y_,
-		   const double *b_, ColorSpinorField &z_, const double *c_)
+    void axpyBzpcx(const double *a_, std::vector<ColorSpinorField *> &x_, std::vector<ColorSpinorField *> &y_,
+                   const double *b_, ColorSpinorField &z_, const double *c_)
     {
       if (y_.size() <= (size_t)max_YW_size(1, z_.Precision(), y_[0]->Precision(), false, true, false)) {
-	// swizzle order since we are writing to x_ and y_, but the
+        // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
 	std::vector<ColorSpinorField*> &y = y_;
@@ -876,10 +876,10 @@ namespace quda {
 	std::vector<ColorSpinorField*> x;
 	x.push_back(&z_);
 
-	coeff_array<double> a(a_), b(b_), c(c_);
-	multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        coeff_array<double> a(a_), b(b_), c(c_);
+        multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
       } else {
-	// split the problem in half and recurse
+        // split the problem in half and recurse
 	const double *a0 = &a_[0];
 	const double *b0 = &b_[0];
 	const double *c0 = &c_[0];
@@ -903,7 +903,7 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      if ( is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION) ) // only swizzle if we have to.
+      if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
         // multi-blas only allow writing to y and w, and moreover the
@@ -918,7 +918,7 @@ namespace quda {
         std::vector<ColorSpinorField*> &x = x_;
 
         coeff_array<Complex> a(a_), b(b_), c;
-	multiBlas<multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        multiBlas<multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];

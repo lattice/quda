@@ -28,11 +28,11 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
-    struct MultiBlasArg :
-      SpinorXZ<NXZ,SpinorX,SpinorZ,Functor::use_z>,
-      SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>(), SpinorY, SpinorW, Functor::use_w>
-    {
-      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
+    struct MultiBlasArg : SpinorXZ<NXZ, SpinorX, SpinorZ, Functor::use_z>,
+                          SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>(),
+                                   SpinorY, SpinorW, Functor::use_w> {
+      static constexpr int NYW_max
+        = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
       const int NYW;
       Functor f;
       const int length;
@@ -42,7 +42,7 @@ namespace quda
           f(f),
           length(length)
       {
-	if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
+        if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
@@ -64,7 +64,7 @@ namespace quda
         for (int j = 0; j < M; j++) {
           // reduce down to the first group of column-split threads
 #pragma unroll
-          for (int offset = warp_size/2; offset >= warp_size/warp_split; offset /= 2) {
+          for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
 #if (__CUDACC_VER_MAJOR__ >= 9)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
             x[j] += __shfl_down_sync(WARP_CONVERGED, x[j], offset);
@@ -101,7 +101,8 @@ namespace quda
       constexpr int vector_site_width = warp_size / warp_split;
       const int lane_id = threadIdx.x % warp_size;
       const int warp_id = threadIdx.x / warp_size;
-      unsigned int idx = blockIdx.x*(blockDim.x/warp_split) + warp_id*(warp_size/warp_split) + lane_id % vector_site_width;
+      unsigned int idx
+        = blockIdx.x * (blockDim.x / warp_split) + warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
       const int l_idx = lane_id / vector_site_width;
 
       if (k >= arg.NYW) return;
@@ -111,18 +112,18 @@ namespace quda
         FloatN x[M], y[M], z[M], w[M];
 
 #pragma unroll
-       for (int m = 0; m < M; m++) {
-         ::quda::zero(y[m]);
-         ::quda::zero(w[m]);
-       }
+        for (int m = 0; m < M; m++) {
+          ::quda::zero(y[m]);
+          ::quda::zero(w[m]);
+        }
 
-       if (l_idx == 0 || warp_size == 1) {
-         arg.Y[k].load(y, idx, parity);
-         arg.W[k].load(w, idx, parity);
-       }
+        if (l_idx == 0 || warp_size == 1) {
+          arg.Y[k].load(y, idx, parity);
+          arg.W[k].load(w, idx, parity);
+        }
 
 #pragma unroll
-        for (int l_ = 0; l_ < NXZ; l_+=warp_split) {
+        for (int l_ = 0; l_ < NXZ; l_ += warp_split) {
           const int l = l_ + l_idx;
           if (l < NXZ || warp_split == 1) {
             arg.X[l].load(x, idx, parity);
@@ -134,8 +135,8 @@ namespace quda
         }
 
         // now combine the results across the warp if needed
-        if (arg.Y[k].write) warp_combine<M,warp_split>(y);
-        if (arg.W[k].write) warp_combine<M,warp_split>(w);
+        if (arg.Y[k].write) warp_combine<M, warp_split>(y);
+        if (arg.W[k].write) warp_combine<M, warp_split>(w);
 
         if (l_idx == 0 || warp_split == 1) {
           arg.Y[k].save(y, idx, parity);
@@ -152,40 +153,41 @@ namespace quda
       coeff_array(const T *data) : data(data) {}
     };
 
-    template <int NXZ, typename Float2, typename FloatN> struct MultiBlasFunctor
-    {
+    template <int NXZ, typename Float2, typename FloatN> struct MultiBlasFunctor {
       typedef Float2 type;
       static constexpr bool reducer = false;
       int NYW;
-      MultiBlasFunctor(int NYW) : NYW(NYW) { }
+      MultiBlasFunctor(int NYW) : NYW(NYW) {}
 
-      __device__ __host__ inline Float2 a(int i, int j) const {
+      __device__ __host__ inline Float2 a(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 b(int i, int j) const {
+      __device__ __host__ inline Float2 b(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Bmatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Bmatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 c(int i, int j) const {
+      __device__ __host__ inline Float2 c(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Cmatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Cmatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
-          = 0;
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j) = 0;
     };
 
     /**
@@ -197,13 +199,11 @@ namespace quda
       static constexpr bool use_w = false;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
-      multiaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
-      {
-      }
+      multiaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-        y += a(j,i).x*x; //Sub-optimal constant buffer usage since we're using a complex array to store real numbers
+        y += a(j, i).x * x; // Sub-optimal constant buffer usage since we're using a complex array to store real numbers
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -247,13 +247,11 @@ namespace quda
       static constexpr bool use_w = false;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
-      multicaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
-      {
-      }
+      multicaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-        _caxpy(a(j,i), x, y);
+        _caxpy(a(j, i), x, y);
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -269,14 +267,12 @@ namespace quda
       static constexpr bool use_w = true;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
-      multicaxpyz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
-      {
-      }
+      multicaxpyz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
         if (j == 0) w = y;
-        _caxpy(a(j,i), x, w);
+        _caxpy(a(j, i), x, w);
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -294,14 +290,12 @@ namespace quda
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::c;
-      multi_axpyBzpcx_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
-      {
-      }
+      multi_axpyBzpcx_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-        y += a(0,i).x * w;
-        w = b(0,i).x * x + c(0,i).x * w;
+        y += a(0, i).x * w;
+        w = b(0, i).x * x + c(0, i).x * w;
       }
 
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
@@ -318,15 +312,13 @@ namespace quda
       using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
       using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
-      multi_caxpyBxpz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW)
-      {
-      }
+      multi_caxpyBxpz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       // i loops over NYW, j loops over NXZ
       __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-        _caxpy(a(0,j), x, y);
-        _caxpy(b(0,j), x, w); // b/c we swizzled z into w.
+        _caxpy(a(0, j), x, y);
+        _caxpy(b(0, j), x, w); // b/c we swizzled z into w.
       }
 
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams

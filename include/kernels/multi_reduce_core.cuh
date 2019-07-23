@@ -25,13 +25,14 @@ namespace quda
        @tparam Reducer Functor used to operate on data
     */
     template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-        typename Reducer>
-    struct MultiReduceArg :
-      public ReduceArg<vector_type<ReduceType, NXZ>>,
-      SpinorXZ<NXZ,SpinorX,SpinorZ,Reducer::use_z>,
-      SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>(), SpinorY, SpinorW, Reducer::use_w>
-    {
-      static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>();
+              typename Reducer>
+    struct MultiReduceArg
+      : public ReduceArg<vector_type<ReduceType, NXZ>>,
+        SpinorXZ<NXZ, SpinorX, SpinorZ, Reducer::use_z>,
+        SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>(), SpinorY,
+                 SpinorW, Reducer::use_w> {
+      static constexpr int NYW_max
+        = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Reducer>();
       const int NYW;
       Reducer r;
       const int length;
@@ -41,7 +42,7 @@ namespace quda
           r(r),
           length(length)
       {
-	if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
+        if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
 
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
@@ -121,34 +122,36 @@ namespace quda
     /**
        Base class from which all reduction functors should derive.
     */
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN> struct MultiReduceFunctor
-    {
+    template <int NXZ, typename ReduceType, typename Float2, typename FloatN> struct MultiReduceFunctor {
       typedef Float2 type;
       static constexpr bool reducer = true;
       int NYW;
-      MultiReduceFunctor(int NYW) : NYW(NYW) { }
+      MultiReduceFunctor(int NYW) : NYW(NYW) {}
 
-      __device__ __host__ inline Float2 a(int i, int j) const {
+      __device__ __host__ inline Float2 a(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 b(int i, int j) const {
+      __device__ __host__ inline Float2 b(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Bmatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Bmatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 c(int i, int j) const {
+      __device__ __host__ inline Float2 c(int i, int j) const
+      {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Cmatrix_d)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Cmatrix_h)[i*NYW + j];
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
 

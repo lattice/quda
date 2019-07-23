@@ -36,10 +36,7 @@ namespace quda
        @param[in] x Value we are testing
        @return True if x is a power of two
     */
-    template <typename T> inline constexpr bool is_power2(T x)
-    {
-      return (x != 0) && ((x & (x - 1)) == 0);
-    }
+    template <typename T> inline constexpr bool is_power2(T x) { return (x != 0) && ((x & (x - 1)) == 0); }
 
     /**
        @brief Return the maximum power of two enabled by default for
@@ -51,10 +48,7 @@ namespace quda
        @param[in] fixed Whether we are using fixed point
        @return Max power of two
     */
-    inline int max_NXZ_power2(bool reducer, bool fixed = false)
-    {
-      return reducer ? 16 : (fixed ? 64 : 128);
-    }
+    inline int max_NXZ_power2(bool reducer, bool fixed = false) { return reducer ? 16 : (fixed ? 64 : 128); }
 
     /**
        @brief Return if the requested nxz parameter is valid or
@@ -66,7 +60,7 @@ namespace quda
     inline bool is_valid_NXZ(int nxz, bool reducer, bool fixed = false)
     {
       if (nxz <= MAX_MULTI_BLAS_N || // all values below MAX_MULTI_BLAS_N are valid
-          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer, fixed)) ) {
+          (is_power2(nxz) && nxz <= max_NXZ_power2(reducer, fixed))) {
         return true;
       } else {
         return false;
@@ -82,22 +76,21 @@ namespace quda
     */
     template <int NXZ, typename xType, typename yType, typename Functor> inline constexpr int max_YW_size()
     {
-      using SpinorX = SpinorTexture<typename mapper<xType>::type,xType,6>;
-      using SpinorY = Spinor<typename mapper<yType>::type,yType,6,1>;
+      using SpinorX = SpinorTexture<typename mapper<xType>::type, xType, 6>;
+      using SpinorY = Spinor<typename mapper<yType>::type, yType, 6, 1>;
       using SpinorZ = SpinorX;
-      using SpinorW = Spinor<typename mapper<xType>::type,xType,6,1>;
+      using SpinorW = Spinor<typename mapper<xType>::type, xType, 6, 1>;
 
       // compute the size remaining for the Y and W accessors
-      constexpr int arg_size = (MAX_ARG_SIZE
-                                - sizeof(int)          // NYW parameter
-                                - sizeof(SpinorX[NXZ]) // SpinorX array
-                                - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ*)) // SpinorZ array
-                                - sizeof(int)          // functor NYW member
-                                - sizeof(int)          // length parameter
-                                - (!Functor::use_w ? sizeof(SpinorW*) : 0) // subtract pointer if not using W
-                                - (Functor::reducer ? 3 * sizeof(void*) : 0) // reduction buffers
-                                - 16)                  // there seems to be 16 bytes other argument space we need
-        / ( sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0) );
+      constexpr int arg_size = (MAX_ARG_SIZE - sizeof(int)                                    // NYW parameter
+                                - sizeof(SpinorX[NXZ])                                        // SpinorX array
+                                - (Functor::use_z ? sizeof(SpinorZ[NXZ]) : sizeof(SpinorZ *)) // SpinorZ array
+                                - sizeof(int)                                                 // functor NYW member
+                                - sizeof(int)                                                 // length parameter
+                                - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
+                                - (Functor::reducer ? 3 * sizeof(void *) : 0) // reduction buffers
+                                - 16) // there seems to be 16 bytes other argument space we need
+        / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
       constexpr int coeff_size = MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::type));
@@ -116,25 +109,24 @@ namespace quda
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      size_t scalar_size = 2 * std::max( {x_prec, y_prec, QUDA_SINGLE_PRECISION} );
-      NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ?  NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
-      size_t spinor_x_size = x_fixed ? sizeof(SpinorTexture<float4,short4,6>) :
-        sizeof(SpinorTexture<float4,float4,6>);
-      size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
+      size_t scalar_size = 2 * std::max({x_prec, y_prec, QUDA_SINGLE_PRECISION});
+      NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
+      size_t spinor_x_size
+        = x_fixed ? sizeof(SpinorTexture<float4, short4, 6>) : sizeof(SpinorTexture<float4, float4, 6>);
+      size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4, short4, 6, 1>) : sizeof(Spinor<float4, float4, 6, 1>);
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size = x_fixed ? sizeof(Spinor<float4,short4,6,1>) : sizeof(Spinor<float4,float4,6,1>);
+      size_t spinor_w_size = x_fixed ? sizeof(Spinor<float4, short4, 6, 1>) : sizeof(Spinor<float4, float4, 6, 1>);
 
       // compute the size remaining for the Y and W accessors
-      int arg_size = (MAX_ARG_SIZE
-                      - sizeof(int)         // NYW parameter
-                      - NXZ*spinor_x_size // SpinorX array
-                      - (use_z ? NXZ*spinor_z_size : sizeof(void*)) // SpinorZ array (else dummy pointer)
-                      - sizeof(int)         // functor NYW member
-                      - sizeof(int)         // length parameter
-                      - (!use_w ? sizeof(void*) : 0) // subtract dummy pointer if not using W
-                      - (reduce ? 3 * sizeof(void*) : 0) // reduction buffers
-                      - 16)                  // there seems to be 16 bytes other argument space we need
-        / ( spinor_y_size + (use_w ? spinor_w_size : 0) );
+      int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter
+                      - NXZ * spinor_x_size                            // SpinorX array
+                      - (use_z ? NXZ * spinor_z_size : sizeof(void *)) // SpinorZ array (else dummy pointer)
+                      - sizeof(int)                                    // functor NYW member
+                      - sizeof(int)                                    // length parameter
+                      - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
+                      - (reduce ? 3 * sizeof(void *) : 0)              // reduction buffers
+                      - 16) // there seems to be 16 bytes other argument space we need
+        / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
       int coeff_size = MAX_MATRIX_SIZE / (NXZ * scalar_size);
@@ -142,28 +134,24 @@ namespace quda
       return std::min(arg_size, coeff_size);
     }
 
-    template <int NXZ, typename SpinorX, typename SpinorZ, bool> struct SpinorXZ
-    {
+    template <int NXZ, typename SpinorX, typename SpinorZ, bool> struct SpinorXZ {
       SpinorX X[NXZ];
       SpinorZ *Z;
-      SpinorXZ() : Z(reinterpret_cast<SpinorZ*>(X)) { }
+      SpinorXZ() : Z(reinterpret_cast<SpinorZ *>(X)) {}
     };
 
-    template <int NXZ, typename SpinorX, typename SpinorZ> struct SpinorXZ<NXZ,SpinorX,SpinorZ,true>
-    {
+    template <int NXZ, typename SpinorX, typename SpinorZ> struct SpinorXZ<NXZ, SpinorX, SpinorZ, true> {
       SpinorX X[NXZ];
       SpinorZ Z[NXZ];
     };
 
-    template <int NYW, typename SpinorY, typename SpinorW, bool> struct SpinorYW
-    {
+    template <int NYW, typename SpinorY, typename SpinorW, bool> struct SpinorYW {
       SpinorY Y[NYW];
       SpinorW *W;
-      SpinorYW() : W(reinterpret_cast<SpinorW*>(Y)) { }
+      SpinorYW() : W(reinterpret_cast<SpinorW *>(Y)) {}
     };
 
-    template <int NYW, typename SpinorY, typename SpinorW> struct SpinorYW<NYW,SpinorY,SpinorW,true>
-    {
+    template <int NYW, typename SpinorY, typename SpinorW> struct SpinorYW<NYW, SpinorY, SpinorW, true> {
       SpinorY Y[NYW];
       SpinorW W[NYW];
     };

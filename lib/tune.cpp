@@ -233,7 +233,7 @@ namespace quda {
 
       // synchronous profile
       if (param.n_calls > 0 && !is_policy && !is_nested_policy) {
-	double time = param.n_calls * param.time;
+        double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
 	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
