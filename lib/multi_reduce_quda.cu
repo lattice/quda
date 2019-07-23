@@ -920,6 +920,9 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
         if (!tuned()) {
           if (!nested_policy) disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
+          // note the 1-d tuning is all redundent now that we call
+          // multiReduce_recurse directly now for 1-d multi
+          // reductions, but I'll keep this code here for now
           if (x.size() == 1) { // 1-d reduction
 
             max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
@@ -1079,6 +1082,9 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
         if (!tuned()) {
           disableProfileCount(); // purely for profiling reasons, don't want to profile tunings.
 
+          // note the 1-d tuning is all redundent now that we call
+          // multiReduce_recurse directly now for 1-d multi
+          // reductions, but I'll keep this code here for now
           if (x.size() == 1) {
             TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
             tile.apply(0);
@@ -1174,22 +1180,98 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
       void postTune() { } // FIXME - use write to determine what needs to be saved
     };
 
+    void reDotProduct(double* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
+      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
+      double* result_tmp = new double[x.size()*y.size()];
+      for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
+
+      if (x.size() == 1) {
+        int NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
+        uint2 max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
+        multiReduce_recurse<double,QudaSumFloat,Dot,write<0,0,0,0>,Dot,write<0,0,0,0>>
+          (result_tmp, x, y, x, y, 0, 0, false, max_tile_size);
+      } else if (y.size() == 1) {
+
+        double *result_trans = new double[x.size()*y.size()];
+
+        // swap (x<->y and w<-z> when doing transpose calculation)
+        int NXZ_max = max_YW_size(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, true);
+        uint2 max_tile_size = make_uint2(1, std::min(NXZ_max, (int)x.size()));
+        multiReduce_recurse<double,QudaSumFloat,Dot,write<0,0,0,0>,Dot,write<0,0,0,0>>
+          (result_trans, y, x, y, x, 0, 0, false, max_tile_size);
+
+        // tranpose the result if we are doing the transpose calculation
+        const auto xlen = x.size();
+        const auto ylen = y.size();
+        for (unsigned int j = 0; j < xlen; j++)
+          for (unsigned int i = 0; i < ylen; i++)
+            result_tmp[i*xlen+j] = result_trans[j*ylen+i];
+
+        delete []result_trans;
+
+      } else {
+        TileSizeTune<double,QudaSumFloat,Dot,write<0,0,0,0>,Dot,write<0,0,0,0>, double > tile(result_tmp, x, y, x, y, false);
+        //tile.apply(0);//
+        tile.apply(*(blas::getStream()));
+      }
+
+      // do a single multi-node reduction only once we have computed all local dot products
+      const int Nreduce = x.size()*y.size();
+      reduceDoubleArray(result_tmp, Nreduce);
+
+      // multiReduce_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
+      const unsigned int xlen = x.size();
+      const unsigned int ylen = y.size();
+      for (unsigned int j = 0; j < xlen; j++)
+        for (unsigned int i = 0; i < ylen; i++)
+          result[j*ylen+i] = result_tmp[i*xlen + j];
+
+      delete[] result_tmp;
+    }
+
     void cDotProduct(Complex* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      // cDotProduct_recurse returns a column-major matrix.
-      // To be consistent with the multi-blas functions, we should
-      // switch this to row-major.
-      TransposeTune<double2,QudaSumFloat2,Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>,Complex> trans(result_tmp, x, y, x, y, false);
-      trans.apply(0);
+      if (x.size() == 1) {
+        int NYW_max = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
+        uint2 max_tile_size = make_uint2(1, std::min(NYW_max, (int)y.size()));
+        multiReduce_recurse<double2,QudaSumFloat2,Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>>
+          (result_tmp, x, y, x, y, 0, 0, false, max_tile_size);
+      } else if (y.size() == 1) {
+
+        Complex *result_trans = new Complex[x.size()*y.size()];
+
+        // swap (x<->y and w<-z> when doing transpose calculation)
+        int NXZ_max = max_YW_size(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, true);
+        uint2 max_tile_size = make_uint2(1, std::min(NXZ_max, (int)x.size()));
+        multiReduce_recurse<double2,QudaSumFloat2,Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>>
+          (result_trans, y, x, y, x, 0, 0, false, max_tile_size);
+
+        // tranpose the result if we are doing the transpose calculation
+        const auto xlen = x.size();
+        const auto ylen = y.size();
+        for (unsigned int j = 0; j < xlen; j++)
+          for (unsigned int i = 0; i < ylen; i++)
+            result_tmp[i*xlen+j] = conj(result_trans[j*ylen+i]);
+
+        delete []result_trans;
+
+      } else {
+        TransposeTune<double2,QudaSumFloat2,Cdot,write<0,0,0,0>,Cdot,write<0,0,0,0>,Complex> trans(result_tmp, x, y, x, y, false);
+        trans.apply(0);
+      }
 
       // do a single multi-node reduction only once we have computed all local dot products
       const int Nreduce = 2*x.size()*y.size();
       reduceDoubleArray((double*)result_tmp, Nreduce);
 
-      // Switch from col-major to row-major
+      // multiReduce_recurse returns a column-major matrix.
+      // To be consistent with the multi-blas functions, we should
+      // switch this to row-major.
       const unsigned int xlen = x.size();
       const unsigned int ylen = y.size();
       for (unsigned int j = 0; j < xlen; j++)
@@ -1283,32 +1365,6 @@ template <typename doubleN, typename ReduceType, template <int MXZ, typename Red
 #else
       errorQuda("cDotProductCopy not enabled");
 #endif
-    }
-
-    void reDotProduct(double* result, std::vector<ColorSpinorField*>& x, std::vector<ColorSpinorField*>& y){
-      if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
-      double* result_tmp = new double[x.size()*y.size()];
-      for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
-
-      // cDotProduct_recurse returns a column-major matrix.
-      // To be consistent with the multi-blas functions, we should
-      // switch this to row-major.
-      TileSizeTune<double,QudaSumFloat,Dot,write<0,0,0,0>,Dot,write<0,0,0,0>, double > tile(result_tmp, x, y, x, y, false);
-      //tile.apply(0);//
-      tile.apply(*(blas::getStream()));
-
-      // do a single multi-node reduction only once we have computed all local dot products
-      const int Nreduce = x.size()*y.size();
-      reduceDoubleArray(result_tmp, Nreduce);
-
-      // Switch from col-major to row-major
-      const unsigned int xlen = x.size();
-      const unsigned int ylen = y.size();
-      for (unsigned int j = 0; j < xlen; j++)
-        for (unsigned int i = 0; i < ylen; i++)
-          result[j*ylen+i] = result_tmp[i*xlen + j];
-
-      delete[] result_tmp;
     }
 
    } // namespace blas
