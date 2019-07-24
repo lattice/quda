@@ -910,11 +910,24 @@ mark_as_advanced(CMAKE_F_FLAGS)
 set(BUILDNAME ${HASH})
 include(CTest)
 
+
+
 if(QUDA_BACKWARDS)
-  #add_subdirectory(include/externals/backward-cpp)
-  include(include/externals/backward-cpp/BackwardConfig.cmake)
+  include(FetchContent)
+  FetchContent_Declare(
+      backward-cpp
+      GIT_REPOSITORY https://github.com/bombela/backward-cpp.git
+      GIT_TAG v1.4
+      GIT_SHALLOW ON
+  )
+  FetchContent_GetProperties(backward-cpp)
+  if(NOT backward-cpp_POPULATED)
+    FetchContent_Populate(backward-cpp)
+  endif()
+  include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
-  # add tests and quda library
+
+# add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(doc)

@@ -5,7 +5,7 @@
 #include <comm_quda.h>
 
 #ifdef QUDA_BACKWARDSCPP
-#include "backward-cpp/backward.hpp"
+#include "backward.hpp"
 namespace backward {
   backward::SignalHandling sh;
 } // namespace backward
