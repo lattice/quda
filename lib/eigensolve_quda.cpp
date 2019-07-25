@@ -290,16 +290,16 @@ namespace quda
       mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] =sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
-      
+      sigma_tmp[i] = sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
+
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
       double norm = sqrt(blas::norm2(*evecs[nConv + i]));
       blas::ax(1.0 / norm, *evecs[nConv + i]);
-      
+
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
-		   sigma_tmp[i] - sqrt(abs(lambda.real())));
-      
+                   sigma_tmp[i] - sqrt(abs(lambda.real())));
+
       evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
     }
@@ -873,9 +873,9 @@ namespace quda
         kSpace.push_back(ColorSpinorField::Create(csParam));
       }
     }
-    
+
     // Array for multi-BLAS axpy
-    double *ritz_mat_col = (double*)safe_malloc((dim - 1) * sizeof(double));
+    double *ritz_mat_col = (double *)safe_malloc((dim - 1) * sizeof(double));
 
     for (int i = 0; i < iter_keep; i++) {
       int k = offset + i;
@@ -889,9 +889,9 @@ namespace quda
       kSpace_ptr.push_back(kSpace[k]);
       for (int j = 1; j < dim; j++) {
         vecs_ptr.push_back(kSpace[num_locked + j]);
-	ritz_mat_col[j - 1] = ritz_mat[i * dim + j];
+        ritz_mat_col[j - 1] = ritz_mat[i * dim + j];
       }
-      
+
       // Multi-BLAS axpy
       blas::axpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
     }
