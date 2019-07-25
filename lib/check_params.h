@@ -723,9 +723,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     }
 
 #ifdef INIT_PARAM
-    if (i < QUDA_MAX_MG_LEVEL) { P(n_vec[i], INVALID_INT); }
+    if (i<QUDA_MAX_MG_LEVEL) {
+          P(n_vec[i], INVALID_INT);
+    }
 #else
-    if (i < n_level - 1) { P(n_vec[i], INVALID_INT); }
+    if (i<n_level-1) {
+      P(n_vec[i], INVALID_INT);
+    }
 #endif
 
 #ifdef INIT_PARAM
