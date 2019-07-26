@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <numeric>
 #include <mpi.h>
-#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <mpi_comm_handle.h>
