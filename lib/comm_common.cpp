@@ -4,6 +4,12 @@
 #include <quda_internal.h>
 #include <comm_quda.h>
 
+#ifdef QUDA_BACKWARDSCPP
+#include "backward.hpp"
+namespace backward {
+  backward::SignalHandling sh;
+} // namespace backward
+#endif 
 
 struct Topology_s {
   int ndim;
@@ -822,3 +828,17 @@ void commGlobalReductionSet(bool global_reduction) { globalReduce = global_reduc
 bool commAsyncReduction() { return asyncReduce; }
 
 void commAsyncReductionSet(bool async_reduction) { asyncReduce = async_reduction; }
+
+void comm_abort(int status)
+{
+#ifdef HOST_DEBUG
+  raise(SIGABRT);
+#endif
+#ifdef QUDA_BACKWARDSCPP
+  backward::StackTrace st; 
+  st.load_here(32);
+  backward::Printer p; 
+  p.print(st, getOutputFile());
+#endif
+  comm_abort_(status);
+}
