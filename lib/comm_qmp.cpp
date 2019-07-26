@@ -1,5 +1,4 @@
 #include <qmp.h>
-#include <csignal>
 #include <algorithm>
 #include <numeric>
 #include <quda_internal.h>
