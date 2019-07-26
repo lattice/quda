@@ -151,8 +151,13 @@ namespace quda {
             //Create a search vector set:
             Vm = MakeSharedPtr(csParam);
 
+	    if(is_host_location) printfQuda("Running eigenvalue computations on the host.\n");
+
             char *enabled_managed_memory = getenv("QUDA_ENABLE_MANAGED_MEMORY");
             if (enabled_managed_memory && strcmp(enabled_managed_memory, "1") == 0) {
+              //nothing to do
+            } else {
+              if (is_host_location) csParam.mem_type = QUDA_MEMORY_MAPPED;
             }
 
             //csParam.mem_type      = pipe_l != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
@@ -274,15 +279,15 @@ namespace quda {
          eigenVecs.leftCols(k) = es_tm.eigenvectors().leftCols(k);
 
          //2.Solve m-1 dim eigenproblem:
-         SelfAdjointEigenSolver<RealMatrix> es_tm1(Map<RealMatrix, Unaligned, DynamicStride >(Tm.data(), (m-1), (m-1), DynamicStride(m, 1)));
+         SelfAdjointEigenSolver<RealMatrix> es_tm1(Tm.block(0, 0, (m-1), (m-1)));
 
-         Block<RealMatrix>(eigenVecs.derived(), 0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
+         eigenVecs.block(0, k, m-1, k) = es_tm1.eigenvectors().leftCols(k);
 
          eigenVecs.block(m-1, k, 1, k).setZero();
 
          MatrixXd Q2k(RealMatrix::Identity(m, 2*k));
 
-         HouseholderQR<RealMatrix> eigenVecs2k_qr( Map<RealMatrix, Unaligned >(eigenVecs.data(), m, 2*k) );
+         HouseholderQR<RealMatrix> eigenVecs2k_qr( eigenVecs.block(0, 0, m, 2*k) );
 
          Q2k.applyOnTheLeft( eigenVecs2k_qr.householderQ() );
 
@@ -298,7 +303,7 @@ namespace quda {
          Tmvals.segment(0,2*k) = es_h2k.eigenvalues();
 
          //4. Rescale eigenvectors since we did not rescale Vm
-         Block<RealMatrix>(eigenVecs.derived(), 0, 0, m, 2*k) = inv_normr_m * Qm2k;
+         eigenVecs.block(0, 0, m, 2*k) = inv_normr_m * Qm2k;
 
          //5. Synchronize an aux compute stream for the pipelined version:
          if(is_host_location) blas::synchronizeAuxBlasStream();
@@ -310,7 +315,7 @@ namespace quda {
          if(is_host_location) {
            ColorSpinorFieldSet &haz = *hAz;
 
-           RealMatrix Alpha(eigenVecs.block(0,0, m, 2*k));
+           RealMatrix Alpha(eigenVecs.block(0, 0, m, 2*k));
 
            if(vm.Precision()  == QUDA_DOUBLE_PRECISION) {
              Map<RealMatrix, Unaligned > eigenv2kmat( static_cast<double*>(v2k.V()), v2k[0].RealLength(), 2*k);
@@ -358,7 +363,8 @@ namespace quda {
            blas::reDotProduct(s.data(), Az_, v2k_);
          }
 
-         for(int j = 0; j < 2*k; j++)  blas::copy(vm[j], v2k[j]);
+         //for(int j = 0; j < 2*k; j++)  blas::copy(vm[j], v2k[j]);
+         vm.CopySubset(v2k, 2*k, 0);
 
          return;
        }
@@ -378,7 +384,16 @@ namespace quda {
             if(ref_pnt == 0) ref_pnt = 2*k;//redefine the reference point...
           }
 
-          if(!is_host_location) return;//nothing to prefetch
+          if(!is_host_location) {
+
+            if(id == (2*k + pipe_l) && restarts > 0) {
+               ColorSpinorFieldSet &vm  = *Vm;
+               warningQuda("Try to prefetch!\n\n");
+               for(int i = 0; i < pipe_l; i++) vm[2*k+i] = vm[m+i];
+            }
+
+            return;
+          }
 
           const int l = (id + shift) % Vm->CompositeDim();
 
@@ -510,7 +525,7 @@ namespace quda {
      EigCGArgs &args = *eigcg_args;
 
      ColorSpinorField &Ap = (*work_space)[0];
-					//whether we want preconditiond (id = 5) or unpreconditioned (id = 2) residual:
+     //whether we want preconditiond (id = 5) or unpreconditioned (id = 2) residual:
      const int r_idx = K ? 5 : 2;
      ColorSpinorField &z  = (*work_space)[r_idx];
 
@@ -528,7 +543,7 @@ namespace quda {
         args.RestartArgs();
      }
 
-     args.UpdateLanczosBasisAndSearchIdx(z, rnorm);
+     args.UpdateLanczosBasisAndSearchIdx(z);
 
      return;
   }
@@ -547,8 +562,8 @@ namespace quda {
 
     // launch RR block for args.id == param.m, otherwise is nop
     if(args.id == args.m) {
-      // launch async task
-      args.rr_task = std::async(std::launch::async, &IncEigCG::EigenSolve, this);
+      // launch async task (current hack for GPU based computing)
+      args.rr_task = std::async(args.is_host_location ? std::launch::async : std::launch::deferred, &IncEigCG::EigenSolve, this);
       printfQuda("Start RR task.\n");
 
       if (args.restarts == 0) args.UpdateShift();
@@ -765,6 +780,8 @@ namespace quda {
 
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
+    constexpr bool host_computing = true;	  
+
     if(param.pipeline < 4) warningQuda("Pipeline length is too short (%d).", param.pipeline);
 
     if( ((param.m - 2*param.nev) % param.pipeline != 0) || ((param.m - 2*param.nev) < param.pipeline) )  errorQuda("Pipeline length %d is not supported.", param.pipeline);
@@ -788,7 +805,7 @@ namespace quda {
 
     if (!init) {
 
-      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, x, param.precision_ritz, true);
+      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, x, param.precision_ritz, host_computing);
 
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       csParam.is_composite  = true;
@@ -952,8 +969,9 @@ namespace quda {
     cudaProfilerStop();
 
     //blas::zero(*args.V2k);
-
-    for(int i = 0; i < args.k; i++) blas::copy( (*args.Vm.get())[i], (*args.hVm.get())[i] );
+    if(args.is_host_location){
+      for(int i = 0; i < args.k; i++) blas::copy( (*args.Vm.get())[i], (*args.hVm.get())[i] );
+    }
 
     blas::destroyAuxBlasStream();
 

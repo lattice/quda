@@ -552,8 +552,12 @@ namespace quda {
        return CompositeColorSpinorField(components.begin()+first_element, components.begin()+last_element) ;
     };
 
+    /**
+       @brief Return (subset of) vector container based on provided agruments:
+    */
     CompositeColorSpinorField& operator()(void) {return components;}
     CompositeColorSpinorField operator()(const int first_idx, const int second_idx) {return Components(first_idx, second_idx);}
+    CompositeColorSpinorField operator()(const int idx) {return Components(idx, idx+1);}
 
     ColorSpinorField &CompositeSubsetBegin() const {return Component(composite_descr.subset_begin);}
     ColorSpinorField &CompositeSubsetBegin()       {return Component(composite_descr.subset_begin);}
@@ -608,7 +612,7 @@ namespace quda {
                                  QudaMemoryType mem_type=QUDA_MEMORY_INVALID);
 
     virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element) = 0;
-    virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) = 0;    
+    virtual void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src) = 0;
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
@@ -884,7 +888,7 @@ namespace quda {
     CompositeColorSpinorField Components(const int first_element, const int last_element) const;
 
     void CopySubset(ColorSpinorField& src, const int range, const int first_element);
-    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src);    
+    void CopySubset(ColorSpinorField& src, const int range, const int first_element_dst, const int first_element_src);
 
     void zero();
 
