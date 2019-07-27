@@ -2870,7 +2870,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
   bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
     (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool deflated_solve = param->deflation_op != nullptr && (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER) ? true : false;
+  bool deflated_solve = param->deflation_op != nullptr && (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER && param->inv_type != QUDA_GMRESDR_INVERTER) ? true : false;
 
   param->secs = 0;
   param->gflops = 0;

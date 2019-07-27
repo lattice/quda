@@ -266,7 +266,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type_precondition = precon_type;
   inv_param.gcrNkrylov = 6;
 
-  inv_param.pipeline = pipeline;  
+  inv_param.pipeline = pipeline;
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
@@ -467,7 +467,7 @@ int main(int argc, char **argv)
 
     invertQuda(spinorOut, spinorIn, &inv_param);
 
-    updateDeflationQuda(df_preconditioner, &df_param);
+    if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ) updateDeflationQuda(df_preconditioner, &df_param);
     //
     printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }

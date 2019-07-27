@@ -140,7 +140,7 @@ namespace quda {
 
      ComplexEigenSolver<DenseMatrix> es( Gk );
      harVecs = es.eigenvectors();
-     harVals = es.eigenvalues ();     
+     harVals = es.eigenvalues ();
 
      std::vector<SortedEvals> sorted_evals;
      sorted_evals.reserve(args.m);
@@ -159,7 +159,7 @@ namespace quda {
     template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args) {
 #ifdef MAGMA_LIB
        DenseMatrix Htemp(DenseMatrix::Zero(args.m+1,args.m));
-       Htemp = args.H; 
+       Htemp = args.H;
 
        Complex *ctemp = static_cast<Complex*> (args.ritzVecs.col(0).data());
        memcpy(ctemp, args.c, (args.m+1)*sizeof(Complex));
@@ -187,10 +187,10 @@ namespace quda {
     void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
       inner.tol = outer.tol_precondition;
       inner.maxiter = outer.maxiter_precondition;
-      inner.delta = 1e-20; 
+      inner.delta = 1e-20;
       inner.inv_type = outer.inv_type_precondition;
 
-      inner.precision = outer.precision_precondition; 
+      inner.precision = outer.precision_precondition;
       inner.precision_sloppy = outer.precision_precondition;
 
       inner.iter = 0;
@@ -198,7 +198,7 @@ namespace quda {
       inner.secs = 0;
 
       inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-      inner.is_preconditioner = true; 
+      inner.is_preconditioner = true;
       inner.global_reduction  = false;
       if(inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
 
@@ -214,15 +214,15 @@ namespace quda {
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
-     if (param.inv_type_precondition == QUDA_CG_INVERTER) 
+     if (param.inv_type_precondition == QUDA_CG_INVERTER)
        K = new CG(matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) 
+     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER)
        K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_MR_INVERTER) 
+     else if (param.inv_type_precondition == QUDA_MR_INVERTER)
        K = new MR(matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_SD_INVERTER) 
+     else if (param.inv_type_precondition == QUDA_SD_INVERTER)
        K = new SD(matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) 
+     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER)
        K = nullptr;
      else
        errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
@@ -273,7 +273,7 @@ namespace quda {
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) {
-     if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+     if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) {
        ComputeEta<libtype::magma_lib>(args);
      } else if (  param.extlib_type == QUDA_EIGEN_EXTLIB ) {
        ComputeEta<libtype::eigen_lib>(args);
@@ -303,7 +303,7 @@ namespace quda {
  {
    GMResDRArgs &args = *gmresdr_args;
 
-   if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) { 
+   if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
      ComputeHarmonicRitz<libtype::magma_lib>(args);
    } else if(param.extlib_type == QUDA_EIGEN_EXTLIB) {
      ComputeHarmonicRitz<libtype::eigen_lib>(args);
@@ -325,8 +325,8 @@ namespace quda {
    std::vector<ColorSpinorField*> vkp1(args.Vkp1->Components());
    std::vector<ColorSpinorField*> vm  (Vm->Components());
 
-   RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first  
-   blas::caxpy(static_cast<Complex*>(Alpha.data()), vm , vkp1); 
+   RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first
+   blas::caxpy(static_cast<Complex*>(Alpha.data()), vm , vkp1);
 
    for(int i = 0; i < (args.m+1); i++)
    {
@@ -380,7 +380,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    Complex c0 = args.c[0];
 
-   while( j < args.m ) 
+   while( j < args.m )
    {
      if(K) {
        ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : Vm->Component(j);
@@ -466,8 +466,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam); 
-      ep = ColorSpinorField::Create(csParam); 
+      yp = ColorSpinorField::Create(csParam);
+      ep = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
 
@@ -486,7 +486,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.is_composite  = true;
       csParam.composite_dim = param.m+1;
 
-      Vm   = ColorSpinorFieldSet::Create(csParam); 
+      Vm   = ColorSpinorFieldSet::Create(csParam);
 
       csParam.composite_dim = param.m;
 
@@ -515,10 +515,10 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     int tot_iters = 0;
 
     double normb = norm2( b );
-    double stop  = param.tol*param.tol* normb;  
+    double stop  = param.tol*param.tol* normb;
 
     mat(r, x);
-    
+
     double r2 = xmyNorm(b, r);
     double b2 = r2;
     args.c[0] = Complex(sqrt(r2), 0.0);
@@ -532,7 +532,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       Vm->Component(0) = y;
       blas::zero(y);
     } else {
-      blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));   
+      blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));
     }
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
@@ -541,7 +541,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
-    double heavy_quark_res = 0.0;  
+    double heavy_quark_res = 0.0;
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
 
