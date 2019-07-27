@@ -3,6 +3,7 @@
 
 #include <quda_internal.h>
 #include <comm_quda.h>
+#include <csignal>
 
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"

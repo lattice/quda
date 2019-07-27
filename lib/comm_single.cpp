@@ -4,7 +4,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <csignal>
 #include <comm_quda.h>
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
