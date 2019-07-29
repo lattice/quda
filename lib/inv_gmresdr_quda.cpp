@@ -11,10 +11,6 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 
-#ifdef MAGMA_LIB
-#include <blas_magma.h>
-#endif
-
 #include <algorithm>
 #include <memory>
 
@@ -54,8 +50,6 @@ namespace quda {
     };
 
 
-    enum class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
-
     class GMResDRArgs{
 
       public:
@@ -85,46 +79,7 @@ namespace quda {
        }
    };
 
-   template<libtype which_lib> void ComputeHarmonicRitz(GMResDRArgs &args) {errorQuda("\nUnknown library type.\n");}
-
-   template <> void ComputeHarmonicRitz<libtype::magma_lib>(GMResDRArgs &args)
-   {
-#ifdef MAGMA_LIB
-     DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
-     DenseMatrix Gk = args.H.block(0, 0, args.m, args.m);
-
-     VectorSet  harVecs = MatrixXcd::Zero(args.m, args.m);
-     Vector     harVals = VectorXcd::Zero(args.m);
-
-     Vector em = VectorXcd::Zero(args.m);
-
-     em(args.m-1) = norm( args.H(args.m, args.m-1) );
-
-     cudaHostRegister(static_cast<void *>(cH.data()), args.m*args.m*sizeof(Complex), cudaHostRegisterDefault);
-     magma_Xgesv(static_cast<void*>(em.data()), args.m, args.m, static_cast<void*>(cH.data()), args.m, sizeof(Complex));
-     cudaHostUnregister(cH.data());
-
-     Gk.col(args.m-1) += em;
-
-     cudaHostRegister(static_cast<void *>(Gk.data()), args.m*args.m*sizeof(Complex), cudaHostRegisterDefault);
-     magma_Xgeev(static_cast<void*>(Gk.data()), args.m, args.m, static_cast<void*>(harVecs.data()), static_cast<void*>(harVals.data()), args.m, sizeof(Complex));
-     cudaHostUnregister(Gk.data());
-
-     std::vector<SortedEvals> sorted_evals;
-     sorted_evals.reserve(args.m);
-
-     for(int e = 0; e < args.m; e++) sorted_evals.push_back( SortedEvals( abs(harVals.data()[e]), e ));
-     std::stable_sort(sorted_evals.begin(), sorted_evals.end(), SortedEvals::SelectSmall);
-
-     for(int e = 0; e < args.k; e++) memcpy(args.ritzVecs.col(e).data(), harVecs.col(sorted_evals[e]._idx).data(), (args.m)*sizeof(Complex));
-#else
-    errorQuda("Magma library was not built.\n");
-#endif
-     return;
-   }
-
-
-   template <> void ComputeHarmonicRitz<libtype::eigen_lib>(GMResDRArgs &args)
+   void ComputeHarmonicRitz(GMResDRArgs &args)
    {
 
      DenseMatrix cH = args.H.block(0, 0, args.m, args.m).adjoint();
@@ -154,29 +109,7 @@ namespace quda {
    }
 
 
-    template<libtype which_lib> void ComputeEta(GMResDRArgs &args) {errorQuda("\nUnknown library type.\n");}
-
-    template <> void ComputeEta<libtype::magma_lib>(GMResDRArgs &args) {
-#ifdef MAGMA_LIB
-       DenseMatrix Htemp(DenseMatrix::Zero(args.m+1,args.m));
-       Htemp = args.H;
-
-       Complex *ctemp = static_cast<Complex*> (args.ritzVecs.col(0).data());
-       memcpy(ctemp, args.c, (args.m+1)*sizeof(Complex));
-
-       cudaHostRegister(static_cast<void*>(Htemp.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault);
-       magma_Xgels(static_cast<void*>(Htemp.data()), ctemp, args.m+1, args.m, args.m+1, sizeof(Complex));
-       cudaHostUnregister(Htemp.data());
-
-       memcpy(args.eta.data(), ctemp, args.m*sizeof(Complex));
-       memset(ctemp, 0, (args.m+1)*sizeof(Complex));
-#else
-       errorQuda("MAGMA library was not built.\n");
-#endif
-       return;
-    }
-
-    template <> void ComputeEta<libtype::eigen_lib>(GMResDRArgs &args) {
+    void ComputeEta(GMResDRArgs &args) {
 
         Map<VectorXcd, Unaligned> c_(args.c, args.m+1);
         args.eta = args.H.jacobiSvd(ComputeThinU | ComputeThinV).solve(c_);
@@ -269,32 +202,25 @@ namespace quda {
 
 
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
- {
+ {	 
    GMResDRArgs &args = *gmresdr_args;
 
-   if(do_gels) {
-     if (  param.extlib_type == QUDA_MAGMA_EXTLIB ) {
-       ComputeEta<libtype::magma_lib>(args);
-     } else if (  param.extlib_type == QUDA_EIGEN_EXTLIB ) {
-       ComputeEta<libtype::eigen_lib>(args);
-     } else {
-       errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
-     }
-   }
+   if(do_gels) ComputeEta(args);
 
-   std::vector<ColorSpinorField*> Z_(Zm->Components().begin(),Zm->Components().begin()+args.m);
-   std::vector<ColorSpinorField*> V_(Vm->Components());
+   std::vector<ColorSpinorField*> zm((*Zm)(0,args.m));
+   std::vector<ColorSpinorField*> vm((*Vm)());   
 
    std::vector<ColorSpinorField*> x_, r_;
    x_.push_back(x), r_.push_back(r);
 
-   blas::caxpy( static_cast<Complex*> ( args.eta.data()), Z_, x_);
+   blas::caxpy( static_cast<Complex*> ( args.eta.data()), zm, x_);
 
    VectorXcd minusHeta = - (args.H * args.eta);
    Map<VectorXcd, Unaligned> c_(args.c, args.m+1);
    c_ += minusHeta;
 
-   blas::caxpy(static_cast<Complex*>(minusHeta.data()), V_, r_);
+   blas::caxpy(static_cast<Complex*>(minusHeta.data()), vm, r_);
+   
    return;
  }
 
@@ -303,13 +229,7 @@ namespace quda {
  {
    GMResDRArgs &args = *gmresdr_args;
 
-   if ( param.extlib_type == QUDA_MAGMA_EXTLIB ) {
-     ComputeHarmonicRitz<libtype::magma_lib>(args);
-   } else if(param.extlib_type == QUDA_EIGEN_EXTLIB) {
-     ComputeHarmonicRitz<libtype::eigen_lib>(args);
-   } else {
-     errorQuda("Library type %d is currently not supported.\n", param.extlib_type);
-   }
+   ComputeHarmonicRitz(args);
 
    DenseMatrix Qkp1(MatrixXcd::Identity((args.m+1), (args.k+1)));
 
@@ -322,8 +242,8 @@ namespace quda {
 
    blas::zero( *args.Vkp1 );
 
-   std::vector<ColorSpinorField*> vkp1(args.Vkp1->Components());
-   std::vector<ColorSpinorField*> vm  (Vm->Components());
+   std::vector<ColorSpinorField*> vkp1((*args.Vkp1)());
+   std::vector<ColorSpinorField*> vm  ((*Vm)());
 
    RowMajorDenseMatrix Alpha(Qkp1);//convert Qkp1 to Row-major format first
    blas::caxpy(static_cast<Complex*>(Alpha.data()), vm , vkp1);
@@ -332,24 +252,24 @@ namespace quda {
    {
      if(i < (args.k+1) )
      {
-       blas::copy(Vm->Component(i), args.Vkp1->Component(i));
-       blas::zero(args.Vkp1->Component(i));
+       blas::copy((*Vm)[i], (*args.Vkp1)[i]);
+       blas::zero((*args.Vkp1)[i]);
      }
-     else blas::zero(Vm->Component(i));
+     else blas::zero((*Vm)[i]);
    }
 
    if( Zm->V() != Vm->V() )
    {
-     std::vector<ColorSpinorField*> z (Zm->Components());
-     std::vector<ColorSpinorField*> vk(args.Vkp1->Components().begin(),args.Vkp1->Components().begin()+args.k);
+     std::vector<ColorSpinorField*> zm((*Zm)());
+     std::vector<ColorSpinorField*> vk((*args.Vkp1)(0,args.k));
 
      RowMajorDenseMatrix Beta(Qkp1.topLeftCorner(args.m,args.k));
-     blas::caxpy(static_cast<Complex*>(Beta.data()), z , vk);
+     blas::caxpy(static_cast<Complex*>(Beta.data()), zm , vk);
 
      for(int i = 0; i < (args.m); i++)
      {
-       if( i < (args.k) ) blas::copy(Zm->Component(i), args.Vkp1->Component(i));
-       else               blas::zero(Zm->Component(i));
+       if( i < (args.k) ) blas::copy((*Zm)[i], (*args.Vkp1)[i]);
+       else               blas::zero((*Zm)[i]);
      }
    }
 
@@ -357,11 +277,11 @@ namespace quda {
 
    for(int j = 0; j < args.k; j++)
    {
-     Complex alpha = cDotProduct(Vm->Component(j), Vm->Component(args.k));
-     caxpy(-alpha, Vm->Component(j), Vm->Component(args.k));
+     Complex alpha = cDotProduct((*Vm)[j], (*Vm)[args.k]);
+     caxpy(-alpha, (*Vm)[j], (*Vm)[args.k]);
    }
 
-   blas::ax(1.0/ sqrt(blas::norm2(Vm->Component(args.k))), Vm->Component(args.k));
+   blas::ax(1.0/ sqrt(blas::norm2((*Vm)[args.k])), (*Vm)[args.k]);
 
    args.ritzVecs.setZero();
    return;
