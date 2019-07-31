@@ -173,29 +173,13 @@ namespace quda {
 
         tp.block.x *= tp.aux.x; // include warp-split factor
 
-#ifdef CONSTANT_ARG
-        cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice,
-                                stream);
-        switch (tp.aux.x) {
-        case 1:
-          multiBlasKernel<FloatN, M, NXZ, 1, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-          break;
-        case 2:
-          multiBlasKernel<FloatN, M, NXZ, 2, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-          break;
-        case 4:
-          multiBlasKernel<FloatN, M, NXZ, 4, decltype(arg)><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-          break;
-        default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
-        }
-#else
         switch (tp.aux.x) {
         case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
-#endif
+
         tp.block.x /= tp.aux.x; // restore block size
 #endif
       }

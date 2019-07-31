@@ -10,10 +10,6 @@ namespace quda
 #define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
 #include <texture.h>
 
-#if __CUDACC_VER_MAJOR__ < 9
-#define CONSTANT_ARG
-#endif
-
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192
 #define MAX_ARG_SIZE 4096
@@ -24,13 +20,6 @@ namespace quda
     static signed char *Amatrix_h;
     static signed char *Bmatrix_h;
     static signed char *Cmatrix_h;
-
-#ifdef CONSTANT_ARG
-    // as a performance work around we put the argument struct into
-    // __constant__ memory to prevent the compiler from spilling
-    // registers on older CUDA
-    static __constant__ signed char arg_buffer[MAX_ARG_SIZE];
-#endif
 
     /**
        @param[in] x Value we are testing

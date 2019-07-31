@@ -51,12 +51,7 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-#ifdef CONSTANT_ARG
-      cudaMemcpyToSymbolAsync(arg_buffer, reinterpret_cast<char *>(&arg), sizeof(arg), 0, cudaMemcpyHostToDevice, stream);
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tp, stream, , ReduceType, FloatN, M, NXZ, Arg);
-#else
       LAUNCH_KERNEL_REDUCE(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
-#endif
 #endif
 #endif
 

@@ -62,14 +62,8 @@ namespace quda
     template <int block_size, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
 #endif
 
-#ifndef CONSTANT_ARG
     __global__ void multiReduceKernel(Arg arg)
     {
-#else
-    __global__ void multiReduceKernel()
-    {
-      Arg &arg = *((Arg *)arg_buffer);
-#endif
       unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
       unsigned int parity = blockIdx.z;
