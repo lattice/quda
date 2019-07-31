@@ -65,12 +65,8 @@ namespace quda
           // reduce down to the first group of column-split threads
 #pragma unroll
           for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
-#if (__CUDACC_VER_MAJOR__ >= 9)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
             x[j] += __shfl_down_sync(WARP_CONVERGED, x[j], offset);
-#else
-            x[j] += __shfl_down(x[j], offset);
-#endif
           }
         }
       }

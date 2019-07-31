@@ -328,12 +328,8 @@ namespace quda {
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
-#if (__CUDACC_VER_MAJOR__ >= 9)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
 	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
-#else
-	  out[color_local] += __shfl_down(out[color_local], offset);
-#endif
       }
 
 #endif // __CUDA_ARCH__ >= 300
