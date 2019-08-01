@@ -1,4 +1,6 @@
+
 #include <transfer.h>
+
 #include <blas_quda.h>
 
 #include <transfer.h>
@@ -282,7 +284,7 @@ namespace quda {
     ColorSpinorField &coarse(*coarse_tmp_h);
 
     // compute the coarse grid point for every site (assuming parity ordering currently)
-    for (int i=0; i<fine.Volume(); i++) {
+    for (size_t i = 0; i < fine.Volume(); i++) {
       // compute the lattice-site index for this offset index
       fine.LatticeIndex(x, i);
       

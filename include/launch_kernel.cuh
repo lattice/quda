@@ -233,3 +233,12 @@
   case 512: kernel<512, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }
+
+#define LAUNCH_KERNEL_REDUCE(kernel, tp, stream, arg, ...)                                                             \
+  switch (tp.block.x) {                                                                                                \
+  case 32: kernel<32, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 64: kernel<64, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 96: kernel<96, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 128: kernel<128, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
+  default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
+  }

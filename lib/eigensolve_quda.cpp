@@ -243,15 +243,15 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, eig_vecs_ptr, vec);
+    double *s = (double *)safe_malloc(n_defl * sizeof(double));
+    blas::reDotProduct(s, eig_vecs_ptr, vec);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
-    blas::caxpy(s, eig_vecs_ptr, vec_defl);
+    blas::axpy(s, eig_vecs_ptr, vec_defl);
     // FIXME - we can optimize the zeroing out with a "multi-caxy"
     // function that just writes over vec_defl and doesn't sum.  When
     // we exceed the multi-blas limit this would deompose into caxy
@@ -269,7 +269,7 @@ namespace quda
     if (evecs.size() != (unsigned int)(2 * nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
 
-    Complex sigma_tmp[nConv];
+    double sigma_tmp[nConv];
 
     for (int i = 0; i < nConv; i++) {
 
@@ -290,16 +290,16 @@ namespace quda
       mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      Complex sigma_sq = blas::cDotProduct(*evecs[nConv + i], *evecs[nConv + i]);
-      sigma_tmp[i] = Complex(sqrt(sigma_sq.real()), sqrt(abs(sigma_sq.imag())));
+      sigma_tmp[i] = sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
       double norm = sqrt(blas::norm2(*evecs[nConv + i]));
       blas::ax(1.0 / norm, *evecs[nConv + i]);
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Sval[%04d] = %+.16e  %+.16e   sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i].real(),
-                   sigma_tmp[i].imag(), sigma_tmp[i].real() - sqrt(abs(lambda.real())));
+        printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
+                   sigma_tmp[i] - sqrt(abs(lambda.real())));
+
       evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
     }
@@ -320,8 +320,8 @@ namespace quda
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs_ptr;
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, left_vecs_ptr, vec);
+    double *s = (double *)safe_malloc(n_defl * sizeof(double));
+    blas::reDotProduct(s, left_vecs_ptr, vec);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
@@ -332,7 +332,7 @@ namespace quda
       right_vecs_ptr.push_back(eig_vecs[i]);
       s[i] /= evals[i].real();
     }
-    blas::caxpy(s, right_vecs_ptr, vec_defl);
+    blas::axpy(s, right_vecs_ptr, vec_defl);
 
     // FIXME - we can optimize the zeroing out with a "multi-caxy"
     // function that just writes over vec_defl and doesn't sum.  When
@@ -361,8 +361,6 @@ namespace quda
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
-    // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    // profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
@@ -409,14 +407,10 @@ namespace quda
 #else
     errorQuda("\nQIO library was not built.\n");
 #endif
-    // profile.TPSTOP(QUDA_PROFILE_IO);
-    // profile.TPSTART(QUDA_PROFILE_COMPUTE);
   }
 
   void EigenSolver::saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string vec_outfile)
   {
-    // profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    // profile.TPSTART(QUDA_PROFILE_IO);
 
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
@@ -458,8 +452,6 @@ namespace quda
 #else
     errorQuda("\nQIO library was not built.\n");
 #endif
-    // profile.TPSTOP(QUDA_PROFILE_IO);
-    // profile.TPSTART(QUDA_PROFILE_COMPUTE);
   }
 
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
@@ -882,8 +874,8 @@ namespace quda
       }
     }
 
-    // Array for multi-BLAS caxpy
-    Complex *ritz_mat_col = (Complex *)safe_malloc((dim - 1) * sizeof(Complex));
+    // Array for multi-BLAS axpy
+    double *ritz_mat_col = (double *)safe_malloc((dim - 1) * sizeof(double));
 
     for (int i = 0; i < iter_keep; i++) {
       int k = offset + i;
@@ -897,12 +889,11 @@ namespace quda
       kSpace_ptr.push_back(kSpace[k]);
       for (int j = 1; j < dim; j++) {
         vecs_ptr.push_back(kSpace[num_locked + j]);
-        ritz_mat_col[j - 1].real(ritz_mat[i * dim + j]);
-        ritz_mat_col[j - 1].imag(0.0);
+        ritz_mat_col[j - 1] = ritz_mat[i * dim + j];
       }
 
       // Multi-BLAS axpy
-      blas::caxpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
+      blas::axpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
     }
 
     host_free(ritz_mat_col);
