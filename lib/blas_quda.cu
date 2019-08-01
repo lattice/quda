@@ -43,18 +43,12 @@ namespace quda {
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-      virtual bool advanceSharedBytes(TuneParam &param) const
-      {
-        TuneParam next(param);
-        advanceBlockDim(next); // to get next blockDim
-        int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
-            sharedBytesPerThread() * nthreads :
-            sharedBytesPerBlock(param);
-        return false;
-      }
+      bool tuneSharedBytes() const { return false; }
 
-  public:
+      // for these streaming kernels, there is no need to tune the grid size, just use max
+      unsigned int minGridSize() const { return maxGridSize(); }
+
+    public:
       BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f, ColorSpinorField &x,
           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length) :
           nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()), // must be first

@@ -33,7 +33,7 @@ extern QudaVerbosity verbosity;
 
 extern void usage(char** );
 
-const int Nkernels = 40;
+const int Nkernels = 43;
 
 using namespace quda;
 
@@ -147,8 +147,6 @@ void initFields(int prec)
   // xmH = new cpuColorSpinorField(param);
   // ymH = new cpuColorSpinorField(param);
 
-
-
   xmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
   ymH.reserve(Msrc);
@@ -217,7 +215,7 @@ void initFields(int prec)
   param.is_composite = true;
   param.is_component = false;
 
-// create composite fields
+  // create composite fields
   param.composite_dim = Nsrc;
   xmD = new cudaColorSpinorField(param);
 
@@ -249,6 +247,7 @@ void initFields(int prec)
                                 low_aux_prec == QUDA_QUARTER_PRECISION || mid_aux_prec == QUDA_QUARTER_PRECISION) );
 
   if ( flag ) {
+
     *vD = *vH;
     *wD = *wH;
     *xD = *xH;
@@ -257,6 +256,7 @@ void initFields(int prec)
     *hD = *hH;
     *mD = *mH;
     *lD = *lH;
+
     // for (int i=0; i < Nsrc; i++){
     //   xmD->Component(i) = *(xmH[i]);
     //   ymD->Component(i) = *(ymH[i]);
@@ -308,6 +308,7 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+  double *Ar = new double[Nsrc * Msrc];
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -487,11 +488,10 @@ double benchmark(int kernel, const int niter) {
     case 41:
       for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
       break;
-      
-    case 42:
-      for (int i=0; i < niter; ++i) blas::axpy((double*)A, xmD->Components(), zmD->Components());
-      break;
 
+    case 42:
+      for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
+      break;
 
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
@@ -508,6 +508,7 @@ double benchmark(int kernel, const int niter) {
   delete[] B;
   delete[] C;
   delete[] A2;
+  delete[] Ar;
   double secs = runTime / 1000;
   return secs;
 }
@@ -524,15 +525,17 @@ double test(int kernel) {
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   quda::Complex * B2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+  double *Ar = new double[Nsrc * Msrc];
 
-  for(int i=0; i < Nsrc*Msrc; i++){
-    A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
-    B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
-    C[i] = a2*  (1.0*((M_PI/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+  for (int i = 0; i < Nsrc * Msrc; i++) {
+    A[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    B[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    C[i] = a2 * (1.0 * ((M_PI / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    Ar[i] = A[i].real();
   }
-  for(int i=0; i < Nsrc*Nsrc; i++){
-    A2[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
-    B2[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+  for (int i = 0; i < Nsrc * Nsrc; i++) {
+    A2[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Nsrc - i));
+    B2[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Nsrc - i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -913,7 +916,7 @@ double test(int kernel) {
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
     error = 0.0;
-    for (int i = 0; i < Nsrc; i++) { 
+    for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Nsrc; j++) {
         ((double*)B2)[i*Nsrc+j] = blas::reDotProduct(xmD->Component(i), xmD->Component(j));
         error += std::abs(((double*)A2)[i*Nsrc+j] - ((double*)B2)[i*Nsrc+j])/std::abs(((double*)B2)[i*Nsrc+j]);
@@ -927,7 +930,7 @@ double test(int kernel) {
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
     blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
     error = 0.0;
-    for (int i = 0; i < Nsrc; i++) { 
+    for (int i = 0; i < Nsrc; i++) {
       for (int j = 0; j < Msrc; j++) {
         ((double*)B)[i*Msrc+j] = blas::reDotProduct(xmD->Component(i), ymD->Component(j));
         error += std::abs(((double*)A)[i*Msrc+j] - ((double*)B)[i*Msrc+j])/std::abs(((double*)B)[i*Msrc+j]);
@@ -937,24 +940,20 @@ double test(int kernel) {
     break;
 
   case 42:
-    for (int i=0; i < Nsrc; i++) {
-      xmD->Component(i) = *(xmH[i]);
-      zmD->Component(i) = *(zmH[i]);
-    }
+    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
-    blas::axpy((double*)A, xmD->Components(), zmD->Components());
-
-    for (int i=0; i<Nsrc; i++) {
-      blas::axpy(((double*)A)[i], *xmH[i], *zmH[i]);
+    blas::axpy(Ar, *xmD, *ymD);
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
     }
 
     error = 0;
-    for (int i=0; i < Nsrc; i++){
-      error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
+    for (int i = 0; i < Msrc; i++) {
+      error += fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
-    error/= Nsrc;
+    error /= Msrc;
     break;
-
 
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
@@ -964,6 +963,7 @@ double test(int kernel) {
   delete[] C;
   delete[] A2;
   delete[] B2;
+  delete[] Ar;
   return error;
 }
 
@@ -972,50 +972,49 @@ const char *prec_str[] = {"quarter", "half", "single", "double"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
-const char *names[] = {
-  "copyHS",
-  "copyMS",
-  "copyLS",
-  "axpby",
-  "xpy",
-  "axpy",
-  "xpay",
-  "mxpy",
-  "ax",
-  "caxpy",
-  "caxpby",
-  "cxpaypbz",
-  "axpyBzpcx",
-  "axpyZpbx",
-  "caxpbypzYmbw",
-  "cabxpyAx",
-  "caxpyXmaz",
-  "norm",
-  "reDotProduct",
-  "axpyNorm",
-  "xmyNorm",
-  "caxpyNorm",
-  "caxpyXmazNormX",
-  "cabxpyzAxNorm",
-  "cDotProduct",
-  "caxpyDotzy",
-  "cDotProductNormA",
-  "cDotProductNormB",
-  "caxpbypzYmbwcDotProductUYNormY",
-  "HeavyQuarkResidualNorm",
-  "xpyHeavyQuarkResidualNorm",
-  "tripleCGReduction",
-  "tripleCGUpdate",
-  "axpyReDot",
-  "caxpy_block",
-  "axpyBzpcx_block",
-  "caxpyBxpz",
-  "caxpyBzpx",
-  "cDotProductNorm_block",
-  "cDotProduct_block",
-  "reDotProduct_block",
-  "axpy_block",  
-};
+const char *names[] = {"copyHS",
+                       "copyMS",
+                       "copyLS",
+                       "axpby",
+                       "xpy",
+                       "axpy",
+                       "xpay",
+                       "mxpy",
+                       "ax",
+                       "caxpy",
+                       "caxpby",
+                       "cxpaypbz",
+                       "axpyBzpcx",
+                       "axpyZpbx",
+                       "caxpbypzYmbw",
+                       "cabxpyAx",
+                       "caxpyXmaz",
+                       "norm",
+                       "reDotProduct",
+                       "axpyNorm",
+                       "xmyNorm",
+                       "caxpyNorm",
+                       "caxpyXmazNormX",
+                       "cabxpyzAxNorm",
+                       "cDotProduct",
+                       "caxpyDotzy",
+                       "cDotProductNormA",
+                       "cDotProductNormB",
+                       "caxpbypzYmbwcDotProductUYNormY",
+                       "HeavyQuarkResidualNorm",
+                       "xpyHeavyQuarkResidualNorm",
+                       "tripleCGReduction",
+                       "tripleCGUpdate",
+                       "axpyReDot",
+                       "caxpy_block",
+                       "axpyBzpcx_block",
+                       "caxpyBxpz",
+                       "caxpyBzpx",
+                       "cDotProductNorm_block",
+                       "cDotProduct_block",
+                       "reDotProductNorm_block",
+                       "reDotProduct_block",
+                       "axpy_block"};
 
 int main(int argc, char** argv)
 {
@@ -1078,15 +1077,19 @@ using ::testing::Combine;
 class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
 protected:
   ::testing::tuple<int, int> param;
+  const int &prec;
+  const int &kernel;
 
 public:
+  BlasTest() : param(GetParam()), prec(::testing::get<0>(param)), kernel(::testing::get<1>(param)) {}
   virtual ~BlasTest() { }
   virtual void SetUp() {
-    param = GetParam();
-    initFields(::testing::get<0>(GetParam()));
+    if (!skip_kernel(prec, kernel)) initFields(prec);
   }
-  virtual void TearDown() { freeFields(); }
-
+  virtual void TearDown()
+  {
+    if (!skip_kernel(prec, kernel)) freeFields();
+  }
 };
 
 
