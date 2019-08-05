@@ -173,7 +173,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.laplace3D = laplace3D;              // for Laplace operator
 
   // outer solver parameters
-  inv_param.inv_type = QUDA_BICGSTAB_INVERTER; // Dummy setting
+  inv_param.inv_type = inv_type;
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
