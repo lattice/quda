@@ -202,13 +202,13 @@ namespace quda {
 
 
  void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
- {	 
+ {
    GMResDRArgs &args = *gmresdr_args;
 
    if(do_gels) ComputeEta(args);
 
    std::vector<ColorSpinorField*> zm((*Zm)(0,args.m));
-   std::vector<ColorSpinorField*> vm((*Vm)());   
+   std::vector<ColorSpinorField*> vm((*Vm)());
 
    std::vector<ColorSpinorField*> x_, r_;
    x_.push_back(x), r_.push_back(r);
@@ -220,7 +220,7 @@ namespace quda {
    c_ += minusHeta;
 
    blas::caxpy(static_cast<Complex*>(minusHeta.data()), vm, r_);
-   
+
    return;
  }
 
@@ -291,58 +291,110 @@ namespace quda {
 int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = false)
  {
    int j = start_idx;
+
    GMResDRArgs &args = *gmresdr_args;
+
+   ColorSpinorFieldSet &vm = *Vm;
+   ColorSpinorFieldSet &zm = *Zm;
    ColorSpinorField &tmp = *tmpp;
 
-   std::unique_ptr<Complex[] > givensH((do_givens) ? new Complex[(args.m+1)*args.m] : nullptr);
-   std::unique_ptr<Complex[] > cn((do_givens) ? new Complex[args.m] : nullptr);
-   std::unique_ptr<double[]  > sn((do_givens) ? new double[args.m] : nullptr);
+   MatrixXcd givensH( do_givens ? MatrixXcd::Zero( args.m+1, args.m ) : MatrixXcd::Zero( 0, 0 ) );
+   VectorXcd cn( VectorXcd::Zero( do_givens ? args.m : 0 ) );
+   VectorXd  sn( VectorXd::Zero( do_givens ? args.m : 0 ) );
+
+   //Advanced Ortho objects:
+   MatrixXcd R (MatrixXcd::Identity(args.m, args.m) );
+   MatrixXcd T (MatrixXcd::Identity(args.m, args.m) );
+   RowMajorDenseMatrix L (args.m-1, 2);
 
    Complex c0 = args.c[0];
 
    while( j < args.m )
    {
      if(K) {
-       ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : Vm->Component(j);
-       ColorSpinorField &outPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : Zm->Component(j);
+       ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : vm[j];
+       ColorSpinorField &outPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : zm[j];
 
-       if(param.precision_precondition != param.precision_sloppy) inPre = Vm->Component(j);
+       if(param.precision_precondition != param.precision_sloppy) inPre = vm[j];
        zero(outPre);
        pushVerbosity(param.verbosity_precondition);
        (*K)( outPre ,inPre );
        popVerbosity();
 
-       if(param.precision_precondition != param.precision_sloppy) Zm->Component(j) = outPre;
+       if(param.precision_precondition != param.precision_sloppy) zm[j] = outPre;
      }
-     matSloppy(Vm->Component(j+1), Zm->Component(j), tmp);
-
-     args.H(0, j) = cDotProduct(Vm->Component(0), Vm->Component(j+1));
-     caxpy(-args.H(0, j), Vm->Component(0), Vm->Component(j+1));
+     matSloppy(vm[j+1], zm[j], tmp);
+#if 0
+     args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
+     caxpy(-args.H(0, j), vm[0], vm[j+1]);
 
      Complex h0 = do_givens ? args.H(0, j) : 0.0;
 
      for(int i = 1; i <= j; i++)
      {
-        args.H(i, j) = cDotProduct(Vm->Component(i), Vm->Component(j+1));
-        caxpy(-args.H(i, j), Vm->Component(i), Vm->Component(j+1));
+        args.H(i, j) = cDotProduct(vm[i], vm[j+1]);
+        caxpy(-args.H(i, j), vm[i], vm[j+1]);
 
         if(do_givens) {
-           givensH[(args.m+1)*j+(i-1)] = conj(cn[i-1])*h0 + sn[i-1]*args.H(i,j);
-           h0 = -sn[i-1]*h0 + cn[i-1]*args.H(i,j);
+           givensH(i-1,j) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j);
+           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
         }
      }
 
-     args.H(j+1, j) = Complex(sqrt(norm2(Vm->Component(j+1))), 0.0);
-     blas::ax( 1.0 / args.H(j+1, j).real(), Vm->Component(j+1));
+     args.H(j+1, j) = Complex(sqrt(norm2(vm[j+1])), 0.0);
+     blas::ax( 1.0 / args.H(j+1, j).real(), vm[j+1]);
+#else
+     printfQuda("Working with vector %d \n", j+1);
+
+     std::vector<ColorSpinorField*> vmjp1(vm(0, j+1));
+     std::vector<ColorSpinorField*> vm2  (vm(j, j+2));
+     blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);
+
+     R(j,j  ) = sqrt( L(j, 0).real() );
+     printfQuda("Rjj %le", L(j, 0).real());
+     R(j,j+1) = L(j, 1) / R(j, j);
+
+     if(j > 1) {
+       T.col(j).head(j) = L.col(0).head(j) / R(j, j);
+       R.col(j+1).head(j) = L.col(1).head(j);
+       T.col(j).head(j) = (-1.0)*T.block(0,0,j,j)*T.col(j).head(j);
+     }
+
+     R.col(j+1).head(j+1) = T.block(0,0,j+1,j+1).adjoint() * R.col(j+1).head(j+1);
+
+     //Normalization of the previous vectors:
+     blas::ax(1.0 / R(j, j).real(), vm[j]);
+     VectorXcd Rjp1( R.col(j+1).head(j+1) );
+
+     std::vector<ColorSpinorField*> vjp1;
+     vjp1.push_back(&vm[j+1]);
+     blas::caxpy( Rjp1.data(), vmjp1, vjp1);
+
+     R(j+1, j+1)  = blas::norm2(vm[j+1]);
+     blas::ax(1.0 / R(j+1, j+1).real(), vm[j+1]);
+
+     args.H.col(j).head(j+1) = R.col(j+1).head(j+1);
+
+     Complex h0 = do_givens ? args.H(0, j) : 0.0;
+
+     if(do_givens) {
+        for(int i = 1; i <= j; i++){
+           givensH(i-1,j) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j);
+           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
+        }
+     }
+#endif
      if(do_givens)
      {
        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
-       cn[j] = h0 * inv_denom;
-       sn[j] = args.H(j+1,j).real() * inv_denom;
-       givensH[j*(args.m+1)+j] = conj(cn[j])*h0 + sn[j]*args.H(j+1,j);
+       cn(j) = h0 * inv_denom;
+       sn(j) = args.H(j+1,j).real() * inv_denom;
+       givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
 
-       args.c[j+1] = -sn[j]*args.c[j];
-       args.c[j]  *= conj(cn[j]);
+       args.c[j+1] = -sn(j)*args.c[j];
+       args.c[j]  *= conj(cn(j));
+       //
+       printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
      }
 
      j += 1;
@@ -350,17 +402,16 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    if(do_givens)
    {
-     Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m+1,1) );
      memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
      args.c[0] = c0;
 
-     givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
+     givensH.block(0,0, args.m, args.m).triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
 
    } else {
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
 
-     std::vector<ColorSpinorField*> v_(Vm->Components().begin(), Vm->Components().begin()+args.k+1);
+     std::vector<ColorSpinorField*> v_(vm(0,args.k+1));
      std::vector<ColorSpinorField*> r_;
      r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
 
