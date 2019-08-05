@@ -48,7 +48,7 @@ namespace quda {
     if (!jitify_init) {
       kernel_cache = new jitify::JitCache;
 
-      std::vector<std::string> options = {"-std=c++11", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
+      std::vector<std::string> options = {"-std=c++14", "-ftz=true", "-prec-div=false", "-prec-sqrt=false"};
 
 #ifdef DEVICE_DEBUG
       options.push_back(std::string("-G"));

@@ -176,8 +176,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
-set(QUDA_CXX_STANDARD 11 CACHE STRING "set the CXX Standard (11 or 14)")
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
+set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
+set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 

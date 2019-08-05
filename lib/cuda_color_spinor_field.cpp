@@ -248,7 +248,6 @@ namespace quda {
       {
          if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
          //if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the eigenvector set... Object size is : %u bytes\n", bytes);
-         if (getVerbosity() == QUDA_DEBUG_VERBOSE) printfQuda("\nEigenvector set constructor...\n");
          // create the associated even and odd subsets
          ColorSpinorParam param;
          param.siteSubset = QUDA_PARITY_SITE_SUBSET;

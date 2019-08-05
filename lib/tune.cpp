@@ -229,10 +229,11 @@ namespace quda {
       strncpy(tmp, key.aux, 13);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
+      bool is_nested_policy = (strncmp(tmp, "nested_policy", 6) == 0) ? true : false; // nested policies not included
 
       // synchronous profile
-      if (param.n_calls > 0 && !is_policy) {
-	double time = param.n_calls * param.time;
+      if (param.n_calls > 0 && !is_policy && !is_nested_policy) {
+        double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
 	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";

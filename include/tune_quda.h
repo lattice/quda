@@ -82,15 +82,14 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = maxGridSize();
         const int step = gridStep();
         param.grid.x += step;
-	if (param.grid.x > max_blocks) {
-	  param.grid.x = minGridSize();
+        if (param.grid.x > maxGridSize()) {
+          param.grid.x = minGridSize();
 	  return false;
-	} else {
-	  return true;
-	}
+        } else {
+          return true;
+        }
       } else {
 	return false;
       }
@@ -111,15 +110,15 @@ namespace quda {
     virtual int blockMin() const { return deviceProp.warpSize; }
 
     virtual void resetBlockDim(TuneParam &param) const {
-      const unsigned int max_threads = maxBlockSize(param);
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const int step = blockStep();
-
       if (tuneGridDim()) {
-	param.block.x = step;
+        param.block.x = blockMin();
       } else { // not tuning the grid dimension so have to set a valid grid size
-	// ensure the blockDim is large enough given the limit on gridDim
-	param.block.x = (minThreads()+max_blocks-1)/max_blocks;
+        const auto step = blockStep();
+        const auto max_threads = maxBlockSize(param);
+        const auto max_blocks = deviceProp.maxGridSize[0];
+
+        // ensure the blockDim is large enough given the limit on gridDim
+        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
 	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
@@ -343,7 +342,7 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(128,1,1);
+      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
