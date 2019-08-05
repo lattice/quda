@@ -2,259 +2,154 @@
 #include <cstdlib>
 
 #include <tune_quda.h>
-#include <quda_internal.h>
-#include <gauge_field_order.h>
-#include <quda_matrix.h>
-#include <color_spinor.h>
+#include <gauge_field.h>
+#include <color_spinor_field.h>
 #include <dslash_quda.h>
+
+#include <jitify_helper.cuh>
+#include <kernels/clover_sigma_outer_product.cuh>
 
 namespace quda {
 
 #ifdef GPU_CLOVER_DIRAC
 
-  namespace { // anonymous
-#include <texture.h>
-  }
-  
-  template<typename Complex, typename Output, typename InputA, typename InputB>
-  struct CloverSigmaOprodArg {
-    unsigned int length;
-    unsigned int parity;
-    InputA inA;
-    InputB inB;
-    Output oprod;
-    typename RealTypeId<Complex>::Type coeff;
-    int mu;
-    int nu;
-    int count;
-      
-    CloverSigmaOprodArg(const unsigned int parity,
-			const double coeff,
-			int mu,
-			int nu,
-			int count,
-			InputA& inA,
-			InputB& inB,
-			Output& oprod,
-			GaugeField &meta) : length(meta.VolumeCB()), parity(parity), 
-					    inA(inA), inB(inB), oprod(oprod), 
-					    coeff(coeff), mu(mu), nu(nu), count(count)
-    {
+  template <typename Float, typename Arg> class CloverSigmaOprod : public TunableVectorYZ
+  {
 
-    }
-  };
-
-  template<typename Complex, typename Output, typename InputA, typename InputB>
-  __global__ void sigmaOprodKernel(CloverSigmaOprodArg<Complex, Output, InputA, InputB> arg) {
-    typedef typename RealTypeId<Complex>::Type real;
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-
-    ColorSpinor<real,3,4> A, B;
-    Matrix<Complex,3> result, temp;
-
-    // workaround for code that hangs generated with CUDA 5.x
-#if (CUDA_VERSION < 6000)
-    if (idx >= arg.length) idx = arg.length - 1;
-#else
-    while(idx<arg.length){
-#endif // CUDA_VERSION
-      arg.inA.load(static_cast<Complex*>(A.data), idx);
-      arg.inB.load(static_cast<Complex*>(B.data), idx);
-
-      // multiply by sigma_mu_nu
-      ColorSpinor<real,3,4> C = A.sigma(arg.mu,arg.nu);
-      result = outerProdSpinTrace(C,B);
-
-      if (arg.count > 0) {
-	arg.oprod.load(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity); 
-	temp = arg.coeff*result + temp;
-      } else {
-	temp = arg.coeff*result;
-      }
-      arg.oprod.save(reinterpret_cast<real*>(temp.data), idx, 0, arg.parity); 
-#if (CUDA_VERSION >= 6000)
-      idx += gridDim.x*blockDim.x;
-    }
-#endif // CUDA_VERSION
-    return;
-  } // sigmaOprodKernel
-
-  
-  template<typename Complex, typename Output, typename InputA, typename InputB> 
-  class CloverSigmaOprod : public Tunable {
-    
-  private:
-    CloverSigmaOprodArg<Complex,Output,InputA,InputB> &arg;
+private:
+    Arg &arg;
     const GaugeField &meta;
-    QudaFieldLocation location; // location of the lattice fields
-    
+
     unsigned int sharedBytesPerThread() const { return 0; }
     unsigned int sharedBytesPerBlock(const TuneParam &) const { return 0; }
-    
+
     unsigned int minThreads() const { return arg.length; }
     bool tuneGridDim() const { return false; }
-    
+
   public:
-    CloverSigmaOprod(CloverSigmaOprodArg<Complex,Output,InputA,InputB> &arg,
-		     const GaugeField &meta, QudaFieldLocation location)
-      : arg(arg), meta(meta), location(location) {
-      writeAuxString("prec=%lu,stride=%d,mu=%d,nu=%d", 
-		     sizeof(Complex)/2, arg.inA.Stride(), arg.mu, arg.nu);
-      // this sets the communications pattern for the packing kernel
-    } 
-    
-    virtual ~CloverSigmaOprod() {}
-    
-    void apply(const cudaStream_t &stream){
-      if(location == QUDA_CUDA_FIELD_LOCATION){
-	// Disable tuning for the time being
-	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
-	sigmaOprodKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-      }else{ // run the CPU code
-	errorQuda("No CPU support for staggered outer-product calculation\n");
+      CloverSigmaOprod(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 6), arg(arg), meta(meta)
+      {
+        writeAuxString("prec=%lu,stride=%d,nvector=%d", sizeof(Float), arg.inA[0].Stride(), arg.nvector);
+        // this sets the communications pattern for the packing kernel
+#ifdef JITIFY
+        create_jitify_program("kernels/clover_sigma_outer_product.cuh");
+#endif
       }
-    } // apply
-    
-    void preTune(){
-      this->arg.oprod.save();
-    }
-    void postTune(){
-      this->arg.oprod.load();
-    }
-  
-    long long flops() const { 
-      ((long long)arg.length)*(0 + 144 + 36); // spin_mu_nu + spin trace + multiply-add
-    }
-    long long bytes() const { 
-      ((long long)arg.length)*(arg.inA.Bytes() + arg.inB.Bytes() + 2*arg.oprod.Bytes());
-    }
-  
-    TuneKey tuneKey() const { 
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
-    }
+
+      virtual ~CloverSigmaOprod() {}
+
+      void apply(const cudaStream_t &stream)
+      {
+        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef JITIFY
+          using namespace jitify::reflection;
+          jitify_error = program->kernel("quda::sigmaOprodKernel")
+                             .instantiate(arg.nvector, Type<Float>(), Type<Arg>())
+                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                             .launch(arg);
+#else
+          switch (arg.nvector) {
+          case 1: sigmaOprodKernel<1, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 2: sigmaOprodKernel<2, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 3: sigmaOprodKernel<3, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 4: sigmaOprodKernel<4, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 5: sigmaOprodKernel<5, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 6: sigmaOprodKernel<6, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 7: sigmaOprodKernel<7, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 8: sigmaOprodKernel<8, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          case 9: sigmaOprodKernel<9, Float><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+          }
+#endif
+        } else { // run the CPU code
+          errorQuda("No CPU support for staggered outer-product calculation\n");
+        }
+      } // apply
+
+      void preTune() { this->arg.oprod.save(); }
+      void postTune() { this->arg.oprod.load(); }
+
+      long long flops() const
+      {
+        return (2 * (long long)arg.length) * 6
+            * ((0 + 144 + 18) * arg.nvector + 18); // spin_mu_nu + spin trace + multiply-add
+      }
+      long long bytes() const
+      {
+        return (2 * (long long)arg.length) * 6
+            * ((arg.inA[0].Bytes() + arg.inB[0].Bytes()) * arg.nvector + 2 * arg.oprod.Bytes());
+      }
+
+      TuneKey tuneKey() const { return TuneKey(meta.VolString(), "CloverSigmaOprod", aux); }
   }; // CloverSigmaOprod
-  
-  template<typename Complex, typename Output, typename InputA, typename InputB>
-  void computeCloverSigmaOprodCuda(Output oprod, cudaGaugeField& out, InputA& inA, InputB& inB,
-				   const unsigned int parity, const double coeff, int mu, int nu, int shift) {
-    // Create the arguments 
-    CloverSigmaOprodArg<Complex,Output,InputA,InputB> arg(parity, coeff, mu, nu, shift, inA, inB, oprod, out);
-    CloverSigmaOprod<Complex,Output,InputA,InputB> sigma_oprod(arg, out, QUDA_CUDA_FIELD_LOCATION);
+
+  template<typename Float, typename Output, typename InputA, typename InputB>
+  void computeCloverSigmaOprod(Output oprod, const GaugeField& out, InputA *inA, InputB *inB,
+			       std::vector<std::vector<double> > &coeff, int nvector) {
+    // Create the arguments
+    typedef CloverSigmaOprodArg<Float, Output, InputA, InputB> Arg;
+    Arg arg(oprod, inA, inB, coeff, out, nvector);
+    CloverSigmaOprod<Float, Arg> sigma_oprod(arg, out);
     sigma_oprod.apply(0);
-  } // computeCloverSigmaOprodCuda
-  
+  } // computeCloverSigmaOprod
+
 #endif // GPU_CLOVER_FORCE
 
-  void computeCloverSigmaOprod(cudaGaugeField& oprod,
-			       cudaColorSpinorField& x,  
-			       cudaColorSpinorField& p,
-			       const double coeff, int mu, int nu, int shift)
+  void computeCloverSigmaOprod(GaugeField& oprod,
+			       std::vector<ColorSpinorField*> &x,
+			       std::vector<ColorSpinorField*> &p,
+			       std::vector<std::vector<double> > &coeff)
   {
 
 #ifdef GPU_CLOVER_DIRAC
-    if(oprod.Order() != QUDA_FLOAT2_GAUGE_ORDER)
-      errorQuda("Unsupported output ordering: %d\n", oprod.Order());    
-
-    if(x.Precision() != oprod.Precision()) errorQuda("Mixed precision not supported: %d %d\n", x.Precision(), oprod.Precision());
-
-    for (int parity=0; parity<2; parity++) {
-      cudaColorSpinorField& inA = (parity&1) ? x.Odd() : x.Even();
-      cudaColorSpinorField& inB = (parity&1) ? p.Odd() : p.Even();
-
-      if(x.Precision() == QUDA_DOUBLE_PRECISION){
-	Spinor<double2, double2, double2, 12, 0, 0> spinorA(inA);
-	Spinor<double2, double2, double2, 12, 0, 1> spinorB(inB);
-	computeCloverSigmaOprodCuda<double2>(FloatNOrder<double, 18, 2, 18>(oprod), 
-					     oprod, spinorA, spinorB, parity, coeff, mu, nu, shift);
-      } else {
-	errorQuda("Unsupported precision: %d\n", x.Precision());
+    if (x.size() > MAX_NVECTOR) {
+      // divide and conquer
+      std::vector<ColorSpinorField*> x0(x.begin(), x.begin()+x.size()/2);
+      std::vector<ColorSpinorField*> p0(p.begin(), p.begin()+p.size()/2);
+      std::vector<std::vector<double> > coeff0(coeff.begin(), coeff.begin()+coeff.size()/2);
+      for (unsigned int i=0; i<coeff0.size(); i++) {
+	coeff0[i].reserve(2); coeff0[i][0] = coeff[i][0]; coeff0[i][1] = coeff[i][1];
       }
-    } // parity
+      computeCloverSigmaOprod(oprod, x0, p0, coeff0);
 
+      std::vector<ColorSpinorField*> x1(x.begin()+x.size()/2, x.end());
+      std::vector<ColorSpinorField*> p1(p.begin()+p.size()/2, p.end());
+      std::vector<std::vector<double> > coeff1(coeff.begin()+coeff.size()/2, coeff.end());
+      for (unsigned int i=0; i<coeff1.size(); i++) {
+	coeff1[i].reserve(2); coeff1[i][0] = coeff[coeff.size()/2 + i][0]; coeff1[i][1] = coeff[coeff.size()/2 + i][1];
+      }
+      computeCloverSigmaOprod(oprod, x1, p1, coeff1);
+
+      return;
+    }
+
+    if (oprod.Order() != QUDA_FLOAT2_GAUGE_ORDER) errorQuda("Unsupported output ordering: %d\n", oprod.Order());
+
+    if(x[0]->Precision() != oprod.Precision())
+      errorQuda("Mixed precision not supported: %d %d\n", x[0]->Precision(), oprod.Precision());
+
+    if(oprod.Precision() == QUDA_DOUBLE_PRECISION){
+
+      Spinor<double2, double2, 12, 0> spinorA[MAX_NVECTOR];
+      Spinor<double2, double2, 12, 0> spinorB[MAX_NVECTOR];
+
+      for (unsigned int i=0; i<x.size(); i++) {
+	spinorA[i].set(*dynamic_cast<cudaColorSpinorField*>(x[i]));
+	spinorB[i].set(*dynamic_cast<cudaColorSpinorField*>(p[i]));
+      }
+
+      computeCloverSigmaOprod<double>(gauge::FloatNOrder<double, 18, 2, 18>(oprod),
+				      oprod, spinorA, spinorB, coeff, x.size());
+
+    } else {
+      errorQuda("Unsupported precision: %d\n", oprod.Precision());
+    }
 #else // GPU_CLOVER_DIRAC not defined
-    errorQuda("Clover Dirac operator has not been built!"); 
+    errorQuda("Clover Dirac operator has not been built!");
 #endif
 
     checkCudaError();
     return;
   } // computeCloverForce
-
-  
-  template<typename Complex, typename Mom, typename Force>
-  struct UpdateMomArg {
-    int volumeCB;
-    Mom mom;
-    Force force;
-    UpdateMomArg(Mom &mom, Force &force, GaugeField &meta)
-      : volumeCB(meta.VolumeCB()), mom(mom), force(force) {}
-  };
-
-
-#ifdef GPU_CLOVER_DIRAC
-  template<typename Complex, typename Mom, typename Force>
-  __global__ void UpdateMom(UpdateMomArg<Complex, Mom, Force> arg) {
-    typedef typename RealTypeId<Complex>::Type real;
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int parity = blockIdx.y;
-    Matrix<Complex,3> m, f;
-    while(x<arg.volumeCB){
-      for (int d=0; d<4; d++) {
-	arg.mom.load(reinterpret_cast<real*>(m.data), x, d, parity); 
-	arg.force.load(reinterpret_cast<real*>(f.data), x, d, parity); 
-
-	m = m - f;
-	makeAntiHerm(m);
-
-	arg.mom.save(reinterpret_cast<real*>(m.data), x, d, parity); 
-      }
-	
-      x += gridDim.x*blockDim.x;
-    }
-    return;
-  } // UpdateMom
-
-  template<typename Complex, typename Mom, typename Force>
-  void updateMomentum(Mom mom, Force force, GaugeField &meta) {
-    UpdateMomArg<Complex,Mom,Force> arg(mom, force, meta);
-    dim3 block(128, 1, 1);
-    dim3 grid((arg.volumeCB + block.x - 1)/ block.x, 2, 1); // y dimension is parity 
-    UpdateMom<Complex,Mom,Force><<<grid,block>>>(arg);
-  }
-#endif
-  
-  void updateMomentum(cudaGaugeField &mom, cudaGaugeField &force) {
-#ifdef GPU_CLOVER_DIRAC
-    if(mom.Order() != QUDA_FLOAT2_GAUGE_ORDER)
-      errorQuda("Unsupported output ordering: %d\n", mom.Order());    
-
-    if(mom.Precision() != force.Precision()) errorQuda("Mixed precision not supported: %d %d\n", mom.Precision(), force.Precision());
-
-    if (mom.Reconstruct() == QUDA_RECONSTRUCT_10) {
-      if(mom.Precision() == QUDA_DOUBLE_PRECISION){
-	updateMomentum<double2>(FloatNOrder<double, 18, 2, 11>(mom),
-				FloatNOrder<double, 18, 2, 18>(force), force);
-      } else {
-	errorQuda("Unsupported precision: %d", mom.Precision());
-      }      
-    } else if (mom.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      if(mom.Precision() == QUDA_DOUBLE_PRECISION){
-	updateMomentum<double2>(FloatNOrder<double, 18, 2, 18>(mom),
-				FloatNOrder<double, 18, 2, 18>(force), force);
-      } else {
-	errorQuda("Unsupported precision: %d", mom.Precision());
-      }
-    } else {
-      errorQuda("Unsupported momentum reconstruction: %d", mom.Reconstruct());
-    }
-
-#else // GPU_CLOVER_DIRAC not defined
-    errorQuda("Clover Dirac operator has not been built!"); 
-#endif
-
-    checkCudaError();
-    return;
-
-  }
-  
 
 } // namespace quda

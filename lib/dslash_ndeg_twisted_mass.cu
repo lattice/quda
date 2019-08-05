@@ -1,212 +1,123 @@
-#include <cstdlib>
-#include <cstdio>
-#include <string>
-#include <iostream>
-
+#include <gauge_field.h>
 #include <color_spinor_field.h>
-#include <clover_field.h>
+#include <dslash.h>
+#include <worker.h>
 
-// these control the Wilson-type actions
-#ifdef GPU_WILSON_DIRAC
-//#define DIRECT_ACCESS_LINK
-//#define DIRECT_ACCESS_WILSON_SPINOR
-//#define DIRECT_ACCESS_WILSON_ACCUM
-//#define DIRECT_ACCESS_WILSON_INTER
-//#define DIRECT_ACCESS_WILSON_PACK_SPINOR
-//#define DIRECT_ACCESS_CLOVER
-#endif // GPU_WILSON_DIRAC
+#include <dslash_policy.cuh>
+#include <kernels/dslash_ndeg_twisted_mass.cuh>
 
+/**
+   This is the gauged twisted-mass operator acting on a non-generate
+   quark doublet.
+*/
 
-#include <quda_internal.h>
-#include <dslash_quda.h>
-#include <sys/time.h>
-#include <blas_quda.h>
-#include <face_quda.h>
+namespace quda
+{
 
-#include <inline_ptx.h>
-
-namespace quda {
-
-  namespace ndegtwisted {
-
-#include <dslash_constants.h>
-#include <dslash_textures.h>
-#include <dslash_index.cuh>
-
-    // Enable shared memory dslash for Fermi architecture
-    //#define SHARED_WILSON_DSLASH
-    //#define SHARED_8_BYTE_WORD_SIZE // 8-byte shared memory access
-
-    //#if (__COMPUTE_CAPABILITY__) >= 200 && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
-#include <tm_ndeg_dslash_def.h>   // Non-degenerate twisted Mass
-#endif
-
-#ifndef NDEGTM_SHARED_FLOATS_PER_THREAD
-#define NDEGTM_SHARED_FLOATS_PER_THREAD 0
-#endif
-
-#include <dslash_quda.cuh>
-
-  } // end namespace twisted
-  
-  // declare the dslash events
-#include <dslash_events.cuh>
-
-  using namespace ndegtwisted;
-
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
-  template <typename sFloat, typename gFloat>
-  class NdegTwistedDslashCuda : public SharedDslashCuda {
-
-  private:
-    const gFloat *gauge0, *gauge1;
-    const QudaTwistDslashType dslashType;
-    double a, b, c, d;
-
-  protected:
-    unsigned int sharedBytesPerThread() const
+  /**
+     @brief This is a helper class that is used to instantiate the
+     correct templated kernel for the dslash.
+   */
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct NdegTwistedMassLaunch {
+    static constexpr const char *kernel = "quda::ndegTwistedMassGPU"; // kernel name for jit compilation
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-#if (__COMPUTE_CAPABILITY__ >= 200)
-      if (dslashParam.kernel_type == INTERIOR_KERNEL) {
-	int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-	return NDEGTM_SHARED_FLOATS_PER_THREAD * reg_size;
-      } else {
-	return 0;
-      }
-#else
-      int reg_size = (typeid(sFloat)==typeid(double2) ? sizeof(double) : sizeof(float));
-      return NDEGTM_SHARED_FLOATS_PER_THREAD * reg_size;
-#endif
+      static_assert(xpay == true, "Non-generate twisted-mass operator only defined for xpay");
+      dslash.launch(ndegTwistedMassGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
+  };
 
-  public:
-    NdegTwistedDslashCuda(cudaColorSpinorField *out, const gFloat *gauge0, const gFloat *gauge1, 
-		      const QudaReconstructType reconstruct, const cudaColorSpinorField *in,  const cudaColorSpinorField *x, 
-		      const QudaTwistDslashType dslashType, const double kappa, const double mu, 
-		      const double epsilon, const double k, const int dagger)
-      : SharedDslashCuda(out, in, x, reconstruct, dagger), gauge0(gauge0), gauge1(gauge1), dslashType(dslashType)
-    { 
-      bindSpinorTex<sFloat>(in, out, x); 
-      a = kappa;
-      b = mu;
-      c = epsilon;
-      d = k;
-      if (dslashType != QUDA_NONDEG_DSLASH) errorQuda("Invalid dslashType for non-degenerate twisted-mass Dslash");
-      dslashParam.fl_stride = in->VolumeCB()/2;
-    }
-    virtual ~NdegTwistedDslashCuda() { unbindSpinorTex<sFloat>(in, out, x); }
+  template <typename Float, int nDim, int nColor, typename Arg> class NdegTwistedMass : public Dslash<Float>
+  {
 
-    TuneKey tuneKey() const
+protected:
+    Arg &arg;
+    const ColorSpinorField &in;
+
+public:
+    NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+      Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass.cuh"),
+      arg(arg),
+      in(in)
     {
-      TuneKey key = DslashCuda::tuneKey();
-      strcat(key.aux,",NdegDslash");
-      return key;
+      TunableVectorYZ::resizeVector(2, arg.nParity);
     }
+
+    virtual ~NdegTwistedMass() {}
 
     void apply(const cudaStream_t &stream)
     {
-
-#ifdef SHARED_WILSON_DSLASH
-      if (dslashParam.kernel_type == EXTERIOR_KERNEL_X) 
-	errorQuda("Shared dslash does not yet support X-dimension partitioning");
-#endif
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      NDEG_TM_DSLASH(twistedNdegMassDslash, tp.grid, tp.block, tp.shared_bytes, stream, dslashParam,
-		     (sFloat*)out->V(), (float*)out->Norm(), gauge0, gauge1, 
-		     (sFloat*)in->V(), (float*)in->Norm(), a, b, c, d, (sFloat*)(x ? x->V() : 0), (float*)(x ? x->Norm() : 0));
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay)
+        Dslash<Float>::template instantiate<NdegTwistedMassLaunch, nDim, nColor, true>(tp, arg, stream);
+      else
+        errorQuda("Non-degenerate twisted-mass operator only defined for xpay=true");
     }
 
-    long long flops() const {
-      int twisted_flops = 48;
-      long long flops = DslashCuda::flops();
-      switch(dslashParam.kernel_type) {
+    long long flops() const
+    {
+      long long flops = Dslash<Float>::flops();
+      switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
       case EXTERIOR_KERNEL_Z:
       case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL:
-	break;
+      case EXTERIOR_KERNEL_ALL: break; // twisted-mass flops are in the interior kernel
       case INTERIOR_KERNEL:
-	// twisted-mass flops are done in the interior kernel
-	flops += twisted_flops * in->VolumeCB();	  
-	break;
+      case KERNEL_POLICY:
+        flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+        break;
       }
       return flops;
     }
+
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
   };
-#endif // GPU_NDEG_TWISTED_MASS_DIRAC
 
+  template <typename Float, int nColor, QudaReconstructType recon> struct NdegTwistedMassApply {
 
-#include <dslash_policy.cuh> 
+    inline NdegTwistedMassApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
+                                double b, double c, const ColorSpinorField &x, int parity, bool dagger,
+                                const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      NdegTwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
+      NdegTwistedMass<Float, nDim, nColor, NdegTwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
 
-  void ndegTwistedMassDslashCuda(cudaColorSpinorField *out, const cudaGaugeField &gauge, 
-				 const cudaColorSpinorField *in, const int parity, const int dagger, 
-				 const cudaColorSpinorField *x, const QudaTwistDslashType type, 
-				 const double &kappa, const double &mu, const double &epsilon, 
-				 const double &k,  const int *commOverride, TimeProfile &profile, 
-				 const QudaDslashPolicy &dslashPolicy)
+      dslash::DslashPolicyTune<decltype(twisted)> policy(
+        twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      policy.apply(0);
+
+      checkCudaError();
+    }
+  };
+
+  void ApplyNdegTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
+                            double c, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                            TimeProfile &profile)
   {
-    inSpinor = (cudaColorSpinorField*)in; // EVIL
-#if (__COMPUTE_CAPABILITY__ >= 200) && defined(GPU_NDEG_TWISTED_MASS_DIRAC)
-    int Npad = (in->Ncolor()*in->Nspin()*2)/in->FieldOrder(); // SPINOR_HOP in old code
+#ifdef GPU_NDEG_TWISTED_MASS_DIRAC
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
 
-    int ghost_threads[4] = {0};
-    int bulk_threads = in->Volume() / 2;
+    // check all precisions match
+    checkPrecision(out, in, x, U);
 
-    for(int i=0;i<4;i++){
-      dslashParam.ghostDim[i] = commDimPartitioned(i); // determines whether to use regular or ghost indexing at boundary
-      dslashParam.ghostOffset[i] = Npad*(in->GhostOffset(i) + in->Stride());
-      dslashParam.ghostNormOffset[i] = in->GhostNormOffset(i) + in->Stride();
-      dslashParam.commDim[i] = (!commOverride[i]) ? 0 : commDimPartitioned(i); // switch off comms if override = 0
-      ghost_threads[i] = in->GhostFace()[i] / 2;
-    }
+    // check all locations match
+    checkLocation(out, in, x, U);
 
-    void *gauge0, *gauge1;
-    bindGaugeTex(gauge, parity, &gauge0, &gauge1);
-
-    if (in->Precision() != gauge.Precision())
-      errorQuda("Mixing gauge and spinor precision not supported");
-
-    DslashCuda *dslash = 0;
-    size_t regSize = sizeof(float);
-
-    if (in->Precision() == QUDA_DOUBLE_PRECISION) {
-#if (__COMPUTE_CAPABILITY__ >= 130)
-      dslash = new NdegTwistedDslashCuda<double2,double2>(out, (double2*)gauge0,(double2*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
-      regSize = sizeof(double);
+    instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
 #else
-      errorQuda("Double precision not supported on this GPU");
-#endif
-    } else if (in->Precision() == QUDA_SINGLE_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<float4,float4>(out, (float4*)gauge0,(float4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
-
-    } else if (in->Precision() == QUDA_HALF_PRECISION) {
-      dslash = new NdegTwistedDslashCuda<short4,short4>(out, (short4*)gauge0,(short4*)gauge1, gauge.Reconstruct(), in, x, type, kappa, mu, epsilon, k, dagger);
-    }
-
-#ifndef GPU_COMMS
-    DslashPolicyImp* dslashImp = DslashFactory::create(dslashPolicy);
-#else
-    DslashPolicyImp* dslashImp = DslashFactory::create(QUDA_GPU_COMMS_DSLASH);
-#endif
-    (*dslashImp)(*dslash, const_cast<cudaColorSpinorField*>(in), regSize, parity, dagger, bulk_threads, ghost_threads, profile);
-    delete dslashImp;
-
-    delete dslash;
-
-    unbindGaugeTex(gauge);
-
-    checkCudaError();
-#else
-
-#if (__COMPUTE_CAPABILITY__ < 200)
-  errorQuda("Non-degenerate twisted-mass fermions not supported on pre-Fermi architecture");
-#else
-    errorQuda("Non-degenerate twisted mass dslash has not been built");
-#endif
-
-#endif
+    errorQuda("Non-degenerate twisted-mass dslash has not been built");
+#endif // GPU_NDEG_TWISTED_MASS_DIRAC
   }
 
-}
+} // namespace quda

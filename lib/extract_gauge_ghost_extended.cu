@@ -1,7 +1,10 @@
 #include <quda_internal.h>
+#include <tune_quda.h>
 #include <gauge_field_order.h>
 
 namespace quda {
+
+  using namespace gauge;
 
   template <typename Order, int nDim, int dim>
   struct ExtractGhostExArg {
@@ -18,12 +21,16 @@ namespace quda {
     int fBody[nDim][nDim];
     int fBuf[nDim][nDim];
     int localParity[nDim];
+    int threads;
     ExtractGhostExArg(const Order &order, const int *X_, const int *R_, 
 		      const int *surfaceCB_, 
 		      const int *A0_, const int *A1_, const int *B0_, const int *B1_, 
 		      const int *C0_, const int *C1_, const int fBody_[nDim][nDim], 
 		      const int fBuf_[nDim][nDim], const int *localParity_) 
-  : order(order) { 
+      : order(order), threads(0) {
+
+      threads = R_[dim]*(A1_[dim]-A0_[dim])*(B1_[dim]-B0_[dim])*(C1_[dim]-C0_[dim])*order.geometry;
+
       for (int d=0; d<nDim; d++) {
 	X[d] = X_[d];
 	R[d] = R_[d];
@@ -59,8 +66,7 @@ namespace quda {
 
     // need dir dependence in write
     // srcIdx is used here to determine boundary condition
-    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, 
-			  (parity+arg.localParity[dim])&1, arg.R);
+    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, (parity+arg.localParity[dim])&1, arg.R);
   }
 
 
@@ -73,11 +79,12 @@ namespace quda {
     
     int dstIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
+
+    int oddness = (parity+arg.localParity[dim])&1;
     
     // need dir dependence in read
     // dstIdx is used here to determine boundary condition
-    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, 
-			  (parity+arg.localParity[dim])&1, arg.R);
+    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, oddness, arg.R);
     
     arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk
   }
@@ -150,13 +157,12 @@ namespace quda {
 	// one parity but parity alternates between threads
 	// linear index used for writing into ghost buffer
 	int X = blockIdx.x * blockDim.x + threadIdx.x; 	
+	if (X >= arg.threads) return;
 
 	int dA = arg.A1[dim]-arg.A0[dim];
 	int dB = arg.B1[dim]-arg.B0[dim];
 	int dC = arg.C1[dim]-arg.C0[dim];
 	int D0 = extract ? dir*arg.X[dim] + (1-dir)*arg.R[dim] : dir*(arg.X[dim] + arg.R[dim]); 
-
-	if (X >= arg.R[dim]*dA*dB*dC*arg.order.geometry) return;
 
 	// thread order is optimized to maximize coalescing
 	// X = (((g*R + d) * dA + a)*dB + b)*dC + c
@@ -204,8 +210,8 @@ namespace quda {
       int dB = arg.B1[dim]-arg.B0[dim];
       int dC = arg.C1[dim]-arg.C0[dim];
       size = arg.R[dim]*dA*dB*dC*arg.order.geometry;
-      writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d",
-		     sizeof(Float),arg.order.stride, extract, dim);
+      writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d,geometry=%d",
+		     sizeof(Float),arg.order.stride, extract, dim, arg.order.geometry);
     }
     virtual ~ExtractGhostEx() { ; }
   
@@ -214,42 +220,26 @@ namespace quda {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);
 	} else {
-#if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,dim,Order,true> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhostEx not supported on pre-Fermi architecture");
-#endif
-
 	}
       } else { // we are injecting
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,false>(arg);
 	} else {
-#if (__COMPUTE_CAPABILITY__ >= 200)
 	  TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	  tp.grid.y = 2;
 	  tp.grid.z = 2;
 	  extractGhostExKernel<Float,length,nDim,dim,Order,false> 
 	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-#else
-      errorQuda("extractGhostEx not supported on pre-Fermi architecture");
-#endif
 	}
       }
     }
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
-
-    std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim.
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
 
     long long flops() const { return 0; } 
     long long bytes() const { return 2 * 2 * 2 * size * arg.order.Bytes(); } // 2 for i/o    
@@ -331,10 +321,7 @@ namespace quda {
       errorQuda("Invalid dim=%d", dim);
     }
 
-    if (location == QUDA_CUDA_FIELD_LOCATION) {
-      cudaDeviceSynchronize(); // need to sync before we commence any communication
-      checkCudaError();
-    }
+    checkCudaError();
   }
 
   /** This is the template driver for extractGhost */
@@ -348,14 +335,8 @@ namespace quda {
 
     if (u.isNative()) {
       if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	if (typeid(Float)==typeid(short) && u.LinkType() == QUDA_ASQTAD_FAT_LINKS) {
-	  extractGhostEx<short,length>(FloatNOrder<short,length,2,19>(u, 0, (short**)Ghost), 
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	} else {
-	  typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	  extractGhostEx<Float,length>(G(u, 0, Ghost),
-				       dim, u.SurfaceCB(), u.X(), R, extract, u, location);
-	}
+        typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
+        extractGhostEx<Float, length>(G(u, 0, Ghost), dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),

@@ -2,6 +2,7 @@
 #define _TEST_UTIL_H
 
 #include <quda.h>
+#include <random_quda.h>
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
@@ -29,7 +30,7 @@
   
   extern int mySpinorSiteSize;
 
-  void initComms(int argc, char **argv, const int *commDims);
+  void initComms(int argc, char **argv, int *const commDims);
   void finalizeComms();
   void initRand();
 
@@ -54,18 +55,22 @@
   int fullLatticeIndex(int dim[], int index, int oddBit);
   int getOddBit(int X);
 
+  void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec);
+
+
   void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
   void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 				    QudaPrecision precision, QudaGaugeParam*, 
 				    QudaDslashType dslash_type);
+
+  /** Create random spinor source field using QUDA's internal hypercubic GPU RNG */
+  void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+                               quda::RNG &rng);
   void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
-  void construct_spinor_field(void *spinor, int type, int i0, int s0, int c0, QudaPrecision precision);
   void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
 
   void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
   void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision, QudaGaugeParam *param);
-  //void su3_construct_8_half(float *mat, short *mat_half);
-  //void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param);
 
   void compare_spinor(void *spinor_cpu, void *spinor_gpu, int len, QudaPrecision precision);
   void strong_check(void *spinor, void *spinorGPU, int len, QudaPrecision precision);
@@ -98,5 +103,47 @@
 #ifdef __cplusplus
 //}
 #endif
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+    // implemented in face_gauge.cpp
+    void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
+			       void** ghost_sitelink_diag,
+			       QudaPrecision gPrecision, QudaGaugeParam* param, int optflag);
+    void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
+				  QudaPrecision gPrecision, int optflag, int geometry);
+    void exchange_cpu_staple(int* X, void* staple, void** ghost_staple,
+			     QudaPrecision gPrecision);
+    void exchange_llfat_init(QudaPrecision prec);
+    void exchange_llfat_cleanup(void);
+
+#ifdef __cplusplus
+  }
+#endif
+
+  inline QudaPrecision getPrecision(int i)
+  {
+    switch (i) {
+    case 0: return QUDA_QUARTER_PRECISION;
+    case 1: return QUDA_HALF_PRECISION;
+    case 2: return QUDA_SINGLE_PRECISION;
+    case 3: return QUDA_DOUBLE_PRECISION;
+    }
+    return QUDA_INVALID_PRECISION;
+  }
+
+  inline int getReconstructNibble(QudaReconstructType recon)
+  {
+    switch (recon) {
+    case QUDA_RECONSTRUCT_NO: return 4;
+    case QUDA_RECONSTRUCT_13:
+    case QUDA_RECONSTRUCT_12: return 2;
+    case QUDA_RECONSTRUCT_9:
+    case QUDA_RECONSTRUCT_8: return 1;
+    default: return 0;
+    }
+  }
 
 #endif // _TEST_UTIL_H

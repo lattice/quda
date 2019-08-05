@@ -4,7 +4,6 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <face_quda.h>
 #include <tune_quda.h>
 
 #define PRESERVE_SPINOR_NORM
@@ -21,6 +20,8 @@
 
 namespace quda {
 
+  using namespace colorspinor;
+  
   void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
@@ -41,10 +42,10 @@ namespace quda {
       if(!commDim(dim)) continue;
 
       spinor->packExtended(nFace, R, parity, dagger, dim, stream_p); // packing in the dim dimension complete
-      cudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
+      qudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
       for(int dir=1; dir<=0; dir--){
         spinor->gather(nFace, dagger, 2*dim + dir);
-        cudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
+        qudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
       } 
 
       int completeSum = 0;
@@ -72,7 +73,7 @@ namespace quda {
         }
       } 
       commsCompleted[0] = commsCompleted[1] = 0;
-      cudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
+      qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
     for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
@@ -107,8 +108,10 @@ namespace quda {
       __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
-        RegTypeOut K1[4] = {kP, -kP, -kP, -kP};
-        RegTypeOut K2[4] = {kP, -kP, kP, kP};
+        RegTypeOut K1[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP),
+			    static_cast<RegTypeOut>(-kP), static_cast<RegTypeOut>(-kP)};
+        RegTypeOut K2[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP),
+			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
             for (int z=0; z<2; z++) {
@@ -128,8 +131,10 @@ namespace quda {
       __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
-        RegTypeOut K1[4] = {-kU, kU,  kU,  kU};
-        RegTypeOut K2[4] = {-kU, kU, -kU, -kU};
+        RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
+			    static_cast<RegTypeOut>(kU), static_cast<RegTypeOut>(kU)};
+        RegTypeOut K2[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
+			    static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(-kU)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
             for (int z=0; z<2; z++) {
@@ -187,8 +192,8 @@ namespace quda {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
 
-      RegTypeIn   in[Ns*Nc*2];
-      RegTypeOut  out[Ns*Nc*2];
+      RegTypeIn   in[Ns*Nc*2] = { };
+      RegTypeOut  out[Ns*Nc*2] = { };
 
       if(extend){
         arg.in.load(in, X);
@@ -261,13 +266,6 @@ namespace quda {
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-      std::string paramString(const TuneParam &param) const { // Don't bother printing the grid dim
-        std::stringstream ps;
-        ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-        ps << "shared=" << param.shared_bytes;
-        return ps.str();
-      }
-
       long long flops() const { return 0; }
       long long bytes() const {
         return arg.length*2*Nc*Ns*(sizeof(FloatIn) + sizeof(FloatOut));
@@ -303,13 +301,13 @@ namespace quda {
           (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else if(outBasis == QUDA_UKQCD_GAMMA_BASIS && inBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS){
         if(Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-        NonRelBasis<FloatOut,FloatIn,Ns,Nc> basis;
-        copySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, NonRelBasis<FloatOut,FloatIn,Ns,Nc> >
+        NonRelBasis<FloatOut,FloatIn,4,Nc> basis;
+        copySpinorEx<FloatOut, FloatIn, 4, Nc, OutOrder, InOrder, NonRelBasis<FloatOut,FloatIn,4,Nc> >
           (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else if(inBasis == QUDA_UKQCD_GAMMA_BASIS && outBasis == QUDA_DEGRAND_ROSSI_GAMMA_BASIS){
         if(Ns != 4) errorQuda("Can only change basis with Nspin = 4, not Nspin = %d", Ns);
-        RelBasis<FloatOut,FloatIn,Ns,Nc> basis;
-        copySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, RelBasis<FloatOut,FloatIn,Ns,Nc> >
+        RelBasis<FloatOut,FloatIn,4,Nc> basis;
+        copySpinorEx<FloatOut, FloatIn, 4, Nc, OutOrder, InOrder, RelBasis<FloatOut,FloatIn,4,Nc> >
           (outOrder, inOrder, basis, E, X, parity, extend, meta, location);
       }else{
         errorQuda("Basis change not supported");
@@ -324,90 +322,47 @@ namespace quda {
         QudaGammaBasis inBasis, const int *E, const int *X,  const int parity, const bool extend,
         QudaFieldLocation location, FloatOut *Out, float *outNorm){
 
-      if(out.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER){
-        FloatNOrder<FloatOut, Ns, Nc, 4> outOrder(out, Out, outNorm);
-        copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
-      }else if(out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER){
-        FloatNOrder<FloatOut, Ns, Nc, 2> outOrder(out, Out, outNorm);
-        copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
-#if 0
-      }else if(out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER){
-        SpaceSpinorColorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
-        copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
-      }else if(out.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER){
-        SpaceColorSpinorOrder<FloatOut, Ns, Nc> outOrder(out, Out);
-        copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
-      } else if (out.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER){
-#ifdef BUILD_QDPJIT_INTERFACE
-        QDPJITDiracOrder<FloatOut, Ns, Nc> outOrder(out, Out);
-        copySpinorEx<FloatOut,FloatIn,Ns,Nc>
-          (outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
-#else
-        errorQuda("QDPJIT interface has not been built\n");
-#endif
-#endif
-      }else{
-        errorQuda("Order not defined");
-      }
+    if (out.isNative()) {
+      typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
+      ColorSpinor outOrder(out, 1, Out, outNorm);
+      copySpinorEx<FloatOut,FloatIn,Ns,Nc>
+	(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
+    } else {
+      errorQuda("Order not defined");
     }
+
+  }
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc> 
     void extendedCopyColorSpinor(ColorSpinorField &out, const ColorSpinorField &in, 
         const int parity, const QudaFieldLocation location, FloatOut *Out, FloatIn *In, 
         float* outNorm, float *inNorm){
 
-
-      int E[4];
-      int X[4];
-      const bool extend = (out.Volume() >= in.Volume());
-      if(extend){
-        for(int d=0; d<4; d++){ 
-          E[d] = out.X()[d];
-          X[d] = in.X()[d];
-        }
-      }else{
-        for(int d=0; d<4; d++){
-          E[d] = in.X()[d];
-          X[d] = out.X()[d];
-        }
+    int E[4];
+    int X[4];
+    const bool extend = (out.Volume() >= in.Volume());
+    if (extend) {
+      for (int d=0; d<4; d++) {
+	E[d] = out.X()[d];
+	X[d] = in.X()[d];
       }
-      X[0] *= 2; E[0] *= 2; // Since we consider only a single parity at a time
-
-
-      if(in.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER){
-        FloatNOrder<FloatIn,Ns,Nc,4> inOrder(in, In, inNorm);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
-      }else if(in.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER){
-        FloatNOrder<FloatIn,Ns,Nc,2> inOrder(in, In, inNorm);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
-#if 0
-      }else if(in.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER){
-        SpaceSpinorColorOrder<FloatIn,Ns,Nc> inOrder(in, In);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
-      }else if(in.FieldOrder() == QUDA_SPACE_COLOR_SPIN_FIELD_ORDER){
-        SpaceColorSpinorOrder<FloatIn,Ns,Nc> inOrder(in, In);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
-      }else if (in.FieldOrder() == QUDA_QDPJIT_FIELD_ORDER){
-#ifdef BUILD_QDPJIT_INTERFACE
-        QDPJITDiracOrder<FloatIn,Ns,Nc> inOrder(in, In);
-        extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend,location, Out, outNorm);
-#else
-        errorQuda("QDPJIT interface has not been built\n");
-#endif
-#endif
-      }else{
-        errorQuda("Order not defined");
+    } else {
+      for (int d=0; d<4; d++) {
+	E[d] = in.X()[d];
+	X[d] = out.X()[d];
       }
     }
+    X[0] *= 2; E[0] *= 2; // Since we consider only a single parity at a time
 
+    if (in.isNative()) {
+      typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
+      ColorSpinor inOrder(in, 1, In, inNorm);
+      extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
+    } else {
+      errorQuda("Order not defined");
+    }
 
-
-
-
+  }
 
   template<int Ns, typename dstFloat, typename srcFloat>
     void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src, 

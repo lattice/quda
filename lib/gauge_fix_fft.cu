@@ -30,11 +30,12 @@ namespace quda {
 
 
 
-
+#ifdef HOST_DEBUG
 #ifdef GAUGEFIXING_DONT_USE_GX
-#warning Don't use precalculated g(x)
+#warning Not using precalculated g(x)
 #else
 #warning Using precalculated g(x)
+#endif
 #endif
 
 
@@ -57,69 +58,71 @@ namespace quda {
     return 0.0;
   }
   template <>
-  inline __device__ typename ComplexTypeId<float>::Type TEXTURE_GX<typename ComplexTypeId<float>::Type>(int id){
+  inline __device__ complex<float> TEXTURE_GX<complex<float> >(int id){
     return tex1Dfetch(GXTexSingle, id);
   }
   template <>
-  inline __device__ typename ComplexTypeId<double>::Type TEXTURE_GX<typename ComplexTypeId<double>::Type>(int id){
+  inline __device__ complex<double> TEXTURE_GX<complex<double> >(int id){
     int4 u = tex1Dfetch(GXTexDouble, id);
-    return makeComplex(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
+    return complex<double>(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
   }
   template <class T>
   inline __device__ T TEXTURE_DELTA(int id){
     return 0.0;
   }
   template <>
-  inline __device__ typename ComplexTypeId<float>::Type TEXTURE_DELTA<typename ComplexTypeId<float>::Type>(int id){
+  inline __device__ complex<float> TEXTURE_DELTA<complex<float> >(int id){
     return tex1Dfetch(DELTATexSingle, id);
   }
   template <>
-  inline __device__ typename ComplexTypeId<double>::Type TEXTURE_DELTA<typename ComplexTypeId<double>::Type>(int id){
+  inline __device__ complex<double> TEXTURE_DELTA<complex<double> >(int id){
     int4 u = tex1Dfetch(DELTATexDouble, id);
-    return makeComplex(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
+    return complex<double>(__hiloint2double(u.y, u.x), __hiloint2double(u.w, u.z));
   }
 
-  static void BindTex(typename ComplexTypeId<float>::Type *delta, typename ComplexTypeId<float>::Type *gx, size_t bytes){
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-                #ifndef GAUGEFIXING_DONT_USE_GX
+  static void BindTex(complex<float> *delta, complex<float> *gx, size_t bytes){
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+#ifndef GAUGEFIXING_DONT_USE_GX
     cudaBindTexture(0, GXTexSingle, gx, bytes);
-                #endif
+#endif
     cudaBindTexture(0, DELTATexSingle, delta, bytes);
-        #endif
+#endif
   }
-  static void BindTex(typename ComplexTypeId<double>::Type *delta, typename ComplexTypeId<double>::Type *gx, size_t bytes){
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-                #ifndef GAUGEFIXING_DONT_USE_GX
+
+  static void BindTex(complex<double> *delta, complex<double> *gx, size_t bytes){
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+#ifndef GAUGEFIXING_DONT_USE_GX
     cudaBindTexture(0, GXTexDouble, gx, bytes);
-                #endif
+#endif
     cudaBindTexture(0, DELTATexDouble, delta, bytes);
-        #endif
+#endif
   }
 
-  static void UnBindTex(typename ComplexTypeId<float>::Type *delta, typename ComplexTypeId<float>::Type *gx){
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-                #ifndef GAUGEFIXING_DONT_USE_GX
+  static void UnBindTex(complex<float> *delta, complex<float> *gx){
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+#ifndef GAUGEFIXING_DONT_USE_GX
     cudaUnbindTexture(GXTexSingle);
-                #endif
+#endif
     cudaUnbindTexture(DELTATexSingle);
-        #endif
+#endif
   }
-  static void UnBindTex(typename ComplexTypeId<double>::Type *delta, typename ComplexTypeId<double>::Type *gx){
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-                #ifndef GAUGEFIXING_DONT_USE_GX
+
+  static void UnBindTex(complex<double> *delta, complex<double> *gx){
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+#ifndef GAUGEFIXING_DONT_USE_GX
     cudaUnbindTexture(GXTexDouble);
-                #endif
+#endif
     cudaUnbindTexture(DELTATexDouble);
-        #endif
+#endif
   }
 
 
-  template <typename Cmplx>
+  template <typename Float>
   struct GaugeFixFFTRotateArg {
     int threads;     // number of active threads required
     int X[4];     // grid dimensions
-    Cmplx *tmp0;
-    Cmplx *tmp1;
+    complex<Float> *tmp0;
+    complex<Float> *tmp1;
     GaugeFixFFTRotateArg(const cudaGaugeField &data){
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
@@ -130,8 +133,8 @@ namespace quda {
 
 
 
-  template <int direction, typename Cmplx>
-  __global__ void fft_rotate_kernel_2D2D(GaugeFixFFTRotateArg<Cmplx> arg){ //Cmplx *data_in, Cmplx *data_out){
+  template <int direction, typename Float>
+  __global__ void fft_rotate_kernel_2D2D(GaugeFixFFTRotateArg<Float> arg){ //Cmplx *data_in, Cmplx *data_out){
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if ( id >= arg.threads ) return;
     if ( direction == 0 ) {
@@ -152,8 +155,6 @@ namespace quda {
       int x3 = (id / arg.X[2]) % arg.X[3];
       int x2 = id % arg.X[2];
 
-
-
       int id  =  x2 + (x3 +  (x0 + x1 * arg.X[0]) * arg.X[3]) * arg.X[2];
       int id_out =  x0 + (x1 + (x2 + x3 * arg.X[2]) * arg.X[1]) * arg.X[0];
       arg.tmp1[id_out] = arg.tmp0[id];
@@ -166,10 +167,10 @@ namespace quda {
 
 
 
-  template<typename Cmplx>
+  template<typename Float>
   class GaugeFixFFTRotate : Tunable {
-    GaugeFixFFTRotateArg<Cmplx> arg;
-    unsigned int direction;
+    GaugeFixFFTRotateArg<Float> arg;
+    int direction;
     mutable char aux_string[128];     // used as a label in the autotuner
     private:
     unsigned int sharedBytesPerThread() const {
@@ -187,13 +188,12 @@ namespace quda {
     }
 
     public:
-    GaugeFixFFTRotate(GaugeFixFFTRotateArg<Cmplx> &arg)
-      : arg(arg) {
+    GaugeFixFFTRotate(GaugeFixFFTRotateArg<Float> &arg) : arg(arg) {
       direction = 0;
     }
     ~GaugeFixFFTRotate () {
     }
-    void setDirection(unsigned int dir, Cmplx *data_in, Cmplx *data_out){
+    void setDirection(int dir, complex<Float> *data_in, complex<Float> *data_out){
       direction = dir;
       arg.tmp0 = data_in;
       arg.tmp1 = data_out;
@@ -202,9 +202,9 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if ( direction == 0 )
-        fft_rotate_kernel_2D2D<0, Cmplx><< < tp.grid, tp.block, 0, stream >> > (arg);
+        fft_rotate_kernel_2D2D<0, Float ><< < tp.grid, tp.block, 0, stream >> > (arg);
       else if ( direction == 1 )
-        fft_rotate_kernel_2D2D<1, Cmplx><< < tp.grid, tp.block, 0, stream >> > (arg);
+        fft_rotate_kernel_2D2D<1, Float ><< < tp.grid, tp.block, 0, stream >> > (arg);
       else
         errorQuda("Error in GaugeFixFFTRotate option.\n");
     }
@@ -215,74 +215,58 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Cmplx) / 2);
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
+
     long long flops() const {
       return 0;
     }
     long long bytes() const {
-      return 2LL * sizeof(Cmplx) * arg.threads;
+      return 4LL * sizeof(Float) * arg.threads;
     }
 
   };
 
 
-  template <typename Cmplx, typename Gauge>
+  template <typename Float, typename Gauge>
   struct GaugeFixQualityArg : public ReduceArg<double2> {
     int threads;     // number of active threads required
     int X[4];     // grid dimensions
     Gauge dataOr;
-    Cmplx *delta;
+    complex<Float> *delta;
 
-    GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, Cmplx * delta)
+    GaugeFixQualityArg(const Gauge &dataOr, const cudaGaugeField &data, complex<Float> * delta)
       : ReduceArg<double2>(), dataOr(dataOr), delta(delta) {
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
-      threads = X[0] * X[1] * X[2] * X[3];
+      threads = data.VolumeCB();
     }
     double getAction(){ return result_h[0].x; }
     double getTheta(){ return result_h[0].y; }
   };
 
-
-
-  template<int blockSize, unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
-  __global__ void computeFix_quality(GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> argQ){
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+  template<int blockSize, int Elems, typename Float, typename Gauge, int gauge_dir>
+  __global__ void computeFix_quality(GaugeFixQualityArg<Float, Gauge> argQ){
+    int idx_cb = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
 
     double2 data = make_double2(0.0,0.0);
-    if ( idx < argQ.threads ) {
-      typedef typename ComplexTypeId<Float>::Type Cmplx;
-      int parity = 0;
-      if ( idx >= argQ.threads / 2 ) {
-        parity = 1;
-        idx -= argQ.threads / 2;
-      }
-      //int X[4];
-      //for(int dr=0; dr<4; ++dr) X[dr] = argQ.X[dr];
+    while (idx_cb < argQ.threads) {
+      typedef complex<Float> Cmplx;
+
       int x[4];
-      getCoords(x, idx, argQ.X, parity);
+      getCoords(x, idx_cb, argQ.X, parity);
       Matrix<Cmplx,3> delta;
       setZero(&delta);
       //idx = linkIndex(x,X);
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),idx, mu, parity);
+        argQ.dataOr.load((Float *)(U.data), idx_cb, mu, parity);
         delta -= U;
       }
       //18*gauge_dir
-      data.x = -delta(0,0).x - delta(1,1).x - delta(2,2).x;
+      data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
       //2
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
         Matrix<Cmplx,3> U;
@@ -294,46 +278,37 @@ namespace quda {
       //18
       //SAVE DELTA!!!!!
       SubTraceUnit(delta);
-      idx = getIndexFull(idx, argQ.X, parity);
+      int idx = getIndexFull(idx_cb, argQ.X, parity);
       //Saving Delta
       argQ.delta[idx] = delta(0,0);
-      argQ.delta[idx + argQ.threads] = delta(0,1);
-      argQ.delta[idx + 2 * argQ.threads] = delta(0,2);
-      argQ.delta[idx + 3 * argQ.threads] = delta(1,1);
-      argQ.delta[idx + 4 * argQ.threads] = delta(1,2);
-      argQ.delta[idx + 5 * argQ.threads] = delta(2,2);
+      argQ.delta[idx + 2 * argQ.threads] = delta(0,1);
+      argQ.delta[idx + 4 * argQ.threads] = delta(0,2);
+      argQ.delta[idx + 6 * argQ.threads] = delta(1,1);
+      argQ.delta[idx + 8 * argQ.threads] = delta(1,2);
+      argQ.delta[idx + 10 * argQ.threads] = delta(2,2);
       //12
-      data.y = getRealTraceUVdagger(delta, delta);
+      data.y += getRealTraceUVdagger(delta, delta);
       //35
       //T=36*gauge_dir+65
+
+      idx_cb += blockDim.x * gridDim.x;
     }
 
-    reduce<blockSize>(argQ, data);
+    reduce2d<blockSize,2>(argQ, data);
   }
 
 
 
-  template<unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
-  class GaugeFixQuality : Tunable {
-    GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> argQ;
+  template<int Elems, typename Float, typename Gauge, int gauge_dir>
+  class GaugeFixQuality : TunableLocalParity {
+    GaugeFixQualityArg<Float, Gauge> argQ;
     mutable char aux_string[128];     // used as a label in the autotuner
-    private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const {return false;}  // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return argQ.threads;
-    }
 
-    public:
-    GaugeFixQuality(GaugeFixQualityArg<typename ComplexTypeId<Float>::Type, Gauge> &argQ)
+  private:
+    bool tuneGridDim() const { return true; }
+
+  public:
+    GaugeFixQuality(GaugeFixQualityArg<Float, Gauge> &argQ)
       : argQ(argQ) {
     }
     ~GaugeFixQuality () { }
@@ -341,37 +316,24 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
-      LAUNCH_KERNEL(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
-      cudaDeviceSynchronize();
-      argQ.result_h[0].x  /= (double)(3 * gauge_dir * argQ.threads);
-      argQ.result_h[0].y  /= (double)(3 * argQ.threads);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
+      qudaDeviceSynchronize();
+      argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads);
+      argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads);
     }
 
     TuneKey tuneKey() const {
       std::stringstream vol;
-      vol << argQ.X[0] << "x";
-      vol << argQ.X[1] << "x";
-      vol << argQ.X[2] << "x";
-      vol << argQ.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d,gaugedir=%d",argQ.threads, sizeof(Float),gauge_dir);
+      vol << argQ.X[0] << "x" << argQ.X[1] << "x" << argQ.X[2] << "x" << argQ.X[3];
+      sprintf(aux_string,"threads=%d,prec=%lu,gaugedir=%d", argQ.threads, sizeof(Float), gauge_dir);
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
+    }
 
-    }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
     long long flops() const {
-      return (36LL * gauge_dir + 65LL) * argQ.threads;
+      return (36LL * gauge_dir + 65LL) * 2 * argQ.threads;
     }                                                                         // Only correct if there is no link reconstruction, no cub reduction accounted also
     long long bytes() const {
-      return (2LL * gauge_dir + 2LL) * Elems * argQ.threads * sizeof(Float);
+      return (2LL * gauge_dir + 2LL) * Elems * 2 * argQ.threads * sizeof(Float);
     }                                                                                                    //Not accounting the reduction!!!
 
   };
@@ -384,20 +346,20 @@ namespace quda {
     int X[4];     // grid dimensions
     cudaGaugeField &data;
     Float *invpsq;
-    typename ComplexTypeId<Float>::Type *delta;
-    typename ComplexTypeId<Float>::Type *gx;
+    complex<Float> *delta;
+    complex<Float> *gx;
 
-    GaugeFixArg( cudaGaugeField & data, const unsigned int Elems) : data(data){
+    GaugeFixArg( cudaGaugeField & data, const int Elems) : data(data){
       for ( int dir = 0; dir < 4; ++dir ) X[dir] = data.X()[dir];
       threads = X[0] * X[1] * X[2] * X[3];
       invpsq = (Float*)device_malloc(sizeof(Float) * threads);
-      delta = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * 6);
+      delta = (complex<Float>*)device_malloc(sizeof(complex<Float>) * threads * 6);
 #ifdef GAUGEFIXING_DONT_USE_GX
-      gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads);
+      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * threads);
 #else
-      gx = (typename ComplexTypeId<Float>::Type *)device_malloc(sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
+      gx = (complex<Float>*)device_malloc(sizeof(complex<Float>) * threads * Elems);
 #endif
-      BindTex(delta, gx, sizeof(typename ComplexTypeId<Float>::Type) * threads * Elems);
+      BindTex(delta, gx, sizeof(complex<Float>) * threads * Elems);
     }
     void free(){
       UnBindTex(delta, gx);
@@ -453,10 +415,8 @@ namespace quda {
     }
 
     public:
-    GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) {
-    }
-    ~GaugeFixSETINVPSP () {
-    }
+    GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) { }
+    ~GaugeFixSETINVPSP () { }
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -469,20 +429,11 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
+
     long long flops() const {
       return 21 * arg.threads;
     }
@@ -537,19 +488,14 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     void preTune(){
       //since delta contents are irrelevant at this point, we can swap gx with delta
-      typename ComplexTypeId<Float>::Type *tmp = arg.gx;
+      complex<Float> *tmp = arg.gx;
       arg.gx = arg.delta;
       arg.delta = tmp;
     }
@@ -567,28 +513,15 @@ namespace quda {
 
 
 
-
-
-
-
-  template<typename Cmplx>
-  __device__ __host__ inline typename RealTypeId<Cmplx>::Type Abs2(const Cmplx & a){
-    return a.x * a.x + a.y * a.y;
-  }
-
-
-
   template <typename Float>
-  __host__ __device__ inline void reunit_link( Matrix<typename ComplexTypeId<Float>::Type,3> &U ){
+  __host__ __device__ inline void reunit_link( Matrix<complex<Float>,3> &U ){
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-
-    Cmplx t2 = makeComplex((Float)0.0, (Float)0.0);
+    complex<Float> t2((Float)0.0, (Float)0.0);
     Float t1 = 0.0;
     //first normalize first row
     //sum of squares of row
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t1 += Abs2(U(0, c));
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(0,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
@@ -596,7 +529,7 @@ namespace quda {
     for ( int c = 0; c < 3; c++ ) U(0,c) *= t1;
     //6
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t2 += Conj(U(0,c)) * U(1,c);
+    for ( int c = 0; c < 3; c++ ) t2 += conj(U(0,c)) * U(1,c);
     //24
 #pragma unroll
     for ( int c = 0; c < 3; c++ ) U(1,c) -= t2 * U(0,c);
@@ -605,7 +538,7 @@ namespace quda {
     //sum of squares of row
     t1 = 0.0;
 #pragma unroll
-    for ( int c = 0; c < 3; c++ ) t1 += Abs2(U(1,c));
+    for ( int c = 0; c < 3; c++ ) t1 += norm(U(1,c));
     t1 = (Float)1.0 / sqrt(t1);
     //14
     //used to normalize row
@@ -613,9 +546,9 @@ namespace quda {
     for ( int c = 0; c < 3; c++ ) U(1, c) *= t1;
     //6
     //Reconstruct lat row
-    U(2,0) = Conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
-    U(2,1) = Conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
-    U(2,2) = Conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
+    U(2,0) = conj(U(0,1) * U(1,2) - U(0,2) * U(1,1));
+    U(2,1) = conj(U(0,2) * U(1,0) - U(0,0) * U(1,2));
+    U(2,2) = conj(U(0,0) * U(1,1) - U(0,1) * U(1,0));
     //42
     //T=130
   }
@@ -624,41 +557,36 @@ namespace quda {
 
   template <typename Float, typename Gauge>
   __global__ void kernel_gauge_fix_U_EO_NEW( GaugeFixArg<Float> arg, Gauge dataOr, Float half_alpha){
-    int idd = threadIdx.x + blockIdx.x * blockDim.x;
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y;
 
-    if ( idd >= arg.threads ) return;
+    if ( id >= arg.threads/2 ) return;
 
-    int parity = 0;
-    int id = idd;
-    if ( idd >= arg.threads / 2 ) {
-      parity = 1;
-      id -= arg.threads / 2;
-    }
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Cmplx;
 
     int x[4];
     getCoords(x, id, arg.X, parity);
     int idx = ((x[3] * arg.X[2] + x[2]) * arg.X[1] + x[1]) * arg.X[0] + x[0];
     Matrix<Cmplx,3> de;
     //Read Delta
-        #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-    de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
-    de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+    de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
+    de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
     de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
     de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
     de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
     de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
-        #else
-    de(0,0) = arg.delta[idx];
-    de(0,1) = arg.delta[idx + arg.threads];
+#else
+    de(0,0) = arg.delta[idx + 0 * arg.threads];
+    de(0,1) = arg.delta[idx + 1 * arg.threads];
     de(0,2) = arg.delta[idx + 2 * arg.threads];
     de(1,1) = arg.delta[idx + 3 * arg.threads];
     de(1,2) = arg.delta[idx + 4 * arg.threads];
     de(2,2) = arg.delta[idx + 5 * arg.threads];
-        #endif
-    de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
-    de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
-    de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+#endif
+    de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
+    de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
+    de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
     Matrix<Cmplx,3> g;
     setIdentity(&g);
     g += de * half_alpha;
@@ -675,24 +603,24 @@ namespace quda {
       //198
       idx = linkNormalIndexP1(x,arg.X,mu);
       //Read Delta
-                #ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
-      de(0,0) = TEXTURE_DELTA<Cmplx>(idx);
-      de(0,1) = TEXTURE_DELTA<Cmplx>(idx + arg.threads);
+#ifdef GAUGEFIXING_SITE_MATRIX_LOAD_TEX
+      de(0,0) = TEXTURE_DELTA<Cmplx>(idx + 0 * arg.threads);
+      de(0,1) = TEXTURE_DELTA<Cmplx>(idx + 1 * arg.threads);
       de(0,2) = TEXTURE_DELTA<Cmplx>(idx + 2 * arg.threads);
       de(1,1) = TEXTURE_DELTA<Cmplx>(idx + 3 * arg.threads);
       de(1,2) = TEXTURE_DELTA<Cmplx>(idx + 4 * arg.threads);
       de(2,2) = TEXTURE_DELTA<Cmplx>(idx + 5 * arg.threads);
-                #else
-      de(0,0) = arg.delta[idx];
-      de(0,1) = arg.delta[idx + arg.threads];
+#else
+      de(0,0) = arg.delta[idx + 0 * arg.threads];
+      de(0,1) = arg.delta[idx + 1 * arg.threads];
       de(0,2) = arg.delta[idx + 2 * arg.threads];
       de(1,1) = arg.delta[idx + 3 * arg.threads];
       de(1,2) = arg.delta[idx + 4 * arg.threads];
       de(2,2) = arg.delta[idx + 5 * arg.threads];
-                #endif
-      de(1,0) = makeComplex(-de(0,1).x, de(0,1).y);
-      de(2,0) = makeComplex(-de(0,2).x, de(0,2).y);
-      de(2,1) = makeComplex(-de(1,2).x, de(1,2).y);
+#endif
+      de(1,0) = Cmplx(-de(0,1).x, de(0,1).y);
+      de(2,0) = Cmplx(-de(0,2).x, de(0,2).y);
+      de(2,1) = Cmplx(-de(1,2).x, de(1,2).y);
 
       setIdentity(&g0);
       g0 += de * half_alpha;
@@ -708,25 +636,17 @@ namespace quda {
 
 
   template<typename Float, typename Gauge>
-  class GaugeFixNEW : Tunable {
+  class GaugeFixNEW : TunableLocalParity {
     GaugeFixArg<Float> arg;
     Float half_alpha;
     Gauge dataOr;
     mutable char aux_string[128];     // used as a label in the autotuner
     private:
-    unsigned int sharedBytesPerThread() const {
-      return 0;
-    }
-    unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      return 0;
-    }
-    //bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-    bool tuneGridDim() const {
-      return false;
-    }                                              // Don't tune the grid dimensions.
-    unsigned int minThreads() const {
-      return arg.threads;
-    }
+
+    // since GaugeFixArg is used by other kernels that don't use
+    // tunableLocalParity, arg.threads stores Volume and not VolumeCB
+    // so we need to divide by two
+    unsigned int minThreads() const { return arg.threads/2; }
 
     public:
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
@@ -734,13 +654,9 @@ namespace quda {
       half_alpha = alpha * 0.5;
       cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
     }
-    ~GaugeFixNEW () {
-    }
+    ~GaugeFixNEW () { }
 
-    void setAlpha(Float alpha){
-      half_alpha = alpha * 0.5;
-    }
-
+    void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -749,20 +665,12 @@ namespace quda {
 
     TuneKey tuneKey() const {
       std::stringstream vol;
-      vol << arg.X[0] << "x";
-      vol << arg.X[1] << "x";
-      vol << arg.X[2] << "x";
-      vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      vol << arg.X[0] << "x" << arg.X[1] << "x" << arg.X[2] << "x" << arg.X[3];
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     //need this
     void preTune() {
       arg.data.backup();
@@ -783,14 +691,14 @@ namespace quda {
 
 
 #else
-  template <unsigned int Elems, typename Float>
+  template <int Elems, typename Float>
   __global__ void kernel_gauge_GX(GaugeFixArg<Float> arg, Float half_alpha){
 
     int id = blockIdx.x * blockDim.x + threadIdx.x;
 
     if ( id >= arg.threads ) return;
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Cmplx;
 
     Matrix<Cmplx,3> de;
     //Read Delta
@@ -837,7 +745,7 @@ namespace quda {
 
 
 
-  template<unsigned int Elems, typename Float>
+  template<int Elems, typename Float>
   class GaugeFix_GX : Tunable {
     GaugeFixArg<Float> arg;
     Float half_alpha;
@@ -882,20 +790,11 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
-    void preTune(){
-    }
-    void postTune(){
-    }
+
     long long flops() const {
       if ( Elems == 6 ) return 208LL * arg.threads;
       else return 166LL * arg.threads;
@@ -907,7 +806,7 @@ namespace quda {
   };
 
 
-  template <unsigned int Elems, typename Float, typename Gauge>
+  template <int Elems, typename Float, typename Gauge>
   __global__ void kernel_gauge_fix_U_EO( GaugeFixArg<Float> arg, Gauge dataOr){
     int idd = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -919,7 +818,7 @@ namespace quda {
       parity = 1;
       id -= arg.threads / 2;
     }
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
+    typedef complex<Float> Cmplx;
 
     Matrix<Cmplx,3> g;
     //for(int i = 0; i < Elems; i++) g.data[i] = arg.gx[idd + i * arg.threads];
@@ -931,9 +830,9 @@ namespace quda {
                 #endif
     }
     if ( Elems == 6 ) {
-      g(2,0) = Conj(g(0,1) * g(1,2) - g(0,2) * g(1,1));
-      g(2,1) = Conj(g(0,2) * g(1,0) - g(0,0) * g(1,2));
-      g(2,2) = Conj(g(0,0) * g(1,1) - g(0,1) * g(1,0));
+      g(2,0) = conj(g(0,1) * g(1,2) - g(0,2) * g(1,1));
+      g(2,1) = conj(g(0,2) * g(1,0) - g(0,0) * g(1,2));
+      g(2,2) = conj(g(0,0) * g(1,1) - g(0,1) * g(1,0));
       //42
     }
     int x[4];
@@ -955,9 +854,9 @@ namespace quda {
                         #endif
       }
       if ( Elems == 6 ) {
-        g0(2,0) = Conj(g0(0,1) * g0(1,2) - g0(0,2) * g0(1,1));
-        g0(2,1) = Conj(g0(0,2) * g0(1,0) - g0(0,0) * g0(1,2));
-        g0(2,2) = Conj(g0(0,0) * g0(1,1) - g0(0,1) * g0(1,0));
+        g0(2,0) = conj(g0(0,1) * g0(1,2) - g0(0,2) * g0(1,1));
+        g0(2,1) = conj(g0(0,2) * g0(1,0) - g0(0,0) * g0(1,2));
+        g0(2,2) = conj(g0(0,0) * g0(1,1) - g0(0,1) * g0(1,0));
         //42
       }
       U = U * conj(g0);
@@ -970,7 +869,7 @@ namespace quda {
   }
 
 
-  template<unsigned int Elems, typename Float, typename Gauge>
+  template<int Elems, typename Float, typename Gauge>
   class GaugeFix : Tunable {
     GaugeFixArg<Float> arg;
     Gauge dataOr;
@@ -995,8 +894,7 @@ namespace quda {
       : dataOr(dataOr), arg(arg) {
       cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   cudaFuncCachePreferL1);
     }
-    ~GaugeFix () {
-    }
+    ~GaugeFix () { }
 
 
     void apply(const cudaStream_t &stream){
@@ -1010,16 +908,11 @@ namespace quda {
       vol << arg.X[1] << "x";
       vol << arg.X[2] << "x";
       vol << arg.X[3];
-      sprintf(aux_string,"threads=%d,prec=%d",arg.threads, sizeof(Float));
+      sprintf(aux_string,"threads=%d,prec=%lu", arg.threads, sizeof(Float));
       return TuneKey(vol.str().c_str(), typeid(*this).name(), aux_string);
 
     }
-    std::string paramString(const TuneParam &param) const {
-      std::stringstream ps;
-      ps << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << ")";
-      ps << "shared=" << param.shared_bytes;
-      return ps.str();
-    }
+
     //need this
     void preTune() {
       arg.data.backup();
@@ -1041,57 +934,11 @@ namespace quda {
 //GAUGEFIXING_DONT_USE_GX
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  template<unsigned int Elems, typename Float, typename Gauge, int gauge_dir>
+  template<int Elems, typename Float, typename Gauge, int gauge_dir>
   void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, \
-                       const Float alpha0, const unsigned int autotune, const double tolerance, \
-                       const unsigned int stopWtheta) {
+                       const int Nsteps, const int verbose_interval, \
+                       const Float alpha0, const int autotune, const double tolerance, \
+                       const int stopWtheta) {
 
     TimeProfile profileInternalGaugeFixFFT("InternalGaugeFixQudaFFT", false);
 
@@ -1108,8 +955,6 @@ namespace quda {
     std::cout << "\tPrint convergence results at every " << verbose_interval << " steps" << std::endl;
 
 
-    typedef typename ComplexTypeId<Float>::Type Cmplx;
-
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4( data.X()[0], data.X()[1], data.X()[2], data.X()[3] );
     cufftHandle plan_xy;
@@ -1120,24 +965,24 @@ namespace quda {
     SetPlanFFT2DMany( plan_xy, size, 1, arg.delta);    //with space only XY
 
 
-    GaugeFixFFTRotateArg<Cmplx> arg_rotate(data);
-    GaugeFixFFTRotate<Cmplx> GFRotate(arg_rotate);
+    GaugeFixFFTRotateArg<Float> arg_rotate(data);
+    GaugeFixFFTRotate<Float> GFRotate(arg_rotate);
 
     GaugeFixSETINVPSP<Float> setinvpsp(arg);
     setinvpsp.apply(0);
     GaugeFixINVPSP<Float> invpsp(arg);
 
 
-        #ifdef GAUGEFIXING_DONT_USE_GX
+#ifdef GAUGEFIXING_DONT_USE_GX
     //without using GX, gx will be created only for plane rotation but with less size
     GaugeFixNEW<Float, Gauge> gfixNew(dataOr, arg, alpha);
-        #else
+#else
     //using GX
     GaugeFix_GX<Elems, Float> calcGX(arg, alpha);
     GaugeFix<Elems, Float, Gauge> gfix(dataOr, arg);
-        #endif
+#endif
 
-    GaugeFixQualityArg<Cmplx, Gauge> argQ(dataOr, data, arg.delta);
+    GaugeFixQualityArg<Float, Gauge> argQ(dataOr, data, arg.delta);
     GaugeFixQuality<Elems, Float, Gauge, gauge_dir> gfixquality(argQ);
 
     gfixquality.apply(0);
@@ -1153,7 +998,7 @@ namespace quda {
         // each element is stored with stride lattice volume
         // it uses gx as temporary array!!!!!!
         //------------------------------------------------------------------------
-        Cmplx *_array = arg.delta + k * delta_pad;
+        complex<Float> *_array = arg.delta + k * delta_pad;
         //////  2D FFT + 2D FFT
         //------------------------------------------------------------------------
         // Perform FFT on xy plane
@@ -1242,18 +1087,16 @@ namespace quda {
                                reunit_allow_svd, reunit_svd_only,
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
-    int* num_failures_dev;
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
+    int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
     cudaMemset(num_failures_dev, 0, sizeof(int));
-    if ( num_failures_dev == NULL ) errorQuda("cudaMalloc failed for dev_pointer\n");
-    unitarizeLinksQuda(data, data, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    unitarizeLinks(data, data, num_failures_dev);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+
+    pool_device_free(num_failures_dev);
     if ( num_failures > 0 ) {
-      cudaFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaFree(num_failures_dev);
     // end reunitarize
 
 
@@ -1261,7 +1104,7 @@ namespace quda {
     CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() > QUDA_SUMMARIZE){
@@ -1296,10 +1139,10 @@ namespace quda {
     }
   }
 
-  template<unsigned int Elems, typename Float, typename Gauge>
-  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const Float alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  template<int Elems, typename Float, typename Gauge>
+  void gaugefixingFFT( Gauge dataOr,  cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
     if ( gauge_dir != 3 ) {
       printf("Starting Landau gauge fixing with FFTs...\n");
       gaugefixingFFT<Elems, Float, Gauge, 4>(dataOr, data, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
@@ -1313,9 +1156,9 @@ namespace quda {
 
 
   template<typename Float>
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const Float alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const Float alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
 
     // Switching to FloatNOrder for the gauge field in order to support RECONSTRUCT_12
     // Need to fix this!!
@@ -1356,9 +1199,9 @@ namespace quda {
    * @param[in] tolerance, torelance value to stop the method, if this value is zero then the method stops when iteration reachs the maximum number of steps defined by Nsteps
    * @param[in] stopWtheta, 0 for MILC criterium and 1 to use the theta value
    */
-  void gaugefixingFFT( cudaGaugeField& data, const unsigned int gauge_dir, \
-                       const unsigned int Nsteps, const unsigned int verbose_interval, const double alpha, const unsigned int autotune, \
-                       const double tolerance, const unsigned int stopWtheta) {
+  void gaugefixingFFT( cudaGaugeField& data, const int gauge_dir, \
+                       const int Nsteps, const int verbose_interval, const double alpha, const int autotune, \
+                       const double tolerance, const int stopWtheta) {
 
 #ifdef GPU_GAUGE_ALG
 #ifdef MULTI_GPU

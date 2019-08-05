@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,11 +9,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-
-#include <face_quda.h>
-
-#include <iostream>
 
 namespace quda {
 
@@ -130,7 +126,7 @@ namespace quda {
     mat(r, x, temp);
     param.true_res = sqrt(xmyNormCuda(b, r)/b2);
 
-    PrintSummary("SimpleBiCGstab", k, r2, b2);
+    PrintSummary("SimpleBiCGstab", k, r2, b2, stop, param.tol_hq);
 
     return;
   }

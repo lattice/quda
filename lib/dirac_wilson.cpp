@@ -1,33 +1,16 @@
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <iostream>
+#include <multigrid.h>
 
 namespace quda {
 
-  namespace wilson {
-#include <dslash_init.cuh>
-  }
+  DiracWilson::DiracWilson(const DiracParam &param) : Dirac(param) { }
 
-  DiracWilson::DiracWilson(const DiracParam &param) : 
-    Dirac(param), face1(param.gauge->X(), 4, 12, 1, param.gauge->Precision()),
-                  face2(param.gauge->X(), 4, 12, 1, param.gauge->Precision()) 
-    { 
-      wilson::initConstants(*param.gauge, profile);
-    }
+  DiracWilson::DiracWilson(const DiracWilson &dirac) : Dirac(dirac) { }
 
-  DiracWilson::DiracWilson(const DiracWilson &dirac) : 
-    Dirac(dirac), face1(dirac.face1), face2(dirac.face2) 
-    { 
-      wilson::initConstants(dirac.gauge, profile);
-    }
-
-  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : 
-    Dirac(param), face1(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls),
-    face2(param.gauge->X(), nDims, 12, 1, param.gauge->Precision(), param.Ls) 
-  { 
-    wilson::initConstants(*param.gauge, profile);
-    
-  }//temporal hack (for DW and TM operators) 
+  // hack (for DW and TM operators)
+  DiracWilson::DiracWilson(const DiracParam &param, const int nDims) : Dirac(param) { } 
 
   DiracWilson::~DiracWilson() { }
 
@@ -35,47 +18,40 @@ namespace quda {
   {
     if (&dirac != this) {
       Dirac::operator=(dirac);
-      face1 = dirac.face1;
-      face2 = dirac.face2;
     }
     return *this;
   }
 
-  void DiracWilson::Dslash(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
+  void DiracWilson::Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			   const QudaParity parity) const
   {
-    wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, 0, 0.0, commDim, profile);
-
+    ApplyWilson(out, in, *gauge, 0.0, in, parity, dagger, commDim, profile);
     flops += 1320ll*in.Volume();
   }
 
-  void DiracWilson::DslashXpay(cudaColorSpinorField &out, const cudaColorSpinorField &in, 
-			       const QudaParity parity, const cudaColorSpinorField &x,
+  void DiracWilson::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			       const QudaParity parity, const ColorSpinorField &x,
 			       const double &k) const
   {
-    wilson::setFace(face1,face2); // FIXME: temporary hack maintain C linkage for dslashCuda
-
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    wilsonDslashCuda(&out, gauge, &in, parity, dagger, &x, k, commDim, profile);
-
+    ApplyWilson(out, in, *gauge, k, x, parity, dagger, commDim, profile);
     flops += 1368ll*in.Volume();
   }
 
-  void DiracWilson::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilson::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
+
+    ApplyWilson(out, in, *gauge, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    flops += 1368ll * in.Volume();
   }
 
-  void DiracWilson::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilson::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
@@ -88,8 +64,8 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracWilson::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			    cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracWilson::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			    ColorSpinorField &x, ColorSpinorField &b, 
 			    const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -100,10 +76,29 @@ namespace quda {
     sol = &x;
   }
 
-  void DiracWilson::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracWilson::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				const QudaSolutionType solType) const
   {
     // do nothing
+  }
+
+  /* Creates the coarse grid dirac operator
+  Takes: multigrid transfer class, which knows
+  about the coarse grid blocking, as well as
+  having prolongate and restrict member functions
+  
+  Returns: Color matrices Y[0..2*dim] corresponding
+  to the coarse grid operator.  The first 2*dim
+  matrices correspond to the forward/backward
+  hopping terms on the coarse grid.  Y[2*dim] is
+  the color matrix that is diagonal on the coarse
+  grid
+  */
+  void DiracWilson::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				   double kappa, double mass, double mu, double mu_factor) const {
+    double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
+    cudaCloverField *c = NULL;
+    CoarseOp(Y, X, T, *gauge, c, kappa, a, mu_factor, QUDA_WILSON_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracWilsonPC::DiracWilsonPC(const DiracParam &param)
@@ -131,7 +126,7 @@ namespace quda {
     return *this;
   }
 
-  void DiracWilsonPC::M(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilsonPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double kappa2 = -kappa*kappa;
 
@@ -150,21 +145,16 @@ namespace quda {
     deleteTmp(&tmp1, reset);
   }
 
-  void DiracWilsonPC::MdagM(cudaColorSpinorField &out, const cudaColorSpinorField &in) const
+  void DiracWilsonPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-#ifdef MULTI_GPU
     bool reset = newTmp(&tmp2, in);
     M(*tmp2, in);
     Mdag(out, *tmp2);
     deleteTmp(&tmp2, reset);
-#else
-    M(out, in);
-    Mdag(out, out);
-#endif
   }
 
-  void DiracWilsonPC::prepare(cudaColorSpinorField* &src, cudaColorSpinorField* &sol,
-			      cudaColorSpinorField &x, cudaColorSpinorField &b, 
+  void DiracWilsonPC::prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			      ColorSpinorField &x, ColorSpinorField &b, 
 			      const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
@@ -192,7 +182,7 @@ namespace quda {
 
   }
 
-  void DiracWilsonPC::reconstruct(cudaColorSpinorField &x, const cudaColorSpinorField &b,
+  void DiracWilsonPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 				  const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) {

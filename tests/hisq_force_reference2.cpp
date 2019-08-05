@@ -339,7 +339,6 @@ int LoadStore<Real>::half_idx_conversion_ex2normal(int half_lattice_index_ex, co
   int X2=dim[1];
   int X3=dim[2];
   //int X4=dim[3];
-  int X1h=X1/2;
   
   int E1=dim[0]+4;
   int E2=dim[1]+4;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <type_traits>
 
 #include "quda.h"
 #include "test_util.h"
@@ -75,8 +76,7 @@ template<typename su3_matrix, typename anti_hermitmat>
 void
 make_anti_hermitian( su3_matrix *m3, anti_hermitmat *ah3 ) 
 {
-    
-    typeof(ah3->m00im) temp =
+    auto temp =
 	(m3->e[0][0].imag + m3->e[1][1].imag + m3->e[2][2].imag)*0.33333333333333333;
     ah3->m00im = m3->e[0][0].imag - temp;
     ah3->m11im = m3->e[1][1].imag - temp;
@@ -95,7 +95,7 @@ static void
 uncompress_anti_hermitian(anti_hermitmat *mat_antihermit,
 			  su3_matrix *mat_su3 )
 {
-    typeof(mat_antihermit->m00im) temp1;
+    typename std::remove_reference<decltype(mat_antihermit->m00im)>::type temp1;
     mat_su3->e[0][0].imag=mat_antihermit->m00im;
     mat_su3->e[0][0].real=0.;
     mat_su3->e[1][1].imag=mat_antihermit->m11im;
@@ -150,7 +150,7 @@ static void
 mult_su3_nn(su3_matrix* a, su3_matrix* b, su3_matrix* c)
 {
     int i,j,k;
-    typeof(a->e[0][0]) x,y;
+    typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
     for(i=0;i<3;i++){
 	for(j=0;j<3;j++){
 	    x.real=x.imag=0.0;
@@ -167,7 +167,7 @@ static void
 mult_su3_an( su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
     int i,j,k;
-    typeof(a->e[0][0]) x,y;
+    typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
     for(i=0;i<3;i++){
 	for(j=0;j<3;j++){
 	    x.real=x.imag=0.0;
@@ -185,7 +185,7 @@ static void
 mult_su3_na(  su3_matrix *a, su3_matrix *b, su3_matrix *c )
 {
     int i,j,k;
-    typeof(a->e[0][0]) x,y;
+    typename std::remove_reference<decltype(a->e[0][0])>::type x,y;
     for(i=0;i<3;i++){
 	for(j=0;j<3;j++){
 	    x.real=x.imag=0.0;

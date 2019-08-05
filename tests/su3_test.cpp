@@ -1,19 +1,24 @@
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
 #include <string.h>
 
+#include <util_quda.h>
 #include <test_util.h>
 #include <dslash_util.h>
+#include "misc.h"
 
-#include <gauge_qio.h>
-#include <util_quda.h>
+#include <qio_field.h>
 
-#ifdef QMP_COMMS
+#if defined(QMP_COMMS)
 #include <qmp.h>
+#elif defined(MPI_COMMS)
+#include <mpi.h>
 #endif
 
-QudaGaugeParam param;
-void *gauge[4], *new_gauge[4];
+// In a typical application, quda.h is the only QUDA header required.
+#include <quda.h>
 
 extern bool tune;
 extern int device;
@@ -23,59 +28,200 @@ extern int zdim;
 extern int tdim;
 extern int gridsize_from_cmdline[];
 extern QudaReconstructType link_recon;
+extern QudaReconstructType link_recon_sloppy;
 extern QudaPrecision prec;
+extern QudaPrecision prec_sloppy;
+extern double anisotropy;
+
+extern bool verify_results;
+
 extern char latfile[];
+extern bool unit_gauge;
+
+extern QudaVerbosity verbosity;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-void init() {
+QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
-  param = newQudaGaugeParam();
+void setGaugeParam(QudaGaugeParam &gauge_param) {
 
-  param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  param.cuda_prec = prec;
-  param.reconstruct = link_recon;
-  param.cuda_prec_sloppy = prec;
-  param.reconstruct_sloppy = link_recon;
+  gauge_param.X[0] = xdim;
+  gauge_param.X[1] = ydim;
+  gauge_param.X[2] = zdim;
+  gauge_param.X[3] = tdim;
+
+  gauge_param.anisotropy = anisotropy;
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_PERIODIC_T;
   
-  param.type = QUDA_WILSON_LINKS;
-  param.tadpole_coeff = 0.8;
-  param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.cpu_prec = cpu_prec;
 
-  param.X[0] = xdim;
-  param.X[1] = ydim;
-  param.X[2] = zdim;
-  param.X[3] = tdim;
-  setDims(param.X);
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.reconstruct = link_recon;
 
-  param.anisotropy = 1.0;
-  param.t_boundary = QUDA_PERIODIC_T;
-  param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
 #ifdef MULTI_GPU
-  int x_face_size = param.X[1]*param.X[2]*param.X[3]/2;
-  int y_face_size = param.X[0]*param.X[2]*param.X[3]/2;
-  int z_face_size = param.X[0]*param.X[1]*param.X[3]/2;
-  int t_face_size = param.X[0]*param.X[1]*param.X[2]/2;
-  int pad_size = MAX(x_face_size, y_face_size);
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  param.ga_pad = pad_size;    
-#else
-  param.ga_pad = 0;    
+  gauge_param.ga_pad = pad_size;    
 #endif
+}
 
-  // construct gauge fields
+
+extern void usage(char**);
+
+void SU3test(int argc, char **argv) {
+
+  for (int i = 1; i < argc; i++){
+    if(process_command_line_option(argc, argv, &i) == 0){
+      continue;
+    }
+    printf("ERROR: Invalid option:%s\n", argv[i]);
+    usage(argv);
+  }
+
+  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  initComms(argc, argv, gridsize_from_cmdline);
+
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  if (prec_sloppy == QUDA_INVALID_PRECISION) 
+    prec_sloppy = prec;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) 
+    link_recon_sloppy = link_recon;
+
+  setGaugeParam(gauge_param);
+  setDims(gauge_param.X);
+  size_t gSize = gauge_param.cpu_prec;
+
+  void *gauge[4], *new_gauge[4];
+
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
-    new_gauge[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
+    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+    new_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
   }
 
   initQuda(device);
-  if (tune) setTuning(QUDA_TUNE_YES);
 
-}
+  setVerbosity(verbosity);
 
-void end() {
+  // call srand() with a rank-dependent seed
+  initRand();
+
+  // load in the command line supplied gauge field
+  if (strcmp(latfile,"")) {  
+    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
+  }
+
+  loadGaugeQuda(gauge, &gauge_param);
+  saveGaugeQuda(new_gauge, &gauge_param);
+
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette gauge precise is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+#ifdef GPU_GAUGE_TOOLS
+
+  // Topological charge
+  double qCharge = 0.0, qChargeCheck = 0.0;
+  // start the timer
+  double time0 = -((double)clock());
+  qCharge = qChargeQuda();
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Computed topological charge gauge precise is %.16e Done in %g secs\n", qCharge, time0);
+
+  // Size of floating point data
+  size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
+  size_t array_size = V * sSize;
+  // Void array passed to the GPU. QUDA will allocate GPU memory and pass back a populated host array.
+  void *qDensity = malloc(array_size);
+  qCharge = qChargeDensityQuda(qDensity);
+
+  // Ensure host array sums to return value
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    for (int i = 0; i < V; i++) qChargeCheck += ((double *)qDensity)[i];
+  } else {
+    for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
+  }
+  printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
+  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
+             qCharge - qChargeCheck);
+
+  // Stout smearing should be equivalent to APE smearing
+  // on D dimensional lattices for rho = alpha/2*(D-1). 
+  // Typical APE values are aplha=0.6, rho=0.1 for Stout.
+  unsigned int nSteps = 50;
+  double coeff_APE = 0.6;
+  double coeff_STOUT = coeff_APE/(2*(4-1));
+  
+  //STOUT
+  // start the timer
+  time0 = -((double)clock());
+  performSTOUTnStep(nSteps, coeff_STOUT);
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for STOUT = %g secs\n", time0);
+  qCharge = qChargeQuda();
+  printf("Computed topological charge after is %.16e \n", qCharge);
+
+  //APE
+  // start the timer
+  time0 = -((double)clock());
+  performAPEnStep(nSteps, coeff_APE);  
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for APE = %g secs\n", time0);
+  qCharge = qChargeQuda();
+  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
+
+  //Over Improved STOUT
+  double epsilon = -0.25;
+  coeff_STOUT = 0.06;
+  nSteps = 200;
+  // start the timer
+  time0 = -((double)clock());
+  performOvrImpSTOUTnStep(nSteps, coeff_STOUT, epsilon);  
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
+  qCharge = qChargeQuda();
+  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
+
+#else
+  printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
+#endif
+
+  if (verify_results) check_gauge(gauge, new_gauge, 1e-3, gauge_param.cpu_prec);
+
+  freeGaugeQuda();
   endQuda();
 
   // release memory
@@ -87,52 +233,9 @@ void end() {
   finalizeComms();
 }
 
-extern void usage(char**);
-
-void SU3Test(int argc, char **argv) {
-
-  for (int i =1;i < argc; i++){    
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
-  initComms(argc, argv, gridsize_from_cmdline);
-
-  init();
-
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, gauge, param.cpu_prec, param.X, argc, argv);
-    construct_gauge_field((void**)gauge, 2, param.cpu_prec, &param);
-  } else { // generate a random SU(3) field
-    printf("Randomizing fields...");
-    construct_gauge_field((void**)gauge, 1, param.cpu_prec, &param);
-    printf("done.\n");
-  }
-
-  loadGaugeQuda(gauge, &param);
-  saveGaugeQuda(new_gauge, &param);
-
-#ifdef GPU_GAUGE_TOOLS
-  double plaq[3];
-  plaqQuda(plaq);
-  printf("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-#else
-  printf("Skipping plaquette computation since gauge tools have not been compiled\n");
-#endif
-
-  check_gauge(gauge, new_gauge, 1e-3, param.cpu_prec);
-
-  end();
-}
-
 int main(int argc, char **argv) {
 
-  SU3Test(argc, argv);
+  SU3test(argc, argv);
 
   return 0;
 }

@@ -1,3 +1,190 @@
+Version 0.9.0 - 24 July 2018
+
+- Add support for CUDA 9.x: QUDA 0.9.0 is supported on CUDA 7.0-9.2.
+
+- Continued focus on optimization of multi-GPU execution, with
+  particular emphasis on Dslash scaling.  For more details on
+  optimizing multi-GPU performance, see
+  https://github.com/lattice/quda/wiki/Multi-GPU-Support
+
+- On systems that support it, QUDA now uses direct peer-to-peer
+  communication between GPUs with in the same node.  The Dslash policy
+  autotuner will ascertain the optimal commuication route to take,
+  whether it be to route through CPU memory, use DMA copy engines or
+  directly write the halo buffer to neighboring GPUs. 
+
+- On systems that support it, QUDA will take advantage of GPU Direct
+  RDMA.  This is enabled through setting the environment variable
+  QUDA_ENABLE_GDR=1 which will augment the dslash tuning policies to
+  include policies using GPU-aware MPI to facilitate direct GPU-NIC
+  communication.  This can improve strong scaling by up to 3x.
+
+- Improved precision when using half precision (use rounding instead
+  of truncation when converting to/from float).
+
+- Add support for symmetric preconditioning for 4-d preconditioned
+  Shamir and Mobius Dirac operators.
+
+- Added initial support for multi-right-hand-side staggered Dirac
+  operator (treat the rhs index as a fifth dimension).
+
+- Added initial implementation of block CG linear solver.
+
+- Added BiCGStab(l) linear solver.  The parameter "l" corresponds to
+  the size of the space to perform GCR-style residual minimization.
+  This is typically much better behaved than BiCGStab for the Wilson
+  and Wilson-clover linear systems.
+
+- Initial version of adaptive multigrid fully implemented into QUDA.
+
+- Creation of multi-blas and multi-reduction framework, this is
+  essential for high performance for pipelined, block and
+  communication-avoiding solvers that work on "matrices of vectors" as
+  opposed to "scalars of vectors".  The max tile size used by the
+  multi-blas framework is set by QUDA_MAX_MULTI_BLAS_N cmake
+  parameter, which default to 4 for reduced compile time.  For
+  production use of such solvers, this should be increase to 8..16.
+
+- Optimization of multi-shift solver using multi-blas framework to permit
+  kernel fusion of all shift updates.
+
+- Complete rewrite and optimization of clover inversion, HISQ force
+  kernels, HISQ link fattening algorithms using accessors.
+
+- QUDA can now directly load/store from MILC's site structure array.
+  This removes the need to unpack and pack data prior to calling QUDA,
+  and dramatically reduces CPU overhead.
+
+- Removal of legacy data structures and kernels.  In particular
+  original single-GPU only ASQTAD fermion force has been removed.
+
+- Implementation of STOUT fattening kernel.
+
+- Significant improvement to the cmake build system to improve
+  compilation speed and aid productivity.  In particular, QUDA now
+  supports being built as a shared library which greatly reduces link
+  time.
+
+- Autoconf and configure build system is no longer supported.
+
+- Automated unit testing of dslash_test and blas_test are now enabled
+  using ctest.
+
+- Adds support for MPS, enabled through setting the environment
+  variable QUDA_ENABLE_MPS=1.  This allow GPUs to be oversubscribed by
+  multiple processes, which can improve overall job throughput.
+
+- Implemented self-profiler that builds on top of autotuning
+  framework.  Kernel profile is output to profile_n.tsv, where n=0,
+  with n incremented with each call to saveProfile (which dumps the
+  profile to disk).  An equivalent algorithm policy profile is output
+  to profile_async_n.tsv which contains policies such as a complete
+  dslash.  Filename prefix and path can be overridden using
+  QUDA_PROFILE_OUTPUT_BASE environment variable.
+
+- Implemented simple tracing facility that dumps the flow of kernels
+  called through a single execution to trace.tsv.  Enabled with
+  environment variable QUDA_ENABLE_TRACE=1.
+
+- Multiple bug fixes and clean up to the library. Many of these are
+  listed here: https://github.com/lattice/quda/milestone/15?closed=1
+
+Version 0.8.0 - 1st February 2016
+
+- Removed all Tesla-generation GPU support from QUDA (sm_1x).  As a
+  result, QUDA now requires a minimum of the Fermi-generation GPUs.
+
+- Added support for building QUDA using cmake.  This gives a much more
+  flexible and extensible build system as well as allowing
+  out-of-source-directory building. For details see:
+  https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake
+
+- Improved strong scaling of the multi-shift solver by overlapping the
+  shift updates with the subsequent iteration's dslash comms waiting.
+
+- Improved performance of multi-shift solver by preventing unnecessary
+  refinement of shifted solutions once the residual falls below
+  floating point precision.
+
+- Significantly improved performance of FloatNOrder accessor functors
+  to ensure vectorized memory accesses as well as removal of
+  unnecessary type conversions.  This gives a significant speedup to
+  all algorithms that use these accessors.
+
+- Significant improvement in compilation time using C++ traits to
+  prune build options.
+
+- Added support for gauge-field reconstruction to naive staggered
+  fermions.
+
+- Added hypercubic random number generator with multi-GPU support.
+
+- Added topological charge computation.
+
+- Added final computational routines to allow for complete off-load of
+  MILC staggered RHMC to QUDA (momActionQuda - compute the momentum
+  contribution to the action, projectSU3Quda - project the gauge field
+  back onto the SU(3) manifold).
+
+- In the MILC interface staggered solver, the resident gauge field is
+  reused until it is invalidated by constructing new links (or
+  overridden with the `num_iters` back door flag).
+
+- Improved gauge field unitarization robustness and added check for
+  NaN in the results.
+
+- Some cleanup and kernel-fusion optimization of gauge force HISQ
+  force kernels.  This also improves compilation time and reduces
+  library size.
+
+- Added support for imaginary chemical potential to the staggered phase
+  application / removal kernel, as well as fixing bugs in this
+  routine.
+
+- Algorithms that previously used double-precision atomics now use a
+  cub reduction.  This drastically improves performance of such
+  routines.
+
+- QUDA can now be configured to enable NVTX markup on the TimeProfile
+  class and MILC interface to give improved visual profiling.
+
+- All gauge field copies now check for NaN when `HOST_DEBUG=yes` to
+  improve debugging.
+
+- Set tunecache.tsv to be invalid if git id changes to ensure a valid
+  tune cache is used.
+
+- Reduced BLAS tuning overhead, by setting the maximum grid size to be
+  twice the SM count to avoid an unnecessarily large parameter sweep.
+
+- Added new profile that records total time spent in QUDA.
+
+- Fixed bugs in long-link field generation.
+
+- Multiple bug fixes to the library. Many of the fixes are listed here:
+  https://github.com/lattice/quda/pulls?q=is%3Apr+is%3Aclosed+milestone%3A%22QUDA+0.8.0%22
+  https://github.com/lattice/quda/issues?q=is%3Aissue+milestone%3A%22QUDA+0.8.0%22+is%3Aclosed
+
+
+Version 0.7.2 - 07th October 2015
+
+- Add support for separate temporal-spatial plaquette
+
+- Fixed memory leak in MPI communications
+
+- Fixed issues with assignment of GPUs to processes when using the QMP
+  backend with multiple nodes with multiple GPUs
+
+- Fixed bug in MR solver which led to incorrect convergence
+
+- Similar to the NVTX markup support for MPI added in 0.7.1 we now
+  support NVTX markup for calls to the MILC interface. Enabled by using
+  "--enable-milc-nvtx" when configuring QUDA.
+
+- Multiple bug fixes to the library. Many of the fixes are listed here:
+  https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.2%22+is%3Aclosed
+
+
 Version 0.7.1 - 11th June 2015
 
 - Added Maxwell-generation GPU support.
@@ -37,6 +224,7 @@ Version 0.7.1 - 11th June 2015
 - Multiple bug fixes that affects stability and correctness throughout
   the library.  Many of these fixes are listed here:
   https://github.com/lattice/quda/issues?q=milestone%3A%22QUDA+0.7.1%22+is%3Aclosed
+
 
 Version 0.7.0 - 4th February 2015
 

@@ -1,2 +1,0 @@
-# Example configure script for building QUDA for Chroma running on Titan
-./configure --enable-os=linux --enable-cpu-arch=x86_64 --enable-gpu-arch=sm_35 --enable-multi-gpu --enable-wilson-dirac --enable-clover-dirac --disable-twisted-mass-dirac --disable-ndeg-twisted-mass --disable-domain-wall-dirac --disable-staggered-dirac --disable-gauge-force --disable-hisq-force --disable-hisq-fatlink --disable-milc-interface --with-cuda=${CUDATOOLKIT_HOME} --with-qmp=${QMP_HOME} CC=mpicc CXX=mpicxx

@@ -50,84 +50,22 @@ double norm_2(void *v, int len, QudaPrecision precision) {
   else return norm2((float*)v, len);
 }
 
-
-/*
-
-
-// sets all elements of the destination vector to zero
-void zero(float* a, int cnt) {
-    for (int i = 0; i < cnt; i++)
-        a[i] = 0;
+// performs the operation y[i] = x[i] + a*y[i]
+template <typename Float>
+static inline void xpay(Float *x, Float a, Float *y, int len) {
+  for (int i=0; i<len; i++) y[i] = x[i] + a*y[i];
 }
 
-// copy one spinor to the other
-void copy(float* a, float *b, int len) {
-  for (int i = 0; i < len; i++) a[i] = b[i];
+void xpay(void *x, double a, void *y, int length, QudaPrecision precision) {
+  if (precision == QUDA_DOUBLE_PRECISION) xpay((double*)x, a, (double*)y, length);
+  else xpay((float*)x, (float)a, (float*)y, length);
 }
 
-// performs the operation y[i] = a*x[i] + b*y[i]
-void axpby(float a, float *x, float b, float *y, int len) {
-    for (int i=0; i<len; i++) y[i] = a*x[i] + b*y[i];
-}
-
-// performs the operation y[i] = a*x[i] + y[i]
-void axpy(float a, float *x, float *y, int len) {
-    for (int i=0; i<len; i++) y[i] += a*x[i];
-}
-
-
-// returns the real part of the dot product of 2 complex valued vectors
-float reDotProduct(float *v1, float *v2, int len) {
-
-  float dot=0.0;
-  for (int i=0; i<len; i++) {
-    dot += v1[i]*v2[i];
+void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION) {
+    xpay((double _Complex *)x, (double _Complex)a, (double _Complex *)y, length / 2);
+  } else {
+    xpay((float _Complex *)x, (float _Complex)a, (float _Complex *)y, length / 2);
   }
-
-  return dot;
 }
-
-// returns the imaginary part of the dot product of 2 complex valued vectors
-float imDotProduct(float *v1, float *v2, int len) {
-
-  float dot=0.0;
-  for (int i=0; i<len; i+=2) {
-    dot += v1[i]*v2[i+1] - v1[i+1]*v2[i];
-  }
-
-  return dot;
-}
-
-// returns the square of the L2 norm of the vector
-double normD(float *v, int len) {
-
-  double sum=0.0;
-  for (int i=0; i<len; i++) {
-    sum += v[i]*v[i];
-  }
-
-  return sum;
-}
-
-// returns the real part of the dot product of 2 complex valued vectors
-double reDotProductD(float *v1, float *v2, int len) {
-
-  double dot=0.0;
-  for (int i=0; i<len; i++) {
-    dot += v1[i]*v2[i];
-  }
-
-  return dot;
-}
-
-// returns the imaginary part of the dot product of 2 complex valued vectors
-double imDotProductD(float *v1, float *v2, int len) {
-
-  double dot=0.0;
-  for (int i=0; i<len; i+=2) {
-    dot += v1[i]*v2[i+1] - v1[i+1]*v2[i];
-  }
-
-  return dot;
-}
-*/

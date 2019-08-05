@@ -1,12 +1,20 @@
 #include <pthread.h>
+
+#if QUDA_NVTX_VERSION==3
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtCudaRt.h>
+#else
 #include <nvToolsExt.h>
 #include <nvToolsExtCudaRt.h>
+#endif
+
+#include <mpi_comm_handle.h>
 // Setup event category name
 {{fn name MPI_Init}}
   nvtxNameCategoryA(999, "MPI");
   {{callfn}}
   int rank;
-  PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  PMPI_Comm_rank(MPI_COMM_HANDLE, &rank);
   char name[256];
   sprintf( name, "MPI Rank %d", rank );
  
@@ -24,6 +32,8 @@ MPI_Sendrecv MPI_Barrier MPI_Start MPI_Test MPI_Send_init MPI_Recv_init }}
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "{{name}}";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   {{callfn}}
