@@ -67,6 +67,12 @@ protected:
     {
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
+      // Set swizzle factor and register blocking (currently staggered mrhs dslash)
+      if ( args.is_composite ) {
+        arg.swizzle        = tp.aux.x;
+        arg.reg_block_size = tp.aux.y;
+      }
+
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
       // Also, the accessor constructor calls Ghost(), which uses
@@ -114,7 +120,7 @@ public:
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+    template <template <typename, int, int, int, int, bool, bool, KernelType, typename> class Launch, int reg_block_size, int nDim, int nColor,
         int nParity, bool dagger, bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
@@ -124,23 +130,23 @@ public:
       } else {
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, INTERIOR_KERNEL, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, INTERIOR_KERNEL, Arg>::launch(*this, tp, arg, stream);
           break;
 #ifdef MULTI_GPU
         case EXTERIOR_KERNEL_X:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_X, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_X, Arg>::launch(*this, tp, arg, stream);
           break;
         case EXTERIOR_KERNEL_Y:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Y, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Y, Arg>::launch(*this, tp, arg, stream);
           break;
         case EXTERIOR_KERNEL_Z:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Z, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Z, Arg>::launch(*this, tp, arg, stream);
           break;
         case EXTERIOR_KERNEL_T:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_T, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_T, Arg>::launch(*this, tp, arg, stream);
           break;
         case EXTERIOR_KERNEL_ALL:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL, Arg>::launch(*this, tp, arg, stream);
+          Launch<Float, reg_block_size, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL, Arg>::launch(*this, tp, arg, stream);
           break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
@@ -148,6 +154,37 @@ public:
 #endif
         }
       }
+    }
+
+    /**
+       @brief This instantiate function is used to instantiate the
+       the reg_block_size template
+       @param[in] tp The tuning parameters to use for this kernel
+       @param[in,out] arg The argument struct for the kernel
+       @param[in] stream The cudaStream_t where the kernel will run
+     */
+    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+        int nParity, bool dagger, bool xpay, typename Arg>
+    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    {
+#ifdef JITIFY
+      using namespace jitify::reflection;
+      const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
+      Tunable::jitify_error
+          = program_->kernel(kernel)
+                .instantiate(Type<Float>(), arg.reg_block_size, nDim, nColor, nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
+                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                .launch(arg);
+#else
+      if (arg.reg_block_size == 1)
+        instantiate<Launch, 1, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+      else if (arg.reg_block_size == 2)
+        instantiate<Launch, 2, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+      else if (arg.reg_block_size == 3)
+        instantiate<Launch, 3, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+      else if (arg.reg_block_size == 4)
+        instantiate<Launch, 4, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+#endif
     }
 
     /**
@@ -166,7 +203,7 @@ public:
       const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
       Tunable::jitify_error
           = program_->kernel(kernel)
-                .instantiate(Type<Float>(), nDim, nColor, nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
+                .instantiate(Type<Float>(), arg.reg_block_size, nDim, nColor, nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
                 .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                 .launch(arg);
 #else
@@ -193,7 +230,7 @@ public:
       const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
       Tunable::jitify_error
           = program_->kernel(kernel)
-                .instantiate(Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
+                .instantiate(Type<Float>(), arg.reg_block_size, nDim, nColor, arg.nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
                 .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                 .launch(arg);
 #else
@@ -220,7 +257,7 @@ public:
       using namespace jitify::reflection;
       const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
       Tunable::jitify_error = program_->kernel(kernel)
-                                  .instantiate(Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay,
+                                  .instantiate(Type<Float>(), arg.reg_block_size, nDim, nColor, arg.nParity, arg.dagger, arg.xpay,
                                       arg.kernel_type, Type<Arg>())
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);

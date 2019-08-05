@@ -20,7 +20,7 @@ namespace quda
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
    */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <typename Float, int reg_block_size, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct DomainWall4DLaunch {
     static constexpr const char *kernel = "quda::domainWall4DGPU"; // kernel name for jit compilation
     template <typename Dslash>

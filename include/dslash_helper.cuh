@@ -262,6 +262,14 @@ namespace quda
     real twist_b; // chiral twist
     real twist_c; // flavor twist
 
+    // these are extra tuning params
+    int_fastdiv swizzle; // swizzle factor
+    int_fastdiv reg_block_size; // register blocking
+
+    // these parameters required for a msrc version
+    const bool is_composite; //false for regular fields
+    const int componentVolumeCB; // checkerboarded component volume (aka compositeVh)
+
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
               int spin_project, const int *comm_override) :
@@ -281,7 +289,12 @@ namespace quda
       spin_project(spin_project),
       twist_a(0.0),
       twist_b(0.0),
-      twist_c(0.0)
+      twist_c(0.0),
+      swizzle(1),
+      reg_block_size(1),
+      is_composite(in.IsComposite()),
+      componentVolumeCB(in.IsComposite() ? in.Component(0).ComponentVolumeCB() : 0 )
+//!      componentVolumeCB(in.IsComposite() ? in[0].ComponentVolumeCB() : 0 )
     {
       for (int d = 0; d < 4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
@@ -328,6 +341,8 @@ namespace quda
     out << "twist_a = " << arg.twist_a;
     out << "twist_b = " << arg.twist_b;
     out << "twist_c = " << arg.twist_c;
+    out << "is multisource = " << arg.is_composite;
+    out << "source volume  = " << arg.componentVolumeCB;
     return out;
   }
 

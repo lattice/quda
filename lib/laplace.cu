@@ -23,7 +23,7 @@ namespace quda
      @brief This is a helper class that is used to instantiate the
      correct templated kernel for the dslash.
   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <typename Float, int reg_block_size, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct LaplaceLaunch {
 
     // kernel name for jit compilation
@@ -134,20 +134,20 @@ public:
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;
         if (arg.xpay) bytes_ += spinor_bytes;
-	
+
         if (arg.kernel_type == KERNEL_POLICY) break;
         // now correct for bytes done by exterior kernel
         long long ghost_sites = 0;
         for (int d = 0; d < 4; d++)
           if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
         bytes_ -= ghost_bytes * ghost_sites;
-	
+
         break;
       }
       }
       return bytes_;
     }
-    
+
     TuneKey tuneKey() const
     {
       // add laplace transverse dir to the key
