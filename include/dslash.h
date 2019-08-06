@@ -68,10 +68,11 @@ protected:
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
       // Set swizzle factor and register blocking (currently staggered mrhs dslash)
-      if ( args.is_composite ) {
-        arg.swizzle        = tp.aux.x;
-        arg.reg_block_size = tp.aux.y;
-      }
+
+      //if ( args.is_composite ) {
+        //arg.swizzle        = tp.aux.x;
+        //arg.reg_block_size = tp.aux.y;
+      //}
 
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
@@ -163,7 +164,7 @@ public:
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+    template <template <typename, int, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
         int nParity, bool dagger, bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
@@ -194,7 +195,7 @@ public:
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+    template <template <typename, int, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
         int nParity, bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
@@ -221,7 +222,7 @@ public:
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+    template <template <typename, int, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
         bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
@@ -249,7 +250,7 @@ public:
        @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
+    template <template <typename, int, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
         typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
