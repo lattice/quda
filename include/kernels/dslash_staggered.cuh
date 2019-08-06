@@ -74,7 +74,7 @@ namespace quda
     typedef typename mapper<Float>::type real;
     typedef Matrix<complex<real>, nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
-    const int componentVh = args.componentVolumeCB;
+    const int componentVh = arg.componentVolumeCB;
 
 #pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
@@ -100,7 +100,7 @@ namespace quda
               arg.U(d, x_cb, parity) :
               arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
 #pragma unroll
-          for (int reg_id = 0; reg_id < reg_block_size; reg_id++)
+          for (int reg_id = 0; reg_id < reg_block_size; reg_id++) {
             const Vector in = arg.in(fwd_idx+(src_idx+reg_id)*componentVh, their_spinor_parity);
             out[reg_id] += (U * in);
           }
@@ -154,7 +154,7 @@ namespace quda
               arg.U(d, gauge_idx, 1 - parity) :
               arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
 #pragma unroll
-          for(int reg_id = 0; reg_id < reg_block_size; reg_id++){
+          for(int reg_id = 0; reg_id < reg_block_size; reg_id++) {
             Vector in = arg.in(back_idx+(src_idx+reg_id)*componentVh, their_spinor_parity);
             out[reg_id] -= (conj(U) * in);
           }
@@ -179,7 +179,7 @@ namespace quda
           const int gauge_idx = back3_idx;
           const Link L = arg.L(d, gauge_idx, 1 - parity);
 #pragma unroll
-          for( int reg_id = 0; reg_id < reg_block_size; reg_id++ ){
+          for( int reg_id = 0; reg_id < reg_block_size; reg_id++ ) {
             const Vector in = arg.in(back3_idx+(src_idx+reg_id)*componentVh, their_spinor_parity);
             out[reg_id] -= conj(L) * in;
           }
@@ -203,7 +203,7 @@ namespace quda
                               getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
 
     const int my_spinor_parity = nParity == 2 ? parity : 0;
-    //const int reg_block_offset = args.is_composite ? 3 : 0;//we should take into account internal dof for mrhs version
+    //const int reg_block_offset = arg.is_composite ? 3 : 0;//we should take into account internal dof for mrhs version
     coord[4] = src_idx;//set the 5th coordinate manually
 
     Vector out[reg_block_size];
@@ -219,15 +219,15 @@ namespace quda
     if (xpay && kernel_type == INTERIOR_KERNEL) {
 #pragma unroll
       for (int reg_id = 0; reg_id < reg_block_size; reg_id++) {
-        //int src_reg_idx = x_cb + (src_idx+reg_id)*reg_block_offset*args.componentVolumeCB;
-        int src_reg_idx = x_cb + (src_idx+reg_id)*args.componentVolumeCB;
+        //int src_reg_idx = x_cb + (src_idx+reg_id)*reg_block_offset*arg.componentVolumeCB;
+        int src_reg_idx = x_cb + (src_idx+reg_id)*arg.componentVolumeCB;
         Vector x = arg.x(src_reg_idx, my_spinor_parity);
         out[reg_id] = arg.a * x - out[reg_id];// <<- what about norm arrays?
       }
     } else if (kernel_type != INTERIOR_KERNEL) {
 #pragma unroll
       for (int reg_id = 0; reg_id < reg_block_size; reg_id++) {
-        int src_reg_idx = x_cb + (src_idx+reg_id)*args.componentVolumeCB;
+        int src_reg_idx = x_cb + (src_idx+reg_id)*arg.componentVolumeCB;
         Vector x = arg.out(src_reg_idx, my_spinor_parity);
         out[reg_id] = x + (xpay ? -out[reg_id] : out[reg_id]);
       }
@@ -235,7 +235,7 @@ namespace quda
     if (kernel_type != EXTERIOR_KERNEL_ALL || active) {
 #pragma unroll
       for (int reg_id = 0; reg_id < reg_block_size; reg_id++) {
-        int src_reg_idx = x_cb + (src_idx+reg_id)*args.componentVolumeCB;
+        int src_reg_idx = x_cb + (src_idx+reg_id)*arg.componentVolumeCB;
         arg.out(src_reg_idx, my_spinor_parity) = out[reg_id];
       }
     }
