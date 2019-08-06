@@ -36,6 +36,10 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
+    if ( (in.IsComposite() && !out.IsComposite()) || (!in.IsComposite() && out.IsComposite()) ) {
+      errorQuda("Mixing a composite with a non-composite field is prohibited.");
+    }
+
     if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	(out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
       errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
