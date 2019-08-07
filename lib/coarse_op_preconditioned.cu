@@ -26,6 +26,8 @@ namespace quda {
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
+    unsigned int maxBlockSize(const TuneParam &param) const { return std::min(TunableVectorYZ::maxBlockSize(param), 128u); }
+
   public:
       CalculateYhat(Arg &arg, const LatticeField &meta) :
         TunableVectorYZ(2 * n, 4 * n),
