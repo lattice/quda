@@ -51,7 +51,7 @@ public:
         errorQuda("Staggered Dslash not implemented on CPU");
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        Dslash<Float>::setParam(arg);
+        Dslash<Float>::setParam(arg, tp);
         Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
       }
     }

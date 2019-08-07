@@ -63,16 +63,16 @@ protected:
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-    template <typename Arg> inline void setParam(Arg &arg)
+    template <typename Arg> inline void setParam(Arg &arg, TuneParam &tp)
     {
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
       // Set swizzle factor and register blocking (currently staggered mrhs dslash)
 
-      //if ( args.is_composite ) {
-        //arg.swizzle        = tp.aux.x;
-        //arg.reg_block_size = tp.aux.y;
-      //}
+      if ( args.is_composite ) {
+        arg.swizzle        = tp.aux.x;
+        arg.reg_block_size = tp.aux.y;
+      }
 
       // Need to reset ghost pointers prior to every call since the
       // ghost buffer may have been changed during policy tuning.
