@@ -23,9 +23,14 @@ static double max_allowed_error = 1e-11;
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
-                         void **qdp_inlink, QudaGaugeParam &gauge_param, double **act_path_coeffs, double eps_naik,
+                         void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
                          size_t gSize, int n_naiks)
 {
+
+  // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
+  auto gauge_param = gauge_param_in;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
   // inlink in different format
   void *milc_inlink = pinned_malloc(4 * V * gaugeSiteSize * gSize);
@@ -270,3 +275,60 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   for (int i = 0; i < 3; i++) delete act_paths[i];
   delete act_paths;
 }
+
+
+// Routine that takes in a QDP-ordered field and outputs the plaquette.
+// Assumes the gauge fields already have phases on them (unless it's the Laplace op),
+// so it corrects the sign as appropriate.
+void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const QudaGaugeParam& gauge_param_in,
+                                       const QudaDslashType dslash_type)
+{
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
+    errorQuda("computeStaggeredPlaquetteQDPOrder does not support dslash type %d\n", dslash_type);
+  }
+
+  // Make no assumptions about any part of gauge_param_in beyond what we need to grab.
+  QudaGaugeParam gauge_param = newQudaGaugeParam();
+  for (int d = 0; d < 4; d++) {
+    gauge_param.X[d] = gauge_param_in.X[d];
+  }
+
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+
+  gauge_param.cpu_prec = gauge_param_in.cpu_prec;
+
+  gauge_param.cuda_prec = gauge_param_in.cuda_prec;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
+  gauge_param.cuda_prec_sloppy = gauge_param_in.cuda_prec; // for ease of use
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+
+  gauge_param.anisotropy = 1;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+
+  gauge_param.ga_pad = 0;
+  // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
+  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
+  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
+  int pad_size = x_face_size > y_face_size ? x_face_size : y_face_size;
+  pad_size = pad_size > z_face_size ? pad_size : z_face_size; 
+  pad_size = pad_size > t_face_size ? pad_size : t_face_size;
+  gauge_param.ga_pad = pad_size;
+#endif
+
+  loadGaugeQuda(qdp_link, &gauge_param);
+  plaqQuda(plaq);
+
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_ASQTAD_DSLASH) {
+    plaq[0] = -plaq[0];
+    plaq[1] = -plaq[1];
+    plaq[2] = -plaq[2];
+  }
+
+}
+
