@@ -61,7 +61,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 

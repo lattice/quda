@@ -52,7 +52,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       Dslash<Float>::template instantiate<WilsonLaunch, nDim, nColor>(tp, arg, stream);
     }
 

@@ -60,7 +60,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 

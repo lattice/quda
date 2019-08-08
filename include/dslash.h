@@ -63,7 +63,7 @@ protected:
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-    template <typename Arg> inline void setParam(Arg &arg, TuneParam &tp)
+    template <typename Arg> inline void setParam(TuneParam &tp, Arg &arg)
     {
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
@@ -273,7 +273,7 @@ public:
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
     Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in, const char *src) :
-        TunableVectorYZ(1, arg.nParity),
+        TunableVectorYZ(arg.nSrc, arg.nParity),
         arg(arg),
         out(out),
         in(in),

@@ -51,7 +51,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       if (arg.nParity == 1) {
         if (arg.xpay)
           Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch, nDim, nColor, 1, true>(tp, arg, stream);

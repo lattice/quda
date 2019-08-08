@@ -50,7 +50,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       if (arg.xpay)
         Dslash<Float>::template instantiate<NdegTwistedMassLaunch, nDim, nColor, true>(tp, arg, stream);
       else

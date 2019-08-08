@@ -51,7 +51,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash<Float>::setParam(tp, arg);
       typedef typename mapper<Float>::type real;
 #ifdef JITIFY
       // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
