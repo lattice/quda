@@ -495,6 +495,21 @@ namespace quda {
 
     void resizeVector(int y) const { vector_length_y = y; }
     void resizeStep(int y) const { step_y = y; }
+
+    // a quick hack for msrc dslash
+    bool advanceAux(TuneParam &param) const { 
+      for (unsigned int register_block=param.aux.y+1; register_block <= max_register_block && register_block <= nSrc; register_block++) {
+	if (vector_length_y % register_block == 0) { // register block size must be a divisor of vector_length_y
+	  param.aux.y = register_block;
+	  return true;
+	}
+      }
+
+      param.aux.y = 1;
+
+      return false; 
+    }
+
   };
 
   class TunableVectorYZ : public TunableVectorY {
