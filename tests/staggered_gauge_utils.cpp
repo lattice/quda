@@ -23,9 +23,14 @@ static double max_allowed_error = 1e-11;
 
 // Wrap everything for the GPU construction of fat/long links here
 void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fatlink_eps, void **qdp_longlink_eps,
-                         void **qdp_inlink, QudaGaugeParam &gauge_param, double **act_path_coeffs, double eps_naik,
+                         void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
                          size_t gSize, int n_naiks)
 {
+
+  // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
+  auto gauge_param = gauge_param_in;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
   // inlink in different format
   void *milc_inlink = pinned_malloc(4 * V * gaugeSiteSize * gSize);
