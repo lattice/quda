@@ -69,7 +69,7 @@ protected:
 
       // Set swizzle factor and register blocking (currently staggered mrhs dslash)
 
-      if ( args.is_composite ) {
+      if ( arg.is_composite ) {
         arg.swizzle        = tp.aux.x;
         arg.reg_block_size = tp.aux.y;
       }
