@@ -135,12 +135,10 @@ void display_test_info()
 void usage_extra(char **argv)
 {
   printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1/2/3/4/5/6>    # Test method\n");
-  printfQuda("                                0: Full parity inverter\n");
-  printfQuda("                                1: Even even spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                3: Even even spinor CG inverter\n");
-  printfQuda("                                4: Odd odd spinor CG inverter\n");
+  printfQuda("    --test <0/3/4>    # Test method\n");
+  printfQuda("                      0: Full parity inverter\n");
+  printfQuda("                      3: Even even spinor CG inverter\n");
+  printfQuda("                      4: Odd odd spinor CG inverter\n");
   return;
 }
 
@@ -467,8 +465,6 @@ void eigensolve_test()
 
   switch (test_type) {
   case 0: // full parity solution
-  case 1: // solving prec system, reconstructing
-  case 2:
   case 3: // even
   case 4: {
     // QUDA eigensolver test
@@ -557,7 +553,7 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  if (test_type < 0 || test_type > 4) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
+  if (test_type != 0 && test_type != 3 && test_type != 4) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
 
   // Ensure a reasonable default
   // ensure that the default is improved staggered
@@ -582,15 +578,15 @@ int main(int argc, char **argv)
       }
     }
 
-    if (test_type == 1 || test_type == 3) {
+    if (test_type == 3) {
       matpc_type = QUDA_MATPC_EVEN_EVEN;
-    } else if (test_type == 2 || test_type == 4) {
+    } else if (test_type == 4) {
       matpc_type = QUDA_MATPC_ODD_ODD;
     } else if (test_type == 0) {
       matpc_type = QUDA_MATPC_EVEN_EVEN; // it doesn't matter
     }
 
-    if (test_type == 0 || test_type == 1 || test_type == 2) {
+    if (test_type == 0) {
       solution_type = QUDA_MAT_SOLUTION;
     } else {
       solution_type = QUDA_MATPC_SOLUTION;
