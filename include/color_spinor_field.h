@@ -38,9 +38,9 @@ namespace quda {
      int  subset_begin; //id of the first element in the subset.
      int  subset_range; //total number of the components in the subset.
 
-     int volume;       // volume of a single eigenvector
-     int volumeCB;     // CB volume of a single eigenvector
-     int stride;       // stride of a single eigenvector
+     size_t volume;       // volume of a single eigenvector
+     size_t volumeCB;     // CB volume of a single eigenvector
+     size_t stride;       // stride of a single eigenvector
      size_t real_length;  // physical length of a single eigenvector
      size_t length;       // length including pads (but not ghost zones)
 
@@ -338,10 +338,10 @@ namespace quda {
     int nDim;
     int x[QUDA_MAX_DIM];
 
-    int volume;
-    int volumeCB;
-    int pad;
-    int stride;
+    size_t volume;
+    size_t volumeCB;
+    size_t pad;
+    size_t stride;
 
     QudaTwistFlavorType twistFlavor;
 
@@ -420,9 +420,9 @@ namespace quda {
     int X(int d) const { return x[d]; }
     size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
-    int Stride() const { return stride; }
-    int Volume() const { return volume; }
-    int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
+    size_t Stride() const { return stride; }
+    size_t Volume() const { return volume; }
+    size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
