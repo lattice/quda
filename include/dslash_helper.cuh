@@ -295,7 +295,6 @@ namespace quda
       reg_block_size(1),
       is_composite(in.IsComposite()),
       componentVolumeCB(in.IsComposite() ? in.Component(0).ComponentVolumeCB() : 0 ),
-//!      componentVolumeCB(in.IsComposite() ? in[0].ComponentVolumeCB() : 0 ),
       nSrc(in.IsComposite() ? in.CompositeDim(): 1)
     {
       for (int d = 0; d < 4; d++) {
