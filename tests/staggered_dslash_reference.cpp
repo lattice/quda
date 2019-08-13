@@ -133,7 +133,8 @@ void staggered_dslash(cpuColorSpinorField *out, void **fatlink, void **longlink,
     void **ghost_longlink, cpuColorSpinorField *in, int oddBit, int daggerBit, QudaPrecision sPrecision,
     QudaPrecision gPrecision, QudaDslashType dslash_type)
 {
-  const int nSrc = in->X(4);
+  //const int nSrc = in->X(4);
+  const int nSrc = in->CompositeDim();
 
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {

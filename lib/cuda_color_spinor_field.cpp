@@ -208,6 +208,13 @@ namespace quda {
 	  param.component_id = cid;
 	  components.push_back(new cudaColorSpinorField(*this, param));
         }
+
+	if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
+
+        x[nDim] = composite_descr.dim;
+        nDim++;
+        setTuningString();
+
       } else {
         // create the associated even and odd subsets
         ColorSpinorParam param;
@@ -244,34 +251,39 @@ namespace quda {
       //! setup an object for selected eigenvector (the 1st one as a default):
       if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
       {
-         if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
-         //if(bytes > 1811939328) warningQuda("\nCUDA API probably won't be able to create texture object for the eigenvector set... Object size is : %u bytes\n", bytes);
-         // create the associated even and odd subsets
-         ColorSpinorParam param;
-         param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-         param.nDim = nDim;
-         memcpy(param.x, x, nDim*sizeof(int));
-         param.create = QUDA_REFERENCE_FIELD_CREATE;
-         param.v = v;
-         param.norm = norm;
-         param.is_composite   = false;
-         param.composite_dim  = 0;
-         param.is_component = true;
-	 param.mem_type = mem_type;
+        if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+        // create the associated even and odd subsets
+        ColorSpinorParam param;
+        param.siteSubset = QUDA_PARITY_SITE_SUBSET;
+        param.nDim = nDim;
+        memcpy(param.x, x, nDim*sizeof(int));
+        param.create = QUDA_REFERENCE_FIELD_CREATE;
+        param.v = v;
+        param.norm = norm;
+        param.is_composite   = false;
+        param.composite_dim  = 0;
+        param.is_component = true;
+	param.mem_type = mem_type;
 
-         //reserve eigvector set
-         components.reserve(composite_descr.dim);
-         //setup volume, [real_]length and stride for a single eigenvector
-         for(int cid = 0; cid < composite_descr.dim; cid++)
-         {
-            param.component_id = cid;
-            components.push_back(new cudaColorSpinorField(*this, param));
+        //reserve eigvector set
+        components.reserve(composite_descr.dim);
+        //setup volume, [real_]length and stride for a single eigenvector
+        for(int cid = 0; cid < composite_descr.dim; cid++){
+          param.component_id = cid;
+          components.push_back(new cudaColorSpinorField(*this, param));
 
 #ifdef USE_TEXTURE_OBJECTS //(a lot of texture objects...)
-            dynamic_cast<cudaColorSpinorField*>(components[cid])->destroyTexObject();
-            dynamic_cast<cudaColorSpinorField*>(components[cid])->createTexObject();
+          dynamic_cast<cudaColorSpinorField*>(components[cid])->destroyTexObject();
+          dynamic_cast<cudaColorSpinorField*>(components[cid])->createTexObject();
 #endif
-         }
+        }
+
+        if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
+
+        x[nDim] = composite_descr.dim;
+        nDim++;
+        setTuningString();	
+
       }
     }
 

@@ -169,9 +169,16 @@ namespace quda {
       } else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
         nDim++;
         x[4] = 2; // for two flavors
-      } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
-        nDim++;
-        x[4] = inv_param.Ls;
+      } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {    
+//Rem: Paramters nDim and x[4] will be adjusted during actual spinor object creation 	      
+//        nDim++;
+//        x[4] = inv_param.Ls;
+        if( nDim == 5 ) errorQuda("Wrong number of dims..\n");
+
+        if( inv_param.Ls > 1 ) {
+	  is_composite  = true;
+          composite_dim = inv_param.Ls;
+	}	
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
@@ -522,15 +529,15 @@ namespace quda {
     ColorSpinorField& operator[](const int idx) const {return Component(idx);}
     ColorSpinorField& operator[](const int idx) {return Component(idx);}
 
-    CompositeColorSpinorField Components(const int first_element, const int last_element){
-       return CompositeColorSpinorField(components.begin()+first_element, components.begin()+last_element) ;
+    CompositeColorSpinorField Components(const int first_element, const int range){
+       return CompositeColorSpinorField(components.begin()+first_element, components.begin()+range) ;
     };
 
     /**
        @brief Return (subset of) vector container based on provided agruments:
     */
     CompositeColorSpinorField& operator()(void) {return components;}
-    CompositeColorSpinorField operator()(const int first_idx, const int second_idx) {return Components(first_idx, second_idx);}
+    CompositeColorSpinorField operator()(const int first_idx, const int range) {return Components(first_idx, range);}
     CompositeColorSpinorField operator()(const int idx) {return Components(idx, idx+1);}
 
     virtual void Source(const QudaSourceType sourceType, const int st=0, const int s=0, const int c=0) = 0;
@@ -853,7 +860,7 @@ namespace quda {
 
     cudaColorSpinorField& Component(const int idx) const;
     CompositeColorSpinorField& Components() const;
-    CompositeColorSpinorField Components(const int first_element, const int last_element) const;
+    CompositeColorSpinorField Components(const int first_element, const int range) const;
 
     void zero();
 

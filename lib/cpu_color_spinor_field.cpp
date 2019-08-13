@@ -74,6 +74,11 @@ namespace quda {
     if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
       v = (void*)src.V();
       norm = (void*)src.Norm();
+
+      if (composite_descr.is_component && !(src.SiteSubset() == QUDA_FULL_SITE_SUBSET && this->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {//setup eigenvector form the set
+        v    = (void*)((char*)v    + composite_descr.id*bytes);
+        norm = (void*)((char*)norm + composite_descr.id*norm_bytes);
+      }      
     }
 
     create(param.create);
@@ -164,21 +169,36 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
       param.norm = norm;
-      param.is_composite  = false;
-      param.composite_dim = 0;
-      param.is_component  = composite_descr.is_component;
-      param.component_id  = composite_descr.id;
-      even = new cpuColorSpinorField(*this, param);
-      odd = new cpuColorSpinorField(*this, param);
+      param.is_composite   = false;
+      param.composite_dim  = 0;
 
-      // need this hackery for the moment (need to locate the odd pointers half way into the full field)
-      (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-	(dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+      if ( !composite_descr.is_composite ) {
+        even = new cpuColorSpinorField(*this, param);
+        odd = new cpuColorSpinorField(*this, param);
 
-      if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
-	errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n",
+        // need this hackery for the moment (need to locate the odd pointers half way into the full field)
+        (dynamic_cast<cpuColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
+        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+	  (dynamic_cast<cpuColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+
+        if (bytes != 2*even->Bytes() || bytes != 2*odd->Bytes())
+	  errorQuda("dual-parity fields should have double the size of a single-parity field (%lu,%lu,%lu)\n",
 		  bytes, even->Bytes(), odd->Bytes());
+
+      } else { //creating a composite field
+        if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+        param.is_component = true;
+        components.reserve(composite_descr.dim);
+        for(int cid = 0; cid < composite_descr.dim; cid++) {
+          param.component_id = cid;
+          components.push_back(new cpuColorSpinorField(*this, param));
+        }
+
+        if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
+
+        x[nDim] = composite_descr.dim;
+        nDim++;
+      }
     }
 
   }
@@ -192,7 +212,12 @@ namespace quda {
       init = false;
     }
 
-    if (siteSubset == QUDA_FULL_SITE_SUBSET) {
+    if (composite_descr.is_composite){
+       CompositeColorSpinorField::iterator vec;
+       for (vec = components.begin(); vec != components.end(); vec++) delete *vec;
+    }
+
+    if (siteSubset == QUDA_FULL_SITE_SUBSET  && (!composite_descr.is_composite || composite_descr.is_component) ) {
       if (even) delete even;
       if (odd) delete odd;
     }
