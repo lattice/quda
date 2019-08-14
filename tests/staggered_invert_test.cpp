@@ -20,6 +20,7 @@
 #include <gauge_field.h>
 #include <unitarization_links.h>
 #include <blas_reference.h>
+#include <random_quda.h>
 
 #if defined(QMP_COMMS)
 #include <qmp.h>
@@ -100,21 +101,6 @@ cpuColorSpinorField *ref;
 cpuColorSpinorField *tmp;
 
 static void end();
-
-template<typename Float>
-void constructSpinorField(Float *res) {
-  const int vol = (solution_type == QUDA_MAT_SOLUTION) ? V : Vh;
-  for(int src=0; src<Nsrc; src++) {
-    for(int i = 0; i < vol; i++) {
-      for (int s = 0; s < 1; s++) {
-        for (int m = 0; m < 3; m++) {
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 0] = rand() / (Float)RAND_MAX;
-          res[(src*Vh + i)*(1*3*2) + s*(3*2) + m*(2) + 1] = rand() / (Float)RAND_MAX;
-        }
-      }
-    }
-  }
-}
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
@@ -295,6 +281,12 @@ int invert_test()
     }
   }
 
+  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
+  double plaq[3];
+  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
+
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -311,6 +303,11 @@ int invert_test()
         memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
       }
     }
+
+    // Compute fat link plaquette.
+    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 
   // Alright, we've created all the void** links.
@@ -339,11 +336,14 @@ int invert_test()
   ref = new cpuColorSpinorField(csParam);
   tmp = new cpuColorSpinorField(csParam);
 
-  if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION){
-    constructSpinorField((float *)in->V());
-  }else{
-    constructSpinorField((double*)in->V());
-  }
+  // Construct source
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  rng->Init();
+
+  construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+
+  rng->Release();
+  delete rng;
 
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
