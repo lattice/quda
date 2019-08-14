@@ -249,9 +249,9 @@ namespace quda
     //int x_cb = block_idx(arg.swizzle) * blockDim.x + threadIdx.x;
     if (x_cb >= arg.threads) return;
 
-    int src_idx = arg.is_composite ? reg_block_size*(blockIdx.y * blockDim.y + threadIdx.y) : 1;
+    int src_idx = arg.is_composite ? reg_block_size*(blockIdx.y * blockDim.y + threadIdx.y) : 0;
 
-    if ( src_idx > arg.dim[4] ) return;
+    if ( src_idx >= arg.dim[4] ) return;
     // for full fields set parity from z thread index else use arg setting
     int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
