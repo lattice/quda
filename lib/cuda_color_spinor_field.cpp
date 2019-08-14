@@ -189,12 +189,13 @@ namespace quda {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       if(composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
-	if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+	if(composite_descr.dim <= 0 /*composite_descr.dim != x[nDim-1]*/) errorQuda("\nComposite size is not defined\n");
 	  
         ColorSpinorParam param;
         param.siteSubset = QUDA_FULL_SITE_SUBSET;
         param.nDim = nDim;
         memcpy(param.x, x, nDim*sizeof(int));
+	//param.x[nDim-1] = 1; //set compnent last dimension to 1
         param.create = QUDA_REFERENCE_FIELD_CREATE;
         param.v = v;
         param.norm = norm;

@@ -498,7 +498,7 @@ namespace quda {
 
     // a quick hack for msrc dslash
     bool advanceAux(TuneParam &param) const { 
-      for (unsigned int register_block=param.aux.y+1; register_block <= 4 && register_block <= nSrc; register_block++) {
+      for (unsigned int register_block=param.aux.y+1; register_block <= 4 && register_block <= vector_length_y; register_block++) {
 	if (vector_length_y % register_block == 0) { // register block size must be a divisor of vector_length_y
 	  param.aux.y = register_block;
 	  return true;

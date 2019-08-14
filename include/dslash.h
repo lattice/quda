@@ -179,12 +179,14 @@ public:
 #else
       if (arg.reg_block_size == 1)
         instantiate<Launch, 1, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+#if 0      
       else if (arg.reg_block_size == 2)
         instantiate<Launch, 2, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
       else if (arg.reg_block_size == 3)
         instantiate<Launch, 3, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
       else if (arg.reg_block_size == 4)
         instantiate<Launch, 4, nDim, nColor, nParity, dagger, xpay>(tp, arg, stream);
+#endif //0
 #endif
     }
 

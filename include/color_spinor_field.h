@@ -170,12 +170,10 @@ namespace quda {
         nDim++;
         x[4] = 2; // for two flavors
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {    
-//Rem: Paramters nDim and x[4] will be adjusted during actual spinor object creation 	      
-//        nDim++;
-//        x[4] = inv_param.Ls;
-        if( nDim == 5 ) errorQuda("Wrong number of dims..\n");
+        //nDim++;
+        //x[4] = inv_param.Ls;
 
-        if( inv_param.Ls > 1 ) {
+        if( inv_param.Ls > 1 ) {		
 	  is_composite  = true;
           composite_dim = inv_param.Ls;
 	}	
@@ -268,7 +266,7 @@ namespace quda {
       printfQuda("create = %d\n", create);
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm = %lx\n", (unsigned long)norm);
-      //! for deflation etc.
+      // for multisource objects
       if(is_composite) printfQuda("Number of elements = %d\n", composite_dim);
     }
 
