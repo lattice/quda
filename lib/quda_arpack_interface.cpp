@@ -67,6 +67,7 @@ namespace quda
     int n_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
     int nEv_ = eig_param->nEv;
     int nKr_ = eig_param->nKr;
+    int nConv_ = eig_param->nConv;
     int ldv_ = h_evecs[0]->Volume() * h_evecs[0]->Nspin() * h_evecs[0]->Ncolor();
     int lworkl_ = (3 * nKr_ * nKr_ + 5 * nKr_) * 2;
     int rvec_ = 1;
@@ -344,6 +345,7 @@ namespace quda
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking eigenvalues\n");
 
+    //Number of converged eigepairs found by ARPACK
     int nconv = iparam_[4];
 
     // Sort the eigenvalues in absolute ascending order
@@ -394,10 +396,10 @@ namespace quda
     }
 
     // copy back eigenvalues using the sorting index
-    for (int i = 0; i < nconv; i++) h_evals[i] = h_evals_[evals_sorted[i].second];
+    for (int i = 0; i < nConv_; i++) h_evals[i] = h_evals_[evals_sorted[i].second];
 
     // copy back eigenvectors using the sorting index
-    for (int i = 0; i < nconv; i++) *h_evecs[i] = *h_evecs_arpack[evals_sorted[i].second];
+    for (int i = 0; i < nConv_; i++) *h_evecs[i] = *h_evecs_arpack[evals_sorted[i].second];
 
     profile.TPSTART(QUDA_PROFILE_FREE);
 
