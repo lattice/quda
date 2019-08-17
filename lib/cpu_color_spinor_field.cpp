@@ -165,6 +165,7 @@ namespace quda {
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       param.nDim = nDim;
       memcpy(param.x, x, nDim*sizeof(int));
+      param.x[nDim-1] = 1; //set compnent last dimension to 1      
       param.x[0] /= 2;
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
@@ -186,18 +187,13 @@ namespace quda {
 		  bytes, even->Bytes(), odd->Bytes());
 
       } else { //creating a composite field
-        if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+        if(composite_descr.dim <= 0 || composite_descr.is_component) errorQuda("\nComposite field is not defined.\n");
         param.is_component = true;
         components.reserve(composite_descr.dim);
         for(int cid = 0; cid < composite_descr.dim; cid++) {
           param.component_id = cid;
           components.push_back(new cpuColorSpinorField(*this, param));
         }
-
-        if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
-
-        x[nDim] = composite_descr.dim;
-        nDim++;
       }
     }
 

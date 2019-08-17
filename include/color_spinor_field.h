@@ -170,12 +170,12 @@ namespace quda {
         nDim++;
         x[4] = 2; // for two flavors
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {    
-        //nDim++;
-        //x[4] = inv_param.Ls;
+        nDim++;
+        x[4] = inv_param.Ls;
 
         if( inv_param.Ls > 1 ) {		
 	  is_composite  = true;
-          composite_dim = inv_param.Ls;
+          composite_dim = x[4];
 	}	
       }
 

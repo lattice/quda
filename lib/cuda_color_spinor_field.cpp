@@ -189,19 +189,19 @@ namespace quda {
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
       if(composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) {
-	if(composite_descr.dim <= 0 /*composite_descr.dim != x[nDim-1]*/) errorQuda("\nComposite size is not defined\n");
+	if(composite_descr.dim <= 0 /*composite_descr.dim != x[nDim-1]*/ || composite_descr.is_component) errorQuda("\nComposite field is not defined\n");
 	  
         ColorSpinorParam param;
         param.siteSubset = QUDA_FULL_SITE_SUBSET;
         param.nDim = nDim;
         memcpy(param.x, x, nDim*sizeof(int));
-	//param.x[nDim-1] = 1; //set compnent last dimension to 1
+	param.x[nDim-1] = 1; //set compnent last dimension to 1
         param.create = QUDA_REFERENCE_FIELD_CREATE;
         param.v = v;
         param.norm = norm;
         param.is_composite   = false;
-        param.composite_dim  = 0;
-        param.is_component = true;
+        param.composite_dim  = composite_descr.dim;
+        param.is_component   = true;
 	param.mem_type = mem_type;
 
         components.reserve(composite_descr.dim);
@@ -209,12 +209,6 @@ namespace quda {
 	  param.component_id = cid;
 	  components.push_back(new cudaColorSpinorField(*this, param));
         }
-
-	if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
-
-        x[nDim] = composite_descr.dim;
-        nDim++;
-        setTuningString();
 
       } else {
         // create the associated even and odd subsets
@@ -227,7 +221,7 @@ namespace quda {
         param.v = v;
         param.norm = norm;
         param.is_composite  = false;
-        param.composite_dim = 0;
+        param.composite_dim = composite_descr.dim;
         param.is_component  = composite_descr.is_component;
         param.component_id  = composite_descr.id;
 	param.mem_type = mem_type;
@@ -252,18 +246,19 @@ namespace quda {
       //! setup an object for selected eigenvector (the 1st one as a default):
       if (composite_descr.is_composite && (create != QUDA_REFERENCE_FIELD_CREATE)) 
       {
-        if(composite_descr.dim <= 0) errorQuda("\nComposite size is not defined\n");
+        if(composite_descr.dim <= 0 || composite_descr.is_component ) errorQuda("\nComposite field is not defined\n");
         // create the associated even and odd subsets
         ColorSpinorParam param;
         param.siteSubset = QUDA_PARITY_SITE_SUBSET;
         param.nDim = nDim;
         memcpy(param.x, x, nDim*sizeof(int));
+        param.x[nDim-1] = 1; //set compnent last dimension to 1	
         param.create = QUDA_REFERENCE_FIELD_CREATE;
         param.v = v;
         param.norm = norm;
         param.is_composite   = false;
-        param.composite_dim  = 0;
-        param.is_component = true;
+        param.composite_dim  = composite_descr.dim;
+        param.is_component   = true;
 	param.mem_type = mem_type;
 
         //reserve eigvector set
@@ -278,20 +273,13 @@ namespace quda {
           dynamic_cast<cudaColorSpinorField*>(components[cid])->createTexObject();
 #endif
         }
-
-        if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
-
-        x[nDim] = composite_descr.dim;
-        nDim++;
-        setTuningString();	
-
       }
     }
 
     if (create != QUDA_REFERENCE_FIELD_CREATE) {
       if ( !(siteSubset == QUDA_FULL_SITE_SUBSET && composite_descr.is_composite) ) {
 	zeroPad();
-      } else { //temporary hack for the full spinor field sets, manual zeroPad for each component:
+      } else if ( composite_descr.is_composite ) { //temporary hack for the full spinor field sets, manual zeroPad for each component:
 	for(int cid = 0; cid < composite_descr.dim; cid++) {
 	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Even())).zeroPad();
 	  (dynamic_cast<cudaColorSpinorField&>(components[cid]->Odd())).zeroPad();

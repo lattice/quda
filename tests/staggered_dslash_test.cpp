@@ -328,15 +328,16 @@ void init()
 
   ColorSpinorParam csParam;
   csParam.nColor = 3;
-  csParam.nSpin = 1;
-  csParam.nDim = 4;
+  csParam.nSpin  = 1;
+  csParam.nDim   = 5;
   for (int d = 0; d < 4; d++) { csParam.x[d] = gaugeParam.X[d]; }
   if(Nsrc > 1) {
     csParam.is_composite  = true;
+    csParam.is_component  = false;
     csParam.composite_dim = Nsrc;
   }
-  //csParam.nDim = 4;
-  //csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  
+  csParam.x[4] = csParam.is_composite ? Nsrc : 1; // number of sources becomes the fifth dimension
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;

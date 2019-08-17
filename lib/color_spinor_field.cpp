@@ -29,7 +29,7 @@ namespace quda {
     : LatticeField(field), init(false), ghost_precision_allocated(QUDA_INVALID_PRECISION), v(0), norm(0),
       ghost( ), ghostNorm( ), ghostFace( ),
       bytes(0), norm_bytes(0), even(0), odd(0),
-     composite_descr(field.composite_descr), components(0)
+      composite_descr(field.composite_descr), components(0)
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
@@ -51,6 +51,7 @@ namespace quda {
     // calculate size of ghost zone required
     int ghostVolume = 0;
     int dims = nDim == 5 ? (nDim - 1) : nDim;
+    //includes DW  and non-degenerate TM ghosts (and composite ghosts)    
     int x5   = nDim == 5 ? x[4] : 1; ///includes DW  and non-degenerate TM ghosts
     for (int i=0; i<dims; i++) {
       ghostFace[i] = 0;
@@ -190,14 +191,18 @@ namespace quda {
 
     precision = Prec;
     volume = 1;
-    for (int d=0; d<nDim; d++) {
+    //for a composite field, compute volume of a component  
+    for (int d=0; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) { 	    
       x[d] = X[d];
       volume *= x[d];
     }
+
+    if(composite_descr.is_composite) x[nDim-1] = X[nDim-1]; //copy last dim    
+
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
-   if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
-     errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
+    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
+      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
     pad = Pad;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
@@ -227,24 +232,24 @@ namespace quda {
 
       if (composite_descr.is_component) errorQuda("\nComposite type is not implemented.\n");
 
-      composite_descr.volume   = volume;
-      composite_descr.volumeCB = volumeCB;
-      composite_descr.stride = stride;
-      composite_descr.length = length;
+      composite_descr.volume      = volume;
+      composite_descr.volumeCB    = volumeCB;
+      composite_descr.stride      = stride;
+      composite_descr.length      = length;
       composite_descr.real_length = real_length;
       composite_descr.bytes       = bytes;
       composite_descr.norm_bytes  = norm_bytes;
 
-      volume *= composite_descr.dim;
-      volumeCB *= composite_descr.dim;
-      stride *= composite_descr.dim;
-      length *= composite_descr.dim;
+      volume      *= composite_descr.dim;
+      volumeCB    *= composite_descr.dim;
+      stride      *= composite_descr.dim;
+      length      *= composite_descr.dim;
       real_length *= composite_descr.dim;
 
-      bytes *= composite_descr.dim;
-      norm_bytes *= composite_descr.dim;
+      bytes       *= composite_descr.dim;
+      norm_bytes  *= composite_descr.dim;
     }  else if (composite_descr.is_component) {
-      composite_descr.dim = 0;
+      //composite_descr.dim         = 0;
 
       composite_descr.volume      = 0;
       composite_descr.volumeCB    = 0;
@@ -305,7 +310,7 @@ namespace quda {
       }
       else if(src.composite_descr.is_component){
         this->composite_descr.is_composite = false;
-        this->composite_descr.dim          = 0;
+        this->composite_descr.dim          = src.composite_descr.dim;
         //this->composite_descr.is_component = false;
         //this->composite_descr.id           = 0;
       }
@@ -332,14 +337,17 @@ namespace quda {
 
     composite_descr.is_composite     = param.is_composite;
     composite_descr.is_component     = param.is_component;
-    composite_descr.dim              = param.is_composite ? param.composite_dim : 0;
+    composite_descr.dim              = param.composite_dim;
     composite_descr.id               = param.component_id;
 
     volume = 1;
-    for (int d=0; d<nDim; d++) {
+    for (int d=0; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) {	    
       if (param.x[d] != 0) x[d] = param.x[d];
       volume *= x[d];
     }
+
+    if ( composite_descr.is_composite ) x[nDim-1] = param.x[nDim-1];    
+
     volumeCB = param.siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
 
     if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
@@ -719,7 +727,7 @@ namespace quda {
     // convert into the full-field lattice coordinate
     int oddBit = parity;
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      for (int d=1; d<nDim; d++) oddBit += y[d];
+      for (int d=1; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) oddBit += y[d];	    
       oddBit = oddBit & 1;
     }
     y[0] = 2*y[0] + oddBit;  // compute the full x coordinate
@@ -738,7 +746,7 @@ namespace quda {
     int savey0 = y[0];
 
     if (siteSubset == QUDA_FULL_SITE_SUBSET) {
-      for (int d=0; d<nDim; d++) parity += y[d];
+      for (int d=0; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) parity += y[d];      
       parity = parity & 1;
       y[0] /= 2;
       z[0] /= 2;
@@ -787,6 +795,7 @@ namespace quda {
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type) {
     ColorSpinorParam coarseParam(*this);
+    //for (int d=0; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) fineParam.x[d] = x[d] * geoBlockSize[d];    
     for (int d=0; d<nDim; d++) coarseParam.x[d] = x[d]/geoBlockSize[d];
     coarseParam.nSpin = nSpin / spinBlockSize; //for staggered coarseParam.nSpin = nSpin
 
@@ -826,6 +835,7 @@ namespace quda {
                                                  QudaPrecision new_precision, QudaFieldLocation new_location,
                                                  QudaMemoryType new_mem_type) {
     ColorSpinorParam fineParam(*this);
+    //for (int d=0; d<(composite_descr.is_composite ? nDim-1 : nDim); d++) fineParam.x[d] = x[d] * geoBlockSize[d];    
     for (int d=0; d<nDim; d++) fineParam.x[d] = x[d] * geoBlockSize[d];
     fineParam.nSpin = nSpin * spinBlockSize;
     fineParam.nColor = Nvec;
