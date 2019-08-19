@@ -164,6 +164,8 @@ namespace quda {
       dslash_constant.dims[3][0]=X[0];
       dslash_constant.dims[3][1]=X[1];
       dslash_constant.dims[3][2]=X[2];
+
+      dslash_constant.is_composite = composite_descr.is_composite ? 1 : 0;
     }
     ghost_precision_allocated = ghost_precision;
 

@@ -169,10 +169,14 @@ public:
       StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
       Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
+      if( args.nSrc > 1 ) pushKernelPack(true);
+
       dslash::DslashPolicyTune<decltype(staggered)> policy(
         staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
         in.GhostFaceCB(), profile);
       policy.apply(0);
+
+      if( args.nSrc > 1 ) popKernelPack();      
 
       checkCudaError();
     }

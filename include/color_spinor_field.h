@@ -312,6 +312,8 @@ namespace quda {
     int X4X3X2X1hmX3X2X1h;
 
     int_fastdiv dims[4][3];
+
+    int is_composite;
   };
 
   class ColorSpinorField : public LatticeField {
