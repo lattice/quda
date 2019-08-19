@@ -68,10 +68,10 @@ namespace quda {
       } else {
         ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
       }
-      flops += 1146ll*in.Volume();
+      flops += 1146ll * in.Volume();
     } else {
       ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
-      flops += 1158ll*in.Volume();
+      flops += 1158ll * in.Volume();
     }
   }
 
@@ -81,8 +81,7 @@ namespace quda {
     checkFullSpinor(out, in);
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
-      if (dagger == QUDA_DAG_YES)
-      {
+      if (dagger == QUDA_DAG_YES) {
         ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
       } else {
         ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
