@@ -57,17 +57,17 @@ namespace quda {
 
     // Need to catch the zero mass case.
     if (k == 0.0) {
-      // There's a sign convention difference for Dslash vs DslashXpay, which is 
+      // There's a sign convention difference for Dslash vs DslashXpay, which is
       // triggered by looking for k == 0. We need to hack around this.
       if (dagger == QUDA_DAG_YES) {
         ApplyStaggered(out, in, *gauge, 0., x, parity, QUDA_DAG_NO, commDim, profile);
       } else {
         ApplyStaggered(out, in, *gauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
       }
-      flops += 570ll*in.Volume();
+      flops += 570ll * in.Volume();
     } else {
       ApplyStaggered(out, in, *gauge, k, x, parity, dagger, commDim, profile);
-      flops += 582ll*in.Volume();
+      flops += 582ll * in.Volume();
     }
   }
 
