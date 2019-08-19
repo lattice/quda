@@ -78,14 +78,14 @@ public:
           out, in, U, U, a, x, parity, dagger, comm_override);
         Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
 
-	if( args.nSrc > 1 ) pushKernelPack(true);
+	if( arg.nSrc > 1 ) pushKernelPackT(true);
 
         dslash::DslashPolicyTune<decltype(staggered)> policy(
           staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
         policy.apply(0);
 
-        if( args.nSrc > 1 ) popKernelPack();	
+        if( arg.nSrc > 1 ) popKernelPackT();	
 #else
         errorQuda("MILC interface has not been built so MILC phase staggered fermions not enabled");
 #endif
@@ -94,7 +94,7 @@ public:
         constexpr int nDim = 5; // MWTODO: this probably should be 5 for mrhs Dslash
         constexpr bool improved = false;
 
-        if( args.nSrc > 1 ) pushKernelPack(true);	
+        if( arg.nSrc > 1 ) pushKernelPackT(true);	
 
         StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
           out, in, U, U, a, x, parity, dagger, comm_override);
@@ -105,7 +105,7 @@ public:
           in.GhostFaceCB(), profile);
         policy.apply(0);
 
-       if( args.nSrc > 1 ) popKernelPack();	
+       if( arg.nSrc > 1 ) popKernelPackT();	
 #else
         errorQuda("TIFR interface has not been built so TIFR phase taggered fermions not enabled");
 #endif

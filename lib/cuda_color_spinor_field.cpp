@@ -1058,7 +1058,7 @@ namespace quda {
           const int x4 = nDim==5 ? x[4] : 1;
           const int Nt_minus_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4;
 
-	  const bool composite_field = is_composite;
+	  const bool composite_field = composite_descr.is_composite;
 
           int offset = 0;
           if (nSpin == 1) {
@@ -1092,7 +1092,7 @@ namespace quda {
                 int norm_offset = (dir == 0) ? 0 : Nt_minus_offset * sizeof(float);
                 void *dst = (char *)ghost_dst + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
                   + parity * nFace * ghostFaceCB[3] * sizeof(float);
-                void *src = (char *)norm + norm_offset + s * ((composite_field ? volume : volumeCB) / x4) * sizeof(float) + parity * (composite_field ? composite_descr.norm_bytes ? norm_bytes) / 2;
+                void *src = (char *)norm + norm_offset + s * ((composite_field ? volume : volumeCB) / x4) * sizeof(float) + parity * (composite_field ? composite_descr.norm_bytes : norm_bytes) / 2;
                 cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToDevice, *copy_stream);
               }
             }
