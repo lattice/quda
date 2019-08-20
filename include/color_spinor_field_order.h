@@ -815,6 +815,7 @@ namespace quda {
       cudaTextureObject_t tex;
       cudaTextureObject_t texNorm;
       const int tex_offset;
+      const int ghost_tex_offset; //identical to tex_offset for regular (4-d or 5-d) spinors
 #if 0 // unused at present
         cudaTextureObject_t ghostTex;
         cudaTextureObject_t ghostTexNorm;
@@ -823,6 +824,7 @@ namespace quda {
       int volumeCB;
       int faceVolumeCB[4];
       int stride;
+      int ghost_stride; //identical to stride for regular (4-d or 5-d) spinors
       mutable Float *ghost[8];
       mutable norm_type *ghost_norm[8];
       int nParity;
@@ -839,9 +841,11 @@ namespace quda {
           tex(0),
           texNorm(0),
           tex_offset(offset / N),
+	  ghost_tex_offset(a.Bytes() / (N * (2*sizeof(float)))),
 #endif
           volumeCB(a.VolumeCB()),
           stride((a.IsComposite() ? a.ComponentStride() : a.Stride())),
+	  ghost_stride(a.Stride()),
           nParity(a.SiteSubset()),
           backup_h(nullptr),
           bytes(a.Bytes())
@@ -988,7 +992,7 @@ namespace quda {
                                                                 // first do vectorized copy from memory into registers
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
       if (!huge_alloc) {                                        // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
+        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity * ghost_tex_offset + ghost_stride * i + x);
 #pragma unroll
         for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<RegType *>(&vecTmp)[j]);
         if (isFixed<Float>::value) {

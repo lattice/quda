@@ -813,6 +813,8 @@ namespace quda {
       const int x4 = nDim==5 ? x[4] : 1;
       const int Nt_minus1_offset = (volumeCB - nFace * ghostFaceCB[3]) / x4; // N_t-1 = Vh-Vsh
 
+      const bool composite_field = composite_descr.is_composite;
+
       int offset = 0;
       if (nSpin == 1) {
 	offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset;
@@ -828,7 +830,7 @@ namespace quda {
 
       size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
       size_t dpitch = x4*len;
-      size_t spitch = stride*Nvec*ghost_precision;
+      size_t spitch = (composite_field ? composite_descr.stride : stride)*Nvec*ghost_precision;
 
       // QUDA Memcpy NPad's worth. 
       //  -- Dest will point to the right beginning PAD. 
@@ -838,7 +840,7 @@ namespace quda {
       for (int parity = 0; parity < nParity; parity++) {
         for (int s = 0; s < x4; s++) { // loop over multiple 4-d volumes (if they exist)
           void *dst = (char *)ghost_spinor + s * len + parity * nFace * Nint * ghostFaceCB[3] * ghost_precision;
-          void *src = (char *)v + (offset + s * (volumeCB / x4)) * Nvec * ghost_precision + parity * bytes / 2;
+          void *src = (char *)v + (offset + s * ((composite_field ? volume : volumeCB) / x4)) * Nvec * ghost_precision + parity * (composite_field ? composite_descr.bytes : bytes) / 2;
           qudaMemcpy2DAsync(dst, dpitch, src, spitch, len, Npad, cudaMemcpyDeviceToHost, *stream);
 
           // we can probably issue this as a single cudaMemcpy2d along the fifth dimension
@@ -847,7 +849,7 @@ namespace quda {
             int norm_offset = (dir == QUDA_BACKWARDS) ? 0 : Nt_minus1_offset * sizeof(float);
             void *dst = (char *)ghost_spinor + nParity * nFace * Nint * ghostFaceCB[3] * ghost_precision + s * len
                 + parity * nFace * ghostFaceCB[3] * sizeof(float);
-            void *src = (char *)norm + norm_offset + s * (volumeCB / x4) * sizeof(float) + parity * norm_bytes / 2;
+            void *src = (char *)norm + norm_offset + s * ((composite_field ? volume : volumeCB) / x4) * sizeof(float) + parity * (composite_field? composite_descr.norm_bytes : norm_bytes) / 2;
             qudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, *stream);
           }
         } // fifth dimension
@@ -1077,7 +1079,7 @@ namespace quda {
 
           size_t len = nFace * (ghostFaceCB[3] / x4) * Nvec * ghost_precision;
           size_t dpitch = x4*len;
-          size_t spitch = stride*Nvec*ghost_precision;
+          size_t spitch = (composite_field ? composite_descr.stride : stride)*Nvec*ghost_precision;
 
           for (int parity = 0; parity < nParity; parity++) {
             for (int s = 0; s < x4; s++) {
