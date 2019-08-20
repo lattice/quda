@@ -9,7 +9,8 @@
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <staggered_dslash_reference.h>
-#include "llfat_reference.h"
+#include <staggered_gauge_utils.h>
+#include <llfat_reference.h>
 #include "misc.h"
 #include <gauge_field.h>
 #include <covdev_reference.h>
@@ -169,14 +170,6 @@ extern bool mg_eig_coarse_guess;
 
 extern char eig_QUDA_logfile[];
 
-// Unitarization coefficients
-static double unitarize_eps  = 1e-6;
-static bool reunit_allow_svd = true;
-static bool reunit_svd_only  = false;
-static double svd_rel_error  = 1e-4;
-static double svd_abs_error  = 1e-4;
-static double max_allowed_error = 1e-11;
-
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -230,91 +223,6 @@ display_test_info()
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
   return ;
-}
-
-void computeHISQLinksGPU(void** fatlink, void** longlink,
-        void** fatlink_eps, void** longlink_eps,
-        void** inlink, void* qudaGaugeParamPtr,
-        double** act_path_coeffs, double eps_naik) {
-
-  QudaGaugeParam gauge_param = *(reinterpret_cast<QudaGaugeParam*>(qudaGaugeParamPtr));
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
-  // inlink in different format
-  void *inlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize);
-  reorderQDPtoMILC(inlink_milc,inlink,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-
-  // Paths for step 1:
-  void* vlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // V links
-  void* wlink_milc  = pinned_malloc(4*V*gaugeSiteSize*gSize); // W links
-  
-  // Paths for step 2:
-  void* fatlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final fat ("X") links
-  void* longlink_milc = pinned_malloc(4*V*gaugeSiteSize*gSize); // final long links
-  
-  // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
-  computeKSLinkQuda(vlink_milc, nullptr, wlink_milc, inlink_milc, act_path_coeffs[0], &gauge_param);
-
-  // Create X and long links, 2nd path table set
-  computeKSLinkQuda(fatlink_milc, longlink_milc, nullptr, wlink_milc, act_path_coeffs[1], &gauge_param);
-
-  // Copy back
-  reorderMILCtoQDP(fatlink,fatlink_milc,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-  reorderMILCtoQDP(longlink,longlink_milc,V,gaugeSiteSize,gauge_param.cpu_prec,gauge_param.cpu_prec);
-
-  // Clean up GPU compute links
-  host_free(inlink_milc);
-  host_free(vlink_milc);
-  host_free(wlink_milc);
-  host_free(fatlink_milc);
-  host_free(longlink_milc);
-
-}
-
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-QudaPrecision &cuda_prec_precondition = prec_precondition;
-
-void computePlaquetteQDPOrder(void** qdp_link, double plaq[3]) {
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-
-  gauge_param.cpu_prec = cpu_prec;
-
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-
-  gauge_param.cuda_prec_sloppy = prec;
-  gauge_param.reconstruct_sloppy = link_recon;
-
-  gauge_param.anisotropy = 1;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
-#endif
-
-  loadGaugeQuda(qdp_link, &gauge_param);
-  plaqQuda(plaq);
-
 }
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
@@ -874,14 +782,9 @@ int main(int argc, char **argv)
     //createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
   }
 
-  // Compute plaquette
+  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
-  computePlaquetteQDPOrder(qdp_inlink, plaq);
-  if (dslash_type != QUDA_LAPLACE_DSLASH) {
-    plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-    plaq[1] = -plaq[1];
-    plaq[2] = -plaq[2];
-  }
+  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
 
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
@@ -895,81 +798,7 @@ int main(int argc, char **argv)
   } else { // QUDA_ASQTAD_DSLASH
 
     if (compute_fatlong) {
-
-      ///////////////////////////
-      // Set path coefficients //
-      ///////////////////////////
-
-      // Reference: "generic_ks/imp_actions/hisq/hisq_action.h",
-      // in QHMC: https://github.com/jcosborn/qhmc/blob/master/lib/qopqdp/hisq.c
-
-      double u1 = 1.0/tadpole_factor;
-      double u2 = u1*u1;
-      double u4 = u2*u2;
-      double u6 = u4*u2;
-
-      // First path: create V, W links
-      double act_path_coeff_1[6] = {
-           ( 1.0/8.0),                 /* one link */
-        u2*( 0.0),                     /* Naik */
-        u2*(-1.0/8.0)*0.5,             /* simple staple */
-        u4*( 1.0/8.0)*0.25*0.5,        /* displace link in two directions */
-        u6*(-1.0/8.0)*0.125*(1.0/6.0), /* displace link in three directions */
-        u4*( 0.0)                      /* Lepage term */
-      };
-      
-      // Second path: create X, long links
-      double act_path_coeff_2[6] = {
-        (( 1.0/8.0)+(2.0*6.0/16.0)+(1.0/8.0)),   // one link 
-            // One link is 1/8 as in fat7 + 2*3/8 for Lepage + 1/8 for Naik 
-        (-1.0/24.0),                             // Naik 
-        (-1.0/8.0)*0.5,                          // simple staple 
-        ( 1.0/8.0)*0.25*0.5,                     // displace link in two directions 
-        (-1.0/8.0)*0.125*(1.0/6.0),              // displace link in three directions 
-        (-2.0/16.0)                              // Lepage term, correct O(a^2) 2x ASQTAD 
-      };
-
-      // Paths for epsilon corrections. Not used if n_naiks = 1.
-      double act_path_coeff_3[6] = {
-        ( 1.0/8.0),    // one link b/c of Naik 
-        (-1.0/24.0),   // Naik 
-          0.0,         // simple staple 
-          0.0,         // displace link in two directions 
-          0.0,         // displace link in three directions 
-          0.0          // Lepage term 
-      };
-
-      double* act_paths[3] = { act_path_coeff_1, act_path_coeff_2, act_path_coeff_3 };
-
-      // silence some Naik complaining
-      (void)n_naiks;
-
-
-      ////////////////////////////////////
-      // Set unitarization coefficients //
-      ////////////////////////////////////
-
-      setUnitarizeLinksConstants(unitarize_eps,
-               max_allowed_error,
-               reunit_allow_svd,
-               reunit_svd_only,
-               svd_rel_error,
-               svd_abs_error);
-
-      //////////////////////////
-      // Create the GPU links //
-      //////////////////////////
-
-      // Skip eps field for now
-
-      // Note: GPU link creation only works for single and double precision
-      computeHISQLinksGPU(qdp_fatlink, qdp_longlink,
-                          nullptr, nullptr,
-                          qdp_inlink, &gauge_param, act_paths, 0.0 /* eps_naik */);
-
-      
-
-
+      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
     } else { //
 
       for (int dir = 0; dir < 4; dir++) {
@@ -977,18 +806,10 @@ int main(int argc, char **argv)
       }
     }
 
-  }
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-
-    computePlaquetteQDPOrder(qdp_fatlink, plaq);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
-      plaq[0] = -plaq[0]; // correction because we've already put phases on the fields
-      plaq[1] = -plaq[1];
-      plaq[2] = -plaq[2];
-    }
+    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
   }
 
   // Alright, we've created all the void** links.
