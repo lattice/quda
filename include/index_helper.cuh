@@ -727,7 +727,10 @@ namespace quda {
     face_idx_in *= 2;
 
     // first compute src index, then find 4-d index from remainder
-    int s = face_idx_in / arg.dc.face_XYZT[dim];
+    // Remark: the composite src index is defined as the thread id 
+    // in y direction in the execution domain. 
+    // the face_idx is given for 3-d surface  
+    int s = arg.dc.is_composite ? 0 : face_idx_in / arg.dc.face_XYZT[dim];
     int face_idx = face_idx_in - s * arg.dc.face_XYZT[dim];
 
     /*y,z,t here are face indexes in new order*/
@@ -774,6 +777,9 @@ namespace quda {
      the 4-d variant since the face_idx that is passed in is the 3-d
      surface not the 4-d one.
 
+     Remark: for a composite field (multi-src 4-d field), the face_idx 
+     is the 3-d surface 
+
      @param[out] face_idx Face index
      @param[in] tid Checkerboard volume index
      @param[in] arg Input parameters
@@ -784,7 +790,7 @@ namespace quda {
   {
 
     // s - the coordinate in the fifth dimension - is the slowest-changing coordinate
-    const int s = (nDim == 5 ? tid / arg.threads : 0);
+    const int s = (nDim == 5 && !arg.dc.is_composite ? tid / arg.threads : 0);
 
     face_idx = tid - s * arg.threads; // face_idx = face_idx % arg.threads
 

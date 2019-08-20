@@ -70,7 +70,7 @@ namespace quda
         threadDimMapUpper[i] = 0;
         if (!commDim[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
-        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
+        threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i] / ( in.IsComposite() ? dc.Ls : 1 );
         prev = i;
 
         dim_map[d++] = i;
@@ -158,13 +158,17 @@ namespace quda
 
     int spinor_parity = (arg.nParity == 2) ? parity : 0;
 
+    // number of components in the composite field (1 for a regular field):
+    // better to introduce componentGhostFaceCB[dim]
+    const int ghostFaceCB = arg.dc.is_composite ? arg.dc.ghostFaceCB[dim] : arg.dc.ghostFaceCB[dim] / arg.dc.Ls ; 
+
     // compute where the output is located
     // compute an index into the local volume from the index into the face
     // read spinor and write spinor to face buffer
 
     // face_num determines which end of the lattice we are packing: 0 = start, 1 = end
-    const int face_num = (ghost_idx >= nFace * arg.dc.ghostFaceCB[dim]) ? 1 : 0;
-    ghost_idx -= face_num * nFace * arg.dc.ghostFaceCB[dim];
+    const int face_num = (ghost_idx >= nFace * ghostFaceCB) ? 1 : 0;
+    ghost_idx -= face_num * nFace * ghostFaceCB;
 
     // remove const to ensure we have non-const Ghost member
     typedef typename std::remove_const<decltype(arg.in)>::type T;
@@ -172,12 +176,14 @@ namespace quda
 
     if (face_num == 0) { // backwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 0>(ghost_idx, parity, arg);
-      Vector f = arg.in(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 0, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      //Vector f = arg.in(idx + s * (arg.dc.is_composite ? arg.dc.volume_4d : arg.dc.volume_4d_cb), spinor_parity);
+      Vector f = arg.dc.is_composite ? arg.in(idx + s * arg.dc.volume_4d_cb, spinor_parity) : arg.in(idx + s * arg.dc.volume_4d, spinor_parity);
+      in.Ghost(dim, 0, ghost_idx + s * ghostFaceCB, spinor_parity) = f;
     } else { // forwards
       int idx = indexFromFaceIndexStaggered<4, QUDA_4D_PC, dim, nFace, 1>(ghost_idx, parity, arg);
-      Vector f = arg.in(idx + s * arg.dc.volume_4d_cb, spinor_parity);
-      in.Ghost(dim, 1, ghost_idx + s * arg.dc.ghostFaceCB[dim], spinor_parity) = f;
+      //Vector f = arg.in(idx + (arg.dc.is_composite ? arg.dc.volume_4d : arg.dc.volume_4d_cb), spinor_parity);
+      Vector f = arg.dc.is_composite ? arg.in(idx + s * arg.dc.volume_4d_cb, spinor_parity) : arg.in(idx + s * arg.dc.volume_4d, spinor_parity);
+      in.Ghost(dim, 1, ghost_idx + s * ghostFaceCB, spinor_parity) = f;
     }
   }
 

@@ -182,7 +182,7 @@ public:
       for (int i = 0; i < 4; i++) {
         if (!commDim[i]) continue;
         if (i == 3 && !getKernelPackT()) continue;
-        threads += 2 * nFace * in.getDslashConstant().ghostFaceCB[i]; // 2 for forwards and backwards faces
+        threads += 2 * nFace * in.getDslashConstant().ghostFaceCB[i] / (in.IsComposite() ? in.getDslashConstant().Ls :  1) ; // 2 for forwards and backwards faces, note that ghostFaceCB[i] was multiplied by X[4], and execution threads in y-direction correspond to source id's. 
       }
     }
 

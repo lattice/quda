@@ -832,16 +832,16 @@ namespace quda {
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0,
           bool override = false) :
           field(field_ ? field_ : (Float *)a.V()),
-          offset(a.Bytes() / (2 * sizeof(Float))),
+          offset((a.IsComposite() ? a.ComponentBytes() : a.Bytes()) / (2 * sizeof(Float))),
           norm(norm_ ? norm_ : (norm_type *)a.Norm()),
-          norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
+          norm_offset((a.IsComposite() ? a.ComponentNormBytes() : a.NormBytes()) / (2 * sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
           tex(0),
           texNorm(0),
           tex_offset(offset / N),
 #endif
           volumeCB(a.VolumeCB()),
-          stride(a.Stride()),
+          stride((a.IsComposite() ? a.ComponentStride() : a.Stride())),
           nParity(a.SiteSubset()),
           backup_h(nullptr),
           bytes(a.Bytes())
