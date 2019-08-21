@@ -170,6 +170,11 @@ extern bool mg_eig_coarse_guess;
 
 extern char eig_QUDA_logfile[];
 
+QudaPrecision &cpu_prec = prec;
+QudaPrecision &cuda_prec = prec;
+QudaPrecision &cuda_prec_sloppy = prec_sloppy;
+QudaPrecision &cuda_prec_precondition = prec_precondition;
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
