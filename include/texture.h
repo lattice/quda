@@ -116,7 +116,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
 
   SpinorNorm() : norm(nullptr), cb_norm_offset(0) {}
 
-  SpinorNorm(const ColorSpinorField &x) : norm((float *)x.Norm()), cb_norm_offset(x.NormBytes() / (2 * sizeof(float)))
+  SpinorNorm(const ColorSpinorField &x) : norm((float *)x.Norm()), cb_norm_offset( (x.IsComposite() ? x.ComponentNormBytes() : x.NormBytes()) / (2 * sizeof(float)))
   {
   }
 
@@ -134,7 +134,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   void set(const cudaColorSpinorField &x)
   {
     norm = (float *)x.Norm();
-    cb_norm_offset = x.NormBytes() / (2 * sizeof(float));
+    cb_norm_offset = (x.IsComposite() ? x.ComponentNormBytes() : x.NormBytes()) / (2 * sizeof(float));
   }
 
   virtual ~SpinorNorm() {}
@@ -229,13 +229,17 @@ public:
   SpinorTexture(const ColorSpinorField &x, int nFace = 1) :
     SN(x),
     tex(&(static_cast<const cudaColorSpinorField &>(x))),
-    stride(x.Stride()),
-    cb_offset(x.Bytes() / (2 * sizeof(StoreType)))
+    stride(x.IsComposite() ? x.ComponentStride() : x.Stride()),
+    cb_offset( (x.IsComposite() ? x.ComponentBytes() : x.Bytes()) / (2 * sizeof(StoreType)))
 #ifndef BLAS_SPINOR
     ,
     ghostTex(&(static_cast<const cudaColorSpinorField &>(x)), true)
 #endif
   {
+    if (x.IsComposite() && x.SiteSubset()==2 && x.Length() != x.RealLength()) {
+        errorQuda("Cannot wrap an align padded full field composite ColorSpinorField");
+    }
+
     checkTypes<RegType, InterType, StoreType>();
 #ifndef BLAS_SPINOR
     for (int d = 0; d < 4; d++) ghost_stride[d] = nFace * x.SurfaceCB(d);
@@ -276,8 +280,8 @@ public:
   {
     SN::set(x);
     tex = Texture<InterType, StoreType>(&x);
-    stride = x.Stride();
-    cb_offset = x.Bytes() / (2 * sizeof(StoreType));
+    stride = x.IsComposite() ? x.ComponentStride() : x.Stride();
+    cb_offset = (x.IsComposite() ? x.ComponentBytes() : x.Bytes()) / (2 * sizeof(StoreType));
 #ifndef BLAS_SPINOR
     ghostTex = Texture<InterType, StoreType>(&x, true);
     for (int d = 0; d < 4; d++) ghost_stride[d] = nFace * x.SurfaceCB(d);
