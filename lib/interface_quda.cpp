@@ -2475,7 +2475,10 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
+    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly accel.
+    if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
+    }
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);

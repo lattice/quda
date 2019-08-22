@@ -4,7 +4,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <csignal>
 #include <comm_quda.h>
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
@@ -64,9 +63,6 @@ void comm_broadcast(void *data, size_t nbytes) {}
 
 void comm_barrier(void) {}
 
-void comm_abort(int status) {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
+void comm_abort_(int status) {
   exit(status);
 }

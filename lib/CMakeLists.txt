@@ -150,6 +150,13 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_BACKWARDS)
+  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
+endif()
+
 if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD)
     add_dependencies(quda QIO)

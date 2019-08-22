@@ -40,14 +40,20 @@ namespace quda {
     const int volumeCB;
 
     inline DslashCoarseArg(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
-			   const GaugeField &Y, const GaugeField &X, Float kappa, int parity)
-      : out(const_cast<ColorSpinorField&>(out)), inA(const_cast<ColorSpinorField&>(inA)),
-	inB(const_cast<ColorSpinorField&>(inB)), Y(const_cast<GaugeField&>(Y)),
-	X(const_cast<GaugeField&>(X)), kappa(kappa), parity(parity),
-	nParity(out.SiteSubset()), nFace(1), X0h( ((3-nParity) * out.X(0)) /2),
-	dim{ (3-nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1 },
-      commDim{comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
-      volumeCB(out.VolumeCB()/dim[4])
+                           const GaugeField &Y, const GaugeField &X, Float kappa, int parity) :
+      out(const_cast<ColorSpinorField &>(out)),
+      inA(const_cast<ColorSpinorField &>(inA)),
+      inB(const_cast<ColorSpinorField &>(inB)),
+      Y(const_cast<GaugeField &>(Y)),
+      X(const_cast<GaugeField &>(X)),
+      kappa(kappa),
+      parity(parity),
+      nParity(out.SiteSubset()),
+      nFace(1),
+      X0h(((3 - nParity) * out.X(0)) / 2),
+      dim {(3 - nParity) * out.X(0), out.X(1), out.X(2), out.X(3), out.Ndim() == 5 ? out.X(4) : 1},
+      commDim {comm_dim_partitioned(0), comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3)},
+      volumeCB((unsigned int)out.VolumeCB() / dim[4])
     {  }
   };
 
@@ -322,12 +328,8 @@ namespace quda {
 	constexpr int warp_size = 32; // FIXME - this is buggy when x-dim * color_stride < 32
 #pragma unroll
 	for (int offset = warp_size/2; offset >= warp_size/color_stride; offset /= 2)
-#if (__CUDACC_VER_MAJOR__ >= 9)
 #define WARP_CONVERGED 0xffffffff // we know warp should be converged here
 	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
-#else
-	  out[color_local] += __shfl_down(out[color_local], offset);
-#endif
       }
 
 #endif // __CUDA_ARCH__ >= 300
