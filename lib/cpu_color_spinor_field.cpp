@@ -165,7 +165,6 @@ namespace quda {
       param.siteSubset = QUDA_PARITY_SITE_SUBSET;
       param.nDim = nDim;
       memcpy(param.x, x, nDim*sizeof(int));
-      param.x[nDim-1] = 1; //set compnent last dimension to 1      
       param.x[0] /= 2;
       param.create = QUDA_REFERENCE_FIELD_CREATE;
       param.v = v;
@@ -189,6 +188,7 @@ namespace quda {
       } else { //creating a composite field
         if(composite_descr.dim <= 0 || composite_descr.is_component) errorQuda("\nComposite field is not defined.\n");
         param.is_component = true;
+        param.x[nDim-1] = 1; //set compnent last dimension to 1 	
         components.reserve(composite_descr.dim);
         for(int cid = 0; cid < composite_descr.dim; cid++) {
           param.component_id = cid;
