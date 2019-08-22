@@ -337,7 +337,7 @@ void init()
     csParam.composite_dim = Nsrc;
   }
   
-  csParam.x[4] = csParam.is_composite ? Nsrc : 1; // number of sources becomes the fifth dimension
+  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
