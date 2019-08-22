@@ -358,13 +358,13 @@ namespace quda {
 #ifndef USE_LEGACY_DSLASH
 		  if ( matpcType == QUDA_MATPC_EVEN_EVEN ) {
 			  // printfQuda("Applying EVEN EVEN\n");
-			  ApplyWilsonCloverHasenbuschTwist(out.Even(),in.Odd(),*gauge,clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
+			  ApplyWilsonCloverHasenbuschTwist(out.Even(),in.Odd(),*gauge,clover, -kappa, 2*mu, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,profile);
 			  ApplyWilsonClover(out.Odd(), in.Even(), *gauge, clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
 		  }
 		  else {
 			  // printfQuda("Applying Odd Odd\n");
 			  ApplyWilsonClover(out.Even(),in.Odd(),*gauge,clover,-kappa,in.Even(),QUDA_EVEN_PARITY,dagger,commDim,profile);
-			  ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
+			  ApplyWilsonCloverHasenbuschTwist(out.Odd(),in.Even(),*gauge,clover, -kappa, 2*mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim, profile);
 
 		  }
 

@@ -398,7 +398,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 
 			// two factors of 2 for two clover applications => (1/4) mu
 			// out_e = out_e -/+ i gamma_5 mu A_ee (A_ee) in_ee
-			twistClover(outEven, tmp, outEven, clover,  0.25*mu, dagger, 0, precision);
+			twistClover(outEven, tmp, outEven, clover,  0.5*mu, dagger, 0, precision);
 
 		}
 		else {
@@ -406,7 +406,7 @@ void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, d
 
 			// two factors of 2 for two clover applications => (1/4) mu
 			// out_e = out_e -/+ i gamma_5 mu A (A_ee)
-			twistClover(outOdd, tmp, outOdd, clover, 0.25*mu, dagger, 1,precision);
+			twistClover(outOdd, tmp, outOdd, clover, 0.5*mu, dagger, 1,precision);
 
 		}
 		free(tmp);

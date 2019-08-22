@@ -343,7 +343,7 @@ int main(int argc, char **argv)
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
 		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-    double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
+    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     size_t cSize = inv_param.clover_cpu_prec;
     clover = malloc(V*cloverSiteSize*cSize);
