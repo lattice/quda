@@ -307,6 +307,7 @@ extern "C" {
   void comm_broadcast(void *data, size_t nbytes);
   void comm_barrier(void);
   void comm_abort(int status);
+  void comm_abort_(int status);
 
   void reduceMaxDouble(double &);
   void reduceDouble(double &);

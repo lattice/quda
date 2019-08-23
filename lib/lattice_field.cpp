@@ -632,23 +632,24 @@ namespace quda {
     if (a.nDim != nDim) errorQuda("nDim does not match %d %d", nDim, a.nDim);
     if (ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && a.ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
       // if source is extended by I am not then we need to compare their interior volume to my volume
-      int a_volume_interior = 1;
+      size_t a_volume_interior = 1;
       for (int i=0; i<nDim; i++) {
 	if (a.x[i]-2*a.r[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]-2*a.r[i]);
 	a_volume_interior *= a.x[i] - 2*a.r[i];
       }
-      if (a_volume_interior != volume) errorQuda("Interior volume does not match %d %d", volume, a_volume_interior);
+      if (a_volume_interior != volume) errorQuda("Interior volume does not match %lu %lu", volume, a_volume_interior);
     } else if (a.ghostExchange != QUDA_GHOST_EXCHANGE_EXTENDED && ghostExchange == QUDA_GHOST_EXCHANGE_EXTENDED) {
       // if source is extended by I am not then we need to compare their interior volume to my volume
-      int this_volume_interior = 1;
+      size_t this_volume_interior = 1;
       for (int i=0; i<nDim; i++) {
 	if (x[i]-2*r[i] != a.x[i]) errorQuda("x[%d] does not match %d %d", i, x[i]-2*r[i], a.x[i]);
 	this_volume_interior *= x[i] - 2*r[i];
       }
-      if (this_volume_interior != a.volume) errorQuda("Interior volume does not match %d %d", this_volume_interior, a.volume);
+      if (this_volume_interior != a.volume)
+        errorQuda("Interior volume does not match %lu %lu", this_volume_interior, a.volume);
     } else {
-      if (a.volume != volume) errorQuda("Volume does not match %d %d", volume, a.volume);
-      if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %d %d", volumeCB, a.volumeCB);
+      if (a.volume != volume) errorQuda("Volume does not match %lu %lu", volume, a.volume);
+      if (a.volumeCB != volumeCB) errorQuda("VolumeCB does not match %lu %lu", volumeCB, a.volumeCB);
       for (int i=0; i<nDim; i++) {
 	if (a.x[i] != x[i]) errorQuda("x[%d] does not match %d %d", i, x[i], a.x[i]);
 	if (a.surface[i] != surface[i]) errorQuda("surface[%d] does not match %d %d", i, surface[i], a.surface[i]);

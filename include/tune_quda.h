@@ -55,6 +55,11 @@ namespace quda {
     }
   };
 
+  /**
+   * @brief Returns a reference to the tunecache map
+   * @return tunecache reference
+   */
+  const std::map<TuneKey, TuneParam> &getTuneCache();
 
   class Tunable {
 
@@ -77,15 +82,14 @@ namespace quda {
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
-	const unsigned int max_blocks = maxGridSize();
         const int step = gridStep();
         param.grid.x += step;
-	if (param.grid.x > max_blocks) {
-	  param.grid.x = minGridSize();
+        if (param.grid.x > maxGridSize()) {
+          param.grid.x = minGridSize();
 	  return false;
-	} else {
-	  return true;
-	}
+        } else {
+          return true;
+        }
       } else {
 	return false;
       }
@@ -106,15 +110,15 @@ namespace quda {
     virtual int blockMin() const { return deviceProp.warpSize; }
 
     virtual void resetBlockDim(TuneParam &param) const {
-      const unsigned int max_threads = maxBlockSize(param);
-      const unsigned int max_blocks = deviceProp.maxGridSize[0];
-      const int step = blockStep();
-
       if (tuneGridDim()) {
-	param.block.x = step;
+        param.block.x = blockMin();
       } else { // not tuning the grid dimension so have to set a valid grid size
-	// ensure the blockDim is large enough given the limit on gridDim
-	param.block.x = (minThreads()+max_blocks-1)/max_blocks;
+        const auto step = blockStep();
+        const auto max_threads = maxBlockSize(param);
+        const auto max_blocks = deviceProp.maxGridSize[0];
+
+        // ensure the blockDim is large enough given the limit on gridDim
+        param.block.x = (minThreads()+max_blocks-1)/max_blocks;
 	param.block.x = ((param.block.x+step-1)/step)*step; // round up to nearest step size
 	if (param.block.x > max_threads && param.block.y == 1 && param.block.z == 1)
 	  errorQuda("Local lattice volume is too large for device");
@@ -162,6 +166,7 @@ namespace quda {
       case 7:
         switch (deviceProp.minor) {
         case 0: return 32;
+        case 2: return 32;
         case 5: return 16;
         }
       default: errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor); return 0;
@@ -201,6 +206,7 @@ namespace quda {
       case 7:
         switch (deviceProp.minor) {
         case 0: return 96 * 1024;
+        case 2: return 96 * 1024;
         case 5: return 64 * 1024;
         }
       default:
@@ -269,6 +275,21 @@ namespace quda {
     /** This is the return result from kernels launched using jitify */
     CUresult jitify_error;
 
+    /**
+       @brief Whether the present instance has already been tuned or not
+       @return True if tuned, false if not
+    */
+    bool tuned()
+    {
+      // not tuning is equivalent to already tuned
+      if (!getTuning()) return true;
+
+      TuneKey key = tuneKey();
+      if (use_managed_memory()) strcat(key.aux, ",managed");
+      // if key is present in cache then already tuned
+      return getTuneCache().find(key) != getTuneCache().end();
+    }
+
   public:
     Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
@@ -323,7 +344,7 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(128,1,1);
+      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
@@ -558,12 +579,6 @@ namespace quda {
    * @brief Post an event in the trace, recording where it was posted
    */
   void postTrace_(const char *func, const char *file, int line);
-
-  /**
-   * @brief Returns a reference to the tunecache map
-   * @return tunecache reference
-   */
-  const std::map<TuneKey, TuneParam> &getTuneCache();
 
   /**
    * @brief Enable the profile kernel counting

@@ -828,8 +828,15 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
   }
 
+  // only apply T-boundary at edge nodes
+#ifdef MULTI_GPU
+  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
+#else
+  bool last_node_in_t = true;
+#endif
+
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
     for (int j = 0; j < Vh; j++) {
       int sign =1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -2612,7 +2619,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 0 || Nsrc > 128){ // allow 0 for testing setup in isolation
+    if (Nsrc < 0 || Nsrc > 2048) { // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -2626,7 +2633,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Msrc = atoi(argv[i+1]);
-    if (Msrc < 1 || Msrc > 128){
+    if (Msrc < 1 || Msrc > 2048) {
       printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }

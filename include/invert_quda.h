@@ -283,6 +283,8 @@ namespace quda {
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase),
       max_res_increase_total(param.max_res_increase_total),
+      max_hq_res_increase(param.max_hq_res_increase),
+      max_hq_res_restart_total(param.max_hq_res_restart_total),
       heavy_quark_check(param.heavy_quark_check),
       pipeline(param.pipeline),
       tol(param.tol),
