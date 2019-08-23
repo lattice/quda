@@ -11,6 +11,7 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
+#include <test_params.h>
 
 #include <qio_field.h>
 #include <color_spinor_field.h>
@@ -19,123 +20,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_precondition;
-extern QudaPrecision prec_null;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa; // kappa of Dirac operator
-extern double mu;
-extern double epsilon;
-extern double anisotropy;
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern double reliable_delta;
-extern char latfile[];
-extern bool unit_gauge;
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
-extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int nvec[];
-extern int mg_levels;
-
-extern bool generate_nullspace;
-extern bool generate_all_levels;
-extern int nu_pre[QUDA_MAX_MG_LEVEL];
-extern int nu_post[QUDA_MAX_MG_LEVEL];
-extern int n_block_ortho[QUDA_MAX_MG_LEVEL];
-extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
-extern double mu_factor[QUDA_MAX_MG_LEVEL];
-
-extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
-
-extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
-extern QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
-
-extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
-extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol[QUDA_MAX_MG_LEVEL];
-extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-extern QudaSetupType setup_type;
-extern bool pre_orthonormalize;
-extern bool post_orthonormalize;
-extern double omega;
-extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
-extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-extern double smoother_tol[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
-
-extern QudaPrecision smoother_halo_prec;
-extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
-extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
-
-extern QudaMatPCType matpc_type;
-extern QudaSolveType solve_type;
-
-extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
-extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
-
-//Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char** );
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern bool verify_results;
-
-// Eigensolver params for MG
-extern bool low_mode_check;
-extern bool oblique_proj_check;
-
-// The coarsest grid params are for deflation,
-// all others are for PR vectors.
-extern bool mg_eig[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_nEv[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_nKr[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_amin[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_amax[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
-extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
-extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_coarse_guess;
-
-extern char eig_QUDA_logfile[];
 
 namespace quda {
   extern void setTransferGPU(bool);

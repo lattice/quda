@@ -3,7 +3,7 @@ include_directories(. googletest/include googletest)
 # enable_language(Fortran)
 
 # enable tests build a common library for all test utilities
-set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
+set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp test_params.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
   add_dependencies(quda_test QMP)
