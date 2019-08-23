@@ -2,6 +2,8 @@
 #include <multigrid.h>
 #include <algorithm>
 
+#define NO_COARSE_LINK
+
 namespace quda {
 
   DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped)
@@ -400,36 +402,36 @@ namespace quda {
 
     // we desire solution to full system
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
-      // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
       src = &(x.Odd());
-#if 0
+#ifndef NO_COARSE_LINK
+      // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
       CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
       DiracCoarse::Dslash(*tmp1, *src, QUDA_EVEN_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *tmp1);
       CloverInv(*src, *tmp1, QUDA_EVEN_PARITY);
-#endif
+#else
       // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
       CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
       Dslash(*tmp1, *src, QUDA_EVEN_PARITY);
       CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
       blas::axpy(-1.0, *tmp1, *src);
-
+#endif
       sol = &(x.Even());
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
-      // src = A_oo^-1 (b_o - D_oe A_ee^-1 b_e)
       src = &(x.Even());
-#if 0
+#ifndef NO_COARSE_LINK
+      // src = A_oo^-1 (b_o - D_oe A_ee^-1 b_e)
       CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
       DiracCoarse::Dslash(*tmp1, *src, QUDA_ODD_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, *tmp1);
       CloverInv(*src, *tmp1, QUDA_ODD_PARITY);
-#endif
+#else
       // src = A_oo^{-1} b_o - (A_oo^{-1} D_oe) A_ee^{-1} b_e
       CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
       Dslash(*tmp1, *src, QUDA_ODD_PARITY);
       CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
       blas::axpy(-1.0, *tmp1, *src);
-
+#endif
       sol = &(x.Odd());
     } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // src = b_e - D_eo A_oo^-1 b_o
@@ -469,31 +471,30 @@ namespace quda {
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||
 	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-#if 0
+#ifndef NO_COARSE_LINK
       // x_o = A_oo^-1 (b_o - D_oe x_e)
       DiracCoarse::Dslash(*tmp1, x.Even(), QUDA_ODD_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, *tmp1);
       CloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
-#endif
+#else
       // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
       Dslash(*tmp1, x.Even(), QUDA_ODD_PARITY);
       CloverInv(x.Odd(), b.Odd(), QUDA_ODD_PARITY);
       blas::axpy(-1.0, const_cast<ColorSpinorField&>(*tmp1), x.Odd());
-
+#endif
     } else if (matpcType == QUDA_MATPC_ODD_ODD ||
 	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-#if 0
+#ifndef NO_COARSE_LINK
       // x_e = A_ee^-1 (b_e - D_eo x_o)
       DiracCoarse::Dslash(*tmp1, x.Odd(), QUDA_EVEN_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *tmp1);
       CloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
-#endif
+#else
       // x_e = A_ee^{-1} b_e - (A_ee^{-1} D_eo) x_o
       Dslash(*tmp1, x.Odd(), QUDA_EVEN_PARITY);
       CloverInv(x.Even(), b.Even(), QUDA_EVEN_PARITY);
       blas::axpy(-1.0, const_cast<ColorSpinorField&>(*tmp1), x.Even());
-
-
+#endif
     } else {
       errorQuda("MatPCType %d not valid for DiracCoarsePC", matpcType);
     }
