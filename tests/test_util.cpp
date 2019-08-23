@@ -85,6 +85,9 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
 }
 
 
+void initComms(int argc, char **argv, std::array<int,4>& commDims){
+  initComms(argc, argv, commDims.data());
+}
 
 void initComms(int argc, char **argv, int *const commDims)
 {
@@ -1618,7 +1621,7 @@ double stopwatchReadSeconds() {
   return ds + 0.000001*dus;
 }
 
-static int dim_partitioned[4] = {0,0,0,0};
+
 
 int dimPartitioned(int dim)
 {

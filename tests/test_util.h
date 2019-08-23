@@ -3,6 +3,7 @@
 
 #include <quda.h>
 #include <random_quda.h>
+#include <vector>
 
 
 #define gaugeSiteSize 18 // real numbers per link
@@ -33,6 +34,7 @@
   
   extern int mySpinorSiteSize;
 
+  void initComms(int argc, char **argv, std::array<int,4>& commDims);
   void initComms(int argc, char **argv, int *const commDims);
   void finalizeComms();
   void initRand();

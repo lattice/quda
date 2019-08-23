@@ -60,7 +60,7 @@ class QUDAApp : public CLI::App
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
       size_t l;
-      T j; // results_t is just a vector of strings
+      // T j; // results_t is just a vector of strings
       bool worked = true;
 
       CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
@@ -70,15 +70,52 @@ class QUDAApp : public CLI::App
         if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
         if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
         worked = worked and CLI::detail::lexical_cast(vals.at(2 * i), l);
+        auto &j = variable[l];
         worked = worked and CLI::detail::lexical_cast(vals.at(2 * i + 1), j);
 
-        if (worked) variable[l] = j;
+        // if (worked) variable[l] = j;
       }
       return worked;
     };
     CLI::Option *opt = add_option(option_name, f, option_description);
     auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
     opt->type_name(valuename)->type_size(-2);
+    opt->expected(-1);
+    opt->transform(trans);
+    // opt->default_str("");
+    group->add_option(opt);
+    return opt;
+  }
+
+
+  template <typename T>
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T,QUDA_MAX_DIM>, QUDA_MAX_MG_LEVEL> &variable,
+                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
+  {
+
+    CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
+      size_t l;
+      T j; // results_t is just a vector of strings
+      bool worked = true;
+
+      CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
+      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
+        auto levelok = validlevel(vals.at(2 * i));
+        auto transformok = trans(vals.at(2 * i + 1));
+        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+        worked = worked and CLI::detail::lexical_cast(vals.at((QUDA_MAX_DIM+1) * i), l);
+
+        for(int k =0; k < QUDA_MAX_DIM; k++){
+        	worked = worked and CLI::detail::lexical_cast(vals.at((QUDA_MAX_DIM+1) * i + k + 1), j);
+					if (worked) variable[l][i] = j;
+				}
+      }
+      return worked;
+    };
+    CLI::Option *opt = add_option(option_name, f, option_description);
+    auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
+    opt->type_name(valuename)->type_size(-QUDA_MAX_DIM-1);
     opt->expected(-1);
     opt->transform(trans);
     // opt->default_str("");
@@ -96,8 +133,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 extern int device;
 extern int rank_order;
-extern int gridsize_from_cmdline[4];
-
+extern std::array<int,4> gridsize_from_cmdline;
+extern std::array<int,4> dim_partitioned;
 extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
@@ -108,10 +145,15 @@ extern QudaPrecision prec_precondition;
 extern QudaPrecision prec_null;
 extern QudaPrecision prec_ritz;
 extern QudaVerbosity verbosity;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
+extern std::array<int,4> dim;
+extern int &xdim;
+extern int &ydim;
+extern int &zdim;
+extern int &tdim;
+// extern int xdim;
+// extern int ydim;
+// extern int zdim;
+// extern int tdim;
 extern int Lsdim;
 extern QudaDagType dagger;
 extern QudaDslashType dslash_type;
@@ -131,8 +173,8 @@ extern int pipeline;
 extern int solution_accumulator_pipeline;
 extern int test_type;
 extern quda::mgarray<int> nvec;
-extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
-extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
+extern quda::mgarray<char[256]> mg_vec_infile;
+extern quda::mgarray<char[256]> mg_vec_outfile;
 extern QudaInverterType inv_type;
 extern QudaInverterType precon_type;
 extern int multishift;
@@ -199,7 +241,7 @@ extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> schwarz_type;
 extern quda::mgarray<int> schwarz_cycle;
 
-extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
+extern quda::mgarray<std::array<int,QUDA_MAX_DIM>> geo_block_size;
 extern int nev;
 extern int max_search_dim;
 extern int deflation_grid;

@@ -1,4 +1,5 @@
 #include "test_params.h"
+#include <comm_quda.h>
 
 // parameters parsed from the command line
 
@@ -9,7 +10,13 @@ int device = 0;
 #endif
 
 int rank_order;
-int gridsize_from_cmdline[4] = {1, 1, 1, 1};
+std::array<int,4> gridsize_from_cmdline = {1, 1, 1, 1};
+auto& grid_x = gridsize_from_cmdline[0];
+auto& grid_y = gridsize_from_cmdline[1];
+auto& grid_z = gridsize_from_cmdline[2];
+auto& grid_t = gridsize_from_cmdline[3];
+
+std::array<int,4> dim_partitioned = {0,0,0,0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
@@ -20,10 +27,11 @@ QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
-int xdim = 24;
-int ydim = 24;
-int zdim = 24;
-int tdim = 24;
+std::array<int,4> dim = {24,24,24,24};
+int &xdim = dim[0];
+int &ydim = dim[1];
+int &zdim = dim[2];
+int &tdim = dim[3];
 int Lsdim = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -43,8 +51,8 @@ int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
 quda::mgarray<int> nvec = {};
-char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
-char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
+quda::mgarray<char[256]> mg_vec_infile;
+quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
@@ -111,7 +119,7 @@ bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> schwarz_type = {};
 quda::mgarray<int> schwarz_cycle = {};
 
-int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = {};
+quda::mgarray<std::array<int,QUDA_MAX_DIM>> geo_block_size = {};
 int nev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -211,8 +219,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
 
-  // quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)");
-
+ 
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
@@ -240,7 +247,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
                        "Width of the Gaussian noise used for random gauge field contruction (default 0.2)");
 
-  //  quda_app->add_option("--gridsize", gridsize, "Set the grid size in all four dimension (default 1 1 1 1)");
+  quda_app->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")->expected(4);
   quda_app->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   quda_app->add_option("--heatbath-coldstart", heatbath_coldstart,
                        "Whether to use a cold or hot start in heatbath test (default false)");
@@ -311,8 +318,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
-  // quda_app->add_option(
-  // "--partition", partition, "Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)");
+  
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
 
@@ -402,6 +408,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ydim", ydim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512));
   quda_app->add_option("--zdim", zdim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512));
   quda_app->add_option("--tdim", tdim, "Set T dimension size(default 24)")->check(CLI::Range(1, 512));
+  quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)")->check(CLI::Range(1, 512));;
 
   quda_app
     ->add_option(
@@ -413,12 +420,25 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "Set space dimension(X/Y/Z) size")
     ->type_name("INT")
     ->check(CLI::Range(1, 512));
-  ;
 
-  // quda_app->add_option("--xgridsize", xgridsize, "Set grid size in X dimension (default 1)");
-  // quda_app->add_option("--ygridsize", ygridsize, "Set grid size in Y dimension (default 1)");
-  // quda_app->add_option("--zgridsize", zgridsize, "Set grid size in Z dimension (default 1)");
-  // quda_app->add_option("--tgridsize", tgridsize, "Set grid size in T dimension (default 1)");
+  quda_app->add_option(
+    "--partition",
+    [](CLI::results_t res) {
+      int p;
+      auto retval = CLI::detail::lexical_cast(res[0], p);
+      for (int j = 0; j < 4; j++) {
+        if (p & (1 << j)) {
+          commDimPartitionedSet(j);
+          dim_partitioned[j] = 1;
+        }
+      }
+      return retval;
+    },
+    "Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)");
+  quda_app->add_option("--xgridsize", grid_x, "Set grid size in X dimension (default 1)");
+  quda_app->add_option("--ygridsize", grid_y, "Set grid size in Y dimension (default 1)");
+  quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)");
+  quda_app->add_option("--tgridsize", grid_t, "Set grid size in T dimension (default 1)");
 
   return quda_app;
 }
@@ -519,8 +539,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto solve_type_transform = CLI::QUDACheckedTransformer(solve_type_map);
 
   // TODO
-  // auto geo_block_size_opt = opgroup->add_mgoption("--mg-block-size", geo_block_size, geo_block_size_transform, "Set
-  // the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)");
+  quda_app->add_mgoption(opgroup, "--mg-block-size", geo_block_size, CLI::Validator(), "Set the geometric block size for the each multigrid levels transfer operator (default 4 4 4 4)" );
   quda_app->add_mgoption(opgroup, "--mg-coarse-solve-type", coarse_solve_type, solve_type_transform,
                          "The type of solve to do on each level (direct, direct-pc) (default = solve_type)");
 
@@ -622,9 +641,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-levels", mg_levels, "The number of multigrid levels to do (default 2)");
 
   // TODO
-  // auto mg_vec_infile_opt = opgroup->add_mgoption("--mg-load-vec", mg_vec_infile, mg_vec_infile_transform, "Load the
-  // vectors "file" for the multigrid_test (requires QIO)"); auto mg_vec_outfile_opt = opgroup->add_mgoption("--mg-save-vec",
-  // mg_vec_outfile, mg_vec_outfile_transform, "Save the generated null-space vectors "file" from the multigrid_test (requires QIO)");
+  quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::ExistingFile, "Load the vectors <file> for the multigrid_test (requires QIO)"); 
+  quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(), "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
 
   opgroup->add_option(
     "--mg-low-mode-check", low_mode_check,

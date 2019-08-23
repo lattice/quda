@@ -62,6 +62,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <array>
 
 
 // Verbatim copy from CLI/Version.hpp:
@@ -4252,6 +4253,41 @@ class App {
         auto default_function = [&variable]() {
             std::vector<std::string> defaults;
             defaults.resize(variable.size());
+            std::transform(variable.begin(), variable.end(), defaults.begin(), [](T &val) {
+                return std::string(CLI::detail::to_string(val));
+            });
+            return std::string("[" + detail::join(defaults) + "]");
+        };
+
+        Option *opt = add_option(option_name, fun, option_description, defaulted, default_function);
+        opt->type_name(detail::type_name<T>())->type_size(-1);
+
+        return opt;
+    }
+
+    /// Add option for vectors
+    template <typename T, size_t S>
+    Option *add_option(std::string option_name,
+                       std::array<T,S> &variable, ///< The variable vector to set
+                       std::string option_description = "",
+                       bool defaulted = false) {
+
+        auto fun = [&variable](CLI::results_t res) {
+            bool retval = true;
+            // variable.clear();
+            // variable.reserve(res.size());
+            for(size_t i=0; i < S; i++) {
+                T temp;
+                
+                retval &= detail::lexical_cast(res[i], temp);
+                variable[i] = temp;
+            }
+            return retval;
+        };
+
+        auto default_function = [&variable]() {
+            std::vector<std::string> defaults;
+            defaults.resize(S);
             std::transform(variable.begin(), variable.end(), defaults.begin(), [](T &val) {
                 return std::string(CLI::detail::to_string(val));
             });
