@@ -268,7 +268,7 @@ namespace quda
 
     // these parameters required for a msrc version
     const bool is_composite; //false for regular fields
-    const int componentVolumeCB; // checkerboarded component volume (aka compositeVh)
+    const int componentOffset; // component (full) volume
     const int nSrc;//number of sources
 
     // constructor needed for staggered to set xpay from derived class
@@ -294,7 +294,7 @@ namespace quda
       swizzle(1),
       reg_block_size(1),
       is_composite(in.IsComposite()),
-      componentVolumeCB(in.IsComposite() ? in.Component(0).ComponentVolumeCB() : 0 ),
+      componentOffset(in.IsComposite() ? in.Component(0).ComponentVolume() : 0 ),
       nSrc(in.IsComposite() ? in.CompositeDim(): 1)
     {
       for (int d = 0; d < 4; d++) {
