@@ -256,15 +256,15 @@ int main(int argc, char **argv)
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
 
-  int i;
-  for (i=1; i<argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
+  }   
 
   initComms(argc, argv, gridsize_from_cmdline);
 

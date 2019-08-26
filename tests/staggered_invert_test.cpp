@@ -582,22 +582,22 @@ void display_test_info()
 
 }
 
-  void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
-  printfQuda("                                                0: Full parity inverter\n");
-  printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                                3: Even even spinor CG inverter\n");
-  printfQuda("                                                4: Odd odd spinor CG inverter\n");
-  printfQuda("                                                5: Even even spinor multishift CG inverter\n");
-  printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu-prec <double/single/half>             # Set CPU precision\n");
+//   void
+// usage_extra(char** argv )
+// {
+//   printfQuda("Extra options:\n");
+//   printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
+//   printfQuda("                                                0: Full parity inverter\n");
+//   printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
+//   printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
+//   printfQuda("                                                3: Even even spinor CG inverter\n");
+//   printfQuda("                                                4: Odd odd spinor CG inverter\n");
+//   printfQuda("                                                5: Even even spinor multishift CG inverter\n");
+//   printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
+//   printfQuda("    --cpu-prec <double/single/half>             # Set CPU precision\n");
 
-  return ;
-}
+//   return ;
+// }
 int main(int argc, char **argv)
 {
 

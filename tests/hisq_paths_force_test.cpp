@@ -417,35 +417,21 @@ static void display_test_info()
 
 }
 
-int main(int argc, char **argv)
-{
-  int i;
-  for (i =1;i < argc; i++){
+int main(int argc, char **argv){
+   auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+ 
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc",QUDA_MILC_GAUGE_ORDER},{"qdp",QUDA_QDP_GAUGE_ORDER}};
+  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
 
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }    
-
-    if( strcmp(argv[i], "--gauge-order") == 0){
-      if(i+1 >= argc){
-        usage(argv);
-      }
-
-      if(strcmp(argv[i+1], "milc") == 0){
-        gauge_order = QUDA_MILC_GAUGE_ORDER;
-      }else if(strcmp(argv[i+1], "qdp") == 0){
-        gauge_order = QUDA_QDP_GAUGE_ORDER;
-      }else{
-        fprintf(stderr, "Error: unsupported gauge-field order\n");
-        exit(1);
-      }
-      i++;
-      continue;
+   try {
+      app->parse(argc, argv);
+    } catch(const CLI::ParseError &e) {
+      return app->exit(e);
     }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
 
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
     errorQuda("Multi-gpu for milc order is not supported\n");

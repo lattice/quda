@@ -64,16 +64,6 @@ void display_test_info()
   return;
 }
 
-void usage_extra(char **argv)
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/3/4>    # Test method\n");
-  printfQuda("                      0: Full parity inverter\n");
-  printfQuda("                      3: Even even spinor CG inverter\n");
-  printfQuda("                      4: Odd odd spinor CG inverter\n");
-  return;
-}
-
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
   gauge_param.X[0] = xdim;
@@ -474,13 +464,15 @@ int main(int argc, char **argv)
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
 
-  for (int i = 1; i < argc; i++) {
-
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
+  auto app = make_app();
+  add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
+  }   
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

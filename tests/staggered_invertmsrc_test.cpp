@@ -538,40 +538,18 @@ display_test_info()
 
 }
 
-  void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: Even even spinor CG inverter\n");
-  printfQuda("                                                1: Odd odd spinor CG inverter\n");
-  printfQuda("                                                3: Even even spinor multishift CG inverter\n");
-  printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
-
-  return ;
-}
 int main(int argc, char** argv)
 {
-  for (int i = 1; i < argc; i++) {
-
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-
-
-    if( strcmp(argv[i], "--cpu_prec") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      cpu_prec= get_prec(argv[i+1]);
-      i++;
-      continue;
-    }
-
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){

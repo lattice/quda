@@ -85,10 +85,15 @@ int main(int argc, char **argv)
 
   // QUDA initialise
   //-----------------------------------------------------------------------------
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)

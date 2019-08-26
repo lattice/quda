@@ -591,16 +591,6 @@ void display_test_info()
   return ;
 }
 
-void usage_extra(char **argv)
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1/2>                              # Test method\n");
-  printfQuda("                                                0: Even destination spinor\n");
-  printfQuda("                                                1: Odd destination spinor\n");
-  printfQuda("                                                2: Full spinor\n");
-  return ;
-}
-
 int main(int argc, char **argv)
 {
   // hack for loading gauge fields
@@ -621,7 +611,6 @@ int main(int argc, char **argv)
   } catch(const CLI::ParseError &e) {
     return app->exit(e);
   }
-
 
   initComms(argc, argv, gridsize_from_cmdline);
 

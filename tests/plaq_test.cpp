@@ -61,14 +61,18 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
 #endif
 }
 
-void plaq_test(int argc, char **argv)
+int main(int argc, char **argv)
 {
 
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
-  }
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
+  }   
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -115,12 +119,7 @@ void plaq_test(int argc, char **argv)
   for (int dir = 0; dir < 4; dir++) { free(gauge[dir]); }
 
   finalizeComms();
-}
-
-int main(int argc, char **argv)
-{
-
-  plaq_test(argc, argv);
-
   return 0;
 }
+
+
