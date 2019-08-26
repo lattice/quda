@@ -457,6 +457,30 @@ namespace quda {
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
 #endif
 
+          } else if (x[0]->Precision() == QUDA_QUARTER_PRECISION) {
+
+#if QUDA_PRECISION & 1
+            if (x[0]->Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+              const int M = 12;
+              multiBlas<NXZ, double2, char4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+
+            } else if (x[0]->Nspin() == 1) {
+
+#if defined(GPU_STAGGERED_DIRAC)
+              const int M = 3;
+              multiBlas<NXZ, double2, char2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
+
           } else {
             errorQuda("Not implemented for this precision combination %d %d", x[0]->Precision(), y[0]->Precision());
           }
