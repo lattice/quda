@@ -826,12 +826,18 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_param.iter == inv_param.maxiter) {
-        sprintf(mg_param.vec_outfile, "dump_step_%d", step);
+        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+        }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
-                    mg_param.vec_outfile);
+                    mg_param.vec_outfile[0]);
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
-        strcpy(mg_param.vec_outfile, vec_outfile); // restore output file name
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+        }
       }
 
       freeGaugeQuda();
