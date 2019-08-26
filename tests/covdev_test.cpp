@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <covdev_reference.h>
 #include <gauge_field.h>
@@ -23,12 +24,6 @@
 using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
-
-extern void usage(char** argv );
-
-extern QudaDslashType dslash_type;
-
-extern int test_type;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cuda_prec;
@@ -50,25 +45,10 @@ void *links[4];
 void **ghostLink;
 #endif
 
-extern QudaDagType dagger;
 QudaParity parity = QUDA_EVEN_PARITY;
 int transfer = 0; // include transfer time in the benchmark?
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-
-extern int device;
-extern bool verify_results;
-extern int niter;
-
-extern double mass; // the mass of the Dirac operator
 
 int X[4];
-extern int Nsrc; // number of spinors to apply to simultaneously
 
 GaugeCovDev* dirac;
 

@@ -7,6 +7,7 @@
 
 #include "quda.h"
 #include "test_util.h"
+#include <test_params.h>
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
@@ -18,16 +19,16 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-extern void usage(char** argv);
-extern bool verify_results;
+// extern void usage(char** argv);
+// extern bool verify_results;
 
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
+// extern int device;
+// extern int xdim, ydim, zdim, tdim;
+// extern int gridsize_from_cmdline[];
 
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern int niter;
+// extern QudaReconstructType link_recon;
+// extern QudaPrecision prec;
+// extern int niter;
 
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 //static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;

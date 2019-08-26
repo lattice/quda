@@ -12,6 +12,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
@@ -43,41 +44,7 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = NULL;
 
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
-extern int test_type;
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-extern QudaMatPCType matpc_type;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaDagType dagger;
 QudaDagType not_dagger;
-
-extern bool compute_clover;
-extern double clover_coeff;
-
-extern bool verify_results;
-extern int niter;
-extern char latfile[];
-extern bool unit_gauge;
-
-extern double mass; // mass of Dirac operator
-extern double mu;
-extern double epsilon;
-
-extern QudaVerbosity verbosity;
 
 double getTolerance(QudaPrecision prec)
 {
@@ -953,8 +920,6 @@ void display_test_info()
   return ;
     
 }
-
-extern void usage(char**);
 
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));

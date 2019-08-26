@@ -7,6 +7,7 @@
 #include <util_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 
 #include <color_spinor_field.h>
@@ -25,16 +26,6 @@ ColorSpinorParam csParam;
 
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern char latfile[];
-extern int gridsize_from_cmdline[];
     
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
@@ -186,8 +177,6 @@ void packTest() {
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
 
 }
-
-extern void usage(char**);
 
 int main(int argc, char **argv) {
   for (int i=1; i<argc; i++){    

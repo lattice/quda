@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <util_quda.h>
+#include <test_params.h>
 #include <test_util.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
@@ -24,41 +25,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision  prec_sloppy;
-extern QudaInverterType  inv_type;
-extern QudaInverterType  precon_type;
-extern int multishift; // whether to test multi-shift or standard solver
-extern double mass; // mass of Dirac operator
-extern double anisotropy; // temporal anisotropy
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern QudaMassNormalization normalization; // mass normalization of Dirac operators
-extern QudaMatPCType matpc_type; // preconditioning type
-
-extern int niter; // max solver iterations
-extern char latfile[];
-extern bool unit_gauge;
-
-extern void usage(char** );
-
-
 
 void
 display_test_info()
@@ -545,9 +511,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck[i], gauge, spinorOutMulti[i], kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));

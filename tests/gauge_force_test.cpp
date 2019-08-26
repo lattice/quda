@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_field.h>
 #include "misc.h"
 #include "gauge_force_reference.h"
@@ -11,24 +12,12 @@
 #include <sys/time.h>
 #include <dslash_quda.h>
 
-extern int device;
+// extern int device;
 
 static QudaGaugeParam qudaGaugeParam;
 QudaGaugeFieldOrder gauge_order =  QUDA_QDP_GAUGE_ORDER;
-extern bool verify_results;
-extern int tdim;
-extern QudaPrecision prec;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int niter;
-extern void usage(char** argv);
 
-extern QudaReconstructType link_recon;
 QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
-
-extern int gridsize_from_cmdline[];
 
 
 int length[]={

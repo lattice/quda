@@ -613,9 +613,9 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  add_eigen_option_group(app);
-  add_deflation_option_group(app);
-  add_multigrid_option_group(app);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch(const CLI::ParseError &e) {

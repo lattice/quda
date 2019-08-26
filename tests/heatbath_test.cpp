@@ -8,6 +8,7 @@
 
 #include <comm_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_tools.h>
 #include "misc.h"
 
@@ -27,31 +28,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
-extern char gauge_outfile[];
-
-extern double heatbath_beta_value;
-extern int heatbath_warmup_steps;
-extern int heatbath_num_steps;
-extern int heatbath_num_heatbath_per_step;
-extern int heatbath_num_overrelax_per_step;
-extern bool heatbath_coldstart;
-
-extern void usage(char** );
 
 
 namespace quda {

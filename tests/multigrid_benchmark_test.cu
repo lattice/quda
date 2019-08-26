@@ -6,6 +6,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <misc.h>
 
 // include because of nasty globals used in the tests
@@ -14,26 +15,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
-
-extern int Nsrc; // number of spinors to apply to simultaneously
-
-extern bool verify_results;
-
-extern int test_type;
-
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision smoother_halo_prec;
 
 extern void usage(char** );
 

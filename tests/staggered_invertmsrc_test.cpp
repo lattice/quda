@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <staggered_dslash_reference.h>
@@ -22,7 +23,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
-extern void usage(char** argv);
 void *qdp_fatlink[4];
 void *qdp_longlink[4];
 
@@ -33,18 +33,9 @@ void *longlink;
 void** ghost_fatlink, **ghost_longlink;
 #endif
 
-extern int device;
-extern int niter;
-extern int Nsrc; // number of spinors to apply to simultaneously
 
-
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision  prec_sloppy;
 cpuColorSpinorField* in;
 cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
@@ -52,23 +43,6 @@ cpuColorSpinorField* tmp;
 
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
-
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern int test_type;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-
-extern QudaInverterType inv_type;
-extern double mass; // the mass of the Dirac operator
-
-extern double mass;
 
 static void end();
 
@@ -320,7 +294,7 @@ invert_test(void)
       inv_param.num_src=Nsrc; // number of spinors to apply to simultaneously
       void* outArray[NUM_SRC];
       void* inArray[NUM_SRC];
-      int len;
+      // int len;
 
       cpuColorSpinorField* spinorOutArray[NUM_SRC];
       cpuColorSpinorField* spinorInArray[NUM_SRC];

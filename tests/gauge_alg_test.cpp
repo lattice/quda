@@ -8,6 +8,7 @@
 
 #include <comm_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
@@ -25,19 +26,6 @@
 #include <gtest/gtest.h>
 
 using   namespace quda;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
 
 int num_failures=0;
 int *num_failures_dev;

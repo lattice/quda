@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include "test_util.h"
+#include <test_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -16,8 +17,7 @@
 
 using namespace quda;
 
-extern void usage(char** argv);
-extern int device;
+
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
 
@@ -39,13 +39,8 @@ cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
 cudaGaugeField *cudaLongLinkOprod = NULL;
 
-extern bool verify_results;
 int ODD_BIT = 1;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
 
-extern QudaPrecision prec;
-extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision hw_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_DOUBLE_PRECISION;

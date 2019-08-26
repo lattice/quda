@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -35,10 +36,6 @@ using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-extern int test_type;
-
-extern void usage(char** argv );
 
 // Only load the gauge from a file once.
 bool gauge_loaded = false;
@@ -73,28 +70,11 @@ bool global_skip = true; // hack to skip tests
 
 
 QudaParity parity = QUDA_EVEN_PARITY;
-extern QudaDagType dagger;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int device;
-extern bool verify_results;
-extern int niter;
-extern double mass; // the mass of the Dirac operator
-extern double kappa; // will get overriden
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-extern QudaDslashType dslash_type;
 
-// extern double tadpole_factor;
-extern double eps_naik; // relativistic correction for naik term
 static int n_naiks = 1; // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
 
-extern char latfile[];
 
 int X[4];
-extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 

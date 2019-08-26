@@ -7,6 +7,8 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
+
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -23,73 +25,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-//extern bool tune;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision  prec;
-extern QudaPrecision  prec_sloppy;
-extern QudaPrecision  prec_precondition;
-extern QudaPrecision  prec_ritz;
-extern QudaPrecision prec_refinement_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa;
-extern double mu;
-extern double anisotropy;
-extern double epsilon;
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern char latfile[];
-extern bool unit_gauge;
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int nvec[];
-
-extern QudaInverterType inv_type;
-extern QudaInverterType precon_type;
-
-extern QudaMatPCType matpc_type;
-extern QudaSolveType solve_type;
-
-extern char eig_vec_infile[];
-extern char eig_vec_outfile[];
-
-//Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char** );
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern int nev;
-extern int max_search_dim;
-extern int deflation_grid;
-extern double tol_restart;
-
-extern int eigcg_max_restarts;
-extern int max_restart_num;
-extern double inc_tol;
-extern double eigenval_tol;
-
-extern QudaExtLibType   solver_ext_lib;
-extern QudaExtLibType   deflation_ext_lib;
-
-extern QudaFieldLocation location_ritz;
-extern QudaMemoryType    mem_type_ritz;
-
-extern QudaMassNormalization normalization; // mass normalization of Dirac operators
-extern QudaVerbosity verbosity;
 
 namespace quda {
   extern void setTransferGPU(bool);

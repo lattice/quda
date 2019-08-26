@@ -8,6 +8,7 @@
 #include "quda.h"
 #include "gauge_field.h"
 #include "test_util.h"
+#include <test_params.h>
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
@@ -24,20 +25,7 @@
 
 using namespace quda;
 
-extern void usage(char** argv);
-extern bool verify_results;
 
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern int niter;
-
-extern double tadpole_factor;
-// relativistic correction for naik term
-extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
 // to construct one naik.
 static int n_naiks = 1;
