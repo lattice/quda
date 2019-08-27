@@ -324,7 +324,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
        if(param.precision_precondition != param.precision_sloppy) zm[j] = outPre;
      }
      matSloppy(vm[j+1], zm[j], tmp);
-#if 0
+#if 1
      args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
      caxpy(-args.H(0, j), vm[0], vm[j+1]);
 
@@ -396,7 +396,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
        //
        printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
      }
-
+exit(-1);
      j += 1;
    }
 

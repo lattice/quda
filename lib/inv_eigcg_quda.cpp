@@ -782,7 +782,7 @@ namespace quda {
 
     constexpr bool host_computing = true;	  
 
-    if(param.pipeline < 4) warningQuda("Pipeline length is too short (%d).", param.pipeline);
+    if(param.pipeline < param.nev / 2) errorQuda("\nPipeline length is too short (%d).\n", param.pipeline);
 
     if( ((param.m - 2*param.nev) % param.pipeline != 0) || ((param.m - 2*param.nev) < param.pipeline) )  errorQuda("Pipeline length %d is not supported.", param.pipeline);
 

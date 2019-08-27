@@ -209,8 +209,7 @@ namespace quda {
     // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
     const int cdot_pipeline_length  = 4;
 
-    for(int i = first_idx; i < (first_idx + nev); i++)
-    {
+    for(int i = first_idx; i < (first_idx + nev); i++) {
       std::unique_ptr<double[] > alpha(new double[i]);
 
       ColorSpinorField *accum = param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ? r : &rv[i];
@@ -223,7 +222,8 @@ namespace quda {
 
         std::vector<ColorSpinorField*> vj_(rv(offset, offset+local_length));
         std::vector<ColorSpinorField*> vi_;
-	      vi_.push_back(accum);
+
+	vi_.push_back(accum);
 
         blas::reDotProduct(alpha.get(), vj_, vi_);
 
@@ -260,7 +260,7 @@ namespace quda {
           param.matProj[j*param.ld+i] = alpha[j];//conj(alpha[j]);//conj
         }
       }
-    }
+    } //end for loop
 
     param.cur_dim += nev;
 
@@ -281,7 +281,7 @@ namespace quda {
 
      std::unique_ptr<double[] > evals(new double[param.cur_dim]);
      //std::unique_ptr<double, decltype(pinned_deleter) > projm( pinned_allocator(param.ld*param.cur_dim * sizeof(double)), pinned_deleter);
-     std::unique_ptr<double[] > projm(new double[param.ld*param.cur_dim]);     
+     std::unique_ptr<double[] > projm(new double[param.ld*param.cur_dim]);
 
      ColorSpinorFieldSet &rv = *param.RV;
 
