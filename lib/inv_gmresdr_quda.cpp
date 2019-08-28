@@ -325,7 +325,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      }
 
      matSloppy(vm[j+1], zm[j], tmp);
-#if 0
+#ifdef DEBUG_MGS
      args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
      caxpy(-args.H(0, j), vm[0], vm[j+1]);
 
@@ -344,10 +344,25 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      args.H(j+1, j) = Complex(sqrt(norm2(vm[j+1])), 0.0);
      blas::ax( 1.0 / args.H(j+1, j).real(), vm[j+1]);
-#else
 
+     if(do_givens){
+
+       double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
+
+       cn(j) = h0 * inv_denom;
+       sn(j) = args.H(j+1,j).real() * inv_denom;
+       givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
+
+       args.c[j+1] = -sn(j)*args.c[j];
+       args.c[j]  *= conj(cn(j));
+       //
+       printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
+     }
+
+#else
      std::vector<ColorSpinorField*> vmjp1(vm(0, j+1));
      std::vector<ColorSpinorField*> vm2  (vm(j, j+2));
+
      blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);
 
      R(j,j  ) = sqrt( L(j, 0).real() );
@@ -379,30 +394,28 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      args.H.col(j).head(j+2) = R.col(j+1).head(j+2);
 
-     Complex h0 = do_givens ? args.H(0, j) : 0.0;
-
      if(do_givens) {
+
+        Complex h0 = args.H(0, j);
+
         for(int i = 1; i <= j; i++){
            givensH(i-1,j) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j);
            h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
         }
+
+        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
+
+        cn(j) = h0 * inv_denom;
+        sn(j) = args.H(j+1,j).real() * inv_denom;
+        givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
+
+        args.c[j+1] = -sn(j)*args.c[j];
+        args.c[j]  *= conj(cn(j));
+        //
+        printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
      }
 
 #endif
-
-     if(do_givens){
-
-       double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
-
-       cn(j) = h0 * inv_denom;
-       sn(j) = args.H(j+1,j).real() * inv_denom;
-       givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
-
-       args.c[j+1] = -sn(j)*args.c[j];
-       args.c[j]  *= conj(cn(j));
-       //
-       printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
-     }
 
      j += 1;
    }
