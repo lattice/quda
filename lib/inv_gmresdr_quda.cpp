@@ -303,9 +303,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    VectorXd  sn( VectorXd::Zero( do_givens ? args.m : 0 ) );
 
    //Advanced Ortho objects:
-   MatrixXcd R (MatrixXcd::Identity(args.m, args.m) );
-   MatrixXcd T (MatrixXcd::Identity(args.m, args.m) );
-   RowMajorDenseMatrix L (args.m-1, 2);
+   MatrixXcd R (MatrixXcd::Identity(args.m+1, args.m+1) );
+   MatrixXcd T (MatrixXcd::Identity(args.m+1, args.m+1) );
+   RowMajorDenseMatrix L (args.m, 2);
 
    Complex c0 = args.c[0];
 
@@ -323,8 +323,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
        if(param.precision_precondition != param.precision_sloppy) zm[j] = outPre;
      }
+
      matSloppy(vm[j+1], zm[j], tmp);
-#if 1
+#if 0
      args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
      caxpy(-args.H(0, j), vm[0], vm[j+1]);
 
@@ -344,17 +345,15 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      args.H(j+1, j) = Complex(sqrt(norm2(vm[j+1])), 0.0);
      blas::ax( 1.0 / args.H(j+1, j).real(), vm[j+1]);
 #else
-     printfQuda("Working with vector %d \n", j+1);
 
      std::vector<ColorSpinorField*> vmjp1(vm(0, j+1));
      std::vector<ColorSpinorField*> vm2  (vm(j, j+2));
      blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);
 
      R(j,j  ) = sqrt( L(j, 0).real() );
-     printfQuda("Rjj %le", L(j, 0).real());
      R(j,j+1) = L(j, 1) / R(j, j);
 
-     if(j > 1) {
+     if( j > 0) {
        T.col(j).head(j) = L.col(0).head(j) / R(j, j);
        R.col(j+1).head(j) = L.col(1).head(j);
        T.col(j).head(j) = (-1.0)*T.block(0,0,j,j)*T.col(j).head(j);
@@ -364,16 +363,21 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      //Normalization of the previous vectors:
      blas::ax(1.0 / R(j, j).real(), vm[j]);
+
      VectorXcd Rjp1( R.col(j+1).head(j+1) );
+
+     for(int i = 0 ; i <= j; i++) Rjp1[i] = -Rjp1[i];
 
      std::vector<ColorSpinorField*> vjp1;
      vjp1.push_back(&vm[j+1]);
+
      blas::caxpy( Rjp1.data(), vmjp1, vjp1);
 
-     R(j+1, j+1)  = blas::norm2(vm[j+1]);
+     R(j+1, j+1)  = sqrt( blas::norm2(vm[j+1]) );
+
      blas::ax(1.0 / R(j+1, j+1).real(), vm[j+1]);
 
-     args.H.col(j).head(j+1) = R.col(j+1).head(j+1);
+     args.H.col(j).head(j+2) = R.col(j+1).head(j+2);
 
      Complex h0 = do_givens ? args.H(0, j) : 0.0;
 
@@ -383,10 +387,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
            h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
         }
      }
+
 #endif
-     if(do_givens)
-     {
+
+     if(do_givens){
+
        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
+
        cn(j) = h0 * inv_denom;
        sn(j) = args.H(j+1,j).real() * inv_denom;
        givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
@@ -396,7 +403,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
        //
        printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
      }
-exit(-1);
+
      j += 1;
    }
 
@@ -520,7 +527,7 @@ exit(-1);
 
     DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
 
-    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
+    //while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
     {
       tot_iters += FlexArnoldiProcedure(j, (j == 0));
       UpdateSolution(&e, r_sloppy, !(j == 0));
