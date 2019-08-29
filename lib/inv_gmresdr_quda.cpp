@@ -311,6 +311,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    while( j < args.m )
    {
+
      if(K) {
        ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : vm[j];
        ColorSpinorField &outPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : zm[j];
@@ -325,59 +326,39 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      }
 
      matSloppy(vm[j+1], zm[j], tmp);
-#ifdef DEBUG_MGS
-     args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
-     caxpy(-args.H(0, j), vm[0], vm[j+1]);
 
-     Complex h0 = do_givens ? args.H(0, j) : 0.0;
-
-     for(int i = 1; i <= j; i++)
-     {
-        args.H(i, j) = cDotProduct(vm[i], vm[j+1]);
-        caxpy(-args.H(i, j), vm[i], vm[j+1]);
-
-        if(do_givens) {
-           givensH(i-1,j) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j);
-           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
-        }
-     }
-
-     args.H(j+1, j) = Complex(sqrt(norm2(vm[j+1])), 0.0);
-     blas::ax( 1.0 / args.H(j+1, j).real(), vm[j+1]);
-
-     if(do_givens){
-
-       double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
-
-       cn(j) = h0 * inv_denom;
-       sn(j) = args.H(j+1,j).real() * inv_denom;
-       givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
-
-       args.c[j+1] = -sn(j)*args.c[j];
-       args.c[j]  *= conj(cn(j));
-       //
-       printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
-     }
-
-#else
      std::vector<ColorSpinorField*> vmjp1(vm(0, j+1));
      std::vector<ColorSpinorField*> vm2  (vm(j, j+2));
 
-     blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);
+     blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);//single reduction for the iteration
 
-     R(j,j  ) = sqrt( L(j, 0).real() );
-     R(j,j+1) = L(j, 1) / R(j, j);
+     if(j > start_idx){ //no need to apply normalization scaling for the first iteration since the first basis vector is already normalized.
+
+       if(L(j, 0).real() <= 0) errorQuda("Breakdown detected at itaration %d", j);
+
+       R(j, j) = sqrt(L(j,0).real());//extract norm of vm[j] vector
+
+       L.block(0,0,j,2) = L.block(0,0,j,2) / R(j,j).real();
+       L(j,1) = L(j,1) / L(j,0);
+       L(j,0) = 1.0;
+
+       blas::ax(1.0 / R(j,j).real(), vm[j]);
+       blas::ax(1.0 / R(j,j).real(), vm[j+1]);
+       blas::ax(1.0 / R(j,j).real(), zm[j]);
+
+       // restore the last entry of the Hessenberg
+       if(j > start_idx) args.H(j, j-1) = R(j,j).real();
+     }
+
+     R(j,j+1) = L(j, 1);
 
      if( j > 0) {
-       T.col(j).head(j) = L.col(0).head(j) / R(j, j);
+       T.col(j).head(j) = L.col(0).head(j);
        R.col(j+1).head(j) = L.col(1).head(j);
        T.col(j).head(j) = (-1.0)*T.block(0,0,j,j)*T.col(j).head(j);
      }
 
      R.col(j+1).head(j+1) = T.block(0,0,j+1,j+1).adjoint() * R.col(j+1).head(j+1);
-
-     //Normalization of the previous vectors:
-     blas::ax(1.0 / R(j, j).real(), vm[j]);
 
      VectorXcd Rjp1( R.col(j+1).head(j+1) );
 
@@ -388,40 +369,59 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      blas::caxpy( Rjp1.data(), vmjp1, vjp1);
 
-     R(j+1, j+1)  = sqrt( blas::norm2(vm[j+1]) );
+     args.H.col(j).head(j+1) = R.col(j+1).head(j+1);
 
-     blas::ax(1.0 / R(j+1, j+1).real(), vm[j+1]);
+     if(do_givens && j > start_idx) {
 
-     args.H.col(j).head(j+2) = R.col(j+1).head(j+2);
+        Complex h0 = args.H(0, j-1);
 
-     if(do_givens) {
-
-        Complex h0 = args.H(0, j);
-
-        for(int i = 1; i <= j; i++){
-           givensH(i-1,j) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j);
-           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j);
+        for(int i = 1; i < j; i++){
+           givensH(i-1,j-1) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j-1);
+           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j-1);
         }
 
-        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j+1,j)));
+        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j,j-1)));
 
-        cn(j) = h0 * inv_denom;
-        sn(j) = args.H(j+1,j).real() * inv_denom;
-        givensH(j,j) = conj(cn(j))*h0 + sn(j)*args.H(j+1,j);
+        cn(j-1) = h0 * inv_denom;
+        sn(j-1) = args.H(j,j-1).real() * inv_denom;
+        givensH(j-1,j-1) = conj(cn(j-1))*h0 + sn(j-1)*args.H(j,j-1);
 
-        args.c[j+1] = -sn(j)*args.c[j];
-        args.c[j]  *= conj(cn(j));
+        args.c[j  ] = -sn(j-1)*args.c[j-1];
+        args.c[j-1]  *= conj(cn(j-1));
         //
-        printfQuda("Residual %le :: %le \n", args.c[j+1].real(), args.c[j+1].imag());
+        printfQuda("Residual %le :: %le \n", args.c[j].real(), args.c[j].imag());
      }
-
-#endif
 
      j += 1;
    }
 
+   R(args.m, args.m)  = sqrt( blas::norm2(vm[args.m]) );
+   //normalize the last vector
+   blas::ax(1.0 / R(args.m, args.m).real(), vm[args.m]);
+
+   args.H(args.m, args.m-1) = R(args.m, args.m);
+
    if(do_givens)
    {
+     //recosntruct the last col
+     Complex h0 = args.H(0, args.m-1);
+
+     for(int i = 1; i <= args.m-1; i++){
+        givensH(i-1, args.m-1) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,args.m-1);
+        h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,args.m-1);
+     }
+
+     double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(args.m,args.m-1)));
+
+     cn(args.m-1) = h0 * inv_denom;
+     sn(args.m-1) = args.H(args.m,args.m-1).real() * inv_denom;
+     givensH(args.m-1,args.m-1) = conj(cn(args.m-1))*h0 + sn(args.m-1)*args.H(args.m,args.m-1);
+
+     args.c[args.m  ] = -sn(args.m-1)*args.c[args.m-1];
+     args.c[args.m-1]  *= conj(cn(args.m-1));
+     //
+     printfQuda("Last cycle residual %le :: %le \n", args.c[args.m].real(), args.c[args.m-1].imag());
+
      memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
      memset(args.c, 0, (args.m+1)*sizeof(Complex));
      args.c[0] = c0;
@@ -540,7 +540,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
 
-    //while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
+    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
     {
       tot_iters += FlexArnoldiProcedure(j, (j == 0));
       UpdateSolution(&e, r_sloppy, !(j == 0));
