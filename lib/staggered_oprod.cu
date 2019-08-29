@@ -19,42 +19,42 @@ namespace quda {
   enum OprodKernelType { OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL };
 
   template<typename Float, typename Output, typename InputA, typename InputB>
-    struct StaggeredOprodArg {
-      unsigned int length;
-      int X[4];
-      unsigned int parity;
-      unsigned int dir;
-      unsigned int ghostOffset[4];
-      unsigned int displacement;
-      OprodKernelType kernelType;
-      int nFace;
-      bool partitioned[4];
-      InputA inA;
-      InputB inB;
-      Output outA;
-      Output outB;
-      Float coeff[2];
+  struct StaggeredOprodArg {
+    unsigned int length;
+    const int parity;
+    int dir;
+    int displacement;
+    OprodKernelType kernelType;
+    const int nFace;
+    const InputA inA;
+    const InputB inB;
+    Output outA;
+    Output outB;
+    Float coeff[2];
+    int X[4];
+    unsigned int ghostOffset[4];
+    bool partitioned[4];
 
-      StaggeredOprodArg(const unsigned int parity, const unsigned int dir, const unsigned int *ghostOffset,
-          const unsigned int displacement, const OprodKernelType &kernelType, const int nFace, const double coeff[2],
-          InputA &inA, InputB &inB, Output &outA, Output &outB, GaugeField &meta) :
-          length(meta.VolumeCB()),
-          parity(parity),
-          dir(dir),
-          displacement(displacement),
-          kernelType(kernelType),
-          nFace(nFace),
-          inA(inA),
-          inB(inB),
-          outA(outA),
-          outB(outB)
-      {
-        this->coeff[0] = coeff[0];
-        this->coeff[1] = coeff[1];
-        for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
-        for(int i=0; i<4; ++i) this->ghostOffset[i] = ghostOffset[i];
-        for(int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
-      }
+    StaggeredOprodArg(int parity, int dir, const unsigned int *ghostOffset,
+                      int displacement, const OprodKernelType &kernelType, int nFace, const double coeff[2],
+                      InputA &inA, InputB &inB, Output &outA, Output &outB, GaugeField &meta) :
+      length(meta.VolumeCB()),
+      parity(parity),
+      dir(dir),
+      displacement(displacement),
+      kernelType(kernelType),
+      nFace(nFace),
+      inA(inA),
+      inB(inB),
+      outA(outA),
+      outB(outB)
+    {
+      this->coeff[0] = coeff[0];
+      this->coeff[1] = coeff[1];
+      for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
+      for(int i=0; i<4; ++i) this->ghostOffset[i] = ghostOffset[i];
+      for(int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
+    }
   };
 
   enum IndexType {
@@ -65,8 +65,7 @@ namespace quda {
   };
 
   template <IndexType idxType>
-    static __device__ __forceinline__ void coordsFromIndex(int& idx, int c[4],  
-        const unsigned int cb_idx, const unsigned int parity, const int X[4])
+  __device__ inline void coordsFromIndex(int& idx, int c[4], unsigned int cb_idx, int parity, const int X[4])
   {
       const int &LX = X[0];
       const int &LY = X[1];
@@ -122,7 +121,7 @@ namespace quda {
   
 
   // Get the  coordinates for the exterior kernels
-  __device__ static void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
+  __device__ inline void coordsFromIndex(int x[4], unsigned int cb_idx, const int X[4], int dir, int displacement, int parity)
   {
     int Xh[2] = {X[0]/2, X[1]/2};
     switch(dir){
@@ -162,13 +161,13 @@ namespace quda {
   }
 
 
-  __device__ __forceinline__
-  int neighborIndex(const unsigned int cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int parity, const int X[4]){
+  __device__ inline int neighborIndex(unsigned int cb_idx, const int shift[4], const bool partitioned[4],
+                                      int parity, const int X[4])
+  {
     int full_idx;
     int x[4]; 
 
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
-
     
     for(int dim = 0; dim<4; ++dim){
       if( partitioned[dim] )
@@ -363,7 +362,7 @@ namespace quda {
 
   template<typename Float, typename Output, typename InputA, typename InputB>
     void computeStaggeredOprodCuda(Output outA, Output outB, GaugeField& outFieldA, GaugeField& outFieldB, InputA& inA, InputB& inB, cudaColorSpinorField& src, 
-				   const unsigned int parity, const int faceVolumeCB[4], const double coeff[2], int nFace)
+				   int parity, const int faceVolumeCB[4], const double coeff[2], int nFace)
     {
       unsigned int ghostOffset[4] = {0,0,0,0};
       for(int dir=0; dir<4; ++dir) ghostOffset[dir] = src.GhostOffset(dir,1)/src.FieldOrder(); // offset we want is the forwards one
@@ -404,7 +403,7 @@ namespace quda {
 #endif // GPU_STAGGERED_DIRAC
 
   void computeStaggeredOprod(GaugeField& outA, GaugeField& outB, ColorSpinorField& inEven, ColorSpinorField& inOdd,
-			     const unsigned int parity, const double coeff[2], int nFace)
+			     int parity, const double coeff[2], int nFace)
   {
 #ifdef GPU_STAGGERED_DIRAC
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
