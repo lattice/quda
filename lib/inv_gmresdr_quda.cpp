@@ -327,10 +327,10 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      matSloppy(vm[j+1], zm[j], tmp);
 
-     std::vector<ColorSpinorField*> vmjp1(vm(0, j+1));
-     std::vector<ColorSpinorField*> vm2  (vm(j, j+2));
+     std::vector<ColorSpinorField*> vmj(vm(0, j+1));
+     std::vector<ColorSpinorField*> vm2(vm(j, j+2));
 
-     blas::cDotProduct(L.block(0,0,j+1,2).data(), vmjp1, vm2);//single reduction for the iteration
+     blas::cDotProduct(L.block(0,0,j+1,2).data(), vmj, vm2);//single reduction for the iteration
 
      if(j > start_idx){ //no need to apply normalization scaling for the first iteration since the first basis vector is already normalized.
 
@@ -342,10 +342,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
        L(j,1) = L(j,1) / L(j,0);
        L(j,0) = 1.0;
 
-       blas::ax(1.0 / R(j,j).real(), vm[j]);
-       blas::ax(1.0 / R(j,j).real(), vm[j+1]);
-       blas::ax(1.0 / R(j,j).real(), zm[j]);
-
+       blas::ax(1.0 / R(j,j).real(), vm2);
        // restore the last entry of the Hessenberg
        if(j > start_idx) args.H(j, j-1) = R(j,j).real();
      }
@@ -364,10 +361,10 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      for(int i = 0 ; i <= j; i++) Rjp1[i] = -Rjp1[i];
 
-     std::vector<ColorSpinorField*> vjp1;
-     vjp1.push_back(&vm[j+1]);
+     std::vector<ColorSpinorField*> vmjp1;
+     vmjp1.push_back(&vm[j+1]);
 
-     blas::caxpy( Rjp1.data(), vmjp1, vjp1);
+     blas::caxpy( Rjp1.data(), vmj, vmjp1);
 
      args.H.col(j).head(j+1) = R.col(j+1).head(j+1);
 
@@ -387,7 +384,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
         givensH(j-1,j-1) = conj(cn(j-1))*h0 + sn(j-1)*args.H(j,j-1);
 
         args.c[j  ] = -sn(j-1)*args.c[j-1];
-        args.c[j-1]  *= conj(cn(j-1));
+        args.c[j-1]*= conj(cn(j-1));
         //
         printfQuda("Residual %le :: %le \n", args.c[j].real(), args.c[j].imag());
      }
@@ -396,9 +393,16 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    }
 
    R(args.m, args.m)  = sqrt( blas::norm2(vm[args.m]) );
+
+   //rescale zm vectors
+   std::vector<ColorSpinorField*> zmj(zm(1, args.m));//we don't need to rescale the first vector zm[0]
+   VectorXd invRii(args.m-1);
+   for(int i = 0; i < args.m-1; i++) invRii[i] = 1.0 / R(i+1, i+1).real();
+   blas::ax(invRii.data(), zmj);
+
    //normalize the last vector
    blas::ax(1.0 / R(args.m, args.m).real(), vm[args.m]);
-
+   // set m+1 entry in the last col of the Hessenberg
    args.H(args.m, args.m-1) = R(args.m, args.m);
 
    if(do_givens)

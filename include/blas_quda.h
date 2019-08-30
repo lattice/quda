@@ -36,6 +36,8 @@ namespace quda {
     void copy(ColorSpinorField &dst, const ColorSpinorField &src);
 
     void ax(double a, ColorSpinorField &x);
+				void ax(double a, std::vector<ColorSpinorField*> &x);
+				void ax(double *a, std::vector<ColorSpinorField*> &x);	// not a true block-blas routine 
 
     void axpbyz(double a, ColorSpinorField &x, double b, ColorSpinorField &y, ColorSpinorField &z);
 
@@ -120,7 +122,6 @@ namespace quda {
     double4 quadrupleEigCGUpdate(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v);
 
     // multi-blas kernels - defined in multi_blas.cu
-
     /**
        @brief Compute the block "axpy" with over the set of
               ColorSpinorFields.  E.g., it computes y = x * a + y

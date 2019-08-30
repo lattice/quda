@@ -201,9 +201,90 @@ namespace quda {
       return;
     }
 
-    for(int i = 0; i < nev; i++) blas::copy(rv[first_idx+i], Vm[i]);
+    printfQuda("\nOrthonormalize new eigenvectors..\n");
+
+#if 1
+    using RowMajorDenseMatrix = Matrix<double, Dynamic, Dynamic, RowMajor>;
+
+    MatrixXd R ( MatrixXd::Identity(first_idx+nev, first_idx+nev) );
+    MatrixXd T ( MatrixXd::Identity(first_idx+nev, first_idx+nev) );
+    RowMajorDenseMatrix L (first_idx+nev-1, 2);
+
+    for (int j = 0; j < nev; j++) {//extra step to include the last vector normalization
+
+      const int i = first_idx+j;
+
+      printfQuda("Working with vector  %d .\n", i);
+
+      rv[i] = Vm[j];
+
+      //if (first_idx == 0) continue;
+      if (j == 0) continue;
+
+      std::vector<ColorSpinorField*> rvj(rv(0  , i  ));
+      std::vector<ColorSpinorField*> rv2(rv(i-1, i+1));
+
+      blas::reDotProduct(L.block(0,0,i,2).data(), rvj, rv2);
+
+      R(i-1,i-1) = sqrt( L(i-1, 0) );
+      R(i-1,i  ) = L(i-1, 1) / R(i-1,i-1);
+
+      if( i > 1 ) {
+	T.col(i-1).head(i-1) = L.col(0).head(i-1) / R(i-1, i-1);
+	R.col(i).head(i-1)   = L.col(1).head(i-1);
+	T.col(i-1).head(i-1) = (-1.0)*T.block(0,0,i-1,i-1)*T.col(i-1).head(i-1);
+      }
+
+      R.col(i).head(i) = T.block(0,0,i,i).adjoint() * R.col(i).head(i);
+
+      //Normalization of the previous vectors:
+      if(R(i-1, i-1) < 1e-16)  errorQuda("\nCannot orthogonalize %dth vector\n", i-1);
+
+      blas::ax(1.0 / R(i-1, i-1), rv[i-1]);//?
+
+      VectorXd Rj( R.col(i).head(i) );
+
+      std::vector<ColorSpinorField*> rvjp1;
+      rvjp1.push_back(&rv[i]);
+
+      for(int l = 0; l < i; l++) Rj[l] = -Rj[l];
+
+      blas::axpy( Rj.data(), rvj, rvjp1);
+
+    } // end for loop over j
 
     printfQuda("\nConstruct projection matrix..\n");
+
+    //extra step to include the last vector normalization
+    R(first_idx+nev-1,first_idx+nev-1) = blas::norm2(rv[first_idx+nev-1]);
+    blas::ax(1.0 / R(first_idx+nev-1,first_idx+nev-1), rv[first_idx+nev-1]);
+
+    // build the porjection matrix
+    for(int i = first_idx; i < (first_idx + nev); i++) {
+
+      std::unique_ptr<double[] > alpha(new double[i]);
+
+      param.matDeflation(*Av_sloppy, rv[i]);
+      //load diagonal:
+
+      param.matProj[i*param.ld+i] = reDotProduct(rv[i], *Av_sloppy);
+
+      if (i>0) {
+	std::vector<ColorSpinorField*> rvi(rv(0, i));
+	std::vector<ColorSpinorField*> av;
+	av.push_back(Av_sloppy);
+	blas::reDotProduct(alpha.get(), rvi, av);
+
+	for (int j = 0; j < i; j++) {
+          param.matProj[i*param.ld+j] = alpha[j];
+	  param.matProj[j*param.ld+i] = alpha[j];//conj(alpha[j]);//conj
+	}
+      }
+    } //end for loop over i
+
+#else //old legacy version
+
+    for(int i = 0; i < nev; i++) blas::copy(rv[first_idx+i], Vm[i]);
 
     // Block MGS orthogonalization
     // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
@@ -261,6 +342,8 @@ namespace quda {
         }
       }
     } //end for loop
+
+#endif
 
     param.cur_dim += nev;
 

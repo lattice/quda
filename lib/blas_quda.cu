@@ -563,6 +563,14 @@ namespace quda {
       uni_blas<ax_, 1>(make_double2(a, 0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, x, x, x, x);
     }
 
+    void ax(double a, std::vector<ColorSpinorField*> &x) {
+      for(auto p : x) ax(a, *p);
+    }
+
+    void ax(double *a, std::vector<ColorSpinorField*> &x) {
+      for(int i = 0; i < x.size(); i++) ax(a[i], *x[i]);
+    }
+
     void caxpy(const Complex &a, ColorSpinorField &x, ColorSpinorField &y) {
       if (x.Precision() != y.Precision()) {
         mixed_blas<caxpy_, 0, 1>(
@@ -686,7 +694,6 @@ namespace quda {
       uni_blas<doubleCG3Update_, 1, 1, 0, 0>(
           make_double2(a, 0.0), make_double2(b, 1.0 - b), make_double2(0.0, 0.0), x, y, z, z, y);
     }
-
   } // namespace blas
 
 } // namespace quda
