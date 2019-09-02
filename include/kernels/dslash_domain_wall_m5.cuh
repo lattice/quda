@@ -19,10 +19,18 @@ namespace quda
   static __constant__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
 
   // helper trait for determining if we are using variable coefficients
-  template <Dslash5Type type> struct is_variable { static constexpr bool value = false; };
-  template <> struct is_variable<DSLASH5_MOBIUS_PRE> { static constexpr bool value = true; };
-  template <> struct is_variable<DSLASH5_MOBIUS> { static constexpr bool value = true; };
-  template <> struct is_variable<M5_INV_ZMOBIUS> { static constexpr bool value = true; };
+  template <Dslash5Type type> struct is_variable {
+    static constexpr bool value = false;
+  };
+  template <> struct is_variable<DSLASH5_MOBIUS_PRE> {
+    static constexpr bool value = true;
+  };
+  template <> struct is_variable<DSLASH5_MOBIUS> {
+    static constexpr bool value = true;
+  };
+  template <> struct is_variable<M5_INV_ZMOBIUS> {
+    static constexpr bool value = true;
+  };
 
   /**
      @brief Helper class for grabbing the constant struct, whether
@@ -30,7 +38,7 @@ namespace quda
   */
   template <typename real, bool is_variable, typename Arg> class coeff_type
   {
-  public:
+public:
     const Arg &arg;
     __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
     __device__ __host__ real a(int s) { return arg.a; }
@@ -41,7 +49,7 @@ namespace quda
   /**
      @brief Specialization for variable complex coefficients
   */
-  template <typename real, typename Arg> class coeff_type<real,true,Arg>
+  template <typename real, typename Arg> class coeff_type<real, true, Arg>
   {
     /**
        @brief Helper function for grabbing the constant struct, whether
@@ -56,7 +64,7 @@ namespace quda
 #endif
     }
 
-  public:
+public:
     const Arg &arg;
     __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
     __device__ __host__ complex<real> a(int s) { return coeff()->a[s]; }
@@ -169,10 +177,7 @@ namespace quda
       cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
     }
 
-    virtual ~Dslash5Arg()
-    {
-      delete mobius_h;
-    }
+    virtual ~Dslash5Arg() { delete mobius_h; }
   };
 
   /**

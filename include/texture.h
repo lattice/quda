@@ -207,7 +207,8 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
 
   virtual ~SpinorTexture() {}
 
-  __device__ inline void load(RegType x[], const int i, const int parity=0) const {
+  __device__ inline void load(RegType x[], const int i, const int parity = 0) const
+  {
     // load data into registers first using the storage order
     constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
     InterType y[M];
@@ -231,7 +232,8 @@ template <typename RegType, typename StoreType, int N> class SpinorTexture
      Load the ghost spinor.  For Wilson fermions, we assume that the
      ghost is spin projected
   */
-  __device__ inline void loadGhost(RegType x[], const int i, const int dim) const {
+  __device__ inline void loadGhost(RegType x[], const int i, const int dim) const
+  {
     // load data into registers first using the storage order
     const int Nspin = (N * vec_length<RegType>::value) / (3 * 2);
     // if Wilson, then load only half the number of components
