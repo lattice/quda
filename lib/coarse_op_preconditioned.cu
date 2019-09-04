@@ -39,6 +39,7 @@ namespace quda {
 #endif
           arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         }
+        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
       strcpy(aux, compile_type_str(meta));
       strcat(aux, comm_dim_partitioned_string());
       }
@@ -46,6 +47,7 @@ namespace quda {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         pool_device_free(arg.max_d);
       }
+      pool_pinned_free(arg.max_h);
     }
 
     void apply(const cudaStream_t &stream) {
@@ -78,8 +80,8 @@ namespace quda {
 #endif
         if (compute_max_only) {
           if (!activeTuning()) { // only do copy once tuning is done
-            qudaMemcpyAsync(&arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost, stream);
-            cudaStreamSynchronize(stream);
+            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost, stream);
+            qudaStreamSynchronize(const_cast<cudaStream_t&>(stream));
           }
         }
       }
@@ -176,14 +178,14 @@ namespace quda {
         yHat.setComputeMaxOnly(true);
         yHat.apply(0);
 
-        double max_h_double = arg.max_h;
+        double max_h_double = *arg.max_h;
         comm_allreduce_max(&max_h_double);
-        arg.max_h = static_cast<float>(max_h_double);
+        *arg.max_h = static_cast<Float>(max_h_double);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", arg.max_h);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
 
-        Yhat.Scale(arg.max_h);
-        arg.Yhat.resetScale(arg.max_h);
+        Yhat.Scale(*arg.max_h);
+        arg.Yhat.resetScale(*arg.max_h);
       }
       yHat.setComputeMaxOnly(false);
       yHat.apply(0);
