@@ -68,7 +68,7 @@ template <typename OutputType, typename InputType> class Texture
     return *this;
   }
 
-  __device__ inline OutputType operator[](unsigned int idx) const
+  __device__ __host__ inline OutputType operator[](unsigned int idx) const
   {
     OutputType out;
     copyFloatN(out, spinor[idx]);
