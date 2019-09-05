@@ -63,6 +63,7 @@ extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
 extern double mu_factor[QUDA_MAX_MG_LEVEL];
 
+extern QudaVerbosity verbosity;
 extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
 
 extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
@@ -179,8 +180,8 @@ display_test_info()
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
         printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
+      printfQuda("\n");
     }
-    printfQuda("\n");
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -508,8 +509,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -575,7 +576,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = mg_verbosity[0];
 
 
