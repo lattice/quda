@@ -4,6 +4,7 @@
 #include <blas_quda.h>
 
 #include <contract_quda.h>
+#include <jitify_helper.cuh>
 #include <kernels/contraction.cuh>
 
 namespace quda {

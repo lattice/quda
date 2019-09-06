@@ -37,11 +37,18 @@ namespace quda {
 #ifdef JITIFY
         create_jitify_program("kernels/coarse_op_preconditioned.cuh");
 #endif
+          arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
         }
+        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
       strcpy(aux, compile_type_str(meta));
       strcat(aux, comm_dim_partitioned_string());
       }
-    virtual ~CalculateYhat() { }
+    virtual ~CalculateYhat() {
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+        pool_device_free(arg.max_d);
+      }
+      pool_pinned_free(arg.max_h);
+    }
 
     void apply(const cudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -54,10 +61,9 @@ namespace quda {
 
       } else {
         if (compute_max_only) {
-          arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
           if (!activeTuning())
           {
-            cudaMemset(arg.max_d, 0, sizeof(Float));
+            cudaMemsetAsync(arg.max_d, 0, sizeof(Float), stream);
           }
         }
 #ifdef JITIFY
@@ -68,15 +74,15 @@ namespace quda {
                          .launch(arg);
 #else
         if (compute_max_only)
-          CalculateYhatGPU<Float, n, true, Arg><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+          CalculateYhatGPU<Float, n, true, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         else
-          CalculateYhatGPU<Float, n, false, Arg><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+          CalculateYhatGPU<Float, n, false, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 #endif
         if (compute_max_only) {
           if (!activeTuning()) { // only do copy once tuning is done
-            qudaMemcpy(&arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost);
+            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost, stream);
+            qudaStreamSynchronize(const_cast<cudaStream_t&>(stream));
           }
-          pool_device_free(arg.max_d);
         }
       }
     }
@@ -172,14 +178,14 @@ namespace quda {
         yHat.setComputeMaxOnly(true);
         yHat.apply(0);
 
-        double max_h_double = arg.max_h;
+        double max_h_double = *arg.max_h;
         comm_allreduce_max(&max_h_double);
-        arg.max_h = static_cast<float>(max_h_double);
+        *arg.max_h = static_cast<Float>(max_h_double);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", arg.max_h);
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
 
-        Yhat.Scale(arg.max_h);
-        arg.Yhat.resetScale(arg.max_h);
+        Yhat.Scale(*arg.max_h);
+        arg.Yhat.resetScale(*arg.max_h);
       }
       yHat.setComputeMaxOnly(false);
       yHat.apply(0);
