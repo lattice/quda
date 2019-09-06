@@ -84,19 +84,6 @@ namespace quda {
     /** TimeProfile for this level */
     TimeProfile profile;
 
-    /** High precision aux field */
-    ColorSpinorField *r;
-
-    /** High precision aux field */
-    ColorSpinorField *Av;
-
-    /** Ritz precision residual vector */
-    ColorSpinorField *r_sloppy;
-
-    /** Deflation matrix operation result */
-    ColorSpinorField *Av_sloppy;
-
-
   public:
     /**
       Constructor for Deflation class
@@ -165,7 +152,7 @@ namespace quda {
     Dirac  *d;
     DiracMatrix *m;
 
-    ColorSpinorField *RV;//Ritz vectors
+    ColorSpinorFieldSet *RV;//Ritz vectors
 
     DeflationParam *deflParam;
 

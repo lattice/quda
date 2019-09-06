@@ -21,50 +21,13 @@ namespace quda {
 
   using DynamicStride = Stride<Dynamic, Dynamic>;
 
-  static auto pinned_allocator = [] (size_t bytes ) { return static_cast<double*>(pool_pinned_malloc(bytes)); };
-  static auto pinned_deleter   = [] (double *hptr)  { pool_pinned_free(hptr); };
-
-
   //static bool debug = false;
 
   Deflation::Deflation(DeflationParam &param, TimeProfile &profile)
-    : param(param),   profile(profile),
-      r(nullptr), Av(nullptr), r_sloppy(nullptr), Av_sloppy(nullptr) {
-
+    : param(param),   profile(profile){
 
     // for reporting level 1 is the fine level but internally use level 0 for indexing
     printfQuda("Creating deflation space of %d vectors.\n", param.tot_dim);
-
-    //if( param.eig_global.import_vectors ) loadVectors(param.RV);//whether to load eigenvectors
-    // create aux fields
-    ColorSpinorParam csParam(param.RV->Component(0));
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    csParam.location = param.location;
-    csParam.mem_type = QUDA_MEMORY_DEVICE;
-    csParam.setPrecision(QUDA_DOUBLE_PRECISION);//accum fields always full precision
-
-    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
-      // all coarse GPU vectors use FLOAT2 ordering
-      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-      if(csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-    }
-
-    r  = ColorSpinorField::Create(csParam);
-    Av = ColorSpinorField::Create(csParam);
-
-    if(param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ) { //allocate sloppy fields
-
-      csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
-      if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-
-      r_sloppy  = ColorSpinorField::Create(csParam);
-      Av_sloppy = ColorSpinorField::Create(csParam);
-
-    } else {
-      r_sloppy  = r;
-      Av_sloppy = Av;
-    }
-
 
     printfQuda("Deflation space setup completed\n");
     // now we can run through the verification if requested
@@ -73,21 +36,10 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
   }
 
-  Deflation::~Deflation() {
-
-    if( param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION ) {
-      if (r_sloppy) delete r_sloppy;
-      if (Av_sloppy) delete Av_sloppy;
-    }
-
-    if (r)  delete r;
-    if (Av) delete Av;
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print();
-  }
+  Deflation::~Deflation() { if (getVerbosity() >= QUDA_SUMMARIZE) profile.Print(); }
 
   double Deflation::flops() const {
-    double flops = 0;//Do we need to report this?
+			 double flops = 0;//Do we need to report this?
 
     //compute total flops for deflation application. Not sure we really need this.
     return flops;
@@ -111,6 +63,25 @@ namespace quda {
     evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
 
     ColorSpinorFieldSet &rv = *param.RV;
+
+				ColorSpinorParam csParam(rv[0]);
+    csParam.create   = QUDA_ZERO_FIELD_CREATE;
+    csParam.location = param.location;
+    csParam.mem_type = QUDA_MEMORY_DEVICE;
+    csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) {
+      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+      if(csParam.nSpin != 1) csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+    }
+
+    std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
+
+    csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
+    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+
+    std::unique_ptr<ColorSpinorField> r_sloppy(ColorSpinorField::Create(csParam));
+    std::unique_ptr<ColorSpinorField> Av_sloppy(ColorSpinorField::Create(csParam));
 
     std::vector<ColorSpinorField*> rv_(rv(0, param.cur_dim));
     std::vector<ColorSpinorField*> res_;
@@ -161,7 +132,7 @@ namespace quda {
     in_.push_back(static_cast<ColorSpinorField*>(b_sloppy));
 
     //blas::reDotProduct(vec.get(), rv_, in_);//<i, b>
-		for(int j = 0; j < param.cur_dim; j++) vec[j] = blas::reDotProduct(rv[j], *b_sloppy);
+    for(int j = 0; j < param.cur_dim; j++) vec[j] = blas::reDotProduct(rv[j], *b_sloppy);
 
     if(!param.use_inv_ritz)
     {

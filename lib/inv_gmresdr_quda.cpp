@@ -332,7 +332,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      blas::cDotProduct(L.block(0,0,j+1,2).data(), vmj, vm2);//single reduction for the iteration
 
-     if(j > start_idx){ //no need to apply normalization scaling for the first iteration since the first basis vector is already normalized.
+     if(j > start_idx){ //no need to apply normalization scaling for the first iteration (the first basis vector is already normalized)
 
        if(L(j, 0).real() <= 0) errorQuda("Breakdown detected at itaration %d", j);
 
@@ -344,7 +344,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
        blas::ax(1.0 / R(j,j).real(), vm2);
        // restore the last entry of the Hessenberg
-       if(j > start_idx) args.H(j, j-1) = R(j,j).real();
+       args.H(j, j-1) = R(j,j).real();
      }
 
      R(j,j+1) = L(j, 1);
