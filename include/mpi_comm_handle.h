@@ -18,7 +18,6 @@ QMP_status_t QMP_get_mpi_comm(QMP_comm_t comm, void **mpicomm);
 #ifdef __cplusplus
 }
 #endif
-#endif
 
 #endif
 
