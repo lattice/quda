@@ -139,7 +139,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
 
   virtual ~SpinorNorm() {}
 
-  __device__ inline float load_norm(const int i, const int parity = 0) { return norm[cb_norm_offset * parity + i]; }
+  __device__ inline float load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
   template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity)
   {
@@ -183,7 +183,7 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
   SpinorNorm(const SpinorNorm &sn) {}
   SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
   void set(const cudaColorSpinorField &x) {}
-  __device__ inline float load_norm(const int i, const int parity = 0) { return 1.0; }
+  __device__ inline float load_norm(const int i, const int parity = 0) const { return 1.0; }
   template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity) { return 1.0; }
   void backup(char **norm_h, size_t norm_bytes) {}
   void restore(char **norm_h, size_t norm_bytes) {}
@@ -295,7 +295,7 @@ public:
 
     // fixed precision
     if (isFixed<StoreType>::value) {
-      float xN = SN::load_norm(i, parity);
+      const float xN = SN::load_norm(i, parity);
 #pragma unroll
       for (int j = 0; j < M; j++) y[j] = xN * tex[cb_offset * parity + i + j * stride];
     } else { // other types
