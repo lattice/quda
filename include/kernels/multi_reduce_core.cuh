@@ -26,11 +26,10 @@ namespace quda
     */
     template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
               typename Reducer>
-    struct MultiReduceArg :
-      public ReduceArg<vector_type<ReduceType, NXZ>>,
-      SpinorXZ<NXZ, SpinorX, SpinorZ, Reducer::use_z>,
-      SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>(), SpinorY, SpinorW, Reducer::use_w>
-    {
+    struct MultiReduceArg
+      : public ReduceArg<vector_type<ReduceType, NXZ>>,
+        SpinorXZ<NXZ, SpinorX, SpinorZ, Reducer::use_z>,
+        SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>(), SpinorY, SpinorW, Reducer::use_w> {
       static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
       const int NYW;
       Reducer r;

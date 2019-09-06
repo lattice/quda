@@ -457,7 +457,7 @@ namespace quda {
             const int M = 12; // determines how much work per thread to do
             value
               = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
-                    a, b, x, y, z, w, v, y.Volume());
+                a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif

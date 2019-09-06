@@ -485,5 +485,4 @@ public:
 #endif
     return (void *)spinor;
   }
-
 };

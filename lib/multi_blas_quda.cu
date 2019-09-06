@@ -255,7 +255,8 @@ namespace quda {
       constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
       Functor<NXZ, Float2, RegType> f(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, write, decltype(f)>();
-      const int NYW_max_check = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, false);
+      const int NYW_max_check
+        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, false);
 
       if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
@@ -278,10 +279,8 @@ namespace quda {
         W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
       }
 
-      MultiBlas<NXZ, RegType, M,
-                typename std::remove_reference<decltype(X[0])>::type,
-                typename std::remove_reference<decltype(Y[0])>::type,
-                typename std::remove_reference<decltype(Z[0])>::type,
+      MultiBlas<NXZ, RegType, M, typename std::remove_reference<decltype(X[0])>::type,
+                typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
                 typename std::remove_reference<decltype(W[0])>::type, decltype(f), T>
         blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
       blas.apply(*getStream());
