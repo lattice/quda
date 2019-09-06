@@ -28,11 +28,11 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
-    struct MultiBlasArg : SpinorXZ<NXZ, SpinorX, SpinorZ, Functor::use_z>,
-                          SpinorYW<max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>(),
-                                   SpinorY, SpinorW, Functor::use_w> {
-      static constexpr int NYW_max
-        = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
+    struct MultiBlasArg :
+      SpinorXZ<NXZ, SpinorX, SpinorZ, Functor::use_z>,
+      SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>(), SpinorY, SpinorW, Functor::use_w>
+    {
+      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
       const int NYW;
       Functor f;
       const int length;
