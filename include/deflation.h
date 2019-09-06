@@ -119,21 +119,6 @@ namespace quda {
     void verify();
 
     /**
-       In the incremental eigcg: expands deflation space.
-       @param V container of new eigenvectors
-       @param nev number of vectors to load
-     */
-    void increment(ColorSpinorField &V, int nev);
-
-    /**
-       In the incremental eigcg: reduce deflation space
-       based on the following criteria:
-       @param tol : keep all eigenvectors with residual norm less then tol
-       @param max_nev : keep the lowest max_nev eigenvectors (conservative)
-     */
-    void reduce(double tol, int max_nev);
-
-    /**
        This applies deflation operation on a given spinor vector(s)
        @param out The projected vector
        @param in The input vector (or equivalently the right hand side vector)
@@ -141,16 +126,9 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       @brief Load the eigen space vectors from file
-       @param RV Loaded eigen-space vectors (pre-allocated)
+       @brief return a reference to the eigen space vectors
      */
-    void loadVectors(ColorSpinorField *RV);
-
-    /**
-       @brief Save the eigen space vectors in file
-       @param RV Save eigen-space vectors from here
-     */
-    void saveVectors(ColorSpinorField *RV);
+    //ColorSpinorFieldSet& exposeVectors() {return *param.RV;}
 
     /**
        @brief Test whether the deflation space is complete
@@ -168,7 +146,6 @@ namespace quda {
        @brief return deflation space size
      */
     int size() {return param.cur_dim;}
-
 
     /**
        @brief Return the total flops done on this and all coarser levels.

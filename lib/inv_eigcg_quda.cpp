@@ -115,7 +115,9 @@ namespace quda {
        std::shared_ptr<ColorSpinorField> hAz;             // mat * conjugate vector from the previous iteration
        std::shared_ptr<ColorSpinorFieldSet> hVm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-       EigCGArgs(const int m, const int k, const int pipe_l, const ColorSpinorField &meta, const QudaPrecision search_space_prec, const bool is_host_location = false) :
+							DeflationParam &deflparam;
+
+       EigCGArgs(const int m, const int k, const int pipe_l, DeflationParam &deflParam, const QudaPrecision solver_prec, const QudaPrecision search_space_prec, const bool is_host_location = false) :
           Tm(RealMatrix::Zero(m,m)),
           eigenVecs(RealVectorSet::Zero(m,m)),
           Tmvals(m),
@@ -136,10 +138,14 @@ namespace quda {
           Vm(nullptr),
           V2k(nullptr),
           hAz(nullptr),
-          hVm(nullptr)
+          hVm(nullptr),
+										deflparam(deflParam)
           {
-            ColorSpinorParam csParam(meta);
+            ColorSpinorParam csParam(*deflparam.RV);
             csParam.create        = QUDA_ZERO_FIELD_CREATE;
+												csParam.is_composite  = false;
+												csParam.composite_dim = 1;
+            csParam.setPrecision(solver_prec);
             //
             Az = MakeSharedPtr(csParam);
 
@@ -432,6 +438,232 @@ namespace quda {
           return;
        }
 
+       void increment(){
+	 const int first_idx = deflparam.cur_dim;
+
+	 ColorSpinorFieldSet &rv = *deflparam.RV;
+	 ColorSpinorFieldSet &vm = *Vm;
+	 ColorSpinorFieldSet &vk = *V2k;
+
+	 if(rv.CompositeDim() < (first_idx+k) || deflparam.tot_dim < (first_idx+k)) {
+           warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", k);
+	   return;
+	 }
+
+	 printfQuda("\nOrthonormalize new eigenvectors..\n");
+
+#if 1 //communication optimized version
+	 MatrixXd R ( MatrixXd::Identity(first_idx+k, first_idx+k) );
+	 MatrixXd T ( MatrixXd::Identity(first_idx+k, first_idx+k) );
+	 RowMajorRealMatrix L (first_idx+k-1, 2);
+
+	 for (int j = 0; j < k; j++) {//extra step to include the last vector normalization
+
+	   const int i = first_idx+j;
+
+	   printfQuda("Working with vector  %d .\n", i);
+
+	   rv[i] = vm[j];
+	   // skip the first vector
+	   if (first_idx == 0 && j == 0) continue;
+
+	   std::vector<ColorSpinorField*> rvj(rv(0  , i  ));
+	   std::vector<ColorSpinorField*> rv2(rv(i-1, i+1));
+
+	   blas::reDotProduct(L.block(0,0,i,2).data(), rvj, rv2);
+
+	   R(i-1,i-1) = sqrt( L(i-1, 0) );
+	   R(i-1,i  ) = L(i-1, 1) / R(i-1,i-1);
+
+	   if( i > 1 ) {
+	     T.col(i-1).head(i-1) = L.col(0).head(i-1) / R(i-1, i-1);
+	     R.col(i).head(i-1)   = L.col(1).head(i-1);
+	     T.col(i-1).head(i-1) = (-1.0)*T.block(0,0,i-1,i-1)*T.col(i-1).head(i-1);
+	   }
+
+	   R.col(i).head(i) = T.block(0,0,i,i).adjoint() * R.col(i).head(i);
+
+	   //Normalization of the previous vectors:
+	   if(R(i-1, i-1) < 1e-8)  errorQuda("\nCannot orthogonalize %dth vector\n", i-1);
+
+	   blas::ax(1.0 / R(i-1, i-1), rv[i-1]);
+
+	   VectorXd Rj( R.col(i).head(i) );
+	   std::vector<ColorSpinorField*> rvjp1;
+
+	   rvjp1.push_back(&rv[i]);
+
+	   for(int l = 0; l < i; l++) Rj[l] = -Rj[l];
+
+	   blas::axpy( Rj.data(), rvj, rvjp1);
+	 } // end for loop over j
+
+	 //extra step to include the last vector normalization
+	 R(first_idx+k-1,first_idx+k-1) = sqrt(blas::norm2(rv[first_idx+k-1]));
+	 blas::ax(1.0 / R(first_idx+k-1,first_idx+k-1), rv[first_idx+k-1]);
+
+#else //old legacy version
+
+         // Block MGS orthogonalization
+         // The degree to which we interpolate between modified GramSchmidt and GramSchmidt (performance vs stability)
+         constexpr int cdot_pipeline_length  = 4;
+
+	 for(int j = 0; j < k; j++) {
+
+           const int i = first_idx + j;
+
+	   rv[i] = vm[j];
+
+           std::unique_ptr<double[] > alpha(new double[i]);
+	   int offset = 0;
+
+	   while (offset < i) {
+
+	     const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
+
+	     std::vector<ColorSpinorField*> vj_(rv(offset, offset+local_length));
+	     std::vector<ColorSpinorField*> vi_(rv(i));
+
+	     blas::reDotProduct(alpha.get(), vj_, vi_);
+	     for (int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
+	     blas::axpy(alpha.get(), vj_, vi_);
+	     offset += cdot_pipeline_length;
+
+	   }
+
+	   alpha[0] = blas::norm2(rv[i]);
+
+	   if(alpha[0] > 1e-16) blas::ax(1.0 /sqrt(alpha[0]), rv[i]);
+	   else                 errorQuda("\nCannot orthogonalize %dth vector\n", i);
+	 }
+
+#endif
+	 printfQuda("\nConstruct projection matrix..\n");
+
+	 for(int i = first_idx; i < (first_idx + k); i++) {
+           std::unique_ptr<double[] > alpha(new double[i+1]);
+
+	   std::vector<ColorSpinorField*> vj_(rv(0,i+1));
+	   std::vector<ColorSpinorField*> av_(vk(0));
+
+	   deflparam.matDeflation(vk[0], rv[i]);
+	   blas::reDotProduct(alpha.get(), vj_, av_);
+
+	   deflparam.matProj[i*deflparam.ld+i] = alpha[i];
+
+	   for (int j = 0; j < i; j++) {
+	     deflparam.matProj[i*deflparam.ld+j] = alpha[j];
+	     deflparam.matProj[j*deflparam.ld+i] = alpha[j];
+	   }
+	 } //end for loop
+
+	 deflparam.cur_dim += k;
+	 printfQuda("\nNew curr deflation space dim = %d\n", deflparam.cur_dim);
+	 return;
+       }
+
+       void reduce(double tol, int max_nev) {
+
+         Vm.reset(); hVm.reset();
+
+	 if(max_nev == 0 || deflparam.cur_dim == 0) {printfQuda("Deflation space is empty.\n"); return;}
+
+	 if(deflparam.cur_dim < max_nev)
+	 {
+	   printf("\nToo big number of eigenvectors was requested, switched to maximum available number %d\n", deflparam.cur_dim);
+	   max_nev = deflparam.cur_dim;
+	 }
+
+	 std::unique_ptr<double[] > evals(new double[deflparam.cur_dim]);
+	 std::unique_ptr<double[] > projm(new double[deflparam.ld*deflparam.cur_dim]);
+
+	 ColorSpinorFieldSet &rv = *deflparam.RV;
+	 ColorSpinorFieldSet &vk = *V2k;
+
+	 memcpy(projm.get(), deflparam.matProj, deflparam.ld*deflparam.cur_dim*sizeof(double));
+
+	 Map<MatrixXd, Unaligned, DynamicStride> projm_(projm.get(), deflparam.cur_dim, deflparam.cur_dim, DynamicStride(deflparam.ld, 1));
+	 Map<VectorXd, Unaligned> evals_(evals.get(), deflparam.cur_dim);
+
+	 SelfAdjointEigenSolver<MatrixXd> es(projm_);
+	 projm_ = es.eigenvectors();
+	 evals_ = es.eigenvalues();
+	 //reset projection matrix, now we will use inverse ritz values when deflate an initial guess:
+	 deflparam.use_inv_ritz = true;
+
+	 for(int i = 0; i < deflparam.cur_dim; i++)
+	 {
+	   if(fabs(evals[i]) > 1e-16)     deflparam.invRitzVals[i] = 1.0 / evals[i];
+	   else 	                  errorQuda("\nCannot invert Ritz value.\n");
+	 }
+
+	 ColorSpinorParam csParam(rv[0]);
+
+	 csParam.create   = QUDA_ZERO_FIELD_CREATE;
+	 csParam.is_composite  = false;
+	 std::unique_ptr<ColorSpinorField> r_sloppy(ColorSpinorField::Create(csParam));
+
+	 csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+	 std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
+
+	 csParam.is_composite  = true;
+	 csParam.composite_dim = max_nev;
+
+       	 csParam.setPrecision(rv.Precision());
+	 csParam.mem_type  = QUDA_MEMORY_MAPPED;
+	 std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
+
+	 int idx       = 0;
+	 double relerr = 0.0;
+	 bool do_residual_check = (tol != 0.0);
+
+	 while ((relerr < tol) && (idx < max_nev))
+	 {
+	   std::vector<ColorSpinorField*> rv_(rv( 0, deflparam.cur_dim));
+	   std::vector<ColorSpinorField*> res;
+	   res.push_back(r.get());
+
+	   blas::zero(*r);
+	   //blas::axpy(&projm.get()[idx*param.ld], rv_, res);//multiblas
+	   for(int j = 0; j < deflparam.cur_dim; j++) blas::axpy(projm.get()[j+idx*deflparam.ld], rv[j], *r);
+
+	   blas::copy(buff->Component(idx), *r);
+
+	   if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
+	   {
+	     *r_sloppy = *r;
+	     deflparam.matDeflation(vk[0], *r_sloppy);
+
+
+	     double rdotAv = blas::reDotProduct(*r_sloppy, vk[0]);
+	     double norm2r = blas::norm2(*r_sloppy);
+
+	     double eval = rdotAv / norm2r;
+
+	     blas::xpay(vk[0], -eval, *r_sloppy );
+
+	     relerr = sqrt( norm2(*r_sloppy) / norm2r );
+
+	     if(getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+	   }
+
+	   idx += 1;
+	 }
+
+	 printfQuda("\nReserved eigenvectors: %d\n", idx);
+	 //copy all the stuff to cudaRitzVectors set:
+
+	 for(int i = 0; i < idx; i++) blas::copy(deflparam.RV->Component(i), buff->Component(i));
+
+	 //reset current dimension:
+	 deflparam.cur_dim = idx;
+	 deflparam.tot_dim = idx;
+
+       	 V2k.reset();
+
+	 return;
+       }
+
    };
 
   // set the required parameters for the inner solver
@@ -477,7 +709,9 @@ namespace quda {
   }
 
   IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
+				K(nullptr), Kparam(param),
+    ep(nullptr), ep_sloppy(nullptr), rp(nullptr), rp_sloppy(nullptr),
     work_space(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
 
@@ -606,29 +840,6 @@ namespace quda {
       param.true_res_hq = 0.0;
 
       return 0;
-    }
-
-    ColorSpinorParam csParam(x);
-
-    if (!init) {
-      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, 0, x, param.precision_ritz);//need only deflation meta
-
-      csParam.create        = QUDA_ZERO_FIELD_CREATE;
-      csParam.is_composite  = true;
-      csParam.composite_dim = K ? 6 : 5;//an extra field for the preconditioned version
-      if (!matSloppy.isStaggered()) csParam.composite_dim += 1; //an extra tmp field for the wilson-like dslash
-      // An auxiliary work space:
-      work_space = MakeSharedPtr(csParam);
-
-      if (K) {
-        csParam.is_composite  = false;
-        csParam.setPrecision(param.precision_precondition);
-        p_pre = MakeSharedPtr(csParam);
-        r_pre = MakeSharedPtr(csParam);
-      }
-
-      eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
-      init = true;
     }
 
     double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
@@ -780,8 +991,6 @@ namespace quda {
 
   int IncEigCG::CAEigCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
 
-    constexpr bool host_computing = true;	  
-
     if(param.pipeline < param.nev / 2) errorQuda("\nPipeline length is too short (%d).\n", param.pipeline);
 
     if( ((param.m - 2*param.nev) % param.pipeline != 0) || ((param.m - 2*param.nev) < param.pipeline) )  errorQuda("Pipeline length %d is not supported.", param.pipeline);
@@ -799,23 +1008,6 @@ namespace quda {
       param.true_res = 0.0;
       param.true_res_hq = 0.0;
       return 0;
-    }
-
-    ColorSpinorParam csParam(x);
-
-    if (!init) {
-
-      eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, x, param.precision_ritz, host_computing);
-
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      csParam.is_composite  = true;
-      csParam.composite_dim = !matSloppy.isStaggered() ? 8 : 7;
-      // auxiliary work space to keep w, p, s, u fields
-      work_space = MakeSharedPtr(csParam);
-
-      eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
-
-      init = true;
     }
 
     EigCGArgs &args = *eigcg_args;
@@ -1014,6 +1206,8 @@ namespace quda {
     return k;
   }
 
+  constexpr bool host_flag = false;
+
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
      if(param.rhs_idx == 0) max_eigcg_cycles = param.eigcg_max_restarts;
@@ -1024,31 +1218,57 @@ namespace quda {
      deflated_solver *defl_p = static_cast<deflated_solver*>(param.deflation_op);
      Deflation &defl         = *(defl_p->defl);
 
+     if (!init) {
+       DeflationParam &deflParam = *(defl_p->deflParam);
+       
+       ColorSpinorParam csParam(in);
+       
+       const bool host_computing = param.pipeline == 0 ? false : host_flag;
+
+       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, deflParam, param.precision_sloppy, param.precision_ritz, host_computing);
+
+       csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+       ep = MakeSharedPtr(csParam);//full precision accumulator
+       rp = MakeSharedPtr(csParam);//full precision residual
+
+       csParam.setPrecision(param.precision_sloppy);
+
+       ep_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : ep;
+       rp_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : rp;
+
+       csParam.is_composite  = true;
+       csParam.composite_dim = (param.pipeline == 0) ? (K ? 6 : 5) : 7;//needs an extra field for the preconditioned version
+       
+       if (!matSloppy.isStaggered()) csParam.composite_dim += 1; //add an extra tmp field for the wilson-like dslash
+
+       // A work space to keep CG fields
+       work_space = MakeSharedPtr(csParam);
+
+       if (K) {
+         csParam.is_composite  = false;
+	 csParam.setPrecision(param.precision_precondition);
+	 p_pre = MakeSharedPtr(csParam);
+	 r_pre = MakeSharedPtr(csParam);
+       }
+
+       eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
+
+       init = true;
+     }
+
      //If deflation space is complete: use initCG solver
      if( defl.is_complete() ) return;
 
-     //Start (incremental) eigCG solver:
-     ColorSpinorParam csParam(in);
-     csParam.create = QUDA_ZERO_FIELD_CREATE;
-
-     std::shared_ptr<ColorSpinorField> ep = MakeSharedPtr(csParam);//full precision accumulator
-     std::shared_ptr<ColorSpinorField> rp = MakeSharedPtr(csParam);//full precision residual
-
-     ColorSpinorField &e = *ep;
-     ColorSpinorField &r = *rp;
+     ColorSpinorField &e       = *ep;
+     ColorSpinorField &eSloppy = *ep_sloppy;
+     ColorSpinorField &r       = *rp;
+     ColorSpinorField &rSloppy = *rp_sloppy;
 
      //deflate initial guess ('out'-field):
      mat(r, out, e);
      //
      double r2 = xmyNorm(in, r);
-
-     csParam.setPrecision(param.precision_sloppy);
-
-     std::shared_ptr<ColorSpinorField> ep_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : ep;
-     std::shared_ptr<ColorSpinorField> rp_sloppy = ( mixed_prec ) ? MakeSharedPtr(csParam) : rp;
-
-     ColorSpinorField &eSloppy = *ep_sloppy;
-     ColorSpinorField &rSloppy = *rp_sloppy;
 
      const double stop = b2*param.tol*param.tol;
      //start iterative refinement cycles (or just one eigcg call for full (solo) precision solver):
@@ -1077,8 +1297,7 @@ namespace quda {
        bool update_ritz = !dcg_cycle && (eigcg_args->restarts >= 1) && !defl.is_complete(); //too uglyyy
 
        if( update_ritz ) {
-
-         defl.increment(*eigcg_args->Vm, param.nev);
+         eigcg_args->increment();
          logical_rhs_id += 1;
 
          dcg_cycle = (logical_rhs_id >= max_eigcg_cycles);
@@ -1121,11 +1340,9 @@ namespace quda {
      if(defl.is_complete()) {
        if(param.rhs_idx != param.deflation_grid) warningQuda("\nTotal rhs number (%d) does not match the requested deflation grid size (%d).\n", param.rhs_idx, param.deflation_grid);
 
-       eigcg_args->Vm.reset(); eigcg_args->V2k.reset(); eigcg_args->hVm.reset();
-
        const int max_nev = defl.size();//param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
-       defl.reduce(param.eigenval_tol, max_nev);
+       eigcg_args->reduce(param.eigenval_tol, max_nev);
      }
      return;
   }

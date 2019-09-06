@@ -1223,7 +1223,12 @@ public:
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    std::shared_ptr<ColorSpinorFieldSet> work_space;  // a workspace to keep a number of temporary fields
+    std::shared_ptr<ColorSpinorField> ep;//full precision accumulator
+    std::shared_ptr<ColorSpinorField> ep_sloppy;    
+    std::shared_ptr<ColorSpinorField> rp;//full precision residual
+    std::shared_ptr<ColorSpinorField> rp_sloppy;
+
+    std::shared_ptr<ColorSpinorFieldSet> work_space;  // a workspace to keep the solver temporary fields
 
     std::shared_ptr<ColorSpinorField> r_pre;    // residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    // preconditioner result
@@ -1234,7 +1239,7 @@ public:
 
     bool init;
 
-public:
+  public:
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
