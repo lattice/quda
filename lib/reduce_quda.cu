@@ -443,7 +443,7 @@ namespace quda {
         } else if (x.Precision() == QUDA_QUARTER_PRECISION) { // quarter precision
 
 #if QUDA_PRECISION & 1
-          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value
