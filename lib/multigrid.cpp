@@ -9,7 +9,7 @@ namespace quda
 
   using namespace blas;
 
-  static bool debug = true;
+  static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) :
     Solver(param, profile),
