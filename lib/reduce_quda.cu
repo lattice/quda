@@ -389,8 +389,8 @@ namespace quda {
 #endif
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
-            const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
-            if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
+            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            if ((x.Nspin() == 2 || x.Nspin() == 4) && siteUnroll) errorQuda("siteUnroll not supported here for nSpin=%d", x.Nspin());
             value = nativeReduce<doubleN, ReduceType, float2, float2, float2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
