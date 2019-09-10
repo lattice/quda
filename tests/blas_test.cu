@@ -122,11 +122,10 @@ const char *names[] = {"copyHS",
                        "reDotProduct_block",
                        "axpy_block"};
 
-bool is_multi(int kernel) {
-  return std::string(names[kernel]).find("_block") != std::string::npos ? true : false;
-}
+bool is_multi(int kernel) { return std::string(names[kernel]).find("_block") != std::string::npos ? true : false; }
 
-bool skip_kernel(int precision, int kernel, int order) {
+bool skip_kernel(int precision, int kernel, int order)
+{
   if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
   // if we've selected a given kernel then make sure we only run that
@@ -156,7 +155,7 @@ bool skip_kernel(int precision, int kernel, int order) {
     // ordered nspin-4 fields in single precision and less, skip all other cases
     if (Nspin == 1 || Nspin == 2 || this_prec == QUDA_DOUBLE_PRECISION) {
       return true;
-    } else if (Nspin == 4 && prec < Nprec-1 && is_multi(kernel)) {
+    } else if (Nspin == 4 && prec < Nprec - 1 && is_multi(kernel)) {
       // we don't instantiate multi-blas kernels for float-2 nspin-4
       // fields, so skip these
       return true;
@@ -1096,20 +1095,22 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
+class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+{
 protected:
   ::testing::tuple<int, int, int> param;
   const int &prec;
   const int &kernel;
   const int &order;
 
- public:
+public:
   BlasTest() :
     param(GetParam()),
     prec(::testing::get<0>(param)),
     kernel(::testing::get<1>(param)),
     order(::testing::get<2>(param))
-      { }
+  {
+  }
   virtual ~BlasTest() { }
   virtual void SetUp() {
     if (!skip_kernel(prec, kernel, order)) initFields(prec, order);
@@ -1119,7 +1120,6 @@ protected:
     if (!skip_kernel(prec, kernel, order)) freeFields();
   }
 };
-
 
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
@@ -1158,7 +1158,8 @@ TEST_P(BlasTest, benchmark) {
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
 }
 
-std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
+std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+{
   int prec = ::testing::get<0>(param.param);
   int kernel = ::testing::get<1>(param.param);
   int order = ::testing::get<2>(param.param);

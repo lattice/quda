@@ -279,8 +279,8 @@ namespace quda {
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
 #if defined(GPU_MULTIGRID)
             const int M = 12;
-            nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
-                a, b, c, x, y, z, w, v, x.Volume());
+            nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
+                                                                                                 x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
