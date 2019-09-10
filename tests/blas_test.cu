@@ -122,7 +122,11 @@ const char *names[] = {"copyHS",
                        "reDotProduct_block",
                        "axpy_block"};
 
+// kernels that utilize multi-blas
 bool is_multi(int kernel) { return std::string(names[kernel]).find("_block") != std::string::npos ? true : false; }
+
+// kernels that require site unrolling
+bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQuark") != std::string::npos ? true : false; }
 
 bool skip_kernel(int precision, int kernel, int order)
 {
@@ -141,7 +145,7 @@ bool skip_kernel(int precision, int kernel, int order)
   } else if (Nspin == 2 && (kernel == 1 || kernel == 2)) {
     // avoid low-precision copy if doing coarse fields
     return true;
-  } else if (Ncolor != 3 && (kernel == 31 || kernel == 32)) {
+  } else if (Ncolor != 3 && is_site_unroll(kernel)) {
     // only benchmark heavy-quark norm if doing 3 colors
     return true;
   } else if ((Nprec < 4) && (kernel == 0)) {
@@ -155,7 +159,8 @@ bool skip_kernel(int precision, int kernel, int order)
     // ordered nspin-4 fields in single precision and less, skip all other cases
     if (Nspin == 1 || Nspin == 2 || this_prec == QUDA_DOUBLE_PRECISION) {
       return true;
-    } else if (Nspin == 4 && prec < Nprec - 1 && is_multi(kernel)) {
+    } else if (Nspin == 4 && (this_prec != QUDA_DOUBLE_PRECISION && is_multi(kernel) ||
+                              this_prec == QUDA_SINGLE_PRECISION && is_site_unroll(kernel))) {
       // we don't instantiate multi-blas kernels for float-2 nspin-4
       // fields, so skip these
       return true;
