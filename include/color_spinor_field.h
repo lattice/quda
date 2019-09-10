@@ -156,7 +156,6 @@ namespace quda {
 
       if (!pc_solution) {
         siteSubset = QUDA_FULL_SITE_SUBSET;
-        ;
       } else {
         x[0] /= 2; // X defined the full lattice dimensions
         siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -219,8 +218,8 @@ namespace quda {
         component_id(0)
     {
       siteSubset = cpuParam.siteSubset;
-      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-      }
+      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    }
 
     /**
        If using CUDA native fields, this function will ensure that the
