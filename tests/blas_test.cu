@@ -45,10 +45,12 @@ std::vector<cpuColorSpinorField*> zmH;
 int Nspin;
 int Ncolor;
 
-void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
+void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
 {
   param.setPrecision(precision);
-  if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
+  if (order == 1) {
+    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  } else if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -71,7 +73,60 @@ void display_test_info()
 
 int Nprec = 4;
 
-bool skip_kernel(int precision, int kernel) {
+const char *prec_str[] = {"quarter", "half", "single", "double"};
+const char *order_str[] = {"default", "float2"};
+
+// For googletest names must be non-empty, unique, and may only contain ASCII
+// alphanumeric characters or underscore
+const char *names[] = {"copyHS",
+                       "copyMS",
+                       "copyLS",
+                       "axpby",
+                       "xpy",
+                       "axpy",
+                       "xpay",
+                       "mxpy",
+                       "ax",
+                       "caxpy",
+                       "caxpby",
+                       "cxpaypbz",
+                       "axpyBzpcx",
+                       "axpyZpbx",
+                       "caxpbypzYmbw",
+                       "cabxpyAx",
+                       "caxpyXmaz",
+                       "norm",
+                       "reDotProduct",
+                       "axpyNorm",
+                       "xmyNorm",
+                       "caxpyNorm",
+                       "caxpyXmazNormX",
+                       "cabxpyzAxNorm",
+                       "cDotProduct",
+                       "caxpyDotzy",
+                       "cDotProductNormA",
+                       "cDotProductNormB",
+                       "caxpbypzYmbwcDotProductUYNormY",
+                       "HeavyQuarkResidualNorm",
+                       "xpyHeavyQuarkResidualNorm",
+                       "tripleCGReduction",
+                       "tripleCGUpdate",
+                       "axpyReDot",
+                       "caxpy_block",
+                       "axpyBzpcx_block",
+                       "caxpyBxpz",
+                       "caxpyBzpx",
+                       "cDotProductNorm_block",
+                       "cDotProduct_block",
+                       "reDotProductNorm_block",
+                       "reDotProduct_block",
+                       "axpy_block"};
+
+bool is_multi(int kernel) {
+  return std::string(names[kernel]).find("_block") != std::string::npos ? true : false;
+}
+
+bool skip_kernel(int precision, int kernel, int order) {
   if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
   // if we've selected a given kernel then make sure we only run that
@@ -95,10 +150,26 @@ bool skip_kernel(int precision, int kernel) {
     return true;
   }
 
+  if (order == 1) {
+#ifdef GPU_MULTIGRID
+    // order == 1 represents the case of multigrid testing for float-2
+    // ordered nspin-4 fields in single precision and less, skip all other cases
+    if (Nspin == 1 || Nspin == 2 || this_prec == QUDA_DOUBLE_PRECISION) {
+      return true;
+    } else if (Nspin == 4 && prec < Nprec-1 && is_multi(kernel)) {
+      // we don't instantiate multi-blas kernels for float-2 nspin-4
+      // fields, so skip these
+      return true;
+    }
+#else
+    return true;
+#endif
+  }
+
   return false;
 }
 
-void initFields(int prec)
+void initFields(int prec, int order)
 {
   // precisions used for the source field in the copyCuda() benchmark
   QudaPrecision high_aux_prec = QUDA_INVALID_PRECISION;
@@ -177,25 +248,25 @@ void initFields(int prec)
 
   switch(prec) {
   case 0:
-    setPrec(param, QUDA_QUARTER_PRECISION);
+    setPrec(param, QUDA_QUARTER_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_HALF_PRECISION;
     break;
   case 1:
-    setPrec(param, QUDA_HALF_PRECISION);
+    setPrec(param, QUDA_HALF_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 2:
-    setPrec(param, QUDA_SINGLE_PRECISION);
+    setPrec(param, QUDA_SINGLE_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 3:
-    setPrec(param, QUDA_DOUBLE_PRECISION);
+    setPrec(param, QUDA_DOUBLE_PRECISION, order);
     high_aux_prec = QUDA_SINGLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
@@ -967,55 +1038,6 @@ double test(int kernel) {
   return error;
 }
 
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-
-
-// For googletest names must be non-empty, unique, and may only contain ASCII
-// alphanumeric characters or underscore
-const char *names[] = {"copyHS",
-                       "copyMS",
-                       "copyLS",
-                       "axpby",
-                       "xpy",
-                       "axpy",
-                       "xpay",
-                       "mxpy",
-                       "ax",
-                       "caxpy",
-                       "caxpby",
-                       "cxpaypbz",
-                       "axpyBzpcx",
-                       "axpyZpbx",
-                       "caxpbypzYmbw",
-                       "cabxpyAx",
-                       "caxpyXmaz",
-                       "norm",
-                       "reDotProduct",
-                       "axpyNorm",
-                       "xmyNorm",
-                       "caxpyNorm",
-                       "caxpyXmazNormX",
-                       "cabxpyzAxNorm",
-                       "cDotProduct",
-                       "caxpyDotzy",
-                       "cDotProductNormA",
-                       "cDotProductNormB",
-                       "caxpbypzYmbwcDotProductUYNormY",
-                       "HeavyQuarkResidualNorm",
-                       "xpyHeavyQuarkResidualNorm",
-                       "tripleCGReduction",
-                       "tripleCGUpdate",
-                       "axpyReDot",
-                       "caxpy_block",
-                       "axpyBzpcx_block",
-                       "caxpyBxpz",
-                       "caxpyBzpx",
-                       "cDotProductNorm_block",
-                       "cDotProduct_block",
-                       "reDotProductNorm_block",
-                       "reDotProduct_block",
-                       "axpy_block"};
-
 int main(int argc, char** argv)
 {
 
@@ -1074,21 +1096,27 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
+class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>> {
 protected:
-  ::testing::tuple<int, int> param;
+  ::testing::tuple<int, int, int> param;
   const int &prec;
   const int &kernel;
+  const int &order;
 
-public:
-  BlasTest() : param(GetParam()), prec(::testing::get<0>(param)), kernel(::testing::get<1>(param)) {}
+ public:
+  BlasTest() :
+    param(GetParam()),
+    prec(::testing::get<0>(param)),
+    kernel(::testing::get<1>(param)),
+    order(::testing::get<2>(param))
+      { }
   virtual ~BlasTest() { }
   virtual void SetUp() {
-    if (!skip_kernel(prec, kernel)) initFields(prec);
+    if (!skip_kernel(prec, kernel, order)) initFields(prec, order);
   }
   virtual void TearDown()
   {
-    if (!skip_kernel(prec, kernel)) freeFields();
+    if (!skip_kernel(prec, kernel, order)) freeFields();
   }
 };
 
@@ -1096,7 +1124,8 @@ public:
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec, kernel)) GTEST_SKIP();
+  int order = ::testing::get<2>(GetParam());
+  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
@@ -1110,7 +1139,8 @@ TEST_P(BlasTest, verify) {
 TEST_P(BlasTest, benchmark) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec, kernel)) GTEST_SKIP();
+  int order = ::testing::get<2>(GetParam());
+  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
 
   // do the initial tune
   benchmark(kernel, 1);
@@ -1128,14 +1158,15 @@ TEST_P(BlasTest, benchmark) {
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
 }
 
-std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param){
+std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param){
   int prec = ::testing::get<0>(param.param);
   int kernel = ::testing::get<1>(param.param);
+  int order = ::testing::get<2>(param.param);
   std::string str(names[kernel]);
-  str += std::string("_");
-  str += std::string(prec_str[prec]);
-  return str; // names[kernel] + "_" + prec_str[prec];
+  str += std::string("_") + std::string(prec_str[prec]);
+  str += std::string("_") + std::string(order_str[order]);
+  return str;
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, 4), Range(0, Nkernels)), getblasname);
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 2)), getblasname);
