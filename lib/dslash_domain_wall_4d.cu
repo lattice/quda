@@ -59,11 +59,11 @@ public:
       const auto kernel = DomainWall4DLaunch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
       auto instance = Dslash<Float>::program_->kernel(kernel).instantiate(
         Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay, arg.kernel_type, Type<Arg>());
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>),
+      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
+      cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
                               streams[Nstream - 1]);
       Dslash<Float>::template instantiate<DomainWall4DLaunch, nDim, nColor>(tp, arg, stream);
 #endif

@@ -12,7 +12,7 @@ namespace quda {
     int nFace;
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    Float max_h;  // host scalar that stores the maximum element of Yhat
+    Float *max_h;  // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
     Float *max_d; // device scalar that stores the maximum element of Yhat
 
     CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
@@ -22,7 +22,7 @@ namespace quda {
       Xinv(Xinv),
       nFace(nFace),
       coarseVolumeCB(Y.VolumeCB()),
-      max_h(0),
+      max_h(nullptr),
       max_d(nullptr)
     {
       for (int i=0; i<4; i++) {
@@ -112,7 +112,7 @@ namespace quda {
         }
       } //parity
     } // dimension
-    if (compute_max_only) arg.max_h = max;
+    if (compute_max_only) *arg.max_h = max;
   }
 
   template <typename Float, int n, bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
