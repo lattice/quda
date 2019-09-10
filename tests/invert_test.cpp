@@ -73,7 +73,6 @@ extern int pipeline; // length of pipeline for fused operations in GCR or BiCGst
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
 extern bool unit_gauge;
-
 extern void usage(char** );
 
 
@@ -660,6 +659,11 @@ int main(int argc, char **argv)
 		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa,
 		     inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+		cloverHasenbuschTwist_matpc(spinorTmp, gauge, spinorOut, clover, clover_inv, inv_param.kappa, 
+				inv_param.mu, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+		cloverHasenbuschTwist_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, 
+				inv_param.mu, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
         dw_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);

@@ -71,7 +71,9 @@ namespace quda {
 	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
 	break;
 	  case COMPUTE_COARSE_THCLOVER:
-
+	// fine operator on single parity
+	flops_ = arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / coarseSpin;
+	break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
@@ -128,6 +130,8 @@ namespace quda {
 	bytes_ = 2*arg.X.Bytes() + 2*arg.C.Bytes() + arg.V.Bytes(); // 2 from parity
 	break;
 	  case COMPUTE_COARSE_THCLOVER:
+	bytes_ = arg.X.Bytes() + arg.C.Bytes() + arg.V.Bytes();
+	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_DIAGONAL:

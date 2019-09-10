@@ -474,7 +474,6 @@ namespace quda {
 		}else if(parity == QUDA_ODD_PARITY){
 			DslashXpayTwistClovInv(out, in, parity, x, k, mu);
 		}
-		flops += 1872ll*in.Volume();
 	}
 
     // Apply the even-odd preconditioned clover-improved Dirac operator
