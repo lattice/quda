@@ -979,6 +979,7 @@ namespace quda
           (param.smoother_solve_type == QUDA_DIRECT_SOLVE && inner_solution_type == QUDA_MAT_SOLUTION) )
         ? true : false;
 
+
       // FIXME this is currently borked if inner solver is preconditioned
       double r2 = 0.0;
       if (use_solver_residual) {
@@ -1042,7 +1043,8 @@ namespace quda
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
-    if ( debug ) {
+    // FIXME on subset check
+    if ( debug && b.SiteSubset() == r->SiteSubset() ) {
       (*param.matResidual)(*r, x);
       double r2 = xmyNorm(b, *r);
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
