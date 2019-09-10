@@ -337,9 +337,7 @@ namespace quda {
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION
-                || x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION)) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);
@@ -391,7 +389,7 @@ namespace quda {
 #endif
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
-            const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
+            const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
             if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
             value = nativeReduce<doubleN, ReduceType, float2, float2, float2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
