@@ -7,13 +7,13 @@
 
 namespace quda {
 
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
+
   enum QudaStaggeredTransferType {
     QUDA_STAGGERED_TRANSFER_PROLONG,
     QUDA_STAGGERED_TRANSFER_RESTRICT,
     QUDA_STAGGERED_TRANSFER_INVALID = QUDA_INVALID_ENUM
   };
-
-#ifdef GPU_MULTIGRID
 
   using namespace quda::colorspinor;
 
@@ -287,7 +287,7 @@ namespace quda {
     StaggeredProlongRestrict<fineSpin,fineColor,coarseSpin,coarseColor,transferType>(out, in, fine_to_coarse, parity);
   }
 
-#endif // GPU_MULTIGRID
+#endif // defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
   void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in,
                   const int *fine_to_coarse, const int * const * spin_map, int parity) {

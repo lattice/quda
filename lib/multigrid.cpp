@@ -833,7 +833,7 @@ namespace quda
       }
       Complex dot = cDotProduct(tmp2->Even(),tmp1->Odd());
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Smoother normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 						     real(dot), imag(dot), deviation);
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
@@ -848,7 +848,7 @@ namespace quda
       }
       Complex dot = cDotProduct(*tmp1,*tmp2);
       double deviation = std::fabs(dot.imag()) / std::fabs(dot.real());
-      /*if (getVerbosity() >= QUDA_VERBOSE)*/ printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Normal operator test (eta^dag M^dag M eta): real=%e imag=%e, relative imaginary deviation=%e\n",
 						     real(dot), imag(dot), deviation);
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }

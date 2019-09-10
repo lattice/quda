@@ -107,14 +107,16 @@ namespace quda {
 #endif
     } else if (coarseColor == 24) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+#ifdef GPU_WILSON_DIRAC
     } else if (coarseColor == 32) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+#endif // GPU_WILSON_DIRAC
 #ifdef GPU_STAGGERED_DIRAC
     } else if (coarseColor == 64) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 96) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#endif
+#endif // GPU_STAGGERED_DIRAC
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
@@ -147,14 +149,16 @@ namespace quda {
 #endif
     } else if (g.Ncolor()/T.Vectors().Nspin() == 24) {
       calculateYcoarse<Float,vFloat,24>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+#ifdef GPU_WILSON_DIRAC
     } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
       calculateYcoarse<Float,vFloat,32>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
+#endif // GPU_WILSON_DIRAC
 #ifdef GPU_STAGGERED_DIRAC
     } else if (g.Ncolor()/T.Vectors().Nspin() == 64) {
       calculateYcoarse<Float,vFloat,64>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 96) {
       calculateYcoarse<Float,vFloat,96>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#endif
+#endif // GPU_WILSON_DIRAC
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

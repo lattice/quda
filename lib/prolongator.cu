@@ -239,8 +239,10 @@ namespace quda {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 24) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
+#ifdef GPU_WILSON_DIRAC
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
+#endif // GPU_WILSON_DIRAC
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
@@ -255,17 +257,20 @@ namespace quda {
       const int fineColor = 24;
       if (nVec == 24) { // to keep compilation under control coarse grids have same or more colors
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
+#ifdef GPU_WILSON_DIRAC
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
+#endif // GPU_WILSON_DIRAC
   #ifdef GPU_STAGGERED_DIRAC
       } else if (nVec == 64) { 
         Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 96) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-  #endif
+  #endif // GPU_STAGGERED_DIRAC
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#ifdef GPU_WILSON_DIRAC
     } else if (out.Ncolor() == 32) {
       const int fineColor = 32;
       if (nVec == 32) {
@@ -273,6 +278,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#endif // GPU_WILSON_DIRAC
 #ifdef GPU_STAGGERED_DIRAC
     } else if (out.Ncolor() == 64) {
       const int fineColor = 64;
@@ -290,7 +296,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
-#endif
+#endif // GPU_STAGGERED_DIRAC
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }
@@ -306,7 +312,7 @@ namespace quda {
     } else if (out.Nspin() == 4) {
       Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#if 0 // Not needed (until we enable Laplace MG)
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif

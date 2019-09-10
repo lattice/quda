@@ -246,12 +246,14 @@ namespace quda {
       } else if (Nvec == 24) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
+#ifdef GPU_WILSON_DIRAC
       } else if (Nvec == 32) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
       } else if (Nvec == 48) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 48>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
+#endif // GPU_WILSON_DIRAC
       } else {
         errorQuda("Unsupported nVec %d\n", Nvec);
       }
@@ -271,18 +273,20 @@ namespace quda {
       constexpr int nColor = 24;
       if (Nvec == 24) {
         BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,24>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+#ifdef GPU_WILSON_DIRAC
       } else if (Nvec == 32) {
         BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+#endif // GPU_WILSON_DIRAC
 #ifdef GPU_STAGGERED_DIRAC
       } else if (Nvec == 64) {
         BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
       } else if (Nvec == 96) {
         BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-#endif
+#endif // GPU_WILSON_DIRAC
       } else {
         errorQuda("Unsupported nVec %d\n", Nvec);
       }
-
+#ifdef GPU_WILSON_DIRAC
     } else if (V.Ncolor()/Nvec == 32) {
 
       constexpr int nColor = 32;
@@ -291,7 +295,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d\n", Nvec);
       }
-
+#endif // GPU_WILSON_DIRAC
 #ifdef GPU_STAGGERED_DIRAC
     } else if (V.Ncolor()/Nvec == 64) {
 
@@ -311,7 +315,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d\n", Nvec);
       }
-#endif
+#endif // GPU_STAGGERD_DIRAC
     } else {
       errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
     }
@@ -327,7 +331,7 @@ namespace quda {
     } else if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
       BlockOrthogonalize<vFloat, bFloat, 4, 2>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#if 0 // not needed until we add Laplace MG
     } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
       BlockOrthogonalize<vFloat, bFloat, 1, 1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif

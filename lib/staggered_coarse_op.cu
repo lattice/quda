@@ -8,7 +8,7 @@
 
 namespace quda {
 
-#ifdef GPU_MULTIGRID
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
@@ -145,7 +145,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
   }
 
-#endif // GPU_MULTIGRID
+#endif // defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
@@ -153,7 +153,7 @@ namespace quda {
 		const cudaGaugeField &gauge,
 		double mass, QudaDiracType dirac, QudaMatPCType matpc) {
 
-#ifdef GPU_MULTIGRID
+#if defined(GPU_MULTIGRID) && defined(GPU_STAGGERED_DIRAC)
 
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
@@ -210,7 +210,7 @@ namespace quda {
 
     if (U != &gauge) delete U;
 #else
-    errorQuda("Multigrid has not been built");
+    errorQuda("Staggered multigrid has not been built");
 #endif
   }
 
