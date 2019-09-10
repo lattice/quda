@@ -57,6 +57,10 @@ namespace quda {
        DenseMatrix H;
        Vector      eta;
 
+       MatrixXcd givensH;
+       VectorXcd cn;
+       VectorXd  sn;
+
        int m;
        int k;
        int restarts;
@@ -66,17 +70,85 @@ namespace quda {
        ColorSpinorFieldSet *Vkp1;//high-precision accumulation array
 
        GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)),
-       eta(Vector::Zero(m)), m(m), k(nev), restarts(0), Vkp1(nullptr) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
+       eta(Vector::Zero(m)), givensH(MatrixXcd::Zero(m+1, m)), cn( VectorXcd::Zero(m) ), sn( VectorXd::Zero(m) ),
+       m(m), k(nev), restarts(0), Vkp1(nullptr) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
 
        inline void ResetArgs() {
          ritzVecs.setZero();
          H.setZero();
          eta.setZero();
+         givensH.setZero();
+         cn.setZero();
+         sn.setZero();
        }
 
        ~GMResDRArgs(){
           if(Vkp1) delete Vkp1;
        }
+
+       void Givens(const int j) {
+         Complex h0 = H(0, j-1);
+
+         for(int i = 1; i < j; i++){
+           givensH(i-1,j-1) = conj(cn(i-1))*h0 + sn(i-1)*H(i,j-1);
+           h0 = -sn(i-1)*h0 + cn(i-1)*H(i,j-1);
+         }
+
+         const double inv_denom = 1.0 / sqrt(norm(h0)+norm(H(j,j-1)));
+
+         cn(j-1) = h0 * inv_denom;
+         sn(j-1) = H(j,j-1).real() * inv_denom;
+         givensH(j-1,j-1) = conj(cn(j-1))*h0 + sn(j-1)*H(j,j-1);
+
+         c[j  ] = -sn(j-1)*c[j-1];
+         c[j-1]*= conj(cn(j-1));
+         //
+         printfQuda("Residual %le :: %le \n", c[j].real(), c[j].imag());
+
+         return;
+      }
+
+      void LeastSquaresSolve(const Complex c0, const ColorSpinorField &r_sloppy, const ColorSpinorFieldSet &vm, const bool do_givens) {
+        if(do_givens)
+        {
+          //recosntruct the last col
+          Complex h0 = H(0, m-1);
+
+          for(int i = 1; i <= m-1; i++){
+            givensH(i-1, m-1) = conj(cn(i-1))*h0 + sn(i-1)*H(i,m-1);
+            h0 = -sn(i-1)*h0 + cn(i-1)*H(i,m-1);
+          }
+
+          const double inv_denom = 1.0 / sqrt(norm(h0)+norm(H(m,m-1)));
+
+          cn(m-1) = h0 * inv_denom;
+          sn(m-1) = H(m,m-1).real() * inv_denom;
+          givensH(m-1,m-1) = conj(cn(m-1))*h0 + sn(m-1)*H(m,m-1);
+
+          c[m  ] = -sn(m-1)*c[m-1];
+          c[m-1]  *= conj(cn(m-1));
+          //
+          printfQuda("Last cycle residual %le :: %le \n", c[m].real(), c[m-1].imag());
+
+          memcpy(eta.data(),  c, m*sizeof(Complex));
+          memset(c, 0, (m+1)*sizeof(Complex));
+          c[0] = c0;
+
+          givensH.block(0,0, m, m).triangularView<Upper>().solveInPlace<OnTheLeft>(eta);
+
+        } else {
+          memset(c, 0, (m+1)*sizeof(Complex));
+
+          std::vector<ColorSpinorField*> v_(const_cast<ColorSpinorField&>(vm)(0,k+1));
+          std::vector<ColorSpinorField*> r_;
+          r_.push_back(const_cast<ColorSpinorField*>(&r_sloppy));
+
+          blas::cDotProduct(c, v_, r_);
+
+        }
+
+        return;
+      }
    };
 
    void ComputeHarmonicRitz(GMResDRArgs &args)
@@ -298,9 +370,11 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    ColorSpinorFieldSet &zm = *Zm;
    ColorSpinorField &tmp = *tmpp;
 
-   MatrixXcd givensH( do_givens ? MatrixXcd::Zero( args.m+1, args.m ) : MatrixXcd::Zero( 0, 0 ) );
-   VectorXcd cn( VectorXcd::Zero( do_givens ? args.m : 0 ) );
-   VectorXd  sn( VectorXd::Zero( do_givens ? args.m : 0 ) );
+   if(do_givens){
+     args.givensH.setZero();
+     args.cn.setZero();
+     args.sn.setZero();
+   }
 
    //Advanced Ortho objects:
    MatrixXcd R (MatrixXcd::Identity(args.m+1, args.m+1) );
@@ -368,26 +442,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
      args.H.col(j).head(j+1) = R.col(j+1).head(j+1);
 
-     if(do_givens && j > start_idx) {
-
-        Complex h0 = args.H(0, j-1);
-
-        for(int i = 1; i < j; i++){
-           givensH(i-1,j-1) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,j-1);
-           h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,j-1);
-        }
-
-        double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(j,j-1)));
-
-        cn(j-1) = h0 * inv_denom;
-        sn(j-1) = args.H(j,j-1).real() * inv_denom;
-        givensH(j-1,j-1) = conj(cn(j-1))*h0 + sn(j-1)*args.H(j,j-1);
-
-        args.c[j  ] = -sn(j-1)*args.c[j-1];
-        args.c[j-1]*= conj(cn(j-1));
-        //
-        printfQuda("Residual %le :: %le \n", args.c[j].real(), args.c[j].imag());
-     }
+     if(do_givens && j > start_idx) args.Givens(j);
 
      j += 1;
    }
@@ -405,43 +460,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    // set m+1 entry in the last col of the Hessenberg
    args.H(args.m, args.m-1) = R(args.m, args.m);
 
-   if(do_givens)
-   {
-     //recosntruct the last col
-     Complex h0 = args.H(0, args.m-1);
+   args.LeastSquaresSolve(c0, *r_sloppy, *Vm, do_givens);
 
-     for(int i = 1; i <= args.m-1; i++){
-        givensH(i-1, args.m-1) = conj(cn(i-1))*h0 + sn(i-1)*args.H(i,args.m-1);
-        h0 = -sn(i-1)*h0 + cn(i-1)*args.H(i,args.m-1);
-     }
-
-     double inv_denom = 1.0 / sqrt(norm(h0)+norm(args.H(args.m,args.m-1)));
-
-     cn(args.m-1) = h0 * inv_denom;
-     sn(args.m-1) = args.H(args.m,args.m-1).real() * inv_denom;
-     givensH(args.m-1,args.m-1) = conj(cn(args.m-1))*h0 + sn(args.m-1)*args.H(args.m,args.m-1);
-
-     args.c[args.m  ] = -sn(args.m-1)*args.c[args.m-1];
-     args.c[args.m-1]  *= conj(cn(args.m-1));
-     //
-     printfQuda("Last cycle residual %le :: %le \n", args.c[args.m].real(), args.c[args.m-1].imag());
-
-     memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
-     memset(args.c, 0, (args.m+1)*sizeof(Complex));
-     args.c[0] = c0;
-
-     givensH.block(0,0, args.m, args.m).triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
-
-   } else {
-     memset(args.c, 0, (args.m+1)*sizeof(Complex));
-
-     std::vector<ColorSpinorField*> v_(vm(0,args.k+1));
-     std::vector<ColorSpinorField*> r_;
-     r_.push_back(static_cast<ColorSpinorField*>(r_sloppy));
-
-     blas::cDotProduct(args.c, v_, r_);
-
-   }
    return (j-start_idx);
  }
 
