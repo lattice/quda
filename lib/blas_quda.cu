@@ -397,7 +397,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
-              const int M = 6;
+              const int M = 12;
               nativeBlas<double2, char4, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
             } else if (x.Nspin() == 1) {
