@@ -174,7 +174,7 @@ namespace quda
           (*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, B_coarse_precision, param.mg_global.setup_location[param.level+1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
-        if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
+        if ((param.level != 0 || param.Nlevel-1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
           for (int i=0; i<param.Nvec; i++) {
             zero(*(*B_coarse)[i]);
@@ -643,6 +643,7 @@ namespace quda
     if (param.level != 0 || param.is_staggered == QUDA_BOOLEAN_NO) {
 
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Checking 0 = (1 - P P^\\dagger) v_k for %d vectors\n", param.Nvec);
+
       for (int i=0; i<param.Nvec; i++) {
         // as well as copying to the correct location this also changes basis if necessary
         *tmp1 = *param.B[i];
@@ -1041,11 +1042,11 @@ namespace quda
       diracSmoother->reconstruct(x, b, outer_solution_type);
     }
 
-    //if ( debug ) {
-    //  (*param.matResidual)(*r, x);
-    //  double r2 = xmyNorm(b, *r);
-    //  printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
-    //}
+    if ( debug ) {
+      (*param.matResidual)(*r, x);
+      double r2 = xmyNorm(b, *r);
+      printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
+    }
 
     setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
   }
@@ -1053,39 +1054,51 @@ namespace quda
   // supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);
-    pushLevel(param.level);
-    std::string vec_infile(param.mg_global.vec_infile[param.level]);
-    vec_infile += "_level_";
-    vec_infile += std::to_string(param.level);
-    vec_infile += "_nvec_";
-    vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-    eig_solve->loadVectors(B, vec_infile);
-    popLevel(param.level);
-    profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
+    if (param.level == 0 && param.is_staggered) {
+      warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
+    } else {
+      profile_global.TPSTOP(QUDA_PROFILE_INIT);
+      profile_global.TPSTART(QUDA_PROFILE_IO);
+      pushLevel(param.level);
+      std::string vec_infile(param.mg_global.vec_infile[param.level]);
+      vec_infile += "_level_";
+      vec_infile += std::to_string(param.level);
+      vec_infile += "_nvec_";
+      vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
+      eig_solve->loadVectors(B, vec_infile);
+      popLevel(param.level);
+      profile_global.TPSTOP(QUDA_PROFILE_IO);
+      profile_global.TPSTART(QUDA_PROFILE_INIT);
+    }
   }
 
   void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
-    profile_global.TPSTART(QUDA_PROFILE_IO);
-    pushLevel(param.level);
-    std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
-    vec_outfile += "_level_";
-    vec_outfile += std::to_string(param.level);
-    vec_outfile += "_nvec_";
-    vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-    eig_solve->saveVectors(B, vec_outfile);
-    popLevel(param.level);
-    profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
+    if (param.level == 0 && param.is_staggered) {
+      warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
+    } else {
+      profile_global.TPSTOP(QUDA_PROFILE_INIT);
+      profile_global.TPSTART(QUDA_PROFILE_IO);
+      pushLevel(param.level);
+      std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
+      vec_outfile += "_level_";
+      vec_outfile += std::to_string(param.level);
+      vec_outfile += "_nvec_";
+      vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
+      eig_solve->saveVectors(B, vec_outfile);
+      popLevel(param.level);
+      profile_global.TPSTOP(QUDA_PROFILE_IO);
+      profile_global.TPSTART(QUDA_PROFILE_INIT);
+    }
   }
 
   void MG::dumpNullVectors() const
   {
-    saveVectors(param.B);
+    if (param.level == 0 && param.is_staggered) {
+      warningQuda("Cannot dump near-null vectors for top level of staggered MG solve.");
+    } else {
+      saveVectors(param.B);
+    }
     if (param.level < param.Nlevel - 2) coarse->dumpNullVectors();
   }
 
@@ -1319,8 +1332,8 @@ namespace quda
         }
 
         delete tmp;
-      } else if (Nspin == 1) // Staggered
-      {
+      } else if (Nspin == 1) { // Staggered
+
         // There needs to be 24 null vectors -> 48 after chirality.
         if (Nvec != 24) errorQuda("\nError in MG::buildFreeVectors: Staggered-type fermions require Nvec = 24\n");
 
@@ -1392,8 +1405,7 @@ namespace quda
       } else {
         errorQuda("\nError in MG::buildFreeVectors: Unsupported combo of Nc %d, Nspin %d", Ncolor, Nspin);
       }
-    } else // coarse level
-    {
+    } else { // coarse level
       if (Nspin == 2) {
         // There needs to be Ncolor null vectors.
         if (Nvec != Ncolor) errorQuda("\nError in MG::buildFreeVectors: Coarse fermions require Nvec = Ncolor");
