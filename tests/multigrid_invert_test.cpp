@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <limits>
 
 #include <util_quda.h>
 #include <test_util.h>
@@ -829,10 +830,10 @@ int main(int argc, char **argv)
 
   mean_time /= Nsrc;
   mean_time2 /= Nsrc;
-  auto stddev_time = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time));
+  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
   mean_gflops /= Nsrc;
   mean_gflops2 /= Nsrc;
-  auto stddev_gflops = sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops));
+  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
   printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
              stddev_time, mean_gflops, stddev_gflops);
 

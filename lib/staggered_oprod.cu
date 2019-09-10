@@ -18,43 +18,42 @@ namespace quda {
 
   enum OprodKernelType { OPROD_INTERIOR_KERNEL, OPROD_EXTERIOR_KERNEL };
 
-  template<typename Float, typename Output, typename InputA, typename InputB>
-    struct StaggeredOprodArg {
-      unsigned int length;
-      int X[4];
-      unsigned int parity;
-      unsigned int dir;
-      unsigned int ghostOffset[4];
-      unsigned int displacement;
-      OprodKernelType kernelType;
-      int nFace;
-      bool partitioned[4];
-      InputA inA;
-      InputB inB;
-      Output outA;
-      Output outB;
-      Float coeff[2];
+  template <typename Float, typename Output, typename InputA, typename InputB> struct StaggeredOprodArg {
+    unsigned int length;
+    const int parity;
+    int dir;
+    int displacement;
+    OprodKernelType kernelType;
+    const int nFace;
+    const InputA inA;
+    const InputB inB;
+    Output outA;
+    Output outB;
+    Float coeff[2];
+    int X[4];
+    unsigned int ghostOffset[4];
+    bool partitioned[4];
 
-      StaggeredOprodArg(const unsigned int parity, const unsigned int dir, const unsigned int *ghostOffset,
-          const unsigned int displacement, const OprodKernelType &kernelType, const int nFace, const double coeff[2],
-          InputA &inA, InputB &inB, Output &outA, Output &outB, GaugeField &meta) :
-          length(meta.VolumeCB()),
-          parity(parity),
-          dir(dir),
-          displacement(displacement),
-          kernelType(kernelType),
-          nFace(nFace),
-          inA(inA),
-          inB(inB),
-          outA(outA),
-          outB(outB)
-      {
-        this->coeff[0] = coeff[0];
-        this->coeff[1] = coeff[1];
-        for(int i=0; i<4; ++i) this->X[i] = meta.X()[i];
-        for(int i=0; i<4; ++i) this->ghostOffset[i] = ghostOffset[i];
-        for(int i=0; i<4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
-      }
+    StaggeredOprodArg(int parity, int dir, const unsigned int *ghostOffset, int displacement,
+                      const OprodKernelType &kernelType, int nFace, const double coeff[2], InputA &inA, InputB &inB,
+                      Output &outA, Output &outB, GaugeField &meta) :
+      length(meta.VolumeCB()),
+      parity(parity),
+      dir(dir),
+      displacement(displacement),
+      kernelType(kernelType),
+      nFace(nFace),
+      inA(inA),
+      inB(inB),
+      outA(outA),
+      outB(outB)
+    {
+      this->coeff[0] = coeff[0];
+      this->coeff[1] = coeff[1];
+      for (int i = 0; i < 4; ++i) this->X[i] = meta.X()[i];
+      for (int i = 0; i < 4; ++i) this->ghostOffset[i] = ghostOffset[i];
+      for (int i = 0; i < 4; ++i) this->partitioned[i] = commDimPartitioned(i) ? true : false;
+    }
   };
 
   enum IndexType {
@@ -65,8 +64,7 @@ namespace quda {
   };
 
   template <IndexType idxType>
-    static __device__ __forceinline__ void coordsFromIndex(int& idx, int c[4],  
-        const unsigned int cb_idx, const unsigned int parity, const int X[4])
+  __device__ inline void coordsFromIndex(int &idx, int c[4], unsigned int cb_idx, int parity, const int X[4])
   {
       const int &LX = X[0];
       const int &LY = X[1];
@@ -122,53 +120,53 @@ namespace quda {
   
 
   // Get the  coordinates for the exterior kernels
-  __device__ static void coordsFromIndex(int x[4], const unsigned int cb_idx, const int X[4], const unsigned int dir, const int displacement, const unsigned int parity)
-  {
-    int Xh[2] = {X[0]/2, X[1]/2};
-    switch(dir){
-    case 0:
-      x[2] = cb_idx/Xh[1] % X[2];
-      x[3] = cb_idx/(Xh[1]*X[2]) % X[3];
-      x[0] = cb_idx/(Xh[1]*X[2]*X[3]);
-      x[0] += (X[0] - displacement);
-      x[1] = 2*(cb_idx % Xh[1]) + ((x[0]+x[2]+x[3]+parity)&1);
-      break;
+    __device__ inline void coordsFromIndex(int x[4], unsigned int cb_idx, const int X[4], int dir, int displacement,
+                                           int parity)
+    {
+      int Xh[2] = {X[0] / 2, X[1] / 2};
+      switch (dir) {
+      case 0:
+        x[2] = cb_idx / Xh[1] % X[2];
+        x[3] = cb_idx / (Xh[1] * X[2]) % X[3];
+        x[0] = cb_idx / (Xh[1] * X[2] * X[3]);
+        x[0] += (X[0] - displacement);
+        x[1] = 2 * (cb_idx % Xh[1]) + ((x[0] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 1:
-      x[2] = cb_idx/Xh[0] % X[2];
-      x[3] = cb_idx/(Xh[0]*X[2]) % X[3];
-      x[1] = cb_idx/(Xh[0]*X[2]*X[3]);
-      x[1] += (X[1] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
+      case 1:
+        x[2] = cb_idx / Xh[0] % X[2];
+        x[3] = cb_idx / (Xh[0] * X[2]) % X[3];
+        x[1] = cb_idx / (Xh[0] * X[2] * X[3]);
+        x[1] += (X[1] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 2:
-      x[1] = cb_idx/Xh[0] % X[1];
-      x[3] = cb_idx/(Xh[0]*X[1]) % X[3];
-      x[2] = cb_idx/(Xh[0]*X[1]*X[3]);
-      x[2] += (X[2] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
+      case 2:
+        x[1] = cb_idx / Xh[0] % X[1];
+        x[3] = cb_idx / (Xh[0] * X[1]) % X[3];
+        x[2] = cb_idx / (Xh[0] * X[1] * X[3]);
+        x[2] += (X[2] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
 
-    case 3:
-      x[1] = cb_idx/Xh[0] % X[1];
-      x[2] = cb_idx/(Xh[0]*X[1]) % X[2];
-      x[3] = cb_idx/(Xh[0]*X[1]*X[2]);
-      x[3] += (X[3] - displacement);
-      x[0] = 2*(cb_idx % Xh[0]) + ((x[1]+x[2]+x[3]+parity)&1);
-      break;
-    }
-    return;
+      case 3:
+        x[1] = cb_idx / Xh[0] % X[1];
+        x[2] = cb_idx / (Xh[0] * X[1]) % X[2];
+        x[3] = cb_idx / (Xh[0] * X[1] * X[2]);
+        x[3] += (X[3] - displacement);
+        x[0] = 2 * (cb_idx % Xh[0]) + ((x[1] + x[2] + x[3] + parity) & 1);
+        break;
+      }
+      return;
   }
 
-
-  __device__ __forceinline__
-  int neighborIndex(const unsigned int cb_idx, const int shift[4],  const bool partitioned[4], const unsigned int parity, const int X[4]){
+  __device__ inline int neighborIndex(unsigned int cb_idx, const int shift[4], const bool partitioned[4], int parity,
+                                      const int X[4])
+  {
     int full_idx;
     int x[4]; 
 
     coordsFromIndex<EVEN_X>(full_idx, x, cb_idx, parity, X);
-
     
     for(int dim = 0; dim<4; ++dim){
       if( partitioned[dim] )
@@ -180,7 +178,6 @@ namespace quda {
     }
     return (((x[3]*X[2] + x[2])*X[1] + x[1])*X[0] + x[0]) >> 1;
   }
-
 
   template<typename real, typename Output, typename InputA, typename InputB>
   __global__ void interiorOprodKernel(StaggeredOprodArg<real, Output, InputA, InputB> arg)
@@ -361,51 +358,54 @@ namespace quda {
     comm_barrier();
   }
 
-  template<typename Float, typename Output, typename InputA, typename InputB>
-    void computeStaggeredOprodCuda(Output outA, Output outB, GaugeField& outFieldA, GaugeField& outFieldB, InputA& inA, InputB& inB, cudaColorSpinorField& src, 
-				   const unsigned int parity, const int faceVolumeCB[4], const double coeff[2], int nFace)
-    {
-      unsigned int ghostOffset[4] = {0,0,0,0};
-      for(int dir=0; dir<4; ++dir) ghostOffset[dir] = src.GhostOffset(dir,1)/src.FieldOrder(); // offset we want is the forwards one
+  template <typename Float, typename Output, typename InputA, typename InputB>
+  void computeStaggeredOprodCuda(Output outA, Output outB, GaugeField &outFieldA, GaugeField &outFieldB, InputA &inA,
+                                 InputB &inB, cudaColorSpinorField &src, int parity, const int faceVolumeCB[4],
+                                 const double coeff[2], int nFace)
+  {
+    unsigned int ghostOffset[4] = {0, 0, 0, 0};
+    for (int dir = 0; dir < 4; ++dir)
+      ghostOffset[dir] = src.GhostOffset(dir, 1) / src.FieldOrder(); // offset we want is the forwards one
 
-      // Create the arguments for the interior kernel
-      StaggeredOprodArg<Float,Output,InputA,InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, nFace, coeff, inA, inB, outA, outB, outFieldA);
-      StaggeredOprodField<Float,Output,InputA,InputB> oprod(arg, outFieldA);
+    // Create the arguments for the interior kernel
+    StaggeredOprodArg<Float, Output, InputA, InputB> arg(parity, 0, ghostOffset, 1, OPROD_INTERIOR_KERNEL, nFace, coeff,
+                                                         inA, inB, outA, outB, outFieldA);
+    StaggeredOprodField<Float, Output, InputA, InputB> oprod(arg, outFieldA);
 
-      arg.kernelType = OPROD_INTERIOR_KERNEL;
-      arg.length = src.VolumeCB();
-      oprod.apply(streams[Nstream-1]); 
+    arg.kernelType = OPROD_INTERIOR_KERNEL;
+    arg.length = src.VolumeCB();
+    oprod.apply(streams[Nstream - 1]);
 
-      for(int i=3; i>=0; i--){
-	if (commDimPartitioned(i)) {
-	  // update parameters for this exterior kernel
-	  arg.kernelType = OPROD_EXTERIOR_KERNEL;
-	  arg.dir = i;
+    for (int i = 3; i >= 0; i--) {
+      if (commDimPartitioned(i)) {
+        // update parameters for this exterior kernel
+        arg.kernelType = OPROD_EXTERIOR_KERNEL;
+        arg.dir = i;
 
-	  // First, do the one hop term
-	  {
-	    arg.displacement = 1;
-	    arg.length = faceVolumeCB[i];
-	    oprod.apply(streams[Nstream-1]);
-	  }
+        // First, do the one hop term
+        {
+          arg.displacement = 1;
+          arg.length = faceVolumeCB[i];
+          oprod.apply(streams[Nstream - 1]);
+        }
 
-	  // Now do the 3 hop term
-	  if (nFace == 3) {
-	    arg.displacement = 3;                      
-	    arg.length = arg.displacement*faceVolumeCB[i];
-	    oprod.apply(streams[Nstream-1]);
-	  } 
-	}
-      } // i=3,..,0
+        // Now do the 3 hop term
+        if (nFace == 3) {
+          arg.displacement = 3;
+          arg.length = arg.displacement * faceVolumeCB[i];
+          oprod.apply(streams[Nstream - 1]);
+        }
+      }
+    } // i=3,..,0
 
-      checkCudaError();
+    checkCudaError();
     } // computeStaggeredOprodCuda
 
 #endif // GPU_STAGGERED_DIRAC
 
-  void computeStaggeredOprod(GaugeField& outA, GaugeField& outB, ColorSpinorField& inEven, ColorSpinorField& inOdd,
-			     const unsigned int parity, const double coeff[2], int nFace)
-  {
+    void computeStaggeredOprod(GaugeField &outA, GaugeField &outB, ColorSpinorField &inEven, ColorSpinorField &inOdd,
+                               int parity, const double coeff[2], int nFace)
+    {
 #ifdef GPU_STAGGERED_DIRAC
     if(outA.Order() != QUDA_FLOAT2_GAUGE_ORDER)
       errorQuda("Unsupported output ordering: %d\n", outA.Order());    
