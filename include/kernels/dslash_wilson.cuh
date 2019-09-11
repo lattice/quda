@@ -6,6 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
+#include <kernels/dslash_pack.cuh> // for the packing kernel
 
 namespace quda
 {
@@ -13,7 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the Wilson operator
    */
-  template <typename Float, int nColor, QudaReconstructType reconstruct_> struct WilsonArg : DslashArg<Float> {
+  template <typename Float, int nColor_, QudaReconstructType reconstruct_> struct WilsonArg : DslashArg<Float> {
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -130,64 +132,81 @@ namespace quda
     } // nDim
   }
 
-  // out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void wilson(Arg &arg, int idx, int s, int parity)
-  {
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, 4> Vector;
+  struct wilson {
 
-    bool active
+    // out(x) = M*in = (-D + m) * in(x-mu)
+    __device__ __host__ inline void operator()(Arg &arg, int idx, int s, int parity)
+    {
+      typedef typename mapper<Float>::type real;
+      typedef ColorSpinor<real, nColor, 4> Vector;
+
+      bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out;
-    applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-        out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      Vector out;
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
 
-    int xs = x_cb + s * arg.dc.volume_4d_cb;
-    if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(xs, my_spinor_parity);
-      out = x + arg.a * out;
-    } else if (kernel_type != INTERIOR_KERNEL && active) {
-      Vector x = arg.out(xs, my_spinor_parity);
-      out = x + (xpay ? arg.a * out : out);
+      int xs = x_cb + s * arg.dc.volume_4d_cb;
+      if (xpay && kernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(xs, my_spinor_parity);
+        out = x + arg.a * out;
+      } else if (kernel_type != INTERIOR_KERNEL && active) {
+        Vector x = arg.out(xs, my_spinor_parity);
+        out = x + (xpay ? arg.a * out : out);
+      }
+
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
-  }
+  };
 
   // CPU kernel for applying the Wilson operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void wilsonCPU(Arg arg)
+  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
+            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  void dslashCPU(Arg arg)
   {
+    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
 
     for (int parity = 0; parity < nParity; parity++) {
       // for full fields then set parity from loop else use arg setting
       parity = nParity == 2 ? parity : arg.parity;
 
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        wilson<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0, parity);
+        dslash(arg, x_cb, 0, parity);
       } // 4-d volumeCB
     }   // parity
   }
 
   // GPU Kernel for applying the Wilson operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void wilsonGPU(Arg arg)
+  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
+            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  __global__ void dslashGPU(Arg arg)
   {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
+    const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
 
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+      // first few blocks do packing kernel
+      // for full fields set parity from z thread index else use arg setting
+      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    switch (parity) {
-    case 0: wilson<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0, 0); break;
-    case 1: wilson<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0, 1); break;
+      packShmem<dagger, 0, QUDA_4D_PC>(arg, 1 - parity); // flip parity since pack is on input
+    } else {
+      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
+      if (x_cb >= arg.threads) return;
+
+      // for full fields set parity from z thread index else use arg setting
+      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+
+      D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
+      switch (parity) {
+      case 0: dslash(arg, x_cb, 0, 0); break;
+      case 1: dslash(arg, x_cb, 0, 1); break;
+      }
     }
   }
 

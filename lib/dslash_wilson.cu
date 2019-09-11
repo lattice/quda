@@ -24,11 +24,11 @@ namespace quda
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct WilsonLaunch {
-    static constexpr const char *kernel = "quda::wilsonGPU"; // kernel name for jit compilation
+    static constexpr const char *kernel = "quda::dslashGPU"; // kernel name for jit compilation
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-      dslash.launch(wilsonGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<wilson,Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -53,12 +53,24 @@ public:
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash<Float>::setParam(arg);
+
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
+        arg.blocks_per_dir = tp.aux.x;
+        arg.setPack(true); // need to recompute for updated block_per_dir
+        arg.in.resetGhost(in, this->packBuffer);
+        tp.grid.x += arg.pack_blocks;
+      }
+
       Dslash<Float>::template instantiate<WilsonLaunch, nDim, nColor>(tp, arg, stream);
     }
 
     TuneKey tuneKey() const
     {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      if (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) {
+        return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux_pack);
+      } else {
+        return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      }
     }
   };
 

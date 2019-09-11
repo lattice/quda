@@ -226,8 +226,9 @@ namespace quda
     return true;
   }
 
-  template <typename Float> struct DslashArg {
+  template <typename Float_> struct DslashArg {
 
+    typedef Float_ Float;
     typedef typename mapper<Float>::type real;
 
     const int parity;  // only use this for single parity fields
