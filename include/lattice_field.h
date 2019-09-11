@@ -143,6 +143,9 @@ namespace quda {
 
   class LatticeField : public Object {
 
+    /** Allow the Dslash kernel driver access */
+    template <typename T> friend class Dslash;
+
   protected:
     /** Lattice volume */
     size_t volume;
