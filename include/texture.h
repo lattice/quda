@@ -196,8 +196,9 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType_, int N>
-struct SpinorTexture : SpinorNorm<RegType, StoreType_, isFixed<StoreType_>::value> {
+template <typename RegType_, typename StoreType_, int N>
+struct SpinorTexture : SpinorNorm<RegType_, StoreType_, isFixed<StoreType_>::value> {
+  typedef RegType_ RegType;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorNorm<RegType, StoreType_, isFixed<StoreType>::value> SN;
@@ -362,9 +363,10 @@ public:
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType_, int N, int write_>
-struct Spinor : public SpinorTexture<RegType, StoreType_, N> {
+template <typename RegType_, typename StoreType_, int N, int write_>
+struct Spinor : public SpinorTexture<RegType_, StoreType_, N> {
   static constexpr bool write = write_;
+  typedef RegType_ RegType;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorTexture<RegType, StoreType, N> ST;
