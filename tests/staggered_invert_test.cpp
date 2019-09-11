@@ -392,11 +392,8 @@ int invert_test()
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct
-      = (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    gauge_param.reconstruct_sloppy
-      = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 :
-                                                                                                link_recon_sloppy;
+    gauge_param.reconstruct = link_recon; 
+    gauge_param.reconstruct_sloppy = link_recon_sloppy; 
     gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
     gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
     loadGaugeQuda(milc_longlink, &gauge_param);
