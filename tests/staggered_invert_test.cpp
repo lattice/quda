@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -169,7 +170,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
 
-  inv_param.Ls = Nsrc;
+  inv_param.Ls = 1; //Nsrc;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
@@ -247,7 +248,7 @@ int invert_test()
   initQuda(device);
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1); // Nsrc); ...so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -322,7 +323,7 @@ int invert_test()
   for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
   bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) csParam.x[0] /= 2;
-  csParam.x[4] = Nsrc;
+  csParam.x[4] = 1; //Nsrc;
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -335,15 +336,6 @@ int invert_test()
   out = new cpuColorSpinorField(csParam);
   ref = new cpuColorSpinorField(csParam);
   tmp = new cpuColorSpinorField(csParam);
-
-  // Construct source
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
-
-  construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
-
-  rng->Release();
-  delete rng;
 
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
@@ -399,27 +391,50 @@ int invert_test()
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 
-  double time0 = -((double)clock()); // Start the timer
-
   double nrm2=0;
   double src2=0;
   int ret = 0;
 
   int len = 0;
   if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V*Nsrc;
+    len = V; //*Nsrc;
   } else {
-    len = Vh*Nsrc;
+    len = Vh; //*Nsrc;
   }
+
+  // Prepare rng
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  rng->Init();
+
+  // Pre-initialize some variables
+  double *time = nullptr;
+  double *gflops = nullptr;
+  auto mean_time = 0.0;
+  auto mean_time2 = 0.0;
+  auto mean_gflops = 0.0;
+  auto mean_gflops2 = 0.0;
+  auto stddev_time = 0.0;
+  auto stddev_gflops = 0.0;
+  double hqr = 0.0;
+  double l2r = 0.0;
 
   switch (test_type) {
   case 0: // full parity solution
   case 1: // solving prec system, reconstructing
   case 2:
 
-    invertQuda(out->V(), in->V(), &inv_param);
-    time0 += clock(); // stop the timer
-    time0 /= CLOCKS_PER_SEC;
+    time = new double[Nsrc];
+    gflops = new double[Nsrc];
+
+    for (int k = 0; k < Nsrc; k++) {
+      construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+      invertQuda(out->V(), in->V(), &inv_param);
+
+      time[k] = inv_param.secs;
+      gflops[k] = inv_param.gflops/inv_param.secs;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+
+    }
 
     // In QUDA, the full staggered operator has the sign convention
     //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
@@ -461,15 +476,46 @@ int invert_test()
     nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
 
+    hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+    l2r = sqrt(nrm2/src2);
+
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+
+    // Compute timings
+    for (int i=0; i<Nsrc; i++) {
+      mean_time += time[i];
+      mean_time2 += time[i] * time[i];
+      mean_gflops += gflops[i];
+      mean_gflops2 += gflops[i] * gflops[i];
+    }
+
+    mean_time /= Nsrc;
+    mean_time2 /= Nsrc;
+    stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+    mean_gflops /= Nsrc;
+    mean_gflops2 /= Nsrc;
+    stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+    printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+               stddev_time, mean_gflops, stddev_gflops);
+
     break;
 
   case 3: // even
   case 4:
 
-    invertQuda(out->V(), in->V(), &inv_param);
+    time = new double[Nsrc];
+    gflops = new double[Nsrc];
 
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
+    for (int k = 0; k < Nsrc; k++) {
+      construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+      invertQuda(out->V(), in->V(), &inv_param);
+
+      time[k] = inv_param.secs;
+      gflops[k] = inv_param.gflops/inv_param.secs;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+
+    }
 
     matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
               gauge_param.cpu_prec, tmp, test_type == 3 ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
@@ -483,6 +529,29 @@ int invert_test()
     mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+
+    hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+    l2r = sqrt(nrm2/src2);
+
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+
+    // Compute timings
+    for (int i=0; i<Nsrc; i++) {
+      mean_time += time[i];
+      mean_time2 += time[i] * time[i];
+      mean_gflops += gflops[i];
+      mean_gflops2 += gflops[i] * gflops[i];
+    }
+
+    mean_time /= Nsrc;
+    mean_time2 /= Nsrc;
+    stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+    mean_gflops /= Nsrc;
+    mean_gflops2 /= Nsrc;
+    stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+    printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+               stddev_time, mean_gflops, stddev_gflops);
 
     break;
 
@@ -510,14 +579,14 @@ int invert_test()
           inv_param.offset[i] = 4*masses[i]*masses[i];
         }
 
+        construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+
         invertMultiShiftQuda(outArray, in->V(), &inv_param);
 
         cudaDeviceSynchronize();
-        time0 += clock(); // stop the timer
-        time0 /= CLOCKS_PER_SEC;
-
-        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", time0,
-            inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+        
+        printfQuda("Done: %i iter / %g secs = %g Gflops\n\n",
+            inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
 
         printfQuda("checking the solution\n");
         QudaParity parity = QUDA_INVALID_PARITY;
@@ -561,17 +630,12 @@ int invert_test()
 
     } // switch
 
-  if (test_type <=4){
+  if (time == nullptr) delete[] time;
+  if (gflops == nullptr) delete[] gflops;
 
-    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-    double l2r = sqrt(nrm2/src2);
-
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
-
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
-        inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
-  }
+  // Free RNG
+  rng->Release();
+  delete rng;
 
   // Clean up gauge fields, at least
   for (int dir = 0; dir < 4; dir++) {
