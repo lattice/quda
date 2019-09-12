@@ -304,8 +304,10 @@ int invert_test()
       }
     }
 
-    // Compute fat link plaquette.
+    // Compute fat link plaquette
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+    gauge_param.reconstruct = link_recon;
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
