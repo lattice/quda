@@ -6,6 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
+#include <kernels/laplace.cuh>
 
 namespace quda
 {
@@ -13,10 +14,11 @@ namespace quda
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
-  template <typename Float, int nColor, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
+  template <typename Float, int nColor_, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
       bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct StaggeredArg : DslashArg<Float> {
     typedef typename mapper<Float>::type real;
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -162,50 +164,41 @@ namespace quda
 
   // out(x) = M*in = (-D + m) * in(x-mu)
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void staggered(Arg &arg, int idx, int parity)
-  {
-    using real = typename mapper<Float>::type;
-    using Vector = ColorSpinor<real, nColor, 1>;
+  struct staggered : dslash_default {
 
-    bool active
+    Arg &arg;
+    constexpr staggered(Arg &arg) : arg(arg) { }
+
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    {
+      using real = typename mapper<Float>::type;
+      using Vector = ColorSpinor<real, nColor, 1>;
+
+      bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = arg.improved ? getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
-                              getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int coord[nDim];
+      int x_cb = arg.improved ? getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
+        getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-    Vector out;
+      Vector out;
 
-    applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(
-        out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
-    if (dagger) { out = -out; }
+      if (dagger) { out = -out; }
 
-    if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
-      out = arg.a * x - out;
-    } else if (kernel_type != INTERIOR_KERNEL) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? -out : out);
+      if (xpay && kernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(x_cb, my_spinor_parity);
+        out = arg.a * x - out;
+      } else if (kernel_type != INTERIOR_KERNEL) {
+        Vector x = arg.out(x_cb, my_spinor_parity);
+        out = x + (xpay ? -out : out);
+      }
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
-  }
 
-  // GPU Kernel for applying the staggered operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void staggeredGPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
+  };
 
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    switch (parity) {
-    case 0: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0); break;
-    case 1: staggered<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 1); break;
-    }
-  }
 } // namespace quda

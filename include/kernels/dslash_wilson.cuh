@@ -133,10 +133,13 @@ namespace quda
   }
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct wilson {
+  struct wilson : dslash_default {
+
+    Arg &arg;
+    constexpr wilson(Arg &arg) : arg(arg) { }
 
     // out(x) = M*in = (-D + m) * in(x-mu)
-    __device__ __host__ inline void operator()(Arg &arg, int idx, int s, int parity)
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       typedef typename mapper<Float>::type real;
       typedef ColorSpinor<real, nColor, 4> Vector;
@@ -164,50 +167,5 @@ namespace quda
     }
 
   };
-
-  // CPU kernel for applying the Wilson operator to a vector
-  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
-            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void dslashCPU(Arg arg)
-  {
-    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
-
-    for (int parity = 0; parity < nParity; parity++) {
-      // for full fields then set parity from loop else use arg setting
-      parity = nParity == 2 ? parity : arg.parity;
-
-      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        dslash(arg, x_cb, 0, parity);
-      } // 4-d volumeCB
-    }   // parity
-  }
-
-  // GPU Kernel for applying the Wilson operator to a vector
-  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
-            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void dslashGPU(Arg arg)
-  {
-    const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
-
-    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
-      // first few blocks do packing kernel
-      // for full fields set parity from z thread index else use arg setting
-      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-      packShmem<dagger, 0, QUDA_4D_PC>(arg, 1 - parity); // flip parity since pack is on input
-    } else {
-      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
-      if (x_cb >= arg.threads) return;
-
-      // for full fields set parity from z thread index else use arg setting
-      int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-      D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
-      switch (parity) {
-      case 0: dslash(arg, x_cb, 0, 0); break;
-      case 1: dslash(arg, x_cb, 0, 1); break;
-      }
-    }
-  }
 
 } // namespace quda

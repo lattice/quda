@@ -24,8 +24,7 @@ namespace quda
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
       static_assert(nParity == 1, "preconditioned twisted-mass operator only defined for nParity=1");
-      dslash.launch(
-          twistedMassPreconditionedGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<twistedMassPreconditioned, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -52,7 +51,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash<Float>::setParam(arg, tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 
@@ -85,7 +84,9 @@ public:
 
     TuneKey tuneKey() const
     {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

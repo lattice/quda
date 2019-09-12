@@ -28,7 +28,7 @@ namespace quda
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-      dslash.launch(dslashGPU<wilson,Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<wilson, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -52,25 +52,15 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
-
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
-        arg.blocks_per_dir = tp.aux.x;
-        arg.setPack(true); // need to recompute for updated block_per_dir
-        arg.in.resetGhost(in, this->packBuffer);
-        tp.grid.x += arg.pack_blocks;
-      }
-
+      Dslash<Float>::setParam(arg, tp);
       Dslash<Float>::template instantiate<WilsonLaunch, nDim, nColor>(tp, arg, stream);
     }
 
     TuneKey tuneKey() const
     {
-      if (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) {
-        return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux_pack);
-      } else {
-        return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
-      }
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

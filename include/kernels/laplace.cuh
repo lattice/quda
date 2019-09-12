@@ -6,6 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
+#include <kernels/dslash_pack.cuh> // for the packing kernel
 
 namespace quda
 {
@@ -13,7 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor, QudaReconstructType reconstruct_> struct LaplaceArg : DslashArg<Float> {
+  template <typename Float, int nColor_, QudaReconstructType reconstruct_> struct LaplaceArg : DslashArg<Float> {
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -129,64 +131,54 @@ namespace quda
 
   // out(x) = M*in
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void laplace(Arg &arg, int idx, int parity)
-  {
+  struct laplace : dslash_default {
 
-    using real = typename mapper<Float>::type;
-    using Vector = ColorSpinor<real, nColor, 1>;
+    Arg &arg;
+    constexpr laplace(Arg &arg) : arg(arg) { }
 
-    // is thread active (non-trival for fused kernel only)
-    bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    {
+      using real = typename mapper<Float>::type;
+      using Vector = ColorSpinor<real, nColor, 1>;
 
-    // which dimension is thread working on (fused kernel only)
-    int thread_dim;
+      // is thread active (non-trival for fused kernel only)
+      bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
 
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
+      // which dimension is thread working on (fused kernel only)
+      int thread_dim;
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out;
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
 
-    //We instantiate two kernel types:
-    //case 4 is an operator in all x,y,z,t dimensions
-    //case 3 is a spatial operator only, the t dimension is omitted.
-    switch (arg.dir) {
-    case 3:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                         active);
-      break;
-    case 4:
-    default:
-      applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
-                                                                          thread_dim, active);
-      break;
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      Vector out;
+
+      //We instantiate two kernel types:
+      //case 4 is an operator in all x,y,z,t dimensions
+      //case 3 is a spatial operator only, the t dimension is omitted.
+      switch (arg.dir) {
+      case 3:
+        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                           active);
+        break;
+      case 4:
+      default:
+        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
+                                                                            thread_dim, active);
+        break;
+      }
+
+      if (xpay && kernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(x_cb, my_spinor_parity);
+        out = x + arg.a * out;
+      } else if (kernel_type != INTERIOR_KERNEL) {
+        Vector x = arg.out(x_cb, my_spinor_parity);
+        out = x + (xpay ? arg.a * out : out);
+      }
+
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
 
-    if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
-      out = x + arg.a * out;
-    } else if (kernel_type != INTERIOR_KERNEL) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out = x + (xpay ? arg.a * out : out);
-    }
+  };
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
-  }
-
-  // GPU Kernel for applying the covariant derivative operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void laplaceGPU(Arg arg)
-  {
-
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
-
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    switch (parity) {
-    case 0: laplace<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 0); break;
-    case 1: laplace<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, 1); break;
-    }
-  }
 } // namespace quda

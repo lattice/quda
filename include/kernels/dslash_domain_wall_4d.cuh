@@ -41,68 +41,39 @@ namespace quda
   };
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void domainWall4D(Arg &arg, int idx, int s, int parity)
-  {
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, 4> Vector;
+  struct domainWall4D : dslash_default {
 
-    bool active
+    Arg &arg;
+    constexpr domainWall4D(Arg &arg) : arg(arg) { }
+
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    {
+      typedef typename mapper<Float>::type real;
+      typedef ColorSpinor<real, nColor, 4> Vector;
+
+      bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out;
-    applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      Vector out;
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
         out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
 
-    int xs = x_cb + s * arg.dc.volume_4d_cb;
-    if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(xs, my_spinor_parity);
-      out = x + arg.a5(s) * out;
-    } else if (kernel_type != INTERIOR_KERNEL && active) {
-      Vector x = arg.out(xs, my_spinor_parity);
-      out = x + (xpay ? arg.a5(s) * out : out);
+      int xs = x_cb + s * arg.dc.volume_4d_cb;
+      if (xpay && kernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(xs, my_spinor_parity);
+        out = x + arg.a5(s) * out;
+      } else if (kernel_type != INTERIOR_KERNEL && active) {
+        Vector x = arg.out(xs, my_spinor_parity);
+        out = x + (xpay ? arg.a5(s) * out : out);
+      }
+
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
-  }
-
-  // CPU Kernel for applying 4-d Wilson operator to a 5-d vector (replicated along fifth dimension)
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void domainWall4DCPU(Arg &arg)
-  {
-    for (int parity = 0; parity < nParity; parity++) {
-      // for full fields then set parity from loop else use arg setting
-      parity = nParity == 2 ? parity : arg.parity;
-
-      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-        for (int s = 0; s < arg.Ls; s++) {
-          domainWall4D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, s, parity);
-        }
-      } // 4-d volumeCB
-    }   // parity
-  }
-
-  // GPU Kernel for applying 4-d Wilson operator to a 5-d vector (replicated along fifth dimension)
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void domainWall4DGPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
-
-    // for this operator Ls is mapped to the y thread dimension
-    int s = blockIdx.y * blockDim.y + threadIdx.y;
-    if (s >= arg.Ls) return;
-
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    switch (parity) {
-    case 0: domainWall4D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, s, 0); break;
-    case 1: domainWall4D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type>(arg, x_cb, s, 1); break;
-    }
-  }
+  };
 
 } // namespace quda

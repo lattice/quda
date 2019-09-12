@@ -22,57 +22,64 @@ namespace quda
     }
   };
 
-  /**
-     @brief Apply the twisted-mass dslash
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  struct nDegTwistedMass : dslash_default {
+
+    Arg &arg;
+    constexpr nDegTwistedMass(Arg &arg) : arg(arg) { }
+
+    /**
+       @brief Apply the twisted-mass dslash
        out(x) = M*in = a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1)*x
-     Note this routine only exists in xpay form.
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void ndegTwistedMass(Arg &arg, int idx, int flavor, int parity)
-  {
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, 4> Vector;
-    typedef ColorSpinor<real, nColor, 2> HalfVector;
+       Note this routine only exists in xpay form.
+    */
+    __device__ __host__ inline void operator()(int idx, int flavor, int parity)
+    {
+      typedef typename mapper<Float>::type real;
+      typedef ColorSpinor<real, nColor, 4> Vector;
+      typedef ColorSpinor<real, nColor, 2> HalfVector;
 
-    bool active
+      bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out;
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      Vector out;
 
-    // defined in dslash_wilson.cuh
-    applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-        out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+      // defined in dslash_wilson.cuh
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
 
-    int my_flavor_idx = x_cb + flavor * arg.dc.volume_4d_cb;
+      int my_flavor_idx = x_cb + flavor * arg.dc.volume_4d_cb;
 
-    if (kernel_type == INTERIOR_KERNEL) {
-      // apply the chiral and flavor twists
-      // use consistent load order across s to ensure better cache locality
-      Vector x0 = arg.x(x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-      Vector x1 = arg.x(x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+      if (kernel_type == INTERIOR_KERNEL) {
+        // apply the chiral and flavor twists
+        // use consistent load order across s to ensure better cache locality
+        Vector x0 = arg.x(x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+        Vector x1 = arg.x(x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
 
-      if (flavor == 0) {
-        out = x0 + arg.a * out;
-        out += arg.b * x0.igamma(4);
-        out += arg.c * x1;
-      } else {
-        out = x1 + arg.a * out;
-        out += -arg.b * x1.igamma(4);
-        out += arg.c * x0;
+        if (flavor == 0) {
+          out = x0 + arg.a * out;
+          out += arg.b * x0.igamma(4);
+          out += arg.c * x1;
+        } else {
+          out = x1 + arg.a * out;
+          out += -arg.b * x1.igamma(4);
+          out += arg.c * x0;
+        }
+
+      } else if (active) {
+        Vector x = arg.out(my_flavor_idx, my_spinor_parity);
+        out = x + arg.a * out;
       }
 
-    } else if (active) {
-      Vector x = arg.out(my_flavor_idx, my_spinor_parity);
-      out = x + arg.a * out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
-  }
+  };
 
+#if 0
   // CPU kernel for applying the non-degenerate twisted-mass operator to a vector
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg>
   void ndegTwistedMassCPU(Arg arg)
@@ -107,5 +114,6 @@ namespace quda
     case 1: ndegTwistedMass<Float, nDim, nColor, nParity, dagger, kernel_type>(arg, x_cb, flavor, 1); break;
     }
   }
+#endif
 
 } // namespace quda

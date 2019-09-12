@@ -68,7 +68,7 @@ protected:
     bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
 
-    template <typename Arg> inline void setParam(Arg &arg)
+    template <typename Arg> inline void setParam(Arg &arg, TuneParam &tp)
     {
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
@@ -92,6 +92,13 @@ protected:
       }
 
       arg.in.resetGhost(in, ghost);
+
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
+        arg.blocks_per_dir = tp.aux.x;
+        arg.setPack(true); // need to recompute for updated block_per_dir
+        arg.in.resetGhost(in, this->packBuffer);
+        tp.grid.x += arg.pack_blocks;
+      }
     }
 
     virtual int tuningIter() const { return 10; }
@@ -328,7 +335,7 @@ public:
 
       // set the tuning string for the fused interior + packer kernel
       strcpy(aux_pack, Dslash<Float>::aux[arg.kernel_type]);
-      strcat(aux_pack, ",fused_pack");
+      strcat(aux_pack, "");
 
       // label the locations we are packing to
       // location label is nonp2p-p2p
@@ -343,8 +350,7 @@ public:
         strcat(aux_pack, ",device-device");
         break;
       case Host:
-        strcat(aux_pack,
-               comm_peer2peer_enabled_global() ? ",host-device" : ",host-host");
+        strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host");
         break;
       default:
         errorQuda("Unknown pack target location %d\n", location);

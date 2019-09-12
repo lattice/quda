@@ -23,7 +23,7 @@ namespace quda
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-      dslash.launch(domainWall5DGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<domainWall5D, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -48,7 +48,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash<Float>::setParam(arg, tp);
       Dslash<Float>::template instantiate<DomainWall5DLaunch, nDim, nColor>(tp, arg, stream);
     }
 
@@ -91,7 +91,9 @@ public:
 
     TuneKey tuneKey() const
     {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

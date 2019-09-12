@@ -6,6 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
+#include <kernels/dslash_pack.cuh>
 
 namespace quda
 {
@@ -116,80 +117,71 @@ namespace quda
 
   // out(x) = M*in
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void covDev(Arg &arg, int idx, int parity)
-  {
+  struct covDev : dslash_default {
 
-    using real = typename mapper<Float>::type;
-    using Vector = ColorSpinor<real, nColor, 4>;
+    Arg &arg;
+    constexpr covDev(Arg &arg) : arg(arg) { }
 
-    // is thread active (non-trival for fused kernel only)
-    bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
+    __device__ __host__ inline void operator()(int idx, int parity)
+    {
+      using real = typename mapper<Float>::type;
+      using Vector = ColorSpinor<real, nColor, 4>;
 
-    // which dimension is thread working on (fused kernel only)
-    int thread_dim;
+      // is thread active (non-trival for fused kernel only)
+      bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
 
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
+      // which dimension is thread working on (fused kernel only)
+      int thread_dim;
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
-    Vector out;
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
 
-    switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
-    case 0:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 1:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 2:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 3:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 4:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 4>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 5:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 5>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 6:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 6>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
-    case 7:
-      applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 7>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
-      break;
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
+      Vector out;
+
+      switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
+      case 0:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 1:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 2:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 3:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 4:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 4>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 5:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 5>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 6:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 6>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      case 7:
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 7>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                          active);
+        break;
+      }
+
+      if (kernel_type != INTERIOR_KERNEL) {
+        Vector x = arg.out(x_cb, my_spinor_parity);
+        out += x;
+      }
+
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
 
-    if (kernel_type != INTERIOR_KERNEL) {
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out += x;
-    }
+  };
 
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
-  }
-
-  // GPU Kernel for applying the covariant derivative operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void covDevGPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
-
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    switch (parity) {
-    case 0: covDev<Float, nDim, nColor, nParity, dagger, kernel_type>(arg, x_cb, 0); break;
-    case 1: covDev<Float, nDim, nColor, nParity, dagger, kernel_type>(arg, x_cb, 1); break;
-    }
-  }
 } // namespace quda

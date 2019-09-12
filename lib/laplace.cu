@@ -32,7 +32,7 @@ namespace quda
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-      dslash.launch(laplaceGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<laplace, packStaggeredShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -56,7 +56,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash<Float>::setParam(arg, tp);
       Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
     }
 
@@ -152,7 +152,8 @@ public:
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux, (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+             Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
       char laplace[32];
       u32toa(laplace, arg.dir);

@@ -218,76 +218,92 @@ namespace quda
     } // while tid
   }
 
-  template <bool dagger, int twist, QudaPCType pc, typename Arg> __device__ void packShmem(Arg &arg, int parity)
-  {
-    // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-    int local_block_idx = blockIdx.x % arg.blocks_per_dir;
-    int dim_dir = blockIdx.x / arg.blocks_per_dir;
-    int dir = dim_dir % 2;
-    int dim;
-    switch (dim_dir / 2) {
-    case 0: dim = arg.dim_map[0]; break;
-    case 1: dim = arg.dim_map[1]; break;
-    case 2: dim = arg.dim_map[2]; break;
-    case 3: dim = arg.dim_map[3]; break;
-    }
+  template <bool dagger, QudaPCType pc, typename Arg>
+  struct packShmem {
 
-    int local_tid = local_block_idx * blockDim.x + threadIdx.x;
-
-    int s = blockDim.y * blockIdx.y + threadIdx.y;
-    if (s >= arg.dc.Ls) return;
-
-    switch (dim) {
-    case 0:
-      while (local_tid < arg.dc.ghostFaceCB[0]) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
-        if (pc == QUDA_5D_PC)
-          pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
-        else
-          pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
+    template <int twist>
+    __device__ inline void operator()(Arg &arg, int s, int parity)
+    {
+      // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
+      int local_block_idx = blockIdx.x % arg.blocks_per_dir;
+      int dim_dir = blockIdx.x / arg.blocks_per_dir;
+      int dir = dim_dir % 2;
+      int dim;
+      switch (dim_dir / 2) {
+      case 0: dim = arg.dim_map[0]; break;
+      case 1: dim = arg.dim_map[1]; break;
+      case 2: dim = arg.dim_map[2]; break;
+      case 3: dim = arg.dim_map[3]; break;
       }
-      break;
-    case 1:
-      while (local_tid < arg.dc.ghostFaceCB[1]) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
+
+      int local_tid = local_block_idx * blockDim.x + threadIdx.x;
+
+      switch (dim) {
+      case 0:
+        while (local_tid < arg.dc.ghostFaceCB[0]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
+          else
+            pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+      }
+        break;
+      case 1:
+        while (local_tid < arg.dc.ghostFaceCB[1]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
         if (pc == QUDA_5D_PC)
           pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
         else
           pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
         local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 2:
+        while (local_tid < arg.dc.ghostFaceCB[2]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
+          else
+            pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 3:
+        while (local_tid < arg.dc.ghostFaceCB[3]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
+          else
+            pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
       }
-      break;
-    case 2:
-      while (local_tid < arg.dc.ghostFaceCB[2]) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
-        if (pc == QUDA_5D_PC)
-          pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
-        else
-          pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
-    case 3:
-      while (local_tid < arg.dc.ghostFaceCB[3]) {
-        int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
-        if (pc == QUDA_5D_PC)
-          pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
-        else
-          pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
     }
-  }
+
+    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack) {
+      switch (twist_pack) {
+      case 0: this->operator()<0>(arg, s, parity); break;
+      case 1: this->operator()<1>(arg, s, parity); break;
+      case 2: this->operator()<2>(arg, s, parity); break;
+      }
+    }
+
+  };
 
   template <bool dagger, int twist, QudaPCType pc, typename Arg>
   __global__ void packShmemKernel(Arg arg) {
+
+    int s = blockDim.y * blockIdx.y + threadIdx.y;
+    if (s >= arg.dc.Ls) return;
+
     // this is the parity used for load/store, but we use arg.parity for index
     // mapping
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    packShmem<dagger, twist, pc>(arg, parity);
+    packShmem<dagger, pc, Arg> pack;
+    pack<twist>(arg, s, parity);
   }
 
   template <typename Arg> __global__ void packStaggeredKernel(Arg arg)
@@ -327,76 +343,83 @@ namespace quda
     } // while tid
   }
 
-  template <typename Arg> __device__ void packStaggeredShmem(Arg &arg, int parity)
-  {
-    // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
-    int local_block_idx = blockIdx.x % arg.blocks_per_dir;
-    int dim_dir = blockIdx.x / arg.blocks_per_dir;
-    int dir = dim_dir % 2;
-    int dim;
-    switch (dim_dir / 2) {
-    case 0: dim = arg.dim_map[0]; break;
-    case 1: dim = arg.dim_map[1]; break;
-    case 2: dim = arg.dim_map[2]; break;
-    case 3: dim = arg.dim_map[3]; break;
+  template <bool dagger, QudaPCType pc, typename Arg>
+  struct packStaggeredShmem {
+
+    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack=0)
+    {
+      // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
+      int local_block_idx = blockIdx.x % arg.blocks_per_dir;
+      int dim_dir = blockIdx.x / arg.blocks_per_dir;
+      int dir = dim_dir % 2;
+      int dim;
+      switch (dim_dir / 2) {
+      case 0: dim = arg.dim_map[0]; break;
+      case 1: dim = arg.dim_map[1]; break;
+      case 2: dim = arg.dim_map[2]; break;
+      case 3: dim = arg.dim_map[3]; break;
+      }
+
+      int local_tid = local_block_idx * blockDim.x + threadIdx.x;
+
+      switch (dim) {
+      case 0:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<0, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<0, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 1:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<1, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<1, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 2:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<2, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<2, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 3:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<3, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<3, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      }
     }
 
-    int local_tid = local_block_idx * blockDim.x + threadIdx.x;
+  };
+
+  template <typename Arg>
+  __global__ void packStaggeredShmemKernel(Arg arg) {
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
 
-    switch (dim) {
-    case 0:
-      while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
-        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
-        if (arg.nFace == 1)
-          packStaggered<0, 1>(arg, ghost_idx, s, parity);
-        else
-          packStaggered<0, 3>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
-    case 1:
-      while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
-        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
-        if (arg.nFace == 1)
-          packStaggered<1, 1>(arg, ghost_idx, s, parity);
-        else
-          packStaggered<1, 3>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
-    case 2:
-      while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
-        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
-        if (arg.nFace == 1)
-          packStaggered<2, 1>(arg, ghost_idx, s, parity);
-        else
-          packStaggered<2, 3>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
-    case 3:
-      while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
-        int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
-        if (arg.nFace == 1)
-          packStaggered<3, 1>(arg, ghost_idx, s, parity);
-        else
-          packStaggered<3, 3>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
-      }
-      break;
-    }
-  }
-
-  template <typename Arg>
-  __global__ void packStaggeredShmemKernel(Arg arg) {
     // this is the parity used for load/store, but we use arg.parity for index
     // mapping
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    packStaggeredShmem(arg, parity);
+    packStaggeredShmem<0,QUDA_4D_PC,Arg> pack;
+    pack(arg, s, parity);
   }
 
 } // namespace quda

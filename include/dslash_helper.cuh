@@ -366,4 +366,79 @@ namespace quda
     return out;
   }
 
+  /**
+     @brief Base class that set common types for dslash
+     implementations.  Where necessary, we specialize in the derived
+     classed.
+   */
+  struct dslash_default {
+    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
+    constexpr int twist_pack() const { return 0; }
+  };
+
+  /**
+     @brief This is a helper routine for spawning a CPU function for
+     applying a Dslash kernel.  The dslash to be applied is passed as
+     template template class (template parameter D), which is a
+     functor that can apply the dslash.
+   */
+  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger,
+                       bool xpay, KernelType kernel_type, typename Arg> typename D,
+             typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  void dslashCPU(Arg arg)
+  {
+    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
+
+    for (int parity = 0; parity < nParity; parity++) {
+      // for full fields then set parity from loop else use arg setting
+      parity = nParity == 2 ? parity : arg.parity;
+
+      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
+        dslash(arg, x_cb, 0, parity);
+      } // 4-d volumeCB
+    }   // parity
+  }
+
+  /**
+     @brief This is a helper routine for spawning a GPU kernel for
+     applying a Dslash kernel.  The dslash to be applied is passed as
+     template template class (template parameter D), which is a
+     functor that can apply the dslash.  The packing routine (P) to be
+     used is similarly passed.
+
+     When running an interior kernel, the first few "pack_blocks" CTAs
+     are reserved for data packing, which may include communication to
+     neighboring processes.
+   */
+  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger,
+                       bool xpay, KernelType kernel_type, typename Arg> typename D,
+             template <bool dagger, QudaPCType pc, typename Arg> typename P,
+             typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay,
+             KernelType kernel_type, typename Arg>
+  __global__ void dslashGPU(Arg arg)
+  {
+    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
+
+    int s = blockDim.y * blockIdx.y + threadIdx.y;
+    if (s >= arg.dc.Ls) return;
+
+    // for full fields set parity from z thread index else use arg setting
+    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+
+    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+      // first few blocks do packing kernel
+      P<dagger, dslash.pc_type(), Arg> packer;
+      packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+    } else {
+      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
+      if (x_cb >= arg.threads) return;
+
+      switch (parity) {
+      case 0: dslash(x_cb, s, 0); break;
+      case 1: dslash(x_cb, s, 1); break;
+      }
+    }
+  }
+
 } // namespace quda

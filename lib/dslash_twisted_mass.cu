@@ -24,7 +24,7 @@ namespace quda
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
       static_assert(xpay == true, "Twisted-mass operator only defined for xpay");
-      dslash.launch(twistedMassGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<twistedMass, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
     }
   };
 
@@ -48,7 +48,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash<Float>::setParam(arg, tp);
       if (arg.xpay)
         Dslash<Float>::template instantiate<TwistedMassLaunch, nDim, nColor, true>(tp, arg, stream);
       else
@@ -74,7 +74,9 @@ public:
 
     TuneKey tuneKey() const
     {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
+        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

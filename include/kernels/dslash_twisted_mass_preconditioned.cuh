@@ -136,104 +136,68 @@ namespace quda
     } // nDim
   }
 
-  /**
-     @brief Apply the preconditioned twisted-mass dslash
-     - no xpay: out(x) = M*in = a*(1+i*b*gamma_5)D * in
-     - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5)D * in
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool asymmetric, bool xpay,
-      KernelType kernel_type, typename Arg>
-  __device__ __host__ inline void twistedMass(Arg &arg, int idx, int parity)
-  {
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, 4> Vector;
-    typedef ColorSpinor<real, nColor, 2> HalfVector;
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger_, bool xpay_, KernelType kernel_type, typename Arg>
+  struct twistedMassPreconditioned : dslash_default {
 
-    bool active
+    Arg &arg;
+    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) { }
+    constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 1 : 0; }
+
+    /**
+       @brief Apply the preconditioned twisted-mass dslash
+       - no xpay: out(x) = M*in = a*(1+i*b*gamma_5)D * in
+       - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5)D * in
+    */
+    template <bool dagger, bool asymmetric, bool xpay>
+    __device__ __host__ inline void apply(int idx, int s, int parity)
+    {
+      typedef typename mapper<Float>::type real;
+      typedef ColorSpinor<real, nColor, 4> Vector;
+      typedef ColorSpinor<real, nColor, 2> HalfVector;
+
+      bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-    int thread_dim;                                          // which dimension is thread working on (fused kernel only)
-    int coord[nDim];
-    int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int coord[nDim];
+      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
-    const int my_spinor_parity = nParity == 2 ? parity : 0;
+      const int my_spinor_parity = nParity == 2 ? parity : 0;
 
-    Vector out;
+      Vector out;
 
-    if (!dagger || asymmetric) // defined in dslash_wilson.cuh
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-          out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
-    else // special dslash for symmetric dagger
-      applyWilsonTM<Float, nDim, nColor, nParity, dagger, 1, kernel_type>(
-          out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      if (!dagger || asymmetric) // defined in dslash_wilson.cuh
+        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      else // special dslash for symmetric dagger
+        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 1, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
-    if (xpay && kernel_type == INTERIOR_KERNEL) {
-      Vector x = arg.x(x_cb, my_spinor_parity);
-      if (!dagger || asymmetric) {
-        out += arg.a_inv * (x + arg.b_inv * x.igamma(4)); // apply inverse twist which is undone below
-      } else {
-        out += x; // just directly add since twist already applied in the dslash
+      if (xpay && kernel_type == INTERIOR_KERNEL) {
+        Vector x = arg.x(x_cb, my_spinor_parity);
+        if (!dagger || asymmetric) {
+          out += arg.a_inv * (x + arg.b_inv * x.igamma(4)); // apply inverse twist which is undone below
+        } else {
+          out += x; // just directly add since twist already applied in the dslash
+        }
+      } else if (kernel_type != INTERIOR_KERNEL && active) {
+        // if we're not the interior kernel, then we must sum the partial
+        Vector x = arg.out(x_cb, my_spinor_parity);
+        out += x;
       }
-    } else if (kernel_type != INTERIOR_KERNEL && active) {
-      // if we're not the interior kernel, then we must sum the partial
-      Vector x = arg.out(x_cb, my_spinor_parity);
-      out += x;
+
+      if (isComplete<kernel_type>(arg, coord) && active) {
+        if (!dagger || asymmetric) out = arg.a * (out + arg.b * out.igamma(4)); // apply A^{-1} to D*in
+      }
+
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
 
-    if (isComplete<kernel_type>(arg, coord) && active) {
-      if (!dagger || asymmetric) out = arg.a * (out + arg.b * out.igamma(4)); // apply A^{-1} to D*in
-    }
-
-    if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
-  }
-
-  // CPU kernel for applying the preconditioned twisted-mass operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  void twistedMassPreconditionedCPU(Arg arg)
-  {
-
-    if (arg.asymmetric) {
-      for (int parity = 0; parity < nParity; parity++) {
-        // for full fields then set parity from loop else use arg setting
-        parity = nParity == 2 ? parity : arg.parity;
-
-        for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-          twistedMass<Float, nDim, nColor, nParity, dagger, true, xpay, kernel_type>(arg, x_cb, parity);
-        } // 4-d volumeCB
-      }   // parity
-    } else {
-      for (int parity = 0; parity < nParity; parity++) {
-        // for full fields then set parity from loop else use arg setting
-        parity = nParity == 2 ? parity : arg.parity;
-
-        for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
-          twistedMass<Float, nDim, nColor, nParity, dagger, false, xpay, kernel_type>(arg, x_cb, parity);
-        } // 4-d volumeCB
-      }   // parity
-    }
-  }
-
-  // GPU Kernel for applying the preconditioned twisted-mass operator to a vector
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  __global__ void twistedMassPreconditionedGPU(Arg arg)
-  {
-    int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
-    if (x_cb >= arg.threads) return;
-
-    // for full fields set parity from z thread index else use arg setting
-    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
-    if (arg.asymmetric) {
+    // wrapper for common interface to dslash driver in dslash_helper.h
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
+    {
       // constrain template instantiation for compilation (asymmetric implies dagger and !xpay)
-      switch (parity) {
-      case 0: twistedMass<Float, nDim, nColor, nParity, true, true, false, kernel_type>(arg, x_cb, 0); break;
-      case 1: twistedMass<Float, nDim, nColor, nParity, true, true, false, kernel_type>(arg, x_cb, 1); break;
-      }
-    } else {
-      switch (parity) {
-      case 0: twistedMass<Float, nDim, nColor, nParity, dagger, false, xpay, kernel_type>(arg, x_cb, 0); break;
-      case 1: twistedMass<Float, nDim, nColor, nParity, dagger, false, xpay, kernel_type>(arg, x_cb, 1); break;
-      }
+      if (arg.asymmetric) apply<true, true, false>(idx, 0, parity);
+      else apply<dagger_, false, xpay_>(idx, 0, parity);
     }
-  }
+
+  };
 
 } // namespace quda
