@@ -16,14 +16,6 @@ namespace quda {
 
     cudaStream_t* getStream();
 
-    template <int writeX, int writeY, int writeZ, int writeW>
-    struct write {
-      static constexpr int X = writeX;
-      static constexpr int Y = writeY;
-      static constexpr int Z = writeZ;
-      static constexpr int W = writeW;
-    };
-
     template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename Functor, typename T>
     class MultiBlas : public TunableVectorY
@@ -32,7 +24,7 @@ namespace quda {
   private:
     typedef typename scalar<FloatN>::type Float;
     typedef typename vector<Float, 2>::type Float2;
-    static constexpr int NYW_max = max_YW_size<NXZ, typename SpinorX::StoreType, typename SpinorY::StoreType, Functor>();
+    static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
     const int NYW;
     int max_warp_split;
     mutable int warp_split; // helper used to keep track of current warp splitting
@@ -187,16 +179,16 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (SpinorY::write) arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+          if (SpinorW::write) arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (SpinorY::write) arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+          if (SpinorW::write) arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
@@ -262,8 +254,9 @@ namespace quda {
       // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
       constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
       Functor<NXZ, Float2, RegType> f(NYW);
-      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
-      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, false);
+      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, write, decltype(f)>();
+      const int NYW_max_check
+        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, false);
 
       if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
@@ -286,8 +279,9 @@ namespace quda {
         W[i].set(*dynamic_cast<cudaColorSpinorField *>(w[i]));
       }
 
-      MultiBlas<NXZ, RegType, M, SpinorTexture<RegType, StoreType, M>, Spinor<RegType, yType, M, write::Y>,
-                SpinorTexture<RegType, StoreType, M>, Spinor<RegType, StoreType, M, write::W>, decltype(f), T>
+      MultiBlas<NXZ, RegType, M, typename std::remove_reference<decltype(X[0])>::type,
+                typename std::remove_reference<decltype(Y[0])>::type, typename std::remove_reference<decltype(Z[0])>::type,
+                typename std::remove_reference<decltype(W[0])>::type, decltype(f), T>
         blas(X, Y, Z, W, f, a, b, c, x, y, z, w, NYW, length);
       blas.apply(*getStream());
 
@@ -459,6 +453,30 @@ namespace quda {
 #if defined(GPU_STAGGERED_DIRAC)
               const int M = 3;
               multiBlas<NXZ, double2, short2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+            }
+#else
+            errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x[0]->Precision());
+#endif
+
+          } else if (x[0]->Precision() == QUDA_QUARTER_PRECISION) {
+
+#if QUDA_PRECISION & 1
+            if (x[0]->Nspin() == 4) {
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+              const int M = 12;
+              multiBlas<NXZ, double2, char4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+#endif
+
+            } else if (x[0]->Nspin() == 1) {
+
+#if defined(GPU_STAGGERED_DIRAC)
+              const int M = 3;
+              multiBlas<NXZ, double2, char2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
@@ -659,9 +677,10 @@ namespace quda {
     void axpy_recurse(const T *a_, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y, int i_idx,
                       int j_idx, int upper)
     {
+      using write_ = write<0, 1, 0, 0>;
 
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, false)) {
+      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, false)) {
         // We need to split up 'a' carefully since it's row-major.
         T *tmpmajor = new T[x.size() * y.size()];
         T *tmpmajor0 = &tmpmajor[0];
@@ -696,7 +715,7 @@ namespace quda {
 
           // mark true since we will copy the "a" matrix into constant memory
           coeff_array<T> a(a_), b, c;
-          multiBlas<Functor, write<0, 1, 0, 0>>(a, b, c, x, y, x, y);
+          multiBlas<Functor, write_>(a, b, c, x, y, x, y);
         } else {
           // split the problem in half and recurse
           const T *a0 = &a_[0];
@@ -752,7 +771,9 @@ namespace quda {
     void caxpyz_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass, int upper) {
 
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, false)) {
+      using write_ = write<0, 0, 0, 1>;
+
+      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, false)) {
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -795,7 +816,7 @@ namespace quda {
           }
 
           coeff_array<Complex> a(a_), b, c;
-          multiBlas<multicaxpyz_, write<0, 0, 0, 1>>(a, b, c, x, y, x, z);
+          multiBlas<multicaxpyz_, write_>(a, b, c, x, y, x, z);
         } else {
           // split the problem in half and recurse
           const Complex *a0 = &a_[0];
@@ -849,7 +870,9 @@ namespace quda {
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField *> &x_, std::vector<ColorSpinorField *> &y_,
                    const double *b_, ColorSpinorField &z_, const double *c_)
     {
-      if (y_.size() <= (size_t)max_YW_size(1, z_.Precision(), y_[0]->Precision(), false, true, false)) {
+      using write_ = write<0, 1, 0, 1>;
+
+      if (y_.size() <= (size_t)max_YW_size<write_>(1, z_.Precision(), y_[0]->Precision(), false, true, false)) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -861,7 +884,7 @@ namespace quda {
 	x.push_back(&z_);
 
         coeff_array<double> a(a_), b(b_), c(c_);
-        multiBlas<1, multi_axpyBzpcx_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        multiBlas<1, multi_axpyBzpcx_, write_>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -887,6 +910,8 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
+      using write_ = write<0, 1, 0, 1>;
+
       if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
@@ -902,7 +927,7 @@ namespace quda {
         std::vector<ColorSpinorField*> &x = x_;
 
         coeff_array<Complex> a(a_), b(b_), c;
-        multiBlas<multi_caxpyBxpz_, write<0, 1, 0, 1>>(a, b, c, x, y, x, w);
+        multiBlas<multi_caxpyBxpz_, write_>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];

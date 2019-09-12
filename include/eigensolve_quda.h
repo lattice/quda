@@ -146,14 +146,14 @@ public:
        @param[in] eig_vecs The eigenvectors to load
        @param[in] file The filename to load
     */
-    void loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string file);
+    static void loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string file);
 
     /**
        @brief Save vectors to file
        @param[in] eig_vecs The eigenvectors to save
        @param[in] file The filename to save
     */
-    void saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string file);
+    static void saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string file);
 
     /**
        @brief Load and check eigenpairs from file

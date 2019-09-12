@@ -21,14 +21,14 @@ template <typename OutputType, typename InputType> class Texture
     return *this;
   }
 
-  __device__ inline OutputType fetch(unsigned int idx)
+  __device__ inline OutputType fetch(unsigned int idx) const
   {
     OutputType rtn;
     copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
     return rtn;
   }
 
-  __device__ inline OutputType operator[](unsigned int idx) { return fetch(idx); }
+  __device__ inline OutputType operator[](unsigned int idx) const { return fetch(idx); }
 };
 
 __device__ inline double fetch_double(int2 v)
@@ -37,10 +37,10 @@ __device__ inline double fetch_double(int2 v)
 __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
-template <> __device__ inline double2 Texture<double2, double2>::fetch(unsigned int idx)
+template <> __device__ inline double2 Texture<double2, double2>::fetch(unsigned int idx) const
 { double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
 
-template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned int idx)
+template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned int idx) const
 { float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
 
 #else // !USE_TEXTURE_OBJECTS - use direct reads
@@ -66,7 +66,7 @@ template <typename OutputType, typename InputType> class Texture
     return *this;
   }
 
-  __device__ __host__ inline OutputType operator[](unsigned int idx)
+  __device__ __host__ inline OutputType operator[](unsigned int idx) const
   {
     OutputType out;
     copyFloatN(out, spinor[idx]);
@@ -139,7 +139,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
 
   virtual ~SpinorNorm() {}
 
-  __device__ inline float load_norm(const int i, const int parity = 0) { return norm[cb_norm_offset * parity + i]; }
+  __device__ inline float load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
   template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity)
   {
@@ -183,7 +183,7 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
   SpinorNorm(const SpinorNorm &sn) {}
   SpinorNorm &operator=(const SpinorNorm &src) { return *this; }
   void set(const cudaColorSpinorField &x) {}
-  __device__ inline float load_norm(const int i, const int parity = 0) { return 1.0; }
+  __device__ inline float load_norm(const int i, const int parity = 0) const { return 1.0; }
   template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity) { return 1.0; }
   void backup(char **norm_h, size_t norm_bytes) {}
   void restore(char **norm_h, size_t norm_bytes) {}
@@ -196,8 +196,9 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType_, int N>
-struct SpinorTexture : SpinorNorm<RegType, StoreType_, isFixed<StoreType_>::value> {
+template <typename RegType_, typename StoreType_, int N>
+struct SpinorTexture : SpinorNorm<RegType_, StoreType_, isFixed<StoreType_>::value> {
+  typedef RegType_ RegType;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorNorm<RegType, StoreType_, isFixed<StoreType>::value> SN;
@@ -287,14 +288,15 @@ public:
 
   virtual ~SpinorTexture() {}
 
-  __device__ inline void load(RegType x[], const int i, const int parity=0) {
+  __device__ inline void load(RegType x[], const int i, const int parity = 0) const
+  {
     // load data into registers first using the storage order
     constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
     InterType y[M];
 
     // fixed precision
     if (isFixed<StoreType>::value) {
-      float xN = SN::load_norm(i, parity);
+      const float xN = SN::load_norm(i, parity);
 #pragma unroll
       for (int j = 0; j < M; j++) y[j] = xN * tex[cb_offset * parity + i + j * stride];
     } else { // other types
@@ -311,7 +313,8 @@ public:
      Load the ghost spinor.  For Wilson fermions, we assume that the
      ghost is spin projected
   */
-  __device__ inline void loadGhost(RegType x[], const int i, const int dim) {
+  __device__ inline void loadGhost(RegType x[], const int i, const int dim) const
+  {
     // load data into registers first using the storage order
     const int Nspin = (N * vec_length<RegType>::value) / (3 * 2);
     // if Wilson, then load only half the number of components
@@ -360,9 +363,10 @@ public:
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType, typename StoreType_, int N, int write_>
-struct Spinor : public SpinorTexture<RegType, StoreType_, N> {
+template <typename RegType_, typename StoreType_, int N, int write_>
+struct Spinor : public SpinorTexture<RegType_, StoreType_, N> {
   static constexpr bool write = write_;
+  typedef RegType_ RegType;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
   typedef SpinorTexture<RegType, StoreType, N> ST;
