@@ -47,9 +47,10 @@ namespace quda
     constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 2 : 0; }
 
     /**
-       @brief Apply the twisted-mass dslash
+       @brief Apply the preconditioned non-degenerate twisted-mass dslash
        out(x) = M*in = a * D * in + (1 + i*b*gamma_5*tau_3 + c*tau_1)*x
-       Note this routine only exists in xpay form.
+       - no xpay: out(x) = M*in = a*(1+i*b*gamma_5*tau_3 + c*tau_1)D * in
+       - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5 + c*tau_1)D * in
     */
     template <bool dagger, bool asymmetric, bool xpay>
     __device__ __host__ inline void apply(int idx, int flavor, int parity)

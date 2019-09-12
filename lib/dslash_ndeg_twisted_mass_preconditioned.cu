@@ -52,6 +52,7 @@ public:
         shared(arg.asymmetric || !arg.dagger)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
+      if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
       if (arg.asymmetric)
         for (int i = 0; i < 8; i++)
           if (i != 4) { strcat(Dslash<Float>::aux[i], ",asym"); }
@@ -80,22 +81,14 @@ public:
 
     void initTuneParam(TuneParam &param) const
     {
-      TunableVectorYZ::initTuneParam(param);
-      if (shared) {
-        param.block.y = 2; // flavor must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
+      Dslash<Float>::initTuneParam(param);
+      if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
-      TunableVectorYZ::defaultTuneParam(param);
-      if (shared) {
-        param.block.y = 2; // flavor must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
-      }
+      Dslash<Float>::defaultTuneParam(param);
+      if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     long long flops() const

@@ -65,8 +65,8 @@ protected:
       strcat(aux[kernel_type], aux_base);
     }
 
-    bool tuneGridDim() const { return false; }
-    unsigned int minThreads() const { return arg.threads; }
+    virtual bool tuneGridDim() const { return false; }
+    virtual unsigned int minThreads() const { return arg.threads; }
 
     template <typename Arg> inline void setParam(Arg &arg, TuneParam &tp)
     {
@@ -103,12 +103,12 @@ protected:
 
     virtual int tuningIter() const { return 10; }
 
-    int blockStep() const { return 16; }
-    int blockMin() const { return 16; }
+    virtual int blockStep() const { return 16; }
+    virtual int blockMin() const { return 16; }
 
     unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 
-    bool advanceAux(TuneParam &param) const
+    virtual bool advanceAux(TuneParam &param) const
     {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         // if doing the fused kernel we tune how many blocks to use for
@@ -126,13 +126,13 @@ protected:
       }
     }
 
-    void initTuneParam(TuneParam &param) const
+    virtual void initTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::initTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    void defaultTuneParam(TuneParam &param) const
+    virtual void defaultTuneParam(TuneParam &param) const
     {
       TunableVectorYZ::defaultTuneParam(param);
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
@@ -160,7 +160,6 @@ public:
         int nParity, bool dagger, bool xpay, typename Arg>
     inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
