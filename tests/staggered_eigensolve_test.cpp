@@ -361,6 +361,9 @@ void eigensolve_test()
   milc_fatlink = malloc(4 * V * gaugeSiteSize * gSize);
   milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
 
+  // for load, etc
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
   // load a field WITHOUT PHASES
   if (strcmp(latfile, "")) {
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
@@ -398,9 +401,7 @@ void eigensolve_test()
     }
 
     // Compute fat link plaquette.
-    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-    gauge_param.reconstruct = link_recon;
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
