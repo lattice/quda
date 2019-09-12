@@ -1774,6 +1774,7 @@ bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = {};
 QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = {};
 QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = {};
 bool mg_eig_coarse_guess = false;
+bool mg_eig_preserve_deflation = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1973,6 +1974,7 @@ void usage(char** argv )
 
   // Multigrid Eigensolver
   printf("    --mg-eig <level> <true/false>                     # Use the eigensolver on this level (default false)\n");
+  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
   printf("    --mg-eig-nEv <level> <n>                          # The size of eigenvector search space in the "
          "eigensolver\n");
   printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
@@ -2001,7 +2003,8 @@ void usage(char** argv )
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
   printf("    --mg-eig-coarse-guess <true/false>                # If deflating on the coarse grid, optionaly use an "
          "initial guess (default = false)\n");
-  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
+  printf("    --mg-eig-preserve-deflation <true/false>          # If deflating on the coarse grid and updating the MG instance "
+         "preserve the deflation space (default = false)\n");
 
   // Miscellanea
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
@@ -4192,11 +4195,29 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i + 1 >= argc) { usage(argv); }
 
     if (strcmp(argv[i + 1], "true") == 0) {
-      eig_use_poly_acc = true;
+      mg_eig_coarse_guess = true;
     } else if (strcmp(argv[i + 1], "false") == 0) {
-      eig_use_poly_acc = false;
+      mg_eig_coarse_guess = false;
     } else {
       fprintf(stderr, "ERROR: invalid value for mg-eig-coarse-guess (true/false)\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+
+  if (strcmp(argv[i], "--mg-eig-preserve-deflation") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_preserve_deflation = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_preserve_deflation = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-preserve-deflation (true/false)\n");
       exit(1);
     }
 

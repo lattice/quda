@@ -138,10 +138,9 @@ public:
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
-       @param[in] k The number to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
-
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
+    
     /**
        @brief Load vectors from file
        @param[in] eig_vecs The eigenvectors to load

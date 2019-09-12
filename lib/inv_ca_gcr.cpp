@@ -28,7 +28,7 @@ namespace quda {
     }
 
     if (deflate_init) {
-      for (auto veci : param.evecs)
+      for (auto veci : evecs)
         if (veci) delete veci;
       delete defl_tmp1[0];
       delete defl_tmp2[0];
@@ -83,10 +83,27 @@ namespace quda {
         }
       }
 
-      // Once the GCR operator is called, we are able to construct an appropriate
-      // Krylov space for deflation
-      if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
-
+      if (param.deflate) {
+	if (!deflate_init) {
+	  // Construct the eigensolver and deflation space.
+	  constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+	  if (!deflate_compute) extendSVDDeflationSpace();
+	}
+	if (deflate_compute) {
+	  // compute the deflation space.
+	  profile.TPSTOP(QUDA_PROFILE_INIT);	
+	  (*eig_solve)(evecs, evals);
+	  profile.TPSTART(QUDA_PROFILE_INIT);
+	  extendSVDDeflationSpace();
+	  eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	  deflate_compute = false;
+	}
+	if (recompute_evals) {
+	  eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	  recompute_evals = false;
+	}
+      }
+      
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
 
@@ -217,9 +234,9 @@ namespace quda {
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
 
-      // Deflate: Hardcoded to SVD
-      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
-
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      if(param.maxiter > 1) eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
+      
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);

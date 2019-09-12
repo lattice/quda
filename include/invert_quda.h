@@ -54,12 +54,6 @@ namespace quda {
     /**< Used to define deflation */
     QudaEigParam eig_param;
 
-    /**< Deflation eigenvectors */
-    std::vector<ColorSpinorField *> evecs;
-
-    /**< Deflation eigenvalues */
-    std::vector<Complex> evals;
-
     /**< Whether to use an initial guess in the solver or not */
     QudaUseInitGuess use_init_guess;
 
@@ -540,24 +534,33 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
-       Deflation objects
+       @brief Deflation objects
     */
     EigenSolver *eig_solve;
     bool deflate_init = false;
+    bool deflate_compute = true;
+    bool recompute_evals = false;
+    std::vector<ColorSpinorField *> evecs;
+    std::vector<Complex> evals;
     std::vector<ColorSpinorField *> defl_tmp1;
     std::vector<ColorSpinorField *> defl_tmp2;
-
+    
     /**
-       @brief Constructs the deflation space
+       @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver
        @param[in] mat The operator to eigensolve
        @param[in] Whether to compute the SVD
     */
-    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd);
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
-     * Return flops
+       @brief Extends the deflation space to twice its size for SVD deflation
+    */
+    void extendSVDDeflationSpace();
+    
+    /**
+     * @brief Return flops
      * @return flops expended by this operator
      */
     virtual double flops() const { return 0; }
@@ -1098,6 +1101,9 @@ public:
 
       setOutputPrefix("");
     }
+    
+    Solver* ExposeSolver() const { return solver; } 
+    
   };
 
   class MultiShiftSolver {

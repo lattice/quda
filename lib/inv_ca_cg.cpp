@@ -4,7 +4,7 @@
 
 /**
    @file inv_ca_cg.cpp
-
+   
    Implementation of the communication -avoiding CG algorithm.  Based
    on the description here:
    http://research.nvidia.com/sites/default/files/pubs/2016-04_S-Step-and-Communication-Avoiding/nvr-2016-003.pdf
@@ -49,7 +49,7 @@ namespace quda {
     }
 
     if (deflate_init) {
-      for (auto veci : param.evecs)
+      for (auto veci : evecs)
         if (veci) delete veci;
       delete defl_tmp1[0];
       delete defl_tmp2[0];
@@ -260,10 +260,24 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Q[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
-
-      // Once the CACG operator is called, we are able to construct an appropriate
-      // Krylov space for deflation
-      if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
+      
+      if (param.deflate) {
+	if (!deflate_init) {
+	  // Construct the eigensolver and deflation space.
+	  constructDeflationSpace(b, mat);
+	}
+	if (deflate_compute) {
+	  // compute the deflation space.
+	  profile.TPSTOP(QUDA_PROFILE_INIT);
+	  (*eig_solve)(evecs, evals);
+	  profile.TPSTART(QUDA_PROFILE_INIT);
+	  deflate_compute = false;
+	}
+	if (recompute_evals) {
+	  eig_solve->computeEvals(mat, evecs, evals);
+	  recompute_evals = false;
+	}
+      }
 
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -498,7 +512,7 @@ namespace quda {
       rhs.push_back(defl_tmp2[0]);
 
       // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+      eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
       mat(r_, *defl_tmp1[0], tmp, tmp2);

@@ -638,6 +638,9 @@ extern "C" {
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
 
+    /** Whether to preserve the deflation space during MG update */
+    QudaBoolean preserve_deflation;
+
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
 
