@@ -291,7 +291,7 @@ namespace quda
       twist_c(0.0),
       pack_threads(0),
       blocks_per_dir(1),
-      dim_map{},
+      dim_map {},
       active_dims(0),
       pack_blocks(0)
     {
@@ -308,17 +308,16 @@ namespace quda
       dc = in.getDslashConstant();
     }
 
-    void setPack(bool pack) {
+    void setPack(bool pack)
+    {
       if (pack) {
         // set packing parameters
         // for now we set one block per direction / dimension
         int d = 0;
         pack_threads = 0;
         for (int i = 0; i < 4; i++) {
-          if (!commDim[i])
-            continue;
-          if (i == 3 && !getKernelPackT())
-            continue;
+          if (!commDim[i]) continue;
+          if (i == 3 && !getKernelPackT()) continue;
           pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
           dim_map[d++] = i;
         }
@@ -382,9 +381,9 @@ namespace quda
      template template class (template parameter D), which is a
      functor that can apply the dslash.
    */
-  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger,
-                       bool xpay, KernelType kernel_type, typename Arg> typename D,
-             typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+            typename D,
+            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   void dslashCPU(Arg arg)
   {
     D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
@@ -410,11 +409,10 @@ namespace quda
      are reserved for data packing, which may include communication to
      neighboring processes.
    */
-  template < template <typename Float, int nDim, int nColor, int nParity, bool dagger,
-                       bool xpay, KernelType kernel_type, typename Arg> typename D,
-             template <bool dagger, QudaPCType pc, typename Arg> typename P,
-             typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay,
-             KernelType kernel_type, typename Arg>
+  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+            typename D,
+            template <bool dagger, QudaPCType pc, typename Arg> typename P, typename Float, int nDim, int nColor,
+            int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   __global__ void dslashGPU(Arg arg)
   {
     D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash(arg);

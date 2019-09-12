@@ -33,7 +33,7 @@ namespace quda
   struct wilsonClover : dslash_default {
 
     Arg &arg;
-    constexpr wilsonClover(Arg &arg) : arg(arg) { }
+    constexpr wilsonClover(Arg &arg) : arg(arg) {}
 
     /**
        @brief Apply the Wilson-clover dslash
@@ -48,7 +48,7 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
@@ -56,7 +56,8 @@ namespace quda
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim,
+                                                                     active);
 
       if (kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(x_cb, my_spinor_parity);
@@ -87,7 +88,6 @@ namespace quda
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

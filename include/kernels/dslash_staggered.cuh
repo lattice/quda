@@ -15,7 +15,7 @@ namespace quda
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor_, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
-      bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct StaggeredArg : DslashArg<Float> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
@@ -167,7 +167,7 @@ namespace quda
   struct staggered : dslash_default {
 
     Arg &arg;
-    constexpr staggered(Arg &arg) : arg(arg) { }
+    constexpr staggered(Arg &arg) : arg(arg) {}
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
@@ -176,16 +176,17 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = arg.improved ? getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
-        getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
+                                getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
-      applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim,
+                                                                        active);
 
       if (dagger) { out = -out; }
 
@@ -198,7 +199,6 @@ namespace quda
       }
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

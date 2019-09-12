@@ -26,8 +26,8 @@ namespace quda
     {
       static_assert(nParity == 1, "preconditioned wilson-clover operator only defined for nParity=1");
       if (xpay && dagger) errorQuda("xpay operator only defined for not dagger");
-      dslash.launch(dslashGPU<wilsonCloverPreconditioned, packShmem, Float, nDim, nColor, nParity, dagger && !xpay, xpay && !dagger,
-                    kernel_type, Arg >, tp, arg, stream);
+      dslash.launch(dslashGPU < wilsonCloverPreconditioned, packShmem, Float, nDim, nColor, nParity, dagger && !xpay,
+                    xpay && !dagger, kernel_type, Arg >, tp, arg, stream);
     }
   };
 
@@ -123,8 +123,8 @@ public:
 
     TuneKey tuneKey() const
     {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
-        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
+                                                                               Dslash<Float>::aux[arg.kernel_type];
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };

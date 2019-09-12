@@ -134,7 +134,7 @@ namespace quda
   struct laplace : dslash_default {
 
     Arg &arg;
-    constexpr laplace(Arg &arg) : arg(arg) { }
+    constexpr laplace(Arg &arg) : arg(arg) {}
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
@@ -153,13 +153,13 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      //We instantiate two kernel types:
-      //case 4 is an operator in all x,y,z,t dimensions
-      //case 3 is a spatial operator only, the t dimension is omitted.
+      // We instantiate two kernel types:
+      // case 4 is an operator in all x,y,z,t dimensions
+      // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
       case 3:
-        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                           active);
+        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx,
+                                                                           thread_dim, active);
         break;
       case 4:
       default:
@@ -178,7 +178,6 @@ namespace quda
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

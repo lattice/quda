@@ -44,7 +44,7 @@ namespace quda
   struct domainWall4D : dslash_default {
 
     Arg &arg;
-    constexpr domainWall4D(Arg &arg) : arg(arg) { }
+    constexpr domainWall4D(Arg &arg) : arg(arg) {}
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
@@ -53,14 +53,14 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-        out, arg, coord, x_cb, s, parity, idx, thread_dim, active);
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, s, parity, idx, thread_dim,
+                                                                     active);
 
       int xs = x_cb + s * arg.dc.volume_4d_cb;
       if (xpay && kernel_type == INTERIOR_KERNEL) {
@@ -73,7 +73,6 @@ namespace quda
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

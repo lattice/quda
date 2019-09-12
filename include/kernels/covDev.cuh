@@ -120,7 +120,7 @@ namespace quda
   struct covDev : dslash_default {
 
     Arg &arg;
-    constexpr covDev(Arg &arg) : arg(arg) { }
+    constexpr covDev(Arg &arg) : arg(arg) {}
 
     __device__ __host__ inline void operator()(int idx, int parity)
     {
@@ -141,36 +141,36 @@ namespace quda
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
       case 0:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 1:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 2:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 3:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 4:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 4>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 4>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 5:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 5>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 5>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 6:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 6>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 6>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       case 7:
-        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 7>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                          active);
+        applyCovDev<Float, nDim, nColor, nParity, dagger, kernel_type, 7>(out, arg, coord, x_cb, parity, idx,
+                                                                          thread_dim, active);
         break;
       }
 
@@ -181,7 +181,6 @@ namespace quda
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

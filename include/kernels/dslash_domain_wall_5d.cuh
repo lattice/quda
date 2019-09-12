@@ -28,7 +28,7 @@ namespace quda
   struct domainWall5D : dslash_default {
 
     Arg &arg;
-    constexpr domainWall5D(Arg &arg) : arg(arg) { }
+    constexpr domainWall5D(Arg &arg) : arg(arg) {}
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
     __device__ __host__ inline void apply(int idx, int parity)
@@ -38,7 +38,7 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = getCoords<nDim, QUDA_5D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
@@ -46,8 +46,8 @@ namespace quda
       Vector out;
 
       // we pass s=0, since x_cb is a 5-d index that includes s
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-        out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim,
+                                                                     active);
 
       if (kernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
@@ -87,11 +87,11 @@ namespace quda
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
     }
 
-    __host__ __device__ void operator()(int idx, int s, int parity) {
+    __host__ __device__ void operator()(int idx, int s, int parity)
+    {
       int x5_cb = s * arg.threads + idx; // 5-d checkerboard index
       apply(x5_cb, parity);
     }
-
   };
 
 } // namespace quda

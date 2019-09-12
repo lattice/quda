@@ -140,7 +140,7 @@ namespace quda
   struct twistedMassPreconditioned : dslash_default {
 
     Arg &arg;
-    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) { }
+    constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 1 : 0; }
 
     /**
@@ -148,8 +148,7 @@ namespace quda
        - no xpay: out(x) = M*in = a*(1+i*b*gamma_5)D * in
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5)D * in
     */
-    template <bool dagger, bool asymmetric, bool xpay>
-    __device__ __host__ inline void apply(int idx, int s, int parity)
+    template <bool dagger, bool asymmetric, bool xpay> __device__ __host__ inline void apply(int idx, int s, int parity)
     {
       typedef typename mapper<Float>::type real;
       typedef ColorSpinor<real, nColor, 4> Vector;
@@ -157,7 +156,7 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
@@ -166,9 +165,11 @@ namespace quda
       Vector out;
 
       if (!dagger || asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx,
+                                                                       thread_dim, active);
       else // special dslash for symmetric dagger
-        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 1, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 1, kernel_type>(out, arg, coord, x_cb, 0, parity, idx,
+                                                                            thread_dim, active);
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(x_cb, my_spinor_parity);
@@ -194,10 +195,11 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       // constrain template instantiation for compilation (asymmetric implies dagger and !xpay)
-      if (arg.asymmetric) apply<true, true, false>(idx, 0, parity);
-      else apply<dagger_, false, xpay_>(idx, 0, parity);
+      if (arg.asymmetric)
+        apply<true, true, false>(idx, 0, parity);
+      else
+        apply<dagger_, false, xpay_>(idx, 0, parity);
     }
-
   };
 
 } // namespace quda

@@ -36,7 +36,8 @@ namespace quda
     {
       static_assert(xpay == false, "Covariant derivative operator only defined without xpay");
       static_assert(nParity == 2, "Covariant derivative operator only defined for full field");
-      dslash.launch(dslashGPU<covDev,packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<covDev, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg,
+                    stream);
     }
   };
 
@@ -149,8 +150,9 @@ public:
     {
       // add mu to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
-             Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
+                                                                           Dslash<Float>::aux[arg.kernel_type]);
       strcat(aux, ",mu=");
       char mu[8];
       u32toa(mu, arg.mu);

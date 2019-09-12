@@ -28,7 +28,8 @@ namespace quda
     template <typename Dslash>
     inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
     {
-      dslash.launch(dslashGPU<wilson, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
+      dslash.launch(dslashGPU<wilson, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg,
+                    stream);
     }
   };
 
@@ -58,8 +59,8 @@ public:
 
     TuneKey tuneKey() const
     {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ?
-        Dslash<Float>::aux_pack : Dslash<Float>::aux[arg.kernel_type];
+      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
+                                                                               Dslash<Float>::aux[arg.kernel_type];
       return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };

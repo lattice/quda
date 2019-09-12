@@ -1642,210 +1642,185 @@ namespace quda
     }
   };
 
-/**
-   Variation of multi-gpu dslash where the packing kernel is fused
-   into the interior dslash kernel.  Only really makes sense on
-   systems that are fully peer connected.
-*/
-template <typename Dslash> struct DslashFusedPack : DslashPolicyImp<Dslash> {
+  /**
+     Variation of multi-gpu dslash where the packing kernel is fused
+     into the interior dslash kernel.  Only really makes sense on
+     systems that are fully peer connected.
+  */
+  template <typename Dslash> struct DslashFusedPack : DslashPolicyImp<Dslash> {
 
-  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume,
-                  const int *faceVolumeCB, TimeProfile &profile) {
+    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+                    TimeProfile &profile)
+    {
 
-    profile.TPSTART(QUDA_PROFILE_TOTAL);
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    auto &dslashParam = dslash.dslashParam;
-    dslashParam.kernel_type = INTERIOR_KERNEL;
-    dslashParam.threads = volume;
+      auto &dslashParam = dslash.dslashParam;
+      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.threads = volume;
 
-    // record start of the dslash
-    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]),
-            profile, QUDA_PROFILE_EVENT_RECORD);
+      // record start of the dslash
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
-    issueRecv(*in, dslash, 0, false); // Prepost receives
+      issueRecv(*in, dslash, 0, false); // Prepost receives
 
-    int packIndex = Nstream - 1; // packing occurs on main compute stream
-    MemoryLocation location =
-        static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
-    dslash.setPack(true, location); // enable fused kernel packing
+      int packIndex = Nstream - 1; // packing occurs on main compute stream
+      MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
+      dslash.setPack(true, location); // enable fused kernel packing
 
-    PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]),
-            profile, QUDA_PROFILE_DSLASH_KERNEL);
+      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-    dslash.setPack(false, location); // disable fused kernel packing
-    if (aux_worker)
-      aux_worker->apply(streams[Nstream - 1]);
+      dslash.setPack(false, location); // disable fused kernel packing
+      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
 
-    for (int i = 3; i >= 0; i--) { // only synchronize if we need to
-      if (!dslashParam.remote_write ||
-          (dslashParam.commDim[i] &&
-           (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-        qudaStreamSynchronize(streams[packIndex]);
-        break;
+      for (int i = 3; i >= 0; i--) { // only synchronize if we need to
+        if (!dslashParam.remote_write
+            || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
+          qudaStreamSynchronize(streams[packIndex]);
+          break;
+        }
       }
-    }
 
-    for (int p2p = 0; p2p < 2;
-         p2p++) { // schedule non-p2p traffic first, then do p2p
-      for (int i = 3; i >= 0; i--) {
-        if (!dslashParam.commDim[i])
-          continue;
+      for (int p2p = 0; p2p < 2; p2p++) { // schedule non-p2p traffic first, then do p2p
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
 
-        for (int dir = 1; dir >= 0; dir--) {
-          if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
-            PROFILE(
-                if (dslash_comms) in->sendStart(
-                    dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                    dslashParam.remote_write ? streams + packIndex : nullptr,
-                    false, dslashParam.remote_write),
-                profile, QUDA_PROFILE_COMMS_START);
-          } // is p2p?
-        }   // dir
-      }     // i
-    }       // p2p
+          for (int dir = 1; dir >= 0; dir--) {
+            if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
+              PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
+                                                      dslashParam.remote_write ? streams + packIndex : nullptr, false,
+                                                      dslashParam.remote_write),
+                      profile, QUDA_PROFILE_COMMS_START);
+            } // is p2p?
+          }   // dir
+        }     // i
+      }       // p2p
 
-    DslashCommsPattern pattern(dslashParam.commDim, true);
-    while (pattern.completeSum < pattern.commDimTotal) {
+      DslashCommsPattern pattern(dslashParam.commDim, true);
+      while (pattern.completeSum < pattern.commDimTotal) {
 
-      for (int i = 3; i >= 0; i--) {
-        if (!dslashParam.commDim[i])
-          continue;
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
 
-        for (int dir = 1; dir >= 0; dir--) {
+          for (int dir = 1; dir >= 0; dir--) {
 
-          // Query if comms have finished
-          if (!pattern.commsCompleted[2 * i + dir]) {
-            if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
-              pattern.commsCompleted[2 * i + dir] = 1;
-              pattern.completeSum++;
+            // Query if comms have finished
+            if (!pattern.commsCompleted[2 * i + dir]) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+                pattern.commsCompleted[2 * i + dir] = 1;
+                pattern.completeSum++;
+              }
             }
           }
-        }
 
-        // enqueue the boundary dslash kernel as soon as the scatters have been
-        // enqueued
-        if (!pattern.dslashCompleted[2 * i] &&
-            pattern.dslashCompleted[pattern.previousDir[2 * i + 1]] &&
-            pattern.commsCompleted[2 * i] &&
-            pattern.commsCompleted[2 * i + 1]) {
-          dslashParam.kernel_type = static_cast<KernelType>(i);
-          dslashParam.threads =
-              dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
+          // enqueue the boundary dslash kernel as soon as the scatters have been
+          // enqueued
+          if (!pattern.dslashCompleted[2 * i] && pattern.dslashCompleted[pattern.previousDir[2 * i + 1]]
+              && pattern.commsCompleted[2 * i] && pattern.commsCompleted[2 * i + 1]) {
+            dslashParam.kernel_type = static_cast<KernelType>(i);
+            dslashParam.threads = dslash.Nface() * faceVolumeCB[i]; // updating 2 or 6 faces
 
-          setMappedGhost(dslash, *in, true);
-          PROFILE(if (dslash_exterior_compute)
-                      dslash.apply(streams[Nstream - 1]),
-                  profile, QUDA_PROFILE_DSLASH_KERNEL);
-          setMappedGhost(dslash, *in, false);
+            setMappedGhost(dslash, *in, true);
+            PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+            setMappedGhost(dslash, *in, false);
 
-          pattern.dslashCompleted[2 * i] = 1;
+            pattern.dslashCompleted[2 * i] = 1;
+          }
         }
       }
+
+      in->bufferIndex = (1 - in->bufferIndex);
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
     }
+  };
 
-    in->bufferIndex = (1 - in->bufferIndex);
-    profile.TPSTOP(QUDA_PROFILE_TOTAL);
-  }
-};
+  /**
+     Variation of multi-gpu dslash where the packing kernel is fused
+     into the interior dslash kernel, and the halo update kernels are
+     all fused.  Only really makes sense on systems that are fully peer
+     connected.
+  */
+  template <typename Dslash> struct DslashFusedPackFusedHalo : DslashPolicyImp<Dslash> {
 
-/**
-   Variation of multi-gpu dslash where the packing kernel is fused
-   into the interior dslash kernel, and the halo update kernels are
-   all fused.  Only really makes sense on systems that are fully peer
-   connected.
-*/
-template <typename Dslash>
-struct DslashFusedPackFusedHalo : DslashPolicyImp<Dslash> {
+    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+                    TimeProfile &profile)
+    {
 
-  void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume,
-                  const int *faceVolumeCB, TimeProfile &profile) {
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
 
-    profile.TPSTART(QUDA_PROFILE_TOTAL);
+      auto &dslashParam = dslash.dslashParam;
+      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.threads = volume;
 
-    auto &dslashParam = dslash.dslashParam;
-    dslashParam.kernel_type = INTERIOR_KERNEL;
-    dslashParam.threads = volume;
+      // record start of the dslash
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
-    // record start of the dslash
-    PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]),
-            profile, QUDA_PROFILE_EVENT_RECORD);
+      issueRecv(*in, dslash, 0, false); // Prepost receives
 
-    issueRecv(*in, dslash, 0, false); // Prepost receives
+      int packIndex = Nstream - 1; // packing occurs on main compute stream
+      MemoryLocation location = static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
+      dslash.setPack(true, location); // enable fused kernel packing
 
-    int packIndex = Nstream - 1; // packing occurs on main compute stream
-    MemoryLocation location =
-        static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write));
-    dslash.setPack(true, location); // enable fused kernel packing
+      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
-    PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]),
-            profile, QUDA_PROFILE_DSLASH_KERNEL);
+      dslash.setPack(false, location); // disable fused kernel packing
+      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
 
-    dslash.setPack(false, location); // disable fused kernel packing
-    if (aux_worker)
-      aux_worker->apply(streams[Nstream - 1]);
-
-    for (int i = 3; i >= 0; i--) { // only synchronize if we need to
-      if (!dslashParam.remote_write ||
-          (dslashParam.commDim[i] &&
-           (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-        qudaStreamSynchronize(streams[packIndex]);
-        break;
+      for (int i = 3; i >= 0; i--) { // only synchronize if we need to
+        if (!dslashParam.remote_write
+            || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
+          qudaStreamSynchronize(streams[packIndex]);
+          break;
+        }
       }
-    }
 
-    for (int p2p = 0; p2p < 2;
-         p2p++) { // schedule non-p2p traffic first, then do p2p
-      for (int i = 3; i >= 0; i--) {
-        if (!dslashParam.commDim[i])
-          continue;
+      for (int p2p = 0; p2p < 2; p2p++) { // schedule non-p2p traffic first, then do p2p
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
 
-        for (int dir = 1; dir >= 0; dir--) {
-          if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
-            PROFILE(
-                if (dslash_comms) in->sendStart(
-                    dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
-                    dslashParam.remote_write ? streams + packIndex : nullptr,
-                    false, dslashParam.remote_write),
-                profile, QUDA_PROFILE_COMMS_START);
-          } // is p2p?
-        }   // dir
-      }     // i
-    }       // p2p
+          for (int dir = 1; dir >= 0; dir--) {
+            if ((comm_peer2peer_enabled(dir, i) + p2p) % 2 == 0) {
+              PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
+                                                      dslashParam.remote_write ? streams + packIndex : nullptr, false,
+                                                      dslashParam.remote_write),
+                      profile, QUDA_PROFILE_COMMS_START);
+            } // is p2p?
+          }   // dir
+        }     // i
+      }       // p2p
 
-    DslashCommsPattern pattern(dslashParam.commDim, true);
-    while (pattern.completeSum < pattern.commDimTotal) {
+      DslashCommsPattern pattern(dslashParam.commDim, true);
+      while (pattern.completeSum < pattern.commDimTotal) {
 
-      for (int i = 3; i >= 0; i--) {
-        if (!dslashParam.commDim[i])
-          continue;
+        for (int i = 3; i >= 0; i--) {
+          if (!dslashParam.commDim[i]) continue;
 
-        for (int dir = 1; dir >= 0; dir--) {
+          for (int dir = 1; dir >= 0; dir--) {
 
-          // Query if comms have finished
-          if (!pattern.commsCompleted[2 * i + dir]) {
-            if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
-              pattern.commsCompleted[2 * i + dir] = 1;
-              pattern.completeSum++;
+            // Query if comms have finished
+            if (!pattern.commsCompleted[2 * i + dir]) {
+              if (commsComplete(*in, dslash, i, dir, false, false, true, false)) {
+                pattern.commsCompleted[2 * i + dir] = 1;
+                pattern.completeSum++;
+              }
             }
           }
         }
       }
-    }
 
-    if (pattern.commDimTotal) {
-      setFusedParam(dslashParam, dslash,
-                    faceVolumeCB); // setup for exterior kernel
-      setMappedGhost(dslash, *in, true);
-      PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]),
-              profile, QUDA_PROFILE_DSLASH_KERNEL);
-      setMappedGhost(dslash, *in, false);
-    }
+      if (pattern.commDimTotal) {
+        setFusedParam(dslashParam, dslash,
+                      faceVolumeCB); // setup for exterior kernel
+        setMappedGhost(dslash, *in, true);
+        PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+        setMappedGhost(dslash, *in, false);
+      }
 
-    completeDslash(*in, dslashParam);
-    in->bufferIndex = (1 - in->bufferIndex);
-    profile.TPSTOP(QUDA_PROFILE_TOTAL);
-  }
-};
+      completeDslash(*in, dslashParam);
+      in->bufferIndex = (1 - in->bufferIndex);
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+    }
+  };
 
   template <typename Dslash> struct DslashNC : DslashPolicyImp<Dslash> {
 
@@ -2159,8 +2134,7 @@ public:
                         || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH
                         || i == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH
                         || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
-                        || i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH
-                        || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
+                        || i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO)
                        || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH
@@ -2232,18 +2206,14 @@ public:
      // switch on kernel packing for the policies that need it, save default kernel packing
      pushKernelPackT(getKernelPackT());
      auto p = static_cast<QudaDslashPolicy>(tp.aux.x);
-     if ( p == QudaDslashPolicy::QUDA_GDR_DSLASH ||
-          p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH ||
-          p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH ||
-          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH ||
-          p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH ||
-          p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH ||
-          p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH ||
-          p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK ||
-          p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO ||
-          dslashParam.remote_write // always use kernel packing if remote writing
-          ) {
+     if (p == QudaDslashPolicy::QUDA_GDR_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_GDR_DSLASH
+         || p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_DSLASH
+         || p == QudaDslashPolicy::QUDA_ZERO_COPY_PACK_GDR_RECV_DSLASH
+         || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
+         || p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
+         || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO
+         || dslashParam.remote_write // always use kernel packing if remote writing
+     ) {
        setKernelPackT(true);
      }
 

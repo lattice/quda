@@ -108,7 +108,8 @@ protected:
 
     unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 
-    bool advanceAux(TuneParam &param) const {
+    bool advanceAux(TuneParam &param) const
+    {
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         // if doing the fused kernel we tune how many blocks to use for
         // communication
@@ -125,16 +126,16 @@ protected:
       }
     }
 
-    void initTuneParam(TuneParam &param) const {
+    void initTuneParam(TuneParam &param) const
+    {
       TunableVectorYZ::initTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL)
-        param.aux.x = 1; // packing blocks per direction
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    void defaultTuneParam(TuneParam &param) const {
+    void defaultTuneParam(TuneParam &param) const
+    {
       TunableVectorYZ::defaultTuneParam(param);
-      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL)
-        param.aux.x = 1; // packing blocks per direction
+      if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
 public:
@@ -309,26 +310,20 @@ public:
 #endif
     }
 
-    void setPack(bool pack, MemoryLocation location) {
+    void setPack(bool pack, MemoryLocation location)
+    {
       arg.setPack(pack);
-      if (!pack)
-        return;
+      if (!pack) return;
 
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
-          if ((location & Remote) &&
-              comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] =
-                static_cast<char *>(
-                    in.ghost_remote_send_buffer_d[in.bufferIndex][dim][dir]) +
-                in.Precision() * in.GhostOffset(dim, 1 - dir);
-          } else if (location & Host &&
-                     !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
-            packBuffer[2 * dim + dir] =
-                in.my_face_dim_dir_hd[in.bufferIndex][dim][dir];
+          if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
+            packBuffer[2 * dim + dir] = static_cast<char *>(in.ghost_remote_send_buffer_d[in.bufferIndex][dim][dir])
+              + in.Precision() * in.GhostOffset(dim, 1 - dir);
+          } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
+            packBuffer[2 * dim + dir] = in.my_face_dim_dir_hd[in.bufferIndex][dim][dir];
           } else { // pack to local gpu memory
-            packBuffer[2 * dim + dir] =
-                in.my_face_dim_dir_d[in.bufferIndex][dim][dir];
+            packBuffer[2 * dim + dir] = in.my_face_dim_dir_d[in.bufferIndex][dim][dir];
           }
         }
       }
@@ -340,20 +335,11 @@ public:
       // label the locations we are packing to
       // location label is nonp2p-p2p
       switch ((int)location) {
-      case Device | Remote:
-        strcat(aux_pack, ",device-remote");
-        break;
-      case Host | Remote:
-        strcat(aux_pack, ",host-remote");
-        break;
-      case Device:
-        strcat(aux_pack, ",device-device");
-        break;
-      case Host:
-        strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host");
-        break;
-      default:
-        errorQuda("Unknown pack target location %d\n", location);
+      case Device | Remote: strcat(aux_pack, ",device-remote"); break;
+      case Host | Remote: strcat(aux_pack, ",host-remote"); break;
+      case Device: strcat(aux_pack, ",device-device"); break;
+      case Host: strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
+      default: errorQuda("Unknown pack target location %d\n", location);
       }
     }
 
@@ -409,8 +395,7 @@ public:
       int ghost_flops = (num_mv_multiply * mv_flops + 2 * in.Ncolor() * in.Nspin());
       int xpay_flops = 2 * 2 * in.Ncolor() * in.Nspin(); // multiply and add per real component
       int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
-      int pack_flops = (in.Nspin() == 4 ? 2 * in.Nspin() / 2 * in.Ncolor()
-                                        : 0); // only flops if spin projecting
+      int pack_flops = (in.Nspin() == 4 ? 2 * in.Nspin() / 2 * in.Ncolor() : 0); // only flops if spin projecting
 
       long long flops_ = 0;
 
@@ -430,10 +415,7 @@ public:
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) {
-          flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls *
-                    arg.pack_threads;
-        }
+        if (arg.pack_threads) { flops_ += pack_flops * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
@@ -464,9 +446,7 @@ public:
       int proj_spinor_bytes = in.Nspin() == 4 ? spinor_bytes / 2 : spinor_bytes;
       int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + 2 * spinor_bytes; // 2 since we have to load the partial
       int num_dir = 2 * 4; // set to 4-d since we take care of 5-d fermions in derived classes where necessary
-      int pack_bytes =
-          2 * ((in.Nspin() == 4 ? in.Nspin() / 2 : in.Nspin()) + in.Nspin()) *
-          in.Ncolor() * in.Precision();
+      int pack_bytes = 2 * ((in.Nspin() == 4 ? in.Nspin() / 2 : in.Nspin()) + in.Nspin()) * in.Ncolor() * in.Precision();
 
       long long bytes_ = 0;
 
@@ -481,10 +461,7 @@ public:
         break;
       }
       case INTERIOR_KERNEL:
-        if (arg.pack_threads) {
-          bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls *
-                    arg.pack_threads;
-        }
+        if (arg.pack_threads) { bytes_ += pack_bytes * arg.nParity * in.getDslashConstant().Ls * arg.pack_threads; }
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         bytes_ = (num_dir * gauge_bytes + ((num_dir - 2) * spinor_bytes + 2 * proj_spinor_bytes) + spinor_bytes) * sites;

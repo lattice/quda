@@ -30,9 +30,9 @@ namespace quda
 
     const DslashConstant dc; // pre-computed dslash constants for optimized indexing
 
-    real twist_a;    // preconditioned twisted-mass scaling parameter
-    real twist_b;    // preconditioned twisted-mass chiral twist factor
-    real twist_c;    // preconditioned twisted-mass flavor twist factor
+    real twist_a; // preconditioned twisted-mass scaling parameter
+    real twist_b; // preconditioned twisted-mass chiral twist factor
+    real twist_c; // preconditioned twisted-mass flavor twist factor
     int twist; // whether we are doing preconditioned twisted-mass or not (1 - singlet, 2 - doublet)
 
     int_fastdiv threads;
@@ -47,19 +47,19 @@ namespace quda
     int sites_per_block;
 
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
-        double b, double c) :
-        in(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
-        nFace(nFace),
-        dagger(dagger),
-        parity(parity),
-        nParity(in.SiteSubset()),
-        threads(threads),
-        pc_type(in.PCType()),
-        dc(in.getDslashConstant()),
-        twist_a(a),
-        twist_b(b),
-        twist_c(c),
-        twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0)
+            double b, double c) :
+      in(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
+      nFace(nFace),
+      dagger(dagger),
+      parity(parity),
+      nParity(in.SiteSubset()),
+      threads(threads),
+      pc_type(in.PCType()),
+      dc(in.getDslashConstant()),
+      twist_a(a),
+      twist_b(b),
+      twist_c(c),
+      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0)
     {
       if (!in.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", in.FieldOrder());
 
@@ -218,11 +218,9 @@ namespace quda
     } // while tid
   }
 
-  template <bool dagger, QudaPCType pc, typename Arg>
-  struct packShmem {
+  template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
-    template <int twist>
-    __device__ inline void operator()(Arg &arg, int s, int parity)
+    template <int twist> __device__ inline void operator()(Arg &arg, int s, int parity)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
@@ -247,16 +245,16 @@ namespace quda
           else
             pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
           local_tid += arg.blocks_per_dir * blockDim.x;
-      }
+        }
         break;
       case 1:
         while (local_tid < arg.dc.ghostFaceCB[1]) {
           int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
-        if (pc == QUDA_5D_PC)
-          pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
-        else
-          pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
-        local_tid += arg.blocks_per_dir * blockDim.x;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
+          else
+            pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
         }
         break;
       case 2:
@@ -282,18 +280,18 @@ namespace quda
       }
     }
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack) {
+    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack)
+    {
       switch (twist_pack) {
       case 0: this->operator()<0>(arg, s, parity); break;
       case 1: this->operator()<1>(arg, s, parity); break;
       case 2: this->operator()<2>(arg, s, parity); break;
       }
     }
-
   };
 
-  template <bool dagger, int twist, QudaPCType pc, typename Arg>
-  __global__ void packShmemKernel(Arg arg) {
+  template <bool dagger, int twist, QudaPCType pc, typename Arg> __global__ void packShmemKernel(Arg arg)
+  {
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
@@ -343,10 +341,9 @@ namespace quda
     } // while tid
   }
 
-  template <bool dagger, QudaPCType pc, typename Arg>
-  struct packStaggeredShmem {
+  template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
-    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack=0)
+    __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
     {
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
@@ -405,11 +402,10 @@ namespace quda
         break;
       }
     }
-
   };
 
-  template <typename Arg>
-  __global__ void packStaggeredShmemKernel(Arg arg) {
+  template <typename Arg> __global__ void packStaggeredShmemKernel(Arg arg)
+  {
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
@@ -418,7 +414,7 @@ namespace quda
     // mapping
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
 
-    packStaggeredShmem<0,QUDA_4D_PC,Arg> pack;
+    packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
     pack(arg, s, parity);
   }
 

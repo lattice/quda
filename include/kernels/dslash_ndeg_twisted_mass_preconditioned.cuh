@@ -43,7 +43,7 @@ namespace quda
   struct nDegTwistedMassPreconditioned : dslash_default {
 
     Arg &arg;
-    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) { }
+    constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 2 : 0; }
 
     /**
@@ -60,7 +60,7 @@ namespace quda
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
-      int thread_dim;                                          // which dimension is thread working on (fused kernel only)
+      int thread_dim;                                        // which dimension is thread working on (fused kernel only)
       int coord[nDim];
       int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
@@ -68,11 +68,11 @@ namespace quda
       Vector out;
 
       if (!dagger || asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(
-          out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx,
+                                                                       thread_dim, active);
       else // defined in dslash_twisted_mass_preconditioned
-        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 2, kernel_type>(
-          out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 2, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx,
+                                                                            thread_dim, active);
 
       int my_flavor_idx = x_cb + flavor * arg.dc.volume_4d_cb;
 
@@ -117,10 +117,11 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
     {
       // constrain template instantiation for compilation (asymmetric implies dagger and !xpay)
-      if (arg.asymmetric) apply<true, true, false>(idx, flavor, parity);
-      else apply<dagger_, false, xpay_>(idx, flavor, parity);
+      if (arg.asymmetric)
+        apply<true, true, false>(idx, flavor, parity);
+      else
+        apply<dagger_, false, xpay_>(idx, flavor, parity);
     }
-
   };
 
 } // namespace quda
