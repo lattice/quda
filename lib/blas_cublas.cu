@@ -1,5 +1,7 @@
+#ifdef CUBLAS_LIB
 #include <blas_cublas.h>
 #include <cublas_v2.h>
+#endif
 #include <malloc_quda.h>
 
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \

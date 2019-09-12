@@ -292,6 +292,7 @@ namespace
 std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_name)
 {
   auto quda_app = std::make_shared<QUDAApp>(app_description, app_name);
+  quda_app->option_defaults()->always_capture_default();
 
   quda_app->add_option("--alternative-reliable", alternative_reliable, "use alternative reliable updates");
   quda_app->add_option("--anisotropy", anisotropy, "Temporal anisotropy factor (default 1.0)");
