@@ -4,7 +4,7 @@
 
 /**
    @file inv_ca_cg.cpp
-   
+
    Implementation of the communication -avoiding CG algorithm.  Based
    on the description here:
    http://research.nvidia.com/sites/default/files/pubs/2016-04_S-Step-and-Communication-Avoiding/nvr-2016-003.pdf
@@ -260,23 +260,23 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Q[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
-      
+
       if (param.deflate) {
-	if (!deflate_init) {
-	  // Construct the eigensolver and deflation space.
-	  constructDeflationSpace(b, mat);
-	}
-	if (deflate_compute) {
-	  // compute the deflation space.
-	  profile.TPSTOP(QUDA_PROFILE_INIT);
-	  (*eig_solve)(evecs, evals);
-	  profile.TPSTART(QUDA_PROFILE_INIT);
-	  deflate_compute = false;
-	}
-	if (recompute_evals) {
-	  eig_solve->computeEvals(mat, evecs, evals);
-	  recompute_evals = false;
-	}
+        if (!deflate_init) {
+          // Construct the eigensolver and deflation space.
+          constructDeflationSpace(b, mat);
+        }
+        if (deflate_compute) {
+          // compute the deflation space.
+          profile.TPSTOP(QUDA_PROFILE_INIT);
+          (*eig_solve)(evecs, evals);
+          profile.TPSTART(QUDA_PROFILE_INIT);
+          deflate_compute = false;
+        }
+        if (recompute_evals) {
+          eig_solve->computeEvals(mat, evecs, evals);
+          recompute_evals = false;
+        }
       }
 
       //sloppy temporary for mat-vec

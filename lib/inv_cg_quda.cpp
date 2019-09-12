@@ -268,25 +268,25 @@ namespace quda {
 
       init = true;
     }
-    
+
     if (param.deflate) {
       if (!deflate_init) {
-	// Construct the eigensolver and deflation space.
-	constructDeflationSpace(b, mat);
+        // Construct the eigensolver and deflation space.
+        constructDeflationSpace(b, mat);
       }
       if (deflate_compute) {
-	// compute the deflation space.
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	(*eig_solve)(evecs, evals);
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	deflate_compute = false;
+        // compute the deflation space.
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(mat, evecs, evals);
-	recompute_evals = false;
+        eig_solve->computeEvals(mat, evecs, evals);
+        recompute_evals = false;
       }
     }
-    
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;

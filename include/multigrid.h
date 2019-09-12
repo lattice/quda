@@ -133,8 +133,8 @@ namespace quda {
       omega = param.omega[level];
     }
 
-    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual,
-	    DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+            DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),

@@ -297,12 +297,12 @@ namespace quda
   {
     // number of evecs
     int n_defl = eig_param->nConv;
-    
+
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
-    
+
     // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
-    
+
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs_ptr;
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
@@ -332,7 +332,7 @@ namespace quda
                                  std::vector<Complex> &evals)
   {
     ColorSpinorParam csParam(*evecs[0]);
-    std::vector<ColorSpinorField*> temp;
+    std::vector<ColorSpinorField *> temp;
     temp.push_back(ColorSpinorField::Create(csParam));
 
     for (int i = 0; i < nConv; i++) {
@@ -347,7 +347,7 @@ namespace quda
     }
     delete temp[0];
   }
-  
+
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
 
@@ -588,7 +588,7 @@ namespace quda
         printfQuda("a-max %f\n", eig_param->a_max);
       }
     }
-    
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
@@ -644,21 +644,21 @@ namespace quda
       num_locked += iter_locked;
 
       if (getVerbosity() >= QUDA_VERBOSE) {
-	printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
+        printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
-      
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {	
-	printfQuda("iter Conv = %d\n", iter_converged);
-	printfQuda("iter Keep = %d\n", iter_keep);
-	printfQuda("iter Lock = %d\n", iter_locked);
-	printfQuda("num_converged = %d\n", num_converged);
-	printfQuda("num_keep = %d\n", num_keep);
-	printfQuda("num_locked = %d\n", num_locked);
+
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("iter Conv = %d\n", iter_converged);
+        printfQuda("iter Keep = %d\n", iter_keep);
+        printfQuda("iter Lock = %d\n", iter_locked);
+        printfQuda("num_converged = %d\n", num_converged);
+        printfQuda("num_keep = %d\n", num_keep);
+        printfQuda("num_locked = %d\n", num_locked);
         for (int i = 0; i < nKr; i++) {
-	  printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
-      
+
       // Check for convergence
       if (num_converged >= nConv) {
         reorder(kSpace);

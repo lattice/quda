@@ -199,8 +199,8 @@ namespace quda
         coarse->reset(refresh);
       } else {
         // create the next multigrid level
-        param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother,
-                                   matCoarseSmootherSloppy, param.level + 1);
+        param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy,
+                                   param.level + 1);
         param_coarse->fine = this;
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
@@ -210,16 +210,15 @@ namespace quda
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
       createCoarseSolver();
-      
     }
-    
+
     if (param.level == 0) {
       // now we can run the verification if requested
       if (param.mg_global.run_verify) verify();
     }
-    
+
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d done\n", param.level);
-    
+
     popLevel(param.level);
   }
 
@@ -400,18 +399,18 @@ namespace quda
       // nothing to do
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
-	int defl_size = reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->evecs.size(); 
-	if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
-	  // Deflation space exists and we are going to create a new solver. Transfer deflation space.	  
-	  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferring deflation space size %d to MG\n", defl_size);
-	  //We can use this MG solver instance's evecs pointer to store the deflation space of the coarse solver.
-	  ColorSpinorParam csParam(*(reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->evecs[0]));
-	  // Create space in MG to hold deflation space
-	  for (int i=0; i<defl_size; i++){
-	    evecs.push_back(ColorSpinorField::Create(csParam));
-	    blas::copy(*evecs[i], *(reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->evecs[i]));
-	  }
-	}
+        int defl_size = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs.size();
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          // Deflation space exists and we are going to create a new solver. Transfer deflation space.
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferring deflation space size %d to MG\n", defl_size);
+          // We can use this MG solver instance's evecs pointer to store the deflation space of the coarse solver.
+          ColorSpinorParam csParam(*(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[0]));
+          // Create space in MG to hold deflation space
+          for (int i = 0; i < defl_size; i++) {
+            evecs.push_back(ColorSpinorField::Create(csParam));
+            blas::copy(*evecs[i], *(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[i]));
+          }
+        }
         delete coarse_solver;
         coarse_solver = nullptr;
       }
@@ -514,59 +513,61 @@ namespace quda
       param_coarse_solver->precision = r_coarse->Precision();
       param_coarse_solver->precision_sloppy = param_coarse_solver->precision;
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
-           
-      if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+
+      if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);	
+        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
+                                                 coarse_prefix);
       } else {
-	Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
       }
-      
+
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
-      
+
       if (param.level == param.Nlevel - 2 && param.mg_global.use_eig_solver[param.level + 1]) {
-	
-	// Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
-	int defl_size = evecs.size();
-	if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
-	  reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->deflate_compute = false;
-	}
-	
-	// Run a first dummy solve so that the deflation space is constructed (and if needed computed) during the MG setup
-	spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
-	param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
-	(*coarse_solver)(*x_coarse, *r_coarse);
-	setOutputPrefix(prefix); // restore since we just popped back from coarse grid
-	param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
-	
-	// Transfer vectors to deflation space
-	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
-	for (int i=0; i<defl_size; i++) {
-	  blas::copy(*(reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->evecs[i]), *evecs[i]);
-	  delete evecs[i];
-	}
-	evecs.resize(0);
-	if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
-	  // Run a second dummy solve so that the deflation eigenvalues are recomputed
-	  reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver()->recompute_evals = true;
-	  param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
-	  (*coarse_solver)(*x_coarse, *r_coarse);
-	  setOutputPrefix(prefix); // restore since we just popped back from coarse grid
-	  param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
-	}       
+
+        // Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
+        int defl_size = evecs.size();
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->deflate_compute = false;
+        }
+
+        // Run a first dummy solve so that the deflation space is constructed (and if needed computed) during the MG setup
+        spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+        param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
+        (*coarse_solver)(*x_coarse, *r_coarse);
+        setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
+
+        // Transfer vectors to deflation space
+        if (getVerbosity() >= QUDA_VERBOSE)
+          printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
+        for (int i = 0; i < defl_size; i++) {
+          blas::copy(*(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[i]), *evecs[i]);
+          delete evecs[i];
+        }
+        evecs.resize(0);
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          // Run a second dummy solve so that the deflation eigenvalues are recomputed
+          reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->recompute_evals = true;
+          param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
+          (*coarse_solver)(*x_coarse, *r_coarse);
+          setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+          param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
+        }
       }
-      
+
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
     } else {
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);
     }
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Coarse solver wrapper done\n");
-    
+
     popLevel(param.level);
   }
 

@@ -140,7 +140,7 @@ public:
        @param[in] evals The eigenvalues
     */
     void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals);
-    
+
     /**
        @brief Load vectors from file
        @param[in] eig_vecs The eigenvectors to load

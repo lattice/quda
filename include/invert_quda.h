@@ -544,7 +544,7 @@ namespace quda {
     std::vector<Complex> evals;
     std::vector<ColorSpinorField *> defl_tmp1;
     std::vector<ColorSpinorField *> defl_tmp2;
-    
+
     /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
@@ -558,7 +558,7 @@ namespace quda {
        @brief Extends the deflation space to twice its size for SVD deflation
     */
     void extendSVDDeflationSpace();
-    
+
     /**
      * @brief Return flops
      * @return flops expended by this operator
@@ -1101,9 +1101,8 @@ public:
 
       setOutputPrefix("");
     }
-    
-    Solver* ExposeSolver() const { return solver; } 
-    
+
+    Solver *ExposeSolver() const { return solver; }
   };
 
   class MultiShiftSolver {

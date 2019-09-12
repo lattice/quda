@@ -164,28 +164,28 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
     for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
-    
+
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
-    
+
     evals.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
-    
+
     deflate_init = true;
   }
 
   void Solver::extendSVDDeflationSpace()
   {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");
-    
+
     // Resize deflation space and compute left singular vectors of M
     // Clone from an existing vector
     ColorSpinorParam csParam(*evecs[0]);
@@ -196,7 +196,7 @@ namespace quda {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }
   }
-  
+
   void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));

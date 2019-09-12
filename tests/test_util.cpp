@@ -2003,7 +2003,8 @@ void usage(char** argv )
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
   printf("    --mg-eig-coarse-guess <true/false>                # If deflating on the coarse grid, optionaly use an "
          "initial guess (default = false)\n");
-  printf("    --mg-eig-preserve-deflation <true/false>          # If deflating on the coarse grid and updating the MG instance "
+  printf("    --mg-eig-preserve-deflation <true/false>          # If deflating on the coarse grid and updating the MG "
+         "instance "
          "preserve the deflation space (default = false)\n");
 
   // Miscellanea
@@ -4208,10 +4209,9 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-
   if (strcmp(argv[i], "--mg-eig-preserve-deflation") == 0) {
     if (i + 1 >= argc) { usage(argv); }
-    
+
     if (strcmp(argv[i + 1], "true") == 0) {
       mg_eig_preserve_deflation = true;
     } else if (strcmp(argv[i + 1], "false") == 0) {

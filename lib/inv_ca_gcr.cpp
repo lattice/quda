@@ -84,26 +84,26 @@ namespace quda {
       }
 
       if (param.deflate) {
-	if (!deflate_init) {
-	  // Construct the eigensolver and deflation space.
-	  constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-	  if (!deflate_compute) extendSVDDeflationSpace();
-	}
-	if (deflate_compute) {
-	  // compute the deflation space.
-	  profile.TPSTOP(QUDA_PROFILE_INIT);	
-	  (*eig_solve)(evecs, evals);
-	  profile.TPSTART(QUDA_PROFILE_INIT);
-	  extendSVDDeflationSpace();
-	  eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	  deflate_compute = false;
-	}
-	if (recompute_evals) {
-	  eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	  recompute_evals = false;
-	}
+        if (!deflate_init) {
+          // Construct the eigensolver and deflation space.
+          constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+          if (!deflate_compute) extendSVDDeflationSpace();
+        }
+        if (deflate_compute) {
+          // compute the deflation space.
+          profile.TPSTOP(QUDA_PROFILE_INIT);
+          (*eig_solve)(evecs, evals);
+          profile.TPSTART(QUDA_PROFILE_INIT);
+          extendSVDDeflationSpace();
+          eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+          deflate_compute = false;
+        }
+        if (recompute_evals) {
+          eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+          recompute_evals = false;
+        }
       }
-      
+
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
 
@@ -235,8 +235,8 @@ namespace quda {
       rhs.push_back(defl_tmp2[0]);
 
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
-      if(param.maxiter > 1) eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-      
+      if (param.maxiter > 1) eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
+
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);
