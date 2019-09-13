@@ -320,8 +320,8 @@ namespace quda
     // 1. Take block inner product: L_i^dag * vec = A_i
     std::vector<ColorSpinorField *> left_vecs_ptr;
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
-    double *s = (double *)safe_malloc(n_defl * sizeof(double));
-    blas::reDotProduct(s, left_vecs_ptr, vec);
+    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    blas::cDotProduct(s, left_vecs_ptr, vec);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
@@ -332,7 +332,7 @@ namespace quda
       right_vecs_ptr.push_back(eig_vecs[i]);
       s[i] /= evals[i].real();
     }
-    blas::axpy(s, right_vecs_ptr, vec_defl);
+    blas::caxpy(s, right_vecs_ptr, vec_defl);
 
     // FIXME - we can optimize the zeroing out with a "multi-caxy"
     // function that just writes over vec_defl and doesn't sum.  When

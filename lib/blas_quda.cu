@@ -191,9 +191,7 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION
-                || x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION)) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
           warningQuda("Device blas on non-native fields is not supported\n");
           return;
         }
@@ -223,8 +221,8 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 2 || x.Nspin() == 1 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
             const int M = 1;
             nativeBlas<float2, float2, float2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Length() / (2 * M));
@@ -251,7 +249,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_MULTIGRID)
             const int M = 12;
             nativeBlas<float2, short2, short2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
@@ -277,11 +275,19 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
-          if (x.Nspin() == 4) { // wilson
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6;
             nativeBlas<float4, char4, char4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
+#if defined(GPU_MULTIGRID)
+            const int M = 12;
+            nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
+                                                                                                 x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif

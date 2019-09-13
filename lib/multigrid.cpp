@@ -1011,7 +1011,7 @@ namespace quda
     vec_infile += std::to_string(param.level);
     vec_infile += "_nvec_";
     vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-    eig_solve->loadVectors(B, vec_infile);
+    EigenSolver::loadVectors(B, vec_infile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1027,7 +1027,7 @@ namespace quda
     vec_outfile += std::to_string(param.level);
     vec_outfile += "_nvec_";
     vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-    eig_solve->saveVectors(B, vec_outfile);
+    EigenSolver::saveVectors(B, vec_outfile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
     profile_global.TPSTART(QUDA_PROFILE_INIT);

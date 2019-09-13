@@ -337,9 +337,7 @@ namespace quda {
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION
-                || x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION)) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);
@@ -392,7 +390,7 @@ namespace quda {
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
 #if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
             const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
-            if (x.Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
+            if ((x.Nspin() == 2 || x.Nspin() == 4) && siteUnroll) errorQuda("siteUnroll not supported here for nSpin=%d", x.Nspin());
             value = nativeReduce<doubleN, ReduceType, float2, float2, float2, M, Reducer, writeX, writeY, writeZ,
                 writeW, writeV>(a, b, x, y, z, w, v, reduce_length / (2 * M));
 #else
@@ -443,12 +441,21 @@ namespace quda {
         } else if (x.Precision() == QUDA_QUARTER_PRECISION) { // quarter precision
 
 #if QUDA_PRECISION & 1
-          if (x.Nspin() == 4) { // wilson
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
             const int M = 6; // determines how much work per thread to do
             value
                 = nativeReduce<doubleN, ReduceType, float4, char4, char4, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                     a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
+#if defined(GPU_MULTIGRID)
+            const int M = 12; // determines how much work per thread to do
+            value
+              = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
