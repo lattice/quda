@@ -30,8 +30,11 @@ namespace quda {
     if (deflate_init) {
       for (auto veci : evecs)
         if (veci) delete veci;
+      evecs.resize(0);
       delete defl_tmp1[0];
       delete defl_tmp2[0];
+      defl_tmp1.resize(0);
+      defl_tmp2.resize(0);
     }
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -80,27 +83,6 @@ namespace quda {
         for (int i=0; i<param.Nkrylov; i++) {
           p[i] = (i==0 && use_source) ? &b : ColorSpinorField::Create(csParam);
           q[i] = ColorSpinorField::Create(csParam);
-        }
-      }
-
-      if (param.deflate) {
-        if (!deflate_init) {
-          // Construct the eigensolver and deflation space.
-          constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-          if (!deflate_compute) extendSVDDeflationSpace();
-        }
-        if (deflate_compute) {
-          // compute the deflation space.
-          profile.TPSTOP(QUDA_PROFILE_INIT);
-          (*eig_solve)(evecs, evals);
-          profile.TPSTART(QUDA_PROFILE_INIT);
-          extendSVDDeflationSpace();
-          eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-          deflate_compute = false;
-        }
-        if (recompute_evals) {
-          eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-          recompute_evals = false;
         }
       }
 
@@ -211,6 +193,26 @@ namespace quda {
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
+    if (param.deflate) {
+      if (!deflate_init) {
+	// Construct the eigensolver and deflation space.
+	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+	if (!deflate_compute) extendSVDDeflationSpace();
+      }
+      if (deflate_compute) {
+	// compute the deflation space.
+	(*eig_solve)(evecs, evals);
+	extendSVDDeflationSpace();
+	eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	deflate_compute = false;
+      }
+      if (recompute_evals) {
+	eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
+	eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	recompute_evals = false;
+      }
+    }
+    
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp);

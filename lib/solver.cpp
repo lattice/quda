@@ -161,9 +161,7 @@ namespace quda {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
