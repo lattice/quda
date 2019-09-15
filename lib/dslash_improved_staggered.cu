@@ -18,27 +18,17 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct StaggeredLaunch {
-    static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(dslashGPU<staggered, packStaggeredShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered,Float,Arg>
   {
+    using Dslash = Dslash<staggered,Float,Arg>;
 
-protected:
+  protected:
     Arg &arg;
     const ColorSpinorField &in;
 
-public:
+  public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
+      Dslash(arg, out, in),
       arg(arg),
       in(in)
     {
@@ -48,13 +38,9 @@ public:
 
     void apply(const cudaStream_t &stream)
     {
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("Staggered Dslash not implemented on CPU");
-      } else {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        Dslash<Float>::setParam(arg, tp);
-        Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
-      }
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packStaggeredShmem, nDim>(tp, stream);
     }
 
     /*
@@ -152,12 +138,6 @@ public:
       return bytes_;
     }
 
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {

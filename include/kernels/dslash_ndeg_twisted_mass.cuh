@@ -27,6 +27,7 @@ namespace quda
 
     Arg &arg;
     constexpr nDegTwistedMass(Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
        @brief Apply the twisted-mass dslash

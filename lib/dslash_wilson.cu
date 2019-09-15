@@ -8,43 +8,20 @@
 
 /**
    This is the basic gauged Wilson operator
-
    TODO
    - gauge fix support
-   - ghost texture support in accessors
-   - CPU support
 */
 
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonLaunch {
-    static constexpr const char *kernel = "quda::dslashGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(dslashGPU<wilson, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg,
-                    stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Wilson : public Dslash<Float>
+  template <typename Float, int nDim, typename Arg> class Wilson : public Dslash<wilson,Float,Arg>
   {
-
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash = Dslash<wilson,Float,Arg>;
 
 public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_wilson.cuh"),
-      arg(arg),
-      in(in)
+      Dslash(arg, out, in)
     {
     }
 
@@ -53,16 +30,10 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
-      Dslash<Float>::template instantiate<WilsonLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packShmem, nDim>(tp, stream);
     }
 
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {
@@ -72,7 +43,7 @@ public:
     {
       constexpr int nDim = 4;
       WilsonArg<Float, nColor, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      Wilson<Float, nDim, nColor, WilsonArg<Float, nColor, recon>> wilson(arg, out, in);
+      Wilson<Float, nDim, WilsonArg<Float, nColor, recon>> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

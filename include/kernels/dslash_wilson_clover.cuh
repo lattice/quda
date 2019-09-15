@@ -34,6 +34,7 @@ namespace quda
 
     Arg &arg;
     constexpr wilsonClover(Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
        @brief Apply the Wilson-clover dslash

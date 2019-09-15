@@ -14,7 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor, QudaReconstructType reconstruct_> struct CovDevArg : DslashArg<Float> {
+  template <typename Float, int nColor_, QudaReconstructType reconstruct_> struct CovDevArg : DslashArg<Float> {
+    static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
@@ -116,13 +117,14 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg>
+  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct covDev : dslash_default {
 
     Arg &arg;
     constexpr covDev(Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
-    __device__ __host__ inline void operator()(int idx, int parity)
+    __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<Float>::type;
       using Vector = ColorSpinor<real, nColor, 4>;

@@ -135,6 +135,7 @@ namespace quda
 
     Arg &arg;
     constexpr laplace(Arg &arg) : arg(arg) {}
+    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {

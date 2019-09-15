@@ -14,34 +14,15 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct TwistedCloverLaunch {
-    static constexpr const char *kernel = "quda::wilsonCloverGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(xpay == true, "Twisted-clover operator only defined for xpay");
-      dslash.launch(dslashGPU<wilsonClover, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedClover : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class TwistedClover : public Dslash<wilsonClover,Float,Arg>
   {
-
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash = Dslash<wilsonClover,Float,Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
 public:
     TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover.cuh"),
-      arg(arg),
-      in(in)
+      Dslash(arg, out, in)
     {
     }
 
@@ -50,25 +31,19 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
-      if (arg.xpay)
-        Dslash<Float>::template instantiate<TwistedCloverLaunch, nDim, nColor, true>(tp, arg, stream);
-      else
-        errorQuda("Twisted-clover operator only defined for xpay=true");
+      Dslash::setParam(tp);
+      if (arg.xpay) this->template instantiate<packShmem, nDim, true>(tp, stream);
+      else          errorQuda("Twisted-clover operator only defined for xpay=true");
     }
 
     long long flops() const
     {
       int clover_flops = 504 + 48;
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // all clover flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY: flops += clover_flops * in.Volume(); break;
+      default: break; // all clover flops are in the interior kernel
       }
       return flops;
     }
@@ -78,26 +53,16 @@ public:
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
 
-      long long bytes = Dslash<Float>::bytes();
+      long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break;
       case INTERIOR_KERNEL:
       case KERNEL_POLICY: bytes += clover_bytes * in.Volume(); break;
+      default: break;
       }
 
       return bytes;
     }
 
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedCloverApply {

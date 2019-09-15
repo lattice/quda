@@ -19,26 +19,9 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct LaplaceLaunch {
-
-    // kernel name for jit compilation
-    static constexpr const char *kernel = "quda::laplaceGPU";
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(dslashGPU<laplace, packStaggeredShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<laplace,Float,Arg>
   {
+    using Dslash = Dslash<laplace,Float,Arg>;
 
 protected:
     Arg &arg;
@@ -46,7 +29,7 @@ protected:
 
 public:
     Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/laplace.cuh"),
+      Dslash(arg, out, in),
       arg(arg),
       in(in)
     {
@@ -57,8 +40,8 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
-      Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packStaggeredShmem, nDim>(tp, stream);
     }
 
     long long flops() const
@@ -153,9 +136,7 @@ public:
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux,
-             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                           Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux, (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack : Dslash::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
       char laplace[32];
       u32toa(laplace, arg.dir);

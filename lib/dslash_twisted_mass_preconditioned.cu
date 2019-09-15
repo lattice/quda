@@ -13,39 +13,19 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct TwistedMassPreconditionedLaunch {
-    static constexpr const char *kernel = "quda::twistedMassPreconditionedGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(nParity == 1, "preconditioned twisted-mass operator only defined for nParity=1");
-      dslash.launch(
-        dslashGPU<twistedMassPreconditioned, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-        tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedMassPreconditioned : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class TwistedMassPreconditioned : public Dslash<twistedMassPreconditioned,Float,Arg>
   {
-
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash = Dslash<twistedMassPreconditioned,Float,Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
 public:
     TwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_twisted_mass_preconditioned.cuh"),
-        arg(arg),
-        in(in)
+      Dslash(arg, out, in)
     {
       if (arg.asymmetric)
         for (int i = 0; i < 8; i++)
-          if (i != 4) { strcat(Dslash<Float>::aux[i], ",asym"); }
+          if (i != 4) { strcat(Dslash::aux[i], ",asym"); }
     }
 
     virtual ~TwistedMassPreconditioned() {}
@@ -53,15 +33,13 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash::setParam(tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 
       if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash<Float>::template instantiate<TwistedMassPreconditionedLaunch, nDim, nColor, 1, true>(tp, arg, stream);
-        else
-          Dslash<Float>::template instantiate<TwistedMassPreconditionedLaunch, nDim, nColor, 1, false>(tp, arg, stream);
+        if (arg.xpay) Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+        else          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned twisted-mass operator not defined nParity=%d", arg.nParity);
       }
@@ -69,27 +47,17 @@ public:
 
     long long flops() const
     {
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // twisted-mass flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * nColor * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
+      default: break;
       }
       return flops;
     }
 
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {

@@ -13,33 +13,15 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct DomainWall5DLaunch {
-    static constexpr const char *kernel = "quda::domainWall5DGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(dslashGPU<domainWall5D, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall5D : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall5D : public Dslash<domainWall5D,Float,Arg>
   {
+    using Dslash = Dslash<domainWall5D,Float,Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
+  public:
     DomainWall5D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_domain_wall_5d.cuh"),
-        arg(arg),
-        in(in)
+      Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
@@ -49,26 +31,24 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
-      Dslash<Float>::template instantiate<DomainWall5DLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packShmem, nDim>(tp, stream);
     }
 
     long long flops() const
     {
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // 5-d flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-        int Ls = in.X(4);
-        long long bulk = (Ls - 2) * (in.Volume() / Ls);
-        long long wall = 2 * (in.Volume() / Ls);
-        flops += 96ll * bulk + 120ll * wall;
+        {
+          int Ls = in.X(4);
+          long long bulk = (Ls - 2) * (in.Volume() / Ls);
+          long long wall = 2 * (in.Volume() / Ls);
+          flops += 96ll * bulk + 120ll * wall;
+        }
         break;
+      default: break; // 5-d flops are in the interior kernel
       }
       return flops;
     }
@@ -77,24 +57,13 @@ public:
     {
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int spinor_bytes = 2 * in.Ncolor() * in.Nspin() * in.Precision() + (isFixed ? sizeof(float) : 0);
-      long long bytes = Dslash<Float>::bytes();
+      long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break;
       case INTERIOR_KERNEL:
       case KERNEL_POLICY: bytes += 2 * spinor_bytes * in.VolumeCB(); break;
+      default: break;
       }
       return bytes;
-    }
-
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

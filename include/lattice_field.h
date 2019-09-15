@@ -143,9 +143,6 @@ namespace quda {
 
   class LatticeField : public Object {
 
-    /** Allow the Dslash kernel driver access */
-    template <typename T> friend class Dslash;
-
   protected:
     /** Lattice volume */
     size_t volume;
@@ -607,6 +604,44 @@ namespace quda {
     */
     virtual void write(char *filename);
     
+    /**
+       @brief Return pointer to the local pinned my_face buffer in a
+       given direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void* myFace_h(int dir, int dim) const { return my_face_dim_dir_h[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return pointer to the local mapped my_face buffer in a
+       given direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void* myFace_hd(int dir, int dim) const { return my_face_dim_dir_hd[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return pointer to the device send buffer in a given
+       direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void* myFace_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return base pointer to a remote device buffer for direct
+       sending in a given direction and dimension.  Since this is a
+       base pointer, one still needs to take care of offsetting to the
+       correct point for each direction/dimension.
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to remote memory buffer
+    */
+    void* remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
+
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 

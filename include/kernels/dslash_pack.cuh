@@ -1,3 +1,5 @@
+#pragma once
+
 #include <color_spinor_field_order.h>
 #include <color_spinor.h>
 #include <index_helper.cuh>

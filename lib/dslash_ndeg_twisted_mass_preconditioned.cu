@@ -14,48 +14,30 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct NdegTwistedMassPreconditionedLaunch {
-    static constexpr const char *kernel = "quda::ndegTwistedMassPreconditionedGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(nParity == 1, "Non-degenerate twisted-mass operator only defined for nParity=1");
-      dslash.launch(
-        dslashGPU<nDegTwistedMassPreconditioned, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-        tp, arg, stream);
-    }
-  };
-
   template <typename Float, int nDim, int nColor, typename Arg>
-  class NdegTwistedMassPreconditioned : public Dslash<Float>
+  class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned,Float,Arg>
   {
+    using Dslash = Dslash<nDegTwistedMassPreconditioned,Float,Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+  protected:
     bool shared;
     unsigned int sharedBytesPerThread() const
     {
       return shared ? 2 * nColor * 4 * sizeof(typename mapper<Float>::type) : 0;
     }
 
-public:
+  public:
     NdegTwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_ndeg_twisted_mass_preconditioned.cuh"),
-        arg(arg),
-        in(in),
-        shared(arg.asymmetric || !arg.dagger)
+      Dslash(arg, out, in),
+      shared(arg.asymmetric || !arg.dagger)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
       if (shared) TunableVectorY::resizeStep(2); // this will force flavor to be contained in the block
       if (arg.asymmetric)
         for (int i = 0; i < 8; i++)
-          if (i != 4) { strcat(Dslash<Float>::aux[i], ",asym"); }
+          if (i != 4) { strcat(Dslash::aux[i], ",asym"); }
     }
 
     virtual ~NdegTwistedMassPreconditioned() {}
@@ -63,17 +45,13 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash::setParam(tp);
       if (arg.asymmetric && !arg.dagger) errorQuda("asymmetric operator only defined for dagger");
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 
       if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash<Float>::template instantiate<NdegTwistedMassPreconditionedLaunch, nDim, nColor, 1, true>(
-              tp, arg, stream);
-        else
-          Dslash<Float>::template instantiate<NdegTwistedMassPreconditionedLaunch, nDim, nColor, 1, false>(
-              tp, arg, stream);
+        if (arg.xpay) Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+        else          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
       }
@@ -81,19 +59,19 @@ public:
 
     void initTuneParam(TuneParam &param) const
     {
-      Dslash<Float>::initTuneParam(param);
+      Dslash::initTuneParam(param);
       if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     void defaultTuneParam(TuneParam &param) const
     {
-      Dslash<Float>::defaultTuneParam(param);
+      Dslash::defaultTuneParam(param);
       if (shared) param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
     }
 
     long long flops() const
     {
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -106,13 +84,6 @@ public:
         break;
       }
       return flops;
-    }
-
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

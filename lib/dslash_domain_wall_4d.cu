@@ -16,33 +16,15 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct DomainWall4DLaunch {
-    static constexpr const char *kernel = "quda::domainWall4DGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(dslashGPU<domainWall4D, packShmem, Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall4D : public Dslash<Float>
+  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall4D : public Dslash<domainWall4D,Float,Arg>
   {
+    using Dslash = Dslash<domainWall4D,Float,Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
+  public:
     DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_domain_wall_4d.cuh"),
-      arg(arg),
-      in(in)
+      Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
@@ -52,29 +34,29 @@ public:
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg, tp);
+      Dslash::setParam(tp);
       typedef typename mapper<Float>::type real;
 #ifdef JITIFY
       // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
       using namespace jitify::reflection;
-      const auto kernel = DomainWall4DLaunch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
-      auto instance = Dslash<Float>::program_->kernel(kernel).instantiate(
-        Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay, arg.kernel_type, Type<Arg>());
+      const auto kernel = "quda::dslashGPU";
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto D_instance = reflect<domainWall4D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_naked = D_instance.substr(0, D_instance.find("<"));
+      auto P_instance = reflect<packShmem<false, QUDA_4D_PC, Arg>>();
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));      
+
+      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(nColor),
+            reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
       cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
                               streams[Nstream - 1]);
-      Dslash<Float>::template instantiate<DomainWall4DLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::template instantiate<packShmem, nDim>(tp, stream);
 #endif
-    }
-
-    TuneKey tuneKey() const
-    {
-      auto aux = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash<Float>::aux_pack :
-                                                                               Dslash<Float>::aux[arg.kernel_type];
-      return TuneKey(in.VolString(), typeid(*this).name(), aux);
     }
   };
 

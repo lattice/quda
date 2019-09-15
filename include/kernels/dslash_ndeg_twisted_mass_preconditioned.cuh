@@ -45,6 +45,7 @@ namespace quda
     Arg &arg;
     constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
     constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 2 : 0; }
+    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
        @brief Apply the preconditioned non-degenerate twisted-mass dslash

@@ -9,11 +9,12 @@
 namespace quda
 {
 
-  template <typename Float> class Dslash : public TunableVectorYZ
+  template <template <typename, int, int, int, bool, bool, KernelType, typename> class D, typename Float, typename Arg>
+  class Dslash : public TunableVectorYZ
   {
 
 protected:
-    DslashArg<Float> &arg;
+    Arg &arg;
     const ColorSpinorField &out;
     const ColorSpinorField &in;
 
@@ -21,18 +22,10 @@ protected:
 
     char aux_base[TuneKey::aux_n];
     char aux[8][TuneKey::aux_n];
-
     char aux_pack[TuneKey::aux_n];
 
     // pointers to ghost buffers we are packing to
     void *packBuffer[2 * QUDA_MAX_DIM];
-
-#ifdef JITIFY
-    // local copy of the static program pointer - this is a work
-    // around for issues with the static program pointer when
-    // HOSTDEBUG compilation is targeted (more precisely -fno-inline)
-    jitify::Program *program_;
-#endif
 
     /**
        @brief Set the base strings used by the different dslash kernel
@@ -68,7 +61,7 @@ protected:
     virtual bool tuneGridDim() const { return false; }
     virtual unsigned int minThreads() const { return arg.threads; }
 
-    template <typename Arg> inline void setParam(Arg &arg, TuneParam &tp)
+    inline void setParam(TuneParam &tp)
     {
       arg.t_proj_scale = getKernelPackT() ? 1.0 : 2.0;
 
@@ -138,9 +131,8 @@ protected:
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-public:
-    template <typename T, typename Arg>
-    inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <typename T>
+    inline void launch(T *f, const TuneParam &tp, const cudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         this->setMaxDynamicSharedBytesPerBlock(f);
@@ -150,44 +142,75 @@ public:
     }
 
     /**
+       @brief This is a helper class that is used to instantiate the
+       correct templated kernel for the dslash.  This can be used for
+       all dslash types, though in some cases we specialize to reduce
+       compilation time.
+    */
+    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    inline void Launch(TuneParam &tp, const cudaStream_t &stream)
+    {
+      launch(dslashGPU<D, P, Float, nDim, Arg::nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
+    }
+
+  public:
+    /**
        @brief This instantiate function is used to instantiate the
        the KernelType template required for the multi-GPU dslash kernels.
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
-        int nParity, bool dagger, bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool dagger, bool xpay>
+    inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
+#ifdef JITIFY
+        if (!program) errorQuda("Jitify program has not been created");
+        using namespace jitify::reflection;
+        const auto kernel = "quda::dslashGPU";
+
+        // we need this hackery to get the naked unbound template class parameters
+        auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+        auto D_naked = D_instance.substr(0, D_instance.find("<"));
+        auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
+        auto P_naked = P_instance.substr(0, P_instance.find("<"));
+
+        // since we pass the operator and packer classes as strings to
+        // jitify, we need to handle the reflection for all other
+        // template parameters here as well
+        Tunable::jitify_error = program->kernel(kernel)
+          .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(nParity), reflect(dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+          .launch(arg);
+#else
         switch (arg.kernel_type) {
         case INTERIOR_KERNEL:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, INTERIOR_KERNEL, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream);
           break;
 #ifdef MULTI_GPU
         case EXTERIOR_KERNEL_X:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_X, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream);
           break;
         case EXTERIOR_KERNEL_Y:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Y, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream);
           break;
         case EXTERIOR_KERNEL_Z:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_Z, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream);
           break;
         case EXTERIOR_KERNEL_T:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_T, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream);
           break;
         case EXTERIOR_KERNEL_ALL:
-          Launch<Float, nDim, nColor, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL, Arg>::launch(*this, tp, arg, stream);
+          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream);
           break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
 #endif
         }
+#endif // JITIFY
       }
     }
 
@@ -195,26 +218,34 @@ public:
        @brief This instantiate function is used to instantiate the
        the dagger template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
-        int nParity, bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool xpay>
+    inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
+      if (!program) errorQuda("Jitify program has not been created");
       using namespace jitify::reflection;
-      const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
-      Tunable::jitify_error
-          = program_->kernel(kernel)
-                .instantiate(Type<Float>(), nDim, nColor, nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
-                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                .launch(arg);
+      const auto kernel = "quda::dslashGPU";
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_naked = D_instance.substr(0, D_instance.find("<"));
+      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));
+
+      // since we pass the operator and packer classes as strings to
+      // jitify, we need to handle the reflection for all other
+      // template parameters here as well
+      Tunable::jitify_error = program->kernel(kernel)
+        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+        .launch(arg);
 #else
       if (arg.dagger)
-        instantiate<Launch, nDim, nColor, nParity, true, xpay>(tp, arg, stream);
+        instantiate<P, nDim, nParity, true, xpay>(tp, stream);
       else
-        instantiate<Launch, nDim, nColor, nParity, false, xpay>(tp, arg, stream);
+        instantiate<P, nDim, nParity, false, xpay>(tp, stream);
 #endif
     }
 
@@ -222,25 +253,33 @@ public:
        @brief This instantiate function is used to instantiate the
        the nParity template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
-        bool xpay, typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <template <bool, QudaPCType, typename> class P, int nDim, bool xpay>
+    inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
+      if (!program) errorQuda("Jitify program has not been created");
       using namespace jitify::reflection;
-      const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
-      Tunable::jitify_error
-          = program_->kernel(kernel)
-                .instantiate(Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, xpay, arg.kernel_type, Type<Arg>())
-                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                .launch(arg);
+      const auto kernel = "quda::dslashGPU";
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_naked = D_instance.substr(0, D_instance.find("<"));
+      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));
+
+      // since we pass the operator and packer classes as strings to
+      // jitify, we need to handle the reflection for all other
+      // template parameters here as well
+      Tunable::jitify_error = program->kernel(kernel)
+        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+        .launch(arg);
 #else
       switch (arg.nParity) {
-      case 1: instantiate<Launch, nDim, nColor, 1, xpay>(tp, arg, stream); break;
-      case 2: instantiate<Launch, nDim, nColor, 2, xpay>(tp, arg, stream); break;
+      case 1: instantiate<P, nDim, 1, xpay>(tp, stream); break;
+      case 2: instantiate<P, nDim, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
 #endif
@@ -250,32 +289,40 @@ public:
        @brief This instantiate function is used to instantiate the
        the xpay template
        @param[in] tp The tuning parameters to use for this kernel
-       @param[in,out] arg The argument struct for the kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <typename, int, int, int, bool, bool, KernelType, typename> class Launch, int nDim, int nColor,
-        typename Arg>
-    inline void instantiate(TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <template <bool, QudaPCType, typename> class P, int nDim>
+    inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
+      if (!program) errorQuda("Jitify program has not been created");
       using namespace jitify::reflection;
-      const auto kernel = Launch<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>::kernel;
-      Tunable::jitify_error = program_->kernel(kernel)
-                                  .instantiate(Type<Float>(), nDim, nColor, arg.nParity, arg.dagger, arg.xpay,
-                                      arg.kernel_type, Type<Arg>())
-                                  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                  .launch(arg);
+      const auto kernel = "quda::dslashGPU";
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_naked = D_instance.substr(0, D_instance.find("<"));
+      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));
+
+      // since we pass the operator and packer classes as strings to
+      // jitify, we need to handle the reflection for all other
+      // template parameters here as well
+      Tunable::jitify_error = program->kernel(kernel)
+        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()})
+        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+        .launch(arg);
 #else
       if (arg.xpay)
-        instantiate<Launch, nDim, nColor, true>(tp, arg, stream);
+        instantiate<P, nDim, true>(tp, stream);
       else
-        instantiate<Launch, nDim, nColor, false>(tp, arg, stream);
+        instantiate<P, nDim, false>(tp, stream);
 #endif
     }
 
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
-    Dslash(DslashArg<Float> &arg, const ColorSpinorField &out, const ColorSpinorField &in, const char *src) :
+    Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
         TunableVectorYZ(1, arg.nParity),
         arg(arg),
         out(out),
@@ -304,8 +351,9 @@ public:
       fillAux(KERNEL_POLICY, "policy");
 
 #ifdef JITIFY
-      create_jitify_program(src);
-      program_ = program;
+      // extract the filename from the template template class
+      using D_ = D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>;
+      create_jitify_program(std::string("kernels/") + D_::filename());
 #endif
     }
 
@@ -317,18 +365,18 @@ public:
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] = static_cast<char *>(in.ghost_remote_send_buffer_d[in.bufferIndex][dim][dir])
-              + in.Precision() * in.GhostOffset(dim, 1 - dir);
+            packBuffer[2 * dim + dir] = static_cast<char*>(in.remoteFace_d(dir, dim)) +
+              in.Precision() * in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
-            packBuffer[2 * dim + dir] = in.my_face_dim_dir_hd[in.bufferIndex][dim][dir];
+            packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else { // pack to local gpu memory
-            packBuffer[2 * dim + dir] = in.my_face_dim_dir_d[in.bufferIndex][dim][dir];
+            packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
           }
         }
       }
 
       // set the tuning string for the fused interior + packer kernel
-      strcpy(aux_pack, Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux_pack, aux[arg.kernel_type]);
       strcat(aux_pack, "");
 
       // label the locations we are packing to
@@ -353,6 +401,12 @@ public:
     void setAux(KernelType type, const char *aux_) { strcpy(aux[type], aux_); }
 
     void augmentAux(KernelType type, const char *extra) { strcat(aux[type], extra); }
+
+    virtual TuneKey tuneKey() const
+    {
+      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+      return TuneKey(in.VolString(), typeid(*this).name(), aux_);
+    }
 
     /**
        @brief Save the output field since the output field is both
