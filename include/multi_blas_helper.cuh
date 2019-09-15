@@ -98,7 +98,7 @@ namespace quda
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      size_t scalar_size = 2 * std::max({x_prec, y_prec, QUDA_SINGLE_PRECISION});
+      size_t scalar_size = 2 * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
       NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size
         = x_fixed ? sizeof(SpinorTexture<float4, short4, 6>) : sizeof(SpinorTexture<float4, float4, 6>);
