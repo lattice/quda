@@ -18,15 +18,12 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered, Float, Arg>
   {
-    using Dslash = Dslash<staggered,Float,Arg>;
+    using Dslash = Dslash<staggered, Float, Arg>;
 
-public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
-    {
-    }
+  public:
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     virtual ~Staggered() {}
 
@@ -36,7 +33,6 @@ public:
       Dslash::setParam(tp);
       Dslash::template instantiate<packStaggeredShmem, nDim>(tp, stream);
     }
-
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct StaggeredApply {

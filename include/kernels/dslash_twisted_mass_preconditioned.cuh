@@ -141,7 +141,7 @@ namespace quda
 
     Arg &arg;
     constexpr twistedMassPreconditioned(Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
+    static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 1 : 0; }
 
     /**

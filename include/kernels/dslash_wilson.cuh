@@ -137,7 +137,7 @@ namespace quda
 
     Arg &arg;
     constexpr wilson(Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
+    static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     // out(x) = M*in = (-D + m) * in(x-mu)
     __device__ __host__ inline void operator()(int idx, int s, int parity)
@@ -167,7 +167,6 @@ namespace quda
 
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(xs, my_spinor_parity) = out;
     }
-
   };
 
 } // namespace quda

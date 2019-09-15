@@ -33,7 +33,7 @@ namespace quda
 
     Arg &arg;
     constexpr wilsonCloverPreconditioned(Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
+    static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
        @brief Apply the clover preconditioned Wilson dslash

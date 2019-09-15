@@ -36,7 +36,7 @@ namespace quda
 
     Arg &arg;
     constexpr twistedCloverPreconditioned(Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
+    static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
        @brief Apply the preconditioned twisted-clover dslash

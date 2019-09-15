@@ -13,15 +13,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedMassPreconditioned : public Dslash<twistedMassPreconditioned,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class TwistedMassPreconditioned : public Dslash<twistedMassPreconditioned, Float, Arg>
   {
-    using Dslash = Dslash<twistedMassPreconditioned,Float,Arg>;
+    using Dslash = Dslash<twistedMassPreconditioned, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
-public:
-    TwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+  public:
+    TwistedMassPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       if (arg.asymmetric)
         for (int i = 0; i < 8; i++)
@@ -38,8 +38,10 @@ public:
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 
       if (arg.nParity == 1) {
-        if (arg.xpay) Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
-        else          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
+        if (arg.xpay)
+          Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+        else
+          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned twisted-mass operator not defined nParity=%d", arg.nParity);
       }
@@ -57,7 +59,6 @@ public:
       }
       return flops;
     }
-
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassPreconditionedApply {

@@ -18,9 +18,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered, Float, Arg>
   {
-    using Dslash = Dslash<staggered,Float,Arg>;
+    using Dslash = Dslash<staggered, Float, Arg>;
 
   protected:
     Arg &arg;

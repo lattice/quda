@@ -16,15 +16,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall4D : public Dslash<domainWall4D,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class DomainWall4D : public Dslash<domainWall4D, Float, Arg>
   {
-    using Dslash = Dslash<domainWall4D,Float,Arg>;
+    using Dslash = Dslash<domainWall4D, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
   public:
-    DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+    DomainWall4D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
@@ -45,10 +45,11 @@ namespace quda
       auto D_instance = reflect<domainWall4D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
       auto D_naked = D_instance.substr(0, D_instance.find("<"));
       auto P_instance = reflect<packShmem<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));      
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));
 
-      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(nColor),
-            reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
+      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
+                                                           reflect(nColor), reflect(arg.nParity), reflect(arg.dagger),
+                                                           reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
       cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);

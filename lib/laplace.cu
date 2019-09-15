@@ -19,21 +19,16 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<laplace,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<laplace, Float, Arg>
   {
-    using Dslash = Dslash<laplace,Float,Arg>;
+    using Dslash = Dslash<laplace, Float, Arg>;
 
-protected:
+  protected:
     Arg &arg;
     const ColorSpinorField &in;
 
-public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
-      arg(arg),
-      in(in)
-    {
-    }
+  public:
+    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in), arg(arg), in(in) {}
 
     virtual ~Laplace() {}
 
@@ -136,7 +131,9 @@ public:
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack : Dslash::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
+                                                                           Dslash::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
       char laplace[32];
       u32toa(laplace, arg.dir);

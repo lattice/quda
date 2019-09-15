@@ -29,7 +29,7 @@ namespace quda
 
     Arg &arg;
     constexpr domainWall5D(Arg &arg) : arg(arg) {}
-    static constexpr const char* filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
+    static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
     constexpr QudaPCType pc_type() const { return QUDA_5D_PC; }
 
     __device__ __host__ inline void apply(int idx, int parity)

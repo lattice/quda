@@ -14,15 +14,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class NdegTwistedMass : public Dslash<nDegTwistedMass,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class NdegTwistedMass : public Dslash<nDegTwistedMass, Float, Arg>
   {
-    using Dslash = Dslash<nDegTwistedMass,Float,Arg>;
+    using Dslash = Dslash<nDegTwistedMass, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
-public:
-    NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+  public:
+    NdegTwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(2, arg.nParity);
     }
@@ -33,8 +33,10 @@ public:
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      if (arg.xpay) Dslash::template instantiate<packShmem, nDim, true>(tp, stream);
-      else          errorQuda("Non-degenerate twisted-mass operator only defined for xpay=true");
+      if (arg.xpay)
+        Dslash::template instantiate<packShmem, nDim, true>(tp, stream);
+      else
+        errorQuda("Non-degenerate twisted-mass operator only defined for xpay=true");
     }
 
     long long flops() const

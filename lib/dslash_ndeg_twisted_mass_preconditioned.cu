@@ -15,9 +15,9 @@ namespace quda
 {
 
   template <typename Float, int nDim, int nColor, typename Arg>
-  class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned,Float,Arg>
+  class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned, Float, Arg>
   {
-    using Dslash = Dslash<nDegTwistedMassPreconditioned,Float,Arg>;
+    using Dslash = Dslash<nDegTwistedMassPreconditioned, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -50,8 +50,10 @@ namespace quda
       if (arg.asymmetric && arg.xpay) errorQuda("asymmetric operator not defined for xpay");
 
       if (arg.nParity == 1) {
-        if (arg.xpay) Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
-        else          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
+        if (arg.xpay)
+          Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+        else
+          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
       }

@@ -13,17 +13,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedMass : public Dslash<twistedMass,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class TwistedMass : public Dslash<twistedMass, Float, Arg>
   {
-    using Dslash = Dslash<twistedMass,Float,Arg>;
+    using Dslash = Dslash<twistedMass, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
-public:
-    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
-    {
-    }
+  public:
+    TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     virtual ~TwistedMass() {}
 
@@ -32,7 +30,7 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash::template instantiate<packShmem,  nDim, true>(tp, stream);
+        Dslash::template instantiate<packShmem, nDim, true>(tp, stream);
       else
         errorQuda("Twisted-mass operator only defined for xpay=true");
     }
@@ -53,7 +51,6 @@ public:
       }
       return flops;
     }
-
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct TwistedMassApply {

@@ -21,7 +21,7 @@ namespace quda
 
 #ifdef GPU_COVDEV
 
-  template <typename Float, int nDim, int nColor, typename Arg> class CovDev : public Dslash<covDev,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg> class CovDev : public Dslash<covDev, Float, Arg>
   {
     using Dslash = Dslash<covDev, Float, Arg>;
 
@@ -30,10 +30,7 @@ namespace quda
     const ColorSpinorField &in;
 
   public:
-    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
-      arg(arg),
-      in(in)
+    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in), arg(arg), in(in)
     {
     }
 
@@ -131,7 +128,9 @@ namespace quda
     {
       // add mu to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack : Dslash::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
+                                                                           Dslash::aux[arg.kernel_type]);
       strcat(aux, ",mu=");
       char mu[8];
       u32toa(mu, arg.mu);

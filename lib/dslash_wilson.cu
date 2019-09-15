@@ -15,15 +15,12 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, typename Arg> class Wilson : public Dslash<wilson,Float,Arg>
+  template <typename Float, int nDim, typename Arg> class Wilson : public Dslash<wilson, Float, Arg>
   {
-    using Dslash = Dslash<wilson,Float,Arg>;
+    using Dslash = Dslash<wilson, Float, Arg>;
 
-public:
-    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
-    {
-    }
+  public:
+    Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     virtual ~Wilson() {}
 
@@ -33,7 +30,6 @@ public:
       Dslash::setParam(tp);
       Dslash::template instantiate<packShmem, nDim>(tp, stream);
     }
-
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonApply {

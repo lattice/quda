@@ -15,15 +15,14 @@ namespace quda
 {
 
   template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonCloverPreconditioned : public Dslash<wilsonCloverPreconditioned,Float,Arg>
+  class WilsonCloverPreconditioned : public Dslash<wilsonCloverPreconditioned, Float, Arg>
   {
-    using Dslash = Dslash<wilsonCloverPreconditioned,Float,Arg>;
+    using Dslash = Dslash<wilsonCloverPreconditioned, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
   public:
-    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
     }
 
@@ -39,8 +38,10 @@ namespace quda
           if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
           Dslash::template instantiate<packShmem, nDim, 1, false, true>(tp, stream);
         } else {
-          if (arg.dagger) Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
-          else            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
+          if (arg.dagger)
+            Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
+          else
+            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
         }
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);

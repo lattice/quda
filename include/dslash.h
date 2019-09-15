@@ -13,7 +13,7 @@ namespace quda
   class Dslash : public TunableVectorYZ
   {
 
-protected:
+  protected:
     Arg &arg;
     const ColorSpinorField &out;
     const ColorSpinorField &in;
@@ -131,8 +131,7 @@ protected:
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) param.aux.x = 1; // packing blocks per direction
     }
 
-    template <typename T>
-    inline void launch(T *f, const TuneParam &tp, const cudaStream_t &stream)
+    template <typename T> inline void launch(T *f, const TuneParam &tp, const cudaStream_t &stream)
     {
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         this->setMaxDynamicSharedBytesPerBlock(f);
@@ -180,31 +179,21 @@ protected:
         // since we pass the operator and packer classes as strings to
         // jitify, we need to handle the reflection for all other
         // template parameters here as well
-        Tunable::jitify_error = program->kernel(kernel)
-          .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(nParity), reflect(dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-          .launch(arg);
+        Tunable::jitify_error
+          = program->kernel(kernel)
+              .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)),
+                            reflect(nParity), reflect(dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+              .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+              .launch(arg);
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL:
-          Launch<P, nDim, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream);
-          break;
+        case INTERIOR_KERNEL: Launch<P, nDim, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X:
-          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream);
-          break;
-        case EXTERIOR_KERNEL_Y:
-          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream);
-          break;
-        case EXTERIOR_KERNEL_Z:
-          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream);
-          break;
-        case EXTERIOR_KERNEL_T:
-          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream);
-          break;
-        case EXTERIOR_KERNEL_ALL:
-          Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream);
-          break;
+        case EXTERIOR_KERNEL_X: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -238,9 +227,11 @@ protected:
       // jitify, we need to handle the reflection for all other
       // template parameters here as well
       Tunable::jitify_error = program->kernel(kernel)
-        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-        .launch(arg);
+                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
+                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
+                                              reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                                .launch(arg);
 #else
       if (arg.dagger)
         instantiate<P, nDim, nParity, true, xpay>(tp, stream);
@@ -273,9 +264,11 @@ protected:
       // jitify, we need to handle the reflection for all other
       // template parameters here as well
       Tunable::jitify_error = program->kernel(kernel)
-        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-        .launch(arg);
+                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
+                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
+                                              reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
+                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                                .launch(arg);
 #else
       switch (arg.nParity) {
       case 1: instantiate<P, nDim, 1, xpay>(tp, stream); break;
@@ -309,9 +302,11 @@ protected:
       // jitify, we need to handle the reflection for all other
       // template parameters here as well
       Tunable::jitify_error = program->kernel(kernel)
-        .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()})
-        .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-        .launch(arg);
+                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
+                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
+                                              reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()})
+                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+                                .launch(arg);
 #else
       if (arg.xpay)
         instantiate<P, nDim, true>(tp, stream);
@@ -323,12 +318,12 @@ protected:
     DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
 
     Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        TunableVectorYZ(1, arg.nParity),
-        arg(arg),
-        out(out),
-        in(in),
-        nDimComms(4),
-        dslashParam(arg)
+      TunableVectorYZ(1, arg.nParity),
+      arg(arg),
+      out(out),
+      in(in),
+      nDimComms(4),
+      dslashParam(arg)
     {
       if (checkLocation(out, in) == QUDA_CPU_FIELD_LOCATION)
         errorQuda("CPU Fields not supported in Dslash framework yet");
@@ -365,8 +360,8 @@ protected:
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
           if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) { // pack to p2p remote
-            packBuffer[2 * dim + dir] = static_cast<char*>(in.remoteFace_d(dir, dim)) +
-              in.Precision() * in.GhostOffset(dim, 1 - dir);
+            packBuffer[2 * dim + dir]
+              = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.Precision() * in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
           } else { // pack to local gpu memory
@@ -472,9 +467,9 @@ protected:
       case KERNEL_POLICY: {
         long long sites = in.Volume();
         flops_ = (num_dir * (in.Nspin() / 4) * in.Ncolor() * in.Nspin() + // spin project (=0 for staggered)
-                     num_dir * num_mv_multiply * mv_flops +               // SU(3) matrix-vector multiplies
-                     ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
-            * sites; // accumulation
+                  num_dir * num_mv_multiply * mv_flops +                  // SU(3) matrix-vector multiplies
+                  ((num_dir - 1) * 2 * in.Ncolor() * in.Nspin()))
+          * sites; // accumulation
         if (arg.xpay) flops_ += xpay_flops * sites;
 
         if (arg.kernel_type == KERNEL_POLICY) break;

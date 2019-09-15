@@ -14,17 +14,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class WilsonClover : public Dslash<wilsonClover,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class WilsonClover : public Dslash<wilsonClover, Float, Arg>
   {
-    using Dslash = Dslash<wilsonClover,Float,Arg>;
+    using Dslash = Dslash<wilsonClover, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
-public:
-    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
-    {
-    }
+  public:
+    WilsonClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     virtual ~WilsonClover() {}
 
@@ -65,7 +63,6 @@ public:
 
       return bytes;
     }
-
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverApply {

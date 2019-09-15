@@ -13,15 +13,15 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class DomainWall5D : public Dslash<domainWall5D,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class DomainWall5D : public Dslash<domainWall5D, Float, Arg>
   {
-    using Dslash = Dslash<domainWall5D,Float,Arg>;
+    using Dslash = Dslash<domainWall5D, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
   public:
-    DomainWall5D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in)
+    DomainWall5D(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
@@ -40,14 +40,12 @@ namespace quda
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
-      case KERNEL_POLICY:
-        {
-          int Ls = in.X(4);
-          long long bulk = (Ls - 2) * (in.Volume() / Ls);
-          long long wall = 2 * (in.Volume() / Ls);
-          flops += 96ll * bulk + 120ll * wall;
-        }
-        break;
+      case KERNEL_POLICY: {
+        int Ls = in.X(4);
+        long long bulk = (Ls - 2) * (in.Volume() / Ls);
+        long long wall = 2 * (in.Volume() / Ls);
+        flops += 96ll * bulk + 120ll * wall;
+      } break;
       default: break; // 5-d flops are in the interior kernel
       }
       return flops;

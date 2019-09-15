@@ -14,9 +14,10 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class TwistedCloverPreconditioned : public Dslash<twistedCloverPreconditioned,Float,Arg>
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class TwistedCloverPreconditioned : public Dslash<twistedCloverPreconditioned, Float, Arg>
   {
-    using Dslash = Dslash<twistedCloverPreconditioned,Float,Arg>;
+    using Dslash = Dslash<twistedCloverPreconditioned, Float, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -38,8 +39,10 @@ namespace quda
           if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
           Dslash::template instantiate<packShmem, nDim, 1, false, true>(tp, stream);
         } else {
-          if (arg.dagger) Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
-          else            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
+          if (arg.dagger)
+            Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
+          else
+            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
         }
       } else {
         errorQuda("Preconditioned twisted-clover operator not defined nParity=%d", arg.nParity);
