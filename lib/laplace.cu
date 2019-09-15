@@ -22,15 +22,11 @@ namespace quda
   template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<laplace, Float, Arg>
   {
     using Dslash = Dslash<laplace, Float, Arg>;
-
-  protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash::arg;
+    using Dslash::in;
 
   public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in), arg(arg), in(in) {}
-
-    virtual ~Laplace() {}
+    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
@@ -151,7 +147,7 @@ namespace quda
 
       constexpr int nDim = 4;
       LaplaceArg<Float, nColor, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<Float, nDim, nColor, LaplaceArg<Float, nColor, recon>> laplace(arg, out, in);
+      Laplace<Float, nDim, nColor, decltype(arg)> laplace(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(laplace)> policy(
         laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

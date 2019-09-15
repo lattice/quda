@@ -26,8 +26,6 @@ namespace quda
     {
     }
 
-    virtual ~WilsonCloverPreconditioned() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -122,8 +120,7 @@ namespace quda
       constexpr bool dynamic_clover = false;
 #endif
       WilsonCloverArg<Float, nColor, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
-      WilsonCloverPreconditioned<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, dynamic_clover>> wilson(
-          arg, out, in);
+      WilsonCloverPreconditioned<Float, nDim, nColor, decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

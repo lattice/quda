@@ -22,8 +22,6 @@ namespace quda
   public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    virtual ~Wilson() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -39,7 +37,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       WilsonArg<Float, nColor, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      Wilson<Float, nDim, WilsonArg<Float, nColor, recon>> wilson(arg, out, in);
+      Wilson<Float, nDim, decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

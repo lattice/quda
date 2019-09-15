@@ -26,8 +26,6 @@ namespace quda
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
 
-    virtual ~DomainWall5D() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -72,9 +70,9 @@ namespace quda
     {
       constexpr int nDim = 5;
       DomainWall5DArg<Float, nColor, recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
-      DomainWall5D<Float, nDim, nColor, DomainWall5DArg<Float, nColor, recon>> twisted(arg, out, in);
+      DomainWall5D<Float, nDim, nColor, decltype(arg)> dwf(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
+      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
           in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);

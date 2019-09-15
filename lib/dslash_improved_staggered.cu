@@ -21,20 +21,11 @@ namespace quda
   template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered, Float, Arg>
   {
     using Dslash = Dslash<staggered, Float, Arg>;
-
-  protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash::arg;
+    using Dslash::in;
 
   public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash(arg, out, in),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~Staggered() {}
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {

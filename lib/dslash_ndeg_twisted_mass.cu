@@ -27,8 +27,6 @@ namespace quda
       TunableVectorYZ::resizeVector(2, arg.nParity);
     }
 
-    virtual ~NdegTwistedMass() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -61,7 +59,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       NdegTwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
-      NdegTwistedMass<Float, nDim, nColor, NdegTwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
+      NdegTwistedMass<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),

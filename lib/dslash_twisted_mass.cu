@@ -23,8 +23,6 @@ namespace quda
   public:
     TwistedMass(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    virtual ~TwistedMass() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -61,7 +59,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       TwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, x, parity, dagger, comm_override);
-      TwistedMass<Float, nDim, nColor, TwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
+      TwistedMass<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

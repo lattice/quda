@@ -24,8 +24,6 @@ namespace quda
   public:
     TwistedClover(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    virtual ~TwistedClover() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -72,7 +70,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       WilsonCloverArg<Float, nColor, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
-      TwistedClover<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, true>> twisted(arg, out, in);
+      TwistedClover<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

@@ -40,8 +40,6 @@ namespace quda
           if (i != 4) { strcat(Dslash::aux[i], ",asym"); }
     }
 
-    virtual ~NdegTwistedMassPreconditioned() {}
-
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -75,15 +73,11 @@ namespace quda
     {
       long long flops = Dslash::flops();
       switch (arg.kernel_type) {
-      case EXTERIOR_KERNEL_X:
-      case EXTERIOR_KERNEL_Y:
-      case EXTERIOR_KERNEL_Z:
-      case EXTERIOR_KERNEL_T:
-      case EXTERIOR_KERNEL_ALL: break; // twisted-mass flops are in the interior kernel
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
         flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
+      default: break; // twisted-mass flops are in the interior kernel
       }
       return flops;
     }
@@ -98,7 +92,7 @@ namespace quda
       constexpr int nDim = 4;
       NdegTwistedMassArg<Float, nColor, recon> arg(
           out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
-      NdegTwistedMassPreconditioned<Float, nDim, nColor, NdegTwistedMassArg<Float, nColor, recon>> twisted(arg, out, in);
+      NdegTwistedMassPreconditioned<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),

@@ -24,17 +24,11 @@ namespace quda
   template <typename Float, int nDim, int nColor, typename Arg> class CovDev : public Dslash<covDev, Float, Arg>
   {
     using Dslash = Dslash<covDev, Float, Arg>;
-
-  protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash::arg;
+    using Dslash::in;
 
   public:
-    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in), arg(arg), in(in)
-    {
-    }
-
-    virtual ~CovDev() {}
+    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
@@ -147,7 +141,7 @@ namespace quda
     {
       constexpr int nDim = 4;
       CovDevArg<Float, nColor, recon> arg(out, in, U, mu, parity, dagger, comm_override);
-      CovDev<Float, nDim, nColor, CovDevArg<Float, nColor, recon>> covDev(arg, out, in);
+      CovDev<Float, nDim, nColor, decltype(arg)> covDev(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
