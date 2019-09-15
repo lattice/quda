@@ -43,8 +43,8 @@ namespace quda {
   static jitify::Program *program = nullptr;
   static bool jitify_init = false;
 
-  static void create_jitify_program(const char *file, const std::vector<std::string> extra_options = {}) {
-
+  static void create_jitify_program(const std::string &file, const std::vector<std::string> extra_options = {})
+  {
     if (!jitify_init) {
       kernel_cache = new jitify::JitCache;
 
