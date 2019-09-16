@@ -2552,6 +2552,7 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
 
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
+  /**
   const int *X = cudaGauge->X();
   ColorSpinorParam cpuParam(&host_evecs, *inv_param, X, inv_param->solution_type, inv_param->input_location);
   cpuParam.v = host_evecs;
@@ -2559,13 +2560,32 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
-  eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
-                                                       cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-  if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
+  // eig_param->cuda_prec_ritz == QUDA_DOUBLE_PRECISION ? cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER :
+  //                                                      cudaParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+  // if (inv_param->dslash_type == QUDA_LAPLACE_DSLASH) { cudaParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER; }
+  cudaParam.setPrecision(eig_param->cuda_prec_ritz, eig_param->cuda_prec_ritz, true);
+  */
+  bool pc_solution = (inv_param->solution_type == QUDA_MATPC_SOLUTION) ||
+      (inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+
+  const int *X = cudaGauge->X();
+  ColorSpinorParam cpuParam(host_evecs, *inv_param, X, pc_solution, inv_param->input_location);
+  ColorSpinorField *h_b = ColorSpinorField::Create(cpuParam);
+  // cpuParam.v = hp_x;
+  // cpuParam.location = param->output_location;
+  // ColorSpinorField *h_x = ColorSpinorField::Create(cpuParam);
+
+  // download source
+  ColorSpinorParam cudaParam(cpuParam, *inv_param);
+  cudaParam.create = QUDA_ZERO_FIELD_CREATE;
+  // b = new cudaColorSpinorField(*h_b, cudaParam);
 
   std::vector<Complex> evals(eig_param->nEv, 0.0);
   std::vector<ColorSpinorField *> kSpace;
-  for (int i = 0; i < eig_param->nKr; i++) { kSpace.push_back(ColorSpinorField::Create(cudaParam)); }
+  for (int i = 0; i < eig_param->nKr; i++){ 
+    ColorSpinorField* b = new cudaColorSpinorField(*h_b, cudaParam);
+    kSpace.push_back(b);
+  }
 
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
@@ -2621,6 +2641,16 @@ void eigensolveQuda(void *host_evecs, void *host_evals, QudaEigParam *eig_param)
   } else {
     for (int i = 0; i < eig_param->nEv; i++) ((complex<float> *)host_evals)[i] = evals[i];
   }
+
+  for(int i = 0; i < eig_param->nEv; i++){
+    cpuParam.v = host_evecs + i*kSpace[i]->RealLength()*( inv_param->cpu_prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float) );
+    cpuParam.location = inv_param->output_location;
+    ColorSpinorField* h_x = ColorSpinorField::Create(cpuParam);
+    *h_x = *(kSpace[i]);
+    delete h_x;
+  }
+
+  delete h_b;
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEigensolve.TPSTART(QUDA_PROFILE_FREE);

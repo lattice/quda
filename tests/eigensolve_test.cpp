@@ -58,6 +58,7 @@ extern int pipeline;   // length of pipeline for fused operations in GCR or BiCG
 
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
+extern QudaSolutionType solution_type;
 
 // Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -296,7 +297,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_nConv = eig_nEv;
   } else
     eig_param.nConv = eig_nConv;
-
+ 
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
@@ -435,10 +436,10 @@ int main(int argc, char **argv)
 
   // Memory allocation
   if (eig_inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(float));
+    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(float) * Ls);
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(float));
   } else {
-    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(double));
+    host_evecs = (void *)malloc(V * sss * evecs_needed * sizeof(double)* Ls);
     host_evals = (void *)malloc(2 * eig_param.nEv * sizeof(double));
   }
 
