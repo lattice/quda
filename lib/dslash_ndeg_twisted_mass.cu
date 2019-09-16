@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class NdegTwistedMass : public Dslash<nDegTwistedMass, Float, Arg>
+  template <typename Arg> class NdegTwistedMass : public Dslash<nDegTwistedMass, Arg>
   {
-    using Dslash = Dslash<nDegTwistedMass, Float, Arg>;
+    using Dslash = Dslash<nDegTwistedMass, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -32,7 +31,7 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash::template instantiate<packShmem, nDim, true>(tp, stream);
+        Dslash::template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Non-degenerate twisted-mass operator only defined for xpay=true");
     }
@@ -43,7 +42,7 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
       default: break; // twisted-mass flops are in the interior kernel
       }
@@ -58,8 +57,8 @@ namespace quda
                                 const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
-      NdegTwistedMass<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
+      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, c, x, parity, dagger, comm_override);
+      NdegTwistedMass<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),

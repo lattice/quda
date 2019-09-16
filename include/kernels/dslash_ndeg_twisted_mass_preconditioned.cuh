@@ -7,8 +7,8 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType reconstruct_>
-  struct NdegTwistedMassArg : WilsonArg<Float, nColor, reconstruct_> {
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
+  struct NdegTwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     typedef typename mapper<Float>::type real;
     real a;          /** this is the Wilson-dslash scale factor */
     real b;          /** this is the chiral twist factor */
@@ -21,7 +21,7 @@ namespace quda
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
         double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
         const int *comm_override) :
-        WilsonArg<Float, nColor, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
         a(a),
         b(dagger ? -b : b), // if dagger flip the chiral twist
         c(c),
@@ -32,9 +32,9 @@ namespace quda
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
-        DslashArg<Float>::twist_a = this->a;
-        DslashArg<Float>::twist_b = this->b;
-        DslashArg<Float>::twist_c = this->c;
+        DslashArg<Float, nDim>::twist_a = this->a;
+        DslashArg<Float, nDim>::twist_b = this->b;
+        DslashArg<Float, nDim>::twist_c = this->c;
       }
     }
   };

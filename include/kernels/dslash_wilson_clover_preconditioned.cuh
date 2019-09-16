@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType reconstruct_, bool dynamic_clover_>
-  struct WilsonCloverArg : WilsonArg<Float, nColor, reconstruct_> {
-    using WilsonArg<Float, nColor, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_>
+  struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_;
 
@@ -20,10 +20,10 @@ namespace quda
     const real a; /** xpay scale factor */
 
     WilsonCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-        double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-        WilsonArg<Float, nColor, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
-        A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-        a(a)
+                    double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, a, x, parity, dagger, comm_override),
+      A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a)
     {
     }
   };

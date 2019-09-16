@@ -9,7 +9,7 @@
 namespace quda
 {
 
-  template <template <typename, int, int, int, bool, bool, KernelType, typename> class D, typename Float, typename Arg>
+  template <template <typename, int, int, int, bool, bool, KernelType, typename> class D, typename Arg>
   class Dslash : public TunableVectorYZ
   {
 
@@ -79,7 +79,7 @@ namespace quda
           // kernel, then we only have to update the non-p2p ghosts,
           // since these may have been assigned to zero-copy memory
           if (!comm_peer2peer_enabled(dir, dim) || arg.kernel_type == INTERIOR_KERNEL) {
-            ghost[2 * dim + dir] = (Float *)((char *)in.Ghost2() + in.GhostOffset(dim, dir) * in.GhostPrecision());
+            ghost[2 * dim + dir] = (typename Arg::Float*)((char *)in.Ghost2() + in.GhostOffset(dim, dir) * in.GhostPrecision());
           }
         }
       }
@@ -146,11 +146,41 @@ namespace quda
        all dslash types, though in some cases we specialize to reduce
        compilation time.
     */
-    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool dagger, bool xpay, KernelType kernel_type>
+    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
     inline void Launch(TuneParam &tp, const cudaStream_t &stream)
     {
-      launch(dslashGPU<D, P, Float, nDim, Arg::nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
+      launch(dslashGPU<D, P, typename Arg::Float, Arg::nDim, Arg::nColor, nParity, dagger, xpay, kernel_type, Arg>, tp,
+             stream);
     }
+
+#ifdef JITIFY
+    /**
+       @brief Return a jitify kernel instance
+    */
+    template <template <bool, QudaPCType, typename> class P>
+    auto kernel_instance() {
+      if (!program) errorQuda("Jitify program has not been created");
+      using namespace jitify::reflection;
+      const auto kernel = "quda::dslashGPU";
+
+      // we need this hackery to get the naked unbound template class parameters
+      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_naked = D_instance.substr(0, D_instance.find("<"));
+      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
+      auto P_naked = P_instance.substr(0, P_instance.find("<"));
+
+      // Since we pass the operator and packer classes as strings to
+      // jitify, we need to handle the reflection for all other
+      // template parameters here as well as opposed to leaving this
+      // to jitify.  Note the use of int(arg.nDim) and
+      // int(arg.nColor): this is to prevent undefined refernces
+      auto instance = program->kernel(kernel).instantiate(
+        {D_naked, P_naked, reflect<typename Arg::Float>(), reflect(int(arg.nDim)), reflect(int(arg.nColor)),
+         reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
+
+      return instance;
+    }
+#endif
 
   public:
     /**
@@ -159,41 +189,23 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool dagger, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay>
     inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
       if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("Not implemented");
       } else {
 #ifdef JITIFY
-        if (!program) errorQuda("Jitify program has not been created");
-        using namespace jitify::reflection;
-        const auto kernel = "quda::dslashGPU";
-
-        // we need this hackery to get the naked unbound template class parameters
-        auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
-        auto D_naked = D_instance.substr(0, D_instance.find("<"));
-        auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-        auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-        // since we pass the operator and packer classes as strings to
-        // jitify, we need to handle the reflection for all other
-        // template parameters here as well
-        Tunable::jitify_error
-          = program->kernel(kernel)
-              .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim), reflect(int(arg.nColor)),
-                            reflect(nParity), reflect(dagger), reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-              .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-              .launch(arg);
+        Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
         switch (arg.kernel_type) {
-        case INTERIOR_KERNEL: Launch<P, nDim, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
+        case INTERIOR_KERNEL: Launch<P, nParity, dagger, xpay, INTERIOR_KERNEL>(tp, stream); break;
 #ifdef MULTI_GPU
-        case EXTERIOR_KERNEL_X: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
-        case EXTERIOR_KERNEL_Y: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
-        case EXTERIOR_KERNEL_Z: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
-        case EXTERIOR_KERNEL_T: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
-        case EXTERIOR_KERNEL_ALL: Launch<P, nDim, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
+        case EXTERIOR_KERNEL_X: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_X>(tp, stream); break;
+        case EXTERIOR_KERNEL_Y: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Y>(tp, stream); break;
+        case EXTERIOR_KERNEL_Z: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_Z>(tp, stream); break;
+        case EXTERIOR_KERNEL_T: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_T>(tp, stream); break;
+        case EXTERIOR_KERNEL_ALL: Launch<P, nParity, dagger, xpay, EXTERIOR_KERNEL_ALL>(tp, stream); break;
         default: errorQuda("Unexpected kernel type %d", arg.kernel_type);
 #else
         default: errorQuda("Unexpected kernel type %d for single-GPU build", arg.kernel_type);
@@ -209,34 +221,16 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nDim, int nParity, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, int nParity, bool xpay>
     inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
-      if (!program) errorQuda("Jitify program has not been created");
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      // since we pass the operator and packer classes as strings to
-      // jitify, we need to handle the reflection for all other
-      // template parameters here as well
-      Tunable::jitify_error = program->kernel(kernel)
-                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
-                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
-                                              reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                .launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       if (arg.dagger)
-        instantiate<P, nDim, nParity, true, xpay>(tp, stream);
+        instantiate<P, nParity, true, xpay>(tp, stream);
       else
-        instantiate<P, nDim, nParity, false, xpay>(tp, stream);
+        instantiate<P, nParity, false, xpay>(tp, stream);
 #endif
     }
 
@@ -246,33 +240,15 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nDim, bool xpay>
+    template <template <bool, QudaPCType, typename> class P, bool xpay>
     inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
-      if (!program) errorQuda("Jitify program has not been created");
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      // since we pass the operator and packer classes as strings to
-      // jitify, we need to handle the reflection for all other
-      // template parameters here as well
-      Tunable::jitify_error = program->kernel(kernel)
-                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
-                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
-                                              reflect(xpay), reflect(arg.kernel_type), reflect<Arg>()})
-                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                .launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       switch (arg.nParity) {
-      case 1: instantiate<P, nDim, 1, xpay>(tp, stream); break;
-      case 2: instantiate<P, nDim, 2, xpay>(tp, stream); break;
+      case 1: instantiate<P, 1, xpay>(tp, stream); break;
+      case 2: instantiate<P, 2, xpay>(tp, stream); break;
       default: errorQuda("nParity = %d undefined\n", arg.nParity);
       }
 #endif
@@ -284,38 +260,20 @@ namespace quda
        @param[in] tp The tuning parameters to use for this kernel
        @param[in] stream The cudaStream_t where the kernel will run
      */
-    template <template <bool, QudaPCType, typename> class P, int nDim>
+    template <template <bool, QudaPCType, typename> class P>
     inline void instantiate(TuneParam &tp, const cudaStream_t &stream)
     {
 #ifdef JITIFY
-      if (!program) errorQuda("Jitify program has not been created");
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      // since we pass the operator and packer classes as strings to
-      // jitify, we need to handle the reflection for all other
-      // template parameters here as well
-      Tunable::jitify_error = program->kernel(kernel)
-                                .instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
-                                              reflect(int(arg.nColor)), reflect(arg.nParity), reflect(arg.dagger),
-                                              reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()})
-                                .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                                .launch(arg);
+      Tunable::jitify_error = kernel_instance<P>().configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       if (arg.xpay)
-        instantiate<P, nDim, true>(tp, stream);
+        instantiate<P, true>(tp, stream);
       else
-        instantiate<P, nDim, false>(tp, stream);
+        instantiate<P, false>(tp, stream);
 #endif
     }
 
-    DslashArg<Float> &dslashParam; // temporary addition for policy compatibility
+    Arg &dslashParam; // temporary addition for policy compatibility
 
     Dslash(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
       TunableVectorYZ(1, arg.nParity),

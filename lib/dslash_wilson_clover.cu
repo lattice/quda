@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonClover : public Dslash<wilsonClover, Float, Arg>
+  template <typename Arg> class WilsonClover : public Dslash<wilsonClover, Arg>
   {
-    using Dslash = Dslash<wilsonClover, Float, Arg>;
+    using Dslash = Dslash<wilsonClover, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -29,7 +28,7 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash::template instantiate<packShmem, nDim, true>(tp, stream);
+        Dslash::template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Wilson-clover operator only defined for xpay=true");
     }
@@ -69,8 +68,8 @@ namespace quda
         double a, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
-      WilsonClover<Float, nDim, nColor, decltype(arg)> wilson(arg, out, in);
+      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, 0.0, x, parity, dagger, comm_override);
+      WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

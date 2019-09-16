@@ -18,9 +18,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<staggered, Float, Arg>
+  template <typename Arg> class Staggered : public Dslash<staggered, Arg>
   {
-    using Dslash = Dslash<staggered, Float, Arg>;
+    using Dslash = Dslash<staggered, Arg>;
 
   public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
@@ -29,7 +29,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem, nDim>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
     }
   };
 
@@ -44,9 +44,9 @@ namespace quda
         constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
         constexpr bool improved = false;
 
-        StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
+        StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
           out, in, U, U, a, x, parity, dagger, comm_override);
-        Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+        Staggered<decltype(arg)> staggered(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered)> policy(
           staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
@@ -60,9 +60,9 @@ namespace quda
         constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
         constexpr bool improved = false;
 
-        StaggeredArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
+        StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_TIFR> arg(
           out, in, U, U, a, x, parity, dagger, comm_override);
-        Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+        Staggered<decltype(arg)> staggered(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered)> policy(
           staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

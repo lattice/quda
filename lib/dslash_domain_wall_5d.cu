@@ -13,10 +13,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class DomainWall5D : public Dslash<domainWall5D, Float, Arg>
+  template <typename Arg> class DomainWall5D : public Dslash<domainWall5D, Arg>
   {
-    using Dslash = Dslash<domainWall5D, Float, Arg>;
+    using Dslash = Dslash<domainWall5D, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -30,7 +29,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packShmem, nDim>(tp, stream);
+      Dslash::template instantiate<packShmem>(tp, stream);
     }
 
     long long flops() const
@@ -69,12 +68,12 @@ namespace quda
         double m_f, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 5;
-      DomainWall5DArg<Float, nColor, recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
-      DomainWall5D<Float, nDim, nColor, decltype(arg)> dwf(arg, out, in);
+      DomainWall5DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_f, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall5D<decltype(arg)> dwf(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(dwf)> policy(dwf,
-          const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
-          in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
+      dslash::DslashPolicyTune<decltype(dwf)> policy(
+        dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),
+        in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
       checkCudaError();

@@ -14,7 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the Wilson operator
    */
-  template <typename Float, int nColor_, QudaReconstructType reconstruct_> struct WilsonArg : DslashArg<Float> {
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  struct WilsonArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = true;
@@ -36,7 +37,7 @@ namespace quda
 
     WilsonArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a,
               const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, spin_project, comm_override),
       out(out),
       in(in),
       U(U),

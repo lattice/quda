@@ -14,9 +14,9 @@ namespace quda
   /**
      @brief Parameter structure for driving the Staggered Dslash operator
   */
-  template <typename Float, int nColor_, QudaReconstructType reconstruct_u_, QudaReconstructType reconstruct_l_,
-            bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
-  struct StaggeredArg : DslashArg<Float> {
+  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_u_,
+            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+  struct StaggeredArg : DslashArg<Float, nDim> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 1;
@@ -45,7 +45,7 @@ namespace quda
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project, comm_override),
       out(out),
       in(in, improved_ ? 3 : 1),
       U(U),

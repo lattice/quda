@@ -15,9 +15,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, typename Arg> class Wilson : public Dslash<wilson, Float, Arg>
+  template <typename Arg> class Wilson : public Dslash<wilson, Arg>
   {
-    using Dslash = Dslash<wilson, Float, Arg>;
+    using Dslash = Dslash<wilson, Arg>;
 
   public:
     Wilson(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
@@ -26,7 +26,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packShmem, nDim>(tp, stream);
+      Dslash::template instantiate<packShmem>(tp, stream);
     }
   };
 
@@ -36,8 +36,8 @@ namespace quda
                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonArg<Float, nColor, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
-      Wilson<Float, nDim, decltype(arg)> wilson(arg, out, in);
+      WilsonArg<Float, nColor, nDim, recon> arg(out, in, U, a, x, parity, dagger, comm_override);
+      Wilson<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

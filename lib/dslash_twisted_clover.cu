@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class TwistedClover : public Dslash<wilsonClover, Float, Arg>
+  template <typename Arg> class TwistedClover : public Dslash<wilsonClover, Arg>
   {
-    using Dslash = Dslash<wilsonClover, Float, Arg>;
+    using Dslash = Dslash<wilsonClover, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -29,7 +28,7 @@ namespace quda
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
       if (arg.xpay)
-        this->template instantiate<packShmem, nDim, true>(tp, stream);
+        this->template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Twisted-clover operator only defined for xpay=true");
     }
@@ -69,8 +68,8 @@ namespace quda
                               bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
-      TwistedClover<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
+      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, C, a, b, x, parity, dagger, comm_override);
+      TwistedClover<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(
         twisted, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

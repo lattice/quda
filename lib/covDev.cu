@@ -21,9 +21,9 @@ namespace quda
 
 #ifdef GPU_COVDEV
 
-  template <typename Float, int nDim, int nColor, typename Arg> class CovDev : public Dslash<covDev, Float, Arg>
+  template <typename Arg> class CovDev : public Dslash<covDev, Arg>
   {
-    using Dslash = Dslash<covDev, Float, Arg>;
+    using Dslash = Dslash<covDev, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -39,7 +39,7 @@ namespace quda
 
       constexpr bool xpay = false;
       constexpr int nParity = 2;
-      Dslash::template instantiate<packShmem, nDim, nParity, xpay>(tp, stream);
+      Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
     }
 
     long long flops() const
@@ -140,8 +140,8 @@ namespace quda
 
     {
       constexpr int nDim = 4;
-      CovDevArg<Float, nColor, recon> arg(out, in, U, mu, parity, dagger, comm_override);
-      CovDev<Float, nDim, nColor, decltype(arg)> covDev(arg, out, in);
+      CovDevArg<Float, nColor, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
+      CovDev<decltype(arg)> covDev(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

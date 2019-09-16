@@ -19,9 +19,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<laplace, Float, Arg>
+  template <typename Arg> class Laplace : public Dslash<laplace, Arg>
   {
-    using Dslash = Dslash<laplace, Float, Arg>;
+    using Dslash = Dslash<laplace, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -32,7 +32,7 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem, nDim>(tp, stream);
+      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
     }
 
     long long flops() const
@@ -144,10 +144,9 @@ namespace quda
                         const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
-
       constexpr int nDim = 4;
-      LaplaceArg<Float, nColor, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<Float, nDim, nColor, decltype(arg)> laplace(arg, out, in);
+      LaplaceArg<Float, nColor, nDim, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
+      Laplace<decltype(arg)> laplace(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(laplace)> policy(
         laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

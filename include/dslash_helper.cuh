@@ -226,10 +226,11 @@ namespace quda
     return true;
   }
 
-  template <typename Float_> struct DslashArg {
+  template <typename Float_, int nDim_> struct DslashArg {
 
-    typedef Float_ Float;
-    typedef typename mapper<Float>::type real;
+    using Float = Float_;
+    using real = typename mapper<Float>::type;
+    static constexpr int nDim = nDim_;
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -331,7 +332,7 @@ namespace quda
     }
   };
 
-  template <typename Float> std::ostream &operator<<(std::ostream &out, const DslashArg<Float> &arg)
+  template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;

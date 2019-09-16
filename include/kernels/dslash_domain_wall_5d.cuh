@@ -7,19 +7,19 @@ namespace quda
 
   // fixme: fused kernel (thread dim mappers set after construction?) and xpay
 
-  template <typename Float, int nColor, QudaReconstructType reconstruct_>
-  struct DomainWall5DArg : WilsonArg<Float, nColor, reconstruct_> {
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
+  struct DomainWall5DArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     typedef typename mapper<Float>::type real;
     int Ls;   /** fifth dimension length */
     real a;   /** xpay scale factor */
     real m_f; /** fermion mass parameter */
 
     DomainWall5DArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_f,
-        bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-        WilsonArg<Float, nColor, reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
-        Ls(in.X(4)),
-        a(a),
-        m_f(m_f)
+                    bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
+      Ls(in.X(4)),
+      a(a),
+      m_f(m_f)
     {
     }
   };

@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class TwistedCloverPreconditioned : public Dslash<twistedCloverPreconditioned, Float, Arg>
+  template <typename Arg> class TwistedCloverPreconditioned : public Dslash<twistedCloverPreconditioned, Arg>
   {
-    using Dslash = Dslash<twistedCloverPreconditioned, Float, Arg>;
+    using Dslash = Dslash<twistedCloverPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -35,12 +34,12 @@ namespace quda
       if (arg.nParity == 1) {
         if (arg.xpay) {
           if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
-          Dslash::template instantiate<packShmem, nDim, 1, false, true>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
         } else {
           if (arg.dagger)
-            Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
+            Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
           else
-            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
+            Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
         }
       } else {
         errorQuda("Preconditioned twisted-clover operator not defined nParity=%d", arg.nParity);
@@ -120,9 +119,9 @@ namespace quda
 #else
       constexpr bool dynamic_clover = false;
 #endif
-      TwistedCloverArg<Float, nColor, recon, dynamic_clover> arg(
+      TwistedCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(
           out, in, U, C, a, b, xpay, x, parity, dagger, comm_override);
-      TwistedCloverPreconditioned<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
+      TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

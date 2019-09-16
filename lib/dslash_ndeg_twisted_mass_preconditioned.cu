@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned, Float, Arg>
+  template <typename Arg> class NdegTwistedMassPreconditioned : public Dslash<nDegTwistedMassPreconditioned, Arg>
   {
-    using Dslash = Dslash<nDegTwistedMassPreconditioned, Float, Arg>;
+    using Dslash = Dslash<nDegTwistedMassPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -25,7 +24,7 @@ namespace quda
     bool shared;
     unsigned int sharedBytesPerThread() const
     {
-      return shared ? 2 * nColor * 4 * sizeof(typename mapper<Float>::type) : 0;
+      return shared ? 2 * in.Ncolor() * 4 * sizeof(typename mapper<typename Arg::Float>::type) : 0;
     }
 
   public:
@@ -49,9 +48,9 @@ namespace quda
 
       if (arg.nParity == 1) {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned non-degenerate twisted-mass operator not defined nParity=%d", arg.nParity);
       }
@@ -75,7 +74,7 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * nColor * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += 2 * in.Ncolor() * 4 * 4 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
       default: break; // twisted-mass flops are in the interior kernel
       }
@@ -90,9 +89,9 @@ namespace quda
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedMassArg<Float, nColor, recon> arg(
+      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(
           out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
-      NdegTwistedMassPreconditioned<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
+      NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),

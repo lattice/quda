@@ -16,10 +16,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class DomainWall4D : public Dslash<domainWall4D, Float, Arg>
+  template <typename Arg> class DomainWall4D : public Dslash<domainWall4D, Arg>
   {
-    using Dslash = Dslash<domainWall4D, Float, Arg>;
+    using Dslash = Dslash<domainWall4D, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -33,28 +32,17 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      typedef typename mapper<Float>::type real;
+      typedef typename mapper<typename Arg::Float>::type real;
 #ifdef JITIFY
       // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
-      using namespace jitify::reflection;
-      const auto kernel = "quda::dslashGPU";
-
-      // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<domainWall4D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
-      auto D_naked = D_instance.substr(0, D_instance.find("<"));
-      auto P_instance = reflect<packShmem<false, QUDA_4D_PC, Arg>>();
-      auto P_naked = P_instance.substr(0, P_instance.find("<"));
-
-      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect<Float>(), reflect(nDim),
-                                                           reflect(nColor), reflect(arg.nParity), reflect(arg.dagger),
-                                                           reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
+      auto instance = Dslash::template kernel_instance<packShmem>();
       cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
                               streams[Nstream - 1]);
-      Dslash::template instantiate<packShmem, nDim>(tp, stream);
+      Dslash::template instantiate<packShmem>(tp, stream);
 #endif
     }
   };
@@ -66,8 +54,8 @@ namespace quda
                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      DomainWall4DArg<Float, nColor, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger, comm_override);
-      DomainWall4D<Float, nDim, nColor, decltype(arg)> dwf(arg, out, in);
+      DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall4D<decltype(arg)> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(
         dwf, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)),

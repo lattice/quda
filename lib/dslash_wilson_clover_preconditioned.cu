@@ -14,10 +14,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonCloverPreconditioned : public Dslash<wilsonCloverPreconditioned, Float, Arg>
+  template <typename Arg> class WilsonCloverPreconditioned : public Dslash<wilsonCloverPreconditioned, Arg>
   {
-    using Dslash = Dslash<wilsonCloverPreconditioned, Float, Arg>;
+    using Dslash = Dslash<wilsonCloverPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -34,12 +33,12 @@ namespace quda
       if (arg.nParity == 1) {
         if (arg.xpay) {
           if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
-          Dslash::template instantiate<packShmem, nDim, 1, false, true>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
         } else {
           if (arg.dagger)
-            Dslash::template instantiate<packShmem, nDim, 1, true, false>(tp, stream);
+            Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
           else
-            Dslash::template instantiate<packShmem, nDim, 1, false, false>(tp, stream);
+            Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
         }
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
@@ -119,8 +118,8 @@ namespace quda
 #else
       constexpr bool dynamic_clover = false;
 #endif
-      WilsonCloverArg<Float, nColor, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
-      WilsonCloverPreconditioned<Float, nDim, nColor, decltype(arg)> wilson(arg, out, in);
+      WilsonCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

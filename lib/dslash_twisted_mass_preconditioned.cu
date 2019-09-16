@@ -13,10 +13,9 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class TwistedMassPreconditioned : public Dslash<twistedMassPreconditioned, Float, Arg>
+  template <typename Arg> class TwistedMassPreconditioned : public Dslash<twistedMassPreconditioned, Arg>
   {
-    using Dslash = Dslash<twistedMassPreconditioned, Float, Arg>;
+    using Dslash = Dslash<twistedMassPreconditioned, Arg>;
     using Dslash::arg;
     using Dslash::in;
 
@@ -37,9 +36,9 @@ namespace quda
 
       if (arg.nParity == 1) {
         if (arg.xpay)
-          Dslash::template instantiate<packShmem, nDim, 1, true>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
         else
-          Dslash::template instantiate<packShmem, nDim, 1, false>(tp, stream);
+          Dslash::template instantiate<packShmem, 1, false>(tp, stream);
       } else {
         errorQuda("Preconditioned twisted-mass operator not defined nParity=%d", arg.nParity);
       }
@@ -51,7 +50,7 @@ namespace quda
       switch (arg.kernel_type) {
       case INTERIOR_KERNEL:
       case KERNEL_POLICY:
-        flops += 2 * nColor * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
+        flops += 2 * in.Ncolor() * 4 * 2 * in.Volume(); // complex * Nc * Ns * fma * vol
         break;
       default: break;
       }
@@ -66,8 +65,8 @@ namespace quda
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      TwistedMassArg<Float, nColor, recon> arg(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override);
-      TwistedMassPreconditioned<Float, nDim, nColor, decltype(arg)> twisted(arg, out, in);
+      TwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, xpay, x, parity, dagger, asymmetric, comm_override);
+      TwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

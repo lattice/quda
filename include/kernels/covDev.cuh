@@ -14,7 +14,8 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor_, QudaReconstructType reconstruct_> struct CovDevArg : DslashArg<Float> {
+  template <typename Float, int nColor_, QudaReconstructType reconstruct_, int nDim>
+  struct CovDevArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
     static constexpr int nSpin = 4;
     static constexpr bool spin_project = false;
@@ -36,7 +37,7 @@ namespace quda
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
               const int *comm_override) :
 
-      DslashArg<Float>(in, U, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float,nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
       U(U),

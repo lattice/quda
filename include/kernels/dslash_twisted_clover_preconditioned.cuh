@@ -7,9 +7,9 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, QudaReconstructType reconstruct_, bool dynamic_clover_>
-  struct TwistedCloverArg : WilsonArg<Float, nColor, reconstruct_> {
-    using WilsonArg<Float, nColor, reconstruct_>::nSpin;
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_>
+  struct TwistedCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
+    using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool dynamic_clover = dynamic_clover_;
 
@@ -21,12 +21,12 @@ namespace quda
     real b;        // this is the twist factor
 
     TwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-        double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-        WilsonArg<Float, nColor, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-        A(A, false),
-        A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
-        a(a),
-        b(dagger ? -0.5 * b : 0.5 * b) // factor of 0.5 comes from basis transform
+                     double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+      WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
+      A(A, false),
+      A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
+      a(a),
+      b(dagger ? -0.5 * b : 0.5 * b) // factor of 0.5 comes from basis transform
     {
     }
   };
