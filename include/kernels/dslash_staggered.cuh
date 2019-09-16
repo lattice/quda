@@ -6,7 +6,7 @@
 #include <color_spinor.h>
 #include <dslash_helper.cuh>
 #include <index_helper.cuh>
-#include <kernels/laplace.cuh>
+#include <kernels/dslash_pack.cuh> // forthe packing kernel
 
 namespace quda
 {
