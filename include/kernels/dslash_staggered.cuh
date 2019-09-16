@@ -45,7 +45,8 @@ namespace quda
     static constexpr bool improved = improved_;
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
-      DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
+                             comm_override),
       out(out),
       in(in, improved_ ? 3 : 1),
       U(U),

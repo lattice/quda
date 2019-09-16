@@ -89,8 +89,8 @@ namespace quda
         const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(
-          out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric, comm_override);
+      NdegTwistedMassArg<Float, nColor, nDim, recon> arg(out, in, U, a, b, c, xpay, x, parity, dagger, asymmetric,
+                                                         comm_override);
       NdegTwistedMassPreconditioned<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,

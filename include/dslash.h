@@ -9,6 +9,21 @@
 namespace quda
 {
 
+  /**
+     @brief This is the generic driver for launching Dslash kernels
+     (the base kernel of which is defined in dslash_helper.cuh).  This
+     is templated on the a template template parameter which is the
+     underlying operator wrapped in a class,
+
+     @tparam D A class that defines the linear operator we wish to
+     apply.  This class should define an operator() method that is
+     used to apply the operator by the dslash kernel.  See the wilson
+     class in the file kernels/dslash_wilson.cuh as an exmaple.
+
+     @tparam Arg The argument struct that is used to parameterize the
+     kernel.  For the wilson class example above, the WilsonArg class
+     defined in the same file is the corresponding argument class.
+  */
   template <template <typename, int, int, int, bool, bool, KernelType, typename> class D, typename Arg>
   class Dslash : public TunableVectorYZ
   {
@@ -157,8 +172,8 @@ namespace quda
     /**
        @brief Return a jitify kernel instance
     */
-    template <template <bool, QudaPCType, typename> class P>
-    auto kernel_instance() {
+    template <template <bool, QudaPCType, typename> class P> auto kernel_instance()
+    {
       if (!program) errorQuda("Jitify program has not been created");
       using namespace jitify::reflection;
       const auto kernel = "quda::dslashGPU";

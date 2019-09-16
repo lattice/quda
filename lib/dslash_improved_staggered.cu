@@ -140,7 +140,8 @@ namespace quda
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
-      StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
+      StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger,
+                                                                        comm_override);
       Staggered<decltype(arg)> staggered(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(staggered)> policy(

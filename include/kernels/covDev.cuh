@@ -37,7 +37,7 @@ namespace quda
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
               const int *comm_override) :
 
-      DslashArg<Float,nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
       U(U),

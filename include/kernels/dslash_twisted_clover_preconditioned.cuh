@@ -21,7 +21,8 @@ namespace quda
     real b;        // this is the twist factor
 
     TwistedCloverArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                     double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
+                     double a, double b, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
+                     const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       A(A, false),
       A2inv(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field

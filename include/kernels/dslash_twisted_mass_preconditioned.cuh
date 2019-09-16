@@ -15,8 +15,8 @@ namespace quda
     real b_inv;      /** inverse twist factor - used to allow early xpay inclusion */
     bool asymmetric; /** whether we are applying the asymmetric operator or not */
 
-    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                   bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric, const int *comm_override) :
+    TwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b, bool xpay,
+                   const ColorSpinorField &x, int parity, bool dagger, bool asymmetric, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the twist

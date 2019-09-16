@@ -28,8 +28,8 @@ namespace quda
     }
 
     DomainWall4DArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double m_5,
-                    const Complex *b_5, const Complex *c_5, bool xpay, const ColorSpinorField &x, int parity, bool dagger,
-                    const int *comm_override) :
+                    const Complex *b_5, const Complex *c_5, bool xpay, const ColorSpinorField &x, int parity,
+                    bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? a : 0.0, x, parity, dagger, comm_override),
       Ls(in.X(4))
     {

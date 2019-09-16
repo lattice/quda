@@ -39,7 +39,7 @@ namespace quda
     LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
 
-      DslashArg<Float,nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
+      DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
       out(out),
       in(in),
       U(U),

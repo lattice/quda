@@ -119,8 +119,8 @@ namespace quda
 #else
       constexpr bool dynamic_clover = false;
 #endif
-      TwistedCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(
-          out, in, U, C, a, b, xpay, x, parity, dagger, comm_override);
+      TwistedCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(out, in, U, C, a, b, xpay, x, parity, dagger,
+                                                                       comm_override);
       TwistedCloverPreconditioned<decltype(arg)> twisted(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(twisted)> policy(twisted,

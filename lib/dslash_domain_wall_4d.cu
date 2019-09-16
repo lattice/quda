@@ -54,7 +54,8 @@ namespace quda
                              bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger, comm_override);
+      DomainWall4DArg<Float, nColor, nDim, recon> arg(out, in, U, a, m_5, b_5, c_5, a != 0.0, x, parity, dagger,
+                                                      comm_override);
       DomainWall4D<decltype(arg)> dwf(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(dwf)> policy(

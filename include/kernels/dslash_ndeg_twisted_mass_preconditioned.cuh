@@ -19,16 +19,16 @@ namespace quda
     bool asymmetric; /** whether we are applying the asymetric operator or not */
 
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-        double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
-        const int *comm_override) :
+                       double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
+                       const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
-        a(a),
-        b(dagger ? -b : b), // if dagger flip the chiral twist
-        c(c),
-        a_inv(1.0 / (a * (1.0 + b * b - c * c))),
-        b_inv(dagger ? b : -b),
-        c_inv(-c),
-        asymmetric(asymmetric)
+      a(a),
+      b(dagger ? -b : b), // if dagger flip the chiral twist
+      c(c),
+      a_inv(1.0 / (a * (1.0 + b * b - c * c))),
+      b_inv(dagger ? b : -b),
+      c_inv(-c),
+      asymmetric(asymmetric)
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
