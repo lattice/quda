@@ -67,8 +67,8 @@ namespace quda
 
   */
   template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Arg, typename Vector>
-  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity, int idx,
-                                               int thread_dim, bool &active)
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+                                               int idx, int thread_dim, bool &active)
   {
 
     typedef typename mapper<typename Arg::Float>::type real;
@@ -129,8 +129,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct laplace : dslash_default {
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> struct laplace : dslash_default {
 
     Arg &arg;
     constexpr laplace(Arg &arg) : arg(arg) {}

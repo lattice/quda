@@ -48,7 +48,8 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
   template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int s, int parity, int idx, int thread_dim, bool &active)
+  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int s,
+                                                int parity, int idx, int thread_dim, bool &active)
   {
     static_assert(twist == 1 || twist == 2, "twist template must equal 1 or 2"); // ensure singlet or doublet
     typedef typename mapper<typename Arg::Float>::type real;
@@ -67,7 +68,8 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            idx;
 
           Link U = arg.U(d, x_cb, parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -103,7 +105,8 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) :
+            idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
