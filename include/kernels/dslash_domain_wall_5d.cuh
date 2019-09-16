@@ -24,7 +24,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct domainWall5D : dslash_default {
 
     Arg &arg;
@@ -34,28 +34,27 @@ namespace quda
 
     __device__ __host__ inline void apply(int idx, int parity)
     {
-      typedef typename mapper<Float>::type real;
-      typedef ColorSpinor<real, nColor, 4> Vector;
+      typedef typename mapper<typename Arg::Float>::type real;
+      typedef ColorSpinor<real, Arg::nColor, 4> Vector;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[nDim];
-      int x_cb = getCoords<nDim, QUDA_5D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int coord[Arg::nDim];
+      int x_cb = getCoords<QUDA_5D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       // we pass s=0, since x_cb is a 5-d index that includes s
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim,
-                                                                     active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
       if (kernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
         {
-          const int fwd_idx = getNeighborIndexCB<nDim>(coord, d, +1, arg.dc);
+          const int fwd_idx = getNeighborIndexCB<Arg::nDim>(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           if (s == arg.Ls - 1) {
@@ -66,7 +65,7 @@ namespace quda
         }
 
         {
-          const int back_idx = getNeighborIndexCB<nDim>(coord, d, -1, arg.dc);
+          const int back_idx = getNeighborIndexCB<Arg::nDim>(coord, d, -1, arg.dc);
           constexpr int proj_dir = dagger ? -1 : +1;
           Vector in = arg.in(back_idx, their_spinor_parity);
           if (s == 0) {

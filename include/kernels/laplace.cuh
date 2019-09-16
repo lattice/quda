@@ -66,19 +66,17 @@ namespace quda
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, int dir,
-            typename Arg, typename Vector>
-  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[nDim], int x_cb, int parity, int idx,
+  template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Arg, typename Vector>
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity, int idx,
                                                int thread_dim, bool &active)
   {
 
-    typedef typename mapper<Float>::type real;
-    typedef Matrix<complex<real>, nColor> Link;
+    typedef typename mapper<typename Arg::Float>::type real;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
 #pragma unroll
-    for (int d = 0; d < nDim; d++) { // loop over dimension
+    for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       if (d != dir) {
         {
           // Forward gather - compute fwd offset for vector fetch
@@ -131,7 +129,7 @@ namespace quda
   }
 
   // out(x) = M*in
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct laplace : dslash_default {
 
     Arg &arg;
@@ -140,8 +138,8 @@ namespace quda
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
-      using real = typename mapper<Float>::type;
-      using Vector = ColorSpinor<real, nColor, 1>;
+      using real = typename mapper<typename Arg::Float>::type;
+      using Vector = ColorSpinor<real, Arg::nColor, 1>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
@@ -149,8 +147,8 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      int coord[nDim];
-      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
+      int coord[Arg::nDim];
+      int x_cb = getCoords<QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -160,13 +158,11 @@ namespace quda
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
       case 3:
-        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx,
-                                                                           thread_dim, active);
+        applyLaplace<nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
         break;
       case 4:
       default:
-        applyLaplace<Float, nDim, nColor, nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx,
-                                                                            thread_dim, active);
+        applyLaplace<nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
         break;
       }
 

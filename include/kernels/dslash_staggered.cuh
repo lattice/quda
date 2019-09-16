@@ -70,12 +70,12 @@ namespace quda
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(
-      Vector &out, Arg &arg, int coord[nDim], int x_cb, int parity, int idx, int thread_dim, bool &active)
+  template <int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
+  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+                                                 int idx, int thread_dim, bool &active)
   {
-    typedef typename mapper<Float>::type real;
-    typedef Matrix<complex<real>, nColor> Link;
+    typedef typename mapper<typename Arg::Float>::type real;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
 #pragma unroll
@@ -164,7 +164,7 @@ namespace quda
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
     Arg &arg;
@@ -173,22 +173,21 @@ namespace quda
 
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
-      using real = typename mapper<Float>::type;
-      using Vector = ColorSpinor<real, nColor, 1>;
+      using real = typename mapper<typename Arg::Float>::type;
+      using Vector = ColorSpinor<real, Arg::nColor, 1>;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[nDim];
-      int x_cb = arg.improved ? getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
-                                getCoords<nDim, QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
+      int coord[Arg::nDim];
+      int x_cb = arg.improved ? getCoords<QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
+                                getCoords<QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
-      applyStaggered<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim,
-                                                                        active);
+      applyStaggered<nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
       if (dagger) { out = -out; }
 

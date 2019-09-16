@@ -47,19 +47,17 @@ namespace quda
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, int twist, KernelType kernel_type,
-      typename Arg, typename Vector>
-  __device__ __host__ inline void applyWilsonTM(
-      Vector &out, Arg &arg, int coord[nDim], int x_cb, int s, int parity, int idx, int thread_dim, bool &active)
+  template <int nParity, bool dagger, int twist, KernelType kernel_type, typename Arg, typename Vector>
+  __device__ __host__ inline void applyWilsonTM(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int s, int parity, int idx, int thread_dim, bool &active)
   {
     static_assert(twist == 1 || twist == 2, "twist template must equal 1 or 2"); // ensure singlet or doublet
-    typedef typename mapper<Float>::type real;
-    typedef ColorSpinor<real, nColor, 2> HalfVector;
-    typedef Matrix<complex<real>, nColor> Link;
+    typedef typename mapper<typename Arg::Float>::type real;
+    typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
 
 #pragma unroll
-    for (int d = 0; d < nDim; d++) { // loop over dimension
+    for (int d = 0; d < Arg::nDim; d++) { // loop over dimension
       {                              // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
         constexpr int proj_dir = dagger ? +1 : -1;
@@ -69,8 +67,7 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-              ghostFaceIndex<1, nDim>(coord, arg.dim, d, arg.nFace) :
-              idx;
+            ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, x_cb, parity);
           HalfVector in = arg.in.Ghost(d, 1, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -106,8 +103,7 @@ namespace quda
         if (doHalo<kernel_type>(d) && ghost) {
           // we need to compute the face index if we are updating a face that isn't ours
           const int ghost_idx = (kernel_type == EXTERIOR_KERNEL_ALL && d != thread_dim) ?
-              ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace) :
-              idx;
+            ghostFaceIndex<0, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U.Ghost(d, ghost_idx, 1 - parity);
           HalfVector in = arg.in.Ghost(d, 0, ghost_idx + s * arg.dc.ghostFaceCB[d], their_spinor_parity);
@@ -136,7 +132,7 @@ namespace quda
     } // nDim
   }
 
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger_, bool xpay_, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger_, bool xpay_, KernelType kernel_type, typename Arg>
   struct twistedMassPreconditioned : dslash_default {
 
     Arg &arg;
@@ -151,26 +147,24 @@ namespace quda
     */
     template <bool dagger, bool asymmetric, bool xpay> __device__ __host__ inline void apply(int idx, int s, int parity)
     {
-      typedef typename mapper<Float>::type real;
-      typedef ColorSpinor<real, nColor, 4> Vector;
-      typedef ColorSpinor<real, nColor, 2> HalfVector;
+      typedef typename mapper<typename Arg::Float>::type real;
+      typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[nDim];
-      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int coord[Arg::nDim];
+      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
       if (!dagger || asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx,
-                                                                       thread_dim, active);
+        applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
       else // special dslash for symmetric dagger
-        applyWilsonTM<Float, nDim, nColor, nParity, dagger, 1, kernel_type>(out, arg, coord, x_cb, 0, parity, idx,
-                                                                            thread_dim, active);
+        applyWilsonTM<nParity, dagger, 1, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(x_cb, my_spinor_parity);

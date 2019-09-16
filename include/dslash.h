@@ -24,7 +24,7 @@ namespace quda
      kernel.  For the wilson class example above, the WilsonArg class
      defined in the same file is the corresponding argument class.
   */
-  template <template <typename, int, int, int, bool, bool, KernelType, typename> class D, typename Arg>
+  template <template <int, bool, bool, KernelType, typename> class D, typename Arg>
   class Dslash : public TunableVectorYZ
   {
 
@@ -42,6 +42,7 @@ namespace quda
     // pointers to ghost buffers we are packing to
     void *packBuffer[2 * QUDA_MAX_DIM];
 
+    std::string kernel_file;
     /**
        @brief Set the base strings used by the different dslash kernel
        types for autotuning.
@@ -164,8 +165,7 @@ namespace quda
     template <template <bool, QudaPCType, typename> class P, int nParity, bool dagger, bool xpay, KernelType kernel_type>
     inline void Launch(TuneParam &tp, const cudaStream_t &stream)
     {
-      launch(dslashGPU<D, P, typename Arg::Float, Arg::nDim, Arg::nColor, nParity, dagger, xpay, kernel_type, Arg>, tp,
-             stream);
+      launch(dslashGPU<D, P, nParity, dagger, xpay, kernel_type, Arg>, tp, stream);
     }
 
 #ifdef JITIFY
@@ -179,7 +179,7 @@ namespace quda
       const auto kernel = "quda::dslashGPU";
 
       // we need this hackery to get the naked unbound template class parameters
-      auto D_instance = reflect<D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>>();
+      auto D_instance = reflect<D<0, false, false, INTERIOR_KERNEL, Arg>>();
       auto D_naked = D_instance.substr(0, D_instance.find("<"));
       auto P_instance = reflect<P<false, QUDA_4D_PC, Arg>>();
       auto P_naked = P_instance.substr(0, P_instance.find("<"));
@@ -187,11 +187,9 @@ namespace quda
       // Since we pass the operator and packer classes as strings to
       // jitify, we need to handle the reflection for all other
       // template parameters here as well as opposed to leaving this
-      // to jitify.  Note the use of int(arg.nDim) and
-      // int(arg.nColor): this is to prevent undefined refernces
-      auto instance = program->kernel(kernel).instantiate(
-        {D_naked, P_naked, reflect<typename Arg::Float>(), reflect(int(arg.nDim)), reflect(int(arg.nColor)),
-         reflect(arg.nParity), reflect(arg.dagger), reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
+      // to jitify.
+      auto instance = program->kernel(kernel).instantiate({D_naked, P_naked, reflect(arg.nParity), reflect(arg.dagger),
+                                                           reflect(arg.xpay), reflect(arg.kernel_type), reflect<Arg>()});
 
       return instance;
     }
@@ -318,10 +316,13 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+      // extract the filename from the template template class (do
+      // this regardless of jitify to ensure a build error if filename
+      // helper isn't defined)
+      using D_ = D<0, false, false, INTERIOR_KERNEL, Arg>;
+      kernel_file = std::string("kernels/") + D_::filename();
 #ifdef JITIFY
-      // extract the filename from the template template class
-      using D_ = D<void, 0, 0, 0, false, false, INTERIOR_KERNEL, Arg>;
-      create_jitify_program(std::string("kernels/") + D_::filename());
+      create_jitify_program(kernel_file);
 #endif
     }
 

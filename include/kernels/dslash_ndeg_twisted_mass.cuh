@@ -22,7 +22,7 @@ namespace quda
     }
   };
 
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedMass : dslash_default {
 
     Arg &arg;
@@ -36,22 +36,21 @@ namespace quda
     */
     __device__ __host__ inline void operator()(int idx, int flavor, int parity)
     {
-      typedef typename mapper<Float>::type real;
-      typedef ColorSpinor<real, nColor, 4> Vector;
-      typedef ColorSpinor<real, nColor, 2> HalfVector;
+      typedef typename mapper<typename Arg::Float>::type real;
+      typedef ColorSpinor<real, Arg::nColor, 4> Vector;
+      typedef ColorSpinor<real, Arg::nColor, 2> HalfVector;
 
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[nDim];
-      int x_cb = getCoords<nDim, QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      int coord[Arg::nDim];
+      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<Float, nDim, nColor, nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx,
-                                                                     thread_dim, active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
 
       int my_flavor_idx = x_cb + flavor * arg.dc.volume_4d_cb;
 

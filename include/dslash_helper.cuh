@@ -84,10 +84,10 @@ namespace quda
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <int nDim, QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
+  template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim)
   {
-
+    constexpr auto nDim = Arg::nDim;
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
 
@@ -410,13 +410,12 @@ namespace quda
      are reserved for data packing, which may include communication to
      neighboring processes.
    */
-  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-            typename D,
-            template <bool dagger, QudaPCType pc, typename Arg> typename P, typename Float, int nDim, int nColor,
-            int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
+            template <bool dagger, QudaPCType pc, typename Arg> typename P, int nParity, bool dagger, bool xpay,
+            KernelType kernel_type, typename Arg>
   __global__ void dslashGPU(Arg arg)
   {
-    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
+    D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
 
     int s = blockDim.y * blockIdx.y + threadIdx.y;
     if (s >= arg.dc.Ls) return;
