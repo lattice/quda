@@ -62,13 +62,18 @@ set (QUDA_OBJS
   extended_color_spinor_utilities.cu
   blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
+  inv_mspcg.cc
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp 
-  inv_mspcg.cc )
+  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 # cmake-format: on
+
+if(QUDA_LEGACY_DSLASH)
+  list(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
+endif()
+>>>>>>> c697d82690f52c419af4fcaf87106d7f19a39721
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
