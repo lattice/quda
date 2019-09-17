@@ -141,7 +141,7 @@ namespace quda {
           hVm(nullptr),
 										deflparam(deflParam)
           {
-            ColorSpinorParam csParam(*deflparam.RV);
+            ColorSpinorParam csParam(*deflparam.RV[0]);
             csParam.create        = QUDA_ZERO_FIELD_CREATE;
 												csParam.is_composite  = false;
 												csParam.composite_dim = 1;
@@ -441,11 +441,10 @@ namespace quda {
        void increment(){
 	 const int first_idx = deflparam.cur_dim;
 
-	 ColorSpinorFieldSet &rv = *deflparam.RV;
 	 ColorSpinorFieldSet &vm = *Vm;
 	 ColorSpinorFieldSet &vk = *V2k;
 
-	 if(rv.CompositeDim() < (first_idx+k) || deflparam.tot_dim < (first_idx+k)) {
+	 if(deflparam.RV.size() < (first_idx+k) || deflparam.tot_dim < (first_idx+k)) {
            warningQuda("\nNot enough space to add %d vectors. Keep deflation space unchanged.\n", k);
 	   return;
 	 }
@@ -463,12 +462,12 @@ namespace quda {
 
 	   printfQuda("Working with vector  %d .\n", i);
 
-	   rv[i] = vm[j];
+	   *deflparam.RV[i] = vm[j];
 	   // skip the first vector
 	   if (first_idx == 0 && j == 0) continue;
 
-	   std::vector<ColorSpinorField*> rvj(rv(0  , i  ));
-	   std::vector<ColorSpinorField*> rv2(rv(i-1, i+1));
+	   std::vector<ColorSpinorField*> rvj(deflparam.RV.begin(), deflparam.RV.begin() + i);
+	   std::vector<ColorSpinorField*> rv2(deflparam.RV.begin() + (i-1), deflparam.RV.begin() + (i+1));
 
 	   blas::reDotProduct(L.block(0,0,i,2).data(), rvj, rv2);
 
@@ -486,12 +485,10 @@ namespace quda {
 	   //Normalization of the previous vectors:
 	   if(R(i-1, i-1) < 1e-8)  errorQuda("\nCannot orthogonalize %dth vector\n", i-1);
 
-	   blas::ax(1.0 / R(i-1, i-1), rv[i-1]);
+	   blas::ax(1.0 / R(i-1, i-1), *deflparam.RV[i-1]);
 
 	   VectorXd Rj( R.col(i).head(i) );
-	   std::vector<ColorSpinorField*> rvjp1;
-
-	   rvjp1.push_back(&rv[i]);
+	   std::vector<ColorSpinorField*> rvjp1{deflparam.RV[i]};
 
 	   for(int l = 0; l < i; l++) Rj[l] = -Rj[l];
 
@@ -499,8 +496,8 @@ namespace quda {
 	 } // end for loop over j
 
 	 //extra step to include the last vector normalization
-	 R(first_idx+k-1,first_idx+k-1) = sqrt(blas::norm2(rv[first_idx+k-1]));
-	 blas::ax(1.0 / R(first_idx+k-1,first_idx+k-1), rv[first_idx+k-1]);
+	 R(first_idx+k-1,first_idx+k-1) = sqrt(blas::norm2(*deflparam.RV[first_idx+k-1]));
+	 blas::ax(1.0 / R(first_idx+k-1,first_idx+k-1), *deflparam.RV[first_idx+k-1]);
 
 #else //old legacy version
 
@@ -512,7 +509,7 @@ namespace quda {
 
            const int i = first_idx + j;
 
-	   rv[i] = vm[j];
+	   *deflparam.RV[i] = vm[j];
 
            std::unique_ptr<double[] > alpha(new double[i]);
 	   int offset = 0;
@@ -521,8 +518,8 @@ namespace quda {
 
 	     const int local_length = (i - offset) > cdot_pipeline_length  ? cdot_pipeline_length : (i - offset);
 
-	     std::vector<ColorSpinorField*> vj_(rv(offset, offset+local_length));
-	     std::vector<ColorSpinorField*> vi_(rv(i));
+	     std::vector<ColorSpinorField*> vj_(deflparam.RV.begin() + offset, deflparam.RV.begin() + offset + local_length);
+	     std::vector<ColorSpinorField*> vi_{deflparam.RV[i]};
 
 	     blas::reDotProduct(alpha.get(), vj_, vi_);
 	     for (int l = 0; l < local_length; l++) alpha[l] = -alpha[l];
@@ -531,9 +528,9 @@ namespace quda {
 
 	   }
 
-	   alpha[0] = blas::norm2(rv[i]);
+	   alpha[0] = blas::norm2(*deflparam.RV[i]);
 
-	   if(alpha[0] > 1e-16) blas::ax(1.0 /sqrt(alpha[0]), rv[i]);
+	   if(alpha[0] > 1e-16) blas::ax(1.0 /sqrt(alpha[0]), *deflparam.RV[i]);
 	   else                 errorQuda("\nCannot orthogonalize %dth vector\n", i);
 	 }
 
@@ -543,10 +540,10 @@ namespace quda {
 	 for(int i = first_idx; i < (first_idx + k); i++) {
            std::unique_ptr<double[] > alpha(new double[i+1]);
 
-	   std::vector<ColorSpinorField*> vj_(rv(0,i+1));
+	   std::vector<ColorSpinorField*> vj_(deflparam.RV.begin(),deflparam.RV.begin()+i+1);
 	   std::vector<ColorSpinorField*> av_(vk(0));
 
-	   deflparam.matDeflation(vk[0], rv[i]);
+	   deflparam.matDeflation(vk[0], *deflparam.RV[i]);
 	   blas::reDotProduct(alpha.get(), vj_, av_);
 
 	   deflparam.matProj[i*deflparam.ld+i] = alpha[i];
@@ -577,7 +574,6 @@ namespace quda {
 	 std::unique_ptr<double[] > evals(new double[deflparam.cur_dim]);
 	 std::unique_ptr<double[] > projm(new double[deflparam.ld*deflparam.cur_dim]);
 
-	 ColorSpinorFieldSet &rv = *deflparam.RV;
 	 ColorSpinorFieldSet &vk = *V2k;
 
 	 memcpy(projm.get(), deflparam.matProj, deflparam.ld*deflparam.cur_dim*sizeof(double));
@@ -597,7 +593,7 @@ namespace quda {
 	   else 	                  errorQuda("\nCannot invert Ritz value.\n");
 	 }
 
-	 ColorSpinorParam csParam(rv[0]);
+	 ColorSpinorParam csParam(*deflparam.RV[0]);
 
 	 csParam.create   = QUDA_ZERO_FIELD_CREATE;
 	 csParam.is_composite  = false;
@@ -609,7 +605,7 @@ namespace quda {
 	 csParam.is_composite  = true;
 	 csParam.composite_dim = max_nev;
 
-       	 csParam.setPrecision(rv.Precision());
+       	 csParam.setPrecision(deflparam.RV[0]->Precision());
 	 csParam.mem_type  = QUDA_MEMORY_MAPPED;
 	 std::unique_ptr<ColorSpinorField> buff(ColorSpinorField::Create(csParam));
 
@@ -619,13 +615,12 @@ namespace quda {
 
 	 while ((relerr < tol) && (idx < max_nev))
 	 {
-	   std::vector<ColorSpinorField*> rv_(rv( 0, deflparam.cur_dim));
-	   std::vector<ColorSpinorField*> res;
-	   res.push_back(r.get());
+	   std::vector<ColorSpinorField*> rv_(deflparam.RV.begin(), deflparam.RV.begin() + deflparam.cur_dim);
+	   std::vector<ColorSpinorField*> res{r.get()};
 
 	   blas::zero(*r);
 	   //blas::axpy(&projm.get()[idx*param.ld], rv_, res);//multiblas
-	   for(int j = 0; j < deflparam.cur_dim; j++) blas::axpy(projm.get()[j+idx*deflparam.ld], rv[j], *r);
+	   for(int j = 0; j < deflparam.cur_dim; j++) blas::axpy(projm.get()[j+idx*deflparam.ld], *deflparam.RV[j], *r);
 
 	   blas::copy(buff->Component(idx), *r);
 
@@ -653,7 +648,7 @@ namespace quda {
 	 printfQuda("\nReserved eigenvectors: %d\n", idx);
 	 //copy all the stuff to cudaRitzVectors set:
 
-	 for(int i = 0; i < idx; i++) blas::copy(deflparam.RV->Component(i), buff->Component(i));
+	 for(int i = 0; i < idx; i++) blas::copy(*deflparam.RV[i], buff->Component(i));
 
 	 //reset current dimension:
 	 deflparam.cur_dim = idx;
@@ -1220,9 +1215,9 @@ namespace quda {
 
      if (!init) {
        DeflationParam &deflParam = *(defl_p->deflParam);
-       
+
        ColorSpinorParam csParam(in);
-       
+
        const bool host_computing = param.pipeline == 0 ? false : host_flag;
 
        eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, deflParam, param.precision_sloppy, param.precision_ritz, host_computing);
@@ -1239,7 +1234,7 @@ namespace quda {
 
        csParam.is_composite  = true;
        csParam.composite_dim = (param.pipeline == 0) ? (K ? 6 : 5) : 7;//needs an extra field for the preconditioned version
-       
+
        if (!matSloppy.isStaggered()) csParam.composite_dim += 1; //add an extra tmp field for the wilson-like dslash
 
        // A work space to keep CG fields

@@ -2741,7 +2741,7 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 }
 
 deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
-  : d(nullptr), m(nullptr), RV(nullptr), deflParam(nullptr), defl(nullptr),  profile(profile) {
+  : d(nullptr), m(nullptr), RV(0), deflParam(nullptr), defl(nullptr),  profile(profile) {
 
   QudaInvertParam *param = eig_param.invert_param;
 
@@ -2769,9 +2769,9 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   ColorSpinorParam ritzParam(nullptr, *param, cudaGauge->X(), pc_solve, eig_param.location);
 
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
-  ritzParam.is_composite  = true;
-  ritzParam.is_component  = false;
-  ritzParam.composite_dim = param->nev*param->deflation_grid;
+  //ritzParam.is_composite  = true;
+  //ritzParam.is_component  = false;
+  //ritzParam.composite_dim = param->nev*param->deflation_grid;
   ritzParam.setPrecision(param->cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
@@ -2797,7 +2797,8 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
       printfQuda("Using mapped memory type.\n");
   }
 
-  RV = ColorSpinorField::Create(ritzParam);
+  //RV = ColorSpinorField::Create(ritzParam);
+  for (int i = 0; i < (param->nev*param->deflation_grid); i++) { RV.push_back(ColorSpinorField::Create(ritzParam)); }
 
   deflParam = new DeflationParam(eig_param, RV, *m);
 

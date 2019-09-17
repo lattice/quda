@@ -62,9 +62,7 @@ namespace quda {
     SelfAdjointEigenSolver<MatrixXd> es_projm( projm_ );
     evecs_.block(0, 0, param.cur_dim, param.cur_dim) = es_projm.eigenvectors();
 
-    ColorSpinorFieldSet &rv = *param.RV;
-
-    ColorSpinorParam csParam(rv[0]);
+    ColorSpinorParam csParam(*param.RV[0]);
     csParam.create   = QUDA_ZERO_FIELD_CREATE;
     csParam.location = param.location;
     csParam.mem_type = QUDA_MEMORY_DEVICE;
@@ -83,9 +81,8 @@ namespace quda {
     std::unique_ptr<ColorSpinorField> r_sloppy(ColorSpinorField::Create(csParam));
     std::unique_ptr<ColorSpinorField> Av_sloppy(ColorSpinorField::Create(csParam));
 
-    std::vector<ColorSpinorField*> rv_(rv(0, param.cur_dim));
-    std::vector<ColorSpinorField*> res_;
-    res_.push_back(r.get());
+    std::vector<ColorSpinorField*> rv_(param.RV.begin(), param.RV.begin() + param.cur_dim);
+    std::vector<ColorSpinorField*> res_{r.get()};
 
     for(int i = 0; i < nevs_to_print; i++)
     {
@@ -111,8 +108,6 @@ namespace quda {
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-//    if(param.eig_global.invert_param->inv_type != QUDA_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_INC_EIGCG_INVERTER && param.eig_global.invert_param->inv_type != QUDA_CG_INVERTER)
-//       errorQuda("\nMethod is not implemented for %d inverter type.\n", param.eig_global.invert_param->inv_type);
 
     if(param.cur_dim == 0) return;//nothing to do
 
@@ -120,16 +115,13 @@ namespace quda {
 
     double check_nrm2 = norm2(b);
 
-    ColorSpinorFieldSet &rv = *param.RV;
-
     printfQuda("\nSource norm (gpu): %1.15e, curr deflation space dim = %d\n", sqrt(check_nrm2), param.cur_dim);
 
-    std::vector<ColorSpinorField*> rv_(rv(0,param.cur_dim));
-    std::vector<ColorSpinorField*> in_;
-    in_.push_back(static_cast<ColorSpinorField*>(&b));
+    std::vector<ColorSpinorField*> rv_(param.RV.begin(), param.RV.begin() + param.cur_dim);
+    std::vector<ColorSpinorField*> in_{static_cast<ColorSpinorField*>(&b)};
 
-    //blas::reDotProduct(vec.get(), rv_, in_);//<i, b>
-    for(int j = 0; j < param.cur_dim; j++) vec[j] = blas::reDotProduct(rv[j], b);
+    blas::reDotProduct(vec.get(), rv_, in_);//<i, b>
+    //for(int j = 0; j < param.cur_dim; j++) vec[j] = blas::reDotProduct(*param.RV[j], b);
 
     if(!param.use_inv_ritz)
     {
@@ -144,8 +136,7 @@ namespace quda {
       for(int i = 0; i < param.cur_dim; i++) vec[i] *= param.invRitzVals[i];
     }
 
-    std::vector<ColorSpinorField*> out_;
-    out_.push_back(&x);
+    std::vector<ColorSpinorField*> out_{&x};
     blas::axpy(vec.get(), rv_, out_); //multiblas
 
     check_nrm2 = norm2(x);

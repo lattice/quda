@@ -19,7 +19,7 @@ namespace quda {
     /** Buffer for Ritz vectors
         For staggered: we need to reduce dimensionality of each component?
      */
-    ColorSpinorFieldSet *RV;
+    std::vector<ColorSpinorField*> RV;
 
     /** Inverse Ritz values*/
     double *invRitzVals;
@@ -48,27 +48,21 @@ namespace quda {
     /** Filename for where to load/store the deflation space */
     char filename[100];
 
-    DeflationParam(QudaEigParam &param, ColorSpinorFieldSet *RV,  DiracMatrix &matDeflation, int cur_dim = 0) : eig_global(param), RV(RV), matDeflation(matDeflation),
+    DeflationParam(QudaEigParam &param, std::vector<ColorSpinorField*> &RV,  DiracMatrix &matDeflation, int cur_dim = 0) : eig_global(param), RV(RV), matDeflation(matDeflation),
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
         //redesign: param.nk => param.nev, param.np => param.deflation_grid*param.nev;
-        tot_dim      = param.np;
-        ld           = ((tot_dim+15) / 16) * tot_dim;
-        //allocate deflation resources:
-        matProj      = new double[ld*tot_dim];
-        invRitzVals  = new double[tot_dim];
+	tot_dim     = param.np;
+        ld          = param.np;
 
-        //Check that RV is a composite field:
-        if(RV->IsComposite() == false) errorQuda("\nRitz vectors must be contained in a composite field.\n");
-
-        cudaHostRegister(matProj,ld*tot_dim*sizeof(double),cudaHostRegisterDefault);
+        matProj     = (double *)safe_malloc(param.np * param.np * sizeof(double));        //Qmat
+        invRitzVals = (double *)safe_malloc(param.np * sizeof(double));
      }
 
      ~DeflationParam(){
-        cudaHostUnregister(matProj);
-        if(matProj) delete[]  matProj;
-        if(invRitzVals)       delete[]  invRitzVals;
+       host_free(matProj);
+       host_free(invRitzVals);
      }
   };
 
@@ -152,7 +146,7 @@ namespace quda {
     Dirac  *d;
     DiracMatrix *m;
 
-    ColorSpinorFieldSet *RV;//Ritz vectors
+    std::vector<ColorSpinorField*> RV;//Ritz vectors
 
     DeflationParam *deflParam;
 
@@ -168,7 +162,7 @@ namespace quda {
       if (defl) delete defl;
       if (deflParam) delete deflParam;
 
-      if (RV) delete RV;
+      for(auto v : RV) delete v;
 
       if (m) delete m;
       if (d) delete d;
