@@ -7,28 +7,26 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool asymmetric_>
   struct NdegTwistedMassArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     typedef typename mapper<Float>::type real;
+    static constexpr bool asymmetric = asymmetric_; /** whether we are applying the asymetric operator or not */
     real a;          /** this is the Wilson-dslash scale factor */
     real b;          /** this is the chiral twist factor */
     real c;          /** this is the flavor twist factor */
     real a_inv;      /** inverse scaling factor - used to allow early xpay inclusion */
     real b_inv;      /** inverse chiral twist factor - used to allow early xpay inclusion */
     real c_inv;      /** inverse flavor twist factor - used to allow early xpay inclusion */
-    bool asymmetric; /** whether we are applying the asymetric operator or not */
 
     NdegTwistedMassArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-                       double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, bool asymmetric,
-                       const int *comm_override) :
+                       double c, bool xpay, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       WilsonArg<Float, nColor, nDim, reconstruct_>(out, in, U, xpay ? 1.0 : 0.0, x, parity, dagger, comm_override),
       a(a),
       b(dagger ? -b : b), // if dagger flip the chiral twist
       c(c),
       a_inv(1.0 / (a * (1.0 + b * b - c * c))),
       b_inv(dagger ? b : -b),
-      c_inv(-c),
-      asymmetric(asymmetric)
+      c_inv(-c)
     {
       // set parameters for twisting in the packing kernel
       if (dagger && !asymmetric) {
@@ -39,12 +37,12 @@ namespace quda
     }
   };
 
-  template <int nParity, bool dagger_, bool xpay_, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct nDegTwistedMassPreconditioned : dslash_default {
 
     Arg &arg;
     constexpr nDegTwistedMassPreconditioned(Arg &arg) : arg(arg) {}
-    constexpr int twist_pack() const { return (!arg.asymmetric && dagger_) ? 2 : 0; }
+    constexpr int twist_pack() const { return (!Arg::asymmetric && dagger) ? 2 : 0; }
     static constexpr const char *filename() { return KERNEL_FILE; } // this file name - used for run-time compilation
 
     /**
@@ -53,8 +51,7 @@ namespace quda
        - no xpay: out(x) = M*in = a*(1+i*b*gamma_5*tau_3 + c*tau_1)D * in
        - with xpay:  out(x) = M*in = x + a*(1+i*b*gamma_5 + c*tau_1)D * in
     */
-    template <bool dagger, bool asymmetric, bool xpay>
-    __device__ __host__ inline void apply(int idx, int flavor, int parity)
+    __device__ __host__ inline void operator()(int idx, int flavor, int parity)
     {
       typedef typename mapper<typename Arg::Float>::type real;
       typedef ColorSpinor<real, Arg::nColor, 4> Vector;
@@ -69,7 +66,7 @@ namespace quda
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      if (!dagger || asymmetric) // defined in dslash_wilson.cuh
+      if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
         applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
       else // defined in dslash_twisted_mass_preconditioned
         applyWilsonTM<nParity, dagger, 2, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
@@ -78,7 +75,7 @@ namespace quda
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
 
-        if (!dagger || asymmetric) { // apply inverse twist which is undone below
+        if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
           // use consistent load order across s to ensure better cache locality
           Vector x0 = arg.x(x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
           Vector x1 = arg.x(x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
@@ -98,7 +95,7 @@ namespace quda
       }
 
       if (isComplete<kernel_type>(arg, coord) && active) {
-        if (!dagger || asymmetric) { // apply A^{-1} to D*in
+        if (!dagger || Arg::asymmetric) { // apply A^{-1} to D*in
           VectorCache<real, Vector> cache;
           // to apply the preconditioner we need to put "out" in shared memory so the other flavor can access it
           cache.save(out);
@@ -114,14 +111,6 @@ namespace quda
       if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(my_flavor_idx, my_spinor_parity) = out;
     }
 
-    __device__ __host__ inline void operator()(int idx, int flavor, int parity)
-    {
-      // constrain template instantiation for compilation (asymmetric implies dagger and !xpay)
-      if (arg.asymmetric)
-        apply<true, true, false>(idx, flavor, parity);
-      else
-        apply<dagger_, false, xpay_>(idx, flavor, parity);
-    }
   };
 
 } // namespace quda
