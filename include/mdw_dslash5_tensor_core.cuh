@@ -142,33 +142,7 @@ namespace quda {
       
       A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
       A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);
-/*
-      // exp = 0 means we are on the diagonal.
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = x==threadIdx.y ? RpL+b : RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = x==threadIdx.y ? RpL+b : RpL;
-        
-      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
       
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
-      
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = static_cast<half>(0.0f);
-      
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = static_cast<half>(0.0f);
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = static_cast<half>(0.0f);
-      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-*/    
       x += block_dim_x;
     }
 
@@ -220,32 +194,7 @@ namespace quda {
 
       A[ (offset_k+3)*(M_sm/2)+(offset_m+0) ] = __floats2half2_rn(0.0f, RmL);
       A[ (offset_k+3)*(M_sm/2)+(offset_m+1) ] = __floats2half2_rn(0.0f, RpL);        
-/*      
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = exp==0 ? RpL+b : RpL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = exp==0 ? RpL+b : RpL;
-      
-      // sm_a[ (offset_k+0)*(M_sm)+(offset_m+0) ] = factorR + factorL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+1) ] = 0.0f;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+2) ] = RmL;
-      sm_a[ (offset_k+0)*(M_sm)+(offset_m+3) ] = 0.0f;
-      
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+0) ] = 0.0f;
-      // sm_a[ (offset_k+1)*(M_sm)+(offset_m+1) ] = factorR + factorL;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+2) ] = 0.0f;
-      sm_a[ (offset_k+1)*(M_sm)+(offset_m+3) ] = RmL;
-      
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+0) ] = RmL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+1) ] = 0.0f;
-      // sm_a[ (offset_k+2)*(M_sm)+(offset_m+2) ] = factorR + factorL;
-      sm_a[ (offset_k+2)*(M_sm)+(offset_m+3) ] = 0.0f;
-      
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+0) ] = 0.0f;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+1) ] = RmL;
-      sm_a[ (offset_k+3)*(M_sm)+(offset_m+2) ] = 0.0f;
-      // sm_a[ (offset_k+3)*(M_sm)+(offset_m+3) ] = factorR + factorL; 
-*/    
+
       x += block_dim_x;
     }
   } 
@@ -297,23 +246,6 @@ namespace quda {
   }
   
   __device__ inline void __half_max_abs_half2__(half& max, const half2& input){
-/*    
-    static_assert(sizeof(half2) == sizeof(uint32_t));
-    // Just mask the exponent part
-    static constexpr uint32_t is_normal_mask_l = 0x83ffffffu;  // 1000 0011 1111 1111 1111 1111 1111 1111 
-    static constexpr uint32_t is_normal_mask_h = 0xffff83ffu;  // 1111 1111 1111 1111 1000 0011 1111 1111 
-    
-    uint32_t is_normal_masked_l = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_l;
-    uint32_t is_normal_masked_h = *reinterpret_cast<uint32_t*>(&input) | is_normal_mask_h;
-    
-    // Check if the halves are normal
-    if(is_normal_masked_l == 0xffffffffu){                     // 1111 1111 1111 1111 1111 1111 1111 1111
-      *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_l;
-    }
-    if(is_normal_masked_h == 0xffffffffu){                     // 1111 1111 1111 1111 1111 1111 1111 1111
-      *reinterpret_cast<uint32_t*>(&input) = *reinterpret_cast<uint32_t*>(&input) & is_normal_mask_h;
-    }
-*/    
     // Set the fisrt bit of the halves to 0.
     static constexpr uint32_t maximum_mask = 0x7fff7fffu;      // 0111 1111 1111 1111 0111 1111 1111 1111 
     
@@ -381,21 +313,13 @@ namespace quda {
       } 
     }
     __syncthreads();
-/*
-    if(warp_id == 0){
-      if(lane_id == 0){
-        smem_scale[0] = 2.0f;
-      } 
-    }
-    __syncthreads();
-*/
   }
 
   // Actually does more than the function name suggests.
   // will find the maximum absolute value among the vector, scale that, and store to sm_b
-  template<int N_sm_d2, bool acc, bool store=true, class Vector>
+  template<int N_sm_d2, bool accumulate, bool store=true, class Vector>
   __device__ inline void load_matrix_b_vector(Vector& v, half2* sm_b, float* smem_scale, float m_scale=1.0f){
-    if(acc){
+    if(accumulate){
       float previous_scale = smem_scale[0]*m_scale;
       half* B = reinterpret_cast<half*>(sm_b);
       #pragma unroll
@@ -411,9 +335,6 @@ namespace quda {
       block_wise_reduce_vector(v, smem_scale);
       // Now smem_scale[0] contains the maximum value
       float current_scale = smem_scale[0];
-      // if(current_scale == 0){
-      //   current_scale = 1.0f;
-      // } // Zero scale means all numbers in the block are strictly zero.
       #pragma unroll
       for(int spin = 0; spin < 4; spin++){
         #pragma unroll

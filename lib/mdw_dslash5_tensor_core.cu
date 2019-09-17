@@ -5,10 +5,6 @@ namespace quda {
 #if defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
   /**
     @brief Structure containing zMobius / Zolotarev coefficients
-
-    FIXME
-    - fix flops counters
-    - use kappa notation and not b/c for consistency with other codes and sanity
   */
   template <typename real>
     struct coeff_5 {
@@ -100,22 +96,14 @@ namespace quda {
       if (!in.isNative() || !out.isNative()) errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
       if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-//      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real>*>(&mobius_h);
-//      auto *a_5 =  coeff->a;
-//      auto *b_5 =  coeff->b;
-//      auto *c_5 =  coeff->c;
 
       switch(type){
         case M5_INV_MOBIUS:
-          // b = -(c_5_[0].real() * (4.0 + m_5) - 1.0) / (b_5_[0].real() * (4.0 + m_5) + 1.0);
-          // c = 0.5 / ( 1.0 + std::pow(b,(int)Ls) * m_f );
           b = b_5_[0].real();
           c = c_5_[0].real();
           kappa   = -(c*(4.+m_5)-1.) / (b*(4.+m_5)+1.);
           fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
           a *= pow(0.5 / (b_5_[0].real() * (m_5 + 4.0) + 1.0), 2);
-//          printfQuda("m5= %+.4f, mf= %.4f, fac_inv= %+.8f\n", this->m_5, this->m_f, this->fac_inv);
-//          printfQuda("b = %+.4f, c = %.4f, -kappa = %+.8f, alpha = %+.4f, beta = %+.4f\n", b, c, this->kappa, this->alpha, this->beta);
           break;
         default:
           errorQuda("Unknown Dslash5Type %d", type);
@@ -126,78 +114,6 @@ namespace quda {
     }
   };
 
-#if 0
-// The following two are the actual kernels. Since there is no "static_if" to use two version 
-// are implemented explicitly.
-// TODO: Maybe someone smart people could have a better idea? Or c++49 will have a "static_if"?
-
-  /**
-    @brief Tensor core kernel for applying the M5inv operator: reload version
-  */
-  template<int block_dim_x, int Ls_, bool dagger, bool xpay, class Arg>
-  __global__ void dslash5inv_tensor_core_reload(Arg arg)
-  {
-    float scale;
-
-    TensorCoreSharedMemory<half2> shared_memory_data;
-    
-    constexpr int M = 4*Ls_;
-    constexpr int N = 6*block_dim_x;
-    
-    constexpr int sm_m_pad_size = 0;
-    constexpr int sm_n_pad_size = 16;
-    
-    constexpr int N_sm = N + sm_n_pad_size;
-    constexpr int M_sm = M + sm_m_pad_size;
-    
-    half2* sm_b = shared_memory_data;
-    half*  sm_c = (half*)sm_b;
-    half*  sm_a = sm_c+M*N_sm;
-
-    { // Construct matrix A
-      construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, dagger, Arg>(arg, sm_a);
-    } // Construct matrix A
-    
-    __syncthreads();
-   
-    bool idle = false;
-    int s4_base = blockIdx.x*blockDim.x; // base.
-    int s4, sid;
-  
-    while(s4_base < arg.volume_4d_cb){
-      
-      s4 = s4_base + threadIdx.x;
-      sid = threadIdx.y*arg.volume_4d_cb + s4;
-      
-      if (s4 >= arg.volume_4d_cb){
-        idle = true;
-      }
-    
-      if(!idle){
-        scale = load_matrix_b_tex<N_sm, Arg>(arg, sm_b, sid);
-      }
-      
-      __syncthreads();
-    
-      { // wmma.h
-        wmma_gemm_reload<block_dim_x, Ls_, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);        
-      } // wmma.h
-      
-      __syncthreads();
-    
-      if(!idle){
-         store_matrix_c<N_sm, Arg>(arg, sm_b, sid, scale);
-      }
-    
-      s4_base += gridDim.x*blockDim.x;
-    
-    } // while
-  }
-#endif  
-  
-  /**
-    @brief Tensor core kernel for applying the M5inv operator: preload version
-  */
   template<int block_dim_x, int Ls_, bool dagger, bool xpay, bool reload, class Arg>
   __global__ void dslash5inv_tensor_core(Arg arg)
   {
@@ -216,9 +132,7 @@ namespace quda {
     half*  sm_c = (half*)sm_b;
     half*  sm_a = sm_c+M*N_sm;
 
-    { // Construct matrix A
-      construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, dagger, Arg>(arg, sm_a);
-    } // Construct matrix A
+    construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, dagger, Arg>(arg, sm_a);
     
     __syncthreads();
    
@@ -242,8 +156,6 @@ namespace quda {
     const int warp_m = this_warp*warp_cycle/tn_dim;
      
     typedef typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major> a_type;
-//    typedef typename std::conditional<reload, char, char[tm_dim]>::type a_frag_size;
-//    a_type a_frag[sizeof(a_frag_size)];
     a_type a_frag[reload?1:tm_dim];
     if(!reload){ // in the preload case we preload ... 
       #pragma unroll

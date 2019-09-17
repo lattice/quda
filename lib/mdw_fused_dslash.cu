@@ -8,7 +8,6 @@ namespace quda {
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
     
-    
     /**
       @brief Parameter structure for applying the Dslash
     */
@@ -115,9 +114,6 @@ namespace quda {
         switch (type) {
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
-          // m_scale = b;
-          // alpha = 1. + c / (kappa * b); // b-c/kappa = b(1-c/(b*kappa))
-          // beta = -c / (kappa * b);
           m_scale = b+c/kappa;
           alpha = 1.;
           beta = -1./(1.+(kappa*b)/c);
@@ -419,20 +415,19 @@ namespace quda {
 
         long long flops_ = 0;
         switch (arg.type) {
-        // I am too lazy to fix the flops count. :(
-        case 0: // FIXME: flops
-          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * mat;
-          break;
-        case 1:
-          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * 2ll * mat;
-          break;
-        case 2:
-        case 3:
-          flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
-              * (hop + mat); // for 2 and 3 we don't have the halo complication.
-          break;
-        case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+          case 0: 
+            flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * mat;
+            break;
+          case 1:
+            flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * 2ll * mat;
+            break;
+          case 2:
+          case 3:
+            flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
+                * (hop + mat); // for 2 and 3 we don't have the halo complication.
+            break;
+          case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
+          default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
 
         return flops_;
@@ -642,44 +637,44 @@ namespace quda {
         int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
       // switch for Ls
       switch (in.X(4)) {
-      //      case  8:
-      //        {
-      //          FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
+        case  8:
+          {
+            FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, scale, type);
+            FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
         case 12: {
           FusedDslashArg<storage_type, 12> arg(
               out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
           FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-      //      case 16:
-      //        {
-      //          FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
-      //      case 20:
-      //        {
-      //          FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
-      //      case 24:
-      //        {
-      //          FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-      //          halo_shift, scale, type);
-      //          FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
-      //          dslash.apply(streams[Nstream-1]);
-      //        }
-      //      break;
+        case 16:
+          {
+            FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, scale, type);
+            FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 20:
+          {
+            FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, scale, type);
+            FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
+        case 24:
+          {
+            FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+            halo_shift, scale, type);
+            FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
+            dslash.apply(streams[Nstream-1]);
+          }
+        break;
       default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
       }
     }
