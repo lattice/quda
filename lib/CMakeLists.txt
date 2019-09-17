@@ -73,7 +73,6 @@ set (QUDA_OBJS
 if(QUDA_LEGACY_DSLASH)
   list(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
 endif()
->>>>>>> c697d82690f52c419af4fcaf87106d7f19a39721
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})

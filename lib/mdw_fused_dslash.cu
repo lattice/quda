@@ -667,14 +667,6 @@ namespace quda {
             dslash.apply(streams[Nstream-1]);
           }
         break;
-        case 24:
-          {
-            FusedDslashArg<storage_type, 24> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-            halo_shift, scale, type);
-            FusedDslash<storage_type, 24, FusedDslashArg<storage_type, 24> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
       default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
       }
     }
