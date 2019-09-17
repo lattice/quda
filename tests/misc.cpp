@@ -964,6 +964,34 @@ get_dslash_str(QudaDslashType type)
     
 }
 
+QudaContractType get_contract_type(char *s)
+{
+  QudaContractType ret = QUDA_CONTRACT_TYPE_INVALID;
+
+  if (strcmp(s, "open") == 0 || strcmp(s, "OPEN") == 0 || strcmp(s, "Open") == 0) {
+    ret = QUDA_CONTRACT_TYPE_OPEN;
+  } else if (strcmp(s, "dr") == 0 || strcmp(s, "DR") == 0) {
+    ret = QUDA_CONTRACT_TYPE_DR;
+  } else {
+    fprintf(stderr, "Error: invalid contract type\n");
+    exit(1);
+  }
+  return ret;
+}
+
+const char *get_contract_str(QudaContractType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
+  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand-Rossi"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
 QudaEigSpectrumType get_eig_spectrum_type(char *s)
 {
 
@@ -1009,12 +1037,14 @@ const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 QudaEigType get_eig_type(char *s)
 {
 
-  QudaEigType ret = QUDA_INVALID_EIG;
+  QudaEigType ret = QUDA_EIG_INVALID;
 
-  if (strcmp(s, "lanczos") == 0) {
-    ret = QUDA_EIG_LANCZOS;
-  } else if (strcmp(s, "arnoldi") == 0) {
-    ret = QUDA_EIG_ARNOLDI;
+  if (strcmp(s, "trlm") == 0) {
+    ret = QUDA_EIG_TR_LANCZOS;
+  } else if (strcmp(s, "irlm") == 0) {
+    ret = QUDA_EIG_IR_LANCZOS;
+  } else if (strcmp(s, "iram") == 0) {
+    ret = QUDA_EIG_IR_ARNOLDI;
   } else {
     fprintf(stderr, "Error: invalid quda eigensolver type\n");
     exit(1);
@@ -1028,8 +1058,9 @@ const char *get_eig_type_str(QudaEigType type)
   const char *ret;
 
   switch (type) {
-  case QUDA_EIG_LANCZOS: ret = "lanczos"; break;
-  case QUDA_EIG_ARNOLDI: ret = "arnoldi"; break;
+  case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
+  case QUDA_EIG_IR_LANCZOS: ret = "irlm"; break;
+  case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
   default: ret = "unknown eigensolver"; break;
   }
 
@@ -1202,8 +1233,7 @@ QudaSolutionType get_solution_type(char *s)
   return ret;
 }
 
-QudaSchwarzType
-get_schwarz_type(char* s)
+QudaSchwarzType get_schwarz_type(char *s)
 {
   QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
 

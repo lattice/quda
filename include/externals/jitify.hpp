@@ -1231,7 +1231,7 @@ static const char* jitsafe_header_type_traits = R"(
     template<bool B, class T = void> struct enable_if {};
     template<class T>                struct enable_if<true, T> { typedef T type; };
     #if __cplusplus >= 201402L
-    template< bool B, class T = void > using enable_if_t = typename enable_if<B,T>::type
+    template< bool B, class T = void > using enable_if_t = typename enable_if<B,T>::type;
     #endif
 
     struct true_type  {
@@ -1340,7 +1340,7 @@ static const char* jitsafe_header_type_traits = R"(
     }
     template< class T > struct add_pointer : __jitify_detail::add_pointer<T, is_function<T>::value> {};
     #if __cplusplus >= 201402L
-    template< class T > using add_pointer_t = typename add_pointer<T>::type
+    template< class T > using add_pointer_t = typename add_pointer<T>::type;
     #endif
 
     template< class T > struct decay {
@@ -1699,9 +1699,38 @@ static const char* jitsafe_header_mutex = R"(
     bool try_lock();
     void unlock();
     };
-    // namespace __jitify_mutex_ns
+    } // namespace __jitify_mutex_ns
     namespace std { using namespace __jitify_mutex_ns; }
     using namespace __jitify_mutex_ns;
+    #endif
+ )";
+
+static const char* jitsafe_header_algorithm = R"(
+    #pragma once
+    #if __cplusplus >= 201103L
+    namespace __jitify_algorithm_ns {
+    #if __cplusplus == 201103L
+    template<class T> const T& max(const T& a, const T& b)
+    {
+      return (b > a) ? b : a;
+    }
+    template<class T> const T& min(const T& a, const T& b)
+    {
+      return (b < a) ? b : a;
+    }
+    #else
+    template<class T> constexpr const T& max(const T& a, const T& b)
+    {
+      return (b > a) ? b : a;
+    }
+    template<class T> constexpr const T& min(const T& a, const T& b)
+    {
+      return (b < a) ? b : a;
+    }
+    #endif
+    } // namespace __jitify_algorithm_ns
+    namespace std { using namespace __jitify_algorithm_ns; }
+    using namespace __jitify_algorithm_ns;
     #endif
  )";
 
@@ -1720,7 +1749,8 @@ static const char* jitsafe_headers[] = {
     jitsafe_header_iostream,     jitsafe_header_ostream,
     jitsafe_header_istream,      jitsafe_header_sstream,
     jitsafe_header_vector,       jitsafe_header_string,
-    jitsafe_header_stdexcept,    jitsafe_header_mutex};
+    jitsafe_header_stdexcept,    jitsafe_header_mutex,
+    jitsafe_header_algorithm};
 static const char* jitsafe_header_names[] = {"jitify_preinclude.h",
                                              "float.h",
                                              "cfloat",
@@ -1750,7 +1780,8 @@ static const char* jitsafe_header_names[] = {"jitify_preinclude.h",
                                              "vector",
                                              "string",
                                              "stdexcept",
-                                             "mutex"};
+                                             "mutex",
+                                             "algorithm"};
 
 template <class T, size_t N>
 size_t array_size(T (&)[N]) {

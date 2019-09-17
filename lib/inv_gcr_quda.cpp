@@ -143,8 +143,8 @@ namespace quda {
   }
 
   void updateSolution(ColorSpinorField &x, const Complex *alpha, Complex** const beta, 
-		      double *gamma, int k, std::vector<ColorSpinorField*> p) {
-
+		      double *gamma, int k, std::vector<ColorSpinorField*> p)
+  {
     Complex *delta = new Complex[k];
 
     // Update the solution vector
@@ -163,10 +163,8 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
-    r_sloppy(nullptr)
+    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
   {
-
     fillInnerSolveParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
@@ -196,8 +194,7 @@ namespace quda {
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false), rp(nullptr), yp(nullptr), tmpp(nullptr), y_sloppy(nullptr),
-    r_sloppy(nullptr)
+    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
   {
     p.resize(nKrylov+1);
     Ap.resize(nKrylov);
@@ -217,17 +214,23 @@ namespace quda {
 
     if (K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;
 
-    if (init && param.precision_sloppy != yp->Precision()) {
-      if (y_sloppy && param.use_sloppy_partial_accumulator) delete y_sloppy;
+    if (init && param.precision_sloppy != tmpp->Precision()) {
       if (r_sloppy && r_sloppy != rp) delete r_sloppy;
     }
 
     for (int i=0; i<nKrylov+1; i++) if (p[i]) delete p[i];
     for (int i=0; i<nKrylov; i++) if (Ap[i]) delete Ap[i];
 
+    if (tmp_sloppy != tmpp) delete tmp_sloppy;
     if (tmpp) delete tmpp;
     if (rp) delete rp;
-    if (yp) delete yp;
+
+    if (deflate_init) {
+      for (auto veci : param.evecs)
+        if (veci) delete veci;
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+    }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -247,52 +250,71 @@ namespace quda {
 
       rp = (K || x.Precision() != param.precision_sloppy) ? ColorSpinorField::Create(csParam) : nullptr;
 
-      // high precision accumulator
-      yp = ColorSpinorField::Create(csParam);
+      // high precision temporary
+      tmpp = ColorSpinorField::Create(csParam);
 
       // create sloppy fields used for orthogonalization
       csParam.setPrecision(param.precision_sloppy);
-      for (int i=0; i<nKrylov+1; i++) p[i] = ColorSpinorField::Create(csParam);
+      for (int i = 0; i < nKrylov + 1; i++) p[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<nKrylov; i++) Ap[i] = ColorSpinorField::Create(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
-      tmpp = ColorSpinorField::Create(csParam); //temporary for sloppy mat-vec
-
-      if (param.precision_sloppy != x.Precision() && param.use_sloppy_partial_accumulator) {
-        y_sloppy = ColorSpinorField::Create(csParam);
+      if (param.precision_sloppy != x.Precision()) {
+        tmp_sloppy = tmpp->CreateAlias(csParam);
       } else {
-        y_sloppy = yp;
+        tmp_sloppy = tmpp;
       }
 
       if (param.precision_sloppy != x.Precision()) {
-	r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
+        r_sloppy = K ? ColorSpinorField::Create(csParam) : nullptr;
       } else {
-	r_sloppy = K ? rp : nullptr;
+        r_sloppy = K ? rp : nullptr;
       }
 
       init = true;
     }
 
+    // Once the GCR operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
+
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
-    ColorSpinorField &y = *yp;
-    ColorSpinorField &ySloppy = *y_sloppy;
     ColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &tmpSloppy = *tmp_sloppy;
 
     double b2 = blas::norm2(b);  // norm sq of source
     double r2;                // norm sq of residual
 
     // compute initial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      mat(r, x, y);
+      // Compute r = b - A * x
+      mat(r, x, tmp);
       r2 = blas::xmyNorm(b, r);
+      // x contains the original guess.
     } else {
       blas::copy(r, b);
       r2 = b2;
       blas::zero(x);
     }
-    blas::zero(y); // FIXME optimize first updates of y and ySloppy
-    if (&y != &ySloppy) blas::zero(ySloppy);
+
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `defl_tmp2` as a temp.
+      blas::copy(*defl_tmp2[0], r);
+      rhs.push_back(defl_tmp2[0]);
+
+      // Deflate: Hardcoded to SVD
+      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0]);
+      r2 = blas::xmyNorm(*rhs[0], r);
+
+      // defl_tmp must be added to the solution at the end
+      blas::axpy(1.0, *defl_tmp1[0], x);
+    }
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0) {
@@ -355,14 +377,11 @@ namespace quda {
 	pushVerbosity(param.verbosity_precondition);
 	(*K)(*p[k], rSloppy);
 	popVerbosity();
-
 	// relaxation p = omega*p + (1-omega)*r
 	//if (param.omega!=1.0) blas::axpby((1.0-param.omega), rPre, param.omega, pPre);
-      } else {
-        // no preconditioner
       }
 
-      matSloppy(*Ap[k], *p[k], tmp);
+      matSloppy(*Ap[k], *p[k], tmpSloppy);
 
       if (getVerbosity()>= QUDA_DEBUG_VERBOSE)
 	printfQuda("GCR debug iter=%d: Ap2=%e, p2=%e, r2=%e\n",
@@ -385,7 +404,7 @@ namespace quda {
       alpha[k] = Complex(Apr.x, Apr.y) / gamma[k]; // alpha = (1/|Ap|) * (Ap, r)
 
       // r -= (1/|Ap|^2) * (Ap, r) r, Ap *= 1/|Ap|
-      r2 = blas::cabxpyzAxNorm(1.0/gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k+1]);
+      r2 = blas::cabxpyzAxNorm(1.0 / gamma[k], -alpha[k], *Ap[k], K ? rSloppy : *p[k], K ? rSloppy : *p[k + 1]);
 
       k++;
       total_iter++;
@@ -397,13 +416,10 @@ namespace quda {
       if (k==nKrylov || total_iter==param.maxiter || (r2 < stop && !l2_converge) || sqrt(r2/r2_old) < param.delta) {
 
         // update the solution vector
-        updateSolution(ySloppy, alpha, beta, gamma, k, p);
-
-        // recalculate residual in high precision
-        blas::xpy(ySloppy, x);
+        updateSolution(x, alpha, beta, gamma, k, p);
 
         if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
-        mat(r, x, y);
+        mat(r, x, tmp);
         r2 = blas::xmyNorm(b, r);  
 
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
@@ -430,7 +446,6 @@ namespace quda {
 
           PrintStats("GCR (restart)", restart, r2, b2, heavy_quark_res);
           blas::copy(rSloppy, r);
-          blas::zero(ySloppy);
 
           r2_old = r2;
 
@@ -459,7 +474,7 @@ namespace quda {
 
     if (param.compute_true_res) {
       // Calculate the true residual
-      mat(r, x, y);
+      mat(r, x, tmp);
       double true_res = blas::xmyNorm(b, r);
       param.true_res = sqrt(true_res / b2);
       if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL)

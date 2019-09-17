@@ -9,13 +9,13 @@
 namespace quda
 {
 
-  template <typename Float, typename Gauge, bool density_=false> struct QChargeArg : public ReduceArg<double> {
+  template <typename Float, typename Gauge, bool density_ = false> struct QChargeArg : public ReduceArg<double> {
     static constexpr bool density = density_;
     int threads; // number of active threads required
     Gauge data;
     Float *qDensity;
 
-    QChargeArg(const Gauge &data, const GaugeField &Fmunu, Float *qDensity=nullptr) :
+    QChargeArg(const Gauge &data, const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<double>(),
       data(data),
       threads(Fmunu.VolumeCB()),
@@ -44,8 +44,8 @@ namespace quda
       Q += Q_idx;
 
       if (Arg::density) {
-        int idx = x_cb + parity*arg.threads;
-        arg.qDensity[idx] = Q_idx/(Pi2 * Pi2);
+        int idx = x_cb + parity * arg.threads;
+        arg.qDensity[idx] = Q_idx / (Pi2 * Pi2);
       }
       x_cb += blockDim.x * gridDim.x;
     }

@@ -84,7 +84,7 @@ extern int eofa_pm;
 double getTolerance(QudaPrecision prec)
 {
   switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 5e-2;
+  case QUDA_QUARTER_PRECISION: return 1e-1;
   case QUDA_HALF_PRECISION: return 1e-3;
   case QUDA_SINGLE_PRECISION: return 1e-4;
   case QUDA_DOUBLE_PRECISION: return 1e-11;

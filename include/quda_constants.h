@@ -60,4 +60,4 @@
  * @brief Maximum number of simultaneous reductions that can take
  * place.  This number may be increased if needed.
  */
-#define QUDA_MAX_MULTI_REDUCE 256
+#define QUDA_MAX_MULTI_REDUCE 1024

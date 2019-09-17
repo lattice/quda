@@ -1,5 +1,7 @@
 # all files for quda -- needs some cleanup
+# cmake-format: off
 set (QUDA_OBJS
+  # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
@@ -23,19 +25,15 @@ set (QUDA_OBJS
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
-  dslash_wilson.cu dslash_clover.cu dslash_clover_asym.cu
-  dslash_twisted_mass.cu dslash_ndeg_twisted_mass.cu
-  dslash_twisted_clover.cu dslash_domain_wall.cu
-  dslash_domain_wall_4d.cu dslash_mobius.cu
+  dslash_staggered.cu dslash_improved_staggered.cu
+  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
+  dslash_wilson_clover_preconditioned.cu 
+  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
+  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
+  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
+  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   mdw_dslash5_tensor_core.cu mdw_fused_dslash.cu dslash5_mobius_eofa.cu
-  dslash4_staggered.cu dslash4_improved_staggered.cu
-  dslash4_wilson.cu dslash4_wilson_clover.cu dslash5_domain_wall.cu
-  dslash4_wilson_clover_preconditioned.cu 
-  dslash4_twisted_mass.cu dslash4_twisted_mass_preconditioned.cu
-  dslash4_ndeg_twisted_mass.cu dslash4_ndeg_twisted_mass_preconditioned.cu
-  dslash4_twisted_clover.cu dslash4_twisted_clover_preconditioned.cu
-  dslash4_domain_wall_4d.cu  dslash4_domain_wall_5d.cu
-  dslash_pack.cu dslash_pack2.cu
+  dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
@@ -70,103 +68,114 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp 
   inv_mspcg.cc )
+# cmake-format: on
 
-if(QUDA_LEGACY_DSLASH)
-LIST(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
-endif()
+# split source into cu and cpp files
+foreach(item ${QUDA_OBJS})
+  string(REGEX MATCH ".+\\.cu$" item_match ${item})
+  if(item_match)
+    list(APPEND QUDA_CU_OBJS ${item})
+  endif(item_match)
+endforeach(item ${QUDA_OBJS})
 
-## split source into cu and cpp files
-FOREACH(item ${QUDA_OBJS})
-  STRING(REGEX MATCH ".+\\.cu$" item_match ${item})
-  IF(item_match)
-    LIST(APPEND QUDA_CU_OBJS ${item})
-  ENDIF(item_match)
-ENDFOREACH(item ${QUDA_OBJS})
-
-LIST(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 
 if(BUILD_FORTRAN_INTERFACE)
-  LIST(APPEND QUDA_OBJS quda_fortran.F90)
+  list(APPEND QUDA_OBJS quda_fortran.F90)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
-# QUDA_CU_OBJS shoudl contain all cuda files now
-# QUDA_OBJS all c, cpp, fortran sources
+# QUDA_CU_OBJS shoudl contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   if(GITVERSION)
     find_path(QUDA_GITDIR NAME HEAD PATHS ${CMAKE_SOURCE_DIR}/.git/logs NO_DEFAULT_PATH)
+    include(AddFileDependencies)
     if(QUDA_GITDIR)
-      set_property(SOURCE version.cpp PROPERTY OBJECT_DEPENDS  ${QUDA_GITDIR}/HEAD)
+      add_file_dependencies(version.cpp ${QUDA_GITDIR}/HEAD)
     endif()
   endif()
   mark_as_advanced(QUDA_GITDIR)
 endif()
-
-
 
 # generate a cmake object library for all cpp files first
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
-IF(GITVERSION)
+if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
-ENDIF()
+endif()
 
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
-    set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-    cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS} )
+  set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+  cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
 # include_directories
-target_include_directories(quda PRIVATE dslash_core)
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp PRIVATE .)
 
-target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
+target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
-  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
-    $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
-    $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}>
-    $<$<CONFIG:RELEASE>:-Xcompiler ${CMAKE_CXX_FLAGS_RELEASE}>
-    $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>  
-    $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-    $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> 
-    >)
+  target_compile_options(quda
+                         PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
+                                $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}> $<$<CONFIG:RELEASE>:-Xcompiler
+                                ${CMAKE_CXX_FLAGS_RELEASE}> $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>
+                                $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
+                                $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
 # some clang warnings shouds be warning even when turning warnings into errors
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
-    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field" "SHELL:-Xcompiler -Wno-error=unused-function" >)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  target_compile_options(quda_cpp
+                         PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
+  target_compile_options(quda
+                         PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
+                                "SHELL:-Xcompiler -Wno-error=unused-function" >)
 
-# this is a hack to get colored diagnostics back when using Ninja and clang
-    if(CMAKE_GENERATOR MATCHES "Ninja")
-      target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
-    endif()
+  # this is a hack to get colored diagnostics back when using Ninja and clang
+  if(CMAKE_GENERATOR MATCHES "Ninja")
+    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
+  endif()
 endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_BACKWARDS)
+  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
+endif()
+
 if(QUDA_QIO)
-  target_link_libraries(quda INTERFACE ${QIO_LIB} ${LIME_LIB})
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QIO)
+    add_dependencies(quda_cpp QIO)
+  endif()
+  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
 endif()
 
 if(QUDA_QDPJIT)
-  target_link_libraries(quda INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS} ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda
+                        INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
+                                  ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
 if(QUDA_QMP)
+  if(QUDA_DOWNLOAD_USQCD)
+    add_dependencies(quda QMP)
+    add_dependencies(quda_cpp QMP)
+  endif()
   target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
 endif()
 
@@ -179,17 +188,20 @@ if(QUDA_MAGMA)
 endif()
 
 if(QUDA_ARPACK)
-  target_link_libraries(quda INTERFACE ${ARPACK})
-  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/SRC)
-  include_directories(SYSTEM ${QUDA_ARPACK_HOME}/UTIL)
-
-  if(QUDA_MPI OR QUDA_QMP)
-    target_link_libraries(quda INTERFACE ${PARPACK})
-    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI)
-    include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)    
+  if(QUDA_DOWNLOAD_ARPACK)
+    target_link_libraries(quda PUBLIC arpack-ng)
+    target_link_libraries(quda_cpp PUBLIC arpack-ng)
+    if(QUDA_MPI OR QUDA_QMP)
+      target_link_libraries(quda PUBLIC parpack-ng)
+      target_link_libraries(quda_cpp PUBLIC parpack-ng)
+    endif()
+  else()
+    target_link_libraries(quda INTERFACE ${ARPACK})
+    if(QUDA_MPI OR QUDA_QMP)
+      target_link_libraries(quda INTERFACE ${PARPACK} MPI::MPI_Fortran)
+    endif()
   endif()
 endif()
-
 
 if(QUDA_NVML)
   target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
@@ -199,46 +211,45 @@ if(QUDA_NUMA_NVML)
   target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
-
-# malloc.cpp uses both the driver and runtime api
-# So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub version
-# for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake 
+# malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
+# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
 target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
-if (QUDA_DOWNLOAD_EIGEN)
+if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_cpp Eigen)
   add_dependencies(quda Eigen)
 endif()
 
+configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
+install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
+
+if(QUDA_JITIFY)
+  configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
+  install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
+endif()
+
 # until we define an install step copy the include directory to the build directory
-ADD_CUSTOM_COMMAND(TARGET quda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+add_custom_command(TARGET quda POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
 # some hackery to prevent having old shared / static builds of quda messing with the current build
-ADD_CUSTOM_COMMAND(TARGET quda PRE_LINK COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
+add_custom_command(TARGET quda PRE_LINK
+                   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a
+                                               ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
-install(TARGETS quda EXPORT qudaTargets
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        INCLUDES DESTINATION include)
+install(TARGETS quda EXPORT qudaTargets LIBRARY DESTINATION lib ARCHIVE DESTINATION lib INCLUDES DESTINATION include)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
-  VERSION ${QUDA_VERSION}
-  COMPATIBILITY AnyNewerVersion
-)
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
+                                 VERSION ${QUDA_VERSION}
+                                 COMPATIBILITY AnyNewerVersion)
 
 export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
 set(ConfigPackageLocation lib/cmake/quda/)
 install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
 
-
-add_custom_target(gen ${PYTHON_EXECUTABLE} generate/gen.py
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Generating dslash_core files" )
-
 add_custom_target(mpi_nvtx ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  COMMENT "Generating mpi_nvtx wrapper" )
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  COMMENT "Generating mpi_nvtx wrapper")

@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <limits>
 
 #include <util_quda.h>
 #include <random_quda.h>
@@ -41,7 +42,6 @@ extern QudaReconstructType link_recon;
 extern QudaReconstructType link_recon_sloppy;
 extern QudaReconstructType link_recon_precondition;
 extern QudaInverterType  inv_type;
-extern bool inv_deflate;
 extern double reliable_delta; // reliable update parameter
 extern bool alternative_reliable;
 extern QudaInverterType  precon_type;
@@ -383,9 +383,6 @@ int main(int argc, char **argv)
     spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   }
 
-  // start the timer
-  double time0 = -((double)clock());
-
   // initialize the QUDA library
   initQuda(device);
 
@@ -400,10 +397,12 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
 
-  auto *rng = new quda::RNG(V, 1234, gauge_param.X);
+  double *time = new double[Nsrc];
+  double *gflops = new double[Nsrc];
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
-  for (int k = 0; k < Nsrc; k++) {
+  for (int i = 0; i < Nsrc; i++) {
 
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
 
@@ -412,17 +411,38 @@ int main(int argc, char **argv)
     } else {
       invertQuda(spinorOut, spinorIn, &inv_param);
     }
+
+    time[i] = inv_param.secs;
+    gflops[i] = inv_param.gflops / inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+               inv_param.gflops / inv_param.secs);
   }
 
   rng->Release();
   delete rng;
 
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-    
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  auto mean_time = 0.0;
+  auto mean_time2 = 0.0;
+  auto mean_gflops = 0.0;
+  auto mean_gflops2 = 0.0;
+  for (int i = 0; i < Nsrc; i++) {
+    mean_time += time[i];
+    mean_time2 += time[i] * time[i];
+    mean_gflops += gflops[i];
+    mean_gflops2 += gflops[i] * gflops[i];
+  }
+
+  mean_time /= Nsrc;
+  mean_time2 /= Nsrc;
+  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+  mean_gflops /= Nsrc;
+  mean_gflops2 /= Nsrc;
+  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
+
+  delete[] time;
+  delete[] gflops;
 
   if (multishift) {
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {

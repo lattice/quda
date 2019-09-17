@@ -611,7 +611,7 @@ static void setInvertParams(const int dim[4], QudaPrecision cpu_prec, QudaPrecis
   invertParam->mass_normalization = QUDA_MASS_NORMALIZATION;
   invertParam->cpu_prec = cpu_prec;
   invertParam->cuda_prec = cuda_prec;
-  invertParam->cuda_prec_sloppy = cuda_prec_sloppy;
+  invertParam->cuda_prec_sloppy = invertParam->heavy_quark_check ? cuda_prec : cuda_prec_sloppy;
   invertParam->cuda_prec_precondition = cuda_prec_sloppy;
 
   invertParam->solution_type = QUDA_MATPC_SOLUTION;

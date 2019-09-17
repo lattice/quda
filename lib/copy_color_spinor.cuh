@@ -378,8 +378,7 @@ namespace quda {
     if (dst.Ndim() != src.Ndim())
       errorQuda("Number of dimensions %d %d don't match", dst.Ndim(), src.Ndim());
 
-    if (dst.Volume() != src.Volume())
-      errorQuda("Volumes %d %d don't match", dst.Volume(), src.Volume());
+    if (dst.Volume() != src.Volume()) errorQuda("Volumes %lu %lu don't match", dst.Volume(), src.Volume());
 
     if (!( dst.SiteOrder() == src.SiteOrder() ||
 	   (dst.SiteOrder() == QUDA_EVEN_ODD_SITE_ORDER && 
@@ -414,7 +413,7 @@ namespace quda {
       errorQuda("source and destination spins must match");
 
     if (dst.Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV)
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_COVDEV) || defined(GPU_CONTRACT)
       copyGenericColorSpinor<4,Nc>(dst, src, location, Dst, Src, dstNorm, srcNorm);
 #else
       errorQuda("%s has not been built for Nspin=%d fields", __func__, src.Nspin());

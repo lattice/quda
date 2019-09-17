@@ -152,6 +152,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
+  P(require_convergence, QUDA_BOOLEAN_YES);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
@@ -162,7 +163,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_NO);
   P(nk, 0);
   P(np, 0);
-  P(eig_type, QUDA_EIG_LANCZOS);
+  P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
 #else
@@ -173,6 +174,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
+  P(require_convergence, QUDA_BOOLEAN_INVALID);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
@@ -184,7 +186,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
-  P(eig_type, QUDA_INVALID_EIG);
+  P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
@@ -334,7 +336,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(solution_accumulator_pipeline, 1); /**< Default is solution accumulator depth of 1 */
   P(max_res_increase, 1); /**< Default is to allow one consecutive residual increase */
   P(max_res_increase_total, 10); /**< Default is to allow ten residual increase */
-  P(max_hq_res_increase, 1); /**< Default is to allow one consecutive heavy-quark residual increase */
+  P(max_hq_res_increase, 1);     /**< Default is to allow one consecutive heavy-quark residual increase */
   P(max_hq_res_restart_total, 10); /**< Default is to allow ten heavy-quark restarts */
   P(heavy_quark_check, 10); /**< Default is to update heavy quark residual after 10 iterations */
  #else
@@ -648,6 +650,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
+    P(use_eig_solver[i], QUDA_BOOLEAN_NO);
+#else
+    P(use_eig_solver[i], QUDA_BOOLEAN_INVALID);
+#endif
+#ifdef INIT_PARAM
     P(setup_tol[i], 5e-6);
     P(setup_maxiter[i], 500);
     P(setup_maxiter_refresh[i], 0);
@@ -669,6 +676,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(setup_ca_lambda_max[i], INVALID_DOUBLE);
 #endif
 
+#ifdef INIT_PARAM
+    P(n_block_ortho[i], 1);
+#else
+    P(n_block_ortho[i], INVALID_INT);
+#endif
 
     P(coarse_solver[i], QUDA_INVALID_INVERTER);
     P(coarse_solver_maxiter[i], INVALID_INT);
@@ -699,7 +711,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
-      P(n_vec[i], INVALID_INT);
 #ifdef INIT_PARAM
       P(precision_null[i], QUDA_SINGLE_PRECISION);
 #else
@@ -710,6 +721,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
+
+#ifdef INIT_PARAM
+    if (i<QUDA_MAX_MG_LEVEL) {
+          P(n_vec[i], INVALID_INT);
+    }
+#else
+    if (i<n_level-1) {
+      P(n_vec[i], INVALID_INT);
+    }
+#endif
 
 #ifdef INIT_PARAM
     P(mu_factor[i], 1);
@@ -755,17 +776,24 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(use_low_modes, QUDA_BOOLEAN_INVALID);
   P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
   P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
-  P(vec_load, QUDA_BOOLEAN_INVALID);
-  P(vec_store, QUDA_BOOLEAN_INVALID);
+  P(coarse_guess, QUDA_BOOLEAN_NO);
 #else
-  P(vec_load, QUDA_BOOLEAN_NO);
-  P(vec_store, QUDA_BOOLEAN_NO);
+  P(coarse_guess, QUDA_BOOLEAN_INVALID);
 #endif
+
+  for (int i = 0; i < n_level - 1; i++) {
+#ifdef INIT_PARAM
+    P(vec_load[i], QUDA_BOOLEAN_INVALID);
+    P(vec_store[i], QUDA_BOOLEAN_INVALID);
+#else
+    P(vec_load[i], QUDA_BOOLEAN_NO);
+    P(vec_store[i], QUDA_BOOLEAN_NO);
+#endif
+  }
 
 #ifdef INIT_PARAM
   P(gflops, 0.0);

@@ -95,7 +95,7 @@ void initComms(int argc, char **argv, int *const commDims)
 
   // make sure the QMP logical ordering matches QUDA's
   if (rank_order == 0) {
-    int map[] = { 3, 1, 2, 0 };
+    int map[] = {3, 2, 1, 0};
     QMP_declare_logical_topology_map(commDims, 4, map, 4);
   } else {
     int map[] = { 0, 1, 2, 3 };
@@ -827,8 +827,15 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
   }
 
+  // only apply T-boundary at edge nodes
+#ifdef MULTI_GPU
+  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
+#else
+  bool last_node_in_t = true;
+#endif
+
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
     for (int j = 0; j < Vh; j++) {
       int sign =1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -1629,6 +1636,7 @@ QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
 bool unit_gauge = false;
+double gaussian_sigma = 0.2;
 char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
@@ -1643,15 +1651,12 @@ int pipeline = 0;
 int solution_accumulator_pipeline = 0;
 int test_type = 0;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
-char vec_infile[256] = "";
-char vec_outfile[256] = "";
+char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 QudaInverterType inv_type;
-bool inv_deflate = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
-bool use_low_modes = false;
-bool deflate_coarsest = false;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
 double mass = 0.1;
@@ -1681,6 +1686,7 @@ QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL] = { };
 
 int nu_pre[QUDA_MAX_MG_LEVEL] = { };
 int nu_post[QUDA_MAX_MG_LEVEL] = { };
+int n_block_ortho[QUDA_MAX_MG_LEVEL] = {};
 double mu_factor[QUDA_MAX_MG_LEVEL] = { };
 QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL] = { };
 QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL] = { };
@@ -1733,6 +1739,7 @@ QudaMemoryType    mem_type_ritz   = QUDA_MEMORY_DEVICE;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
+bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
 double eig_tol = 1e-6;
@@ -1744,7 +1751,7 @@ bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
 QudaEigSpectrumType eig_spectrum = QUDA_SPECTRUM_LR_EIG;
-QudaEigType eig_type = QUDA_EIG_LANCZOS;
+QudaEigType eig_type = QUDA_EIG_TR_LANCZOS;
 bool eig_arpack_check = false;
 char eig_arpack_logfile[256] = "arpack_logfile.log";
 char eig_QUDA_logfile[256] = "QUDA_logfile.log";
@@ -1754,6 +1761,10 @@ char eig_vec_outfile[256] = "";
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
+bool mg_eig[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_nEv[QUDA_MAX_MG_LEVEL] = {};
+int mg_eig_nKr[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_check_interval[QUDA_MAX_MG_LEVEL] = {};
 int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL] = {};
 double mg_eig_tol[QUDA_MAX_MG_LEVEL] = {};
@@ -1765,6 +1776,7 @@ bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL] = {};
 bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL] = {};
 QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL] = {};
 QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL] = {};
+bool mg_eig_coarse_guess = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -1773,6 +1785,7 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 static int dim_partitioned[4] = {0,0,0,0};
 
@@ -1790,6 +1803,8 @@ void usage(char** argv )
 #ifndef MULTI_GPU
   printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");
 #endif
+
+  // Problem size and type parameters
   printf("    --verbosity <silent/summurize/verbose>    # The the verbosity on the top level of QUDA( default summarize)\n");
   printf("    --prec <double/single/half>               # Precision in GPU\n");
   printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
@@ -1820,9 +1835,12 @@ void usage(char** argv )
   printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
   printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
-  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, heatbath test only)\n");
+  printf("    --save-gauge file                         # Save gauge field \"file\" for the test (requires QIO, "
+         "heatbath test only)\n");
   printf("    --unit-gauge <true/false>                 # Generate a unit valued gauge field in the tests. If false, a "
          "random gauge is generated (default false)\n");
+  printf("    --gaussian-sigma <sigma>                    # Width of the Gaussian noise used for random gauge field "
+         "contruction (default 0.2)\n");
   printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
   printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)\n");
   printf("    --ca-basis-type <power/chebyshev>         # The basis to use for CA-CG (default power)\n");
@@ -1831,8 +1849,6 @@ void usage(char** argv )
   printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n");
   printf("    --solution-pipeline <n>                   # The pipeline length for fused solution accumulation (default 0, no pipelining)\n");
   printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf(
-    "    --inv-deflate <true/false>                # Run the IRLM eigensolver to deflate low modes (default false)\n");
   printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n");
   printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");
   printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
@@ -1848,7 +1864,8 @@ void usage(char** argv )
   printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
   printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
   printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
-  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
+  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, "
+         "normop-pc, normerr, normerr-pc) \n");
   printf("    --solution-type                           # The solution we desire (mat (default), mat-dag-mat, mat-pc, "
          "mat-pc-dag-mat-pc (default for multi-shift))\n");
   printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
@@ -1856,15 +1873,16 @@ void usage(char** argv )
   printf("    --reliable-delta <delta>                  # Set reliable update delta factor\n");
   printf("    --test                                    # Test method (different for each test)\n");
   printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --mg-use-low-modes <true/false>           # Use the low eigenmodes as the null vector subspace (default "
-         "false)\n");
-  printf("    --mg-deflate-coarsest <true/false>        # Run the eigensolver on the coarsest grid to deflate low "
-         "modes (default false)\n");
+
+  // Multigrid
   printf("    --mg-low-mode-check <true/false>          # Measure how well the null vector subspace overlaps with the "
          "low eigenmode subspace (default false)\n");
   printf("    --mg-oblique-proj-check <true/false>      # Measure how well the null vector subspace adjusts the low "
          "eigenmode subspace (default false)\n");
-  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
+  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid "
+         "transfer operator on a given level\n"
+         "                                                If using the eigensolver of the coarsest level then this "
+         "dictates the size of the deflation space.\n");
   printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
   printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
   printf("    --mg-nu-pre <level 1-20>                  # The number of pre-smoother applications to do at a given multigrid level (default 2)\n");
@@ -1885,6 +1903,8 @@ void usage(char** argv )
   printf("    --mg-setup-type <null/test>               # The type of setup to use for the multigrid (default null)\n");
   printf("    --mg-pre-orth <true/false>                # If orthonormalize the vector before inverting in the setup of multigrid (default false)\n");
   printf("    --mg-post-orth <true/false>               # If orthonormalize the vector after inverting in the setup of multigrid (default true)\n");
+  printf("    --mg-n-block-ortho <level n>              # The number of times to run Gram-Schmidt during block "
+         "orthonormalization (default 1)\n");
   printf("    --mg-omega                                # The over/under relaxation factor for the smoother of multigrid (default 0.85)\n");
   printf("    --mg-coarse-solver <level gcr/etc.>       # The solver to wrap the V cycle on each level (default gcr, only for levels 1+)\n");
   printf("    --mg-coarse-solver-tol <level gcr/etc.>   # The coarse solver tolerance for each level (default 0.25, only for levels 1+)\n");
@@ -1902,10 +1922,14 @@ void usage(char** argv )
   printf("    --mg-mu-factor <level factor>             # Set the multiplicative factor for the twisted mass mu parameter on each level (default 1)\n");
   printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true, if set false and mg-load-vec isn't set, creates free-field null vectors)\n");
   printf("    --mg-generate-all-levels <true/talse>     # true=generate null-space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
-  printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
-  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
+  printf("    --mg-load-vec <level file>                # Load the vectors \"file\" for the multigrid_test (requires "
+         "QIO)\n");
+  printf("    --mg-save-vec <level file>                # Save the generated null-space vectors \"file\" from the "
+         "multigrid_test (requires QIO)\n");
   printf("    --mg-verbosity <level verb>               # The verbosity to use on each level of the multigrid (default "
          "summarize)\n");
+
+  // Deflated solvers
   printf("    --df-nev <nev>                            # Set number of eigenvectors computed within a single solve cycle (default 8)\n");
   printf("    --df-max-search-dim <dim>                 # Set the size of eigenvector search space (default 64)\n");
   printf("    --df-deflation-grid <n>                   # Set maximum number of cycles needed to compute eigenvectors(default 1)\n");
@@ -1920,14 +1944,15 @@ void usage(char** argv )
   printf("    --df-location-ritz <host/cuda>            # Set memory location for the ritz vectors  (default cuda memory location)\n");
   printf("    --df-mem-type-ritz <device/pinned/mapped> # Set memory type for the ritz vectors  (default device memory type)\n");
 
-  // Stand alone Eigensolver
+  // Eigensolver
   printf("    --eig-nEv <n>                             # The size of eigenvector search space in the eigensolver\n");
   printf("    --eig-nKr <n>                             # The size of the Krylov subspace to use in the eigensolver\n");
   printf("    --eig-nConv <n>                           # The number of converged eigenvalues requested\n");
+  printf("    --eig-require-convergence  <true/false>   # If true, the solver will error out if convergence is not "
+         "attained. If false, a warning will be given (default true)\n");
   printf("    --eig-check-interval <n>                  # Perform a convergence check every nth restart/iteration in "
          "the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
-  printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the IRAM/IRLM "
-         "eigensolver\n");
+  printf("    --eig-max-restarts <n>                    # Perform n iterations of the restart in the eigensolver\n");
   printf("    --eig-tol <tol>                           # The tolerance to use in the eigensolver\n");
   printf("    --eig-use-poly-acc <true/false>           # Use Chebyshev polynomial acceleration in the eigensolver\n");
   printf("    --eig-poly-deg <n>                        # Set the degree of the Chebyshev polynomial acceleration in "
@@ -1942,8 +1967,7 @@ void usage(char** argv )
          "false)\n");
   printf("    --eig-spectrum <SR/LR/SM/LM/SI/LI>        # The spectrum part to be calulated. S=smallest L=largest "
          "R=real M=modulus I=imaginary\n");
-  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (lanczos, irlm, arnoldi, "
-         "iram, trlm,...)\n");
+  printf("    --eig-type <eigensolver>                  # The type of eigensolver to use (default trlm)\n");
   printf("    --eig-QUDA-logfile <file_name>            # The filename storing the stdout from the QUDA eigensolver\n");
   printf("    --eig-arpack-check <true/false>           # Cross check the device data against ARPACK (requires ARPACK, "
          "default false)\n");
@@ -1951,28 +1975,39 @@ void usage(char** argv )
   printf("    --eig-save-vec <file>                     # Save eigenvectors to <file> (requires QIO)\n");
 
   // Multigrid Eigensolver
+  printf("    --mg-eig <level> <true/false>                     # Use the eigensolver on this level (default false)\n");
+  printf("    --mg-eig-nEv <level> <n>                          # The size of eigenvector search space in the "
+         "eigensolver\n");
+  printf("    --mg-eig-nKr <level> <n>                          # The size of the Krylov subspace to use in the "
+         "eigensolver\n");
+  printf("    --mg-eig-require-convergence <level> <true/false> # If true, the solver will error out if convergence is "
+         "not attained. If false, a warning will be given (default true)\n");
   printf("    --mg-eig-check-interval <level> <n>               # Perform a convergence check every nth "
-         "restart/iteration in the IRAM,IRLM/lanczos,arnoldi eigensolver\n");
-  printf("    --mg-eig-max-restarts <level> <n>                 # Perform n iterations of the restart in the IRAM/IRLM "
-         "eigensolver\n");
-  printf("    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver\n");
-  printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the "
-         "eigensolver\n");
-  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial "
-         "acceleration in the eigensolver\n");
-  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration\n");
-  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration\n");
+         "restart/iteration (only used in Implicit Restart types)\n");
+  printf("    --mg-eig-max-restarts <level> <n>                 # Perform a maximun of n restarts in eigensolver "
+         "(default 100)\n");
   printf("    --mg-eig-use-normop <level> <true/false>          # Solve the MdagM problem instead of M (MMdag if "
          "eig-use-dagger == true) (default false)\n");
   printf("    --mg-eig-use-dagger <level> <true/false>          # Solve the MMdag problem instead of M (MMdag if "
          "eig-use-normop == true) (default false)\n");
+  printf(
+    "    --mg-eig-tol <level> <tol>                        # The tolerance to use in the eigensolver (default 1e-6)\n");
+  printf("    --mg-eig-use-poly-acc <level> <true/false>        # Use Chebyshev polynomial acceleration in the "
+         "eigensolver (default true)\n");
+  printf("    --mg-eig-poly-deg <level> <n>                     # Set the degree of the Chebyshev polynomial (default "
+         "100)\n");
+  printf("    --mg-eig-amin <level> <Float>                     # The minimum in the polynomial acceleration (default "
+         "0.1)\n");
+  printf("    --mg-eig-amax <level> <Float>                     # The maximum in the polynomial acceleration (default "
+         "4.0)\n");
   printf("    --mg-eig-spectrum <level> <SR/LR/SM/LM/SI/LI>     # The spectrum part to be calulated. S=smallest "
          "L=largest R=real M=modulus I=imaginary (default SR)\n");
-  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (lanczos, irlm, "
-         "arnoldi, iram, trlm,...) (default irlm)\n");
+  printf("    --mg-eig-coarse-guess <true/false>                # If deflating on the coarse grid, optionaly use an "
+         "initial guess (default = false)\n");
+  printf("    --mg-eig-type <level> <eigensolver>               # The type of eigensolver to use (default trlm)\n");
 
+  // Miscellanea
   printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-
   printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
   printf("    --heatbath-beta <beta>                    # Beta value used in heatbath test (default 6.2)\n");
   printf("    --heatbath-warmup-steps <n>               # Number of warmup steps in heatbath test (default 10)\n");
@@ -1980,6 +2015,10 @@ void usage(char** argv )
   printf("    --heatbath-num-hb-per-step <n>            # Number of heatbath hits per heatbath step (default 5)\n");
   printf("    --heatbath-num-or-per-step <n>            # Number of overrelaxation hits per heatbath step (default 5)\n");
   printf("    --heatbath-coldstart <true/false>         # Whether to use a cold or hot start in heatbath test (default false)\n");
+
+  printf("    --contraction-type <open/dr/dp>           # Whether to leave spin elemental open, or use a gamma basis "
+         "and contract on spin (default open)\n");
+
   printf("    --help                                    # Print out this message\n");
 
   usage_extra(argv);
@@ -2035,40 +2074,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
       low_mode_check = false;
     } else {
       fprintf(stderr, "ERROR: invalid low_mode_check type (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if (strcmp(argv[i], "--mg-use-low-modes") == 0) {
-    if (i + 1 >= argc) { usage(argv); }
-
-    if (strcmp(argv[i + 1], "true") == 0) {
-      use_low_modes = true;
-    } else if (strcmp(argv[i + 1], "false") == 0) {
-      use_low_modes = false;
-    } else {
-      fprintf(stderr, "ERROR: invalid use_low_modes type (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if (strcmp(argv[i], "--mg-deflate-coarsest") == 0) {
-    if (i + 1 >= argc) { usage(argv); }
-
-    if (strcmp(argv[i + 1], "true") == 0) {
-      deflate_coarsest = true;
-    } else if (strcmp(argv[i + 1], "false") == 0) {
-      deflate_coarsest = false;
-    } else {
-      fprintf(stderr, "ERROR: invalid deflate_coarsest type (true/false)\n");
       exit(1);
     }
 
@@ -2513,25 +2518,6 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
-  if (strcmp(argv[i], "--inv-deflate") == 0) {
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i + 1], "true") == 0) {
-      inv_deflate = true;
-    } else if (strcmp(argv[i + 1], "false") == 0) {
-      inv_deflate = false;
-    } else {
-      fprintf(stderr, "ERROR: invalid inv_deflate type (true/false)\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
   if (strcmp(argv[i], "--precon-type") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     precon_type = get_solver_type(argv[i + 1]);
@@ -2776,7 +2762,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 0 || Nsrc > 128){ // allow 0 for testing setup in isolation
+    if (Nsrc < 0 || Nsrc > 2048) { // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -2790,7 +2776,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Msrc = atoi(argv[i+1]);
-    if (Msrc < 1 || Msrc > 128){
+    if (Msrc < 1 || Msrc > 2048) {
       printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }
@@ -2819,7 +2805,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     nvec[level] = atoi(argv[i+1]);
-    if (nvec[level] < 0 || nvec[level] > 128){
+    if (nvec[level] < 0 || nvec[level] > 1024) {
       printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
       usage(argv);
     }
@@ -3182,6 +3168,25 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--mg-n-block-ortho") == 0) {
+    if (i + 2 >= argc) { usage(argv); }
+
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d for number of block orthos", level);
+      usage(argv);
+    }
+    i++;
+
+    n_block_ortho[level] = atoi(argv[i + 1]);
+    if (n_block_ortho[level] < 1) {
+      fprintf(stderr, "ERROR: invalid number %d of block orthonormalizations", n_block_ortho[level]);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--mg-omega") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -3536,10 +3541,15 @@ int process_command_line_option(int argc, char** argv, int* idx)
   }
 
   if( strcmp(argv[i], "--mg-load-vec") == 0){
-    if (i+1 >= argc){
+    if (i + 2 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
       usage(argv);
     }
-    strcpy(vec_infile, argv[i+1]);
+    i++;
+
+    strcpy(mg_vec_infile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3549,7 +3559,13 @@ int process_command_line_option(int argc, char** argv, int* idx)
     if (i+1 >= argc){
       usage(argv);
     }
-    strcpy(vec_outfile, argv[i+1]);
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+    strcpy(mg_vec_outfile[level], argv[i + 1]);
     i++;
     ret = 0;
     goto out;
@@ -3703,6 +3719,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
   if (strcmp(argv[i], "--eig-nConv") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     eig_nConv = atoi(argv[i + 1]);
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_require_convergence = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_require_convergence = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for require-convergence (true/false)\n");
+      exit(1);
+    }
+
     i++;
     ret = 0;
     goto out;
@@ -3889,6 +3922,84 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--mg-eig") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig %d (true/false)\n", level);
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-nEv") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_nEv[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-nKr") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    mg_eig_nKr[level] = atoi(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-require-convergence") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    int level = atoi(argv[i + 1]);
+    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
+      printf("ERROR: invalid multigrid level %d", level);
+      usage(argv);
+    }
+    i++;
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      mg_eig_require_convergence[level] = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      mg_eig_require_convergence[level] = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-require-convergence %d (true/false)\n", level);
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if (strcmp(argv[i], "--mg-eig-check-interval") == 0) {
     if (i + 1 >= argc) { usage(argv); }
     int level = atoi(argv[i + 1]);
@@ -3951,7 +4062,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     } else if (strcmp(argv[i + 1], "false") == 0) {
       mg_eig_use_poly_acc[level] = false;
     } else {
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-poly-acc %d (true/false)\n", level);
       exit(1);
     }
 
@@ -4022,7 +4133,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     } else if (strcmp(argv[i + 1], "false") == 0) {
       mg_eig_use_normop[level] = false;
     } else {
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-normop (true/false)\n");
       exit(1);
     }
 
@@ -4045,7 +4156,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
     } else if (strcmp(argv[i + 1], "false") == 0) {
       mg_eig_use_dagger[level] = false;
     } else {
-      fprintf(stderr, "ERROR: invalid value for eig-compute-svd (true/false)\n");
+      fprintf(stderr, "ERROR: invalid value for mg-eig-use-dagger (true/false)\n");
       exit(1);
     }
 
@@ -4080,6 +4191,23 @@ int process_command_line_option(int argc, char** argv, int* idx)
     i++;
 
     mg_eig_type[level] = get_eig_type(argv[i + 1]);
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--mg-eig-coarse-guess") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i + 1], "true") == 0) {
+      eig_use_poly_acc = true;
+    } else if (strcmp(argv[i + 1], "false") == 0) {
+      eig_use_poly_acc = false;
+    } else {
+      fprintf(stderr, "ERROR: invalid value for mg-eig-coarse-guess (true/false)\n");
+      exit(1);
+    }
 
     i++;
     ret = 0;
@@ -4214,6 +4342,18 @@ int process_command_line_option(int argc, char** argv, int* idx)
     goto out;
   }
 
+  if (strcmp(argv[i], "--gaussian-sigma") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    gaussian_sigma = atof(argv[i + 1]);
+    if (gaussian_sigma < 0.0 || gaussian_sigma > 1.0) {
+      printf("ERROR: invalid sigma (%f)\n", gaussian_sigma);
+      usage(argv);
+    }
+    i++;
+    ret = 0;
+    goto out;
+  }
+
   if( strcmp(argv[i], "--heatbath-beta") == 0){
     if (i+1 >= argc){
       usage(argv);
@@ -4298,6 +4438,14 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
 
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if (strcmp(argv[i], "--contract-type") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    contract_type = get_contract_type(argv[i + 1]);
     i++;
     ret = 0;
     goto out;

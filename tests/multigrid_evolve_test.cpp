@@ -70,6 +70,7 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern int nu_pre[QUDA_MAX_MG_LEVEL];
 extern int nu_post[QUDA_MAX_MG_LEVEL];
+extern int n_block_ortho[QUDA_MAX_MG_LEVEL];
 extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
 extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
@@ -115,8 +116,8 @@ extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 
-extern char vec_infile[];
-extern char vec_outfile[];
+extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
+extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
 
 //Twisted mass flavor type
 extern QudaTwistFlavorType twist_flavor;
@@ -292,6 +293,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -422,10 +424,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
-  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+  }
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -580,6 +584,7 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+    n_block_ortho[i] = 1;
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
@@ -590,6 +595,9 @@ int main(int argc, char **argv)
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    strcpy(mg_vec_infile[i], "");
+    strcpy(mg_vec_outfile[i], "");
   }
   reliable_delta = 1e-4;
 
@@ -723,9 +731,8 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
     // CURAND random generator initialization
-    RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
+    RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
 
     int nsteps = 10;
@@ -742,7 +749,7 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette(*gaugeEx);
 
-    Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -819,12 +826,18 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_param.iter == inv_param.maxiter) {
-        sprintf(mg_param.vec_outfile, "dump_step_%d", step);
+        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+        }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
-                    mg_param.vec_outfile);
+                    mg_param.vec_outfile[0]);
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
-        strcpy(mg_param.vec_outfile, vec_outfile); // restore output file name
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+        }
       }
 
       freeGaugeQuda();

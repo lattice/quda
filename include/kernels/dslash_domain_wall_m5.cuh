@@ -16,24 +16,29 @@ namespace quda
   };
 
   constexpr int size = 4096;
-  static __constant__ char mobius_d[size]; // constant buffer used for Mobius coefficients for GPU kernel
-  static char mobius_h[size];              // constant buffer used for Mobius coefficients for CPU kernel
+  static __constant__ char mobius_d[size]; // buffer used for Mobius coefficients for GPU kernel
+
+  // helper trait for determining if we are using variable coefficients
+  template <Dslash5Type type> struct is_variable {
+    static constexpr bool value = false;
+  };
+  template <> struct is_variable<DSLASH5_MOBIUS_PRE> {
+    static constexpr bool value = true;
+  };
+  template <> struct is_variable<DSLASH5_MOBIUS> {
+    static constexpr bool value = true;
+  };
+  template <> struct is_variable<M5_INV_ZMOBIUS> {
+    static constexpr bool value = true;
+  };
 
   /**
-     @brief Helper function for grabbing the constant struct, whether
+     @brief Helper class for grabbing the constant struct, whether
      we are on the GPU or CPU.
   */
-  template <typename real> inline __device__ __host__ const coeff_5<real> *coeff()
+  template <typename real, bool is_variable, typename Arg> class coeff_type
   {
-#ifdef __CUDA_ARCH__
-    return reinterpret_cast<const coeff_5<real> *>(mobius_d);
-#else
-    return reinterpret_cast<const coeff_5<real> *>(mobius_h);
-#endif
-  }
-
-  template <typename real, Dslash5Type, typename Arg> struct coeff_type {
-    typedef real type;
+public:
     const Arg &arg;
     __device__ __host__ coeff_type(const Arg &arg) : arg(arg) {}
     __device__ __host__ real a(int s) { return arg.a; }
@@ -41,12 +46,30 @@ namespace quda
     __device__ __host__ real c(int s) { return arg.c; }
   };
 
-  template <typename real, typename Arg> struct coeff_type<real, M5_INV_ZMOBIUS, Arg> {
-    typedef complex<real> type;
-    __device__ __host__ coeff_type(const Arg &arg) {}
-    __device__ __host__ complex<real> a(int s) { return coeff<real>()->a[s]; }
-    __device__ __host__ complex<real> b(int s) { return coeff<real>()->b[s]; }
-    __device__ __host__ complex<real> c(int s) { return coeff<real>()->c[s]; }
+  /**
+     @brief Specialization for variable complex coefficients
+  */
+  template <typename real, typename Arg> class coeff_type<real, true, Arg>
+  {
+    /**
+       @brief Helper function for grabbing the constant struct, whether
+       we are on the GPU or CPU.
+    */
+    inline __device__ __host__ const coeff_5<real> *coeff() const
+    {
+#ifdef __CUDA_ARCH__
+      return reinterpret_cast<const coeff_5<real> *>(mobius_d);
+#else
+      return arg.mobius_h;
+#endif
+    }
+
+public:
+    const Arg &arg;
+    __device__ __host__ inline coeff_type(const Arg &arg) : arg(arg) {}
+    __device__ __host__ complex<real> a(int s) { return coeff()->a[s]; }
+    __device__ __host__ complex<real> b(int s) { return coeff()->b[s]; }
+    __device__ __host__ complex<real> c(int s) { return coeff()->c[s]; }
   };
 
   /**
@@ -76,6 +99,8 @@ namespace quda
 
     Dslash5Type type;
 
+    coeff_5<real> *mobius_h; // constant buffer used for Mobius coefficients for CPU kernel
+
     Dslash5Arg(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f, double m_5,
         const Complex *b_5_, const Complex *c_5_, double a_, bool dagger, Dslash5Type type) :
         out(out),
@@ -97,10 +122,10 @@ namespace quda
         errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
       if (sizeof(coeff_5<real>) > size) errorQuda("Coefficient buffer too large at %lu bytes\n", sizeof(coeff_5<real>));
-      coeff_5<real> *coeff = reinterpret_cast<coeff_5<real> *>(&mobius_h);
-      auto *a_5 = coeff->a;
-      auto *b_5 = coeff->b;
-      auto *c_5 = coeff->c;
+      mobius_h = new coeff_5<real>;
+      auto *a_5 = mobius_h->a;
+      auto *b_5 = mobius_h->b;
+      auto *c_5 = mobius_h->c;
 
       switch (type) {
       case DSLASH5_DWF: break;
@@ -151,6 +176,8 @@ namespace quda
 
       cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
     }
+
+    virtual ~Dslash5Arg() { delete mobius_h; }
   };
 
   /**
@@ -164,6 +191,7 @@ namespace quda
   __device__ __host__ inline void dslash5(Arg &arg, int parity, int x_cb, int s)
   {
     typedef typename mapper<Float>::type real;
+    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
     typedef ColorSpinor<real, nColor, 4> Vector;
 
     Vector out;
@@ -195,21 +223,19 @@ namespace quda
       out = x + arg.a * out;
     } else if (type == DSLASH5_MOBIUS_PRE) {
       Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      auto *z = coeff<real>();
-      out = z->c[s] * out + z->b[s] * diagonal;
+      out = coeff.c(s) * out + coeff.b(s) * diagonal;
 
       if (xpay) {
         Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = x + z->a[s] * out;
+        out = x + coeff.a(s) * out;
       }
     } else if (type == DSLASH5_MOBIUS) {
       Vector diagonal = arg.in(s * arg.volume_4d_cb + x_cb, parity);
-      auto *z = coeff<real>();
-      out = z->c[s] * out + diagonal;
+      out = coeff.c(s) * out + diagonal;
 
       if (xpay) { // really axpy
         Vector x = arg.x(s * arg.volume_4d_cb + x_cb, parity);
-        out = z->a[s] * x + out;
+        out = coeff.a(s) * x + out;
       }
     }
 
@@ -268,7 +294,6 @@ namespace quda
   template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector constantInv(Arg &arg, int parity, int x_cb, int s_)
   {
-
     const auto k = arg.b;
     const auto inv = arg.c;
 
@@ -326,10 +351,9 @@ namespace quda
   template <typename real, int nColor, bool dagger, Dslash5Type type, bool shared, typename Vector, typename Arg>
   __device__ __host__ inline Vector variableInv(Arg &arg, int parity, int x_cb, int s_)
   {
-
     constexpr int nSpin = 4;
     typedef ColorSpinor<real, nColor, nSpin / 2> HalfVector;
-    coeff_type<real, type, Arg> coeff(arg);
+    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
     Vector in = arg.in(s_ * arg.volume_4d_cb + x_cb, parity);
     Vector out;
 
@@ -411,7 +435,7 @@ namespace quda
     constexpr int nSpin = 4;
     typedef typename mapper<Float>::type real;
     typedef ColorSpinor<real, nColor, nSpin> Vector;
-    coeff_type<real, type, Arg> coeff(arg);
+    coeff_type<real, is_variable<type>::value, Arg> coeff(arg);
 
     Vector out;
     if (var_inverse) { // zMobius, must call variableInv

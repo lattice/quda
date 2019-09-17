@@ -1,5 +1,4 @@
 #include <qmp.h>
-#include <csignal>
 #include <algorithm>
 #include <numeric>
 #include <quda_internal.h>
@@ -303,10 +302,7 @@ void comm_barrier(void)
 }
 
 
-void comm_abort(int status)
+void comm_abort_(int status)
 {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
   QMP_abort(status);
 }
