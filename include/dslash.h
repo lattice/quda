@@ -1,5 +1,7 @@
 #pragma once
 
+#include <typeinfo>
+
 #include <color_spinor_field.h>
 #include <tune_quda.h>
 #include <dslash_quda.h>
