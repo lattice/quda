@@ -840,9 +840,8 @@ namespace quda {
     bool init;
 
     ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *y_sloppy; //! sloppy solution vector
+    ColorSpinorField *tmp_sloppy; //! temporary for sloppy mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
