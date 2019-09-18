@@ -14,49 +14,32 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverPreconditionedLaunch {
-    static constexpr const char *kernel = "quda::wilsonCloverPreconditionedGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(nParity == 1, "preconditioned wilson-clover operator only defined for nParity=1");
-      if (xpay && dagger) errorQuda("xpay operator only defined for not dagger");
-      dslash.launch(wilsonCloverPreconditionedGPU < Float, nDim, nColor, nParity, dagger && !xpay, xpay && !dagger,
-          kernel_type, Arg >, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class WilsonCloverPreconditioned : public Dslash<Float>
+  template <typename Arg> class WilsonCloverPreconditioned : public Dslash<wilsonCloverPreconditioned, Arg>
   {
+    using Dslash = Dslash<wilsonCloverPreconditioned, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
-    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-        Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_preconditioned.cuh"),
-        arg(arg),
-        in(in)
+  public:
+    WilsonCloverPreconditioned(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in)
     {
     }
-
-    virtual ~WilsonCloverPreconditioned() {}
 
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
+      // specialize here to constrain the template instantiation
       if (arg.nParity == 1) {
-        if (arg.xpay)
-          Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch, nDim, nColor, 1, true>(tp, arg, stream);
-        else
-          Dslash<Float>::template instantiate<WilsonCloverPreconditionedLaunch, nDim, nColor, 1, false>(tp, arg, stream);
+        if (arg.xpay) {
+          if (arg.dagger) errorQuda("xpay operator only defined for not dagger");
+          Dslash::template instantiate<packShmem, 1, false, true>(tp, stream);
+        } else {
+          if (arg.dagger)
+            Dslash::template instantiate<packShmem, 1, true, false>(tp, stream);
+          else
+            Dslash::template instantiate<packShmem, 1, false, false>(tp, stream);
+        }
       } else {
         errorQuda("Preconditioned Wilson-clover operator not defined nParity=%d", arg.nParity);
       }
@@ -66,7 +49,7 @@ public:
     long long flops() const
     {
       int clover_flops = 504;
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -96,7 +79,7 @@ public:
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
 
-      long long bytes = Dslash<Float>::bytes();
+      long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -122,10 +105,6 @@ public:
       return bytes;
     }
 
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverPreconditionedApply {
@@ -140,9 +119,8 @@ public:
 #else
       constexpr bool dynamic_clover = false;
 #endif
-      WilsonCloverArg<Float, nColor, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
-      WilsonCloverPreconditioned<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, dynamic_clover>> wilson(
-          arg, out, in);
+      WilsonCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

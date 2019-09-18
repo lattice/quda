@@ -274,8 +274,8 @@ namespace quda {
     {
       int aux_string_n = TuneKey::aux_n / 2;
       char aux_tmp[aux_string_n];
-      int check = snprintf(aux_string, aux_string_n, "vol=%d,stride=%d,precision=%d,Ns=%d,Nc=%d",
-                           volume, stride, precision, nSpin, nColor);
+      int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,Ns=%d,Nc=%d", volume, stride,
+                           precision, nSpin, nColor);
       if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
       if (twistFlavor != QUDA_TWIST_NO && twistFlavor != QUDA_TWIST_INVALID) {
         strcpy(aux_tmp, aux_string);
@@ -775,6 +775,38 @@ namespace quda {
     }
 
     return field;
+  }
+
+  ColorSpinorField* ColorSpinorField::CreateAlias(const ColorSpinorParam &param_)
+  {
+    if (param_.Precision() > precision) errorQuda("Cannot create an alias to source with lower precision than the alias");
+    ColorSpinorParam param(param_);
+    param.create = QUDA_REFERENCE_FIELD_CREATE;
+    param.v = V();
+
+    // if norm field in the source exists, use it, else use the second
+    // half of main field for norm storage, ensuring that the start of
+    // the norm field is on an alignment boundary if we're using an
+    // internal field
+    if (param.Precision() < QUDA_SINGLE_PRECISION) {
+      auto norm_offset = (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) ?
+        (siteSubset == QUDA_FULL_SITE_SUBSET) ? 2*ALIGNMENT_ADJUST(Bytes()/4) : ALIGNMENT_ADJUST(Bytes()/2) : 0;
+      param.norm = Norm() ? Norm() : static_cast<char*>(V()) + norm_offset;
+    }
+
+    auto alias = ColorSpinorField::Create(param);
+
+    if (alias->Bytes() > Bytes()) errorQuda("Alias footprint %lu greater than source %lu", alias->Bytes(), Bytes());
+    if (alias->Precision() < QUDA_SINGLE_PRECISION) {
+      // check that norm does not overlap with body
+      if (static_cast<char*>(alias->V()) + alias->Bytes() > alias->Norm())
+        errorQuda("Overlap between alias body and norm");
+      // check that norm does fall off the end
+      if (static_cast<char*>(alias->Norm()) + alias->NormBytes() > static_cast<char*>(V()) + Bytes())
+        errorQuda("Norm is not contained in the srouce field");
+    }
+
+    return alias;
   }
 
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,

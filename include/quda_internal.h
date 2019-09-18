@@ -18,6 +18,12 @@
 #include <qmp.h>
 #endif
 
+// this is a helper macro for stripping the path information from
+// __FILE__.  FIXME - convert this into a consexpr routine
+#define KERNEL_FILE                                                                                                    \
+  (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 :                                                               \
+                            strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>

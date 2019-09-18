@@ -43,18 +43,12 @@ namespace quda {
       unsigned int sharedBytesPerThread() const { return 0; }
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
-      virtual bool advanceSharedBytes(TuneParam &param) const
-      {
-        TuneParam next(param);
-        advanceBlockDim(next); // to get next blockDim
-        int nthreads = next.block.x * next.block.y * next.block.z;
-        param.shared_bytes = sharedBytesPerThread() * nthreads > sharedBytesPerBlock(param) ?
-            sharedBytesPerThread() * nthreads :
-            sharedBytesPerBlock(param);
-        return false;
-      }
+      bool tuneSharedBytes() const { return false; }
 
-  public:
+      // for these streaming kernels, there is no need to tune the grid size, just use max
+      unsigned int minGridSize() const { return maxGridSize(); }
+
+    public:
       BlasCuda(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor &f, ColorSpinorField &x,
           ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length) :
           nParity((x.IsComposite() ? x.CompositeDim() : 1) * x.SiteSubset()), // must be first
@@ -190,9 +184,7 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION
-                || x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_HALF_PRECISION)) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
           warningQuda("Device blas on non-native fields is not supported\n");
           return;
         }
@@ -222,8 +214,8 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
-          } else if (x.Nspin() == 2 || x.Nspin() == 1 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+          } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
+#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
             const int M = 1;
             nativeBlas<float2, float2, float2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Length() / (2 * M));
@@ -250,7 +242,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(GPU_MULTIGRID)
             const int M = 12;
             nativeBlas<float2, short2, short2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
@@ -276,11 +268,19 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
-          if (x.Nspin() == 4) { // wilson
+          if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
 #if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
             const int M = 6;
             nativeBlas<float4, char4, char4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
+#if defined(GPU_MULTIGRID)
+            const int M = 12;
+            nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
+                                                                                                 x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
@@ -403,7 +403,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
-              const int M = 6;
+              const int M = 12;
               nativeBlas<double2, char4, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
             } else if (x.Nspin() == 1) {

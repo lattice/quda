@@ -16,6 +16,9 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+  add_dependencies(quda_test QIO)
+endif()
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -94,19 +97,23 @@ if(QUDA_DIRAC_WILSON
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp blas_reference.cpp
+  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp
                       llfat_reference.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
-  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp
+  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp
                       blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
   quda_checkbuildtest(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp blas_reference.cpp
+  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp
                       llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_invert_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(staggered_eigensolve_test staggered_eigensolve_test.cpp staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
+  target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
+  quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
 
   if(QUDA_BLOCKSOLVER)
     cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp
@@ -247,10 +254,10 @@ endif()
 
 # loop over Dslash policies
 if(QUDA_CTEST_SEP_DSLASH_POLICIES)
-  set(DSLASH_POLICIES 0 1 6 7 8 9 -1)
+  set(DSLASH_POLICIES 0 1 6 7 8 9 12 13 -1)
   if(DEFINED ENV{QUDA_ENABLE_GDR})
     if($ENV{QUDA_ENABLE_GDR} EQUAL 1)
-      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 -1)
+      set(DSLASH_POLICIES 0 1 2 3 4 5 6 7 8 9 10 11 12 13 -1)
       message(STATUS "QUDA_ENABLE_GDR=1: enabling GDR-enabled dslash policies in ctest")
     else()
       message(STATUS "QUDA_ENABLE_GDR!=1: disabling GDR-enabled dslash policies in ctest")
