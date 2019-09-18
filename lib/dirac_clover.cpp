@@ -50,19 +50,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, cs,
-                           &static_cast<const cudaColorSpinorField &>(in), parity, dagger,
-                           &static_cast<const cudaColorSpinorField &>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not implemented");
-    }
-#endif
-
     flops += 1872ll * in.Volume();
   }
 
@@ -346,7 +334,6 @@ namespace quda {
     bool asymmetric = (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) || (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC);
 
     if (!asymmetric) {
-#ifndef USE_LEGACY_DSLASH
       if (matpcType == QUDA_MATPC_EVEN_EVEN) {
         // printfQuda("Applying EVEN EVEN\n");
         ApplyWilsonCloverHasenbuschTwist(out.Even(), in.Odd(), *gauge, clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY,
@@ -381,9 +368,6 @@ namespace quda {
       // 2 Applies of DiracClover + (1-imu gamma_5)psi_{!p}
       flops += 2 * 1872ll * in.Volume() + 48ll * in.VolumeCB();
     }
-#else
-      errorQuda("DiracCloverHasenbuschTwist is not implemented for USE_LEGACY_DSLASH");
-#endif
   }
 
   void DiracCloverHasenbuschTwist::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

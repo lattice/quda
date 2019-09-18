@@ -12,65 +12,26 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-   */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverHasenbuschTwistPCClovInvLaunch {
-    static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCClovInvGPU"; // Kernel name for jit
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(xpay == true, "wilsonCloverHasenbuschTwistPCClovInv operator only defined for xpay");
-      dslash.launch(wilsonCloverHasenbuschTwistPCClovInvGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
-                    tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct WilsonCloverHasenbuschTwistPCNoClovInvLaunch {
-    static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCNoClovInvGPU"; // Kernel name for jit
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(xpay == true, "wilsonCloverHasenbuschNoTwistPCClovInv operator only defined for xpay");
-      dslash.launch(
-        wilsonCloverHasenbuschTwistPCNoClovInvGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp,
-        arg, stream);
-    }
-  };
-
   /* ***************************
    * No Clov Inv:  1 - k^2 D - i mu gamma_5 A
    * **************************/
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonCloverHasenbuschTwistPCNoClovInv : public Dslash<Float>
+  template <typename Arg>
+  class WilsonCloverHasenbuschTwistPCNoClovInv : public Dslash<cloverHasenbuschPreconditioned, Arg>
   {
-
-  protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash = Dslash<cloverHasenbuschPreconditioned, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
   public:
     WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~WilsonCloverHasenbuschTwistPCNoClovInv() {}
+      Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCNoClovInvLaunch, nDim, nColor, true>(tp, arg,
-                                                                                                              stream);
+        Dslash::template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
     }
@@ -78,7 +39,7 @@ namespace quda
     long long flops() const
     {
       int clover_flops = 504;
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -114,7 +75,7 @@ namespace quda
       bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
       int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
 
-      long long bytes = Dslash<Float>::bytes();
+      long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -144,11 +105,6 @@ namespace quda
 
       return bytes;
     }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
@@ -166,10 +122,10 @@ namespace quda
       constexpr bool dynamic_clover = false;
 #endif
 
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, recon, dynamic_clover>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, dynamic_clover, false>;
 
       ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
-      WilsonCloverHasenbuschTwistPCNoClovInv<Float, nDim, nColor, ArgType> wilson(arg, out, in);
+      WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
@@ -211,31 +167,23 @@ namespace quda
    *
    * M = psi_p - k^2 A^{-1} D_p\not{p} - i mu gamma_5 A_{pp} psi_{p}
    * **************************/
-  template <typename Float, int nDim, int nColor, typename Arg>
-  class WilsonCloverHasenbuschTwistPCClovInv : public Dslash<Float>
+  template <typename Arg>
+  class WilsonCloverHasenbuschTwistPCClovInv : public Dslash<cloverHasenbuschPreconditioned, Arg>
   {
-
-  protected:
-    Arg &arg;
-    const ColorSpinorField &in;
+    using Dslash = Dslash<cloverHasenbuschPreconditioned, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
   public:
     WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~WilsonCloverHasenbuschTwistPCClovInv() {}
+      Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
       if (arg.xpay)
-        Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCClovInvLaunch, nDim, nColor, true>(tp, arg,
-                                                                                                            stream);
+        Dslash::template instantiate<packShmem, true>(tp, stream);
       else
         errorQuda("Wilson-clover hasenbusch twist clov inv operator only defined for xpay=true");
     }
@@ -243,7 +191,7 @@ namespace quda
     long long flops() const
     {
       int clover_flops = 504;
-      long long flops = Dslash<Float>::flops();
+      long long flops = Dslash::flops();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -283,7 +231,7 @@ namespace quda
       // otherwise we read both A and A^{-1}
       int dyn_factor = arg.dynamic_clover ? 1 : 2;
 
-      long long bytes = Dslash<Float>::bytes();
+      long long bytes = Dslash::bytes();
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -314,11 +262,6 @@ namespace quda
 
       return bytes;
     }
-
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
@@ -335,10 +278,10 @@ namespace quda
       constexpr bool dynamic_clover = false;
 #endif
 
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, recon, dynamic_clover>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, dynamic_clover, true>;
 
       ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
-      WilsonCloverHasenbuschTwistPCClovInv<Float, nDim, nColor, ArgType> wilson(arg, out, in);
+      WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

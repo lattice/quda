@@ -87,8 +87,8 @@ namespace quda
                                       bool dagger, const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      WilsonCloverArg<Float, nColor, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
-      WilsonClover<Float, nDim, nColor, WilsonCloverArg<Float, nColor, recon, true>> wilson(arg, out, in);
+      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonClover<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(
         wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
