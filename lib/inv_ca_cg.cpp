@@ -261,22 +261,6 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
 
-      if (param.deflate) {
-        if (!deflate_init) {
-          // Construct the eigensolver and deflation space.
-          constructDeflationSpace(b, mat);
-        }
-        if (deflate_compute) {
-          // compute the deflation space.
-          (*eig_solve)(evecs, evals);
-          deflate_compute = false;
-        }
-        if (recompute_evals) {
-          eig_solve->computeEvals(mat, evecs, evals);
-          recompute_evals = false;
-        }
-      }
-
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
       tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -486,6 +470,25 @@ namespace quda {
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
+    if (param.deflate) {
+      if (!deflate_init) {
+	// Construct the eigensolver and deflation space.
+	profile.TPSTART(QUDA_PROFILE_INIT);
+	constructDeflationSpace(b, mat);
+	profile.TPSTOP(QUDA_PROFILE_INIT);
+	deflate_init = true;
+      }
+      if (deflate_compute) {
+	// compute the deflation space.
+	(*eig_solve)(evecs, evals);
+	deflate_compute = false;
+      }
+      if (recompute_evals) {
+	eig_solve->computeEvals(mat, evecs, evals);
+	recompute_evals = false;
+      }
+    }
+    
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);

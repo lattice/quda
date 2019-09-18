@@ -297,15 +297,12 @@ namespace quda {
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
         eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	//eig_solve->computeSVD(mat, evecs, evals);
 	profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
         eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
         eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	//eig_solve->computeEvals(mat, evecs, evals);
-        //eig_solve->computeSVD(mat, evecs, evals);
         recompute_evals = false;
       }
     }

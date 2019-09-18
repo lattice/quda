@@ -2707,9 +2707,9 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
 
-  bool refresh = true;
+  bool refresh = mg_param->preserve_deflation ? false : true;
   mg->mg->reset(refresh);
-
+  
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted

@@ -195,14 +195,11 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	//if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-	//else profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 	profile.TPSTART(QUDA_PROFILE_INIT);
 	// Construct the eigensolver and deflation space if requested.
 	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-	profile.TPSTOP(QUDA_PROFILE_INIT);	
-	//if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-	//else profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	profile.TPSTOP(QUDA_PROFILE_INIT);
+	deflate_init = true;
       }
       if (deflate_compute) {
 	// compute the deflation space.

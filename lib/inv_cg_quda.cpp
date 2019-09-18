@@ -273,6 +273,7 @@ namespace quda {
       if (!deflate_init) {
         // Construct the eigensolver and deflation space if requested.
         constructDeflationSpace(b, mat);
+	deflate_init = true;
       }
       if (deflate_compute) {
         // compute the deflation space.
