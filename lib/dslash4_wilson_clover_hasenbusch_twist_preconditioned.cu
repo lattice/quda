@@ -9,8 +9,8 @@
 #include <dslash_policy.cuh>
 #include <kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh>
 
-
-namespace quda {
+namespace quda
+{
 
   /**
      @brief This is a helper class that is used to instantiate the
@@ -18,332 +18,363 @@ namespace quda {
    */
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   struct WilsonCloverHasenbuschTwistPCClovInvLaunch {
-	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCClovInvGPU"; // Kernel name for jit
+    static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCClovInvGPU"; // Kernel name for jit
 
     template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    {
       static_assert(xpay == true, "wilsonCloverHasenbuschTwistPCClovInv operator only defined for xpay");
-      dslash.launch(wilsonCloverHasenbuschTwistPCClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+      dslash.launch(wilsonCloverHasenbuschTwistPCClovInvGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>,
+                    tp, arg, stream);
     }
   };
 
   template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-    struct WilsonCloverHasenbuschTwistPCNoClovInvLaunch {
-	  static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCNoClovInvGPU"; // Kernel name for jit
+  struct WilsonCloverHasenbuschTwistPCNoClovInvLaunch {
+    static constexpr const char *kernel = "quda::wilsonCloverHasenbuschTwistPCNoClovInvGPU"; // Kernel name for jit
 
-      template <typename Dslash>
-      inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream) {
-        static_assert(xpay == true, "wilsonCloverHasenbuschNoTwistPCClovInv operator only defined for xpay");
-        dslash.launch(wilsonCloverHasenbuschTwistPCNoClovInvGPU<Float,nDim,nColor,nParity,dagger,xpay,kernel_type,Arg>, tp, arg, stream);
+    template <typename Dslash>
+    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    {
+      static_assert(xpay == true, "wilsonCloverHasenbuschNoTwistPCClovInv operator only defined for xpay");
+      dslash.launch(
+        wilsonCloverHasenbuschTwistPCNoClovInvGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp,
+        arg, stream);
+    }
+  };
+
+  /* ***************************
+   * No Clov Inv:  1 - k^2 D - i mu gamma_5 A
+   * **************************/
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class WilsonCloverHasenbuschTwistPCNoClovInv : public Dslash<Float>
+  {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &in;
+
+  public:
+    WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
+      arg(arg),
+      in(in)
+    {
+    }
+
+    virtual ~WilsonCloverHasenbuschTwistPCNoClovInv() {}
+
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay)
+        Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCNoClovInvLaunch, nDim, nColor, true>(tp, arg,
+                                                                                                              stream);
+      else
+        errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
+    }
+
+    long long flops() const
+    {
+      int clover_flops = 504;
+      long long flops = Dslash<Float>::flops();
+      switch (arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        // 2 from fwd / back face * 1 clover terms:
+        // there is no A^{-1}D only D
+        // there is one clover_term and 48 is the - mu (igamma_5) A
+        flops += 2 * (clover_flops + 48) * in.GhostFace()[arg.kernel_type];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        flops
+          += 2 * (clover_flops + 48) * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        break;
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+        flops += (clover_flops + 48) * in.Volume();
+
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for flops done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        flops -= (clover_flops + 48) * ghost_sites;
+
+        break;
       }
-    };
+      return flops;
+    }
 
-    /* ***************************
-  	  * No Clov Inv:  1 - k^2 D - i mu gamma_5 A
-  	  * **************************/
-  template <typename Float, int nDim, int nColor, typename Arg> class WilsonCloverHasenbuschTwistPCNoClovInv : public Dslash<Float> {
+    long long bytes() const
+    {
+      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
 
-    protected:
-      Arg &arg;
-      const ColorSpinorField &in;
+      long long bytes = Dslash<Float>::bytes();
+      switch (arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        // Factor of 2 is from the fwd/back faces.
+        bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        // Factor of 2 is from the fwd/back faces
+        bytes += clover_bytes * 2 * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        break;
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
 
-    public:
+        bytes += clover_bytes * in.Volume();
 
-      WilsonCloverHasenbuschTwistPCNoClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-        : Dslash<Float>(arg, out, in,"kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
-		  arg(arg),
-		  in(in){  }
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for bytes done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        bytes -= clover_bytes * ghost_sites;
 
-      virtual ~WilsonCloverHasenbuschTwistPCNoClovInv() { }
-
-      void apply(const cudaStream_t &stream) {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        Dslash<Float>::setParam(arg);
-        if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCNoClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
-        else errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
+        break;
       }
 
-      long long flops() const {
-        	int clover_flops = 504;
-        	long long flops = Dslash<Float>::flops();
-        	switch(arg.kernel_type) {
-        	case EXTERIOR_KERNEL_X:
-        	case EXTERIOR_KERNEL_Y:
-        	case EXTERIOR_KERNEL_Z:
-        	case EXTERIOR_KERNEL_T:
-        		// 2 from fwd / back face * 1 clover terms:
-        		// there is no A^{-1}D only D
-        		// there is one clover_term and 48 is the - mu (igamma_5) A
-        		flops += 2*(clover_flops + 48) * in.GhostFace()[arg.kernel_type];
-        		break;
-        	case EXTERIOR_KERNEL_ALL:
-        		flops += 2*(clover_flops + 48) * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-        		break;
-        	case INTERIOR_KERNEL:
-        	case KERNEL_POLICY:
-        		flops += (clover_flops + 48) * in.Volume();
+      return bytes;
+    }
 
-
-        		if (arg.kernel_type == KERNEL_POLICY) break;
-        		// now correct for flops done by exterior kernel
-        		long long ghost_sites = 0;
-        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-        		flops -= (clover_flops + 48) * ghost_sites;
-
-        		break;
-        	}
-        	return flops;
-        }
-
-        long long bytes() const {
-        	bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-        	int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
-
-        	long long bytes = Dslash<Float>::bytes();
-        	switch(arg.kernel_type) {
-        	case EXTERIOR_KERNEL_X:
-        	case EXTERIOR_KERNEL_Y:
-        	case EXTERIOR_KERNEL_Z:
-        	case EXTERIOR_KERNEL_T:
-        		// Factor of 2 is from the fwd/back faces.
-        		bytes += clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
-        		break;
-        	case EXTERIOR_KERNEL_ALL:
-        		// Factor of 2 is from the fwd/back faces
-        		bytes += clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-        		break;
-        	case INTERIOR_KERNEL:
-        	case KERNEL_POLICY:
-
-        		bytes += clover_bytes*in.Volume();
-
-        		if (arg.kernel_type == KERNEL_POLICY) break;
-        		// now correct for bytes done by exterior kernel
-        		long long ghost_sites = 0;
-        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-        		bytes -= clover_bytes * ghost_sites;
-
-        		break;
-        	}
-
-        	return bytes;
-        }
-
-
-      TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
-    };
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
+  };
 
   template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCNoClovInvApply {
 
-      inline WilsonCloverHasenbuschTwistPCNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-          double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-		  const int *comm_override, TimeProfile &profile)
-      {
-          constexpr int nDim = 4;
+    inline WilsonCloverHasenbuschTwistPCNoClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
+                                                       const GaugeField &U, const CloverField &A, double a, double b,
+                                                       const ColorSpinorField &x, int parity, bool dagger,
+                                                       const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
 
 #ifdef DYNAMIC_CLOVER
-    constexpr bool dynamic_clover = true;
+      constexpr bool dynamic_clover = true;
 #else
-    constexpr bool dynamic_clover = false;
+      constexpr bool dynamic_clover = false;
 #endif
 
-    	     using ArgType = WilsonCloverHasenbuschTwistPCArg<Float,nColor,recon,dynamic_clover>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, recon, dynamic_clover>;
 
-    	      ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
-    	      WilsonCloverHasenbuschTwistPCNoClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
+      ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonCloverHasenbuschTwistPCNoClovInv<Float, nDim, nColor, ArgType> wilson(arg, out, in);
 
-    	      dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-    	                                                in.VolumeCB(), in.GhostFaceCB(), profile);
-    	      policy.apply(0);
+      dslash::DslashPolicyTune<decltype(wilson)> policy(
+        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-    	      checkCudaError();
-      }
-
-   };
+      checkCudaError();
+    }
+  };
 
   // Apply the Wilson-clover operator
-    // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
-    // Uses the kappa normalization for the Wilson operator.
-    void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-  					const CloverField &A, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-  			 const int *comm_override, TimeProfile &profile)
+  // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+  // Uses the kappa normalization for the Wilson operator.
+  void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+                                                   const GaugeField &U, const CloverField &A, double a, double b,
+                                                   const ColorSpinorField &x, int parity, bool dagger,
+                                                   const int *comm_override, TimeProfile &profile)
+  {
+#ifdef GPU_CLOVER_DIRAC
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+
+    // check all precisions match
+    checkPrecision(out, in, U, A);
+
+    // check all locations match
+    checkLocation(out, in, U, A);
+
+    instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
+                                                             profile);
+#else
+    errorQuda("Clover dslash has not been built");
+#endif
+  }
+
+  /* ***************************
+   * Clov Inv
+   *
+   * M = psi_p - k^2 A^{-1} D_p\not{p} - i mu gamma_5 A_{pp} psi_{p}
+   * **************************/
+  template <typename Float, int nDim, int nColor, typename Arg>
+  class WilsonCloverHasenbuschTwistPCClovInv : public Dslash<Float>
+  {
+
+  protected:
+    Arg &arg;
+    const ColorSpinorField &in;
+
+  public:
+    WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
+      Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
+      arg(arg),
+      in(in)
     {
-  #ifdef GPU_CLOVER_DIRAC
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      if (in.FieldOrder() != out.FieldOrder())
-        errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-      // check all precisions match
-      checkPrecision(out, in, U, A);
-
-      // check all locations match
-      checkLocation(out, in, U, A);
-
-      instantiate<WilsonCloverHasenbuschTwistPCNoClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
-  #else
-      errorQuda("Clover dslash has not been built");
-  #endif
     }
 
+    virtual ~WilsonCloverHasenbuschTwistPCClovInv() {}
 
-
-
-    /* ***************************
-     * Clov Inv
-     *
-     * M = psi_p - k^2 A^{-1} D_p\not{p} - i mu gamma_5 A_{pp} psi_{p}
-     * **************************/
-    template <typename Float, int nDim, int nColor, typename Arg>
-      class WilsonCloverHasenbuschTwistPCClovInv : public Dslash<Float> {
-
-      protected:
-        Arg &arg;
-        const ColorSpinorField &in;
-
-      public:
-
-        WilsonCloverHasenbuschTwistPCClovInv(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in)
-          : Dslash<Float>(arg, out, in, "kernels/dslash_wilson_clover_hasenbusch_twist_preconditioned.cuh"),
-			arg(arg),
-			in(in)
-        {}
-
-        virtual ~WilsonCloverHasenbuschTwistPCClovInv() { }
-
-        void apply(const cudaStream_t &stream) {
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          Dslash<Float>::setParam(arg);
-          if (arg.xpay) Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCClovInvLaunch,nDim,nColor,true>(tp, arg, stream);
-          else errorQuda("Wilson-clover hasenbusch twist clov inv operator only defined for xpay=true");
-        }
-
-        long long flops() const {
-        	int clover_flops = 504;
-        	long long flops = Dslash<Float>::flops();
-        	switch(arg.kernel_type) {
-        	case EXTERIOR_KERNEL_X:
-        	case EXTERIOR_KERNEL_Y:
-        	case EXTERIOR_KERNEL_Z:
-        	case EXTERIOR_KERNEL_T:
-        		// 2 from fwd / back face * 2 clover terms:
-        		// one clover_term from the A^{-1}D
-        		// second clover_term and 48 is the - mu (igamma_5) A
-        		flops += 2*(2*clover_flops + 48) * in.GhostFace()[arg.kernel_type];
-        		break;
-        	case EXTERIOR_KERNEL_ALL:
-        		flops += 2*(2*clover_flops + 48) * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-        		break;
-        	case INTERIOR_KERNEL:
-        	case KERNEL_POLICY:
-        		flops += (2*clover_flops + 48) * in.Volume();
-
-
-        		if (arg.kernel_type == KERNEL_POLICY) break;
-        		// now correct for flops done by exterior kernel
-        		long long ghost_sites = 0;
-        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
-        		flops -= (2*clover_flops + 48) * ghost_sites;
-
-        		break;
-        	}
-        	return flops;
-        }
-
-        long long bytes() const {
-        	bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
-        	int clover_bytes = 72 * in.Precision() + (isFixed ? 2*sizeof(float) : 0);
-
-        	// if we use dynamic clover we read only A (even for A^{-1}
-        	// otherwise we read both A and A^{-1}
-        	int dyn_factor = arg.dynamic_clover ? 1 : 2;
-
-        	long long bytes = Dslash<Float>::bytes();
-        	switch(arg.kernel_type) {
-        	case EXTERIOR_KERNEL_X:
-        	case EXTERIOR_KERNEL_Y:
-        	case EXTERIOR_KERNEL_Z:
-        	case EXTERIOR_KERNEL_T:
-        		// Factor of 2 is from the fwd/back faces.
-        		bytes += dyn_factor * clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
-        		break;
-        	case EXTERIOR_KERNEL_ALL:
-        		// Factor of 2 is from the fwd/back faces
-        		bytes += dyn_factor * clover_bytes * 2 * (in.GhostFace()[0]+in.GhostFace()[1]+in.GhostFace()[2]+in.GhostFace()[3]);
-        		break;
-        	case INTERIOR_KERNEL:
-        	case KERNEL_POLICY:
-
-        		bytes += dyn_factor *  clover_bytes*in.Volume();
-
-        		if (arg.kernel_type == KERNEL_POLICY) break;
-        		// now correct for bytes done by exterior kernel
-        		long long ghost_sites = 0;
-        		for (int d=0; d<4; d++) if (arg.commDim[d]) ghost_sites += 2*in.GhostFace()[d];
-        		bytes -= dyn_factor * clover_bytes * ghost_sites;
-
-        		break;
-        	}
-
-        	return bytes;
-        }
-
-        TuneKey tuneKey() const { return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]); }
-      };
-
-
-    template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
-
-        inline WilsonCloverHasenbuschTwistPCClovInvApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-				double kappa, double mu, const ColorSpinorField &x, int parity, bool dagger,
-				const int *comm_override, TimeProfile &profile)
-         {
-            constexpr int nDim = 4;
-        #ifdef DYNAMIC_CLOVER
-            constexpr bool dynamic_clover = true;
-        #else
-            constexpr bool dynamic_clover = false;
-        #endif
-
-            using ArgType = WilsonCloverHasenbuschTwistPCArg<Float,nColor,recon,dynamic_clover>;
-
-            ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
-            WilsonCloverHasenbuschTwistPCClovInv<Float,nDim,nColor,ArgType > wilson(arg, out, in);
-
-            dslash::DslashPolicyTune<decltype(wilson)> policy(wilson, const_cast<cudaColorSpinorField*>(static_cast<const cudaColorSpinorField*>(&in)),
-                                                      in.VolumeCB(), in.GhostFaceCB(), profile);
-            policy.apply(0);
-
-            checkCudaError();
-
-        	checkCudaError();
-         }
-
-      };
-
-
-    // Apply the Wilson-clover operator
-    // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
-    // Uses the kappa normalization for the Wilson operator.
-    void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-  					const CloverField &A, double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-  			 const int *comm_override, TimeProfile &profile)
+    void apply(const cudaStream_t &stream)
     {
-  #ifdef GPU_CLOVER_DIRAC
-      if (in.V() == out.V()) errorQuda("Aliasing pointers");
-      if (in.FieldOrder() != out.FieldOrder())
-        errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-      // check all precisions match
-      checkPrecision(out, in, U, A);
-
-      // check all locations match
-      checkLocation(out, in, U, A);
-
-      instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
-  #else
-      errorQuda("Clover dslash has not been built");
-  #endif
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash<Float>::setParam(arg);
+      if (arg.xpay)
+        Dslash<Float>::template instantiate<WilsonCloverHasenbuschTwistPCClovInvLaunch, nDim, nColor, true>(tp, arg,
+                                                                                                            stream);
+      else
+        errorQuda("Wilson-clover hasenbusch twist clov inv operator only defined for xpay=true");
     }
+
+    long long flops() const
+    {
+      int clover_flops = 504;
+      long long flops = Dslash<Float>::flops();
+      switch (arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        // 2 from fwd / back face * 2 clover terms:
+        // one clover_term from the A^{-1}D
+        // second clover_term and 48 is the - mu (igamma_5) A
+        flops += 2 * (2 * clover_flops + 48) * in.GhostFace()[arg.kernel_type];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        flops += 2 * (2 * clover_flops + 48)
+          * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        break;
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+        flops += (2 * clover_flops + 48) * in.Volume();
+
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for flops done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        flops -= (2 * clover_flops + 48) * ghost_sites;
+
+        break;
+      }
+      return flops;
+    }
+
+    long long bytes() const
+    {
+      bool isFixed = (in.Precision() == sizeof(short) || in.Precision() == sizeof(char)) ? true : false;
+      int clover_bytes = 72 * in.Precision() + (isFixed ? 2 * sizeof(float) : 0);
+
+      // if we use dynamic clover we read only A (even for A^{-1}
+      // otherwise we read both A and A^{-1}
+      int dyn_factor = arg.dynamic_clover ? 1 : 2;
+
+      long long bytes = Dslash<Float>::bytes();
+      switch (arg.kernel_type) {
+      case EXTERIOR_KERNEL_X:
+      case EXTERIOR_KERNEL_Y:
+      case EXTERIOR_KERNEL_Z:
+      case EXTERIOR_KERNEL_T:
+        // Factor of 2 is from the fwd/back faces.
+        bytes += dyn_factor * clover_bytes * 2 * in.GhostFace()[arg.kernel_type];
+        break;
+      case EXTERIOR_KERNEL_ALL:
+        // Factor of 2 is from the fwd/back faces
+        bytes += dyn_factor * clover_bytes * 2
+          * (in.GhostFace()[0] + in.GhostFace()[1] + in.GhostFace()[2] + in.GhostFace()[3]);
+        break;
+      case INTERIOR_KERNEL:
+      case KERNEL_POLICY:
+
+        bytes += dyn_factor * clover_bytes * in.Volume();
+
+        if (arg.kernel_type == KERNEL_POLICY) break;
+        // now correct for bytes done by exterior kernel
+        long long ghost_sites = 0;
+        for (int d = 0; d < 4; d++)
+          if (arg.commDim[d]) ghost_sites += 2 * in.GhostFace()[d];
+        bytes -= dyn_factor * clover_bytes * ghost_sites;
+
+        break;
+      }
+
+      return bytes;
+    }
+
+    TuneKey tuneKey() const
+    {
+      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
+    }
+  };
+
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverHasenbuschTwistPCClovInvApply {
+
+    inline WilsonCloverHasenbuschTwistPCClovInvApply(ColorSpinorField &out, const ColorSpinorField &in,
+                                                     const GaugeField &U, const CloverField &A, double kappa, double mu,
+                                                     const ColorSpinorField &x, int parity, bool dagger,
+                                                     const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+#ifdef DYNAMIC_CLOVER
+      constexpr bool dynamic_clover = true;
+#else
+      constexpr bool dynamic_clover = false;
+#endif
+
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, recon, dynamic_clover>;
+
+      ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
+      WilsonCloverHasenbuschTwistPCClovInv<Float, nDim, nColor, ArgType> wilson(arg, out, in);
+
+      dslash::DslashPolicyTune<decltype(wilson)> policy(
+        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
+      policy.apply(0);
+
+      checkCudaError();
+
+      checkCudaError();
+    }
+  };
+
+  // Apply the Wilson-clover operator
+  // out(x) = M*in = (A(x) + kappa * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
+  // Uses the kappa normalization for the Wilson operator.
+  void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                                 const CloverField &A, double a, double b, const ColorSpinorField &x,
+                                                 int parity, bool dagger, const int *comm_override, TimeProfile &profile)
+  {
+#ifdef GPU_CLOVER_DIRAC
+    if (in.V() == out.V()) errorQuda("Aliasing pointers");
+    if (in.FieldOrder() != out.FieldOrder())
+      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
+
+    // check all precisions match
+    checkPrecision(out, in, U, A);
+
+    // check all locations match
+    checkLocation(out, in, U, A);
+
+    instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
+                                                           profile);
+#else
+    errorQuda("Clover dslash has not been built");
+#endif
+  }
 
 } // namespace quda
 

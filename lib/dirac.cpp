@@ -9,7 +9,6 @@ namespace quda {
   // FIXME: At the moment, it's unsafe for more than one Dirac operator to be active unless
   // they all have the same volume, etc. (used to initialize the various CUDA constants).
 
-
   Dirac::Dirac(const DiracParam &param) :
     gauge(param.gauge),
     kappa(param.kappa),
@@ -80,7 +79,6 @@ namespace quda {
 
     return true;
   }
-
 
   void Dirac::deleteTmp(ColorSpinorField **a, const bool &reset) const {
     if (reset) {

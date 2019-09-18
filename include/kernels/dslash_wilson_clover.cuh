@@ -91,8 +91,4 @@ namespace quda
     }
   };
 
-
-
-
-
 } // namespace quda

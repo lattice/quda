@@ -45,7 +45,6 @@ namespace quda
       }
     }
 
-
     long long flops() const
     {
       int clover_flops = 504;
