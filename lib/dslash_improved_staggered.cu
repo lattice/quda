@@ -18,42 +18,20 @@
 namespace quda
 {
 
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct StaggeredLaunch {
-    static constexpr const char *kernel = "quda::staggeredGPU"; // kernel name for jit compilation
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(staggeredGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Staggered : public Dslash<Float>
+  template <typename Arg> class Staggered : public Dslash<staggered, Arg>
   {
+    using Dslash = Dslash<staggered, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
-    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/dslash_staggered.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~Staggered() {}
+  public:
+    Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
-      if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("Staggered Dslash not implemented on CPU");
-      } else {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        Dslash<Float>::setParam(arg);
-        Dslash<Float>::template instantiate<StaggeredLaunch, nDim, nColor>(tp, arg, stream);
-      }
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
     }
 
     /*
@@ -151,10 +129,6 @@ public:
       return bytes_;
     }
 
-    TuneKey tuneKey() const
-    {
-      return TuneKey(in.VolString(), typeid(*this).name(), Dslash<Float>::aux[arg.kernel_type]);
-    }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredApply {
@@ -166,8 +140,9 @@ public:
       constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
       constexpr bool improved = true;
       constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
-      StaggeredArg<Float, nColor, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger, comm_override);
-      Staggered<Float, nDim, nColor, decltype(arg)> staggered(arg, out, in);
+      StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved> arg(out, in, U, L, a, x, parity, dagger,
+                                                                        comm_override);
+      Staggered<decltype(arg)> staggered(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(staggered)> policy(
         staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
