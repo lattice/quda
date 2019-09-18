@@ -271,15 +271,15 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-        // Construct the eigensolver and deflation space.
+        // Construct the eigensolver and deflation space if requested.
         constructDeflationSpace(b, mat);
       }
       if (deflate_compute) {
         // compute the deflation space.
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        (*eig_solve)(evecs, evals);
-        profile.TPSTART(QUDA_PROFILE_INIT);
-        deflate_compute = false;
+	profile.TPSTOP(QUDA_PROFILE_INIT);
+	(*eig_solve)(evecs, evals);
+	profile.TPSTART(QUDA_PROFILE_INIT);
+	deflate_compute = false;
       }
       if (recompute_evals) {
         eig_solve->computeEvals(mat, evecs, evals);
@@ -352,7 +352,7 @@ namespace quda {
       blas::zero(y);
     }
 
-    if (param.deflate == true) {
+    if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
       // rhs b. use `x` as a temp.

@@ -195,9 +195,14 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	// Construct the eigensolver and deflation space.
+	//if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+	//else profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+	profile.TPSTART(QUDA_PROFILE_INIT);
+	// Construct the eigensolver and deflation space if requested.
 	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-	if (!deflate_compute) extendSVDDeflationSpace();
+	profile.TPSTOP(QUDA_PROFILE_INIT);	
+	//if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+	//else profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       }
       if (deflate_compute) {
 	// compute the deflation space.
@@ -229,7 +234,7 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
+    if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
       // rhs b. use `defl_tmp2` as a temp.
@@ -237,8 +242,8 @@ namespace quda {
       rhs.push_back(defl_tmp2[0]);
 
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
-      if (param.maxiter > 1) eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-
+      eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
+      
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);

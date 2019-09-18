@@ -210,6 +210,7 @@ namespace quda {
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
+
     delete []alpha;
     for (int i=0; i<nKrylov; i++) delete []beta[i];
     delete []beta;
@@ -286,26 +287,29 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-        // Construct the eigensolver and deflation space.
-        constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-        if (!deflate_compute) extendSVDDeflationSpace();
+	// Construct the eigensolver and deflation space if requested.
+	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+	deflate_init = true;
       }
       if (deflate_compute) {
         // compute the deflation space.
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+	profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        profile.TPSTART(QUDA_PROFILE_INIT);
         extendSVDDeflationSpace();
         eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	//eig_solve->computeSVD(mat, evecs, evals);
+	profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
         eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
         eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+	//eig_solve->computeEvals(mat, evecs, evals);
+        //eig_solve->computeSVD(mat, evecs, evals);
         recompute_evals = false;
       }
     }
-
+    
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
     ColorSpinorField &y = *yp;
@@ -327,24 +331,24 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
+    if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
       // rhs b. use `defl_tmp2` as a temp.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
-
+      
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
-      if (param.maxiter > 1) eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-
+      eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
+      
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);
-
+      
       // defl_tmp must be added to the solution at the end
       blas::axpy(1.0, *defl_tmp1[0], x);
     }
-
+    
     blas::zero(y); // FIXME optimize first updates of y and ySloppy
     if (&y != &ySloppy) blas::zero(ySloppy);
 

@@ -914,23 +914,24 @@ int main(int argc, char **argv)
     inv_param2.chrono_precision = inv_param2.cuda_prec_sloppy; // use sloppy precision for chrono basis
     inv_param2.use_init_guess = QUDA_USE_INIT_GUESS_YES;
 
-    invertQuda(spinorOut, spinorIn, &inv_param2);
+    //invertQuda(spinorOut, spinorIn, &inv_param2);
 
     // Demonstrate MG evolution on an evolving gauge field
     //----------------------------------------------------
     // setup the multigrid solver
     void *mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
-    invertQuda(spinorOut, spinorIn, &inv_param);
+    // invertQuda(spinorOut, spinorIn, &inv_param);
 
     // freeGaugeQuda();
 
-    for (int step = 1; step <= nsteps; ++step) {
+    //for (int step = 1; step <= nsteps; ++step) {
+    for (int step = 1; step <= 3; ++step) {
       freeGaugeQuda();
-      Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+      //Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
-      CallUnitarizeLinks(gaugeEx);
+      //CallUnitarizeLinks(gaugeEx);
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -938,11 +939,11 @@ int main(int argc, char **argv)
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       plaq = plaquette(*gaugeEx);
       charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      printfQuda("EVOLVE: step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
       // reference BiCGStab for comparison
-      invertQuda(spinorOut, spinorIn, &inv_param2);
-
+      // invertQuda(spinorOut, spinorIn, &inv_param2);
+      
       updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new gauge and clover fields
       invertQuda(spinorOut, spinorIn, &inv_param);
 
@@ -980,34 +981,35 @@ int main(int argc, char **argv)
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    plaq = plaquette(*gaugeEx);
-    charge = qChargeQuda();
-    printfQuda("plaquette = %e topological charge = %e\n", plaq.x, charge);
+    //for (int step = 1; step <= nsteps; ++step) {
+    for (int step = 0; step <= 2; ++step) {
 
-    for (int step = 1; step <= nsteps; ++step) {
+      plaq = plaquette(*gaugeEx);
+      charge = qChargeQuda();
+      printfQuda("PERSIST: step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      
+      // if (kappa == -1.0) {
+      //   inv_param.mass = mass * pow(0.9, step);
+      //   inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass * pow(1.1, step)));
+      //   inv_param2.mass = mass * pow(1.1, step);
+      //   inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass * pow(1.1, step)));
+      // } else {
+      //   inv_param.kappa = kappa / pow(1.1, step);
+      //   inv_param.mass = 0.5 / (kappa / pow(1.1, step)) - (1 + 3 / anisotropy);
+      //   inv_param.kappa = kappa / pow(1.1, step);
+      //   inv_param.mass = 0.5 / (kappa / pow(1.1, step)) - (1 + 3 / anisotropy);
+      // }
 
-      if (kappa == -1.0) {
-        inv_param.mass = mass * pow(0.9, step);
-        inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass * pow(1.1, step)));
-        inv_param2.mass = mass * pow(1.1, step);
-        inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass * pow(1.1, step)));
-      } else {
-        inv_param.kappa = kappa / pow(1.1, step);
-        inv_param.mass = 0.5 / (kappa / pow(1.1, step)) - (1 + 3 / anisotropy);
-        inv_param.kappa = kappa / pow(1.1, step);
-        inv_param.mass = 0.5 / (kappa / pow(1.1, step)) - (1 + 3 / anisotropy);
-      }
-
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        inv_param.mu = mu * pow(0.9, step);
-      }
+      // if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+      //   inv_param.mu = mu * pow(0.9, step);
+      // }
 
       // reference BiCGStab for comparison
-      invertQuda(spinorOut, spinorIn, &inv_param2);
-
+      //invertQuda(spinorOut, spinorIn, &inv_param2);
+      
       updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
       invertQuda(spinorOut, spinorIn, &inv_param);
-
+      
       if (inv_param.iter == inv_param.maxiter) {
         char vec_outfile[QUDA_MAX_MG_LEVEL][256];
         for (int i = 0; i < mg_param.n_level; i++) {
