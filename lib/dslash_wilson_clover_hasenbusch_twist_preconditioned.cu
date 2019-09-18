@@ -30,10 +30,16 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      if (arg.xpay)
-        Dslash::template instantiate<packShmem, true>(tp, stream);
-      else
-        errorQuda("Wilson-clover hasenbusch twist no clover operator only defined for xpay=true");
+
+      // specialize here to constrain the template instantiation
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
+        else
+          errorQuda("Operator only defined for xpay=true");
+      } else {
+        errorQuda("Operator not defined nParity=%d", arg.nParity);
+      }
     }
 
     long long flops() const
@@ -182,10 +188,16 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      if (arg.xpay)
-        Dslash::template instantiate<packShmem, true>(tp, stream);
-      else
-        errorQuda("Wilson-clover hasenbusch twist clov inv operator only defined for xpay=true");
+
+      // specialize here to constrain the template instantiation
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packShmem, 1, true>(tp, stream);
+        else
+          errorQuda("Operator only defined for xpay=true");
+      } else {
+        errorQuda("Operator not defined nParity=%d", arg.nParity);
+      }
     }
 
     long long flops() const
