@@ -318,9 +318,28 @@ foreach(pol IN LISTS DSLASH_POLICIES)
   endif()
 
  if(QUDA_DIRAC_CLOVER)
-    add_test(NAME dslash_clover_hasenbusch_twist-policy${pol2} COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> --dslash-type clover-hasenbusch-twist --test 3 --dim 2 4 6 8 --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    # symmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
     if(polenv)
-      set_tests_properties(dslash_clover_hasenbusch_twist--policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    # asymmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
   
