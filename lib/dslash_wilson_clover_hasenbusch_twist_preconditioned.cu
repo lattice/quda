@@ -121,14 +121,7 @@ namespace quda
                                                        const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-
-#ifdef DYNAMIC_CLOVER
-      constexpr bool dynamic_clover = true;
-#else
-      constexpr bool dynamic_clover = false;
-#endif
-
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, dynamic_clover, false>;
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, false>;
 
       ArgType arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCNoClovInv<ArgType> wilson(arg, out, in);
@@ -284,14 +277,7 @@ namespace quda
                                                      const int *comm_override, TimeProfile &profile)
     {
       constexpr int nDim = 4;
-#ifdef DYNAMIC_CLOVER
-      constexpr bool dynamic_clover = true;
-#else
-      constexpr bool dynamic_clover = false;
-#endif
-
-      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, dynamic_clover, true>;
-
+      using ArgType = WilsonCloverHasenbuschTwistPCArg<Float, nColor, nDim, recon, true>;
       ArgType arg(out, in, U, A, kappa, mu, x, parity, dagger, comm_override);
       WilsonCloverHasenbuschTwistPCClovInv<ArgType> wilson(arg, out, in);
 

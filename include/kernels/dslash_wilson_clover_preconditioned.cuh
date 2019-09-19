@@ -7,11 +7,11 @@
 namespace quda
 {
 
-  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_, bool dynamic_clover_>
+  template <typename Float, int nColor, int nDim, QudaReconstructType reconstruct_>
   struct WilsonCloverArg : WilsonArg<Float, nColor, nDim, reconstruct_> {
     using WilsonArg<Float, nColor, nDim, reconstruct_>::nSpin;
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_;
+    static constexpr bool dynamic_clover = dynamic_clover_inverse();
 
     typedef typename clover_mapper<Float, length>::type C;
     typedef typename mapper<Float>::type real;
