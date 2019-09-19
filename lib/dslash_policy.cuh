@@ -3,6 +3,13 @@
 namespace quda
 {
 
+  void pack_barrier_all();
+  void pack_barrier_all(const cudaStream_t &stream);
+  void pack_barrier_light(const int ngbs[2 * QUDA_MAX_DIM], long &counter, volatile long *sync_arr,
+                          const cudaStream_t &stream);
+  void pack_barrier_spin(const int ngbs[2 * QUDA_MAX_DIM], long &counter, volatile long *sync_arr,
+                         const cudaStream_t &stream);
+
   namespace dslash
   {
 
@@ -31,6 +38,8 @@ namespace quda
     extern bool dslash_comms;
     extern bool dslash_copy;
 
+    extern long *sync_arr;
+    extern long synccounter;
     static cudaColorSpinorField *inSpinor;
 
     /**
@@ -136,7 +145,8 @@ namespace quda
      @param[in] packIndex Stream index where the packing kernel will run
   */
   template <typename Dslash>
-  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location, int packIndex)
+  inline void issuePack(cudaColorSpinorField &in, const Dslash &dslash, int parity, MemoryLocation location,
+                        int packIndex, int shmem = 0)
   {
 
     auto &arg = dslash.dslashParam;
@@ -152,9 +162,11 @@ namespace quda
     MemoryLocation pack_dest[2*QUDA_MAX_DIM];
     for (int dim=0; dim<4; dim++) {
       for (int dir=0; dir<2; dir++) {
-        if ( (location & Remote) && comm_peer2peer_enabled(dir,dim) ) {
+        if ((location & Shmem)) {
+          pack_dest[2 * dim + dir] = Shmem; // pack to p2p remote
+        } else if ((location & Remote) && comm_peer2peer_enabled(dir, dim)) {
           pack_dest[2*dim+dir] = Remote; // pack to p2p remote
-        } else if ( location & Host && !comm_peer2peer_enabled(dir,dim) ) {
+        } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) {
           pack_dest[2*dim+dir] = Host;   // pack to cpu memory
         } else {
           pack_dest[2*dim+dir] = Device; // pack to local gpu memory
@@ -163,7 +175,7 @@ namespace quda
     }
     if (pack) {
       PROFILE(if (dslash_pack_compute) in.pack(dslash.Nface() / 2, parity, dslash.Dagger(), packIndex, pack_dest,
-                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c),
+                                               location, arg.spin_project, arg.twist_a, arg.twist_b, arg.twist_c, shmem),
               profile, QUDA_PROFILE_PACK_KERNEL);
 
       // Record the end of the packing
@@ -455,7 +467,97 @@ namespace quda
     }
   };
 
-/**
+  /**
+     Generic shmem dslash
+      // shmem bitfield encodes
+      // 0 - no shmem
+      // 1 - pack P2P (merged in interior)
+      // 2 - pack IB (merged in interior)
+      // 3 - pack P2P + IB (merged in interior)
+      // 8 - barrier part I (packing) (merged in interior, only useful if packing)
+      // 16 - barrier part II (spin exterior) (merged in exterior)
+      // 32 - use packstream
+  */
+  template <typename Dslash, int shmem> struct DslashShmemGeneric : DslashPolicyImp<Dslash> {
+
+    void operator()(Dslash &dslash, cudaColorSpinorField *in, const int volume, const int *faceVolumeCB,
+                    TimeProfile &profile)
+    {
+#ifdef NVSHMEM_COMMS
+      profile.TPSTART(QUDA_PROFILE_TOTAL);
+
+      auto &dslashParam = dslash.dslashParam;
+      dslashParam.kernel_type = INTERIOR_KERNEL;
+      dslashParam.threads = volume;
+      dslashParam.shmem = shmem;
+
+      // record start of the dslash
+      PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
+
+      constexpr bool use_packstream = (shmem & 32);
+      const int packIndex = use_packstream ? getStreamIndex(dslashParam) : Nstream - 1;
+      constexpr MemoryLocation location = static_cast<MemoryLocation>(Shmem);
+      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+              QUDA_PROFILE_STREAM_WAIT_EVENT);
+
+      if (!(((shmem & 2)) and (shmem & 1))) {
+        issuePack(*in, dslash, 1 - dslashParam.parity, location, packIndex, shmem);
+      }
+
+      dslash.setPack(((shmem & 2) or (shmem & 1)), location); // enable fused kernel packing
+
+      PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+      dslash.setPack(false, location); // disable fused kernel packing
+      if (aux_worker) aux_worker->apply(streams[Nstream - 1]);
+
+      const bool shmembarrierI = !(shmem & 8);
+      const bool shmembarrierII = !(shmem & 16);
+
+      // if we need to launch any barrier kernel
+      if (shmembarrierI || shmembarrierII) {
+        int neighbor_ranks[2 * QUDA_MAX_DIM];
+        for (int dim = 0; dim < 4; dim++) {
+          for (int dir = 0; dir < 2; dir++) {
+            neighbor_ranks[2 * dim + dir] = dslash.dslashParam.commDim[dim] ? comm_neighbor_rank(dir, dim) : -1;
+          }
+        }
+        if (shmembarrierI) {
+          pack_barrier_light(neighbor_ranks, dslash::synccounter, sync_arr, streams[packIndex]);
+        } else {
+          if (shmembarrierII) {
+            pack_barrier_spin(neighbor_ranks, dslash::synccounter, sync_arr, streams[packIndex]);
+          } else {
+            errorQuda("Only barrier part I not supported in barrier kernel.");
+          }
+        }
+      }
+
+      setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
+      PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+
+      dslash::synccounter++;
+      in->bufferIndex = (1 - in->bufferIndex);
+      profile.TPSTOP(QUDA_PROFILE_TOTAL);
+#else
+      errorQuda("NVSHMEM Dslash policies not build.");
+#endif
+    }
+  };
+
+  template <typename Dslash> using DslashShmemFusedHalo = DslashShmemGeneric<Dslash, 0>;
+
+  template <typename Dslash> using DslashShmemStreamFusedHalo = DslashShmemGeneric<Dslash, 32 + 16 + 8 + 1>;
+
+  template <typename Dslash> using DslashShmemFusedP2PPackFusedHalo = DslashShmemGeneric<Dslash, 16 + 8 + 1>;
+
+  template <typename Dslash> using DslashShmemFusedPackFusedHalo = DslashShmemGeneric<Dslash, 16 + 8 + 2 + 1>;
+
+  // template <typename Dslash> using DslashShmemFusedP2PPackFusedHaloStream = DslashShmemGeneric<Dslash, 32 + 16 + 8 + 1>;
+
+  // template <typename Dslash> using DslashShmemFusedPackFusedHaloStream = DslashShmemGeneric<Dslash, 32 + 16 + 8 + 2 + 1>;
+
+  /**
    Standard dslash parallelization with host staging for send and receive, and fused halo update kernel
  */
   template <typename Dslash> struct DslashFusedExterior : DslashPolicyImp<Dslash> {
@@ -1865,7 +1967,11 @@ namespace quda
     QUDA_DSLASH_ASYNC,
     QUDA_FUSED_DSLASH_ASYNC,
     QUDA_DSLASH_NC,
-    QUDA_DSLASH_POLICY_DISABLED // this MUST be the last element
+    QUDA_FUSED_DSLASH_SHMEM,                    // shmem 0
+    QUDA_FUSED_DSLASH_SHMEM_STREAM,             // shmem 1
+    QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM, // shmem 16+8+ 1 // kept as policy 19 here for compatibility with some scripts
+    QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM, // shmem 16+8+ 1 // kept as policy 19 here for compatibility with some scripts
+    QUDA_DSLASH_POLICY_DISABLED              // this MUST be the last element
   };
 
   // list of dslash policies that are enabled
@@ -1938,6 +2044,14 @@ namespace quda
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK: result = new DslashFusedPack<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO: result = new DslashFusedPackFusedHalo<Dslash>; break;
       case QudaDslashPolicy::QUDA_DSLASH_NC: result = new DslashNC<Dslash>; break;
+      case QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM: result = new DslashShmemFusedHalo<Dslash>; break;
+      case QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM_STREAM: result = new DslashShmemStreamFusedHalo<Dslash>; break;
+      case QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM:
+        result = new DslashShmemFusedPackFusedHalo<Dslash>;
+        break;
+      case QudaDslashPolicy::QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM:
+        result = new DslashShmemFusedP2PPackFusedHalo<Dslash>;
+        break;
       default: errorQuda("Dslash policy %d not recognized", static_cast<int>(dslashPolicy)); break;
       }
       return result; // default
@@ -1983,11 +2097,16 @@ public:
         first_active_policy = static_cast<int>(QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED);
         first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_POLICY_DISABLED);
 
+#ifndef QUDA_NVSHMEM
         if (comm_peer2peer_enabled_global() & 2) { // enable/disable p2p copy engine policy tuning
+#endif
+
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE)]
               = QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE;
           first_active_p2p_policy = static_cast<int>(QudaP2PPolicy::QUDA_P2P_REMOTE_WRITE);
+#ifndef QUDA_NVSHMEM
         }
+#endif
 
         if (comm_peer2peer_enabled_global() & 1) { // enable/disable p2p direct store policy tuning
           p2p_policies[static_cast<std::size_t>(QudaP2PPolicy::QUDA_P2P_COPY_ENGINE)]
@@ -2136,7 +2255,11 @@ public:
                         || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
                         || i == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
                         || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK
-                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO)
+                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO
+                        || i == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM
+                        || i == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM_STREAM
+                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM
+                        || i == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM)
                        || ((i == QudaDslashPolicy::QUDA_DSLASH || i == QudaDslashPolicy::QUDA_FUSED_DSLASH
                             || i == QudaDslashPolicy::QUDA_DSLASH_ASYNC || i == QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC)
                            && dslashParam.remote_write)) {
@@ -2212,6 +2335,9 @@ public:
          || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_PACK_GDR_RECV_DSLASH
          || p == QudaDslashPolicy::QUDA_ZERO_COPY_DSLASH || p == QudaDslashPolicy::QUDA_FUSED_ZERO_COPY_DSLASH
          || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO
+         || p == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM || p == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM_STREAM
+         || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM
+         || p == QudaDslashPolicy::QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM
          || dslashParam.remote_write // always use kernel packing if remote writing
      ) {
        setKernelPackT(true);

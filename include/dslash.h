@@ -42,7 +42,7 @@ namespace quda
     char aux_pack[TuneKey::aux_n];
 
     // pointers to ghost buffers we are packing to
-    void *packBuffer[2 * QUDA_MAX_DIM];
+    void *packBuffer[4 * QUDA_MAX_DIM];
 
     std::string kernel_file;
     /**
@@ -76,8 +76,33 @@ namespace quda
       strcat(aux[kernel_type], aux_base);
     }
 
-    virtual bool tuneGridDim() const { return false; }
+    // do we want to do this here -- do exterior kernels support grid strided loops???
+    virtual bool tuneGridDim() const { return arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0; }
     virtual unsigned int minThreads() const { return arg.threads; }
+    // maxGridSize should be fine, but maybe so not overallocate GPU?
+
+    virtual unsigned int minGridSize() const
+    {
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        // int min = 2;
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+      } else {
+        return TunableVectorYZ::minGridSize();
+      }
+    }
+
+    virtual int gridStep() const
+    {
+      if (arg.kernel_type == EXTERIOR_KERNEL_ALL && arg.shmem > 0) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        return ((deviceProp.multiProcessorCount) / nDimComms) * nDimComms;
+      } else {
+        return TunableVectorYZ::gridStep();
+      }
+    }
 
     inline void setParam(TuneParam &tp)
     {
@@ -107,9 +132,16 @@ namespace quda
 
       if (arg.pack_threads && arg.kernel_type == INTERIOR_KERNEL) {
         arg.blocks_per_dir = tp.aux.x;
-        arg.setPack(true); // need to recompute for updated block_per_dir
+        arg.setPack(true, this->packBuffer); // need to recompute for updated block_per_dir
         arg.in.resetGhost(in, this->packBuffer);
         tp.grid.x += arg.pack_blocks;
+        arg.counter = dslash::synccounter;
+      }
+      if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
+        int nDimComms = 0;
+        for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
+        arg.blocks_per_dir == static_cast<int>(tp.grid.x / (2 * nDimComms));
+        arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::synccounter;
       }
     }
 
@@ -331,8 +363,10 @@ namespace quda
 
     void setPack(bool pack, MemoryLocation location)
     {
-      arg.setPack(pack);
-      if (!pack) return;
+      if (!pack) {
+        arg.setPack(pack, packBuffer);
+        return;
+      }
 
       for (int dim = 0; dim < 4; dim++) {
         for (int dir = 0; dir < 2; dir++) {
@@ -341,12 +375,20 @@ namespace quda
               = static_cast<char *>(in.remoteFace_d(dir, dim)) + in.Precision() * in.GhostOffset(dim, 1 - dir);
           } else if (location & Host && !comm_peer2peer_enabled(dir, dim)) { // pack to cpu memory
             packBuffer[2 * dim + dir] = in.myFace_hd(dir, dim);
+          } else if (location & Shmem) {
+            packBuffer[2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+              static_cast<char *>(in.remoteFace_d(dir, dim)) + in.Precision() * in.GhostOffset(dim, 1 - dir) :
+              in.myFace_d(dir, dim);
+            packBuffer[2 * QUDA_MAX_DIM + 2 * dim + dir] = comm_peer2peer_possible(dir, dim) ?
+              nullptr :
+              static_cast<char *>(in.remoteFace_r()) + in.Precision() * in.GhostOffset(dim, 1 - dir);
           } else { // pack to local gpu memory
             packBuffer[2 * dim + dir] = in.myFace_d(dir, dim);
           }
         }
       }
 
+      arg.setPack(pack, packBuffer);
       // set the tuning string for the fused interior + packer kernel
       strcpy(aux_pack, aux[arg.kernel_type]);
       strcat(aux_pack, "");
@@ -358,6 +400,7 @@ namespace quda
       case Host | Remote: strcat(aux_pack, ",host-remote"); break;
       case Device: strcat(aux_pack, ",device-device"); break;
       case Host: strcat(aux_pack, comm_peer2peer_enabled_global() ? ",host-device" : ",host-host"); break;
+      case Shmem: strcat(aux_pack, ",shmem"); break;
       default: errorQuda("Unknown pack target location %d\n", location);
       }
     }

@@ -4,9 +4,15 @@
 #include <color_spinor.h>
 #include <index_helper.cuh>
 #include <dslash_helper.cuh>
+#ifdef NVSHMEM_COMMS
+#include <nvshmem.h>
+#include <nvshmemx.h>
+#endif
 
 namespace quda
 {
+
+  __device__ static unsigned int retirementCount[2 * QUDA_MAX_DIM] = {0};
 
   static int commDim[QUDA_MAX_DIM];
 
@@ -20,6 +26,8 @@ namespace quda
 
     static constexpr bool spin_project = (nSpin == 4 && spin_project_ ? true : false);
     static constexpr bool spinor_direct_load = false; // false means texture load
+
+    static constexpr bool packkernel = true;
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
 
     const F in; // field we are packing
@@ -48,8 +56,23 @@ namespace quda
     int_fastdiv swizzle;
     int sites_per_block;
 
+    char *packBuffer[4 * QUDA_MAX_DIM];
+    int neighbor_ranks[2 * QUDA_MAX_DIM];
+    int bytes[2 * QUDA_MAX_DIM];
+    // shmem bitfield encodes
+    // 0 - no shmem
+    // 1 - pack P2P
+    // 2 - pack IB
+    // 3 - pack P2P + IB
+    // 8 - barrier part I (just the put part)
+    // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
+    int shmem;
+
+    volatile long *sync_arr;
+    long counter;
+
     PackArg(void **ghost, const ColorSpinorField &in, int nFace, bool dagger, int parity, int threads, double a,
-            double b, double c) :
+            double b, double c, int shmem_ = 0) :
       in(in, nFace, nullptr, nullptr, reinterpret_cast<Float **>(ghost)),
       nFace(nFace),
       dagger(dagger),
@@ -61,8 +84,18 @@ namespace quda
       twist_a(a),
       twist_b(b),
       twist_c(c),
-      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0)
+      twist((a != 0.0 && b != 0.0) ? (c != 0.0 ? 2 : 1) : 0),
+      shmem(shmem_),
+      sync_arr(dslash::sync_arr),
+      counter(dslash::synccounter)
     {
+      for (int i = 0; i < 4 * QUDA_MAX_DIM; i++) { packBuffer[i] = static_cast<char *>(ghost[i]); }
+      for (int dim = 0; dim < 4; dim++) {
+        for (int dir = 0; dir < 2; dir++) {
+          neighbor_ranks[2 * dim + dir] = comm_neighbor_rank(dir, dim);
+          bytes[2 * dim + dir] = in.GhostFaceBytes(dim);
+        }
+      }
       if (!in.isNative()) errorQuda("Unsupported field order colorspinor=%d\n", in.FieldOrder());
 
       int d = 0;
@@ -220,10 +253,80 @@ namespace quda
     } // while tid
   }
 
+  template <int dest, typename Arg> __device__ inline void *getShmemBuffer(int shmemindex, Arg &arg)
+  {
+    switch (shmemindex) {
+    case 0: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 0]);
+    case 1: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 1]);
+    case 2: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 2]);
+    case 3: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 3]);
+    case 4: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 4]);
+    case 5: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 5]);
+    case 6: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 6]);
+    case 7: return static_cast<void *>(arg.packBuffer[dest * 2 * QUDA_MAX_DIM + 7]);
+    default: return nullptr;
+    }
+  }
+
+  template <typename Arg> __device__ inline int getNeighborRank(int idx, Arg &arg)
+  {
+    switch (idx) {
+    case 0: return arg.neighbor_ranks[0];
+    case 1: return arg.neighbor_ranks[1];
+    case 2: return arg.neighbor_ranks[2];
+    case 3: return arg.neighbor_ranks[3];
+    case 4: return arg.neighbor_ranks[4];
+    case 5: return arg.neighbor_ranks[5];
+    case 6: return arg.neighbor_ranks[6];
+    case 7: return arg.neighbor_ranks[7];
+    default: return -1;
+    }
+  }
+
+  template <typename Arg> __device__ inline void shmem_putbuffer(int shmemindex, Arg &arg)
+  {
+    switch (shmemindex) {
+    case 0:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(0, arg), getShmemBuffer<0>(0, arg), arg.bytes[0], arg.neighbor_ranks[0]);
+      return;
+    case 1:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(1, arg), getShmemBuffer<0>(1, arg), arg.bytes[1], arg.neighbor_ranks[1]);
+      return;
+    case 2:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(2, arg), getShmemBuffer<0>(2, arg), arg.bytes[2], arg.neighbor_ranks[2]);
+      return;
+    case 3:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(3, arg), getShmemBuffer<0>(3, arg), arg.bytes[3], arg.neighbor_ranks[3]);
+      return;
+    case 4:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(4, arg), getShmemBuffer<0>(4, arg), arg.bytes[4], arg.neighbor_ranks[4]);
+      return;
+    case 5:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(5, arg), getShmemBuffer<0>(5, arg), arg.bytes[5], arg.neighbor_ranks[5]);
+      return;
+    case 6:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(6, arg), getShmemBuffer<0>(6, arg), arg.bytes[6], arg.neighbor_ranks[6]);
+      return;
+    case 7:
+      nvshmem_putmem_nbi(getShmemBuffer<1>(7, arg), getShmemBuffer<0>(7, arg), arg.bytes[7], arg.neighbor_ranks[7]);
+      return;
+    default: return;
+    }
+  }
+
+  // shmem bitfield encodes
+  // 0 - no shmem
+  // 1 - pack P2P
+  // 2 - pack IB
+  // 3 - pack P2P + IB
+  // 8 - barrier part I (just the put part)
+  // 16 - barrier part II (wait on shmem to complete, all directions) -- not implemented
   template <bool dagger, QudaPCType pc, typename Arg> struct packShmem {
 
     template <int twist> __device__ inline void operator()(Arg &arg, int s, int parity)
     {
+
+      // bool amLast = false;
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
       int dim_dir = blockIdx.x / arg.blocks_per_dir;
@@ -238,48 +341,102 @@ namespace quda
 
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
-      switch (dim) {
-      case 0:
-        while (local_tid < arg.dc.ghostFaceCB[0]) {
-          int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
-          if (pc == QUDA_5D_PC)
-            pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
-          else
-            pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
+      // for shmem
+      const int shmem = arg.shmem;
+      const int shmemidx = 2 * dim + dir;
+      const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
+      // constexpr int shmem = shmem_;
+      const bool pack_intranode = (!arg.packkernel) != (!(arg.shmem & 1));
+      const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
+
+      if (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
+        switch (dim) {
+        case 0:
+          while (local_tid < arg.dc.ghostFaceCB[0]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
+            if (pc == QUDA_5D_PC)
+              pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
+            else
+              pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 1:
+          while (local_tid < arg.dc.ghostFaceCB[1]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
+            if (pc == QUDA_5D_PC)
+              pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
+            else
+              pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 2:
+          while (local_tid < arg.dc.ghostFaceCB[2]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
+            if (pc == QUDA_5D_PC)
+              pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
+            else
+              pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 3:
+          while (local_tid < arg.dc.ghostFaceCB[3]) {
+            int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
+            if (pc == QUDA_5D_PC)
+              pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
+            else
+              pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
         }
-        break;
-      case 1:
-        while (local_tid < arg.dc.ghostFaceCB[1]) {
-          int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
-          if (pc == QUDA_5D_PC)
-            pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
-          else
-            pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 2:
-        while (local_tid < arg.dc.ghostFaceCB[2]) {
-          int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
-          if (pc == QUDA_5D_PC)
-            pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
-          else
-            pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 3:
-        while (local_tid < arg.dc.ghostFaceCB[3]) {
-          int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
-          if (pc == QUDA_5D_PC)
-            pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
-          else
-            pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
       }
+
+#ifdef NVSHMEM_COMMS
+      // MWTODO: This can probably be merged
+      bool amLast;
+      if (!intranode && pack_internode) {
+        __threadfence();
+
+        if (threadIdx.x == 0) {
+          unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
+          amLast = (ticket == arg.blocks_per_dir - 1);
+        }
+        if (threadIdx.x == 0) {
+          if (amLast) {
+            // send data over IB if necessary
+            if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
+            // shmem barrier part I
+            if (shmem & 8) {
+              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+                nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                               getNeighborRank(2 * dim + dir, arg));
+            }
+            *(retirementCount + shmemidx) = 0;
+          }
+        }
+      }
+      if (intranode && pack_intranode) {
+        __threadfence();
+        if (threadIdx.x == 0) {
+          unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
+          amLast = (ticket == arg.blocks_per_dir - 1);
+        }
+
+        if (threadIdx.x == 0) {
+          if (amLast) {
+            if (shmem & 8) {
+              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+                nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                               getNeighborRank(2 * dim + dir, arg));
+            }
+            *(retirementCount + shmemidx) = 0;
+          }
+        }
+      }
+#endif
     }
 
     __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack)
@@ -301,9 +458,15 @@ namespace quda
     // this is the parity used for load/store, but we use arg.parity for index
     // mapping
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
     packShmem<dagger, pc, Arg> pack;
-    pack<twist>(arg, s, parity);
+    // switch (arg.shmem%16) {
+    // case  9: pack.operator()<twist,9> (arg, s, parity); break;
+    // case 11: pack.operator()<twist,11> (arg, s, parity); break;
+    // case 0:
+    // default:
+    pack.operator()<twist>(arg, s, parity);
+    //  break;
+    // }
   }
 
   template <typename Arg> __global__ void packStaggeredKernel(Arg arg)
@@ -345,8 +508,10 @@ namespace quda
 
   template <bool dagger, QudaPCType pc, typename Arg> struct packStaggeredShmem {
 
+    // template<int shmem_ = 0>
     __device__ inline void operator()(Arg &arg, int s, int parity, int twist_pack = 0)
     {
+
       // (active_dims * 2 + dir) * blocks_per_dir + local_block_idx
       int local_block_idx = blockIdx.x % arg.blocks_per_dir;
       int dim_dir = blockIdx.x / arg.blocks_per_dir;
@@ -361,48 +526,106 @@ namespace quda
 
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
-      switch (dim) {
-      case 0:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<0, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<0, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
+      // for shmem
+      const int shmem = arg.shmem;
+      const int shmemidx = 2 * dim + dir;
+      bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
+      bool pack_intranode = (!arg.packkernel) != (!(shmem & 1));
+      bool pack_internode = (!arg.packkernel) != (!(shmem & 2));
+
+      if (shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
+        switch (dim) {
+        case 0:
+          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
+            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
+            if (arg.nFace == 1)
+              packStaggered<0, 1>(arg, ghost_idx, s, parity);
+            else
+              packStaggered<0, 3>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 1:
+          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
+            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
+            if (arg.nFace == 1)
+              packStaggered<1, 1>(arg, ghost_idx, s, parity);
+            else
+              packStaggered<1, 3>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 2:
+          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
+            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
+            if (arg.nFace == 1)
+              packStaggered<2, 1>(arg, ghost_idx, s, parity);
+            else
+              packStaggered<2, 3>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
+        case 3:
+          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
+            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
+            if (arg.nFace == 1)
+              packStaggered<3, 1>(arg, ghost_idx, s, parity);
+            else
+              packStaggered<3, 3>(arg, ghost_idx, s, parity);
+            local_tid += arg.blocks_per_dir * blockDim.x;
+          }
+          break;
         }
-        break;
-      case 1:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<1, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<1, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 2:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<2, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<2, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 3:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<3, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<3, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
       }
+
+#ifdef NVSHMEM_COMMS
+      // MWTO -> clean up and merge with non-staggered version
+      bool amLast = false;
+      if (!intranode && pack_internode) {
+
+        __syncthreads();
+
+        if (threadIdx.x == 0) {
+          unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
+          amLast = (ticket == arg.blocks_per_dir - 1);
+        }
+        __threadfence();
+        if (threadIdx.x == 0) {
+          if (amLast) {
+            // send data over IB if necessary
+            if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
+            // shmem barrier part I
+            if (shmem & 8) {
+              nvshmem_fence();
+              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+                nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                               getNeighborRank(2 * dim + dir, arg));
+            }
+            *(retirementCount + shmemidx) = 0;
+          }
+        }
+      }
+      if (intranode && pack_intranode) {
+        __syncthreads();
+        if (threadIdx.x == 0) {
+          unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
+          amLast = (ticket == arg.blocks_per_dir - 1);
+        }
+        __threadfence();
+        if (threadIdx.x == 0) {
+          if (amLast) {
+            // shmem barrier part I
+            if (shmem & 8) {
+              nvshmem_fence();
+              if (!(getNeighborRank(2 * dim + dir, arg) < 0))
+                nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
+                               getNeighborRank(2 * dim + dir, arg));
+            }
+            *(retirementCount + shmemidx) = 0;
+          }
+        }
+      }
+#endif
     }
   };
 
@@ -415,9 +638,15 @@ namespace quda
     // this is the parity used for load/store, but we use arg.parity for index
     // mapping
     int parity = (arg.nParity == 2) ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
-
     packStaggeredShmem<0, QUDA_4D_PC, Arg> pack;
-    pack(arg, s, parity);
+    // switch (arg.shmem%16) {
+    // case  9: pack.operator() (arg, s, parity); break;
+    // case 11: pack.operator() (arg, s, parity); break;
+    // case 0:
+    // default:
+    pack.operator()(arg, s, parity);
+    // break;
+    // }
   }
 
 } // namespace quda
