@@ -24,7 +24,6 @@
 #include <blas_reference.h>
 #include <random_quda.h>
 
-
 #if defined(QMP_COMMS)
 #include <qmp.h>
 #elif defined(MPI_COMMS)
@@ -649,13 +648,13 @@ void display_test_info()
 //   printfQuda("Extra options:\n");
 //   printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
 //   printfQuda("                                                0: Full parity inverter\n");
-//   printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
-//   printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
-//   printfQuda("                                                3: Even even spinor CG inverter\n");
-//   printfQuda("                                                4: Odd odd spinor CG inverter\n");
-//   printfQuda("                                                5: Even even spinor multishift CG inverter\n");
-//   printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
-//   printfQuda("    --cpu-prec <double/single/half>             # Set CPU precision\n");
+//   printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full
+//   parity\n"); printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct
+//   to full parity\n"); printfQuda("                                                3: Even even spinor CG
+//   inverter\n"); printfQuda("                                                4: Odd odd spinor CG inverter\n"); printfQuda("
+//   5: Even even spinor multishift CG inverter\n"); printfQuda("                                                6: Odd
+//   odd spinor multishift CG inverter\n"); printfQuda("    --cpu-prec <double/single/half>             # Set CPU
+//   precision\n");
 
 //   return ;
 // }
@@ -670,9 +669,12 @@ int main(int argc, char **argv)
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
+                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 

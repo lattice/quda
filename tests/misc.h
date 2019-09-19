@@ -11,7 +11,7 @@ extern "C" {
   void display_link(void* link, int len, int precision);
   int link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* gaugeParam);
   int site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gaugeParam);
-  
+
   // QudaReconstructType get_recon(char* s);
   const char* get_recon_str(QudaReconstructType recon);
 

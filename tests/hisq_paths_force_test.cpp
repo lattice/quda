@@ -17,7 +17,6 @@
 
 using namespace quda;
 
-
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
 
@@ -417,21 +416,23 @@ static void display_test_info()
 
 }
 
-int main(int argc, char **argv){
-   auto app = make_app();
+int main(int argc, char **argv)
+{
+  auto app = make_app();
   // app->get_formatter()->column_width(40);
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
- 
-  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc",QUDA_MILC_GAUGE_ORDER},{"qdp",QUDA_QDP_GAUGE_ORDER}};
+
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
 
-   try {
-      app->parse(argc, argv);
-    } catch(const CLI::ParseError &e) {
-      return app->exit(e);
-    }
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
+  }
 
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
     errorQuda("Multi-gpu for milc order is not supported\n");
@@ -452,7 +453,4 @@ int main(int argc, char **argv){
   }else{
     return -1;
   }
-
 }
-
-

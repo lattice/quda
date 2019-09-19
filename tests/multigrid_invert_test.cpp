@@ -548,16 +548,16 @@ int main(int argc, char **argv)
   }
   reliable_delta = 1e-4;
 
-    // command line options
+  // command line options
   auto app = make_app();
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   add_multigrid_option_group(app);
-    try {
+  try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
+  }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;

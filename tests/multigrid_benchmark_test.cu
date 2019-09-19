@@ -214,16 +214,19 @@ int main(int argc, char** argv)
   // with default parameters.
   xdim = ydim = zdim = tdim = 8;
 
-    // command line options
+  // command line options
   auto app = make_app();
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
+  }
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
 
   initComms(argc, argv, gridsize_from_cmdline);

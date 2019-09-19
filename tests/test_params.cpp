@@ -10,13 +10,13 @@ int device = 0;
 #endif
 
 int rank_order;
-std::array<int,4> gridsize_from_cmdline = {1, 1, 1, 1};
-auto& grid_x = gridsize_from_cmdline[0];
-auto& grid_y = gridsize_from_cmdline[1];
-auto& grid_z = gridsize_from_cmdline[2];
-auto& grid_t = gridsize_from_cmdline[3];
+std::array<int, 4> gridsize_from_cmdline = {1, 1, 1, 1};
+auto &grid_x = gridsize_from_cmdline[0];
+auto &grid_y = gridsize_from_cmdline[1];
+auto &grid_z = gridsize_from_cmdline[2];
+auto &grid_t = gridsize_from_cmdline[3];
 
-std::array<int,4> dim_partitioned = {0,0,0,0};
+std::array<int, 4> dim_partitioned = {0, 0, 0, 0};
 QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
 QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
 QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
@@ -27,7 +27,7 @@ QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
 QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
-std::array<int,4> dim = {24,24,24,24};
+std::array<int, 4> dim = {24, 24, 24, 24};
 int &xdim = dim[0];
 int &ydim = dim[1];
 int &zdim = dim[2];
@@ -119,7 +119,7 @@ bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> schwarz_type = {};
 quda::mgarray<int> schwarz_cycle = {};
 
-quda::mgarray<std::array<int,QUDA_MAX_DIM>> geo_block_size = {};
+quda::mgarray<std::array<int, QUDA_MAX_DIM>> geo_block_size = {};
 int nev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -190,10 +190,10 @@ QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
-  
+
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
-  
+
   CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
@@ -278,7 +278,7 @@ namespace
                                                                  {"12", QUDA_RECONSTRUCT_12},
                                                                  {"9", QUDA_RECONSTRUCT_9},
                                                                  {"8", QUDA_RECONSTRUCT_8}};
- 
+
   CLI::TransformPairs<QudaEigSpectrumType> eig_spectrum_map {
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
@@ -310,7 +310,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-
   quda_app
     ->add_option("--contraction-type", contract_type,
                  "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
@@ -319,8 +318,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
-
- 
 
   quda_app->add_option("--dslash-type", dslash_type, "Set the dslash type")
     ->transform(CLI::QUDACheckedTransformer(dslash_type_map));
@@ -336,7 +333,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--gaussian-sigma", gaussian_sigma,
                        "Width of the Gaussian noise used for random gauge field contruction (default 0.2)");
 
-
   quda_app->add_option("--heatbath-beta", heatbath_beta_value, "Beta value used in heatbath test (default 6.2)");
   quda_app->add_option("--heatbath-coldstart", heatbath_coldstart,
                        "Whether to use a cold or hot start in heatbath test (default false)");
@@ -349,8 +345,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--heatbath-warmup-steps", heatbath_warmup_steps,
                        "Number of warmup steps in heatbath test (default 10)");
 
-
-
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
@@ -360,7 +354,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--load-gauge", latfile, "Load gauge field \" file \" for the test (requires QIO)");
   quda_app->add_option("--Lsdim", Lsdim, "Set Ls dimension size(default 16)");
   quda_app->add_option("--mass", mass, "Mass of Dirac operator (default 0.1)");
-
 
   quda_app->add_option("--mass-normalization", normalization, "Mass normalization (kappa (default) / mass / asym-mass)")
     ->transform(CLI::QUDACheckedTransformer(mass_normalization_map));
@@ -377,12 +370,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
-  
+
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
 
   // // precision options
-
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
@@ -401,11 +393,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--precon-type", prec_precondition, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
 
-  CLI::TransformPairs<int> rank_order_map {{"col",0},{"row",1}};
-  quda_app->add_option(
-    "--rank-order", rank_order,
-    "Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)")->transform(CLI::QUDACheckedTransformer(rank_order_map));
-
+  CLI::TransformPairs<int> rank_order_map {{"col", 0}, {"row", 1}};
+  quda_app
+    ->add_option("--rank-order", rank_order,
+                 "Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)")
+    ->transform(CLI::QUDACheckedTransformer(rank_order_map));
 
   quda_app->add_option("--recon", link_recon, "Link reconstruction type")
     ->transform(CLI::QUDACheckedTransformer(reconstruct_type_map));
@@ -421,14 +413,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--solution-pipeline", solution_accumulator_pipeline,
                        "The pipeline length for fused solution accumulation (default 0, no pipelining)");
 
-
   quda_app
     ->add_option(
       "--solution-type", solution_type,
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
-
-
 
   quda_app
     ->add_option("--solve-type", solve_type,
@@ -441,7 +430,6 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tadpole-coeff", tadpole_factor,
                        "Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)");
 
-  quda_app->add_option("--test", test_type, "Test method (different for each test)");
   quda_app->add_option("--tol", tol, "Set L2 residual tolerance");
   quda_app->add_option("--tolhq", tol_hq, "Set heavy-quark residual tolerance");
   quda_app->add_option(
@@ -452,28 +440,34 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(verbosity_map));
   quda_app->add_option("--verify", verify_results, "Verify the GPU results using CPU results (default true)");
 
-
   // lattice dimensions
   auto dimopt = quda_app->add_option("--dim", dim, "Set space-time dimension (X Y Z T)")->check(CLI::Range(1, 512));
-  auto sdimopt =   quda_app
-    ->add_option(
-      "--sdim",
-      [](CLI::results_t res) {
-        return CLI::detail::lexical_cast(res[0], xdim) && CLI::detail::lexical_cast(res[0], ydim)
-          && CLI::detail::lexical_cast(res[0], zdim);
-      },
-      "Set space dimension(X/Y/Z) size")
-    ->type_name("INT")
-    ->check(CLI::Range(1, 512));
+  auto sdimopt = quda_app
+                   ->add_option(
+                     "--sdim",
+                     [](CLI::results_t res) {
+                       return CLI::detail::lexical_cast(res[0], xdim) && CLI::detail::lexical_cast(res[0], ydim)
+                         && CLI::detail::lexical_cast(res[0], zdim);
+                     },
+                     "Set space dimension(X/Y/Z) size")
+                   ->type_name("INT")
+                   ->check(CLI::Range(1, 512));
 
-  quda_app->add_option("--xdim", xdim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512))->excludes(dimopt)->excludes(sdimopt);
-  quda_app->add_option("--ydim", ydim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512))->excludes(dimopt)->excludes(sdimopt);
-  quda_app->add_option("--zdim", zdim, "Set X dimension size(default 24)")->check(CLI::Range(1, 512))->excludes(dimopt)->excludes(sdimopt);
+  quda_app->add_option("--xdim", xdim, "Set X dimension size(default 24)")
+    ->check(CLI::Range(1, 512))
+    ->excludes(dimopt)
+    ->excludes(sdimopt);
+  quda_app->add_option("--ydim", ydim, "Set X dimension size(default 24)")
+    ->check(CLI::Range(1, 512))
+    ->excludes(dimopt)
+    ->excludes(sdimopt);
+  quda_app->add_option("--zdim", zdim, "Set X dimension size(default 24)")
+    ->check(CLI::Range(1, 512))
+    ->excludes(dimopt)
+    ->excludes(sdimopt);
   quda_app->add_option("--tdim", tdim, "Set T dimension size(default 24)")->check(CLI::Range(1, 512))->excludes(dimopt);
 
-
   // multi-gpu partitioning
-
 
   quda_app->add_option(
     "--partition",
@@ -489,8 +483,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       return retval;
     },
     "Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)");
- 
-  auto gridsizeopt = quda_app->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")->expected(4);
+
+  auto gridsizeopt
+    = quda_app
+        ->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")
+        ->expected(4);
   quda_app->add_option("--xgridsize", grid_x, "Set grid size in X dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--ygridsize", grid_y, "Set grid size in Y dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);
@@ -530,14 +527,11 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-load-vec", eig_vec_infile, "Load eigenvectors to <file> (requires QIO)")
     ->check(CLI::ExistingFile);
 
-
-
   opgroup
     ->add_option("--eig-spectrum", eig_spectrum,
                  "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary")
     ->transform(CLI::QUDACheckedTransformer(eig_spectrum_map));
   opgroup->add_option("--eig-tol", eig_tol, "The tolerance to use in the eigensolver");
-
 
   opgroup->add_option("--eig-type", eig_type, "The type of eigensolver to use (default trlm)")
     ->transform(CLI::QUDACheckedTransformer(eig_type_map));
@@ -585,15 +579,15 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("MultiGrid", "Options controlling deflation");
 
   // MWTODO: clean this up - code duplication
- 
+
   auto solve_type_transform = CLI::QUDACheckedTransformer(solve_type_map);
 
   // TODO
-  quda_app->add_mgoption(opgroup, "--mg-block-size", geo_block_size, CLI::Validator(), "Set the geometric block size for the each multigrid levels transfer operator (default 4 4 4 4)" );
+  quda_app->add_mgoption(
+    opgroup, "--mg-block-size", geo_block_size, CLI::Validator(),
+    "Set the geometric block size for the each multigrid levels transfer operator (default 4 4 4 4)");
   quda_app->add_mgoption(opgroup, "--mg-coarse-solve-type", coarse_solve_type, solve_type_transform,
                          "The type of solve to do on each level (direct, direct-pc) (default = solve_type)");
-
-
 
   auto solver_trans = CLI::QUDACheckedTransformer(inverter_type_map);
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver", coarse_solver, solver_trans,
@@ -601,7 +595,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-ca-basis-size", coarse_solver_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA-CG setup of multigrid (default 4)");
-
 
   quda_app->add_mgoption(opgroup, "--mg-coarse-solver-ca-basis-type", coarse_solver_ca_basis,
                          CLI::QUDACheckedTransformer(ca_basis_map),
@@ -640,7 +633,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     opgroup, "--mg-eig-require-convergence", mg_eig_require_convergence,
     CLI::Validator(), "If true, the solver will error out if convergence is not attained. If false, a warning will be given (default true)");
 
-
   quda_app->add_mgoption(
     opgroup, "--mg-eig-spectrum", mg_eig_spectrum, CLI::QUDACheckedTransformer(eig_spectrum_map),
     "The spectrum part to be calulated. S=smallest L=largest R=real M=modulus I=imaginary (default SR)");
@@ -664,8 +656,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-levels", mg_levels, "The number of multigrid levels to do (default 2)");
 
   // TODO
-  quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::ExistingFile, "Load the vectors <file> for the multigrid_test (requires QIO)"); 
-  quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(), "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
+  quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::ExistingFile,
+                         "Load the vectors <file> for the multigrid_test (requires QIO)");
+  quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
+                         "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
 
   opgroup->add_option(
     "--mg-low-mode-check", low_mode_check,
@@ -724,7 +718,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
     ->transform(CLI::QUDACheckedTransformer(setup_type_map));
   quda_app->add_mgoption(opgroup, "--mg-smoother", smoother_type, solver_trans,
                          "The smoother to use for multigrid (default mr)");
-
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   opgroup

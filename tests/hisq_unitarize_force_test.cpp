@@ -28,7 +28,6 @@ cpuGaugeField *cpuReference = NULL;
 
 static QudaGaugeParam gaugeParam;
 
-
 // extern bool verify_results;
 double accuracy = 1e-5;
 int ODD_BIT = 1;
@@ -210,7 +209,7 @@ main(int argc, char **argv)
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 

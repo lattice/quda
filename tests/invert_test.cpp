@@ -64,14 +64,14 @@ int main(int argc, char **argv)
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 
   // for (int i = 1; i < argc; i++){
   //   if(process_command_line_option(argc, argv, &i) == 0){
   //     continue;
-  //   } 
+  //   }
   //   printfQuda("ERROR: Invalid option:%s\n", argv[i]);
   //   usage(argv);
   // }

@@ -47,9 +47,9 @@ const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 TEST(unitarization, verify) {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
-    
-  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(),
-			   4*cudaResult->Volume()*gaugeSiteSize, unittol, cpu_prec);
+
+  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gaugeSiteSize,
+                           unittol, cpu_prec);
 
 #ifdef MULTI_GPU
   comm_allreduce_int(&res);
@@ -224,13 +224,10 @@ display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("link_precision      link_reconstruct           space_dimension        T_dimension    algorithm           max allowed error  deviation tolerance\n");
-  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g             %g\n",
-	     get_prec_str(prec),
-	     get_recon_str(link_recon),
-	     xdim, ydim, zdim, tdim,
-	     get_unitarization_str(reunit_svd_only),
-	     max_allowed_error,
-	     unittol);
+  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g        "
+             "     %g\n",
+             get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim,
+             get_unitarization_str(reunit_svd_only), max_allowed_error, unittol);
 
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
@@ -262,9 +259,9 @@ int main(int argc, char **argv)
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
+  }
 
   initComms(argc, argv, gridsize_from_cmdline);
 

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <short.h>
 
-
 #include <comm_quda.h>
 
 // This contains the appropriate ifdef guards already
@@ -84,10 +83,7 @@ static int lex_rank_from_coords_x(const int *coords, void *fdata)
   return rank;
 }
 
-
-void initComms(int argc, char **argv, std::array<int,4>& commDims){
-  initComms(argc, argv, commDims.data());
-}
+void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
 
 void initComms(int argc, char **argv, int *const commDims)
 {
@@ -1605,24 +1601,17 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
   return ret;
 }
 
-
 static struct timeval startTime;
 
-void stopwatchStart() {
-  gettimeofday(&startTime, NULL);
-}
+void stopwatchStart() { gettimeofday(&startTime, NULL); }
 
-double stopwatchReadSeconds() {
+double stopwatchReadSeconds()
+{
   struct timeval endTime;
   gettimeofday(&endTime, NULL);
   long ds = endTime.tv_sec - startTime.tv_sec;
   long dus = endTime.tv_usec - startTime.tv_usec;
-  return ds + 0.000001*dus;
+  return ds + 0.000001 * dus;
 }
 
-
-int dimPartitioned(int dim)
-{
-  return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
-}
-
+int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }

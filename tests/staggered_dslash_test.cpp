@@ -51,7 +51,6 @@ void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 
 QudaParity parity = QUDA_EVEN_PARITY;
 
-
 static int n_naiks = 1;
 
 int X[4];
@@ -599,16 +598,18 @@ int main(int argc, char **argv)
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  
+
   // command line options
   auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   // app->get_formatter()->column_width(40);
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 

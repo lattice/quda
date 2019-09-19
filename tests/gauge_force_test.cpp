@@ -17,8 +17,7 @@
 static QudaGaugeParam qudaGaugeParam;
 QudaGaugeFieldOrder gauge_order =  QUDA_QDP_GAUGE_ORDER;
 
-QudaPrecision  link_prec = QUDA_SINGLE_PRECISION;
-
+QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
 
 int length[]={
   3, 
@@ -581,19 +580,20 @@ display_test_info()
 int 
 main(int argc, char **argv) 
 {
-    // command line options
+  // command line options
   auto app = make_app();
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
-  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc",QUDA_MILC_GAUGE_ORDER},{"qdp",QUDA_QDP_GAUGE_ORDER}};
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
   app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
-    
+  }
+
   link_prec = prec;
 
   initComms(argc, argv, gridsize_from_cmdline);
