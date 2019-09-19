@@ -171,7 +171,8 @@ set(QUDA_PRECISION
 set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
 set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
-set(QUDA_NVSHMEM_HOME "" CACHE PATH "path to NVSHMEM")
+
+set(QUDA_NVSHMEM_HOME $ENV{NVSHMEM_HOME} CACHE PATH "path to NVSHMEM")
 
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES
@@ -391,7 +392,8 @@ if(QUDA_NVSHMEM)
 
     find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/" PATH_SUFFIXES "nvprefix")
     find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" PATH_SUFFIXES "nvprefix")
-    message(STATUS "Found NVSHMEM: ${NVSHMEM_LIBS}")
+    mark_as_advanced(NVSHMEM_LIBS)
+    mark_as_advanced(NVSHMEM_INCLUDE)
     include_directories(SYSTEM ${NVSHMEM_INCLUDE})
     include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH}) 
     #set(COMM_OBJS comm_nvshmem.cu) # disable for now - NVSHMEM does not properly support communication routines on the host

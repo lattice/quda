@@ -14,7 +14,7 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
+  color_spinor_wuppertal.cu gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -61,12 +61,14 @@ set (QUDA_OBJS
 # cmake-format: on
 
 # current workaround for nvshmem
-set(QUDA_DSLASH_OBJS dslash_pack2.cu dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-dslash_wilson_clover_preconditioned.cu 
+set(QUDA_DSLASH_OBJS dslash_pack2.cu 
+dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu dslash_wilson_clover_preconditioned.cu 
 dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
 dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
 dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu dslash_staggered.cu  dslash_improved_staggered.cu laplace.cu)
+dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu 
+covDev.cu 
+dslash_staggered.cu  dslash_improved_staggered.cu laplace.cu)
 
 if(NOT QUDA_NVSHMEM)
   list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
