@@ -96,7 +96,7 @@ namespace quda
                                         const CloverField &A, double a, double b, const ColorSpinorField &x, int parity,
                                         bool dagger, const int *comm_override, TimeProfile &profile)
   {
-#ifdef GPU_CLOVER_DIRAC
+#ifdef GPU_CLOVER_HASENBUSCH_TWIST
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());

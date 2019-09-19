@@ -317,7 +317,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
- if(QUDA_DIRAC_CLOVER)
+ if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
     # symmetric preconditioning
     add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}

@@ -122,28 +122,4 @@ namespace quda
 #endif
   }
 
-  // Apply the Wilson-clover operator
-  // out(x) = M*in = (A(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
-  // Uses the kappa normalization for the Wilson operator.
-  void ApplyWilsonClover(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const CloverField &A,
-                         double a, double b, const ColorSpinorField &x, int parity, bool dagger,
-                         const int *comm_override, TimeProfile &profile)
-  {
-#ifdef GPU_CLOVER_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, A);
-
-    // check all locations match
-    checkLocation(out, in, U, A);
-
-    instantiate<WilsonCloverWithTwistApply>(out, in, U, A, a, b, x, parity, dagger, comm_override, profile);
-#else
-    errorQuda("Clover dslash has not been built");
-#endif
-  }
-
 } // namespace quda
