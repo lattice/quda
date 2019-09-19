@@ -63,7 +63,8 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 #endif
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 
   auto app = make_app();
   // add_eigen_option_group(app);
@@ -71,9 +72,9 @@ int main(int argc, char **argv) {
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
+  }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -213,5 +214,3 @@ int main(int argc, char **argv) {
   finalizeComms();
   return 0;
 }
-
-

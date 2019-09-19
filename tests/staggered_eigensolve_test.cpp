@@ -465,16 +465,16 @@ int main(int argc, char **argv)
   solve_type = QUDA_INVALID_SOLVE;
 
   auto app = make_app();
-  CLI::TransformPairs<int> test_type_map {{"full", 0},{"even",3},{"odd",4}};
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
+  } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }   
+  }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

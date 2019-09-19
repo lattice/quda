@@ -719,17 +719,18 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
-      auto app = make_app();
-        CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC",1},{"Mat",2},{"MatPCDagMatPC",3},{"MatDagMat",4}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
-  try {
-    app->parse(argc, argv);
-  } catch(const CLI::ParseError &e) {
-    return app->exit(e);
-  }   
+    auto app = make_app();
+    CLI::TransformPairs<int> test_type_map {
+      {"dslash", 0}, {"MatPC", 1}, {"Mat", 2}, {"MatPCDagMatPC", 3}, {"MatDagMat", 4}};
+    app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+    // add_eigen_option_group(app);
+    // add_deflation_option_group(app);
+    // add_multigrid_option_group(app);
+    try {
+      app->parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+      return app->exit(e);
+    }
     initComms(argc, argv, gridsize_from_cmdline);
 
     // Ensure that the default is improved staggered
