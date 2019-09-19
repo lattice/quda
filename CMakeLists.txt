@@ -170,6 +170,9 @@ set(QUDA_PRECISION
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
 set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
+set(QUDA_NVSHMEM OFF CACHE BOOL "set to 'yes' to build the NVSHMEM multi-GPU code")
+set(QUDA_NVSHMEM_HOME "" CACHE PATH "path to NVSHMEM")
+
 # Set CTest options
 set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
@@ -215,6 +218,9 @@ mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
 
 mark_as_advanced(QUDA_BACKWARDS)
+
+mark_as_advanced(QUDA_NVSHMEM)
+mark_as_advanced(QUDA_NVSHMEM_HOME)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -343,7 +349,7 @@ enable_language(C)
 
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
 
-if(QUDA_MPI OR QUDA_QMP)
+if(QUDA_MPI OR QUDA_QMP OR QUDA_NVSHMEM)
   add_definitions(-DMULTI_GPU)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC
   # environment variables
@@ -377,6 +383,22 @@ else()
   set(COMM_OBJS comm_single.cpp)
 endif()
 
+if(QUDA_NVSHMEM)
+    if("${QUDA_NVSHMEM_HOME}" STREQUAL "")
+        message( FATAL_ERROR "QUDA_NVSHMEM_HOME must be defined if QUDA_NVSHMEM is set" )
+    endif()
+    add_definitions(-DNVSHMEM_COMMS -DNVSHMEM_TARGET)
+
+    find_library(NVSHMEM_LIBS NAMES nvshmem PATHS "${QUDA_NVSHMEM_HOME}/lib/" PATH_SUFFIXES "nvprefix")
+    find_path(NVSHMEM_INCLUDE NAMES nvshmem.h PATHS "${QUDA_NVSHMEM_HOME}/include/" PATH_SUFFIXES "nvprefix")
+    message(STATUS "Found NVSHMEM: ${NVSHMEM_LIBS}")
+    include_directories(SYSTEM ${NVSHMEM_INCLUDE})
+    include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH}) 
+    #set(COMM_OBJS comm_nvshmem.cu) # disable for now - NVSHMEM does not properly support communication routines on the host
+    set(COMM_OBJS comm_mpi.cpp)
+endif()
+
+
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
@@ -400,7 +422,7 @@ if(QUDA_MPI AND QUDA_QMP)
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
-if(QUDA_MPI)
+if(QUDA_MPI OR QUDA_NVSHMEM)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})

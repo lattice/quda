@@ -293,6 +293,8 @@ bool comm_peer2peer_enabled(int dir, int dim){
   return enable_p2p ? peer2peer_enabled[dir][dim] : false;
 }
 
+bool comm_peer2peer_possible(int dir, int dim) { return peer2peer_enabled[dir][dim]; }
+
 int comm_peer2peer_enabled_global() {
   if (!enable_p2p) return false;
 

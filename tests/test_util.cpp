@@ -15,6 +15,12 @@
 #include <dslash_quda.h>
 #include "misc.h"
 
+#if defined(NVSHMEM_COMMS)
+#include <mpi.h>
+#include <nvshmem.h>
+#include <nvshmemx.h>
+#endif
+
 using namespace std;
 
 #define XUP 0
@@ -103,6 +109,14 @@ void initComms(int argc, char **argv, int *const commDims)
   }
 #elif defined(MPI_COMMS)
   MPI_Init(&argc, &argv);
+#endif
+#if defined(NVSHMEM_COMMS)
+  // MPI_Init(&argc, &argv);
+  MPI_Comm tmp = MPI_COMM_WORLD;
+
+  nvshmemx_init_attr_t attr;
+  attr.mpi_comm = &tmp;
+  nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
 #endif
 
   QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;

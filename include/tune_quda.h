@@ -595,6 +595,11 @@ namespace quda {
    */
   void setPolicyTuning(bool);
 
+  /**
+   * @brief Enable / disable whether are tuning a policy
+   */
+  bool policyTuning();
+
 } // namespace quda
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

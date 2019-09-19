@@ -9,7 +9,7 @@ set (QUDA_OBJS
   prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
+  gauge_stout.cu gauge_plaq.cu  gauge_laplace.cpp
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
@@ -25,14 +25,6 @@ set (QUDA_OBJS
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
-  dslash_staggered.cu dslash_improved_staggered.cu
-  dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
-  dslash_wilson_clover_preconditioned.cu 
-  dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
-  dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
-  dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
-  dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
@@ -67,6 +59,18 @@ set (QUDA_OBJS
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
 # cmake-format: on
+
+# current workaround for nvshmem
+set(QUDA_DSLASH_OBJS dslash_pack2.cu dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu
+dslash_wilson_clover_preconditioned.cu 
+dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
+dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
+dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
+dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu dslash_staggered.cu  dslash_improved_staggered.cu laplace.cu)
+
+if(NOT QUDA_NVSHMEM)
+  list(APPEND QUDA_OBJS ${QUDA_DSLASH_OBJS})
+endif()
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
@@ -119,8 +123,21 @@ target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp PRIVATE .)
-
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
+
+# nvshmem enabled parts need CUDA_SEPARABLE_COMPILATION ...
+if(QUDA_NVSHMEM)
+  cuda_add_library(quda_pack STATIC ${QUDA_DSLASH_OBJS})
+  target_include_directories(quda_pack PRIVATE dslash_core)
+  target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
+  target_include_directories(quda_pack PRIVATE .)
+  target_link_libraries(quda INTERFACE quda_pack)
+  set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  # set_source_files_properties(dslash_wilson.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
+  # set_source_files_properties(dslash_pack2.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
+  target_include_directories(quda_pack PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+endif()
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -180,6 +197,11 @@ endif()
 if(QUDA_MPI)
   target_link_libraries(quda INTERFACE ${MPI_CXX_LIBRARIES})
 endif()
+
+if(QUDA_NVSHMEM)
+    target_link_libraries(quda INTERFACE ${NVSHMEM_LIBS} ${MPI_CXX_LIBRARIES})
+endif()
+
 
 if(QUDA_MAGMA)
   target_link_libraries(quda PRIVATE ${MAGMA})
@@ -244,9 +266,11 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.
                                  VERSION ${QUDA_VERSION}
                                  COMPATIBILITY AnyNewerVersion)
 
-export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
-set(ConfigPackageLocation lib/cmake/quda/)
-install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
+if(NOT QUDA_NVSHMEM)
+  export(EXPORT qudaTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaTargets.cmake" NAMESPACE quda::)
+  set(ConfigPackageLocation lib/cmake/quda/)
+  install(EXPORT qudaTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
+endif()
 
 add_custom_target(mpi_nvtx ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

@@ -59,6 +59,10 @@ namespace quda {
     cudaEvent_t scatterEnd[Nstream];
     cudaEvent_t dslashStart[2];
 
+    // for shmem lightweight sync
+    long *sync_arr;
+    long synccounter = 1;
+
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
     bool dslash_interior_compute;
@@ -106,7 +110,11 @@ namespace quda {
       cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
       cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
     }
-
+#ifdef NVSHMEM_COMMS
+    sync_arr = (long *)shmem_malloc(2 * QUDA_MAX_DIM * sizeof(long));
+    cudaMemset(sync_arr, 0, 2 * QUDA_MAX_DIM * sizeof(long));
+    synccounter = 1;
+#endif
     aux_worker = NULL;
 
 #if CUDA_VERSION >= 8000
@@ -161,7 +169,9 @@ namespace quda {
       cudaEventDestroy(packEnd[i]);
       cudaEventDestroy(dslashStart[i]);
     }
-
+#ifdef NVSHMEM_COMMS
+    shmem_free(sync_arr);
+#endif
     checkCudaError();
   }
 
