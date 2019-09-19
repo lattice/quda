@@ -88,7 +88,7 @@ namespace quda {
       if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
 
       //sloppy temporary for mat-vec
-      tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
+      tmp_sloppy = mixed ? tmpp->CreateAlias(csParam) : nullptr;
 
       if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
 

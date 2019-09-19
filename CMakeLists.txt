@@ -803,11 +803,11 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
 set(CMAKE_CUDA_FLAGS
-    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}"
+    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr"
     CACHE STRING "Flags used by the CUDA compiler" FORCE)
 if(QUDA_VERBOSE_BUILD)
   set(CMAKE_CUDA_FLAGS
-      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v"
+      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr --ptxas-options=-v"
       CACHE STRING "Flags used by the CUDA compiler" FORCE)
 endif(QUDA_VERBOSE_BUILD)
 
