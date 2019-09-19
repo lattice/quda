@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include "test_util.h"
+#include <test_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -12,7 +13,7 @@
 #include <dslash_quda.h>
 
 using namespace quda;
-extern void usage(char** argv);
+
 cudaGaugeField *cudaFatLink = NULL;
 cpuGaugeField  *cpuFatLink  = NULL;
 
@@ -28,15 +29,10 @@ cpuGaugeField *cpuReference = NULL;
 static QudaGaugeParam gaugeParam;
 
 
-extern bool verify_results;
+// extern bool verify_results;
 double accuracy = 1e-5;
 int ODD_BIT = 1;
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
 
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 QudaPrecision link_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision hw_prec = QUDA_SINGLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_SINGLE_PRECISION;
@@ -207,15 +203,15 @@ display_test_info()
 int 
 main(int argc, char **argv) 
 {
-  int i;
-  for (i =1;i < argc; i++){
-	
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

@@ -305,7 +305,7 @@ namespace{
     int num_failures = 0;
     Matrix<complex<double>,3> inlink, outlink;
       
-    for (size_t i=0; i<infield.Volume(); ++i){
+    for (unsigned int i=0; i<infield.Volume(); ++i){
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
@@ -331,7 +331,7 @@ namespace{
 #ifdef GPU_UNITARIZE
     Matrix<complex<double>,3> link, identity;
       
-    for(size_t i=0; i<field.Volume(); ++i){
+    for(unsigned int i=0; i<field.Volume(); ++i){
       for(int dir=0; dir<4; ++dir){
 	if(field.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?

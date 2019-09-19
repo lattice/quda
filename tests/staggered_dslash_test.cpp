@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -31,10 +32,6 @@ using namespace quda;
 
 #define staggeredSpinorSiteSize 6
 
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-extern int test_type;
-
-extern void usage(char** argv );
 
 void *qdp_inlink[4] = { nullptr, nullptr, nullptr, nullptr };
 
@@ -53,35 +50,11 @@ void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 
 QudaParity parity = QUDA_EVEN_PARITY;
-extern QudaDagType dagger;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision cpu_prec;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision prec_sloppy;
-extern QudaDslashType dslash_type;
-extern int device;
-extern bool verify_results;
-extern int niter;
-extern double mass; // the mass of the Dirac operator
-extern double kappa; // will get overriden
-extern int laplace3D;
 
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-extern double eps_naik;      // relativistic correction for naik term
-static int n_naiks = 1;      // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
 
-extern char latfile[];
+static int n_naiks = 1;
 
 int X[4];
-extern int Nsrc; // number of spinors to apply to simultaneously
-
-extern QudaVerbosity verbosity;
 
 Dirac* dirac;
 
@@ -618,16 +591,6 @@ void display_test_info()
   return ;
 }
 
-void usage_extra(char **argv)
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1/2>                              # Test method\n");
-  printfQuda("                                                0: Even destination spinor\n");
-  printfQuda("                                                1: Odd destination spinor\n");
-  printfQuda("                                                2: Full spinor\n");
-  return ;
-}
-
 int main(int argc, char **argv)
 {
   // hack for loading gauge fields
@@ -636,12 +599,17 @@ int main(int argc, char **argv)
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  for (int i=1 ;i < argc; i++){
-
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

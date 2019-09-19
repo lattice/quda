@@ -3,6 +3,8 @@
 
 #include <quda.h>
 #include <random_quda.h>
+#include <vector>
+
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
@@ -13,6 +15,8 @@
 #ifdef __cplusplus
 //extern "C" {
 #endif
+
+
 
   extern int Z[4];
   extern int V;
@@ -30,6 +34,7 @@
   
   extern int mySpinorSiteSize;
 
+  void initComms(int argc, char **argv, std::array<int,4>& commDims);
   void initComms(int argc, char **argv, int *const commDims);
   void finalizeComms();
   void initRand();
@@ -94,6 +99,7 @@
   int fullLatticeIndex_5d(int i, int oddBit);
   int fullLatticeIndex_5d_4dpc(int i, int oddBit);
   int process_command_line_option(int argc, char** argv, int* idx);
+  int process_options(int argc, char** argv);
 
   // use for some profiling
   void stopwatchStart();

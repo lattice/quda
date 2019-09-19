@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <util_quda.h>
+#include <test_params.h>
 #include <test_util.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
@@ -24,41 +25,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision  prec_sloppy;
-extern QudaInverterType  inv_type;
-extern QudaInverterType  precon_type;
-extern int multishift; // whether to test multi-shift or standard solver
-extern double mass; // mass of Dirac operator
-extern double anisotropy; // temporal anisotropy
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern QudaMassNormalization normalization; // mass normalization of Dirac operators
-extern QudaMatPCType matpc_type; // preconditioning type
-
-extern int niter; // max solver iterations
-extern char latfile[];
-extern bool unit_gauge;
-
-extern void usage(char** );
-
-
 
 void
 display_test_info()
@@ -86,42 +52,18 @@ display_test_info()
 }
 
 
-void
-usage_extra(char** argv )
-{
-printfQuda("Extra options:\n");
-printfQuda("    --num_src n                             # Numer of sources used\n");
-
-
-return ;
-}
-
-
 int main(int argc, char **argv)
 {
 
-  int num_src=2;
-
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-
-
-
-    if( strcmp(argv[i], "--num_src") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      num_src= atoi(argv[i+1]);
-      i++;
-      continue;
-    }
-
-
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch(const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){
@@ -209,7 +151,7 @@ int main(int argc, char **argv)
 
   // offsets used only by multi-shift solver
   inv_param.num_offset = 12;
-  inv_param.num_src= num_src;
+  inv_param.num_src= Nsrc;
   double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
   for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
 
