@@ -938,6 +938,8 @@ int main(int argc, char **argv)
   int test_rc = 0;
   // command line options
   auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC",1},{"Mat",2},{"MatPCDagMatPC",3},{"MatDagMat",4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);

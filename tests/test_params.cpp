@@ -441,7 +441,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--tadpole-coeff", tadpole_factor,
                        "Tadpole coefficient for HISQ fermions (default 1.0, recommended [Plaq]^1/4)");
 
-  quda_app->add_option("--test", test_type, "Test method (different for each test)");
+
   quda_app->add_option("--tol", tol, "Set L2 residual tolerance");
   quda_app->add_option("--tolhq", tol_hq, "Set heavy-quark residual tolerance");
   quda_app->add_option(

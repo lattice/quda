@@ -542,6 +542,8 @@ int main(int argc, char** argv)
 {
   // command line options
   auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1},{"full_oo_prec",2},{"even",3},{"odd",4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
   // app->get_formatter()->column_width(40);
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);

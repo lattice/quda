@@ -219,6 +219,9 @@ int main(int argc, char** argv)
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat",1},{"Clover",2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
   try {
     app->parse(argc, argv);
   } catch(const CLI::ParseError &e) {
