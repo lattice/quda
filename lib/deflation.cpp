@@ -76,7 +76,7 @@ namespace quda {
     std::unique_ptr<ColorSpinorField> r(ColorSpinorField::Create(csParam));
 
     csParam.setPrecision(param.eig_global.cuda_prec_ritz);//accum fields always full precision
-    if (csParam.location==QUDA_CUDA_FIELD_LOCATION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
+    if (csParam.location==QUDA_CUDA_FIELD_LOCATION && param.eig_global.cuda_prec_ritz != QUDA_DOUBLE_PRECISION) csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
 
     std::unique_ptr<ColorSpinorField> r_sloppy(ColorSpinorField::Create(csParam));
     std::unique_ptr<ColorSpinorField> Av_sloppy(ColorSpinorField::Create(csParam));

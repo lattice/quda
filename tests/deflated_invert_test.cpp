@@ -463,6 +463,7 @@ int main(int argc, char **argv)
       printfQuda("Deflation space is complete. Running deflated CG solver.\n");
       inv_param.inv_type = QUDA_CG_INVERTER;
       inv_param.cuda_prec_sloppy = cuda_prec_precondition;
+      continue;
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);

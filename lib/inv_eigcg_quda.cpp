@@ -1090,7 +1090,7 @@ namespace quda {
     const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
     bool converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq);
 
-    constexpr int prediction_correction_interval = 16;
+    constexpr int prediction_correction_interval = 8;
     int correction_count;
 
     printfQuda("\nRunning CA eigCG with %d correction interval\n", prediction_correction_interval);
@@ -1321,7 +1321,7 @@ namespace quda {
 
      if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
        printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
-       max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
+       //max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
      }
 
      param.rhs_idx += logical_rhs_id;
