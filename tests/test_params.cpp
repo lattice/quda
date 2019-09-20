@@ -119,7 +119,8 @@ bool generate_all_levels = true;
 quda::mgarray<QudaSchwarzType> schwarz_type = {};
 quda::mgarray<int> schwarz_cycle = {};
 
-quda::mgarray<std::array<int, QUDA_MAX_DIM>> geo_block_size = {};
+// we only actually support 4 here currently
+quda::mgarray<std::array<int, 4>> geo_block_size = {};
 int nev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;

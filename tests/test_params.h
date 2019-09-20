@@ -88,9 +88,8 @@ public:
   }
 
   template <typename T>
-  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name,
-                            std::array<std::array<T, QUDA_MAX_DIM>, QUDA_MAX_MG_LEVEL> &variable, CLI::Validator trans,
-                            std::string option_description = "", bool defaulted = false)
+  CLI::Option *add_mgoption(CLI::Option_group *group, std::string option_name, std::array<std::array<T, 4>, QUDA_MAX_MG_LEVEL> &variable,
+                            CLI::Validator trans, std::string option_description = "", bool defaulted = false)
   {
 
     CLI::callback_t f = [&variable, &option_name, trans](CLI::results_t vals) {
@@ -99,23 +98,24 @@ public:
       bool worked = true;
 
       CLI::Range validlevel(0, QUDA_MAX_MG_LEVEL);
-      for (size_t i {0}; i < vals.size() / 2; ++i) { // will always be a multiple of 2
-        auto levelok = validlevel(vals.at(2 * i));
-        auto transformok = trans(vals.at(2 * i + 1));
-        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
-        if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
-        worked = worked and CLI::detail::lexical_cast(vals.at((QUDA_MAX_DIM + 1) * i), l);
+      for (size_t i {0}; i < vals.size() / (4 + 1); ++i) {
+        auto levelok = validlevel(vals.at((4 + 1) * i));
 
-        for (int k = 0; k < QUDA_MAX_DIM; k++) {
-          worked = worked and CLI::detail::lexical_cast(vals.at((QUDA_MAX_DIM + 1) * i + k + 1), j);
-          if (worked) variable[l][i] = j;
+        if (!levelok.empty()) throw CLI::ValidationError(option_name, levelok);
+        worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i), l);
+
+        for (int k = 0; k < 4; k++) {
+          auto transformok = trans(vals.at((4 + 1) * i + k + 1));
+          if (!transformok.empty()) throw CLI::ValidationError(option_name, transformok);
+          worked = worked and CLI::detail::lexical_cast(vals.at((4 + 1) * i + k + 1), j);
+          if (worked) variable[l][k] = j;
         }
       }
       return worked;
     };
     CLI::Option *opt = add_option(option_name, f, option_description);
     auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
-    opt->type_name(valuename)->type_size(-QUDA_MAX_DIM - 1);
+    opt->type_name(valuename)->type_size(-4 - 1);
     opt->expected(-1);
     opt->transform(trans);
     // opt->default_str("");
@@ -237,7 +237,7 @@ extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> schwarz_type;
 extern quda::mgarray<int> schwarz_cycle;
 
-extern quda::mgarray<std::array<int, QUDA_MAX_DIM>> geo_block_size;
+extern quda::mgarray<std::array<int, 4>> geo_block_size;
 extern int nev;
 extern int max_search_dim;
 extern int deflation_grid;
