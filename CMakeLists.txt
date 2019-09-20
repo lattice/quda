@@ -74,7 +74,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# Backend tyoe
+# Backend type
 set(VALID_BACKEND_TYPES CUDA HIP)
 set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
 set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CUDA HIP)
