@@ -15,10 +15,6 @@
 #include <quda_define.h>
 #include <quda_constants.h>
 
-#ifdef HIPCC_BUILD
-typedef cudaStream_t qudaStream_t
-#endif
-
 #ifndef __CUDACC_RTC__
 #define double_complex double _Complex
 #else // keep NVRTC happy since it can't handle C types
