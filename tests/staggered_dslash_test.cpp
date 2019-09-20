@@ -103,7 +103,6 @@ double getTolerance(QudaPrecision prec)
 
 void setGaugeParam(QudaGaugeParam &gaugeParam)
 {
-
   gaugeParam.X[0] = X[0] = xdim;
   gaugeParam.X[1] = X[1] = ydim;
   gaugeParam.X[2] = X[2] = zdim;
@@ -150,7 +149,6 @@ void setGaugeParam(QudaGaugeParam &gaugeParam)
 
 void setInvertParam(QudaInvertParam &inv_param)
 {
-
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
