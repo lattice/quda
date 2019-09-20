@@ -242,7 +242,7 @@ find_package(PythonInterp)
 if(QUDA_BACKEND_CUDA AND QUDA_BACKEND_HIP)
   message(
     FATAL_ERROR
-    "QUDA can only have one backend, bro..."
+    "QUDA can only have one backend."
     )
 endif()
 
