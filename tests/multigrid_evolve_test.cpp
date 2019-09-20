@@ -552,7 +552,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
    using namespace quda;
    int *num_failures_dev = (int*)device_malloc(sizeof(int));
    int num_failures;
-   cudaMemset(num_failures_dev, 0, sizeof(int));
+   qudaMemset(num_failures_dev, 0, sizeof(int));
    unitarizeLinks(*cudaInGauge, num_failures_dev);
 
    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);

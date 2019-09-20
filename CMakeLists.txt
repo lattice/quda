@@ -98,6 +98,11 @@ set(QUDA_GPU_ARCH
     CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
 # build options
+
+# Backend options
+set(QUDA_BACKEND_CUDA ON CACHE BOOL "set to 'yes' to build the CUDA backend code")
+set(QUDA_BACKEND_HIP OFF CACHE BOOL "set to 'yes' to build the HIP backend code")
+
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
@@ -233,6 +238,13 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # ######################################################################################################################
 # we need to check for some packages
 find_package(PythonInterp)
+
+if(QUDA_BACKEND_CUDA AND QUDA_BACKEND_HIP)
+  message(
+    FATAL_ERROR
+    "QUDA can only have one backend, bro..."
+    )
+endif()
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
@@ -663,6 +675,14 @@ if(QUDA_JITIFY)
   # find_library(LibDL_Libraries nvToolsExt ${CUDA_TOOLKIT_ROOT_DIR}/lib/)
   list(APPEND QUDA_LIBS ${CUDA_nvrtc_LIBRARY})
   list(APPEND QUDA_LIBS ${LIBDL_LIBRARIES})
+endif()
+
+if(QUDA_BACKEND_CUDA)
+  add_definitions(-DCUDA_BACKEND)
+endif()
+
+if(QUDA_BACKEND_HIP)
+  add_definitions(-DHIP_BACKEND)
 endif()
 
 if(QUDA_USE_EIGEN)

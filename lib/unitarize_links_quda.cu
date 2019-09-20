@@ -407,7 +407,7 @@ namespace{
     void preTune() { if (arg.input.gauge == arg.output.gauge) arg.output.save(); }
     void postTune() {
       if (arg.input.gauge == arg.output.gauge) arg.output.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
     
     long long flops() const { 
@@ -572,7 +572,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     void preTune() { arg.u.save(); }
     void postTune() {
       arg.u.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
   
     long long flops() const { return 0; } // depends on number of iterations

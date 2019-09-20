@@ -40,7 +40,8 @@
 #include <nvml.h>
 #endif
 
-#include <cuda.h>
+#include <quda_backend.h>
+//#include <cuda.h>
 
 #include <ks_force_quda.h>
 
@@ -154,8 +155,8 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
-cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+qudaDeviceProp deviceProp;
+qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -643,7 +644,7 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new qudaStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;
@@ -4636,7 +4637,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  qudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);

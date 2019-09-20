@@ -274,7 +274,7 @@ namespace quda {
     int count = 0;
     for (int dir=0; dir<4; dir++) {
       input_path_d[dir] = (int*)pool_device_malloc(bytes);
-      cudaMemset(input_path_d[dir], 0, bytes);
+      qudaMemset(input_path_d[dir], 0, bytes);
 
       int* input_path_h = (int*)safe_malloc(bytes);
       memset(input_path_h, 0, bytes);

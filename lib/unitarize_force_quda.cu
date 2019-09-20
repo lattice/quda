@@ -590,7 +590,7 @@ namespace quda{
       }
       
       void preTune() { ; }
-      void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
+      void postTune() { qudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
       
       long long flops() const { return 4ll*4528*meta.Volume(); }
       long long bytes() const { return 4ll * arg.threads * (arg.force.Bytes() + arg.force_old.Bytes() + arg.gauge.Bytes()); }

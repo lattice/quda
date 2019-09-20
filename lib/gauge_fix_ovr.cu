@@ -1238,7 +1238,7 @@ public:
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     GaugeFixQualityArg<Gauge> argQ(dataOr, data);
     GaugeFixQuality<Float,Gauge, gauge_dir> GaugeFixQuality(argQ);
@@ -1342,7 +1342,7 @@ public:
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
 
     int iter = 0;
     for ( iter = 0; iter < Nsteps; iter++ ) {
@@ -1495,7 +1495,7 @@ public:
         unitarizeLinks(data, data, num_failures_dev);
         qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
         if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-        cudaMemset(num_failures_dev, 0, sizeof(int));
+        qudaMemset(num_failures_dev, 0, sizeof(int));
         flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
         byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
       }
@@ -1518,7 +1518,7 @@ public:
       unitarizeLinks(data, data, num_failures_dev);
       qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
       if ( num_failures > 0 ) errorQuda("Error in the unitarization\n");
-      cudaMemset(num_failures_dev, 0, sizeof(int));
+      qudaMemset(num_failures_dev, 0, sizeof(int));
       flop += 4588.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3];
       byte += 8.0 * data.X()[0]*data.X()[1]*data.X()[2]*data.X()[3] * dataOr.Bytes();
     }
