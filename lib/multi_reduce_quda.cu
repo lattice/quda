@@ -21,6 +21,8 @@ namespace quda {
     cudaStream_t* getStream();
     cudaEvent_t* getReduceEvent();
     bool getFastReduce();
+    void initFastReduce(int words);
+    void completeFastReduce(int32_t words);
 
     template <int writeX, int writeY, int writeZ, int writeW>
     struct write {
@@ -37,14 +39,8 @@ namespace quda {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-      if (getFastReduce() && !commAsyncReduction()) {
-        // initialize the reduction values in 32-bit increments to INT_MIN
-        constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
-        void *h_reduce = getHostReduceBuffer();
-        for (unsigned int i = 0; i < tp.grid.z * NXZ * arg.NYW * words; i++) {
-          reinterpret_cast<int32_t *>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
-        }
-      }
+      const int32_t words = tp.grid.z * NXZ * arg.NYW * sizeof(ReduceType) / sizeof(int32_t);
+      if (getFastReduce() && !commAsyncReduction()) initFastReduce(words);
 
 #ifdef WARP_MULTI_REDUCE
 #error "Untested - should be reverified"
@@ -69,18 +65,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
         if (deviceProp.canMapHostMemory) {
           if (getFastReduce()) {
-            constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
-            volatile int32_t *check = reinterpret_cast<int32_t *>(getHostReduceBuffer());
-            int count = 0;
-            for (unsigned int i = 0; i < tp.grid.z * NXZ * arg.NYW * words; i++) {
-              // spin-wait until all values have been updated
-              while (check[i] == std::numeric_limits<int32_t>::min()) {
-                if (count++ % 10000 == 0) { // check error every 10000 iterations
-                  // if there is an error in the kernel then we need to exit the spin-wait
-                  if (cudaSuccess != cudaPeekAtLastError()) break;
-                }
-              }
-            }
+            completeFastReduce(words);
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
             while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
@@ -174,6 +159,7 @@ namespace quda {
       {
         strcpy(aux, "policy_kernel,");
         strcat(aux, x[0]->AuxString());
+        if (getFastReduce()) strcat(aux, ",fast_reduce");
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
