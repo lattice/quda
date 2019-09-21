@@ -1061,5 +1061,9 @@ int main(int argc, char **argv)
 
   for (int dir = 0; dir<4; dir++) free(gauge[dir]);
 
+  free(spinorIn);
+  free(spinorCheck);
+  free(spinorOut);
+  
   return 0;
 }

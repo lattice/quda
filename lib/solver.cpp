@@ -14,7 +14,10 @@ namespace quda {
     param(param),
     profile(profile),
     node_parity(0),
-    eig_solve(nullptr)
+    eig_solve(nullptr),
+    deflate_init(false),
+    deflate_compute(true),
+    recompute_evals(false)
   {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);

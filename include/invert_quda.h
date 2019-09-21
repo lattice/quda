@@ -537,9 +537,9 @@ namespace quda {
        @brief Deflation objects
     */
     EigenSolver *eig_solve;
-    bool deflate_init = false;
-    bool deflate_compute = true;
-    bool recompute_evals = false;
+    bool deflate_init;
+    bool deflate_compute;
+    bool recompute_evals;
     std::vector<ColorSpinorField *> evecs;
     std::vector<Complex> evals;
     std::vector<ColorSpinorField *> defl_tmp1;
