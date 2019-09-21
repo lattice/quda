@@ -47,7 +47,8 @@ public:
     auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
     opt->type_name(valuename)->type_size(-2);
     opt->expected(-1);
-    opt->transform(trans);
+    opt->check(CLI::Validator(trans.get_description()));
+    // opt->transform(trans);
     // opt->default_str("");
 
     return opt;
@@ -81,7 +82,8 @@ public:
     auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
     opt->type_name(valuename)->type_size(-2);
     opt->expected(-1);
-    opt->transform(trans);
+    opt->check(CLI::Validator(trans.get_description()));
+    // opt->transform(trans);
     // opt->default_str("");
     group->add_option(opt);
     return opt;
@@ -117,7 +119,8 @@ public:
     auto valuename = std::string("LEVEL ") + std::string(CLI::detail::type_name<T>());
     opt->type_name(valuename)->type_size(-4 - 1);
     opt->expected(-1);
-    opt->transform(trans);
+    opt->check(CLI::Validator(trans.get_description()));
+    // opt->transform(trans);
     // opt->default_str("");
     group->add_option(opt);
     return opt;
