@@ -200,7 +200,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_NVML)

@@ -12,6 +12,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
@@ -45,39 +46,8 @@ Dirac *dirac = NULL;
 DiracMobiusPC *dirac_mdwf = NULL; // create the MDWF Dirac operator
 DiracDomainWall4DPC *dirac_4dpc = NULL; // create the 4d preconditioned DWF Dirac operator
 
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
-extern int test_type;
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-extern QudaMatPCType matpc_type;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaDagType dagger;
 QudaDagType not_dagger;
 
-extern bool compute_clover;
-extern double clover_coeff;
-
-extern bool verify_results;
-extern int niter;
-extern char latfile[];
-
-extern double mass; // mass of Dirac operator
-extern double mu;
-extern double epsilon;
-extern void usage(char**);
-
-extern QudaVerbosity verbosity;
 
 const char *prec_str[] = {"quarter", "half", "single", "double"};
 const char *recon_str[] = {"r18", "r12", "r8"};
@@ -1098,11 +1068,17 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   // return code for google test
   int test_rc = 0;
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}, {"MatPCDagMatPC", 3}, {"MatDagMat", 4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
