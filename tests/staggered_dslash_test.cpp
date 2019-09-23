@@ -482,7 +482,7 @@ DslashTime dslashCUDA(int niter) {
   dslash_time.event_time = runTime / 1000;
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
+  qudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 

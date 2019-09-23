@@ -297,7 +297,7 @@ double dslashCUDA(int niter, int mu) {
   double secs = runTime / 1000; //stopwatchReadSeconds();
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
+  qudaError_t stat = cudaGetLastError();
   if (stat != cudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 

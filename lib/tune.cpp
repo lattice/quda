@@ -719,7 +719,7 @@ namespace quda {
 	 can't guarantee that all nodes are partaking */
       if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
 	TuneParam best_param;
-	cudaError_t error = cudaSuccess;
+	qudaError_t error = cudaSuccess;
 	cudaEvent_t start, end;
 	float elapsed_time, best_time;
 	time_t now;
@@ -767,7 +767,7 @@ namespace quda {
 
 	  { // check that error state is cleared
 	    cudaDeviceSynchronize();
-	    cudaError_t error = cudaGetLastError();
+	    qudaError_t error = cudaGetLastError();
 	    if (error != cudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
 	  }
 

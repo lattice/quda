@@ -400,7 +400,7 @@ namespace quda
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
 
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
@@ -496,7 +496,7 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
@@ -740,7 +740,7 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
@@ -822,7 +822,7 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
@@ -914,7 +914,7 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
@@ -1033,7 +1033,7 @@ namespace quda
 
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
               if (event_test != cudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 

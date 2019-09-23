@@ -255,7 +255,7 @@ namespace quda {
 #ifdef MULTI_GPU
         if(commDimPartitioned(dim) && dim!=3){
           while(1){
-            cudaError_t eventQuery = cudaEventQuery(gatherEnd);
+            qudaError_t eventQuery = cudaEventQuery(gatherEnd);
             if(eventQuery == cudaSuccess){
               face->commsStart(2*dim + offset); // if argument is even, send backwards, else send forwards
               break;
