@@ -103,10 +103,10 @@ namespace quda {
 
     if (isNative() && geometry != QUDA_COARSE_GEOMETRY) {
       // create the texture for the field components
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      qudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = qudaChannelFormatKindFloat;
+      else desc.f = qudaChannelFormatKindSigned; // half is short, double is int2
 
       int texel_size = 1;
       if (isPhase) {

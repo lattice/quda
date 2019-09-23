@@ -169,10 +169,10 @@ namespace quda {
     if (isNative()) {
       // create the texture for the field components
       
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      qudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = qudaChannelFormatKindFloat;
+      else desc.f = qudaChannelFormatKindSigned; // half is short, double is int2
       
       // always four components regardless of precision
       desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
@@ -211,9 +211,9 @@ namespace quda {
       
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	desc.f = cudaChannelFormatKindFloat;
+        qudaChannelFormatDesc desc;
+	memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+	desc.f = qudaChannelFormatKindFloat;
 	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 	
 	cudaResourceDesc resDesc;

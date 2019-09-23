@@ -7,7 +7,8 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <cuda_runtime.h>
+//#include <cuda_runtime.h>
+#include <quda_backend.h>
 
 /**
  * @file lattice_field.h

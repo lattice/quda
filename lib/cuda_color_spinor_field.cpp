@@ -300,10 +300,10 @@ namespace quda {
       
       // create the texture for the field components
       
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // quarter is char, half is short, double is int2
+      qudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = qudaChannelFormatKindFloat;
+      else desc.f = qudaChannelFormatKindSigned; // quarter is char, half is short, double is int2
       
       // staggered and coarse fields in half and single are always two component
       int texel_size = 1;
@@ -351,9 +351,9 @@ namespace quda {
 
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaChannelFormatDesc desc;
-        memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-        desc.f = cudaChannelFormatKindFloat;
+        qudaChannelFormatDesc desc;
+        memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+        desc.f = qudaChannelFormatKindFloat;
         desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 
         cudaResourceDesc resDesc;
@@ -390,10 +390,10 @@ namespace quda {
       if (ghostTexInit) errorQuda("Already bound ghost texture");
 
       for (int b=0; b<2; b++) {
-	cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	if (ghost_precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-	else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+	qudaChannelFormatDesc desc;
+	memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+	if (ghost_precision == QUDA_SINGLE_PRECISION) desc.f = qudaChannelFormatKindFloat;
+	else desc.f = qudaChannelFormatKindSigned; // half is short, double is int2
 
 	// all FLOAT2-ordred fields that are not double precision
 	if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
@@ -436,9 +436,9 @@ namespace quda {
         cudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
 
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
-          cudaChannelFormatDesc desc;
-	  memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	  desc.f = cudaChannelFormatKindFloat;
+          qudaChannelFormatDesc desc;
+	  memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+	  desc.f = qudaChannelFormatKindFloat;
 	  desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 
 	  cudaResourceDesc resDesc;

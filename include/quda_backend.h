@@ -3,6 +3,10 @@
 #ifdef CUDA_BACKEND
 #include <cuda.h>
 #include <cuda_runtime.h>
+
+#define qudaChannelFormatDesc cudaChannelFormatDesc
+#define qudaChannelFormatKindFloat cudaChannelFormatKindFloat
+#define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
 #define qudaStream_t cudaStream_t
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
@@ -13,6 +17,9 @@
 
 #ifdef HIP_BACKEND
 #include <hip/hip_runtime.h>
+#define qudaChannelFormatDesc hipChannelFormatDesc
+#define qudaChannelFormatKindFloat hipChannelFormatKindFloat
+#define qudaChannelFormatKindSigned hipChannelFormatKindSigned
 #define qudaStream_t hipStream_t
 #define qudaEvent_t hipEvent_t
 #define qudaError_t hipError_t
