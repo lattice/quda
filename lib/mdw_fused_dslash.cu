@@ -7,7 +7,7 @@ namespace quda {
   namespace mobius_tensor_core {
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
-    
+
     /**
       @brief Parameter structure for applying the Dslash
     */
@@ -105,18 +105,17 @@ namespace quda {
         b = b_5[0].real();
         c = c_5[0].real();
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
-       
-        if(kappa*kappa < 1e-12){
-          errorQuda("kappa(=%16.12e) too small.\n", kappa);
-        }
-        
-        fac_inv = 0.5/(1.+std::pow(kappa,(int)Ls)*m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
+
+        if (kappa * kappa < 1e-12) { errorQuda("kappa(=%16.12e) too small.\n", kappa); }
+
+        fac_inv = 0.5
+            / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
-          m_scale = b+c/kappa;
+          m_scale = b + c / kappa;
           alpha = 1.;
-          beta = -1./(1.+(kappa*b)/c);
+          beta = -1. / (1. + (kappa * b) / c);
           break;
         case dslash4_dslash5inv_dslash5invdag:
           m_scale = -0.25 / ((b * (4. + m_5) + 1.) * (b * (4. + m_5) + 1.)); // -kappa_b^2
@@ -174,7 +173,7 @@ namespace quda {
           const Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in.project(d, proj_dir)).reconstruct(d, proj_dir);
         }
-        coordinate[d]-=2;
+        coordinate[d] -= 2;
         if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
           const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
@@ -222,13 +221,12 @@ namespace quda {
     */
     template <class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg,
         int type_>
-    __global__ void __launch_bounds__(block_dim_x* Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
-    {
+    __global__ void __launch_bounds__(block_dim_x* Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg) {
       const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
       TensorCoreSharedMemory<float> shared_memory_data;
 
-      static_assert(block_dim_x*Ls_/32<32);
+      static_assert(block_dim_x * Ls_ / 32 < 32);
 
       constexpr int M = 4 * Ls_;
       constexpr int N = 6 * block_dim_x;
@@ -241,7 +239,7 @@ namespace quda {
 
       float* smem_scale = shared_memory_data;
 
-      half2* sm_b = reinterpret_cast<half2*>(smem_scale+32);
+      half2* sm_b = reinterpret_cast<half2*>(smem_scale + 32);
       half* sm_c = reinterpret_cast<half*>(sm_b);
 
       half* sm_a = reload ? sm_c + M * N_sm : sm_c;
@@ -355,7 +353,8 @@ namespace quda {
           if (!idle) {
             constexpr int in_x_shift = 2;
             int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
-            int back_dim[4] = {arg.dim[0] - in_x_shift*2, arg.dim[1] - in_x_shift*2, arg.dim[2] - in_x_shift*2, arg.dim[3] - in_x_shift*2};
+            int back_dim[4] = {arg.dim[0] - in_x_shift * 2, arg.dim[1] - in_x_shift * 2, arg.dim[2] - in_x_shift * 2,
+                arg.dim[3] - in_x_shift * 2};
             if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
                 && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
               center = true;
@@ -365,9 +364,7 @@ namespace quda {
             }
           }
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
-          if (!idle && center){
-            store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back_shift, smem_scale[0]);
-          }
+          if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back_shift, smem_scale[0]); }
           __syncthreads();
           wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
           __syncthreads();
@@ -375,21 +372,17 @@ namespace quda {
         } else if (type_ == 3) {
           Vector aux_in_vec;
           int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
-          if (!idle) {
-            aux_in_vec = arg.x(sid_shift, explicit_parity);
-          }
-          load_matrix_b_vector<N_sm/2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
-          if (!idle) {
-            arg.out(sid_shift, explicit_parity) = aux_in_vec;
-          }
+          if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
+          load_matrix_b_vector<N_sm / 2, true, false>(aux_in_vec, sm_b, smem_scale, arg.m_scale);
+          if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
         }
 
         if (type_ == 3) {
-        
-        } else if(type_ == 1){
+
+        } else if (type_ == 1) {
           if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]); }
         } else {
-          if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]*arg.m_scale); }
+          if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0] * arg.m_scale); }
         }
 
         s4_shift_base += gridDim.x * blockDim.x;
@@ -415,36 +408,36 @@ namespace quda {
 
         long long flops_ = 0;
         switch (arg.type) {
-          case 0: 
-            flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * mat;
-            break;
-          case 1:
-            flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * 2ll * mat;
-            break;
-          case 2:
-          case 3:
-            flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
-                * (hop + mat); // for 2 and 3 we don't have the halo complication.
-            break;
-          case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
-          default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        case 0:
+          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * mat;
+          break;
+        case 1:
+          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * 2ll * mat;
+          break;
+        case 2:
+        case 3:
+          flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
+              * (hop + mat); // for 2 and 3 we don't have the halo complication.
+          break;
+        case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
+        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
 
         return flops_;
       }
 
       long long bytes() const {
-        const long long dim[4] = { arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3] };
-        const long long b_m0 =  ((dim[0]-0)*(dim[1]-0)*(dim[2]-0)*(dim[3]-0)/2)*arg.Ls*(24*2+4);
-        const long long b_m1 =  ((dim[0]-1)*(dim[1]-1)*(dim[2]-1)*(dim[3]-1)/2)*arg.Ls*(24*2+4);
-        const long long b_m2 =  ((dim[0]-2)*(dim[1]-2)*(dim[2]-2)*(dim[3]-2)/2)*arg.Ls*(24*2+4);
+        const long long dim[4] = {arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3]};
+        const long long b_m0 = ((dim[0] - 0) * (dim[1] - 0) * (dim[2] - 0) * (dim[3] - 0) / 2) * arg.Ls * (24 * 2 + 4);
+        const long long b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * arg.Ls * (24 * 2 + 4);
+        const long long b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * arg.Ls * (24 * 2 + 4);
         switch (arg.type) {
-          case 0: return b_m1 + b_m2 + arg.U.Bytes();
-          case 1: return 2*b_m2 + b_m1 + b_m0 + arg.U.Bytes();
-          case 2: return b_m1 + b_m0 + arg.U.Bytes();
-          case 3: return 2*b_m2 + b_m1 + arg.U.Bytes();
-          case 4: return 2*b_m2;
-          default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        case 0: return b_m1 + b_m2 + arg.U.Bytes();
+        case 1: return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
+        case 2: return b_m1 + b_m0 + arg.U.Bytes();
+        case 3: return 2 * b_m2 + b_m1 + arg.U.Bytes();
+        case 4: return 2 * b_m2;
+        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
         return 0ll;
       }
@@ -459,10 +452,12 @@ namespace quda {
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half) + 128;
+                * sizeof(half)
+                + 128;
           } else {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half) + 128;
+                * sizeof(half)
+                + 128;
           }
         } else {
           int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
@@ -587,11 +582,11 @@ namespace quda {
 
       template <bool reload, int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
         switch (tp.block.x) {
-          case  8: apply< 8, reload, type>(tp, arg, stream); break;
-          case 16: apply<16, reload, type>(tp, arg, stream); break;
-          case 24: apply<24, reload, type>(tp, arg, stream); break;
-          case 32: apply<32, reload, type>(tp, arg, stream); break;
-          default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
+        case 8: apply<8, reload, type>(tp, arg, stream); break;
+        case 16: apply<16, reload, type>(tp, arg, stream); break;
+        case 24: apply<24, reload, type>(tp, arg, stream); break;
+        case 32: apply<32, reload, type>(tp, arg, stream); break;
+        default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
         }
       }
 
@@ -606,11 +601,11 @@ namespace quda {
       void apply(const cudaStream_t& stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {
-          case 0: apply<0>(tp, arg, stream); break;
-          case 1: apply<1>(tp, arg, stream); break;
-          case 2: apply<2>(tp, arg, stream); break;
-          case 3: apply<3>(tp, arg, stream); break;
-          case 4: apply<4>(tp, arg, stream); break;
+        case 0: apply<0>(tp, arg, stream); break;
+        case 1: apply<1>(tp, arg, stream); break;
+        case 2: apply<2>(tp, arg, stream); break;
+        case 3: apply<3>(tp, arg, stream); break;
+        case 4: apply<4>(tp, arg, stream); break;
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
       }
@@ -637,36 +632,30 @@ namespace quda {
         int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
       // switch for Ls
       switch (in.X(4)) {
-        case  8:
-          {
-            FusedDslashArg<storage_type,  8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-            halo_shift, scale, type);
-            FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 12: {
-          FusedDslashArg<storage_type, 12> arg(
-              out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
-          FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
-          dslash.apply(streams[Nstream - 1]);
-        } break;
-        case 16:
-          {
-            FusedDslashArg<storage_type, 16> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-            halo_shift, scale, type);
-            FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
-        case 20:
-          {
-            FusedDslashArg<storage_type, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
-            halo_shift, scale, type);
-            FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20> > dslash(arg, in);
-            dslash.apply(streams[Nstream-1]);
-          }
-        break;
+      case 8: {
+        FusedDslashArg<storage_type, 8> arg(
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
+      case 12: {
+        FusedDslashArg<storage_type, 12> arg(
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
+      case 16: {
+        FusedDslashArg<storage_type, 16> arg(
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16>> dslash(arg, in);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
+      case 20: {
+        FusedDslashArg<storage_type, 20> arg(
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20>> dslash(arg, in);
+        dslash.apply(streams[Nstream - 1]);
+      } break;
       default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
       }
     }
