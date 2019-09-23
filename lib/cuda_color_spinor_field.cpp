@@ -331,7 +331,7 @@ namespace quda {
       
       cudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
       else texDesc.readMode = qudaReadModeElementType;
 
       if (resDesc.res.linear.sizeInBytes % deviceProp.textureAlignment != 0
@@ -422,7 +422,7 @@ namespace quda {
 
         cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = cudaReadModeNormalizedFloat;
+        if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
 	else texDesc.readMode = qudaReadModeElementType;
 
 	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
