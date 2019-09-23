@@ -17,6 +17,8 @@
 #define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
 #define qudaReadModeElementType cudaReadModeElementType
 #define qudaReadModeNormalizedFloat cudaReadModeNormalizedFloat
+#define qudaResourceDesc cudaResourceDesc
+#define qudaResourceTypeLinear cudaResourceTypeLinear
 #define qudaStream_t cudaStream_t
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
@@ -32,6 +34,8 @@
 #define qudaChannelFormatKindSigned hipChannelFormatKindSigned
 #define qudaReadModeElementType hipReadModeElementType
 #define qudaReadModeNormalizedFloat hipReadModeNormalizedFloat
+#define qudaResourceDesc hipResourceDesc
+#define qudaResourceTypeLinear hipResourceTypeLinear
 #define qudaStream_t hipStream_t
 #define qudaEvent_t hipEvent_t
 #define qudaError_t hipError_t

@@ -138,9 +138,9 @@ namespace quda {
         }
       }
 
-      cudaResourceDesc resDesc;
+      qudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
-      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.resType = qudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = (isPhase ? phase_bytes : bytes) / (!full ? 2 : 1);

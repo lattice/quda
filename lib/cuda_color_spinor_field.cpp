@@ -322,9 +322,9 @@ namespace quda {
         texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
       }
       
-      cudaResourceDesc resDesc;
+      qudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
-      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.resType = qudaResourceTypeLinear;
       resDesc.res.linear.devPtr = v;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes;
@@ -356,9 +356,9 @@ namespace quda {
         desc.f = qudaChannelFormatKindFloat;
         desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 
-        cudaResourceDesc resDesc;
+        qudaResourceDesc resDesc;
         memset(&resDesc, 0, sizeof(resDesc));
-        resDesc.resType = cudaResourceTypeLinear;
+        resDesc.resType = qudaResourceTypeLinear;
         resDesc.res.linear.devPtr = norm;
         resDesc.res.linear.desc = desc;
         resDesc.res.linear.sizeInBytes = norm_bytes;
@@ -408,9 +408,9 @@ namespace quda {
 	  desc.w = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	}
 
-	cudaResourceDesc resDesc;
+	qudaResourceDesc resDesc;
 	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeLinear;
+	resDesc.resType = qudaResourceTypeLinear;
 	resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
 	resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = ghost_bytes;
@@ -441,9 +441,9 @@ namespace quda {
 	  desc.f = qudaChannelFormatKindFloat;
 	  desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 
-	  cudaResourceDesc resDesc;
+	  qudaResourceDesc resDesc;
 	  memset(&resDesc, 0, sizeof(resDesc));
-	  resDesc.resType = cudaResourceTypeLinear;
+	  resDesc.resType = qudaResourceTypeLinear;
 	  resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
 	  resDesc.res.linear.desc = desc;
 	  resDesc.res.linear.sizeInBytes = ghost_bytes;
@@ -1519,12 +1519,12 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
     printfQuda("\nPrint texture info for the field:\n");
     std::cout << *this;
-    cudaResourceDesc resDesc;
+    qudaResourceDesc resDesc;
     //memset(&resDesc, 0, sizeof(resDesc));
     cudaGetTextureObjectResourceDesc(&resDesc, this->Tex());
     printfQuda("\nDevice pointer: %p\n", resDesc.res.linear.devPtr);
     printfQuda("\nVolume (in bytes): %lu\n", resDesc.res.linear.sizeInBytes);
-    if (resDesc.resType == cudaResourceTypeLinear) printfQuda("\nResource type: linear \n");
+    if (resDesc.resType == qudaResourceTypeLinear) printfQuda("\nResource type: linear \n");
 #endif
   }
 
