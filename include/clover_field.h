@@ -190,7 +190,7 @@ namespace quda {
     qudaTextureObject_t evenInvNormTex;
     qudaTextureObject_t oddInvTex;
     qudaTextureObject_t oddInvNormTex;
-    void createTexObject(qudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm, bool full);
+    void createTexObject(qudaTextureObject_t &tex, qudaTextureObject_t &texNorm, void *field, void *norm, bool full);
     void destroyTexObject();
 #endif
 
