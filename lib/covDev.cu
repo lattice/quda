@@ -21,52 +21,25 @@ namespace quda
 
 #ifdef GPU_COVDEV
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct CovDevLaunch {
-
-    // kernel name for jit compilation
-    static constexpr const char *kernel = "quda::covDevGPU";
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      static_assert(xpay == false, "Covariant derivative operator only defined without xpay");
-      static_assert(nParity == 2, "Covariant derivative operator only defined for full field");
-      dslash.launch(covDevGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class CovDev : public Dslash<Float>
+  template <typename Arg> class CovDev : public Dslash<covDev, Arg>
   {
+    using Dslash = Dslash<covDev, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
-    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/covDev.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~CovDev() {}
+  public:
+    CovDev(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
+      Dslash::setParam(tp);
       if (arg.xpay) errorQuda("Covariant derivative operator only defined without xpay");
       if (arg.nParity != 2) errorQuda("Covariant derivative operator only defined for full field");
 
       constexpr bool xpay = false;
       constexpr int nParity = 2;
-      Dslash<Float>::template instantiate<CovDevLaunch, nDim, nColor, nParity, xpay>(tp, arg, stream);
+      Dslash::template instantiate<packShmem, nParity, xpay>(tp, stream);
     }
 
     long long flops() const
@@ -149,7 +122,9 @@ public:
     {
       // add mu to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
+                                                                           Dslash::aux[arg.kernel_type]);
       strcat(aux, ",mu=");
       char mu[8];
       u32toa(mu, arg.mu);
@@ -165,8 +140,8 @@ public:
 
     {
       constexpr int nDim = 4;
-      CovDevArg<Float, nColor, recon> arg(out, in, U, mu, parity, dagger, comm_override);
-      CovDev<Float, nDim, nColor, CovDevArg<Float, nColor, recon>> covDev(arg, out, in);
+      CovDevArg<Float, nColor, recon, nDim> arg(out, in, U, mu, parity, dagger, comm_override);
+      CovDev<decltype(arg)> covDev(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(covDev)> policy(
         covDev, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
