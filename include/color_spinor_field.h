@@ -595,12 +595,12 @@ namespace quda {
     mutable QudaPrecision ghost_precision_tex; /** the precision allocated for the ghost texture */
 
 #ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t texNorm;
+    qudaTextureObject_t tex;
+    qudaTextureObject_t texNorm;
     void createTexObject();
     void destroyTexObject();
-    mutable cudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
-    mutable cudaTextureObject_t ghostTexNorm[4];
+    mutable qudaTextureObject_t ghostTex[4]; // these are double buffered and variants to host-mapped buffers
+    mutable qudaTextureObject_t ghostTexNorm[4];
     void createGhostTexObject() const;
     void destroyGhostTexObject() const;
 #endif
@@ -840,10 +840,10 @@ namespace quda {
 		       QudaPrecision ghost_precision=QUDA_INVALID_PRECISION) const;
 
 #ifdef USE_TEXTURE_OBJECTS
-    inline const cudaTextureObject_t& Tex() const { return tex; }
-    inline const cudaTextureObject_t& TexNorm() const { return texNorm; }
-    inline const cudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
-    inline const cudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
+    inline const qudaTextureObject_t& Tex() const { return tex; }
+    inline const qudaTextureObject_t& TexNorm() const { return texNorm; }
+    inline const qudaTextureObject_t& GhostTex() const { return ghostTex[bufferIndex]; }
+    inline const qudaTextureObject_t& GhostTexNorm() const { return ghostTexNorm[bufferIndex]; }
 #endif
 
     cudaColorSpinorField& Component(const int idx) const;

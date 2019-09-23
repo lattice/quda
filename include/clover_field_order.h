@@ -558,8 +558,8 @@ namespace quda {
       const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
 	typedef typename TexVectorType<RegType,N>::type TexVector;
-	cudaTextureObject_t tex;
-	cudaTextureObject_t normTex;
+	qudaTextureObject_t tex;
+	qudaTextureObject_t normTex;
 	const int tex_offset;
 #endif
 	const int volumeCB;

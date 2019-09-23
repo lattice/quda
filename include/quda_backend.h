@@ -23,6 +23,7 @@
 #define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
+#define qudaTextureObject_t cudaTextureObject_t
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
@@ -42,6 +43,7 @@
 #define qudaSuccess hipSuccess
 #define qudaEvent_t hipEvent_t
 #define qudaError_t hipError_t
+#define qudaTextureObject_t hipTextureObject_t
 #define qudaMemcpyKind hipMemcpyKind
 #define qudaFuncAttribute hipFuncAttribute
 #define qudaDeviceProp hipDeviceProp

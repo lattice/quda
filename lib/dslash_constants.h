@@ -124,24 +124,24 @@
     int Vsh; // used by contraction kernels
 
 #ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t inTex;
-    cudaTextureObject_t inTexNorm;
-    cudaTextureObject_t ghostTex[2*QUDA_MAX_DIM];
-    cudaTextureObject_t ghostTexNorm[2*QUDA_MAX_DIM];
-    cudaTextureObject_t xTex;
-    cudaTextureObject_t xTexNorm;
-    cudaTextureObject_t outTex;
-    cudaTextureObject_t outTexNorm;
-    cudaTextureObject_t gauge0Tex; // also applies to fat gauge
-    cudaTextureObject_t gauge1Tex; // also applies to fat gauge
-    cudaTextureObject_t longGauge0Tex;
-    cudaTextureObject_t longGauge1Tex;
-    cudaTextureObject_t longPhase0Tex;
-    cudaTextureObject_t longPhase1Tex;
-    cudaTextureObject_t cloverTex;
-    cudaTextureObject_t cloverNormTex;
-    cudaTextureObject_t cloverInvTex;
-    cudaTextureObject_t cloverInvNormTex;
+    qudaTextureObject_t inTex;
+    qudaTextureObject_t inTexNorm;
+    qudaTextureObject_t ghostTex[2*QUDA_MAX_DIM];
+    qudaTextureObject_t ghostTexNorm[2*QUDA_MAX_DIM];
+    qudaTextureObject_t xTex;
+    qudaTextureObject_t xTexNorm;
+    qudaTextureObject_t outTex;
+    qudaTextureObject_t outTexNorm;
+    qudaTextureObject_t gauge0Tex; // also applies to fat gauge
+    qudaTextureObject_t gauge1Tex; // also applies to fat gauge
+    qudaTextureObject_t longGauge0Tex;
+    qudaTextureObject_t longGauge1Tex;
+    qudaTextureObject_t longPhase0Tex;
+    qudaTextureObject_t longPhase1Tex;
+    qudaTextureObject_t cloverTex;
+    qudaTextureObject_t cloverNormTex;
+    qudaTextureObject_t cloverInvTex;
+    qudaTextureObject_t cloverInvNormTex;
 #endif
 
     // used by the autotuner to switch on/off remote writing vs using copy engines

@@ -164,7 +164,7 @@ namespace quda {
   }
 
 #ifdef USE_TEXTURE_OBJECTS
-  void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
+  void cudaCloverField::createTexObject(qudaTextureObject_t &tex, qudaTextureObject_t &texNorm,
 					void *field, void *norm, bool full) {
     if (isNative()) {
       // create the texture for the field components

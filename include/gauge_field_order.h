@@ -688,7 +688,7 @@ namespace quda {
       const int offset_cb;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<Float,2>::type TexVector;
-      cudaTextureObject_t tex;
+      qudaTextureObject_t tex;
 #endif
       const int volumeCB;
       const int stride;
@@ -1724,7 +1724,7 @@ namespace quda {
         const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType,N>::type TexVector;
-      cudaTextureObject_t tex;
+      qudaTextureObject_t tex;
       const int tex_offset;
 #endif
       Float *ghost[4];

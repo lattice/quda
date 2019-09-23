@@ -99,7 +99,7 @@ namespace quda {
   }
 
 #ifdef USE_TEXTURE_OBJECTS
-  void cudaGaugeField::createTexObject(cudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
+  void cudaGaugeField::createTexObject(qudaTextureObject_t &tex, void *field, bool full, bool isPhase) {
 
     if (isNative() && geometry != QUDA_COARSE_GEOMETRY) {
       // create the texture for the field components
