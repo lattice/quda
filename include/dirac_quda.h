@@ -53,10 +53,20 @@ namespace quda {
     Dirac *dirac;
 
     // Default constructor
-  DiracParam() 
-    : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
-      tmp1(0), tmp2(0), halo_precision(QUDA_INVALID_PRECISION)
+    DiracParam() :
+      type(QUDA_INVALID_DIRAC),
+      kappa(0.0),
+      m5(0.0),
+      matpcType(QUDA_MATPC_INVALID),
+      dagger(QUDA_DAG_INVALID),
+      gauge(0),
+      clover(0),
+      mu(0.0),
+      mu_factor(0.0),
+      epsilon(0.0),
+      tmp1(0),
+      tmp2(0),
+      halo_precision(QUDA_INVALID_PRECISION)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -83,18 +93,17 @@ namespace quda {
 
   };
 
-
-  // This is a free function: 
+  // This is a free function:
   // Dirac params structure
   // inv_param structure
   // pc -> preconditioned.
   void setDiracParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
-  
+
   // This is a free function.
   void setDiracSloppyParam(DiracParam &diracParam, QudaInvertParam *inv_param, bool pc);
 
   // forward declarations
-  class DiracMatrix;  // What are the differences in these classes?
+  class DiracMatrix; // What are the differences in these classes?
   class DiracM;
   class DiracMdagM;
   class DiracMMdag;
@@ -132,10 +141,10 @@ namespace quda {
     mutable TimeProfile profile;
 
   public:
-    Dirac(const DiracParam &param);  // construct from params
-    Dirac(const Dirac &dirac);       // Copy construct
-    virtual ~Dirac();                // virtual destructor as this is a base classe
-    Dirac& operator=(const Dirac &dirac); // assignment
+    Dirac(const DiracParam &param);       // construct from params
+    Dirac(const Dirac &dirac);            // Copy construct
+    virtual ~Dirac();                     // virtual destructor as this is a base classe
+    Dirac &operator=(const Dirac &dirac); // assignment
 
     /**
        @brief Enable / disable communications for the Dirac operator
@@ -146,23 +155,23 @@ namespace quda {
       for (int i=0; i<QUDA_MAX_DIM; i++) { commDim[i] = commDim_[i]; }
     }
 
-    /** 
-	@brief Check parity spinors are usable (check geometry ?)
+    /**
+        @brief Check parity spinors are usable (check geometry ?)
     */
     virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
-    
-    /** 
-	@brief check full spinors are compatible (check geometry ?)
+
+    /**
+        @brief check full spinors are compatible (check geometry ?)
     */
     virtual void checkFullSpinor(const ColorSpinorField &, const ColorSpinorField &) const;
 
-    /** 
-	@brief check spinors do not alias 
+    /**
+        @brief check spinors do not alias
     */
     void checkSpinorAlias(const ColorSpinorField &, const ColorSpinorField &) const;
 
-    /** 
-	@brief apply 'dslash' operator for the DiracOp. This may be e.g. AD 
+    /**
+        @brief apply 'dslash' operator for the DiracOp. This may be e.g. AD
     */
     virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 			const QudaParity parity) const = 0;
@@ -184,8 +193,8 @@ namespace quda {
     */
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
-    /** 
-	@brief Apply Mdag (daggered operator of M
+    /**
+        @brief Apply Mdag (daggered operator of M
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -203,18 +212,18 @@ namespace quda {
     void setMass(double mass){ this->mass = mass;}
 
     // Dirac operator factory
-    /** 
-	@brief Creates a subclass from parameters
+    /**
+        @brief Creates a subclass from parameters
     */
     static Dirac* create(const DiracParam &param);
 
-    /** 
-	@brief accessor for Kappa (mass parameter)
+    /**
+        @brief accessor for Kappa (mass parameter)
     */
     double Kappa() const { return kappa; }
 
-    /** 
-	@brief accessor for twist parameter -- overrride can return better value
+    /**
+        @brief accessor for twist parameter -- overrride can return better value
     */
     virtual double Mu() const { return 0.; }
 
@@ -223,8 +232,8 @@ namespace quda {
     */
     virtual double MuFactor() const { return 0.; }
 
-    /** 
-	@brief  returns and then zeroes flopcount 
+    /**
+        @brief  returns and then zeroes flopcount
     */
     unsigned long long Flops() const { unsigned long long rtn = flops; flops = 0; return rtn; }
 
@@ -233,8 +242,8 @@ namespace quda {
     */
     QudaMatPCType getMatPCType() const { return matpcType; }
 
-    /** 
-	@brief  I have no idea what this does 
+    /**
+        @brief  I have no idea what this does
     */
     int getStencilSteps() const;
 
@@ -244,8 +253,6 @@ namespace quda {
     /** Flips value of daggered */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
-
-    
     /**
      * @brief Create the coarse operator (virtual parent)
      *
@@ -342,12 +349,13 @@ namespace quda {
 
     // APply clover
     void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const ColorSpinorField &x, const double &k) const;
 
     // Overload to allow shift.
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const ColorSpinorField &x, const double &k, const double &b) const;
+                            const ColorSpinorField &x, const double &k, const double &b) const;
+
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+			    const ColorSpinorField &x, const double &k) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -384,17 +392,15 @@ namespace quda {
 
     // Clover Inv is new
     void CloverInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-   
-    // Dslash is redefined as A_pp^{-1} D_p\bar{p} 
+
+    // Dslash is redefined as A_pp^{-1} D_p\bar{p}
     void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
 		const QudaParity parity) const;
-
 
     // out = x + k A_pp^{-1} D_p\bar{p}
     void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    
     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -431,7 +437,8 @@ namespace quda {
   //
   //    A_oo + i mu g_5 A_oo^2 = A_oo( 1 + i mu g_5 A_oo)
 
-  class DiracCloverHasenbuschTwist : public DiracClover {
+  class DiracCloverHasenbuschTwist : public DiracClover
+  {
 
     // Inherit these so I will comment them out
     /*
@@ -441,8 +448,7 @@ namespace quda {
     void initConstants();
     */
   protected:
-	double mu;
-
+    double mu;
 
   public:
     DiracCloverHasenbuschTwist(const DiracParam &param);
@@ -453,7 +459,6 @@ namespace quda {
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-
     /**
      * @brief Create the coarse clover operator
      *
@@ -463,9 +468,9 @@ namespace quda {
      * @param kappa Kappa parameter for the coarse operator
      * @param mass Mass parameter for the coarse operator (hard coded to 0 when CoarseOp is called)
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
-   };
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
+                        double mu_factor = 0.) const;
+  };
 
   // Even-odd preconditioned clover
    class DiracCloverHasenbuschTwistPC : public DiracCloverPC {
@@ -1274,7 +1279,6 @@ public:
 
   };
 
-
   // Functor base class for applying a given Dirac matrix (M, MdagM, etc.)
   // This basically wraps around a Dirac op
   // and provides for several operator() operations to apply it, perhaps to apply
@@ -1327,26 +1331,24 @@ public:
   DiracM(const Dirac &d) : DiracMatrix(d) { }
   DiracM(const Dirac *d) : DiracMatrix(d) { }
 
-
-    /**
-       @brief apply operator and potentially a shift 
-    */
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
-    {
-      dirac->M(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+  /**
+     @brief apply operator and potentially a shift
+  */
+  void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    dirac->M(out, in);
+    if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
     }
 
+    /**
+        If the Dirac Operator's tmp1 member is not set, this provides
+        a tmp. The tmp is set as the DiracOperator's tmp before the matrix apply
+        and after the matrix apply it is unset and the tmp1 is set to null.
 
-    /** 
-	If the Dirac Operator's tmp1 member is not set, this provides
-	a tmp. The tmp is set as the DiracOperator's tmp before the matrix apply
-	and after the matrix apply it is unset and the tmp1 is set to null. 
-   
-	If the operator has a tmp1 member set it will be used and the passed
-	tmp will be untouched
+        If the operator has a tmp1 member set it will be used and the passed
+        tmp will be untouched
     */
-	
+
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       bool reset1 = false;
@@ -1355,7 +1357,6 @@ public:
       if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
       if (reset1) { dirac->tmp1 = NULL; reset1 = false; }
     }
-
 
     /* Provides two tmps, in case the dirac op doesn't have them */
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -1376,7 +1377,6 @@ public:
       return dirac->getStencilSteps(); 
     }
   };
-
 
   /* Gloms onto a DiracOp and provides an operator() which applies its MdagM */
   class DiracMdagM : public DiracMatrix {
@@ -1456,7 +1456,6 @@ public:
     }
   };
 
-
   /* Gloms onto a DiracMatrix and provides an  operator() for its Mdag method */
   class DiracMdag : public DiracMatrix {
 
@@ -1494,7 +1493,6 @@ public:
       return dirac->getStencilSteps(); 
     }
   };
-
 
   /* Gloms onto a dirac matrix and gives back the dagger of whatever that was originally.
      (flips dagger before applying and restores afterwards */

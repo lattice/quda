@@ -889,29 +889,29 @@ get_dslash_type(char* s)
     ret = QUDA_WILSON_DSLASH;
   }else if (strcmp(s, "clover") == 0){
     ret = QUDA_CLOVER_WILSON_DSLASH;
-  }else if (strcmp(s, "clover-hasenbusch-twist") == 0) { 
+  } else if (strcmp(s, "clover-hasenbusch-twist") == 0) {
     ret = QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH;
-  }else if (strcmp(s, "twisted-mass") == 0){
+  } else if (strcmp(s, "twisted-mass") == 0) {
     ret = QUDA_TWISTED_MASS_DSLASH;
-  }else if (strcmp(s, "twisted-clover") == 0){
+  } else if (strcmp(s, "twisted-clover") == 0) {
     ret = QUDA_TWISTED_CLOVER_DSLASH;
-  }else if (strcmp(s, "staggered") == 0){
+  } else if (strcmp(s, "staggered") == 0) {
     ret =  QUDA_STAGGERED_DSLASH;
-  }else if (strcmp(s, "asqtad") == 0){
+  } else if (strcmp(s, "asqtad") == 0) {
     ret =  QUDA_ASQTAD_DSLASH;
-  }else if (strcmp(s, "domain-wall") == 0){
+  } else if (strcmp(s, "domain-wall") == 0) {
     ret =  QUDA_DOMAIN_WALL_DSLASH;
-  }else if (strcmp(s, "domain-wall-4d") == 0){
+  } else if (strcmp(s, "domain-wall-4d") == 0) {
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
-  }else if (strcmp(s, "mobius") == 0){
+  } else if (strcmp(s, "mobius") == 0) {
     ret =  QUDA_MOBIUS_DWF_DSLASH;
-  }else if (strcmp(s, "laplace") == 0){
+  } else if (strcmp(s, "laplace") == 0) {
     ret =  QUDA_LAPLACE_DSLASH;
-  }else{
+  } else {
     fprintf(stderr, "Error: invalid dslash type\n");	
     exit(1);
   }
-  
+
   return ret;
 }
 
@@ -927,9 +927,7 @@ get_dslash_str(QudaDslashType type)
   case QUDA_CLOVER_WILSON_DSLASH:
     ret= "clover";
     break;
-  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
-    ret="clover-hasenbusch-twist";
-    break;
+  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH: ret = "clover-hasenbusch-twist"; break;
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted-mass";
     break;
