@@ -497,7 +497,7 @@ void eigensolve_test()
     free(host_evals);
 
   } break;
-  default: errorQuda("Unsupported test type");
+  default: errorQuda("Unsupported test type %d given", test_type);
   } // switch
 
   // Clean up gauge fields.

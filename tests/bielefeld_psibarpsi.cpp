@@ -780,8 +780,8 @@ int invert_test(void)
 
     break;
 
-  default: errorQuda("Unsupported test type");
-
+  default: errorQuda("Unsupported test type %d given", test_type);
+    
   } // switch
 
 
@@ -885,7 +885,7 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  test_type = dslash_type = QUDA_ASQTAD_DSLASH;
+  dslash_type = QUDA_ASQTAD_DSLASH;
   solve_type = QUDA_DIRECT_PC_SOLVE;
   matpc_type = QUDA_MATPC_EVEN_EVEN;
   solution_type = QUDA_MAT_SOLUTION;
