@@ -71,7 +71,7 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 1.0.0 LANGUAGES)
+project("QUDA" VERSION 0.9.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -95,8 +95,8 @@ message(STATUS "")
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
+    CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -176,8 +176,10 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
-set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (11 or 14)")
-set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 11 14)
+set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
+set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
+
+option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 # NVTX options
 set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
@@ -191,6 +193,7 @@ set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
 set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requested by QUDA_ARPACK")
+
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -210,6 +213,8 @@ mark_as_advanced(QUDA_CTEST_SEP_DSLASH_POLICIES)
 mark_as_advanced(QUDA_CTEST_LAUNCH)
 mark_as_advanced(QUDA_CTEST_LAUNCH_ARGS)
 mark_as_advanced(QUDA_OPENMP)
+
+mark_as_advanced(QUDA_BACKWARDS)
 
 mark_as_advanced(QUDA_MPI_NVTX)
 mark_as_advanced(QUDA_INTERFACE_NVTX)
@@ -798,11 +803,11 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
 set(CMAKE_CUDA_FLAGS
-    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}"
+    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr"
     CACHE STRING "Flags used by the CUDA compiler" FORCE)
 if(QUDA_VERBOSE_BUILD)
   set(CMAKE_CUDA_FLAGS
-      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v"
+      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr --ptxas-options=-v"
       CACHE STRING "Flags used by the CUDA compiler" FORCE)
 endif(QUDA_VERBOSE_BUILD)
 
@@ -904,6 +909,24 @@ mark_as_advanced(CMAKE_F_FLAGS)
 
 set(BUILDNAME ${HASH})
 include(CTest)
+
+
+
+if(QUDA_BACKWARDS)
+  include(FetchContent)
+  FetchContent_Declare(
+      backward-cpp
+      GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
+      GIT_TAG v1.4
+      GIT_SHALLOW ON
+  )
+  FetchContent_GetProperties(backward-cpp)
+  if(NOT backward-cpp_POPULATED)
+    FetchContent_Populate(backward-cpp)
+  endif()
+  include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
+endif()
+
 # add tests and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)

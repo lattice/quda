@@ -31,10 +31,6 @@ namespace quda {
       errorQuda("Input and output spinor precisions don't match in dslash_quda");
     }
 
-    if (in.Stride() != out.Stride()) {
-      errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", in.Stride(), out.Stride());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
@@ -42,7 +38,7 @@ namespace quda {
 
     if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	(out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-      errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), fatGauge.VolumeCB());
+      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
     }
   }
 
@@ -59,16 +55,38 @@ namespace quda {
   {    
     checkParitySpinor(in, out);
 
-    ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
-    flops += 1158ll*in.Volume();
+    // Need to catch the zero mass case.
+    if (k == 0.0) {
+      // There's a sign convention difference for Dslash vs DslashXpay, which is
+      // triggered by looking for k == 0. We need to hack around this.
+      if (dagger == QUDA_DAG_YES) {
+        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., x, parity, QUDA_DAG_NO, commDim, profile);
+      } else {
+        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., x, parity, QUDA_DAG_YES, commDim, profile);
+      }
+      flops += 1146ll * in.Volume();
+    } else {
+      ApplyImprovedStaggered(out, in, fatGauge, longGauge, k, x, parity, dagger, commDim, profile);
+      flops += 1158ll * in.Volume();
+    }
   }
 
   // Full staggered operator
   void DiracImprovedStaggered::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
-    ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-    flops += 1158ll * in.Volume();
+    // Need to flip sign via dagger convention if mass == 0.
+    if (mass == 0.0) {
+      if (dagger == QUDA_DAG_YES) {
+        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+      } else {
+        ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+      }
+      flops += 1146ll * in.Volume();
+    } else {
+      ApplyImprovedStaggered(out, in, fatGauge, longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      flops += 1158ll * in.Volume();
+    }
   }
 
   void DiracImprovedStaggered::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const

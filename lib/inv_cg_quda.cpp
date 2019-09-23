@@ -297,8 +297,13 @@ namespace quda {
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
-    const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double u = param.precision_sloppy == 8 ?
+      std::numeric_limits<double>::epsilon() / 2. :
+      param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
+                                    param.precision == 2 ? pow(2., -13) : pow(2., -6);
+    const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
+                                                param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
+                                                                       param.precision == 2 ? pow(2., -13) : pow(2., -6);
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
     double d_new = 0;
@@ -427,6 +432,7 @@ namespace quda {
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
     bool L2breakdown = false;
+    const double L2breakdown_eps = 100. * uhigh;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -614,12 +620,17 @@ namespace quda {
           warningQuda(
             "CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
             sqrt(r2), r0Norm, resIncreaseTotal);
-          if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
+
+          if ((use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > maxResIncrease
+              or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
+              warningQuda("CG: L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps);
             } else {
-              warningQuda("CG: solver exiting due to too many true residual norm increases");
-              break;
+              if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
+                warningQuda("CG: solver exiting due to too many true residual norm increases");
+                break;
+              }
             }
           }
         } else {
@@ -640,7 +651,8 @@ namespace quda {
                         heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
-              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
+              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)",
+                          hqresIncrease, hqmaxresIncrease);
               break;
             }
           } else {
@@ -648,7 +660,8 @@ namespace quda {
           }
 
           if (hqresRestartTotal > hqmaxresRestartTotal) {
-            warningQuda("CG: solver exiting due to too many heavy quark residual restarts");
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts (%i/%i)", hqresRestartTotal,
+                        hqmaxresRestartTotal);
             break;
           }
         }

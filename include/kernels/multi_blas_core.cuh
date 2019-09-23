@@ -3,31 +3,19 @@
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
 
+#include <multi_blas_helper.cuh>
+#include <float_vector.h>
+
+#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
+#define WARP_SPLIT
+#include <generics/shfl.h>
+#endif
+
 namespace quda
 {
 
   namespace blas
   {
-
-#define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
-#include <texture.h>
-
-    // storage for matrix coefficients
-#define MAX_MATRIX_SIZE 4096
-    static __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
-
-    static signed char *Amatrix_h;
-    static signed char *Bmatrix_h;
-    static signed char *Cmatrix_h;
-
-#if CUDA_VERSION < 9000
-    // as a performance work around we put the argument struct into
-    // __constant__ memory to prevent the compiler from spilling
-    // registers on older CUDA
-    static __constant__ signed char arg_buffer[MAX_MATRIX_SIZE];
-#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -40,12 +28,11 @@ namespace quda
        @tparam Functor Functor used to operate on data
     */
     template <int NXZ, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename Functor>
-    struct MultiBlasArg {
+    struct MultiBlasArg
+      : SpinorXZ<NXZ, SpinorX, SpinorZ, Functor::use_z>,
+        SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>(), SpinorY, SpinorW, Functor::use_w> {
+      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
       const int NYW;
-      SpinorX X[NXZ];
-      SpinorY Y[MAX_MULTI_BLAS_N];
-      SpinorZ Z[NXZ];
-      SpinorW W[MAX_MULTI_BLAS_N];
       Functor f;
       const int length;
 
@@ -54,79 +41,162 @@ namespace quda
           f(f),
           length(length)
       {
+        if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
+
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
-          this->Z[i] = Z[i];
+          if (Functor::use_z) this->Z[i] = Z[i];
         }
         for (int i = 0; i < NYW; ++i) {
           this->Y[i] = Y[i];
-          this->W[i] = W[i];
+          if (Functor::use_w) this->W[i] = W[i];
         }
       }
     };
+
+    template <int M, int warp_split, typename FloatN> __device__ __host__ void warp_combine(FloatN x[M])
+    {
+#ifdef WARP_SPLIT
+      constexpr int warp_size = 32;
+      if (warp_split > 1) {
+#pragma unroll
+        for (int j = 0; j < M; j++) {
+          // reduce down to the first group of column-split threads
+#pragma unroll
+          for (int offset = warp_size / 2; offset >= warp_size / warp_split; offset /= 2) {
+#define WARP_CONVERGED 0xffffffff // we know warp should be converged here
+            x[j] += __shfl_down_sync(WARP_CONVERGED, x[j], offset);
+          }
+        }
+      }
+
+#endif // WARP_SPLIT
+    }
 
     /**
        @brief Generic multi-blas kernel with four loads and up to four stores.
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename FloatN, int M, int NXZ, typename Arg> __global__ void multiBlasKernel(Arg arg_)
+    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
     {
-#if CUDA_VERSION >= 9000
-      Arg &arg = arg_;
-#else
-      Arg &arg = *((Arg *)arg_buffer);
-#endif
-
       // use i to loop over elements in kernel
-      unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
-      unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
-      unsigned int parity = blockIdx.z;
+      const int k = blockIdx.y * blockDim.y + threadIdx.y;
+      const int parity = blockIdx.z;
 
-      arg.f.init();
+      // partition the warp between grid points and the NXZ update
+      constexpr int warp_size = 32;
+      constexpr int vector_site_width = warp_size / warp_split;
+      const int lane_id = threadIdx.x % warp_size;
+      const int warp_id = threadIdx.x / warp_size;
+      unsigned int idx
+        = blockIdx.x * (blockDim.x / warp_split) + warp_id * (warp_size / warp_split) + lane_id % vector_site_width;
+      const int l_idx = lane_id / vector_site_width;
+
       if (k >= arg.NYW) return;
 
       while (idx < arg.length) {
 
         FloatN x[M], y[M], z[M], w[M];
-        arg.Y[k].load(y, idx, parity);
-        arg.W[k].load(w, idx, parity);
 
 #pragma unroll
-        for (int l = 0; l < NXZ; l++) {
-          arg.X[l].load(x, idx, parity);
-          arg.Z[l].load(z, idx, parity);
-
-#pragma unroll
-          for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+        for (int m = 0; m < M; m++) {
+          ::quda::zero(y[m]);
+          ::quda::zero(w[m]);
         }
-        arg.Y[k].save(y, idx, parity);
-        arg.W[k].save(w, idx, parity);
 
-        idx += gridDim.x * blockDim.x;
+        if (l_idx == 0 || warp_size == 1) {
+          arg.Y[k].load(y, idx, parity);
+          arg.W[k].load(w, idx, parity);
+        }
+
+#pragma unroll
+        for (int l_ = 0; l_ < NXZ; l_ += warp_split) {
+          const int l = l_ + l_idx;
+          if (l < NXZ || warp_split == 1) {
+            arg.X[l].load(x, idx, parity);
+            arg.Z[l].load(z, idx, parity);
+
+#pragma unroll
+            for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], k, l);
+          }
+        }
+
+        // now combine the results across the warp if needed
+        if (arg.Y[k].write) warp_combine<M, warp_split>(y);
+        if (arg.W[k].write) warp_combine<M, warp_split>(w);
+
+        if (l_idx == 0 || warp_split == 1) {
+          arg.Y[k].save(y, idx, parity);
+          arg.W[k].save(w, idx, parity);
+        }
+
+        idx += gridDim.x * blockDim.x / warp_split;
       }
     }
 
     template <typename T> struct coeff_array {
       const T *data;
-      const bool use_const;
-      coeff_array() : data(nullptr), use_const(false) {}
-      coeff_array(const T *data, bool use_const) : data(data), use_const(use_const) {}
+      coeff_array() : data(nullptr) {}
+      coeff_array(const T *data) : data(data) {}
     };
 
     template <int NXZ, typename Float2, typename FloatN> struct MultiBlasFunctor {
+      typedef Float2 type;
+      static constexpr bool reducer = false;
+      int NYW;
+      MultiBlasFunctor(int NYW) : NYW(NYW) {}
 
-      //! pre-computation routine before the main loop
-      virtual __device__ __host__ void init() { ; }
+      __device__ __host__ inline Float2 a(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
+#endif
+      }
+
+      __device__ __host__ inline Float2 b(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
+#endif
+      }
+
+      __device__ __host__ inline Float2 c(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
+#endif
+      }
 
       //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-          = 0;
+      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j) = 0;
     };
 
     /**
-       Functor to perform the operation y += a * x  (complex-valued)
+       Functor performing the operations: y[i] = a*x[i] + y[i]
     */
+    template <int NXZ, typename Float2, typename FloatN>
+    struct multiaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      multiaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
+
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
+      {
+        y += a(j, i).x * x; // Sub-optimal constant buffer usage since we're using a complex array to store real numbers
+      }
+
+      int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
+      int flops() { return 2 * NXZ * NYW; }         //! flops per real element
+    };
 
     __device__ __host__ inline void _caxpy(const float2 &a, const float4 &x, float4 &y)
     {
@@ -156,24 +226,20 @@ namespace quda
       y.y += a.x * x.y;
     }
 
+    /**
+       Functor to perform the operation y += a * x  (complex-valued)
+    */
     template <int NXZ, typename Float2, typename FloatN>
     struct multicaxpy_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
-      const int NYW;
-      // ignore parameter arrays since we place them in constant memory
-      multicaxpy_(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
-      {
-      }
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      multicaxpy_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-#ifdef __CUDA_ARCH__
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_d); // fetch coefficient matrix from constant memory
-        _caxpy(a[MAX_MULTI_BLAS_N * j + i], x, y);
-#else
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_h);
-        _caxpy(a[NYW * j + i], x, y);
-#endif
+        _caxpy(a(j, i), x, y);
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -185,24 +251,16 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multicaxpyz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
-      const int NYW;
-      // ignore parameter arrays since we place them in constant memory
-      multicaxpyz_(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
-      {
-      }
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      multicaxpyz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-#ifdef __CUDA_ARCH__
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_d); // fetch coefficient matrix from constant memory
         if (j == 0) w = y;
-        _caxpy(a[MAX_MULTI_BLAS_N * j + i], x, w);
-#else
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_h);
-        if (j == 0) w = y;
-        _caxpy(a[NYW * j + i], x, w);
-#endif
+        _caxpy(a(j, i), x, w);
       }
 
       int streams() { return 2 * NYW + NXZ * NYW; } //! total number of input and output streams
@@ -214,28 +272,20 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multi_axpyBzpcx_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
-      typedef typename scalar<Float2>::type real;
-      const int NYW;
-      real a[MAX_MULTI_BLAS_N], b[MAX_MULTI_BLAS_N], c[MAX_MULTI_BLAS_N];
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::c;
+      multi_axpyBzpcx_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
-      multi_axpyBzpcx_(const coeff_array<double> &a, const coeff_array<double> &b, const coeff_array<double> &c, int NYW) :
-          NYW(NYW),
-          a {},
-          b {},
-          c {}
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-        // copy arguments into the functor
-        for (int i = 0; i < NYW; i++) {
-          this->a[i] = a.data[i];
-          this->b[i] = b.data[i];
-          this->c[i] = c.data[i];
-        }
+        y += a(0, i).x * w;
+        w = b(0, i).x * x + c(0, i).x * w;
       }
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
-      {
-        y += a[i] * w;
-        w = b[i] * x + c[i] * w;
-      }
+
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
       int flops() { return 5 * NXZ * NYW; }   //! flops per real element
     };
@@ -245,30 +295,20 @@ namespace quda
     */
     template <int NXZ, typename Float2, typename FloatN>
     struct multi_caxpyBxpz_ : public MultiBlasFunctor<NXZ, Float2, FloatN> {
-      typedef typename scalar<Float2>::type real;
-      const int NYW;
-
-      multi_caxpyBxpz_(
-          const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
-      {
-      }
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::NYW;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::a;
+      using MultiBlasFunctor<NXZ, Float2, FloatN>::b;
+      multi_caxpyBxpz_(int NYW) : MultiBlasFunctor<NXZ, Float2, FloatN>(NYW) {}
 
       // i loops over NYW, j loops over NXZ
-      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
+      __device__ __host__ inline void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, int i, int j)
       {
-#ifdef __CUDA_ARCH__
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_d); // fetch coefficient matrix from constant memory
-        Float2 *b = reinterpret_cast<Float2 *>(Bmatrix_d); // fetch coefficient matrix from constant memory
-        _caxpy(a[MAX_MULTI_BLAS_N * j], x, y);
-        _caxpy(b[MAX_MULTI_BLAS_N * j], x, w); // b/c we swizzled z into w.
-#else
-        Float2 *a = reinterpret_cast<Float2 *>(Amatrix_h);
-        Float2 *b = reinterpret_cast<Float2 *>(Bmatrix_h);
-        _caxpy(a[j], x, y);
-        _caxpy(b[j], x, w); // b/c we swizzled z into w.
-#endif
+        _caxpy(a(0, j), x, y);
+        _caxpy(b(0, j), x, w); // b/c we swizzled z into w.
       }
+
       int streams() { return 4 * NYW + NXZ; } //! total number of input and output streams
       int flops() { return 8 * NXZ * NYW; }   //! flops per real element
     };

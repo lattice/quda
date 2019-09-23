@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <numeric>
 #include <mpi.h>
-#include <csignal>
 #include <quda_internal.h>
 #include <comm_quda.h>
 #include <mpi_comm_handle.h>
@@ -19,7 +18,6 @@
     errorQuda("(MPI) %s", err_string);              \
   }                                                 \
 } while (0)
-
 
 struct MsgHandle_s {
   /**
@@ -325,10 +323,7 @@ void comm_broadcast(void *data, size_t nbytes)
 
 void comm_barrier(void) { MPI_CHECK(MPI_Barrier(MPI_COMM_HANDLE)); }
 
-void comm_abort(int status)
+void comm_abort_(int status)
 {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
   MPI_Abort(MPI_COMM_HANDLE, status);
 }
