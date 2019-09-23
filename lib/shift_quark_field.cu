@@ -256,7 +256,7 @@ namespace quda {
         if(commDimPartitioned(dim) && dim!=3){
           while(1){
             qudaError_t eventQuery = cudaEventQuery(gatherEnd);
-            if(eventQuery == cudaSuccess){
+            if(eventQuery == qudaSuccess){
               face->commsStart(2*dim + offset); // if argument is even, send backwards, else send forwards
               break;
             }

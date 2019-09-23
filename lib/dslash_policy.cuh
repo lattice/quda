@@ -400,11 +400,11 @@ namespace quda
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
 
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -496,11 +496,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -740,11 +740,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -822,11 +822,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -914,11 +914,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -1033,11 +1033,11 @@ namespace quda
 
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              qudaError_t event_test = comm_peer2peer_enabled(dir, i) ? qudaSuccess : cudaErrorNotReady;
+              if (event_test != qudaSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (qudaSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),

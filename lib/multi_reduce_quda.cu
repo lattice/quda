@@ -59,13 +59,13 @@ namespace quda {
               while (check[i] == std::numeric_limits<int32_t>::min()) {
                 if (count++ % 10000 == 0) { // check error every 10000 iterations
                   // if there is an error in the kernel then we need to exit the spin-wait
-                  if (cudaSuccess != cudaPeekAtLastError()) break;
+                  if (qudaSuccess != cudaPeekAtLastError()) break;
                 }
               }
             }
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
-            while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
+            while (qudaSuccess != qudaEventQuery(*getReduceEvent())) {}
           }
         } else
 #endif

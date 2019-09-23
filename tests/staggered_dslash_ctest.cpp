@@ -488,7 +488,7 @@ DslashTime dslashCUDA(int niter) {
 
   // check for errors
   qudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
+  if (stat != qudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;

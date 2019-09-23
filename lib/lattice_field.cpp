@@ -601,12 +601,12 @@ namespace quda {
 
   bool LatticeField::ipcCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return (qudaSuccess == qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == qudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return (qudaSuccess == qudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
   const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {

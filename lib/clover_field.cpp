@@ -199,7 +199,7 @@ namespace quda {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
-      cudaTextureDesc texDesc;
+      qudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
         texDesc.readMode = qudaReadModeNormalizedFloat;
@@ -228,7 +228,7 @@ namespace quda {
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-        cudaTextureDesc texDesc;
+        qudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 

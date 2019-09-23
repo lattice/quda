@@ -20,11 +20,13 @@
 #define qudaResourceDesc cudaResourceDesc
 #define qudaResourceTypeLinear cudaResourceTypeLinear
 #define qudaStream_t cudaStream_t
+#define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
+#define qudaTextureDesc cudaTextureDesc
 #endif
 
 #ifdef HIP_BACKEND
@@ -37,9 +39,11 @@
 #define qudaResourceDesc hipResourceDesc
 #define qudaResourceTypeLinear hipResourceTypeLinear
 #define qudaStream_t hipStream_t
+#define qudaSuccess hipSuccess
 #define qudaEvent_t hipEvent_t
 #define qudaError_t hipError_t
 #define qudaMemcpyKind hipMemcpyKind
 #define qudaFuncAttribute hipFuncAttribute
 #define qudaDeviceProp hipDeviceProp
+#define qudaTextureDesc hipTextureDesc
 #endif

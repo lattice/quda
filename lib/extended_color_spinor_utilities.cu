@@ -52,7 +52,7 @@ namespace quda {
       int dir = 1;
       while(completeSum < 2){
         if(!gatherCompleted[dir]){
-          if(cudaSuccess == qudaEventQuery(gatherEnd[dir])){
+          if(qudaSuccess == qudaEventQuery(gatherEnd[dir])){
             spinor->commsStart(nFace, 2*dim+dir, dagger);
             completeSum++;
             gatherCompleted[dir--] = 1;

@@ -144,7 +144,7 @@ namespace quda {
 
 #define checkCudaErrorNoSync() do {                    \
   qudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
+  if (error != qudaSuccess)                            \
     errorQuda("(CUDA) %s", cudaGetErrorString(error)); \
 } while (0)
 

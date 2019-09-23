@@ -11,7 +11,7 @@
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 #define CUDA_SAFE_CALL_NO_SYNC( call) {                                 \
     cudaError err = call;                                               \
-    if( cudaSuccess != err) {                                           \
+    if( qudaSuccess != err) {                                           \
       fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",     \
               __FILE__, __LINE__, cudaGetErrorString( err) );           \
       exit(EXIT_FAILURE);                                               \
@@ -155,7 +155,7 @@ namespace quda {
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore() {
     qudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
+    if (err != qudaSuccess) {
       host_free(backup_state);
       errorQuda("Failed to restore curand rng states array\n");
     }
@@ -166,7 +166,7 @@ namespace quda {
   void RNG::backup() {
     backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
     qudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
+    if (err != qudaSuccess) {
       host_free(backup_state);
       errorQuda("Failed to backup curand rng states array\n");
     }

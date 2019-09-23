@@ -160,7 +160,7 @@ hisq_force_test()
 
 
   int* num_failures_dev;
-  if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
+  if(cudaMalloc(&num_failures_dev, sizeof(int)) != qudaSuccess){
     errorQuda("cudaMalloc failed for num_failures_dev\n");
   }
   qudaMemset(num_failures_dev, 0, sizeof(int));

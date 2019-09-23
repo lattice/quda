@@ -329,7 +329,7 @@ namespace quda {
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes;
       
-      cudaTextureDesc texDesc;
+      qudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
       else texDesc.readMode = qudaReadModeElementType;
@@ -369,7 +369,7 @@ namespace quda {
         	    resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-        cudaTextureDesc texDesc;
+        qudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 
@@ -420,7 +420,7 @@ namespace quda {
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-        cudaTextureDesc texDesc;
+        qudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
 	else texDesc.readMode = qudaReadModeElementType;
@@ -453,7 +453,7 @@ namespace quda {
                       resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
           }
 
-          cudaTextureDesc texDesc;
+          qudaTextureDesc texDesc;
           memset(&texDesc, 0, sizeof(texDesc));
           texDesc.readMode = qudaReadModeElementType;
 
@@ -659,7 +659,7 @@ namespace quda {
         // special case where we use mapped memory to read/write directly from application's array
         void *src_d;
         qudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
-        if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+        if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
         void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
@@ -674,7 +674,7 @@ namespace quda {
           memcpy(buffer, src.V(), src.Bytes());
           memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
           qudaError_t error = cudaHostGetDevicePointer(&Src, buffer, 0);
-          if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+          if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
@@ -708,7 +708,7 @@ namespace quda {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *dest_d;
 	qudaError_t error = cudaHostGetDevicePointer(&dest_d, const_cast<void*>(dest.V()), 0);
-        if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+        if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
         void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
@@ -719,7 +719,7 @@ namespace quda {
         } else {
           buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
           qudaError_t error = cudaHostGetDevicePointer(&dst, buffer, 0);
-          if (error != cudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
+          if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
           dstNorm = static_cast<char*>(dst)+dest.Bytes();
         }
 

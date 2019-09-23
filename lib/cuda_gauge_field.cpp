@@ -156,7 +156,7 @@ namespace quda {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
-      cudaTextureDesc texDesc;
+      qudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
       else texDesc.readMode = qudaReadModeElementType;
@@ -680,7 +680,7 @@ namespace quda {
 	  // special case where we use zero-copy memory to read/write directly from application's array
 	  void *src_d;
 	  qudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
-	  if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	  if (error != qudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	    copyGenericGauge(*this, src, QUDA_CUDA_FIELD_LOCATION, gauge, src_d);
@@ -758,7 +758,7 @@ namespace quda {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *cpu_d;
 	qudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
-	if (error != cudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
+	if (error != qudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
 	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);
 	} else {
