@@ -8,12 +8,12 @@ namespace quda
 
     extern int it;
 
-    extern cudaEvent_t packEnd[2]; // double buffered
-    extern cudaEvent_t gatherStart[Nstream];
-    extern cudaEvent_t gatherEnd[Nstream];
-    extern cudaEvent_t scatterStart[Nstream];
-    extern cudaEvent_t scatterEnd[Nstream];
-    extern cudaEvent_t dslashStart[2]; // double buffered
+    extern qudaEvent_t packEnd[2]; // double buffered
+    extern qudaEvent_t gatherStart[Nstream];
+    extern qudaEvent_t gatherEnd[Nstream];
+    extern qudaEvent_t scatterStart[Nstream];
+    extern qudaEvent_t scatterEnd[Nstream];
+    extern qudaEvent_t dslashStart[2]; // double buffered
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finish
@@ -184,7 +184,7 @@ namespace quda
       if (!dslash.dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) { // forwards gather
-        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
+        qudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
 
         PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 

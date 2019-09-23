@@ -471,7 +471,7 @@ void end() {
     DslashTime dslash_time;
     timeval tstart, tstop;
 
-    cudaEvent_t start, end;
+    qudaEvent_t start, end;
     cudaEventCreate(&start);
     cudaEventCreate(&end);
 

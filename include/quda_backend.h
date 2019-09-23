@@ -6,7 +6,11 @@
 // cudaEventSynchronize
 // cudaGetTextureObjectResourceDesc
 // cudaHostGetDevicePointer
-
+// cudaHostRegisterDefault
+// cudaHostRegisterMapped
+// cudaHostRegisterPortable
+// cudaHostUnregister
+// cudaHostRegister
 
 #ifdef CUDA_BACKEND
 #include <cuda.h>

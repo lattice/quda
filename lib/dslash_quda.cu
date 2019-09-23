@@ -52,12 +52,12 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-    cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[Nstream];
-    cudaEvent_t gatherEnd[Nstream];
-    cudaEvent_t scatterStart[Nstream];
-    cudaEvent_t scatterEnd[Nstream];
-    cudaEvent_t dslashStart[2];
+    qudaEvent_t packEnd[2];
+    qudaEvent_t gatherStart[Nstream];
+    qudaEvent_t gatherEnd[Nstream];
+    qudaEvent_t scatterStart[Nstream];
+    qudaEvent_t scatterEnd[Nstream];
+    qudaEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;

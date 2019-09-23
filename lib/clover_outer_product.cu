@@ -17,7 +17,7 @@ namespace quda {
   }
 
   template<int N>
-  void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
+  void createEventArray(qudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
     for(int i=0; i<N; ++i)
       cudaEventCreate(&event[i],flags);
@@ -25,18 +25,18 @@ namespace quda {
   }
 
   template<int N>
-  void destroyEventArray(cudaEvent_t (&event)[N])
+  void destroyEventArray(qudaEvent_t (&event)[N])
   {
     for(int i=0; i<N; ++i)
       cudaEventDestroy(event[i]);
   }
 
 
-  static cudaEvent_t packEnd;
-  static cudaEvent_t gatherEnd[4];
-  static cudaEvent_t scatterEnd[4];
-  static cudaEvent_t oprodStart;
-  static cudaEvent_t oprodEnd;
+  static qudaEvent_t packEnd;
+  static qudaEvent_t gatherEnd[4];
+  static qudaEvent_t scatterEnd[4];
+  static qudaEvent_t oprodStart;
+  static qudaEvent_t oprodEnd;
 
 
   void createCloverForceEvents(){

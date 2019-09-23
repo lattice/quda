@@ -720,7 +720,7 @@ namespace quda {
       if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
 	TuneParam best_param;
 	qudaError_t error = qudaSuccess;
-	cudaEvent_t start, end;
+	qudaEvent_t start, end;
 	float elapsed_time, best_time;
 	time_t now;
 

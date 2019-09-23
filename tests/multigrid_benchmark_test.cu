@@ -190,7 +190,7 @@ DiracCoarse *dirac;
 
 double benchmark(int test, const int niter) {
 
-  cudaEvent_t start, end;
+  qudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);

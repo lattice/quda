@@ -273,7 +273,7 @@ void end(void)
 
 double dslashCUDA(int niter, int mu) {
 
-  cudaEvent_t start, end;
+  qudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
   cudaEventSynchronize(start);

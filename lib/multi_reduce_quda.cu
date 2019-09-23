@@ -13,7 +13,7 @@ namespace quda {
   namespace blas {
 
     qudaStream_t* getStream();
-    cudaEvent_t* getReduceEvent();
+    qudaEvent_t* getReduceEvent();
     bool getFastReduce();
 
     template <typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>

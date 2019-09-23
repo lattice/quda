@@ -11,7 +11,7 @@
 static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
-static cudaEvent_t reduceEnd;
+static qudaEvent_t reduceEnd;
 static bool fast_reduce_enabled = false;
 
 namespace quda {
@@ -25,7 +25,7 @@ namespace quda {
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
-    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    qudaEvent_t* getReduceEvent() { return &reduceEnd; }
     bool getFastReduce() { return fast_reduce_enabled; }
 
     void initReduce()
