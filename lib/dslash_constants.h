@@ -125,11 +125,11 @@
 
     int partial_length = 0;
     int R[4];
-    
+
     int_fastdiv Xs[4];
 
     bool expanding = false;
-    int Rz[4] = {0,0,0,0};
+    int Rz[4] = {0, 0, 0, 0};
 
 #ifdef USE_TEXTURE_OBJECTS
     cudaTextureObject_t inTex;

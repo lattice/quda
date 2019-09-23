@@ -26,14 +26,14 @@ namespace quda {
     int Ls;    // used by domain wall and twisted mass
     Complex b_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
     Complex c_5[QUDA_MAX_DWF_LS]; // used by mobius domain wall only
-    
+
     // The EOFA parameters. See the description in InvertParam
     double eofa_shift;
     int eofa_pm;
     double mq1;
     double mq2;
     double mq3;
-    
+
     QudaMatPCType matpcType;
     QudaDagType dagger;
     cudaGaugeField *gauge;
@@ -472,15 +472,15 @@ public:
 			const ColorSpinorField &x, const double &k) const;
     void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    
-    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in,
-         const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
-         bool expanding_=false, std::array<int,4> Rz_={0,0,0,0}) const;
+
+    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, int sp_idx_length,
+                        int R_[4], int_fastdiv Xs_[4], bool expanding_ = false,
+                        std::array<int, 4> Rz_ = {0, 0, 0, 0}) const;
     void Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-    void Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in,
-				  const QudaParity parity, const ColorSpinorField &x, const double &k,
-          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+                           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+    void Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4],
+                               int_fastdiv Xs_[4]) const;
 
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -500,6 +500,7 @@ public:
     double kappa_c;
     double m5inv_fac = 0.;
     std::vector<double> m5inv_plus, m5inv_minus;
+
   private:
   public:
     DiracMobiusPC(const DiracParam &param);
@@ -509,43 +510,47 @@ public:
 
     void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
     void Dslash5invPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-          int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+                           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
 
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-		void dslash4_dslash5inv_dslash4pre_partial(ColorSpinorField &out, const ColorSpinorField &in,
-          const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
-          bool expanding_, std::array<int,4> Rz_) const;
-		
-		void dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
-          const QudaParity parity, const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4], int_fastdiv Xs_[4],
-          bool expanding_, std::array<int,4> Rz_) const;
-    
-		void dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
-		      const QudaParity parity, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+    void dslash4_dslash5inv_dslash4pre_partial(ColorSpinorField &out, const ColorSpinorField &in,
+                                               const QudaParity parity, int sp_idx_length, int R_[4],
+                                               int_fastdiv Xs_[4], bool expanding_, std::array<int, 4> Rz_) const;
+
+    void dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
+                                                           const QudaParity parity, const ColorSpinorField &x,
+                                                           const double &k, int sp_idx_length, int R_[4],
+                                                           int_fastdiv Xs_[4], bool expanding_,
+                                                           std::array<int, 4> Rz_) const;
+
+    void dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
+                                                                    const QudaParity parity, int sp_idx_length,
+                                                                    int R_[4], int_fastdiv Xs_[4]) const;
 
     void dslash4_dagger_dslash4pre_dagger_xpay_partial(ColorSpinorField &out, const ColorSpinorField &in,
-          const QudaParity parity, const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+                                                       const QudaParity parity, const ColorSpinorField &x,
+                                                       const double &k, int sp_idx_length, int R_[4],
+                                                       int_fastdiv Xs_[4]) const;
 
-		void dslash5inv_sm_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-		
+    void dslash5inv_sm_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+
     void dslash5inv_sm_tc_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			    const double scale, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-    
-    void fused_f0(ColorSpinorField &out, const ColorSpinorField &in,
-         const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-	  void fused_f2(ColorSpinorField &out, const ColorSpinorField &in,
-         const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-    void fused_f1(ColorSpinorField &out, const ColorSpinorField &in,
-          ColorSpinorField& aux_out, const ColorSpinorField& aux_in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-    void fused_f3(ColorSpinorField &out, const ColorSpinorField &in,
-          const ColorSpinorField& aux_in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
-    void fused_f4(ColorSpinorField &out, const ColorSpinorField &in,
-          const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const;
+                                  const double scale, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
+
+    void fused_f0(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
+                  int shift[4], int halo_shift[4]) const;
+    void fused_f2(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
+                  int shift[4], int halo_shift[4]) const;
+    void fused_f1(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &aux_out,
+                  const ColorSpinorField &aux_in, const double scale, const QudaParity parity, int shift[4],
+                  int halo_shift[4]) const;
+    void fused_f3(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &aux_in, const double scale,
+                  const QudaParity parity, int shift[4], int halo_shift[4]) const;
+    void fused_f4(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
+                  int shift[4], int halo_shift[4]) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -553,41 +558,44 @@ public:
 		 ColorSpinorField &b, const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
-  
+
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
-  class DiracMobiusPCEofa : public DiracMobiusPC {
+  class DiracMobiusPCEofa : public DiracMobiusPC
+  {
 
   protected:
-
   private:
     // The EOFA parameters
     double sherman_morrison_fac = 0.;
     double eofa_shift;
-    int    eofa_pm;
+    int eofa_pm;
     double mq1;
-    double mq2; 
+    double mq2;
     double mq3;
     double eofa_u[QUDA_MAX_DWF_LS];
     double eofa_x[QUDA_MAX_DWF_LS];
     double eofa_y[QUDA_MAX_DWF_LS];
+
   public:
     DiracMobiusPCEofa(const DiracParam &param);
     DiracMobiusPCEofa(const DiracMobiusPC &dirac);
     virtual ~DiracMobiusPCEofa();
-    DiracMobiusPCEofa& operator=(const DiracMobiusPC &dirac);
+    DiracMobiusPCEofa &operator=(const DiracMobiusPC &dirac);
 
     void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
-    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
-    
+    void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+                         double a = -1.) const;
+
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
- 
-    void full_dslash(ColorSpinorField &out, const ColorSpinorField &in) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
 
-    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol, ColorSpinorField &x, 
-		  ColorSpinorField &b, const QudaSolutionType) const;
+    void full_dslash(ColorSpinorField &out,
+                     const ColorSpinorField &in) const; // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
+
+    void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 

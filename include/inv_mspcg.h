@@ -9,110 +9,110 @@
 
 #include <invert_quda.h>
 
-namespace quda {
+namespace quda
+{
 
-  class MSPCG : public Solver { // Multisplitting Preconditioned CG
+  class MSPCG : public Solver
+  { // Multisplitting Preconditioned CG
 
-    private:
-      
-      Solver *solver_prec;
-      SolverParam solver_prec_param;
+  private:
+    Solver *solver_prec;
+    SolverParam solver_prec_param;
 
-      DiracMobiusPC* mat;
-      DiracMobiusPC* mat_sloppy;
-      DiracMobiusPC* mat_precondition;
-      //    DiracDubiusPC* mat_extended;
-      DiracMdagM* nrm_op;
-      DiracMdagM* nrm_op_sloppy;
-      DiracMdagM* nrm_op_precondition;
+    DiracMobiusPC *mat;
+    DiracMobiusPC *mat_sloppy;
+    DiracMobiusPC *mat_precondition;
+    //    DiracDubiusPC* mat_extended;
+    DiracMdagM *nrm_op;
+    DiracMdagM *nrm_op_sloppy;
+    DiracMdagM *nrm_op_precondition;
 
-      DiracParam dirac_param;
-      DiracParam dirac_param_sloppy;
-      DiracParam dirac_param_precondition;
+    DiracParam dirac_param;
+    DiracParam dirac_param_sloppy;
+    DiracParam dirac_param_precondition;
 
-      cudaGaugeField* padded_gauge_field;
-      cudaGaugeField* padded_gauge_field_precondition;
+    cudaGaugeField *padded_gauge_field;
+    cudaGaugeField *padded_gauge_field_precondition;
 
-      std::array<int, 4> R;
-      
-      cudaColorSpinorField* vct_dr;
-      cudaColorSpinorField* vct_dp;
-      cudaColorSpinorField* vct_dmmp;
-      cudaColorSpinorField* vct_dtmp;
-      cudaColorSpinorField* vct_dtmp2;
+    std::array<int, 4> R;
 
-      cudaColorSpinorField* r;
-      cudaColorSpinorField* x;
-      cudaColorSpinorField* p;
-      cudaColorSpinorField* z;
-      cudaColorSpinorField* mmp;
-      cudaColorSpinorField* tmp;
-      cudaColorSpinorField* tmp2;
-      
-      cudaColorSpinorField* r_old;
+    cudaColorSpinorField *vct_dr;
+    cudaColorSpinorField *vct_dp;
+    cudaColorSpinorField *vct_dmmp;
+    cudaColorSpinorField *vct_dtmp;
+    cudaColorSpinorField *vct_dtmp2;
 
-      cudaColorSpinorField* fr;
-      cudaColorSpinorField* fz;
+    cudaColorSpinorField *r;
+    cudaColorSpinorField *x;
+    cudaColorSpinorField *p;
+    cudaColorSpinorField *z;
+    cudaColorSpinorField *mmp;
+    cudaColorSpinorField *tmp;
+    cudaColorSpinorField *tmp2;
 
-      cudaColorSpinorField* immp;
-      cudaColorSpinorField* ip;
+    cudaColorSpinorField *r_old;
 
-#ifdef PIPELINED_PRECONDITIONER      
-      cudaColorSpinorField* iz;
-      cudaColorSpinorField* is;
-      cudaColorSpinorField* iw;
-      cudaColorSpinorField* iq;
-#endif 
-      cudaColorSpinorField* ifmmp;
-      cudaColorSpinorField* ifp;
-      cudaColorSpinorField* iftmp;
-      cudaColorSpinorField* ifset;
+    cudaColorSpinorField *fr;
+    cudaColorSpinorField *fz;
 
-      Timer copier_timer;
-      Timer preconditioner_timer;
-      Timer sloppy_timer;
-      Timer precise_timer;
-      Timer linalg_timer[2];
- 
-      int sp_len2, sp_len1, sp_len0;
-      int RR2[4], RR1[4], RR0[4];
-      int_fastdiv Xs2[4], Xs1[4], Xs0[4];
-      
-      int shift0[4] = {0,0,0,0};
-      int shift1[4] = {1,1,1,1};
-      int shift2[4] = {2,2,2,2};
+    cudaColorSpinorField *immp;
+    cudaColorSpinorField *ip;
 
-      bool tc;
+#ifdef PIPELINED_PRECONDITIONER
+    cudaColorSpinorField *iz;
+    cudaColorSpinorField *is;
+    cudaColorSpinorField *iw;
+    cudaColorSpinorField *iq;
+#endif
+    cudaColorSpinorField *ifmmp;
+    cudaColorSpinorField *ifp;
+    cudaColorSpinorField *iftmp;
+    cudaColorSpinorField *ifset;
 
-    public:
+    Timer copier_timer;
+    Timer preconditioner_timer;
+    Timer sloppy_timer;
+    Timer precise_timer;
+    Timer linalg_timer[2];
 
-      MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic=6);
+    int sp_len2, sp_len1, sp_len0;
+    int RR2[4], RR1[4], RR0[4];
+    int_fastdiv Xs2[4], Xs1[4], Xs0[4];
 
-      int inner_iterations;
+    int shift0[4] = {0, 0, 0, 0};
+    int shift1[4] = {1, 1, 1, 1};
+    int shift2[4] = {2, 2, 2, 2};
 
-      double Gflops;
-      double fGflops;
+    bool tc;
 
-      double reliable_update_delta;
+  public:
+    MSPCG(QudaInvertParam *inv_param, SolverParam &_param, TimeProfile &profile, int ic = 6);
 
-      void allocate(ColorSpinorField& db);
-      void deallocate();
+    int inner_iterations;
 
-      void test_dslash( const ColorSpinorField& tb );
+    double Gflops;
+    double fGflops;
 
-      virtual ~MSPCG();
+    double reliable_update_delta;
 
-      void operator()(ColorSpinorField& out, ColorSpinorField& in);
-      void reliable_update(ColorSpinorField& dx, ColorSpinorField& db);
-     
-      void pipelined_inner_cg(ColorSpinorField& ix, ColorSpinorField& ib);
-      void Minv(ColorSpinorField& out, const ColorSpinorField& in); 
-      
-      void inner_dslash( ColorSpinorField& out, const ColorSpinorField& in, const double scale = 1. );
-      void inner_cg( ColorSpinorField& ix, ColorSpinorField& ib );
-      int  outer_cg( ColorSpinorField& dx, ColorSpinorField& db, double quit );
+    void allocate(ColorSpinorField &db);
+    void deallocate();
+
+    void test_dslash(const ColorSpinorField &tb);
+
+    virtual ~MSPCG();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void reliable_update(ColorSpinorField &dx, ColorSpinorField &db);
+
+    void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
+    void Minv(ColorSpinorField &out, const ColorSpinorField &in);
+
+    void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in, const double scale = 1.);
+    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
+    int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
   };
 
-}
+} // namespace quda
 
 #endif

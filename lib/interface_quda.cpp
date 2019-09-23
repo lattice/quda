@@ -1585,19 +1585,17 @@ namespace quda {
       diracParam.Ls = inv_param->Ls;
       break;
     case QUDA_MOBIUS_DWF_EOFA_DSLASH:
-      if (inv_param->Ls > QUDA_MAX_DWF_LS){
-	      errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
+      if (inv_param->Ls > QUDA_MAX_DWF_LS) {
+        errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       }
-      if(!pc){
-	      errorQuda("EOFA ONLY support even-odd preconditioned dslash, for now. :( \n");
-      }
+      if (!pc) { errorQuda("EOFA ONLY support even-odd preconditioned dslash, for now. :( \n"); }
       diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
       if (sizeof(Complex) != sizeof(double _Complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
       }
-      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex)*inv_param->Ls);
-      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex)*inv_param->Ls);
+      memcpy(diracParam.b_5, inv_param->b_5, sizeof(Complex) * inv_param->Ls);
+      memcpy(diracParam.c_5, inv_param->c_5, sizeof(Complex) * inv_param->Ls);
       diracParam.eofa_shift = inv_param->eofa_shift;
       diracParam.eofa_pm = inv_param->eofa_pm;
       diracParam.mq1 = inv_param->mq1;
@@ -1792,10 +1790,11 @@ namespace quda {
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
-    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-		    param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-		    param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || 
-        param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ? kappa5 : param.kappa;
+    double kappa
+        = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+              || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
+        ? kappa5
+        : param.kappa;
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -2108,11 +2107,10 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   popVerbosity();
 }
 
-void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
-{
-  if(inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
+void dslashQuda_mobius_eofa(void* h_out, void* h_in, QudaInvertParam* inv_param, QudaParity parity, int test_type) {
+  if (inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     setKernelPackT(true);
-  }else{
+  } else {
     errorQuda("This type of dslashQuda operator is defined for QUDA_MOBIUS_DWF_EOFA_DSLASH ONLY");
   }
 
@@ -2124,7 +2122,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   bool precondition_output = test_type == 2 ? false : true;
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), precondition_output, inv_param->input_location);
-  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField* in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);
@@ -2153,22 +2151,15 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
 
   DiracMobiusPCEofa dirac(diracParam); // create the Dirac operator
   switch (test_type) {
-    case 0:
-      dirac.m5_eofa(out, in);
-      break;
-    case 1:
-      dirac.m5inv_eofa(out, in);
-      break;
-    case 2:
-      dirac.full_dslash(out, in);
-      break;
-    default:
-      errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", test_type);
+  case 0: dirac.m5_eofa(out, in); break;
+  case 1: dirac.m5inv_eofa(out, in); break;
+  case 2: dirac.full_dslash(out, in); break;
+  default: errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", test_type);
   }
 
   cpuParam.v = h_out;
   cpuParam.location = inv_param->output_location;
-  ColorSpinorField *out_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField* out_h = ColorSpinorField::Create(cpuParam);
   *out_h = out;
 
   if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -2929,10 +2920,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
 
-  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-      param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) setKernelPackT(true);
+  if (param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || param->dslash_type == QUDA_MOBIUS_DWF_DSLASH || param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
+    setKernelPackT(true);
 
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -3217,14 +3207,14 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     // MSPCG here.
-    if(param->inv_type == QUDA_MSPCG_INVERTER){
+    if (param->inv_type == QUDA_MSPCG_INVERTER) {
       MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert, param->maxiter_precondition);
-//      (*mspcg)(*out, *in);
+      //      (*mspcg)(*out, *in);
       mspcg->reliable_update(*out, *in);
       solverParam.updateInvertParam(*param);
       delete mspcg;
-    }else{
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+    } else {
+      Solver* solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete solve;
@@ -4012,11 +4002,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
         // delete m;
         // delete mSloppy;
-
       }
     }
   }
-  
+
   delete m;
   delete mSloppy;
 

@@ -394,7 +394,16 @@ namespace quda {
                          const Complex *b_5, const Complex *c_5, const ColorSpinorField &x, int parity, bool dagger,
                          const int *comm_override, TimeProfile &profile);
 
-  enum Dslash5Type { DSLASH5_DWF, DSLASH5_MOBIUS_PRE, DSLASH5_MOBIUS, M5_INV_DWF, M5_INV_MOBIUS, M5_INV_ZMOBIUS, M5_EOFA, M5INV_EOFA };
+  enum Dslash5Type {
+    DSLASH5_DWF,
+    DSLASH5_MOBIUS_PRE,
+    DSLASH5_MOBIUS,
+    M5_INV_DWF,
+    M5_INV_MOBIUS,
+    M5_INV_ZMOBIUS,
+    M5_EOFA,
+    M5INV_EOFA
+  };
 
   enum MdwfFusedDslashType { // the details are too complicated to describe here.
     dslash4_dslash5pre_dslash5inv = 0,
@@ -403,7 +412,7 @@ namespace quda {
     dslash4dag_dslash5predag = 3,
     dslash5pre = 4,
   };
-  
+
   /**
      @brief Apply either the domain-wall / mobius Dslash5 operator or
      the M5 inverse operator.  In the current implementation, it is
@@ -419,30 +428,31 @@ namespace quda {
      @param[in] dagger Whether this is for the dagger operator
      @param[in] type Type of dslash we are applying
   */
-  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-		    double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-		    double a, bool dagger, Dslash5Type type);
-  
+  void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
+                    double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
+
   void apply_dslash5_tensor_core(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-      double m_f, double m_5, const Complex* b_5, const Complex* c_5, double a, bool dagger, const double scale, Dslash5Type type);
+                                 double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger,
+                                 const double scale, Dslash5Type type);
 
   // Tensor core functions for Mobius DWF
-  namespace mobius_tensor_core{
-    void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U,
-      ColorSpinorField& y, const ColorSpinorField& x, double m_f, double m_5,
-      const Complex* b_5, const Complex* c_5, bool dagger, int parity, int shift[4], int halo_shift[4],
-      const double scale, MdwfFusedDslashType type);
+  namespace mobius_tensor_core
+  {
+    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
+                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+                            bool dagger, int parity, int shift[4], int halo_shift[4], const double scale,
+                            MdwfFusedDslashType type);
   }
 
   // The EOFA stuff
-  namespace mobius_eofa{
-    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-      double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a,
-      int eofa_pm,
-      double inv, double kappa, const double* eofa_u, const double* eofa_x, const double* eofa_y, double sherman_morrison,
-      bool dagger, Dslash5Type type);  
+  namespace mobius_eofa
+  {
+    void apply_dslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
+                       double m_5, const Complex *b_5, const Complex *c_5, double a, int eofa_pm, double inv,
+                       double kappa, const double *eofa_u, const double *eofa_x, const double *eofa_y,
+                       double sherman_morrison, bool dagger, Dslash5Type type);
   }
-  
+
   /**
      @brief Driver for applying the Laplace stencil
 

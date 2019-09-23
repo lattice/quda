@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-  void ritzQuda(void *hp_x, void *hp_b, QudaInvertParam& inv_param, bool find_min = false);
+void ritzQuda(void *hp_x, void *hp_b, QudaInvertParam &inv_param, bool find_min = false);
 
 #ifdef __cplusplus
 }

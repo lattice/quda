@@ -903,15 +903,15 @@ get_dslash_type(char* s)
     ret =  QUDA_DOMAIN_WALL_4D_DSLASH;
   }else if (strcmp(s, "mobius") == 0){
     ret =  QUDA_MOBIUS_DWF_DSLASH;
-  }else if (strcmp(s, "mobius-eofa") == 0){
-    ret =  QUDA_MOBIUS_DWF_EOFA_DSLASH;
-  }else if (strcmp(s, "laplace") == 0){
+  } else if (strcmp(s, "mobius-eofa") == 0) {
+    ret = QUDA_MOBIUS_DWF_EOFA_DSLASH;
+  } else if (strcmp(s, "laplace") == 0) {
     ret =  QUDA_LAPLACE_DSLASH;
-  }else{
+  } else {
     fprintf(stderr, "Error: invalid dslash type\n");	
     exit(1);
   }
-  
+
   return ret;
 }
 
@@ -948,9 +948,7 @@ get_dslash_str(QudaDslashType type)
   case QUDA_MOBIUS_DWF_DSLASH:
     ret = "mobius";
     break;
-  case QUDA_MOBIUS_DWF_EOFA_DSLASH:
-    ret = "mobius-eofa";
-    break;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius-eofa"; break;
   case QUDA_LAPLACE_DSLASH:
     ret = "laplace";
     break;
@@ -1339,27 +1337,27 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
-  } else if (strcmp(s, "mspcg") == 0){
+  } else if (strcmp(s, "mspcg") == 0) {
     ret = QUDA_MSPCG_INVERTER;
-  } else if (strcmp(s, "cg3") == 0){
+  } else if (strcmp(s, "cg3") == 0) {
     ret = QUDA_CG3_INVERTER;
-  } else if (strcmp(s, "cg3ne") == 0){
+  } else if (strcmp(s, "cg3ne") == 0) {
     ret = QUDA_CG3NE_INVERTER;
-  } else if (strcmp(s, "cg3nr") == 0){
+  } else if (strcmp(s, "cg3nr") == 0) {
     ret = QUDA_CG3NR_INVERTER;
-  } else if (strcmp(s, "ca-cg") == 0){
+  } else if (strcmp(s, "ca-cg") == 0) {
     ret = QUDA_CA_CG_INVERTER;
-  } else if (strcmp(s, "ca-cgne") == 0){
+  } else if (strcmp(s, "ca-cgne") == 0) {
     ret = QUDA_CA_CGNE_INVERTER;
-  } else if (strcmp(s, "ca-cgnr") == 0){
+  } else if (strcmp(s, "ca-cgnr") == 0) {
     ret = QUDA_CA_CGNR_INVERTER;
-  } else if (strcmp(s, "ca-gcr") == 0){
+  } else if (strcmp(s, "ca-gcr") == 0) {
     ret = QUDA_CA_GCR_INVERTER;
   } else {
     fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
   }
-  
+
   return ret;
 }
 

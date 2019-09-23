@@ -107,9 +107,8 @@ void init(int argc, char **argv) {
 
   if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
-  } else if( dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-             dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     // for these we always use kernel packing
     dw_setDims(gauge_param.X, Lsdim);
   } else {
@@ -139,15 +138,15 @@ void init(int argc, char **argv) {
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH ) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);
     for(int k = 0; k < Lsdim; k++)
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 2.5;// + 0.5*k;
-      inv_param.c_5[k] = 1.5;// - 0.5*k;
+      inv_param.b_5[k] = 2.5; // + 0.5*k;
+      inv_param.c_5[k] = 1.5; // - 0.5*k;
     }
     inv_param.eofa_pm = eofa_pm;
     inv_param.eofa_shift = -1.;
@@ -224,18 +223,13 @@ void init(int argc, char **argv) {
       default:
         errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", test_type);
     }
-  }else if(dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-    switch(test_type) {
-      case 1:
-      case 2:
-        inv_param.solution_type = QUDA_MATPC_SOLUTION;
-        break;
-      default:
-        errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", test_type);
+  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    switch (test_type) {
+    case 1:
+    case 2: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
+    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", test_type);
     }
-  }
-  else
-  {
+  } else {
     switch(test_type) {
       case 0:
       case 1:
@@ -275,9 +269,8 @@ void init(int argc, char **argv) {
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     csParam.nDim = 5;
     csParam.x[4] = Ls;
   }
@@ -568,58 +561,57 @@ DslashTime dslashCUDA(int niter) {
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (test_type) {
-        case 1: // The test for EOFA
-          if (transfer) {
-            errorQuda("(transfer == true) version NOT yet available!\n");
-          } else {
-            static_cast<DiracMobiusPCEofa*>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
-          }
-          break;
-        case 2:
-          if (transfer) {
-            errorQuda("(transfer == true) version NOT yet available!\n");
-          } else {
-            static_cast<DiracMobiusPCEofa*>(dirac)->m5_eofa(*tmp1, *cudaSpinor);
-            static_cast<DiracMobiusPCEofa*>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
-          }
-          break;
-        default:
-          errorQuda("Undefined test type(=%d)\n", test_type);
+      case 1: // The test for EOFA
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case 2:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*tmp1, *cudaSpinor);
+          static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
+        }
+        break;
+      default: errorQuda("Undefined test type(=%d)\n", test_type);
       }
     } else {
       switch (test_type) {
-    
-    case 0:
-          if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-            if (transfer) {
-              dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
-            } else {
-              dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
-            }
-          } else {
-            if (transfer) {
-              dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
-            } else {
-              dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
-            }
-          }
-          break;
-        case 1:
-        case 2:
+
+      case 0:
+        if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
           if (transfer) {
-            MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+            dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
           } else {
-            dirac->M(*cudaSpinorOut, *cudaSpinor);
+            dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
           }
-          break;
-        case 3:
-        case 4:
+        } else {
           if (transfer) {
-            MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+            dslashQuda(spinorOut->V(), spinor->V(), &inv_param, parity);
           } else {
-            dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+            dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity);
           }
-          break;
+        }
+        break;
+      case 1:
+      case 2:
+        if (transfer) {
+          MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->M(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case 3:
+      case 4:
+        if (transfer) {
+          MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
       }
     }
 
@@ -965,30 +957,26 @@ void dslashRef() {
     free(kappa_c);
     free(kappa_5);
     free(kappa_mdwf);
-  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH){
-    double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_5 = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    double _Complex *kappa_mdwf = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-    for(int xs = 0 ; xs < Lsdim ; xs++)
-    {
-      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
-      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
-      kappa_5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
+  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+    double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_5 = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    double _Complex *kappa_mdwf = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+    for (int xs = 0; xs < Lsdim; xs++) {
+      kappa_b[xs] = 1.0 / (2 * (inv_param.b_5[xs] * (4.0 + inv_param.m5) + 1.0));
+      kappa_c[xs] = 1.0 / (2 * (inv_param.c_5[xs] * (4.0 + inv_param.m5) - 1.0));
+      kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
       kappa_mdwf[xs] = -kappa_5[xs];
     }
     printfQuda("Testing EOFA! :) \n");
     switch (test_type) {
-      case 1:
-        mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), 
-          inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
-        break;
-      case 2:
-        spinorRef->copy(*spinor);
-        break;
-      default:
-        printf("Test type not supported for domain wall\n");
-      exit(-1);
+    case 1:
+      mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case 2: spinorRef->copy(*spinor); break;
+    default: printf("Test type not supported for domain wall\n"); exit(-1);
     }
     free(kappa_b);
     free(kappa_c);

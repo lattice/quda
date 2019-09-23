@@ -99,11 +99,11 @@ display_test_info()
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
-	     dimPartitioned(3)); 
- 	
-	printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
-	printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
-	printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
+	     dimPartitioned(3));
+
+  printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
+  printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
+  printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
 
   return ;
   
@@ -137,14 +137,10 @@ int main(int argc, char **argv)
 
   // *** QUDA parameters begin here.
 
-  if (dslash_type != QUDA_WILSON_DSLASH &&
-      dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      dslash_type != QUDA_TWISTED_MASS_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
-      dslash_type != QUDA_MOBIUS_DWF_DSLASH &&
-      dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH &&
-      dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_MOBIUS_DWF_EOFA_DSLASH
+      && dslash_type != QUDA_TWISTED_CLOVER_DSLASH && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -198,10 +194,8 @@ int main(int argc, char **argv)
     inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-	     dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-       dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     inv_param.m5 = -1.8;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
@@ -210,9 +204,9 @@ int main(int argc, char **argv)
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
       // inv_param.b_5[k] = 2.5;
-      inv_param.b_5[k] = (mobius_scale+1.)/2.;
+      inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
       // inv_param.c_5[k] = 1.5;
-      inv_param.c_5[k] = (mobius_scale-1.)/2.;
+      inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
     }
     inv_param.eofa_pm = 0;
     inv_param.eofa_shift = 0.12345;
@@ -276,8 +270,8 @@ int main(int argc, char **argv)
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
-  
-	inv_param.maxiter_precondition = maxiter_inner_preconditioning;
+
+  inv_param.maxiter_precondition = maxiter_inner_preconditioning;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -322,10 +316,8 @@ int main(int argc, char **argv)
   // *** application-specific.
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     dw_setDims(gauge_param.X, inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -538,8 +530,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -552,14 +544,12 @@ int main(int argc, char **argv)
         errorQuda("Unsupported dslash_type");
       }
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
-            dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-            dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-            dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+            || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
           ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
-	} else {
+        } else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
         }
       }
@@ -596,8 +586,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
@@ -611,15 +601,12 @@ int main(int argc, char **argv)
       }
 
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-            dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-            dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-            dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
+        if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+            || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
           ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else {
           ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
-      
-	}
+        }
       }
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
@@ -672,8 +659,8 @@ int main(int argc, char **argv)
         dw_4d_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
         dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-        double _Complex *kappa_b = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
-        double _Complex *kappa_c = (double _Complex*)malloc(Lsdim*sizeof(double _Complex));
+        double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));

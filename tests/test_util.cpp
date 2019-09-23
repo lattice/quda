@@ -2337,13 +2337,13 @@ int process_command_line_option(int argc, char** argv, int* idx)
     dagger = QUDA_DAG_YES;
     ret = 0;
     goto out;
-  }	
-  
-  if( strcmp(argv[i], "--eofa-minus") == 0){
+  }
+
+  if (strcmp(argv[i], "--eofa-minus") == 0) {
     eofa_pm = 0;
     ret = 0;
     goto out;
-  }	
+  }
 
   if( strcmp(argv[i], "--partition") == 0){
     if (i+1 >= argc){
@@ -2762,7 +2762,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 0){ // allow 0 for testing setup in isolation
+    if (Nsrc < 0) { // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -4227,13 +4227,11 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
- 
-  if( strcmp(argv[i], "--maxiter-inner-preconditioning") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    maxiter_inner_preconditioning = atoi(argv[i+1]);
-    if (maxiter_inner_preconditioning < 1 || maxiter_inner_preconditioning > 1e6){
+
+  if (strcmp(argv[i], "--maxiter-inner-preconditioning") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    maxiter_inner_preconditioning = atoi(argv[i + 1]);
+    if (maxiter_inner_preconditioning < 1 || maxiter_inner_preconditioning > 1e6) {
       printf("ERROR: invalid number of inner preconditioning iterations (%d)\n", maxiter_inner_preconditioning);
       usage(argv);
     }
@@ -4241,13 +4239,11 @@ int process_command_line_option(int argc, char** argv, int* idx)
     ret = 0;
     goto out;
   }
-  
-  if( strcmp(argv[i], "--mobius-scale") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mobius_scale = atof(argv[i+1]);
-    if (mobius_scale < 1.){
+
+  if (strcmp(argv[i], "--mobius-scale") == 0) {
+    if (i + 1 >= argc) { usage(argv); }
+    mobius_scale = atof(argv[i + 1]);
+    if (mobius_scale < 1.) {
       printf("ERROR: invalid value of M\"obius scale (%.4f)\n", mobius_scale);
       usage(argv);
     }
