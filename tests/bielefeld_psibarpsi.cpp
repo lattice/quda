@@ -75,8 +75,6 @@ extern QudaSolutionType solution_type; // solution type
 
 extern QudaInverterType inv_type;
 extern double mass; // the mass of the Dirac operator
-extern double kappa;
-extern int laplace3D;
 
 extern bool compute_fatlong; // build the true fat/long links or use random numbers
 
@@ -88,6 +86,30 @@ extern double eps_naik;
 static int n_naiks = 1;
 
 extern char latfile[];
+
+extern int eig_nEv;
+extern int eig_nKr;
+extern int eig_nConv;
+extern bool eig_require_convergence;
+extern int eig_check_interval;
+extern int eig_max_restarts;
+extern double eig_tol;
+extern int eig_maxiter;
+extern bool eig_use_poly_acc;
+extern int eig_poly_deg;
+extern double eig_amin;
+extern double eig_amax;
+extern bool eig_use_normop;
+extern bool eig_use_dagger;
+extern bool eig_compute_svd;
+extern QudaEigSpectrumType eig_spectrum;
+extern QudaEigType eig_type;
+extern bool eig_arpack_check;
+extern char eig_arpack_logfile[];
+extern char eig_QUDA_logfile[];
+extern char eig_vec_infile[];
+extern char eig_vec_outfile[];
+
 
 extern int pipeline;                      // length of pipeline for fused operations in GCR or BiCGstab-l
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
@@ -524,6 +546,10 @@ int invert_test(void)
   set_params(&gaugeParam, &inv_param, xdim, ydim, zdim, tdim, cpu_prec, prec, prec_sloppy, prec_refinement_sloppy,
              link_recon, link_recon_sloppy, mass, tol, tadpole_factor);
 
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+
+
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -835,6 +861,30 @@ void display_test_info()
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
              get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
 
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+  if (eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false");
+  }
+  if (eig_use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+    printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  }
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -858,6 +908,52 @@ void usage_extra(char **argv)
   printfQuda("    --cpu_prec <double/single/half>             # Set CPU precision\n");
 
   return;
+}
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  // eig_param.cuda_prec_ritz = cuda_prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
 }
 
 // main
