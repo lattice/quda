@@ -204,7 +204,7 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
         texDesc.readMode = cudaReadModeNormalizedFloat;
       else
-        texDesc.readMode = cudaReadModeElementType;
+        texDesc.readMode = qudaReadModeElementType;
 
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
@@ -230,7 +230,7 @@ namespace quda {
 
         cudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.readMode = cudaReadModeElementType;
+        texDesc.readMode = qudaReadModeElementType;
 
         cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();

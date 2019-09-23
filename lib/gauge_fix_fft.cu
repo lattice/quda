@@ -44,13 +44,13 @@ namespace quda {
 #endif
 
 
-  texture<float2, 1, cudaReadModeElementType> GXTexSingle;
-  texture<int4, 1, cudaReadModeElementType> GXTexDouble;
+  texture<float2, 1, qudaReadModeElementType> GXTexSingle;
+  texture<int4, 1, qudaReadModeElementType> GXTexDouble;
 //Delta is only stored using 12 real number parameters,
 //	(0,0), (0,1), (0,2), (1,1), (1,2) and (2,2)
 //	(0,0), (1,1) and (0,1) don't have real part, however we need a complex for the FFTs
-  texture<float2, 1, cudaReadModeElementType> DELTATexSingle;
-  texture<int4, 1, cudaReadModeElementType> DELTATexDouble;
+  texture<float2, 1, qudaReadModeElementType> DELTATexSingle;
+  texture<int4, 1, qudaReadModeElementType> DELTATexDouble;
 
 
   template <class T>
