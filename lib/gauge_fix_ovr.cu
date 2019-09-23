@@ -181,7 +181,7 @@ namespace quda {
     GaugeFixQuality(GaugeFixQualityArg<Gauge> &argQ) : argQ(argQ) { }
     ~GaugeFixQuality () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Float, Gauge, gauge_dir);
@@ -440,7 +440,7 @@ public:
       parity = par;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFix, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -708,7 +708,7 @@ public:
 
     void setParity(const int par) { parity = par; }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixInteriorPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
@@ -971,7 +971,7 @@ public:
       parity = par;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       LAUNCH_KERNEL_GAUGEFIX(computeFixBorderPoints, tp, stream, arg, parity, Float, Gauge, gauge_dir);
     }
@@ -1256,7 +1256,7 @@ public:
     void *sendg_d[4];
     void *recvg_d[4];
     void *hostbuffer_h[4];
-    cudaStream_t GFStream[9];
+    qudaStream_t GFStream[9];
     size_t offset[4];
     size_t bytes[4];
     size_t faceVolume[4];

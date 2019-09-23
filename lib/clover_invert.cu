@@ -32,7 +32,7 @@ namespace quda {
 
     virtual ~CloverInvert() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.result_h[0] = make_double2(0.,0.);
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {

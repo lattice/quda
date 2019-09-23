@@ -115,7 +115,7 @@ public:
     GaugeGauss(Arg &arg, GaugeField &meta) : TunableVectorY(2), arg(arg), meta(meta) {}
     ~GaugeGauss() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());

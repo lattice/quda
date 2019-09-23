@@ -400,7 +400,7 @@ namespace{
     UnitarizeLinks(UnitarizeLinksArg<Out,In> &arg, const GaugeField &meta)
       : TunableVectorYZ(2,4), arg(arg), meta(meta) { }
     
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DoUnitarizedLink<Float,Out,In><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -565,7 +565,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     ProjectSU3(ProjectSU3Arg<Float,G> &arg, const GaugeField &meta)
       : TunableVectorYZ(2, 4), arg(arg), meta(meta) { }
     
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE); //getVerbosity());
       ProjectSU3kernel<Float,G><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

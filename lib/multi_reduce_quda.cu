@@ -12,12 +12,12 @@ namespace quda {
 
   namespace blas {
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
     cudaEvent_t* getReduceEvent();
     bool getFastReduce();
 
     template <typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
 
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
@@ -172,7 +172,7 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         multiReduceLaunch<doubleN, ReduceType, FloatN, M, NXZ>(result, arg, tp, stream, *this);
@@ -966,7 +966,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -1120,7 +1120,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

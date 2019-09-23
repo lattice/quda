@@ -19,8 +19,8 @@ namespace quda {
   MsgHandle* LatticeField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
   MsgHandle* LatticeField::mh_recv_p2p_back[2][QUDA_MAX_DIM] { };
 
-  cudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
-  cudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
+  qudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
   void *LatticeField::ghost_pinned_send_buffer_h[2] = {nullptr, nullptr};
   void *LatticeField::ghost_pinned_send_buffer_hd[2] = {nullptr, nullptr};
@@ -601,19 +601,19 @@ namespace quda {
 
   bool LatticeField::ipcCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == cudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return (cudaSuccess == qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
-    return (cudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    return (cudaSuccess == qudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
-  const cudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+  const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
     return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
-  const cudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
+  const qudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }
 

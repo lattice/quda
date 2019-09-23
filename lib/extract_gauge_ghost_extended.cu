@@ -215,7 +215,7 @@ namespace quda {
     }
     virtual ~ExtractGhostEx() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);

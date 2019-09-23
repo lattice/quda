@@ -116,7 +116,7 @@ namespace quda {
     }
     virtual ~UpdateGaugeField() { }
     
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (location == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	updateGaugeFieldKernel<Float,Gauge,Mom,N,conj_mom,exact>

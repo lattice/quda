@@ -101,7 +101,7 @@ namespace quda {
       strcat(aux, meta.Location()==QUDA_CUDA_FIELD_LOCATION ? ",GPU" : ",CPU");
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       SpinorNoiseGPU<real, Ns, Nc, type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

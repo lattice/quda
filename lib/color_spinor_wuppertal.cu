@@ -171,7 +171,7 @@ namespace quda {
     }
     virtual ~WuppertalSmearing() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         wuppertalStepCPU<Float,Ns,Nc>(arg);
       } else {

@@ -425,7 +425,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p)
+  void cudaGaugeField::sendStart(int dim, int dir, qudaStream_t* stream_p)
   {
     if (!comm_dim_partitioned(dim)) return;
 

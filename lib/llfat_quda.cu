@@ -97,7 +97,7 @@ namespace quda {
     LongLink(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2,4), arg(arg), meta(meta) {}
     virtual ~LongLink() {}
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }
@@ -193,7 +193,7 @@ namespace quda {
     OneLink(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2,4), arg(arg), meta(meta) {}
     virtual ~OneLink() {}
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
     }
@@ -441,7 +441,7 @@ namespace quda {
 	}
     virtual ~Staple() {}
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
 	computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);

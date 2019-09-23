@@ -15,7 +15,7 @@
 namespace quda {
 
   namespace blas {
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
 
     namespace copy_ns {
 
@@ -71,7 +71,7 @@ namespace quda {
 	return TuneKey(blasStrings.vol_str, "copyKernel", blasStrings.aux_str);
       }
 
-      inline void apply(const cudaStream_t &stream) {
+      inline void apply(const qudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	copyKernel<FloatN, N><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(Y, X, length);
       }

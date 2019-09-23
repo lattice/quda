@@ -119,7 +119,7 @@ using namespace gauge;
     MomAction(MomActionArg<Mom> &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
     virtual ~MomAction () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION){
 	arg.result_h[0] = 0.0;
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -271,7 +271,7 @@ using namespace gauge;
     UpdateMom(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
     virtual ~UpdateMom () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, tp, stream, arg, Float);
@@ -393,7 +393,7 @@ using namespace gauge;
     ApplyU(ApplyUArg<Float,Force,Gauge> &arg, const GaugeField &meta) : arg(arg), meta(meta) {}
     virtual ~ApplyU () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if(meta.Location() == QUDA_CUDA_FIELD_LOCATION){
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	ApplyUKernel<Float,Force,Gauge><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);

@@ -479,7 +479,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, qudaStream_t *stream_p=nullptr);
 
     /**
        @brief Wait for communication to complete

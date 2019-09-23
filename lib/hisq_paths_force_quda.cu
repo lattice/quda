@@ -586,7 +586,7 @@ namespace quda {
         return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
       }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_ONE_LINK:
@@ -994,7 +994,7 @@ namespace quda {
       }
       virtual ~HisqForce() { }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_LONG_LINK:

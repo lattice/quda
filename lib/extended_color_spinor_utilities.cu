@@ -22,7 +22,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -35,7 +35,7 @@ namespace quda {
     int gatherCompleted[2] = {0,0};
     int commsCompleted[2] = {0,0};
 
-    cudaEvent_t gatherEnd[2];
+    qudaEvent_t gatherEnd[2];
     for(int dir=0; dir<2; dir++) cudaEventCreate(&gatherEnd[dir], cudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
@@ -52,7 +52,7 @@ namespace quda {
       int dir = 1;
       while(completeSum < 2){
         if(!gatherCompleted[dir]){
-          if(cudaSuccess == cudaEventQuery(gatherEnd[dir])){
+          if(cudaSuccess == qudaEventQuery(gatherEnd[dir])){
             spinor->commsStart(nFace, 2*dim+dir, dagger);
             completeSum++;
             gatherCompleted[dir--] = 1;
@@ -253,7 +253,7 @@ namespace quda {
       }
       virtual ~CopySpinorEx() {}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if(location == QUDA_CPU_FIELD_LOCATION){

@@ -119,6 +119,13 @@ namespace quda {
   qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream=0);
 
   /**
+     @brief Wrapper around qudaEventSynchronize or quEventSynchronize
+     @param[in] event Event which we are synchronizing with respect to
+   */
+  qudaError_t qudaEventSynchronize(qudaEvent_t &event);
+
+
+  /**
      @brief Wrapper around qudaEventRecord or quEventRecord
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
@@ -131,12 +138,6 @@ namespace quda {
      @param[in] stream Stream which we are synchronizing with respect to
    */
   qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
-
-  /**
-     @brief Wrapper around qudaEventSynchronize or quEventSynchronize
-     @param[in] event Event which we are synchronizing with respect to
-   */
-  qudaError_t qudaEventSynchronize(qudaEvent_t &event);
 
   /**
      @brief Wrapper around qudaDeviceSynchronize or quDeviceSynchronize

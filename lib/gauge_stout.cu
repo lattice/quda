@@ -31,7 +31,7 @@ public:
     }
     virtual ~GaugeSTOUT() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -171,7 +171,7 @@ public:
     GaugeOvrImpSTOUT(Arg &arg, const GaugeField &meta) : TunableVectorYZ(2, 3), arg(arg), meta(meta) {}
     virtual ~GaugeOvrImpSTOUT() {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
