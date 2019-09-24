@@ -3338,15 +3338,15 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
   printfQuda("Create b \n");
   ColorSpinorField *b = ColorSpinorField::Create(cudaParam);
 
-
-
-
   for(int i=0; i < param->num_src; i++) {
     b->Component(i) = *h_b[i];
   }
+
+  b->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
+
   printfQuda("Done b \n");
 
-    ColorSpinorField *x;
+  ColorSpinorField *x = nullptr;
   if (param->use_init_guess == QUDA_USE_INIT_GUESS_YES) { // download initial guess
     // initial guess only supported for single-pass solvers
     if ((param->solution_type == QUDA_MATDAG_MAT_SOLUTION || param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) &&
@@ -3370,6 +3370,8 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
       printfQuda("Done x \n");
  // solution
   }
+
+  x->ExtendLastDimension();//ok, now cudaParam.x[4] = cudaParam.composite_dim, so we have correct 5-d field
 
   profileInvert.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -3476,17 +3478,19 @@ for(int i=0; i < param->num_src; i++) {
     if (direct_solve) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->blocksolve(*out,*in);
+      // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      // solve->solve(*out,*in);
+      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      bcg(*out, *in);
       solverParam.updateInvertParam(*param);
       delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      solve->blocksolve(*out,*in);
+      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      bcg(*out, *in);
       solverParam.updateInvertParam(*param);
-      delete solve;
+      // delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       errorQuda("norm_error_solve not supported in multi source solve");
