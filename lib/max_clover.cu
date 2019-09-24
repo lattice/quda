@@ -51,8 +51,8 @@ namespace quda {
     double nrm = 0.0;
 #ifdef GPU_CLOVER_DIRAC
     switch(u.Precision()) {
-    case QUDA_DOUBLE_PRECISION: nrm = _norm<double>(*this, type); break;
-    case QUDA_SINGLE_PRECISION: nrm = _norm< float>(*this, type); break;
+    case QUDA_DOUBLE_PRECISION: nrm = _norm<double>(u, type); break;
+    case QUDA_SINGLE_PRECISION: nrm = _norm< float>(u, type); break;
     default: errorQuda("Unsupported precision %d", u.Precision());
     }
 #else
