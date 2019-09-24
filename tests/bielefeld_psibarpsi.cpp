@@ -394,7 +394,7 @@ void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *
     solverParam.eig_param = *eig_param;
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    //(*solve)(*out, *in);
     blas::copy(*in, *out);
     solverParam.updateInvertParam(*param);
     delete solve;
@@ -416,7 +416,7 @@ void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *
     solverParam.eig_param = *eig_param;
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    // (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
   } else { // norm_error_solve
@@ -426,7 +426,7 @@ void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *
     solverParam.deflate = true;
     solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(tmp, *in);    // y = (M M^\dag) b
+    // (*solve)(tmp, *in);    // y = (M M^\dag) b
     dirac.Mdag(*out, tmp); // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
@@ -472,6 +472,91 @@ void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *
 
   // profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *rng, int NumberOfRandomSpinors)
+{
+    pushVerbosity(param->verbosity);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+    ColorSpinorField* in = nullptr;
+    ColorSpinorField* out = nullptr;
+    std::vector<ColorSpinorField*> savedResults;
+    cudaGaugeField *cudaGauge = checkGauge(param);
+    const int *X = cudaGauge->X();
+
+    std::vector<Complex> TraceEstims;
+    
+    bool pc_solution
+        = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+    bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE)
+        || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    /*    bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+    bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+    bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    */
+    
+    
+    ColorSpinorParam cpuParam(nullptr, *param, X, pc_solution, param->input_location); 
+    ColorSpinorParam cudaParam(cpuParam, *param);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+
+    auto bb = std::make_unique<cudaColorSpinorField>(cudaParam);
+    auto b = bb.get();
+    auto xx = std::make_unique<cudaColorSpinorField>(cudaParam);
+    auto x = xx.get();
+    
+    quda::Dirac *d = nullptr;
+    quda::Dirac *dSloppy = nullptr;
+    quda::Dirac *dPre = nullptr;
+    
+    quda::createDirac(d, dSloppy, dPre, *param, pc_solve);
+    
+    Dirac &dirac = *d;
+    Dirac &diracSloppy = *dSloppy;
+    Dirac &diracPre = *dPre;
+    bool save_res = false; 
+    
+    for (int i = 0; i < NumberOfRandomSpinors; i++) {
+        spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
+        blas::zero(*x);
+        double nb = blas::norm2(*b);
+        blas::ax(1.0 / sqrt(nb), *b);
+        blas::ax(1.0 / sqrt(nb), *x);
+
+        massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
+        dirac.prepare(in, out, *x, *b, param->solution_type);
+
+        DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+        SolverParam solverParam(*param);
+        solverParam.deflate = false;
+        solverParam.eig_param = *eig_param;
+        Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+        (*solve)(*out, *in);
+        solverParam.updateInvertParam(*param);
+        delete solve;
+        
+        dirac.reconstruct(*x,*b, param->solution_type);
+        blas::ax(sqrt(nb), *x);
+        if(save_res) {
+            savedResults.push_back(x);
+        }
+        Complex trace = blas::cDotProduct(*b,*x);
+        TraceEstims.push_back(trace);
+        //printfQuda("(%g,%g)\n",trace.real(), trace.imag());
+    }
+    delete d;
+    delete dSloppy;
+    delete dPre;
+    for (auto it=TraceEstims.begin(); it!=TraceEstims.end(); ++it) {
+        printfQuda("(%g,%g)\n", (*it).real(), (*it).imag());
+    }
+    popVerbosity();
+}
+    
+
+    
+
+    
 
 // Parameters defining the eigensolver
 void setEigParam(QudaEigParam &eig_param)
@@ -771,8 +856,9 @@ int invert_test(void)
   //case 0: // full parity solution
   //case 1: // solving prec system, reconstructing
   //case 2:
-
-    psibarpsiQuda(&inv_param, &eig_param, rng.get());
+  
+  //  psibarpsiQuda(&inv_param, &eig_param, rng.get());
+  calcTraceEstimator(&inv_param,&eig_param,rng.get(),5);
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
