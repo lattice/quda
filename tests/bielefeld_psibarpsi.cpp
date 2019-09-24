@@ -526,7 +526,7 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     for (int i = 0; i < NumberOfRandomSpinors; i++) {
         spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
 
-        double nb = blas::norm2(*b);
+        //double nb = blas::norm2(*b);
         // blas::ax(1.0 / sqrt(nb), *b);
       
 

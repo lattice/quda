@@ -180,6 +180,9 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 {
   int status = 0;
   switch (Ninternal) {
+  case 6:
+    status = read_field<6>(infile, count, field_in, cpu_prec);
+    break;
   case 24:
     status = read_field<24>(infile, count, field_in, cpu_prec);
     break;
@@ -303,24 +306,27 @@ void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precis
 // count is the number of vectors
 // Ninternal is the size of the "inner struct" (24 for Wilson spinor)
 int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[],
-		QudaPrecision file_prec, QudaPrecision cpu_prec,
-		int nSpin, int nColor, const char *type)
+                QudaPrecision file_prec, QudaPrecision cpu_prec,
+                int nSpin, int nColor, const char *type)
 {
-  int status = 0;
-  switch (Ninternal) {
-  case 24:
-    status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
-    break;
-  case 96:
-    status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
-    break;
-  case 128:
-    status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
-    break;
-  default:
-    errorQuda("Undefined %d", Ninternal);
-  }
-  return status;
+    int status = 0;
+    switch (Ninternal) {
+    case 6:
+        status =  write_field<6>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+        break;
+    case 24:
+        status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+        break;
+    case 96:
+        status = write_field<96>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+        break;
+    case 128:
+        status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+        break;
+    default:
+        errorQuda("Undefined %d", Ninternal);
+    }
+    return status;
 }
 
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, int nColor, int nSpin,
