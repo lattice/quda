@@ -514,10 +514,11 @@ namespace quda {
      @param[in] in The input field
      @param[in] U The gauge field used for the gauge Laplace
      @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
-     @param[in] kappa Scale factor applied
+     @param[in] a Scale factor applied to derivative
+     @param[in] b Scale factor applied to aux field
      @param[in] x Vector field we accumulate onto to
   */
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**

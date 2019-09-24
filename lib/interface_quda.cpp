@@ -5504,9 +5504,13 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   cudaColorSpinorField out(in, cudaParam);
   int parity = 0;
 
+  // Computes out(x) = 1/(1+6*alpha)*(in(x) + alpha*\sum_mu (U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)))
+  double a = alpha/(1.+6.*alpha);
+  double b = 1./(1.+6.*alpha);
+
   for (unsigned int i=0; i<nSteps; i++) {
-    if(i) in = out;
-    wuppertalStep(out, in, parity, *precise, alpha);
+    if (i) in = out;
+    ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       double norm = blas::norm2(out);
       printfQuda("Step %d, vector norm %e\n", i, norm);
