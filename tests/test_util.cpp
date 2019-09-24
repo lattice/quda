@@ -1611,7 +1611,7 @@ double stopwatchReadSeconds()
   gettimeofday(&endTime, NULL);
   long ds = endTime.tv_sec - startTime.tv_sec;
   long dus = endTime.tv_usec - startTime.tv_usec;
-  return ds + 0.000001 * dus;
+  return ds + 0.000001*dus;
 }
 
 int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }
