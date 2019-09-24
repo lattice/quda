@@ -16,6 +16,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 // #include <staggered_dslash_reference.h>
 #include <llfat_reference.h>
@@ -34,87 +35,13 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define mySpinorSiteSize 6
 
-extern void usage(char **argv);
-
 void **ghost_fatlink, **ghost_longlink;
 
-extern int device;
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_refinement_sloppy;
-
-extern double tol;    // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern double reliable_delta;
-extern bool alternative_reliable;
-extern int test_type;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
 
 int X[4];
 
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov;
-extern QudaCABasis ca_basis; // basis for CA-CG solves
-extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
-extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-extern QudaMatPCType matpc_type;       // preconditioning type
-extern QudaSolutionType solution_type; // solution type
-
-extern QudaInverterType inv_type;
-extern double mass; // the mass of the Dirac operator
-
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-
-extern double tadpole_factor;
-// relativistic correction for naik term
-extern double eps_naik;
-// Number of naiks. If eps_naik is 0.0, we only need
-// to construct one naik.
 static int n_naiks = 1;
-
-extern char latfile[];
-
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv;
-extern bool eig_require_convergence;
-extern int eig_check_interval;
-extern int eig_max_restarts;
-extern double eig_tol;
-extern int eig_maxiter;
-extern bool eig_use_poly_acc;
-extern int eig_poly_deg;
-extern double eig_amin;
-extern double eig_amax;
-extern bool eig_use_normop;
-extern bool eig_use_dagger;
-extern bool eig_compute_svd;
-extern QudaEigSpectrumType eig_spectrum;
-extern QudaEigType eig_type;
-extern bool eig_arpack_check;
-extern char eig_arpack_logfile[];
-extern char eig_QUDA_logfile[];
-extern char eig_vec_infile[];
-extern char eig_vec_outfile[];
-
-
-extern int pipeline;                      // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
-
-extern QudaSolveType solve_type;
 
 // Unitarization coefficients
 static double unitarize_eps = 1e-6;
@@ -192,8 +119,7 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
 
   inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
-  inv_param->kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
-  inv_param->laplace3D = laplace3D;              // for Laplace operator
+
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
@@ -316,7 +242,7 @@ namespace quda
 quda::cudaGaugeField *checkGauge(QudaInvertParam *param);
 
 using namespace quda;
-void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
+void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *rng)
 {
 
   // profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
@@ -378,7 +304,7 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   auto b = bb.get();
   auto xx = std::make_unique<cudaColorSpinorField>(cudaParam);
   auto x = xx.get();
-  unsigned long long seed = 12345;
+
   spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
   blas::zero(*x);
 
@@ -464,6 +390,9 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
+
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     blas::copy(*in, *out);
@@ -474,6 +403,8 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
@@ -481,6 +412,8 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
@@ -490,6 +423,8 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(tmp, *in);    // y = (M M^\dag) b
     dirac.Mdag(*out, tmp); // x = M^dag y
@@ -537,6 +472,54 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
 
   // profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  // eig_param.cuda_prec_ritz = cuda_prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
+
 
 int invert_test(void)
 {
@@ -789,7 +772,7 @@ int invert_test(void)
   case 1: // solving prec system, reconstructing
   case 2:
 
-    for (int i = 0; i < 10; i++) psibarpsiQuda(&inv_param, rng.get());
+    psibarpsiQuda(&inv_param, &eig_param, rng.get());
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
@@ -909,72 +892,25 @@ void usage_extra(char **argv)
 
   return;
 }
-// Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
-{
-  eig_param.eig_type = eig_type;
-  eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
-      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
-  }
-
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
-  } else {
-    eig_param.nConv = eig_nConv;
-  }
-
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
-  eig_param.tol = eig_tol;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.check_interval = eig_check_interval;
-  eig_param.max_restarts = eig_max_restarts;
-  // eig_param.cuda_prec_ritz = cuda_prec;
-
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_NO;
-    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
-  }
-
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min = eig_amin;
-  eig_param.a_max = eig_amax;
-
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
-
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
-}
 
 // main
 int main(int argc, char **argv)
 {
-
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
-
-
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    if (strcmp(argv[i], "--cpu_prec") == 0) {
-      if (i + 1 >= argc) { usage(argv); }
-      cpu_prec = get_prec(argv[i + 1]);
-      i++;
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
+                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
 
