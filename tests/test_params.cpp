@@ -657,7 +657,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-levels", mg_levels, "The number of multigrid levels to do (default 2)");
 
   // TODO
-  quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::ExistingFile,
+  quda_app->add_mgoption(opgroup, "--mg-load-vec", mg_vec_infile, CLI::Validator(),
                          "Load the vectors <file> for the multigrid_test (requires QIO)");
   quda_app->add_mgoption(opgroup, "--mg-save-vec", mg_vec_outfile, CLI::Validator(),
                          "Save the generated null-space vectors <file> from the multigrid_test (requires QIO)");
