@@ -55,7 +55,7 @@ cpuGaugeField *cpuLong = NULL;
 
 extern double tol; // tolerance for inverter
 extern double tol_hq; // heavy-quark tolerance for inverter
-extern double rdelta; // reliable delta
+// extern double rdelta; // reliable delta
 extern int test_type;
 extern int xdim;
 extern int ydim;
@@ -126,7 +126,7 @@ set_params(QudaGaugeParam* gaugeParam, QudaInvertParam* inv_param,
   inv_param->tol = tol;
   inv_param->tol_restart = 1e-3; //now theoretical background for this parameter...
   inv_param->maxiter = niter;
-  inv_param->reliable_delta = rdelta;
+  inv_param->reliable_delta = reliable_delta;
   inv_param->use_sloppy_partial_accumulator = false;
   inv_param->pipeline = false;
 
@@ -358,10 +358,10 @@ invert_test(void)
 
 
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
+      // matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+      //     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
-      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
+      // matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
 
       mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -392,10 +392,10 @@ invert_test(void)
       time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
+      // matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+      //     out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
-      matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
+      // matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
 #endif
       mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
       nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
@@ -469,13 +469,13 @@ invert_test(void)
         }
         for(int i=0;i < inv_param.num_offset;i++){
           printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-#ifdef MULTI_GPU
-          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec,
-              gaugeParam.cpu_prec, tmp, parity);
-#else
-          matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
-#endif
+// #ifdef MULTI_GPU
+//           matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+//               spinorOutArray[i], masses[i], 0, inv_param.cpu_prec,
+//               gaugeParam.cpu_prec, tmp, parity);
+// #else
+//           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
+// #endif
 
 	  mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
 	  double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);

@@ -3483,14 +3483,12 @@ for(int i=0; i < param->num_src; i++) {
       BlockCG bcg(m, mSloppy, solverParam, profileMulti);
       bcg(*out, *in);
       solverParam.updateInvertParam(*param);
-      delete solve;
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       BlockCG bcg(m, mSloppy, solverParam, profileMulti);
       bcg(*out, *in);
       solverParam.updateInvertParam(*param);
-      // delete solve;
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       errorQuda("norm_error_solve not supported in multi source solve");
