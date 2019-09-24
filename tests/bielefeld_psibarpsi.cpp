@@ -767,31 +767,31 @@ int invert_test(void)
   //   len = Vh * Nsrc;
   // }
 
-  switch (test_type) {
-  case 0: // full parity solution
-  case 1: // solving prec system, reconstructing
-  case 2:
+  //switch (test_type) {
+  //case 0: // full parity solution
+  //case 1: // solving prec system, reconstructing
+  //case 2:
 
     psibarpsiQuda(&inv_param, &eig_param, rng.get());
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
 
-    break;
+    //break;
 
-  case 3: // even
-  case 4:
+    //case 3: // even
+    //case 4:
 
     // invertQuda(out->V(), in->V(), &inv_param);
 
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
+    //time0 += clock();
+    //time0 /= CLOCKS_PER_SEC;
 
-    break;
+    //break;
 
-  default: errorQuda("Unsupported test type %d given", test_type);
+    //default: errorQuda("Unsupported test type %d given", test_type);
     
-  } // switch
+    //} // switch
 
 
   // Clean up gauge fields, at least
