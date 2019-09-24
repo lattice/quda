@@ -515,28 +515,29 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     Dirac &diracSloppy = *dSloppy;
     Dirac &diracPre = *dPre;
     bool save_res = false; 
+
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      
     
     for (int i = 0; i < NumberOfRandomSpinors; i++) {
         spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
-        blas::zero(*x);
+
         double nb = blas::norm2(*b);
-        blas::ax(1.0 / sqrt(nb), *b);
-        blas::ax(1.0 / sqrt(nb), *x);
+        // blas::ax(1.0 / sqrt(nb), *b);
+      
 
         massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
         dirac.prepare(in, out, *x, *b, param->solution_type);
 
-        DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-        SolverParam solverParam(*param);
-        solverParam.deflate = false;
-        solverParam.eig_param = *eig_param;
-        Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
         (*solve)(*out, *in);
         solverParam.updateInvertParam(*param);
-        delete solve;
         
         dirac.reconstruct(*x,*b, param->solution_type);
-        blas::ax(sqrt(nb), *x);
+        //blas::ax(sqrt(nb), *x);
         if(save_res) {
             savedResults.push_back(x);
         }
@@ -544,6 +545,9 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
         TraceEstims.push_back(trace);
         //printfQuda("(%g,%g)\n",trace.real(), trace.imag());
     }
+    
+    delete solve;
+      
     delete d;
     delete dSloppy;
     delete dPre;
