@@ -6,6 +6,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
@@ -13,27 +14,7 @@
 // google test
 #include <gtest/gtest.h>
 
-extern int test_type;
-extern QudaPrecision prec;
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec[QUDA_MAX_MG_LEVEL];
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
-
-extern int Nsrc;
-extern int Msrc;
-extern QudaSolveType solve_type;
-extern QudaVerbosity verbosity;
-
-extern void usage(char** );
-
-const int Nkernels = 43;
+constexpr int Nkernels = 43;
 
 using namespace quda;
 
@@ -1055,12 +1036,17 @@ int main(int argc, char** argv)
   prec = QUDA_INVALID_PRECISION;
   test_type = -1;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+
+  app->add_option("--test", test_type, "Kernel to test (-1: -> all kernels)")->check(CLI::Range(0, Nkernels - 1));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // override spin setting if mg solver is set to test coarse grids
