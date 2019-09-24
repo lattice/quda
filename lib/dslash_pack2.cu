@@ -11,6 +11,10 @@
 namespace quda
 {
 
+  static int commDim[QUDA_MAX_DIM];
+
+  int* getPackComms() { return commDim; }
+
   void setPackComms(const int *comm_dim)
   {
     for (int i = 0; i < 4; i++) commDim[i] = comm_dim[i];
