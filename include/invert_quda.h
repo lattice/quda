@@ -283,6 +283,8 @@ namespace quda {
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase),
       max_res_increase_total(param.max_res_increase_total),
+      max_hq_res_increase(param.max_hq_res_increase),
+      max_hq_res_restart_total(param.max_hq_res_restart_total),
       heavy_quark_check(param.heavy_quark_check),
       pipeline(param.pipeline),
       tol(param.tol),
@@ -836,9 +838,8 @@ namespace quda {
     bool init;
 
     ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *y_sloppy; //! sloppy solution vector
+    ColorSpinorField *tmp_sloppy; //! temporary for sloppy mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors

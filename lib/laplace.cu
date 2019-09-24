@@ -19,45 +19,20 @@
 namespace quda
 {
 
-  /**
-     @brief This is a helper class that is used to instantiate the
-     correct templated kernel for the dslash.
-  */
-  template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-  struct LaplaceLaunch {
-
-    // kernel name for jit compilation
-    static constexpr const char *kernel = "quda::laplaceGPU";
-
-    template <typename Dslash>
-    inline static void launch(Dslash &dslash, TuneParam &tp, Arg &arg, const cudaStream_t &stream)
-    {
-      dslash.launch(laplaceGPU<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg>, tp, arg, stream);
-    }
-  };
-
-  template <typename Float, int nDim, int nColor, typename Arg> class Laplace : public Dslash<Float>
+  template <typename Arg> class Laplace : public Dslash<laplace, Arg>
   {
+    using Dslash = Dslash<laplace, Arg>;
+    using Dslash::arg;
+    using Dslash::in;
 
-protected:
-    Arg &arg;
-    const ColorSpinorField &in;
-
-public:
-    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) :
-      Dslash<Float>(arg, out, in, "kernels/laplace.cuh"),
-      arg(arg),
-      in(in)
-    {
-    }
-
-    virtual ~Laplace() {}
+  public:
+    Laplace(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Dslash<Float>::setParam(arg);
-      Dslash<Float>::template instantiate<LaplaceLaunch, nDim, nColor>(tp, arg, stream);
+      Dslash::setParam(tp);
+      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
     }
 
     long long flops() const
@@ -152,7 +127,9 @@ public:
     {
       // add laplace transverse dir to the key
       char aux[TuneKey::aux_n];
-      strcpy(aux, Dslash<Float>::aux[arg.kernel_type]);
+      strcpy(aux,
+             (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? Dslash::aux_pack :
+                                                                           Dslash::aux[arg.kernel_type]);
       strcat(aux, ",laplace=");
       char laplace[32];
       u32toa(laplace, arg.dir);
@@ -167,10 +144,9 @@ public:
                         const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
-
       constexpr int nDim = 4;
-      LaplaceArg<Float, nColor, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<Float, nDim, nColor, LaplaceArg<Float, nColor, recon>> laplace(arg, out, in);
+      LaplaceArg<Float, nColor, nDim, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
+      Laplace<decltype(arg)> laplace(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(laplace)> policy(
         laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),

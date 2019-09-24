@@ -827,8 +827,15 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
   }
 
+  // only apply T-boundary at edge nodes
+#ifdef MULTI_GPU
+  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
+#else
+  bool last_node_in_t = true;
+#endif
+
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
     for (int j = 0; j < Vh; j++) {
       int sign =1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -1820,7 +1827,8 @@ void usage(char** argv )
   printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
   printf("    --rank-order <col/row>                    # Set the [t][z][y][x] rank order as either column major (t fastest, default) or row major (x fastest)\n");
   printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
+         "                                                  "
+         "wilson/clover/twisted-mass/twisted-clover/staggered/clover-hasenbusch-twist\n"
          "                                                  /asqtad/domain-wall/domain-wall-4d/mobius/laplace\n");
   printf("    --laplace3D <n>                           # Restrict laplace operator to omit the t dimension (n=3), or include all dims (n=4) (default 4)\n");
   printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
@@ -2746,7 +2754,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 0 || Nsrc > 128){ // allow 0 for testing setup in isolation
+    if (Nsrc < 0 || Nsrc > 2048) { // allow 0 for testing setup in isolation
       printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
       usage(argv);
     }
@@ -2760,7 +2768,7 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Msrc = atoi(argv[i+1]);
-    if (Msrc < 1 || Msrc > 128){
+    if (Msrc < 1 || Msrc > 2048) {
       printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
       usage(argv);
     }

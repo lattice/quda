@@ -222,7 +222,8 @@ void printQudaCloverParam(QudaInvertParam *param)
 #endif
 
 #ifndef INIT_PARAM
-  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (param->dslash_type == QUDA_CLOVER_WILSON_DSLASH || param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || param->dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
 #endif
     P(clover_cpu_prec, QUDA_INVALID_PRECISION);
     P(clover_cuda_prec, QUDA_INVALID_PRECISION);
@@ -711,7 +712,6 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     if (i<n_level-1) {
       for (int j=0; j<4; j++) P(geo_block_size[i][j], INVALID_INT);
       P(spin_block_size[i], INVALID_INT);
-      P(n_vec[i], INVALID_INT);
 #ifdef INIT_PARAM
       P(precision_null[i], QUDA_SINGLE_PRECISION);
 #else
@@ -722,6 +722,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
       P(nu_post[i], INVALID_INT);
       P(coarse_grid_solution_type[i], QUDA_INVALID_SOLUTION);
     }
+
+#ifdef INIT_PARAM
+    if (i<QUDA_MAX_MG_LEVEL) {
+          P(n_vec[i], INVALID_INT);
+    }
+#else
+    if (i<n_level-1) {
+      P(n_vec[i], INVALID_INT);
+    }
+#endif
 
 #ifdef INIT_PARAM
     P(mu_factor[i], 1);

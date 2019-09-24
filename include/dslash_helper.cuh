@@ -84,10 +84,10 @@ namespace quda
      @param[out] the dimension we are working on (fused kernel only)
      @return checkerboard space-time index
   */
-  template <int nDim, QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
+  template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
   __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim)
   {
-
+    constexpr auto nDim = Arg::nDim;
     int x_cb, X;
     dim = kernel_type; // keep compiler happy
 
@@ -226,9 +226,11 @@ namespace quda
     return true;
   }
 
-  template <typename Float> struct DslashArg {
+  template <typename Float_, int nDim_> struct DslashArg {
 
-    typedef typename mapper<Float>::type real;
+    using Float = Float_;
+    using real = typename mapper<Float>::type;
+    static constexpr int nDim = nDim_;
 
     const int parity;  // only use this for single parity fields
     const int nParity; // number of parities we're working on
@@ -262,6 +264,12 @@ namespace quda
     real twist_b; // chiral twist
     real twist_c; // flavor twist
 
+    int pack_threads; // really number of face sites we have to pack
+    int_fastdiv blocks_per_dir;
+    int dim_map[4];
+    int active_dims;
+    int pack_blocks; // total number of blocks used for packing in the dslash
+
     // constructor needed for staggered to set xpay from derived class
     DslashArg(const ColorSpinorField &in, const GaugeField &U, int parity, bool dagger, bool xpay, int nFace,
               int spin_project, const int *comm_override) :
@@ -281,7 +289,12 @@ namespace quda
       spin_project(spin_project),
       twist_a(0.0),
       twist_b(0.0),
-      twist_c(0.0)
+      twist_c(0.0),
+      pack_threads(0),
+      blocks_per_dir(1),
+      dim_map {},
+      active_dims(0),
+      pack_blocks(0)
     {
       for (int d = 0; d < 4; d++) {
         ghostDim[d] = comm_dim_partitioned(d);
@@ -295,9 +308,31 @@ namespace quda
       }
       dc = in.getDslashConstant();
     }
+
+    void setPack(bool pack)
+    {
+      if (pack) {
+        // set packing parameters
+        // for now we set one block per direction / dimension
+        int d = 0;
+        pack_threads = 0;
+        for (int i = 0; i < 4; i++) {
+          if (!commDim[i]) continue;
+          if (i == 3 && !getKernelPackT()) continue;
+          pack_threads += 2 * nFace * dc.ghostFaceCB[i]; // 2 for fwd/back faces
+          dim_map[d++] = i;
+        }
+        active_dims = d;
+        pack_blocks = active_dims * blocks_per_dir * 2;
+      } else {
+        pack_threads = 0;
+        pack_blocks = 0;
+        active_dims = 0;
+      }
+    }
   };
 
-  template <typename Float> std::ostream &operator<<(std::ostream &out, const DslashArg<Float> &arg)
+  template <typename Float, int nDim> std::ostream &operator<<(std::ostream &out, const DslashArg<Float, nDim> &arg)
   {
     out << "parity = " << arg.parity << std::endl;
     out << "nParity = " << arg.nParity << std::endl;
@@ -328,7 +363,87 @@ namespace quda
     out << "twist_a = " << arg.twist_a;
     out << "twist_b = " << arg.twist_b;
     out << "twist_c = " << arg.twist_c;
+    out << "pack_threads = " << arg.pack_threads;
+    out << "blocks_per_dir = " << arg.blocks_per_dir;
+    out << "dim_map = { ";
+    for (int i = 0; i < 4; i++) out << arg.dim_map[i] << (i < 3 ? ", " : " }");
+    out << "active_dims = " << arg.active_dims;
+    out << "pack_blocks = " << arg.pack_blocks;
+
     return out;
+  }
+
+  /**
+     @brief Base class that set common types for dslash
+     implementations.  Where necessary, we specialize in the derived
+     classed.
+   */
+  struct dslash_default {
+    constexpr QudaPCType pc_type() const { return QUDA_4D_PC; }
+    constexpr int twist_pack() const { return 0; }
+  };
+
+  /**
+     @brief This is a helper routine for spawning a CPU function for
+     applying a Dslash kernel.  The dslash to be applied is passed as
+     template template class (template parameter D), which is a
+     functor that can apply the dslash.
+   */
+  template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+            typename D,
+            typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  void dslashCPU(Arg arg)
+  {
+    D<Float, nDim, nColor, nParity, dagger, xpay, kernel_type, Arg> dslash;
+
+    for (int parity = 0; parity < nParity; parity++) {
+      // for full fields then set parity from loop else use arg setting
+      parity = nParity == 2 ? parity : arg.parity;
+
+      for (int x_cb = 0; x_cb < arg.threads; x_cb++) { // 4-d volume
+        dslash(arg, x_cb, 0, parity);
+      } // 4-d volumeCB
+    }   // parity
+  }
+
+  /**
+     @brief This is a helper routine for spawning a GPU kernel for
+     applying a Dslash kernel.  The dslash to be applied is passed as
+     template template class (template parameter D), which is a
+     functor that can apply the dslash.  The packing routine (P) to be
+     used is similarly passed.
+
+     When running an interior kernel, the first few "pack_blocks" CTAs
+     are reserved for data packing, which may include communication to
+     neighboring processes.
+   */
+  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
+            template <bool dagger, QudaPCType pc, typename Arg> typename P, int nParity, bool dagger, bool xpay,
+            KernelType kernel_type, typename Arg>
+  __global__ void dslashGPU(Arg arg)
+  {
+    D<nParity, dagger, xpay, kernel_type, Arg> dslash(arg);
+
+    int s = blockDim.y * blockIdx.y + threadIdx.y;
+    if (s >= arg.dc.Ls) return;
+
+    // for full fields set parity from z thread index else use arg setting
+    int parity = nParity == 2 ? blockDim.z * blockIdx.z + threadIdx.z : arg.parity;
+
+    if (kernel_type == INTERIOR_KERNEL && blockIdx.x < arg.pack_blocks) {
+      // first few blocks do packing kernel
+      P<dagger, dslash.pc_type(), Arg> packer;
+      packer(arg, s, 1 - parity, dslash.twist_pack()); // flip parity since pack is on input
+    } else {
+      const int dslash_block_offset = (kernel_type == INTERIOR_KERNEL ? arg.pack_blocks : 0);
+      int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
+      if (x_cb >= arg.threads) return;
+
+      switch (parity) {
+      case 0: dslash(x_cb, s, 0); break;
+      case 1: dslash(x_cb, s, 1); break;
+      }
+    }
   }
 
 } // namespace quda

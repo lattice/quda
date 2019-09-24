@@ -2,6 +2,7 @@
 
 #include <color_spinor_field_order.h>
 #include <blas_helper.cuh>
+#include <multi_blas_helper.cuh>
 #include <cub_helper.cuh>
 
 //#define WARP_MULTI_REDUCE
@@ -11,26 +12,6 @@ namespace quda
 
   namespace blas
   {
-
-#define BLAS_SPINOR // do not include ghost functions in Spinor class to reduce parameter space overhead
-#include <texture.h>
-
-    // storage for matrix coefficients
-#define MAX_MATRIX_SIZE 4096
-    static __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
-
-    static signed char *Amatrix_h;
-    static signed char *Bmatrix_h;
-    static signed char *Cmatrix_h;
-
-#if CUDA_VERSION < 9000
-    // as a performance work around we put the argument struct into
-    // __constant__ memory to prevent the compiler from spilling
-    // registers on older CUDA
-    static __constant__ signed char arg_buffer[MAX_MATRIX_SIZE];
-#endif
 
     /**
        @brief Parameter struct for generic multi-blas kernel.
@@ -44,29 +25,31 @@ namespace quda
        @tparam Reducer Functor used to operate on data
     */
     template <int NXZ, typename ReduceType, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
-        typename Reducer>
-    struct MultiReduceArg : public ReduceArg<vector_type<ReduceType, NXZ>> {
-
+              typename Reducer>
+    struct MultiReduceArg
+      : public ReduceArg<vector_type<ReduceType, NXZ>>,
+        SpinorXZ<NXZ, SpinorX, SpinorZ, Reducer::use_z>,
+        SpinorYW<max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>(), SpinorY, SpinorW, Reducer::use_w> {
+      static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
       const int NYW;
-      SpinorX X[NXZ];
-      SpinorY Y[MAX_MULTI_BLAS_N];
-      SpinorZ Z[NXZ];
-      SpinorW W[MAX_MULTI_BLAS_N];
       Reducer r;
       const int length;
+
       MultiReduceArg(SpinorX X[NXZ], SpinorY Y[], SpinorZ Z[NXZ], SpinorW W[], Reducer r, int NYW, int length) :
           NYW(NYW),
           r(r),
           length(length)
       {
+        if (NYW > NYW_max) errorQuda("NYW = %d greater than maximum size of %d", NYW, NYW_max);
+
         for (int i = 0; i < NXZ; ++i) {
           this->X[i] = X[i];
-          this->Z[i] = Z[i];
+          if (Reducer::use_z) this->Z[i] = Z[i];
         }
 
         for (int i = 0; i < NYW; ++i) {
           this->Y[i] = Y[i];
-          this->W[i] = W[i];
+          if (Reducer::use_w) this->W[i] = W[i];
         }
       }
     };
@@ -76,13 +59,9 @@ namespace quda
 #else
     template <int block_size, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
 #endif
-    __global__ void multiReduceKernel(Arg arg_)
+
+    __global__ void multiReduceKernel(Arg arg)
     {
-#if CUDA_VERSION >= 9000
-      Arg &arg = arg_;
-#else
-      Arg &arg = *((Arg *)arg_buffer);
-#endif
       unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
       unsigned int k = blockIdx.y * blockDim.y + threadIdx.y;
       unsigned int parity = blockIdx.z;
@@ -113,7 +92,6 @@ namespace quda
 
           arg.r.post(sum[l]);
         }
-
         arg.Y[k].save(y, idx, parity);
         arg.W[k].save(w, idx, parity);
 
@@ -129,15 +107,45 @@ namespace quda
 
     template <typename T> struct coeff_array {
       const T *data;
-      const bool use_const;
-      coeff_array() : data(nullptr), use_const(false) {}
-      coeff_array(const T *data, bool use_const) : data(data), use_const(use_const) {}
+      coeff_array() : data(nullptr) {}
+      coeff_array(const T *data) : data(data) {}
     };
 
     /**
        Base class from which all reduction functors should derive.
     */
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN> struct MultiReduceFunctor {
+      typedef Float2 type;
+      static constexpr bool reducer = true;
+      int NYW;
+      MultiReduceFunctor(int NYW) : NYW(NYW) {}
+
+      __device__ __host__ inline Float2 a(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
+#endif
+      }
+
+      __device__ __host__ inline Float2 b(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
+#endif
+      }
+
+      __device__ __host__ inline Float2 c(int i, int j) const
+      {
+#ifdef __CUDA_ARCH__
+        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
+#else
+        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
+#endif
+      }
 
       //! pre-computation routine called before the "M-loop"
       virtual __device__ __host__ void pre() { ; }
@@ -177,12 +185,13 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct Dot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
       typedef typename scalar<Float2>::type real;
-      const int NYW;
+      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       Dot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
+        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
       {
-        ;
       }
       __device__ __host__ void operator()(
           ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
@@ -229,12 +238,13 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct Cdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = false;
       typedef typename scalar<Float2>::type real;
-      const int NYW;
+      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       Cdot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
+        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
       {
-        ;
       }
       __device__ __host__ inline void operator()(
           ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)
@@ -247,12 +257,13 @@ namespace quda
 
     template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
     struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+      static constexpr bool use_z = false;
+      static constexpr bool use_w = true;
       typedef typename scalar<Float2>::type real;
-      const int NYW;
+      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
       CdotCopy(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-          NYW(NYW)
+        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
       {
-        ;
       }
       __device__ __host__ inline void operator()(
           ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, const int i, const int j)

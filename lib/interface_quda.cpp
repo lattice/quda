@@ -1003,7 +1003,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   if (inv_param->clover_cpu_prec == QUDA_HALF_PRECISION)  errorQuda("Half precision not supported on CPU");
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded before clover");
-  if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH)) {
+  if ((inv_param->dslash_type != QUDA_CLOVER_WILSON_DSLASH) && (inv_param->dslash_type != QUDA_TWISTED_CLOVER_DSLASH)
+      && (inv_param->dslash_type != QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH)) {
     errorQuda("Wrong dslash_type %d in loadCloverQuda()", inv_param->dslash_type);
   }
 
@@ -1031,11 +1032,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   bool twisted = inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH ? true : false;
-#ifdef DYNAMIC_CLOVER
-  bool dynamic_clover = true;
-#else
-  bool dynamic_clover = false;
-#endif
 
   CloverFieldParam clover_param;
   clover_param.nDim = 4;
@@ -1050,7 +1046,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   clover_param.invNorm = nullptr;
   clover_param.setPrecision(inv_param->clover_cuda_prec);
   clover_param.direct = h_clover || device_calc ? true : false;
-  clover_param.inverse = (h_clovinv || pc_solve) && !dynamic_clover ? true : false;
+  clover_param.inverse = (h_clovinv || pc_solve) && !dynamic_clover_inverse() ? true : false;
   CloverField *in = nullptr;
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -1086,7 +1082,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
     if (!device_calc) {
       profileClover.TPSTART(QUDA_PROFILE_H2D);
-      bool inverse = (h_clovinv && !inv_param->compute_clover_inverse && !dynamic_clover);
+      bool inverse = (h_clovinv && !inv_param->compute_clover_inverse && !dynamic_clover_inverse());
       cloverPrecise->copy(*in, inverse);
       profileClover.TPSTOP(QUDA_PROFILE_H2D);
     } else {
@@ -1098,7 +1094,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // inverted clover term is required when applying preconditioned operator
     if ((!h_clovinv || inv_param->compute_clover_inverse) && pc_solve) {
       profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
-      if (!dynamic_clover) {
+      if (!dynamic_clover_inverse()) {
 	cloverInvert(*cloverPrecise, inv_param->compute_clover_trlog);
 	if (inv_param->compute_clover_trlog) {
 	  inv_param->trlogA[0] = cloverPrecise->TrLog()[0];
@@ -1112,7 +1108,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   }
 
   clover_param.direct = true;
-  clover_param.inverse = dynamic_clover ? false : true;
+  clover_param.inverse = dynamic_clover_inverse() ? false : true;
 
   cloverPrecise->setRho(inv_param->clover_rho);
 
@@ -1132,7 +1128,7 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // this isn't really "epilogue" but this label suffices
     profileClover.TPSTART(QUDA_PROFILE_EPILOGUE);
     cudaCloverField *hack = nullptr;
-    if (!dynamic_clover) {
+    if (!dynamic_clover_inverse()) {
       clover_param.order = inv_param->clover_order;
       hack = new cudaCloverField(clover_param);
       hack->copy(*cloverPrecise); // FIXME this can lead to an redundant copies if we're not copying back direct + inverse
@@ -1572,6 +1568,9 @@ namespace quda {
       break;
     case QUDA_CLOVER_WILSON_DSLASH:
       diracParam.type = pc ? QUDA_CLOVERPC_DIRAC : QUDA_CLOVER_DIRAC;
+      break;
+    case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH:
+      diracParam.type = pc ? QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC : QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC;
       break;
     case QUDA_DOMAIN_WALL_DSLASH:
       diracParam.type = pc ? QUDA_DOMAIN_WALLPC_DIRAC : QUDA_DOMAIN_WALL_DIRAC;
@@ -2470,7 +2469,10 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // If you use polynomial acceleration on a non-symmetric matrix,
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
-    errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
+    // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly accel.
+    if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+      errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
+    }
   }
 
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);

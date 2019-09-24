@@ -20,6 +20,7 @@ set (QUDA_OBJS
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
+  dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp
@@ -31,6 +32,8 @@ set (QUDA_OBJS
   dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
+  dslash_wilson_clover_hasenbusch_twist.cu
+  dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
@@ -147,6 +150,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+
+if(QUDA_BACKWARDS)
+  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
+endif()
 
 if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD)
