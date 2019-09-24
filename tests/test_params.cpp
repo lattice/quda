@@ -199,6 +199,7 @@ namespace
                                                        {"clover", QUDA_CLOVER_WILSON_DSLASH},
                                                        {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
                                                        {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
+                                                       {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
                                                        {"staggered", QUDA_STAGGERED_DSLASH},
                                                        {"asqtad", QUDA_ASQTAD_DSLASH},
                                                        {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
