@@ -177,6 +177,12 @@ namespace quda {
 			const QudaParity parity) const = 0;
 
     /**
+            @brief Vectorized apply 'dslash' operator for the DiracOp. This may be e.g. AD
+        */
+    virtual void Dslash(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in,
+                        const QudaParity parity) const;
+
+    /**
        @brief Xpay version of Dslash
     */
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
@@ -184,9 +190,20 @@ namespace quda {
 			    const double &k) const = 0;
 
     /**
+       @brief Vectorized Xpay version of Dslash
+    */
+    virtual void DslashXpay(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in,
+                            const QudaParity parity, std::vector<const ColorSpinorField *> &x, const double &k) const;
+
+    /**
        @brief Apply M for the dirac op. E.g. the Schur Complement operator
     */
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
+
+    /**
+           @brief Vectorized pply M for the dirac op. E.g. the Schur Complement operator
+        */
+    virtual void M(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in) const;
 
     /**
        @brief Apply MdagM operator which may be optimized
@@ -194,14 +211,29 @@ namespace quda {
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
 
     /**
+           @brief Vectorized Apply MdagM operator which may be optimized
+        */
+    virtual void MdagM(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in) const;
+
+    /**
         @brief Apply Mdag (daggered operator of M
     */
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     /**
+        @brief Vectorized Apply Mdag (daggered operator of M
+    */
+    void Mdag(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in) const;
+
+    /**
        @brief Apply Normal Operator
     */
     void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    /**
+       @brief Vectorized Apply Normal Operator
+    */
+    void MMdag(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in) const;
 
     // required methods to use e-o preconditioning for solving full system
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
@@ -209,6 +241,7 @@ namespace quda {
 			 const QudaSolutionType) const = 0;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const = 0;
+
     void setMass(double mass){ this->mass = mass;}
 
     // Dirac operator factory
