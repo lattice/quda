@@ -1,3 +1,7 @@
+#ifndef USE_LEGACY_DSLASH
+
+#else
+
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <gauge_field.h>
@@ -294,3 +298,5 @@ namespace quda {
     wuppertalStep(out, in, parity, U, 1./(1.+6.*alpha), alpha/(1.+6.*alpha));
   }
 } // namespace quda
+
+#endif
