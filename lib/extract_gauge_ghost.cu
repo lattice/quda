@@ -112,11 +112,23 @@ namespace quda {
       if (u.Precision() == QUDA_DOUBLE_PRECISION) {
 	extractGhost(u, (double**)ghost, extract, offset);
       } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
 	extractGhost(u, (float**)ghost, extract, offset);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
       } else if (u.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
 	extractGhost(u, (short**)ghost, extract, offset);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
       } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
         extractGhost(u, (char **)ghost, extract, offset);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("Unknown precision type %d", u.Precision());
       }
