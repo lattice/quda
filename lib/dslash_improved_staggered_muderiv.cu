@@ -133,7 +133,7 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredMuDerivApply {
 
-    inline ImprovedStaggeredMuderivApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
+    inline ImprovedStaggeredMuDerivApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
                                   const GaugeField &U, double a/*, int order*/, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {

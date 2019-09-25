@@ -762,7 +762,6 @@ public:
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
 			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in, int order) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
