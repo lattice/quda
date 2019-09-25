@@ -41,6 +41,7 @@ namespace quda {
     double norm_ = 0.0;
     switch(u.Ncolor()) {
     case  3: norm_ = norm<real, 3>(u, d, type); break;
+#ifdef GPU_MULTIGRID
     case  8: norm_ = norm<real, 8>(u, d, type); break;
     case 12: norm_ = norm<real,12>(u, d, type); break;
     case 16: norm_ = norm<real,16>(u, d, type); break;
@@ -50,61 +51,58 @@ namespace quda {
     case 48: norm_ = norm<real,48>(u, d, type); break;
     case 56: norm_ = norm<real,56>(u, d, type); break;
     case 64: norm_ = norm<real,64>(u, d, type); break;
+#endif
     default: errorQuda("Unsupported color %d", u.Ncolor());
     }
     return norm_;
   }
 
+  double norm(const GaugeField &u, int d, norm_type_ type) {
+    double nrm = 0.0;
+    switch(u.Precision()) {
+    case QUDA_DOUBLE_PRECISION:
+      nrm = norm<double>(u, d, type); break;
+    case QUDA_SINGLE_PRECISION:
+#if QUDA_PRECISION & 4
+      nrm = norm<float>(u, d, type); break;
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    case QUDA_HALF_PRECISION:
+#if QUDA_PRECISION & 2
+      nrm = norm<short>(u, d, type); break;
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    case QUDA_QUARTER_PRECISION:
+#if QUDA_PRECISION & 1
+      nrm = norm<char>(u, d, type); break;
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
+    default: errorQuda("Unsupported precision %d", u.Precision());
+    }
+    return nrm;
+  }
+
   double GaugeField::norm1(int d) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    double nrm1 = 0.0;
-    switch(precision) {
-    case QUDA_DOUBLE_PRECISION: nrm1 = norm<double>(*this, d, NORM1); break;
-    case QUDA_SINGLE_PRECISION: nrm1 = norm<float>(*this, d, NORM1); break;
-    case QUDA_HALF_PRECISION: nrm1 = norm<short>(*this, d, NORM1); break;
-    case QUDA_QUARTER_PRECISION: nrm1 = norm<char>(*this, d, NORM1); break;
-    default: errorQuda("Unsupported precision %d", precision);
-    }
-    return nrm1;
+    return norm(*this, d, NORM1);
   }
 
   double GaugeField::norm2(int d) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    double nrm2 = 0.0;
-    switch(precision) {
-    case QUDA_DOUBLE_PRECISION: nrm2 = norm<double>(*this, d, NORM2); break;
-    case QUDA_SINGLE_PRECISION: nrm2 = norm<float>(*this, d, NORM2); break;
-    case QUDA_HALF_PRECISION: nrm2 = norm<short>(*this, d, NORM2); break;
-    case QUDA_QUARTER_PRECISION: nrm2 = norm<char>(*this, d, NORM2); break;
-    default: errorQuda("Unsupported precision %d", precision);
-    }
-    return nrm2;
+    return norm(*this, d, NORM1);
   }
 
   double GaugeField::abs_max(int d) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    double max = 0.0;
-    switch(precision) {
-    case QUDA_DOUBLE_PRECISION: max = norm<double>(*this, d, ABS_MAX); break;
-    case QUDA_SINGLE_PRECISION: max = norm<float>(*this, d, ABS_MAX); break;
-    case QUDA_HALF_PRECISION: max = norm<short>(*this, d, ABS_MAX); break;
-    case QUDA_QUARTER_PRECISION: max = norm<char>(*this, d, ABS_MAX); break;
-    default: errorQuda("Unsupported precision %d", precision);
-    }
-    return max;
+    return norm(*this, d, ABS_MAX);
   }
 
   double GaugeField::abs_min(int d) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    double min = 0.0;
-    switch(precision) {
-    case QUDA_DOUBLE_PRECISION: min = norm<double>(*this, d, ABS_MIN); break;
-    case QUDA_SINGLE_PRECISION: min = norm<float>(*this, d, ABS_MIN); break;
-    case QUDA_HALF_PRECISION: min = norm<short>(*this, d, ABS_MIN); break;
-    case QUDA_QUARTER_PRECISION: min = norm<char>(*this, d, ABS_MIN); break;
-    default: errorQuda("Unsupported precision %d", precision);
-    }
-    return min;
+    return norm(*this, d, ABS_MIN);
   }
 
 } // namespace quda
