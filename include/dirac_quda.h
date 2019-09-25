@@ -782,6 +782,10 @@ public:
     virtual ~DiracImprovedStaggeredMuDeriv();
     DiracImprovedStaggeredMuDeriv& operator=(const DiracImprovedStaggeredMuDeriv &dirac);
 
+    virtual void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
+  
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+            const QudaParity parity, int order) const;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in, int order) const;
 
   };

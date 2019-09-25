@@ -499,7 +499,7 @@ namespace quda {
 
 
   void ApplyImprovedStaggeredMuDeriv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                              const GaugeField &L, double a/*, int order*/, const ColorSpinorField &x, int parity, bool dagger,
+                              const GaugeField &L, double a, int order, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile);
 
   /**

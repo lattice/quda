@@ -134,28 +134,28 @@ namespace quda
   template <typename Float, int nColor, QudaReconstructType recon_l> struct ImprovedStaggeredMuDerivApply {
 
     inline ImprovedStaggeredMuDerivApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &L,
-                                  const GaugeField &U, double a/*, int order*/, const ColorSpinorField &x, int parity, bool dagger,
+                                  const GaugeField &U, double a, int order, const ColorSpinorField &x, int parity, bool dagger,
                                   const int *comm_override, TimeProfile &profile)
     {
-      // constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
-      // constexpr bool improved = true;
-      // constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
-      // constexpr bool muderiv = true;
-      // StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved, muderiv> arg(out, in, U, L, a, order, x, parity, dagger,
-      //                                                                   comm_override);
-      // Staggered<decltype(arg)> staggered(arg, out, in);
+      constexpr int nDim = 4; // MWTODO: this probably should be 5 for mrhs Dslash
+      constexpr bool improved = true;
+      constexpr QudaReconstructType recon_u = QUDA_RECONSTRUCT_NO;
+      constexpr bool muderiv = true;
+      StaggeredArg<Float, nColor, nDim, recon_u, recon_l, improved, muderiv> arg(out, in, U, L, a, order, x, parity, dagger,
+                                                                        comm_override);
+      Staggered<decltype(arg)> staggered(arg, out, in);
 
-      // dslash::DslashPolicyTune<decltype(staggered)> policy(
-      //   staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-      //   in.GhostFaceCB(), profile);
-      // policy.apply(0);
+      dslash::DslashPolicyTune<decltype(staggered)> policy(
+        staggered, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
+      policy.apply(0);
 
-      // checkCudaError();
+      checkCudaError();
     }
   };
 
   void ApplyImprovedStaggeredMuDeriv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
-                              const GaugeField &L, double a/*, int order*/, const ColorSpinorField &x, int parity, bool dagger,
+                              const GaugeField &L, double a, int order, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile)
   {
 
@@ -178,7 +178,7 @@ namespace quda
     }
 
     // L must be first gauge field argument since we template on long reconstruct
-    instantiate<ImprovedStaggeredMuDerivApply, StaggeredReconstruct>(out, in, L, U, a/*, order*/, x, parity, dagger, comm_override,
+    instantiate<ImprovedStaggeredMuDerivApply, StaggeredReconstruct>(out, in, L, U, a, order, x, parity, dagger, comm_override,
                                                               profile);
 #else
     errorQuda("Staggered dslash has not been built");

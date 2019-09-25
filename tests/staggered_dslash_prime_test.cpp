@@ -116,8 +116,8 @@ void setGaugeParam(QudaGaugeParam &gaugeParam)
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
 
   // ensure that the default is improved staggered deriv
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH_MUDERIV && dslash_type != QUDA_LAPLACE_DSLASH) {
-    dslash_type = QUDA_ASQTAD_DSLASH_MUDERIV;
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
+    dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH;
   }
 
   gaugeParam.anisotropy = 1.0;
@@ -127,7 +127,7 @@ void setGaugeParam(QudaGaugeParam &gaugeParam)
   // The tadpole doesn't mean anything for the second fattening
   // since the input fields are unitarized.
   gaugeParam.tadpole_coeff = 1.0;
-  if (dslash_type == QUDA_ASQTAD_DSLASH_MUDERIV) {
+  if (dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH) {
     gaugeParam.scale = -1.0 / 24.0;
     if (eps_naik != 0) {
       gaugeParam.scale *= (1.0+eps_naik);

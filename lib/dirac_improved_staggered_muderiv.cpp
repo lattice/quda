@@ -20,34 +20,34 @@ namespace quda {
     return *this;
   }
 
- //  void DiracImprovedStaggered::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
- //  {
- //    if (in.Ndim() != 5 || out.Ndim() != 5) {
- //      errorQuda("Staggered dslash requires 5-d fermion fields");
- //    }
+  void DiracImprovedStaggeredMuDeriv::checkParitySpinor(const ColorSpinorField &in, const ColorSpinorField &out) const
+  {
+    if (in.Ndim() != 5 || out.Ndim() != 5) {
+      errorQuda("Staggered dslash requires 5-d fermion fields");
+    }
 
- //    if (in.Precision() != out.Precision()) {
- //      errorQuda("Input and output spinor precisions don't match in dslash_quda");
- //    }
+    if (in.Precision() != out.Precision()) {
+      errorQuda("Input and output spinor precisions don't match in dslash_quda");
+    }
 
- //    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
- //      errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
-	// 	in.SiteSubset(), out.SiteSubset());
- //    }
+    if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
+      errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
+		in.SiteSubset(), out.SiteSubset());
+    }
 
- //    if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	// (out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
- //      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
- //    }
- //  }
+    if ((out.Volume()/out.X(4) != 2*fatGauge.VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
+	(out.Volume()/out.X(4) != fatGauge.VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+      errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge.VolumeCB());
+    }
+  }
 
- //  void DiracImprovedStaggered::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
- //  {
- //    checkParitySpinor(in, out);
+  void DiracImprovedStaggeredMuDeriv::Dslash(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, int order) const
+  {
+    checkParitySpinor(in, out);
 
- //    ApplyImprovedStaggered(out, in, fatGauge, longGauge, 0., in, parity, dagger, commDim, profile);
- //    flops += 1146ll*in.Volume();
- //  }
+    ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 0., order, in, parity, dagger, commDim, profile);
+    flops += 1146ll*in.Volume();
+  }
 
  //  void DiracImprovedStaggered::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
  //      const ColorSpinorField &x, const double &k) const
@@ -77,13 +77,13 @@ namespace quda {
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 0./*, order*/, in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+        ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 0., order, in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
       } else {
-        ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 0./*, order*/, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+        ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 0., order, in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
       }
       flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 2. * mass/*, order*/, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      ApplyImprovedStaggeredMuDeriv(out, in, fatGauge, longGauge, 2. * mass, order, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
       flops += 1158ll * in.Volume();
     }
   }
