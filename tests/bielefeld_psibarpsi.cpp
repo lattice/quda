@@ -16,6 +16,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 // #include <staggered_dslash_reference.h>
 #include <llfat_reference.h>
@@ -34,65 +35,13 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define mySpinorSiteSize 6
 
-extern void usage(char **argv);
-
 void **ghost_fatlink, **ghost_longlink;
 
-extern int device;
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_refinement_sloppy;
-
-extern double tol;    // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern double reliable_delta;
-extern bool alternative_reliable;
-extern int test_type;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
 
 int X[4];
 
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov;
-extern QudaCABasis ca_basis; // basis for CA-CG solves
-extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
-extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-extern QudaMatPCType matpc_type;       // preconditioning type
-extern QudaSolutionType solution_type; // solution type
-
-extern QudaInverterType inv_type;
-extern double mass; // the mass of the Dirac operator
-extern double kappa;
-extern int laplace3D;
-
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-
-extern double tadpole_factor;
-// relativistic correction for naik term
-extern double eps_naik;
-// Number of naiks. If eps_naik is 0.0, we only need
-// to construct one naik.
 static int n_naiks = 1;
-
-extern char latfile[];
-
-extern int pipeline;                      // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
-
-extern QudaSolveType solve_type;
 
 // Unitarization coefficients
 static double unitarize_eps = 1e-6;
@@ -170,8 +119,7 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
 
   inv_param->verbosity = QUDA_VERBOSE;
   inv_param->mass = mass;
-  inv_param->kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
-  inv_param->laplace3D = laplace3D;              // for Laplace operator
+
 
   // outer solver parameters
   inv_param->inv_type = inv_type;
@@ -294,7 +242,7 @@ namespace quda
 quda::cudaGaugeField *checkGauge(QudaInvertParam *param);
 
 using namespace quda;
-void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
+void psibarpsiQuda(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *rng)
 {
 
   // profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
@@ -356,7 +304,7 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   auto b = bb.get();
   auto xx = std::make_unique<cudaColorSpinorField>(cudaParam);
   auto x = xx.get();
-  unsigned long long seed = 12345;
+
   spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
   blas::zero(*x);
 
@@ -442,8 +390,11 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
+
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    //(*solve)(*out, *in);
     blas::copy(*in, *out);
     solverParam.updateInvertParam(*param);
     delete solve;
@@ -452,6 +403,8 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   if (direct_solve) {
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
@@ -459,17 +412,21 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(*out, *in);
+    // (*solve)(*out, *in);
     solverParam.updateInvertParam(*param);
     delete solve;
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    (*solve)(tmp, *in);    // y = (M M^\dag) b
+    // (*solve)(tmp, *in);    // y = (M M^\dag) b
     dirac.Mdag(*out, tmp); // x = M^dag y
     solverParam.updateInvertParam(*param);
     delete solve;
@@ -516,6 +473,143 @@ void psibarpsiQuda(QudaInvertParam *param, quda::RNG *rng)
   // profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::RNG *rng, int NumberOfRandomSpinors)
+{
+    pushVerbosity(param->verbosity);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
+
+    ColorSpinorField* in = nullptr;
+    ColorSpinorField* out = nullptr;
+    std::vector<ColorSpinorField*> savedResults;
+    cudaGaugeField *cudaGauge = checkGauge(param);
+    const int *X = cudaGauge->X();
+
+    std::vector<Complex> TraceEstims;
+    
+    bool pc_solution
+        = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+    bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE)
+        || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    /*    bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type == QUDA_MATPC_SOLUTION);
+    bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
+    bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) || (param->solve_type == QUDA_NORMERR_PC_SOLVE);
+    */
+    
+    
+    ColorSpinorParam cpuParam(nullptr, *param, X, pc_solution, param->input_location); 
+    ColorSpinorParam cudaParam(cpuParam, *param);
+    cudaParam.create = QUDA_NULL_FIELD_CREATE;
+
+    auto bb = std::make_unique<cudaColorSpinorField>(cudaParam);
+    auto b = bb.get();
+    auto xx = std::make_unique<cudaColorSpinorField>(cudaParam);
+    auto x = xx.get();
+    
+    quda::Dirac *d = nullptr;
+    quda::Dirac *dSloppy = nullptr;
+    quda::Dirac *dPre = nullptr;
+    
+    quda::createDirac(d, dSloppy, dPre, *param, pc_solve);
+    
+    Dirac &dirac = *d;
+    Dirac &diracSloppy = *dSloppy;
+    Dirac &diracPre = *dPre;
+    bool save_res = false; 
+
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*param);
+    solverParam.deflate = true;
+    solverParam.eig_param = *eig_param;
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      
+    
+    for (int i = 0; i < NumberOfRandomSpinors; i++) {
+        spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
+
+        //double nb = blas::norm2(*b);
+        // blas::ax(1.0 / sqrt(nb), *b);
+      
+
+        massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
+        dirac.prepare(in, out, *x, *b, param->solution_type);
+
+        (*solve)(*out, *in);
+        solverParam.updateInvertParam(*param);
+        
+        dirac.reconstruct(*x,*b, param->solution_type);
+        //blas::ax(sqrt(nb), *x);
+        if(save_res) {
+            savedResults.push_back(x);
+        }
+        Complex trace = blas::cDotProduct(*b,*x);
+        TraceEstims.push_back(trace);
+        //printfQuda("(%g,%g)\n",trace.real(), trace.imag());
+    }
+    
+    delete solve;
+      
+    delete d;
+    delete dSloppy;
+    delete dPre;
+    for (auto it=TraceEstims.begin(); it!=TraceEstims.end(); ++it) {
+        printfQuda("(%g,%g)\n", (*it).real(), (*it).imag());
+    }
+    popVerbosity();
+}
+    
+
+    
+
+    
+
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  // eig_param.cuda_prec_ritz = cuda_prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
+
+
 int invert_test(void)
 {
   QudaGaugeParam gaugeParam = newQudaGaugeParam();
@@ -523,6 +617,10 @@ int invert_test(void)
 
   set_params(&gaugeParam, &inv_param, xdim, ydim, zdim, tdim, cpu_prec, prec, prec_sloppy, prec_refinement_sloppy,
              link_recon, link_recon_sloppy, mass, tol, tadpole_factor);
+
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -758,31 +856,32 @@ int invert_test(void)
   //   len = Vh * Nsrc;
   // }
 
-  switch (test_type) {
-  case 0: // full parity solution
-  case 1: // solving prec system, reconstructing
-  case 2:
-
-    for (int i = 0; i < 10; i++) psibarpsiQuda(&inv_param, rng.get());
+  //switch (test_type) {
+  //case 0: // full parity solution
+  //case 1: // solving prec system, reconstructing
+  //case 2:
+  
+  //  psibarpsiQuda(&inv_param, &eig_param, rng.get());
+  calcTraceEstimator(&inv_param,&eig_param,rng.get(),5);
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
 
-    break;
+    //break;
 
-  case 3: // even
-  case 4:
+    //case 3: // even
+    //case 4:
 
     // invertQuda(out->V(), in->V(), &inv_param);
 
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
+    //time0 += clock();
+    //time0 /= CLOCKS_PER_SEC;
 
-    break;
+    //break;
 
-  default: errorQuda("Unsupported test type");
-
-  } // switch
+    //default: errorQuda("Unsupported test type %d given", test_type);
+    
+    //} // switch
 
 
   // Clean up gauge fields, at least
@@ -835,6 +934,30 @@ void display_test_info()
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
              get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
 
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+  if (eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false");
+  }
+  if (eig_use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+    printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  }
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -863,29 +986,28 @@ void usage_extra(char **argv)
 // main
 int main(int argc, char **argv)
 {
-
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
-
-
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    if (strcmp(argv[i], "--cpu_prec") == 0) {
-      if (i + 1 >= argc) { usage(argv); }
-      cpu_prec = get_prec(argv[i + 1]);
-      i++;
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
+                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  test_type = dslash_type = QUDA_ASQTAD_DSLASH;
+  dslash_type = QUDA_ASQTAD_DSLASH;
   solve_type = QUDA_DIRECT_PC_SOLVE;
   matpc_type = QUDA_MATPC_EVEN_EVEN;
   solution_type = QUDA_MAT_SOLUTION;
