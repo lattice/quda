@@ -3481,13 +3481,13 @@ for(int i=0; i < param->num_src; i++) {
       // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       // solve->solve(*out,*in);
       BlockCG bcg(m, mSloppy, solverParam, profileMulti);
-      bcg(*out, *in);
+      // bcg(*out, *in);
       solverParam.updateInvertParam(*param);
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       BlockCG bcg(m, mSloppy, solverParam, profileMulti);
-      bcg(*out, *in);
+      // bcg(*out, *in);
       solverParam.updateInvertParam(*param);
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);

@@ -1164,7 +1164,8 @@ public:
     param(param), profile(profile) { ; }
     virtual ~BlockSolver() { ; }
 
-    virtual void operator()(ColorSpinorField& out, ColorSpinorField& in) = 0;
+    virtual void operator()(ColorSpinorFieldVector& out, ColorSpinorFieldVector& in) = 0;
+    
     bool convergence(const double &r2, const double &hq2, const double &r2_tol,
          const double &hq_tol) const;
     static double stopping(const double &tol, const double &b2, QudaResidualType residual_type);
@@ -1188,14 +1189,14 @@ public:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     // pointers to fields to avoid multiple creation overhead
-    std::shared_ptr<ColorSpinorField> yp, rp, App, tmpp;
-    std::vector<ColorSpinorField*> p;
-    std::shared_ptr<ColorSpinorField> x_sloppy_savedp, pp, qp, tmp_matsloppyp;
-    std::shared_ptr<ColorSpinorField> p_oldp; // only for BLOCKSOLVER_PRECISE_Q
+    ColorSpinorFieldVector yp, rp, App, tmpp;
+    ColorSpinorFieldVector p;
+    ColorSpinorFieldVector x_sloppy_savedp, pp, qp, tmp_matsloppyp;
+    ColorSpinorFieldVector p_oldp; // only for BLOCKSOLVER_PRECISE_Q
     bool init;
 
     template <int n>
-    void solve_n(ColorSpinorField& out, ColorSpinorField& in);
+    void solve_n(ColorSpinorFieldVector& out, ColorSpinorFieldVector& in);
     int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
     
@@ -1203,7 +1204,7 @@ public:
   public:
     BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~BlockCG();
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void operator()(ColorSpinorFieldVector &out, ColorSpinorFieldVector &in);
 
 
     
