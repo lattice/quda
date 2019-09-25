@@ -145,10 +145,10 @@ template <int MAX>
 struct IterateThreadStore<MAX, MAX>
 {
     template <CacheStoreModifier MODIFIER, typename T>
-    static __device__ __forceinline__ void Store(T * /*ptr*/, T * /*vals*/) {}
+    static __device__ __forceinline__ void Store(T *ptr, T *vals) {}
 
     template <typename OutputIteratorT, typename T>
-    static __device__ __forceinline__ void Dereference(OutputIteratorT /*ptr*/, T * /*vals*/) {}
+    static __device__ __forceinline__ void Dereference(OutputIteratorT ptr, T *vals) {}
 };
 
 
@@ -348,7 +348,7 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
         reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
-    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
+    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference<volatile VolatileWord*,VolatileWord>(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
 }
