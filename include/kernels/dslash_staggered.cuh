@@ -15,7 +15,7 @@ namespace quda
      @brief Parameter structure for driving the Staggered Dslash operator
   */
   template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_u_,
-            QudaReconstructType reconstruct_l_, bool improved_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
+            QudaReconstructType reconstruct_l_, bool improved_, bool muderiv_, QudaStaggeredPhase phase_ = QUDA_STAGGERED_PHASE_MILC>
   struct StaggeredArg : DslashArg<Float, nDim> {
     typedef typename mapper<Float>::type real;
     static constexpr int nColor = nColor_;
@@ -29,6 +29,7 @@ namespace quda
     static constexpr bool gauge_direct_load = false; // false means texture load
     static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
     static constexpr bool use_inphase = improved_ ? false : true;
+    static constexpr bool muderiv = muderiv_;
     static constexpr QudaStaggeredPhase phase = phase_;
     using GU = typename gauge_mapper<Float, reconstruct_u, 18, phase, gauge_direct_load, ghost, use_inphase>::type;
     using GL =
@@ -41,9 +42,10 @@ namespace quda
     const GL L; /** the long gauge field */
 
     const real a; /** xpay scale factor */
+    const int order;
     const real tboundary;
     static constexpr bool improved = improved_;
-    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
+    StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a, int order,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
                              comm_override),
@@ -53,7 +55,8 @@ namespace quda
       L(L),
       tboundary(U.TBoundary()),
       x(x),
-      a(a)
+      a(a),
+      order(order)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -77,9 +80,10 @@ namespace quda
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
-
+    const real naik_scaling = pow(3.0, arg.order); 
+    real sign = pow(-1.0, arg.order);
 #pragma unroll
-    for (int d = 0; d < 4; d++) { // loop over dimension
+    for (int d = arg.muderiv ? 3 : 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
       {
@@ -103,6 +107,7 @@ namespace quda
         }
       }
 
+
       // improved - forward direction
       if (arg.improved) {
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -115,9 +120,9 @@ namespace quda
           const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
           const Link L = arg.L(d, x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
-          out += L * in;
+          out +=  arg.muderiv ? L * in * naik_scaling : L * in;
+          }
         }
-      }
 
       {
         // Backward gather - compute back offset for spinor and gauge fetch
@@ -161,6 +166,113 @@ namespace quda
         }
       }
     } // nDim
+  }
+
+
+
+   /**
+     @brief Applies the off-diagonal part of the Staggered / Asqtad
+     operator.
+
+     @param[out] out The out result field
+     @param[in] U The gauge field
+     @param[in] in The input field
+     @param[in] parity The site parity
+     @param[in] x_cb The checkerboarded site index
+  */
+  template <int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector, bool mu_deriv>
+  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+                                                 int idx, int thread_dim, bool &active)
+  {
+    typedef typename mapper<typename Arg::Float>::type real;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
+    const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
+
+    int d = 0 ;
+
+    real naik_scaling = pow(3.0, arg.order); 
+    real sign = pow(-1.0, arg.order);
+
+      // standard - forward direction
+      {
+        const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        if (doHalo<kernel_type>(d) && ghost) {
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
+          const Link U = arg.improved ?
+              arg.U(d, x_cb, parity) :
+              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+          out += (U * in);
+
+          if (x_cb == 0 && parity == 0 && d == 0) printLink(U);
+        } else if (doBulk<kernel_type>() && !ghost) {
+          const int fwd_idx = linkIndexP1(coord, arg.dim, d);
+          const Link U = arg.improved ?
+              arg.U(d, x_cb, parity) :
+              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          Vector in = arg.in(fwd_idx, their_spinor_parity);
+          out += (U * in);
+        }
+      }
+
+      // improved - forward direction
+      if (arg.improved) {
+        const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        if (doHalo<kernel_type>(d) && ghost) {
+          const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
+          const Link L = arg.L(d, x_cb, parity);
+          const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
+          out += L * in;
+        } else if (doBulk<kernel_type>() && !ghost) {
+          const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
+          const Link L = arg.L(d, x_cb, parity);
+          const Vector in = arg.in(fwd3_idx, their_spinor_parity);
+          out += naik_scaling* L * in;
+        }
+      }
+
+      {
+        // Backward gather - compute back offset for spinor and gauge fetch
+        const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+
+        if (doHalo<kernel_type>(d) && ghost) {
+          const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
+          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const Link U = arg.improved ?
+              arg.U.Ghost(d, ghost_idx2, 1 - parity) :
+              arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          out -= (conj(U) * in);
+        } else if (doBulk<kernel_type>() && !ghost) {
+          const int back_idx = linkIndexM1(coord, arg.dim, d);
+          const int gauge_idx = back_idx;
+          const Link U = arg.improved ?
+              arg.U(d, gauge_idx, 1 - parity) :
+              arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          Vector in = arg.in(back_idx, their_spinor_parity);
+          out -= sign * (conj(U) * in);
+        }
+      }
+
+      // improved - backward direction
+      if (arg.improved) {
+        const bool ghost = (coord[d] - 3 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
+        if (doHalo<kernel_type>(d) && ghost) {
+          // when updating replace arg.nFace with 1 here
+          const int ghost_idx = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
+          const Link L = arg.L.Ghost(d, ghost_idx, 1 - parity);
+          const Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
+          out -= conj(L) * in;
+        } else if (doBulk<kernel_type>() && !ghost) {
+          const int back3_idx = linkIndexM3(coord, arg.dim, d);
+          const int gauge_idx = back3_idx;
+          const Link L = arg.L(d, gauge_idx, 1 - parity);
+          const Vector in = arg.in(back3_idx, their_spinor_parity);
+          out -= sign * naik_scaling* conj(L) * in;
+        }
+      }
+
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)

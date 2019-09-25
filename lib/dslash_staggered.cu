@@ -45,7 +45,7 @@ namespace quda
         constexpr bool improved = false;
 
         StaggeredArg<Float, nColor, nDim, recon_u, QUDA_RECONSTRUCT_NO, improved, QUDA_STAGGERED_PHASE_MILC> arg(
-          out, in, U, U, a, x, parity, dagger, comm_override);
+          out, in, U, U, a, 0, x, parity, dagger, comm_override);
         Staggered<decltype(arg)> staggered(arg, out, in);
 
         dslash::DslashPolicyTune<decltype(staggered)> policy(

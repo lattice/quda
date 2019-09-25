@@ -497,6 +497,11 @@ namespace quda {
                               const GaugeField &L, double a, const ColorSpinorField &x, int parity, bool dagger,
                               const int *comm_override, TimeProfile &profile);
 
+
+  void ApplyImprovedStaggeredMuDeriv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                              const GaugeField &L, double a/*, int order*/, const ColorSpinorField &x, int parity, bool dagger,
+                              const int *comm_override, TimeProfile &profile);
+
   /**
      @brief Apply the twisted-mass gamma operator to a color-spinor field.
      @param[out] out Result color-spinor field
