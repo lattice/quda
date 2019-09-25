@@ -789,9 +789,9 @@ get_staggered_test_type(int t)
     default:
   ret = "unknown";
   break;
-    }
-    
-    return ret;
+  }
+
+  return ret;
 }
 
 const char* 
@@ -806,6 +806,7 @@ get_dslash_str(QudaDslashType type)
   case QUDA_CLOVER_WILSON_DSLASH:
     ret= "clover";
     break;
+  case QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH: ret = "clover-hasenbusch-twist"; break;
   case QUDA_TWISTED_MASS_DSLASH:
     ret= "twisted-mass";
     break;
