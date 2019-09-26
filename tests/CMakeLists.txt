@@ -526,4 +526,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
+  if(QUDA_COVDEV)
+    add_test(NAME covdev_-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNC} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
+                     --dim 6 8 10 12
+                     --gtest_output=xml:covdev_test_pol${pol2}.xml)
+   endif()
+
 endforeach(pol)

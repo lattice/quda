@@ -73,7 +73,7 @@ namespace quda
     {
       strcpy(aux[kernel_type], kernel_str);
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
-      strcat(aux[kernel_type], aux_base);
+      strncat(aux[kernel_type], aux_base, TuneKey::aux_n-1);
     }
 
     virtual bool tuneGridDim() const { return false; }
