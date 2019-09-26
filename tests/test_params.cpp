@@ -25,7 +25,7 @@ QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
-QudaPrecision prec_ritz = QUDA_INVALID_PRECISION;
+QudaPrecision prec_deflation = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
 std::array<int, 4> dim = {24, 24, 24, 24};
 int &xdim = dim[0];
@@ -384,7 +384,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--prec-refine", prec_refinement_sloppy, "Sloppy precision for refinement in GPU")
     ->transform(prec_transform);
   ;
-  quda_app->add_option("--prec-ritz", prec_ritz, "Eigenvector precision in GPU")->transform(prec_transform);
+  quda_app->add_option("--prec-deflation", prec_deflation, "Eigenvector precision in GPU")->transform(prec_transform);
   ;
   quda_app->add_option("--prec-sloppy", prec_sloppy, "Sloppy precision in GPU")->transform(prec_transform);
   ;

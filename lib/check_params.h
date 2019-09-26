@@ -400,6 +400,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(cuda_prec_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_refinement_sloppy, QUDA_INVALID_PRECISION);
   P(cuda_prec_precondition, QUDA_INVALID_PRECISION);
+  P(cuda_prec_deflation, QUDA_INVALID_PRECISION);
 #else
   if (param->cuda_prec_sloppy == QUDA_INVALID_PRECISION)
     param->cuda_prec_sloppy = param->cuda_prec;
@@ -407,6 +408,8 @@ void printQudaInvertParam(QudaInvertParam *param) {
     param->cuda_prec_refinement_sloppy = param->cuda_prec_sloppy;
   if (param->cuda_prec_precondition == QUDA_INVALID_PRECISION)
     param->cuda_prec_precondition = param->cuda_prec_sloppy;
+  if (param->cuda_prec_deflation == QUDA_INVALID_PRECISION)
+    param->cuda_prec_deflation = param->cuda_prec;
 #endif
 
   // leave the default behaviour to cpu pointers
