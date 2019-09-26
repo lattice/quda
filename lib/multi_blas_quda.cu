@@ -305,7 +305,7 @@ namespace quda {
         if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
-#if defined(NSPIN4| || defined(NSPIN2) || defined(NSPIN1)
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
           multiBlas<NXZ, double2, double2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
