@@ -3890,7 +3890,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         solverParam.delta = param->reliable_delta_refinement;
 
         {
-          CG cg(*m, *mSloppy, solverParam, profileMulti);
+          CG cg(*m, *mSloppy, *mSloppy, solverParam, profileMulti);
           if (i==0)
             cg(*x[i], *b, p[i], r2_old[i]);
           else

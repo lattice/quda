@@ -577,13 +577,14 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
     bool init;
 
   public:
-    CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
     /**
      * @brief Run CG.

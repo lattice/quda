@@ -28,9 +28,9 @@ namespace quda {
     }
 
     if (in.Precision() != out.Precision()) {
-      errorQuda("Input and output spinor precisions don't match in dslash_quda");
+      errorQuda("Input %d and output %d spinor precisions don't match in dslash_quda", in.Precision(), out.Precision());
     }
-
+    
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity, in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
