@@ -74,7 +74,7 @@ namespace quda {
     if (total_block_size == 1) errorQuda("Total geometric block size is 1");
 
     std::string block_str = std::to_string(geo_bs[0]);
-    for (int d=1; d<ndim; d++) block_str += " x " + std::to_string(geo_bs[1]);
+    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[1]);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str.c_str());
 
     createV(B[0]->Location()); // allocate V field

@@ -240,9 +240,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
            }
        }
        if (dir == TUP){
-	 if (last_node_in_t() && i4 == (X4-1) ){
-	   coeff *= -1;
-	 } 
+         if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
        }       
    }
  

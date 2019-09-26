@@ -174,8 +174,8 @@ namespace quda {
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
-        fieldOrder
-          = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
+                                                                                        QUDA_FLOAT4_FIELD_ORDER;
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
         fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;

@@ -119,7 +119,7 @@ bool last_node_in_t()
 {
   // only apply T-boundary at edge nodes
 #ifdef MULTI_GPU
-  return commCoords(3) == commDim(3)-1;
+  return commCoords(3) == commDim(3) - 1;
 #else
   return true;
 #endif
@@ -726,7 +726,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
   if (param->gauge_fix) {
     // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
-    int iMax = ( last_node_in_t() ? (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1) : Vh );
+    int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
@@ -848,7 +848,6 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
     }
   }
-
 }
 
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec) {
@@ -1276,10 +1275,8 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 	  break;
 
         case TUP:
-	  if (last_node_in_t() && i4 == (X4-1)){
-	    coeff *= -1;
-	  }
-	  break;
+          if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
+          break;
 
 	default:
 	  printf("ERROR: wrong dir(%d)\n", dir);

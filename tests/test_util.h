@@ -91,8 +91,8 @@
   //used by link fattening code
   int x4_from_full_index(int i);
 
-// ---------- gauge_read.cpp ----------
-  
+  // ---------- gauge_read.cpp ----------
+
   //void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);
 
   // additions for dw (quickly hacked on)

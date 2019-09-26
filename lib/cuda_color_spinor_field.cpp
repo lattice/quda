@@ -632,7 +632,7 @@ namespace quda {
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
-  } 
+  }
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
