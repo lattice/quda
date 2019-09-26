@@ -1650,7 +1650,7 @@ namespace quda {
 
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecise : gaugePrecise;
+    diracParam.gauge = ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))  ? gaugeFatPrecise : gaugePrecise;
     diracParam.fatGauge = gaugeFatPrecise;
     diracParam.longGauge = gaugeLongPrecise;
     diracParam.clover = cloverPrecise;
@@ -1671,7 +1671,7 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatSloppy : gaugeSloppy;
+    diracParam.gauge = ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ? gaugeFatSloppy : gaugeSloppy;
     diracParam.fatGauge = gaugeFatSloppy;
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
@@ -1689,7 +1689,7 @@ namespace quda {
   {
     setDiracParam(diracParam, inv_param, pc);
 
-    diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatRefinement : gaugeRefinement;
+    diracParam.gauge = ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ? gaugeFatRefinement : gaugeRefinement;
     diracParam.fatGauge = gaugeFatRefinement;
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
@@ -1709,11 +1709,11 @@ namespace quda {
     setDiracParam(diracParam, inv_param, pc);
 
     if (inv_param->overlap) {
-      diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatExtended : gaugeExtended;
+      diracParam.gauge = ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ? gaugeFatExtended : gaugeExtended;
       diracParam.fatGauge = gaugeFatExtended;
       diracParam.longGauge = gaugeLongExtended;
     } else {
-      diracParam.gauge = inv_param->dslash_type == QUDA_ASQTAD_DSLASH ? gaugeFatPrecondition : gaugePrecondition;
+      diracParam.gauge = ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ? gaugeFatPrecondition : gaugePrecondition;
       diracParam.fatGauge = gaugeFatPrecondition;
       diracParam.longGauge = gaugeLongPrecondition;
     }
@@ -1724,7 +1724,7 @@ namespace quda {
     }
 
     // In the preconditioned staggered CG allow a different dslash type in the preconditioning
-    if(inv_param->inv_type == QUDA_PCG_INVERTER && inv_param->dslash_type == QUDA_ASQTAD_DSLASH
+    if(inv_param->inv_type == QUDA_PCG_INVERTER && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))
        && inv_param->dslash_type_precondition == QUDA_STAGGERED_DSLASH) {
        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
        diracParam.gauge = gaugeFatPrecondition;
@@ -1864,10 +1864,10 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
   profileDslash.TPSTART(QUDA_PROFILE_TOTAL);
   profileDslash.TPSTART(QUDA_PROFILE_INIT);
 
-  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = (((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) ? *gaugePrecise : *gaugeFatPrecise;
 
-  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
-      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if ((!gaugePrecise && ((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)))
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))))
     errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
@@ -1907,7 +1907,7 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
   if (inv_param->mass_normalization == QUDA_KAPPA_NORMALIZATION &&
       (inv_param->dslash_type == QUDA_STAGGERED_DSLASH ||
-       inv_param->dslash_type == QUDA_ASQTAD_DSLASH) )
+       ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))) )
     blas::ax(1.0/(2.0*inv_param->mass), in);
 
   if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
@@ -1953,10 +1953,10 @@ void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity 
 
 void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
 {
-  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = (((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) ? *gaugePrecise : *gaugeFatPrecise;
 
-  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
-      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if ((!gaugePrecise && ((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)))
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))))
     errorQuda("Gauge field not allocated");
 
   pushVerbosity(inv_param->verbosity);
@@ -2023,10 +2023,10 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
 
 void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type)
 {
-  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = (((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) ? *gaugePrecise : *gaugeFatPrecise;
 
-  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
-      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if ((!gaugePrecise && ((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)))
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))))
     errorQuda("Gauge field not allocated");
 
   pushVerbosity(inv_param->verbosity);
@@ -2098,10 +2098,10 @@ void MatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = (((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) ? *gaugePrecise : *gaugeFatPrecise;
 
-  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
-      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if ((!gaugePrecise && ((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)))
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))))
     errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
@@ -2168,10 +2168,10 @@ void MatDagMatQuda(void *h_out, void *h_in, QudaInvertParam *inv_param)
 {
   pushVerbosity(inv_param->verbosity);
 
-  const auto &gauge = (inv_param->dslash_type != QUDA_ASQTAD_DSLASH) ? *gaugePrecise : *gaugeFatPrecise;
+  const auto &gauge = (((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) ? *gaugePrecise : *gaugeFatPrecise;
 
-  if ((!gaugePrecise && inv_param->dslash_type != QUDA_ASQTAD_DSLASH)
-      || ((!gaugeFatPrecise || !gaugeLongPrecise) && inv_param->dslash_type == QUDA_ASQTAD_DSLASH))
+  if ((!gaugePrecise && ((inv_param->dslash_type != QUDA_ASQTAD_DSLASH) && (inv_param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)))
+      || ((!gaugeFatPrecise || !gaugeLongPrecise) && ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))))
     errorQuda("Gauge field not allocated");
   if (cloverPrecise == nullptr && ((inv_param->dslash_type == QUDA_CLOVER_WILSON_DSLASH) || (inv_param->dslash_type == QUDA_TWISTED_CLOVER_DSLASH)))
     errorQuda("Clover field not allocated");
@@ -2240,7 +2240,7 @@ namespace quda
 {
   bool canReuseResidentGauge(QudaInvertParam *param)
   {
-    if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+    if (((param->dslash_type != QUDA_ASQTAD_DSLASH) && (param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) {
       return (gaugePrecise != nullptr) and param->cuda_prec == gaugePrecise->Precision();
     } else {
       return (gaugeFatPrecise != nullptr) and param->cuda_prec == gaugeFatPrecise->Precision();
@@ -2275,7 +2275,7 @@ void checkClover(QudaInvertParam *param) {
 quda::cudaGaugeField *checkGauge(QudaInvertParam *param)
 {
   quda::cudaGaugeField *cudaGauge = nullptr;
-  if (param->dslash_type != QUDA_ASQTAD_DSLASH) {
+  if (((param->dslash_type != QUDA_ASQTAD_DSLASH) && (param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH))) {
     if (gaugePrecise == nullptr) errorQuda("Precise gauge field doesn't exist");
 
     if (param->cuda_prec != gaugePrecise->Precision()) {
@@ -2480,7 +2480,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   // the solver will fail.
   if (eig_param->use_poly_acc && !eig_param->use_norm_op && !(inv_param->dslash_type == QUDA_LAPLACE_DSLASH)) {
     // Breaking up the boolean check a little bit. If it's a staggered dslash type and a PC type, we can use poly accel.
-    if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || inv_param->dslash_type == QUDA_ASQTAD_DSLASH) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
+    if (!((inv_param->dslash_type == QUDA_STAGGERED_DSLASH || ((inv_param->dslash_type == QUDA_ASQTAD_DSLASH) || (inv_param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))) && inv_param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
   }
@@ -3611,7 +3611,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
 
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+  if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
       param->dslash_type == QUDA_STAGGERED_DSLASH) {
 
     if (param->solution_type != QUDA_MATPC_SOLUTION) {
@@ -3666,7 +3666,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // Balint: Isn't there a nice construction pattern we could use here? This is
   // expedient but yucky.
   //  DiracParam diracParam;
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+  if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
       param->dslash_type == QUDA_STAGGERED_DSLASH){
     param->mass = sqrt(param->offset[0]/4);
   }
@@ -3689,7 +3689,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   std::unique_ptr<double[]> r2_old(new double[param->num_offset]);
 
   // Grab the dimension array of the input gauge field.
-  const int *X = ( param->dslash_type == QUDA_ASQTAD_DSLASH ) ?
+  const int *X = ( ((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ) ?
     gaugeFatPrecise->X() : gaugePrecise->X();
 
   // This creates a ColorSpinorParam struct, from the host data
@@ -3762,7 +3762,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   DiracMatrix *m, *mSloppy;
 
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+  if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
       param->dslash_type == QUDA_STAGGERED_DSLASH) {
     m = new DiracM(dirac);
     mSloppy = new DiracM(diracSloppy);
@@ -3818,7 +3818,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 		     i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
 
         // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
-        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+        if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           dirac.setMass(sqrt(param->offset[i]/4));
           diracSloppy.setMass(sqrt(param->offset[i]/4));
@@ -3826,7 +3826,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
         DiracMatrix *m, *mSloppy;
 
-        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+        if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           m = new DiracM(dirac);
           mSloppy = new DiracM(diracSloppy);
@@ -3836,7 +3836,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         }
 
 	// need to curry in the shift if we are not doing staggered
-	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
+	if (((param->dslash_type != QUDA_ASQTAD_DSLASH) && (param->dslash_type != QUDA_ASQTAD_MUDERIV_DSLASH)) &&
 	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
 	  m->shift = param->offset[i];
 	  mSloppy->shift = param->offset[i];
@@ -3901,7 +3901,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         solverParam.true_res_hq_offset[i] = solverParam.true_res_hq;
         solverParam.updateInvertParam(*param,i);
 
-        if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
+        if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           dirac.setMass(sqrt(param->offset[0]/4)); // restore just in case
           diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
@@ -5180,19 +5180,19 @@ void mat_dag_mat_quda_(void *h_out, void *h_in, QudaInvertParam *inv_param)
 void invert_quda_(void *hp_x, void *hp_b, QudaInvertParam *param) {
   fflush(stdout);
   // ensure that fifth dimension is set to 1
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
+  if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
   invertQuda(hp_x, hp_b, param);
   fflush(stdout);
 }
 
 void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
   // ensure that fifth dimension is set to 1
-  if (param->dslash_type == QUDA_ASQTAD_DSLASH || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
+  if (((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH)) || param->dslash_type == QUDA_STAGGERED_DSLASH) param->Ls = 1;
 
   if (!gaugePrecise) errorQuda("Resident gauge field not allocated");
 
   // get data into array of pointers
-  int nSpin = (param->dslash_type == QUDA_STAGGERED_DSLASH || param->dslash_type == QUDA_ASQTAD_DSLASH) ? 1 : 4;
+  int nSpin = (param->dslash_type == QUDA_STAGGERED_DSLASH || ((param->dslash_type == QUDA_ASQTAD_DSLASH) || (param->dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH))) ? 1 : 4;
 
   // compute offset assuming TIFR padded ordering (FIXME)
   if (param->dirac_order != QUDA_TIFR_PADDED_DIRAC_ORDER)
