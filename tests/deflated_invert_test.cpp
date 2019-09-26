@@ -58,7 +58,7 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 QudaPrecision &cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-QudaPrecision &cuda_prec_ritz = prec_ritz;
+QudaPrecision &cuda_prec_ritz = prec_deflation;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[0] = xdim;
@@ -192,7 +192,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.tol_restart = 0.0;//restart is not requested...
   }
 
-  inv_param.cuda_prec_ritz = cuda_prec_ritz;
+  inv_param.cuda_prec_ritz = prec_deflation;
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
 
@@ -228,7 +228,7 @@ void setDeflationParam(QudaEigParam &df_param) {
   df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
   df_param.extlib_type    = deflation_ext_lib;
 
-  df_param.cuda_prec_ritz = prec_ritz;
+  df_param.cuda_prec_ritz = prec_deflation;
   df_param.location       = location_ritz;
   df_param.mem_type_ritz  = mem_type_ritz;
 
@@ -253,7 +253,7 @@ int main(int argc, char **argv)
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
-  if (prec_ritz == QUDA_INVALID_PRECISION) prec_ritz = prec_sloppy;
+  if (prec_deflation == QUDA_INVALID_PRECISION) prec_deflation = prec_sloppy;
   if (prec_refinement_sloppy == QUDA_INVALID_PRECISION) prec_refinement_sloppy = prec_sloppy;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
