@@ -479,8 +479,10 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     pushVerbosity(param->verbosity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
+    printQudaInvertParam(param);
     QudaInvertParam Dmu_param = *param; 
-
+    printQudaInvertParam(&Dmu_param);
+    
     Dmu_param.dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
     Dmu_param.solve_type = QUDA_DIRECT_SOLVE;
   
@@ -524,20 +526,19 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     Dirac &diracSloppy = *dSloppy;
     Dirac &diracPre = *dPre;
 
-    quda::Dirac *d_mu_p = nullptr;
+    quda::Dirac *d_mu = nullptr;
     quda::Dirac *dSloppy_mu = nullptr;
     quda::Dirac *dPre_mu = nullptr;
 
-    (*param).dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
-    (*param).solve_type = QUDA_DIRECT_SOLVE;
-    quda::createDirac(d_mu_p, dSloppy_mu, dPre_mu, *param, false);
+    //(*param).dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
+    //(*param).solve_type = QUDA_DIRECT_SOLVE;
+    quda::createDirac(d_mu, dSloppy_mu, dPre_mu, Dmu_param, false);
 
-    auto d_mu = dynamic_cast<DiracImprovedStaggeredMuDeriv*>(d_mu_p); 
+    //auto d_mu = dynamic_cast<DiracImprovedStaggeredMuDeriv*>(d_mu_p); 
     
-    DiracImprovedStaggeredMuDeriv &dirac_mu = *d_mu;
+    Dirac &dirac_mu = *d_mu;
     Dirac &diracSloppy_mu = *dSloppy_mu;
     Dirac &diracPre_mu = *dPre_mu;
-
     
     bool save_res = false; 
 
@@ -576,7 +577,7 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
 
         
         dirac.reconstruct(*x,*b, param->solution_type);
-        dirac_mu.M(tmp,*x,1);
+        dirac_mu.M(tmp,*x);
         
         //        dirac_mu.prepare(in, out, *x, *b, Dmu_param.solution_type);
          //apply Ax=
