@@ -125,13 +125,14 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.tol = tol;
   inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
-  inv_param.reliable_delta = reliable_delta;
+  inv_param.reliable_delta = 0;//reliable_delta;
   inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = false;
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
+  inv_param.num_src = Nsrc;
 
-  inv_param.Ls = Nsrc;
+  inv_param.Ls = 1;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
@@ -209,7 +210,7 @@ int invert_test()
   initQuda(device);
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -284,7 +285,7 @@ int invert_test()
   for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
   bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) csParam.x[0] /= 2;
-  csParam.x[4] = Nsrc;
+  csParam.x[4] = 1;
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -376,9 +377,9 @@ int invert_test()
 
   int len = 0;
   if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V*Nsrc;
+    len = V*1;
   } else {
-    len = Vh*Nsrc;
+    len = Vh*1;
   }
 
   switch (test_type) {
@@ -539,13 +540,15 @@ int invert_test()
 
   if (test_type <=4){
 
-    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-    double l2r = sqrt(nrm2/src2);
 
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+    //MWTODO
+    double hqr = 0;//sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+    double l2r = 0;//sqrt(nrm2/src2);
+
+    printfQuda("FIXME Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
+    printfQuda("FIXME done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
         inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
   }
 

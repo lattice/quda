@@ -25,7 +25,7 @@ namespace quda
 // this is more here for development convenience.
 #ifdef BLOCKSOLVER
 #define BLOCKSOLVER_MULTIFUNCTIONS
-//#define BLOCKSOLVE_DSLASH5D
+#define BLOCKSOLVE_DSLASH5D
 #endif
 // #define BLOCKSOLVER_VERBOSE
 
@@ -122,9 +122,11 @@ namespace quda
       p_oldp(p_oldp),
       alpha(alpha),
       n_rhs(p_oldp.size()),
+      // n_update(1)
       n_update(x_sloppyp[0]->Nspin() == 4 ? 4 : 2)
 #ifdef BLOCKSOLVE_DSLASH5D
     {
+      if(x_sloppyp.size()==0) errorQuda("Xsloppyp is zero");
       ;
     }
 #else
@@ -155,7 +157,7 @@ namespace quda
                                                p_oldp.begin() + (count + 1) * update_per_apply);
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-        blas::caxpy(&alpha[count * update_per_apply * n_rhs], curr_p, x_sloppyp;
+        blas::caxpy(&alpha[count * update_per_apply * n_rhs], curr_p, x_sloppyp);
 #else
         for (int i = 0; i < update_per_apply; i++)
           for (int j = 0; j < n_rhs; j++)
@@ -179,7 +181,7 @@ namespace quda
         curr_p.emplace_back(p_oldp[curr_update]);
         blas::caxpy(&alpha[curr_update * n_rhs], curr_p, x_sloppyp);
 #else
-        for (int j = 0; j < n_rhs; j++) blas::caxpy(alpha(curr_update, j), p_oldp(curr_update), x_sloppyp(j));
+        for (int j = 0; j < n_rhs; j++) blas::caxpy(alpha(curr_update, j), *p_oldp[curr_update], *x_sloppyp[j]);
 #endif
         if (++curr_update == n_rhs) curr_update = 0;
       }
@@ -279,7 +281,7 @@ namespace quda
     ColorSpinorFieldVector &tmp_matsloppy = tmp_matsloppyp;
 
     ColorSpinorFieldVector x_sloppyp;
-    x_sloppyp.reserve(nsrc); // Gets assigned below.
+    x_sloppyp.resize(nsrc); // Gets assigned below.
 
     csParam.setPrecision(param.precision_sloppy);
     // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -344,6 +346,7 @@ namespace quda
     // on BiCGstab-L conventions.
     if (param.precision_sloppy == x[0]->Precision() || !param.use_sloppy_partial_accumulator) {
       
+      printfQuda("Go here ...\n");
       for(int i=0; i < nsrc; i++) x_sloppyp[i] = x[i];
       // x_sloppyp = std::shared_ptr<ColorSpinorField>(&x, ; // s_sloppy and x point to the same vector in memory.
       // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -352,6 +355,7 @@ namespace quda
       for (int i = 0; i < nsrc; i++) blas::zero(*x_sloppyp[i]);
       // #endif
     } else {
+      printfQuda("Go there ...\n");
       x_sloppyp = x_sloppy_savedp; // x_sloppy point to saved x_sloppy memory.
                                    // x_sloppy_savedp was already zero.
     }
@@ -429,7 +433,7 @@ namespace quda
     for (int i = 0; i < nsrc; i++) {
       r2avg += H(i, i).real();
       printfQuda("r2[%i] %e\n", i, H(i, i).real());
-      printfQuda("CHECK r2 %e\n",blas::norm2(*r[0]));
+      printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
     }
 #else
     for (int i = 0; i < nsrc; i++) {
@@ -545,16 +549,18 @@ namespace quda
 #endif
 
     // Step 8: finally set Q to thin QR decompsition of R.
-    // blas::zero(*qp); // guaranteed to be zero at start.
+    for(int i=0; i < nsrc; i++){
+    blas::zero(*qp[i]); // guaranteed to be zero at start.
+  }
 #ifdef BLOCKSOLVER_PRECISE_Q
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    blas::caxpy_U(Linv_raw, r, qp);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+//     blas::caxpy_U(Linv_raw, r, qp);
+// #else
     for (int i = 0; i < nsrc; i++) {
-      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), r[i], qp[j]); }
+      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *r[i], *qp[j]); }
     }
-#endif
+// #endif
 
 #else
 
@@ -601,11 +607,11 @@ namespace quda
         just_reliable_updated = false;
       }
       // Step 12: Compute Ap.
-#ifdef BLOCKSOLVE_DSLASH5D
-      matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
-#else
+// #ifdef BLOCKSOLVE_DSLASH5D
+      // matSloppy(Ap, *pp, tmp_matsloppy, tmp2);
+// #else
       for (int i = 0; i < nsrc; i++) matSloppy(*Ap[i], *pp[i], *tmp_matsloppy[i], *tmp2[i]);
-#endif
+// #endif
 
       // Step 13: calculate pAp = P^\dagger Ap
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
@@ -640,19 +646,19 @@ namespace quda
       // Step 17: Update Q = Q - Ap beta (remember we already put the minus sign on beta)
       // update rSloppy
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy(beta_raw, Ap, qp);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+      // blas::caxpy(beta_raw, Ap, qp);
+// #else
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { blas::caxpy(beta(i, j), Ap[i], qp[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::caxpy(beta(i, j), *Ap[i], *qp[j]); }
       }
-#endif
+// #endif
 
       // MWALTBETA
 #ifdef BLOCKSOLVER_ALTERNATIVE_BETA
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
       blas::zero(*tmpp);
-      blas::caxpy(beta_raw, Ap, *tmpp);
+      blas::caxpy(beta_raw, Ap, tmpp);
       blas::hDotProduct(H_raw, qp, tmpp);
       L = H.llt().matrixL();
       S = L.adjoint();
@@ -773,11 +779,11 @@ namespace quda
         dslash::aux_worker = NULL;
 
         // Reliable updates step 4: R = AY - B, using X as a temporary with the right precision.
-#ifdef BLOCKSOLVE_DSLASH5D
-        mat(r, y, x, tmp3);
-#else
+// #ifdef BLOCKSOLVE_DSLASH5D
+        // mat(r, y, x, tmp3);
+// #else
         for (int i = 0; i < nsrc; i++) mat(*r[i], *y[i], *x[i], *tmp3[i]);
-#endif
+// #endif
 
         // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
         // blas::xpay(b, -1.0, r);
@@ -1095,11 +1101,11 @@ namespace quda
 
     if (param.compute_true_res) {
     // compute the true residuals
-#ifdef BLOCKSOLVE_DSLASH5D
-      mat(r, x, y, tmp3);
-#else
+// #ifdef BLOCKSOLVE_DSLASH5D
+      // mat(r, x, y, tmp3);
+// #else
       for (int i = 0; i < nsrc; i++) mat(*r[i], *x[i], *y[i], *tmp3[i]);
-#endif
+// #endif
       for (int i = 0; i < nsrc; i++) {
         param.true_res = sqrt(blas::xmyNorm(*b[i], *r[i]) / b2[i]);
         param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(*x[i], *r[i]).z);
@@ -1172,7 +1178,7 @@ namespace quda
     // case 5: solve_n<5>(x, b); break;
     // case 6: solve_n<6>(x, b); break;
     // case 7: solve_n<7>(x, b); break;
-    // case 8: solve_n<8>(x, b); break;
+    case 8: solve_n<8>(x, b); break;
     // case 9: solve_n<9>(x, b); break;
     // case 10: solve_n<10>(x, b); break;
     // case 11: solve_n<11>(x, b); break;
@@ -1180,9 +1186,9 @@ namespace quda
     // case 13: solve_n<13>(x, b); break;
     // case 14: solve_n<14>(x, b); break;
     // case 15: solve_n<15>(x, b); break;
-    // case 16: solve_n<16>(x, b); break;
+    case 16: solve_n<16>(x, b); break;
     // case 24: solve_n<24>(x, b); break;
-    // case 32: solve_n<32>(x, b); break;
+    case 32: solve_n<32>(x, b); break;
     // case 48: solve_n<48>(x, b); break;
     // case 64: solve_n<64>(x, b); break;
     default: errorQuda("Block-CG with dimension %d not supported", param.num_src);

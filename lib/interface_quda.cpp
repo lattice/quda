@@ -3354,9 +3354,9 @@ void invertMultiSrcQuda(void **_hp_x, void **_hp_b, QudaInvertParam *param)
         && (param->solve_type == QUDA_DIRECT_SOLVE || param->solve_type == QUDA_DIRECT_PC_SOLVE)) {
       errorQuda("Initial guess not supported for two-pass solver");
     }
-    cudaParam.is_composite = true;
-    cudaParam.is_component = false;
-    cudaParam.composite_dim = param->num_src;
+    // cudaParam.is_composite = false;
+    // cudaParam.is_component = false;
+    // cudaParam.composite_dim = param->num_src;
 
     // ColorSpinorFieldVector x;
     for (int i = 0; i < param->num_src; i++) {
