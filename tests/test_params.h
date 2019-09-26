@@ -146,7 +146,7 @@ extern QudaPrecision prec_sloppy;
 extern QudaPrecision prec_refinement_sloppy;
 extern QudaPrecision prec_precondition;
 extern QudaPrecision prec_null;
-extern QudaPrecision prec_ritz;
+extern QudaPrecision prec_deflation;
 extern QudaVerbosity verbosity;
 extern std::array<int, 4> dim;
 extern int &xdim;

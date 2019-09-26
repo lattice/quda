@@ -169,7 +169,7 @@ namespace quda {
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    csParam.setPrecision(param.precision_deflation, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
 
