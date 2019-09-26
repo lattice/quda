@@ -305,7 +305,7 @@ namespace quda {
         if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN4| || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
           multiBlas<NXZ, double2, double2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
@@ -319,7 +319,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
           if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 1;
             multiBlas<NXZ, float4, float4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
@@ -328,7 +328,7 @@ namespace quda {
 
           } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
 
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN2) || defined(NSPIN1)
             const int M = 1;
             multiBlas<NXZ, float2, float2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
@@ -346,14 +346,14 @@ namespace quda {
 #if QUDA_PRECISION & 2
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 6;
             multiBlas<NXZ, float4, short4, short4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
             const int M = 3;
             multiBlas<NXZ, float2, short2, short2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -371,14 +371,14 @@ namespace quda {
 #if QUDA_PRECISION & 1
           if (x[0]->Ncolor() != 3) { errorQuda("nColor = %d is not supported", x[0]->Ncolor()); }
           if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 6;
             multiBlas<NXZ, float4, char4, char4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
             const int M = 3;
             multiBlas<NXZ, float2, char2, char2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -417,7 +417,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
             if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
               const int M = 12;
               multiBlas<NXZ, double2, float4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -425,7 +425,7 @@ namespace quda {
 #endif
             } else if (x[0]->Nspin() == 1) {
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
               const int M = 3;
               multiBlas<NXZ, double2, float2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -441,7 +441,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 2
             if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
               const int M = 12;
               multiBlas<NXZ, double2, short4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -450,7 +450,7 @@ namespace quda {
 
             } else if (x[0]->Nspin() == 1) {
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
               const int M = 3;
               multiBlas<NXZ, double2, short2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -465,7 +465,7 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
             if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
               const int M = 12;
               multiBlas<NXZ, double2, char4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -474,7 +474,7 @@ namespace quda {
 
             } else if (x[0]->Nspin() == 1) {
 
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
               const int M = 3;
               multiBlas<NXZ, double2, char2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -499,16 +499,16 @@ namespace quda {
 
 #if (QUDA_PRECISION & 2)
             if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
               const int M = 6;
               multiBlas<NXZ, float4, short4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
 
-            } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
               const int M = 3;
               multiBlas<NXZ, float2, short2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
@@ -526,16 +526,16 @@ namespace quda {
 
 #if (QUDA_PRECISION & 1)
             if (x[0]->Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
               const int M = 6;
               multiBlas<NXZ, float4, char4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
 #endif
 
-            } else if (x[0]->Nspin() == 2 || x[0]->Nspin() == 1) {
+            } else if (x[0]->Nspin() == 1) {
 
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
               const int M = 3;
               multiBlas<NXZ, float2, char2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
