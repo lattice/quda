@@ -338,21 +338,37 @@ namespace quda {
         typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
         extractGhostEx<Float, length>(G(u, 0, Ghost), dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+#if QUDA_RECONSTRUCT & 1
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost), 
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+#if QUDA_RECONSTRUCT & 1
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+#endif
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
