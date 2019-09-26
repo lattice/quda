@@ -478,6 +478,14 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     pushVerbosity(param->verbosity);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(param);
 
+    QudaInvertParam Dmu_param = *param; 
+
+    Dmu_param.dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
+    Dmu_param.solve_type = QUDA_DIRECT_SOLVE;
+  
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&Dmu_param);
+
+    
     ColorSpinorField* in = nullptr;
     ColorSpinorField* out = nullptr;
     std::vector<ColorSpinorField*> savedResults;
@@ -514,34 +522,72 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     Dirac &dirac = *d;
     Dirac &diracSloppy = *dSloppy;
     Dirac &diracPre = *dPre;
+
+    quda::Dirac *d_mu_p = nullptr;
+    quda::Dirac *dSloppy_mu = nullptr;
+    quda::Dirac *dPre_mu = nullptr;
+
+    (*param).dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
+    (*param).solve_type = QUDA_DIRECT_SOLVE;
+    quda::createDirac(d_mu_p, dSloppy_mu, dPre_mu, *param, false);
+
+    auto d_mu = dynamic_cast<DiracImprovedStaggeredMuDeriv*>(d_mu_p); 
+    
+    DiracImprovedStaggeredMuDeriv &dirac_mu = *d_mu;
+    Dirac &diracSloppy_mu = *dSloppy_mu;
+    Dirac &diracPre_mu = *dPre_mu;
+
+    
     bool save_res = false; 
 
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    DiracM mat_mu(dirac_mu), matSloppy_mu(diracSloppy_mu), matPre_mu(diracPre_mu);
     SolverParam solverParam(*param);
     solverParam.deflate = true;
     solverParam.eig_param = *eig_param;
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-      
-    
+
     for (int i = 0; i < NumberOfRandomSpinors; i++) {
         spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
 
-        //double nb = blas::norm2(*b);
+        double nb = blas::norm2(*b);
         // blas::ax(1.0 / sqrt(nb), *b);
-      
-
+        
+        cudaColorSpinorField tmp(*x);
         massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
         dirac.prepare(in, out, *x, *b, param->solution_type);
-
+         
+        
         (*solve)(*out, *in);
+        //double nout = blas::norm2(*out);
+        
+        // double ntemp = blas::norm2(tmp);
+        // printfQuda("Norm of tmp %g \n", sqrt(ntemp));
+        //blas::ax(1.0/sqrt(nout), *out);
+        //dirac.M(*out,tmp);
+        
+        
+        
+        //printfQuda("Norm of out %g \n", sqrt(nout));
         solverParam.updateInvertParam(*param);
         
+        //printfQuda("Norm of source %g \n", sqrt(nb));
+
+        
         dirac.reconstruct(*x,*b, param->solution_type);
+        dirac_mu.M(tmp,*x,1);
+        
+        //        dirac_mu.prepare(in, out, *x, *b, Dmu_param.solution_type);
+         //apply Ax=
+        double ntmp = blas::norm2(tmp);
+        printfQuda("Norm of tmp %g \n", sqrt(ntmp));
+        printfQuda("Norm of source %g \n", sqrt(nb));
+    
         //blas::ax(sqrt(nb), *x);
         if(save_res) {
             savedResults.push_back(x);
         }
-        Complex trace = blas::cDotProduct(*b,*x);
+        Complex trace = blas::cDotProduct(*b,tmp);
         TraceEstims.push_back(trace);
         //printfQuda("(%g,%g)\n",trace.real(), trace.imag());
     }

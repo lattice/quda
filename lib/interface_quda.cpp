@@ -1605,6 +1605,15 @@ namespace quda {
     case QUDA_STAGGERED_DSLASH:
       diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
       break;
+    case QUDA_ASQTAD_MUDERIV_DSLASH:
+        if (diracParam.type == pc) {
+            errorQuda("precondition not implemented for Mu-Derivative!");
+        }
+        else {
+            diracParam.type = QUDA_ASQTAD_MUDERIV_DIRAC;
+            //?  : QUDA_ASQTAD_MUDERIV_DIRAC;
+        }
+      break;
     case QUDA_ASQTAD_DSLASH:
       diracParam.type = pc ? QUDA_ASQTADPC_DIRAC : QUDA_ASQTAD_DIRAC;
       break;

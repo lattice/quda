@@ -34,7 +34,7 @@ namespace quda {
     int laplace3D;
     cudaCloverField *clover;
   
-    int order; // used by improved staggerd mu derivative only
+
     double mu; // used by twisted mass only
     double mu_factor; // used by multigrid only
     double epsilon; //2nd tm parameter (used by twisted mass only)
@@ -52,7 +52,7 @@ namespace quda {
 
   DiracParam() 
     : type(QUDA_INVALID_DIRAC), kappa(0.0), m5(0.0), matpcType(QUDA_MATPC_INVALID),
-      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), order(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
+      dagger(QUDA_DAG_INVALID), gauge(0), clover(0), mu(0.0), mu_factor(0.0), epsilon(0.0),
       tmp1(0), tmp2(0), halo_precision(QUDA_INVALID_PRECISION)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
@@ -68,7 +68,6 @@ namespace quda {
       printfQuda("Ls = %d\n", Ls);
       printfQuda("matpcType = %d\n", matpcType);
       printfQuda("dagger = %d\n", dagger);
-      printfQuda("order = %d\n", order);
       printfQuda("mu = %g\n", mu);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
