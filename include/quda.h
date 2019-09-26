@@ -215,6 +215,7 @@ extern "C" {
     QudaPrecision cuda_prec_sloppy;        /**< The precision used by the QUDA sloppy operator */
     QudaPrecision cuda_prec_refinement_sloppy; /**< The precision of the sloppy gauge field for the refinement step in multishift */
     QudaPrecision cuda_prec_precondition;  /**< The precision used by the QUDA preconditioner */
+    QudaPrecision cuda_prec_deflation;     /**< The precision used by the QUDA deflation eigensolver */
 
     QudaDiracFieldOrder dirac_order;       /**< The order of the input and output fermion fields */
 
