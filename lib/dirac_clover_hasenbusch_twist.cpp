@@ -154,8 +154,10 @@ namespace quda {
 
       // DiracCloverHasenbuschTwistPC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, parity[0]);
-      // DiracClover::DslashXpay applies (A - kappa^2 D)-
-      DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2, mu);
+
+      // applies (A + imu*g5 - kappa^2 D)-
+      ApplyTwistedClover(out, *tmp1, *gauge, clover, kappa2, mu, in, parity[1], dagger, commDim, profile);
+      flops += 1872ll*in.Volume();
     } else if (!dagger) { // symmetric preconditioning
       // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
       // where A is actually a clover inverse.
