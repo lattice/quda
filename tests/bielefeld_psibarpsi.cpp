@@ -557,7 +557,7 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
         
         cudaColorSpinorField tmp(*x);
         massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
-        dirac.prepare(in, out, *x, *b, param->solution_type);
+        dirac.prepare(in, out, *b, *x, param->solution_type);
          
         
         (*solve)(*out, *in);

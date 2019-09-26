@@ -1790,7 +1790,7 @@ namespace quda {
     }
 
     // staggered dslash uses mass normalization internally
-    if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH) {
+    if (param.dslash_type == QUDA_ASQTAD_DSLASH || param.dslash_type == QUDA_STAGGERED_DSLASH || param.dslash_type == QUDA_ASQTAD_MUDERIV_DSLASH) {
       switch (param.solution_type) {
         case QUDA_MAT_SOLUTION:
         case QUDA_MATPC_SOLUTION:
