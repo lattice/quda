@@ -72,7 +72,7 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
   gaugeParam->cpu_prec = cpu_prec;
   gaugeParam->cuda_prec = prec;
   gaugeParam->reconstruct = link_recon;
-  gaugeParam->cuda_prec_sloppy = prec_sloppy;
+  gaugeParam->cuda_prec_sloppy = prec_sloppy;  
   gaugeParam->cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   gaugeParam->reconstruct_sloppy = link_recon_sloppy;
 
@@ -171,7 +171,6 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
   inv_param->cuda_prec = prec;
   inv_param->cuda_prec_sloppy = prec_sloppy;
   inv_param->cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  inv_param->cuda_prec_deflation = prec_deflation;
   inv_param->preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param->gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
   inv_param->dirac_order = QUDA_DIRAC_ORDER;
@@ -186,7 +185,7 @@ static void set_params(QudaGaugeParam *gaugeParam, QudaInvertParam *inv_param, i
   inv_param->tol_precondition = 1e-1;
   inv_param->maxiter_precondition = 10;
   inv_param->verbosity_precondition = QUDA_SILENT;
-  inv_param->cuda_prec_precondition = inv_param->cuda_prec_sloppy;
+  inv_param->cuda_prec_precondition = prec_precondition;
 
   int tmpint = MAX(X[1] * X[2] * X[3], X[0] * X[2] * X[3]);
   tmpint = MAX(tmpint, X[0] * X[1] * X[3]);
@@ -638,7 +637,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = prec_deflation;
+  eig_param.cuda_prec_ritz = prec_precondition;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;

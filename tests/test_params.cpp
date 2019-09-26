@@ -23,9 +23,8 @@ QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
 QudaPrecision prec = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_sloppy = QUDA_INVALID_PRECISION;
 QudaPrecision prec_refinement_sloppy = QUDA_INVALID_PRECISION;
-QudaPrecision prec_precondition = QUDA_INVALID_PRECISION;
+QudaPrecision prec_precondition = QUDA_SINGLE_PRECISION;
 QudaPrecision prec_null = QUDA_INVALID_PRECISION;
-QudaPrecision prec_deflation = QUDA_INVALID_PRECISION;
 QudaVerbosity verbosity = QUDA_SUMMARIZE;
 std::array<int, 4> dim = {24, 24, 24, 24};
 int &xdim = dim[0];
@@ -379,12 +378,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
-  quda_app->add_option("--prec-precondition", precon_type, "Preconditioner precision in GPU")->transform(prec_transform);
+  quda_app->add_option("--prec-precondition", prec_precondition, "Preconditioner precision in GPU")->transform(prec_transform);
   ;
   quda_app->add_option("--prec-refine", prec_refinement_sloppy, "Sloppy precision for refinement in GPU")
     ->transform(prec_transform);
-  ;
-  quda_app->add_option("--prec-deflation", prec_deflation, "Eigenvector precision in GPU")->transform(prec_transform);
   ;
   quda_app->add_option("--prec-sloppy", prec_sloppy, "Sloppy precision in GPU")->transform(prec_transform);
   ;

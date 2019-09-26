@@ -44,7 +44,7 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, param, profile);
+      solver = new CG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
@@ -168,8 +168,8 @@ namespace quda {
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_deflation, QUDA_INVALID_PRECISION, true);
+    // This is the vector precision used by matPrecon
+    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
     param.evecs.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
 
@@ -182,7 +182,7 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_INIT);
     (*eig_solve)(param.evecs, param.evals);
     profile.TPSTART(QUDA_PROFILE_INIT);
-
+    
     if (svd) {
       // Resize deflation space and compute left SV of M
       for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++)

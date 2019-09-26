@@ -168,7 +168,7 @@ namespace quda {
     fillInnerSolveParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
-      K = new CG(matSloppy, matPrecon, Kparam, profile);
+      K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
       K = new BiCGstab(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
@@ -276,7 +276,7 @@ namespace quda {
 
     // Once the GCR operator is called, we are able to construct an appropriate
     // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
+    if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(matSloppy.Expose()), true); }
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
