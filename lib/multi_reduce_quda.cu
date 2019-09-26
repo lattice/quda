@@ -43,7 +43,7 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
+      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
 #endif
 #endif
 

@@ -36,7 +36,7 @@ namespace quda {
           .instantiate((int)tp.block.x,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, tp, stream, arg, Arg);
+	LAUNCH_KERNEL_LOCAL_PARITY(computePlaq, (*this), tp, stream, arg, Arg);
 #endif
       } else {
 	errorQuda("CPU not supported yet\n");

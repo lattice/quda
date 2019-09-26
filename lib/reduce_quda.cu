@@ -123,7 +123,7 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL(reduceKernel, tp, stream, arg, ReduceType, FloatN, M);
+      LAUNCH_KERNEL(reduceKernel, tunable, tp, stream, arg, ReduceType, FloatN, M);
 #endif
 
       if (!commAsyncReduction()) {
