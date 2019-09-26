@@ -194,7 +194,7 @@ namespace quda {
       return new DiracImprovedStaggered(param);
     } else if (param.type == QUDA_ASQTAD_MUDERIV_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a mu Derivative of a DiracImprovedStaggered operator\n");
-      return new DiracImprovedStaggered(param);
+      return new DiracImprovedStaggeredMuDeriv(param);
     } else if (param.type == QUDA_ASQTADPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracImprovedStaggeredPC operator\n");
       return new DiracImprovedStaggeredPC(param);

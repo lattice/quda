@@ -480,9 +480,11 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
 
     QudaInvertParam Dmu_param = *param; 
 
+    
+    
     Dmu_param.dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
     Dmu_param.solve_type = QUDA_DIRECT_SOLVE;
-  
+    
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaInvertParam(&Dmu_param);
 
     
@@ -527,9 +529,8 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     quda::Dirac *dSloppy_mu = nullptr;
     quda::Dirac *dPre_mu = nullptr;
 
-    (*param).dslash_type = QUDA_ASQTAD_MUDERIV_DSLASH; //CHANGE THAT TO QUDA_ASQTAD_DSLASH_MUDERIV
-    (*param).solve_type = QUDA_DIRECT_SOLVE;
-    quda::createDirac(d_mu_p, dSloppy_mu, dPre_mu, *param, false);
+    printQudaInvertParam(&Dmu_param);
+    quda::createDirac(d_mu_p, dSloppy_mu, dPre_mu, Dmu_param, false);
 
     auto d_mu = dynamic_cast<DiracImprovedStaggeredMuDeriv*>(d_mu_p); 
     
@@ -542,6 +543,8 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
 
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     DiracM mat_mu(dirac_mu), matSloppy_mu(diracSloppy_mu), matPre_mu(diracPre_mu);
+
+    
     SolverParam solverParam(*param);
     solverParam.deflate = true;
     solverParam.eig_param = *eig_param;
@@ -551,7 +554,8 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
         spinorNoise(*b, *rng, QUDA_NOISE_GAUSS);
 
         double nb = blas::norm2(*b);
-        // blas::ax(1.0 / sqrt(nb), *b);
+        
+        //        blas::ax(1.0 / sqrt(nb), *b);
         
         cudaColorSpinorField tmp(*x);
         massRescale(*static_cast<cudaColorSpinorField *>(b), *param);
@@ -588,6 +592,7 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
             savedResults.push_back(x);
         }
         Complex trace = blas::cDotProduct(*b,tmp);
+        trace/= V;
         TraceEstims.push_back(trace);
         //printfQuda("(%g,%g)\n",trace.real(), trace.imag());
     }
@@ -908,7 +913,7 @@ int invert_test(void)
   //case 2:
   
   //  psibarpsiQuda(&inv_param, &eig_param, rng.get());
-  calcTraceEstimator(&inv_param,&eig_param,rng.get(),5);
+  calcTraceEstimator(&inv_param,&eig_param,rng.get(),2000);
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;

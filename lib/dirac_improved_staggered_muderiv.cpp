@@ -13,7 +13,7 @@ namespace quda {
   DiracImprovedStaggeredMuDeriv& DiracImprovedStaggeredMuDeriv::operator=(const DiracImprovedStaggeredMuDeriv &dirac)
   {
     if (&dirac != this) {
-      DiracImprovedStaggered::operator=(dirac);
+      DiracImprovedStaggeredMuDeriv::operator=(dirac);
       // fatGauge = dirac.fatGauge;
       // longGauge = dirac.longGauge;
     }
