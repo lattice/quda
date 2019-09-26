@@ -602,6 +602,11 @@ void calcTraceEstimator(QudaInvertParam *param, QudaEigParam * eig_param, quda::
     delete d;
     delete dSloppy;
     delete dPre;
+
+    delete d_mu_p;
+    delete dSloppy_mu;
+    delete dPre_mu;
+    
     for (auto it=TraceEstims.begin(); it!=TraceEstims.end(); ++it) {
         printfQuda("(%g,%g)\n", (*it).real(), (*it).imag());
     }
@@ -913,7 +918,7 @@ int invert_test(void)
   //case 2:
   
   //  psibarpsiQuda(&inv_param, &eig_param, rng.get());
-  calcTraceEstimator(&inv_param,&eig_param,rng.get(),2000);
+  calcTraceEstimator(&inv_param,&eig_param,rng.get(),5);
     // pinvertQuda(out->V(), in->V(), &inv_param);
     time0 += clock(); // stop the timer
     time0 /= CLOCKS_PER_SEC;
