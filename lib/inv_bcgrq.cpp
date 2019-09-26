@@ -27,7 +27,7 @@ namespace quda
 #define BLOCKSOLVER_MULTIFUNCTIONS
 //#define BLOCKSOLVE_DSLASH5D
 #endif
-//#define BLOCKSOLVER_VERBOSE
+// #define BLOCKSOLVER_VERBOSE
 
 // Run algorithm with Q in high precision.
 #define BLOCKSOLVER_PRECISE_Q
@@ -241,41 +241,45 @@ namespace quda
 
     ColorSpinorParam csParam(*x[0]);
 
-    csParam.is_composite = true;
-    csParam.composite_dim = nsrc;
-    csParam.nDim = 5;
-    csParam.x[4] = 1;
+    // csParam.is_composite = true;
+    // csParam.composite_dim = nsrc;
+    // csParam.nDim = 5;
+    // csParam.x[4] = 1;
 
     if (!init) {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      rp.resize(nsrc, ColorSpinorField::Create(*b[0], csParam));
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp.resize(nsrc, ColorSpinorField::Create(*b[0], csParam));
+      for(int i=0; i < nsrc; i++){
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      rp.emplace_back(ColorSpinorField::Create(csParam));
+      // csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp.emplace_back(ColorSpinorField::Create(csParam));
+    
 #ifdef BLOCKSOLVER_PRECISE_Q // high precision Q
-      qp.resize(nsrc, ColorSpinorField::Create(csParam));
-      tmpp.resize(nsrc, ColorSpinorField::Create(csParam));
+      qp.emplace_back(ColorSpinorField::Create(csParam));
+      tmpp.emplace_back(ColorSpinorField::Create(csParam));
 #endif
       // sloppy fields
       csParam.setPrecision(param.precision_sloppy);
-      x_sloppy_savedp.resize(nsrc, ColorSpinorField::Create(csParam));
-      pp.resize(nsrc, ColorSpinorField::Create(csParam));
+      x_sloppy_savedp.emplace_back(ColorSpinorField::Create(csParam));
+      pp.emplace_back(ColorSpinorField::Create(csParam));
 #ifdef BLOCKSOLVER_PRECISE_Q // we need an extra temporary p since we can't tmpp <-> qp <-> pp swap anymore.
-      p_oldp.resize(nsrc, ColorSpinorField::Create(csParam));
+      p_oldp.emplace_back(ColorSpinorField::Create(csParam));
 #else
-      qp.resize(nsrc, ColorSpinorField::Create(csParam)); // We need a sloppy q.
-      tmpp.resize(nsrc, ColorSpinorField::Create(csParam));
+      qp.emplace_back(ColorSpinorField::Create(csParam)); // We need a sloppy q.
+      tmpp.emplace_back(ColorSpinorField::Create(csParam));
 #endif
-      App.resize(nsrc, ColorSpinorField::Create(csParam));
-      tmp_matsloppyp.resize(nsrc, ColorSpinorField::Create(csParam));
+      App.emplace_back(ColorSpinorField::Create(csParam));
+      tmp_matsloppyp.emplace_back(ColorSpinorField::Create(csParam));
+      }
       init = true;
     }
     ColorSpinorFieldVector &r = rp;
     ColorSpinorFieldVector &y = yp;
-    ColorSpinorFieldVector &x_sloppy_saved = x_sloppy_savedp;
+    // ColorSpinorFieldVector &x_sloppy_saved = x_sloppy_savedp;
     ColorSpinorFieldVector &Ap = App;
     ColorSpinorFieldVector &tmp_matsloppy = tmp_matsloppyp;
 
-    ColorSpinorFieldVector x_sloppyp; // Gets assigned below.
+    ColorSpinorFieldVector x_sloppyp;
+    x_sloppyp.reserve(nsrc); // Gets assigned below.
 
     csParam.setPrecision(param.precision_sloppy);
     // tmp2 only needed for multi-gpu Wilson-like kernels
@@ -284,12 +288,12 @@ namespace quda
     // ColorSpinorField &tmp2 = *tmp2_p;
     ColorSpinorFieldVector tmp2_p; // = nullptr;
 
-    if (!mat.isStaggered()) {
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      tmp2_p.resize(nsrc, ColorSpinorField::Create(*x[0], csParam));
-    } else {
+    // if (!mat.isStaggered()) {
+    //   csParam.create = QUDA_ZERO_FIELD_CREATE;
+    //   tmp2_p.resize(nsrc, ColorSpinorField::Create(*x[0], csParam));
+    // } else {
       tmp2_p = tmp_matsloppyp;
-    }
+    // }
 
     ColorSpinorFieldVector &tmp2 = tmp2_p;
 
@@ -297,22 +301,29 @@ namespace quda
     csParam.setPrecision(param.precision);
 
     ColorSpinorFieldVector tmp3_p; // = nullptr;
-    if (param.precision != param.precision_sloppy && !mat.isStaggered()) {
-      // csParam.create = QUDA_ZERO_FIELD_CREATE;
-      tmp3_p.resize(nsrc, ColorSpinorField::Create(*x[0], csParam)); // ColorSpinorField::Create(csParam);
-      // tmp3_p->ExtendLastDimension();
-    } else {
+    // if (param.precision != param.precision_sloppy && !mat.isStaggered()) {
+    //   // csParam.create = QUDA_ZERO_FIELD_CREATE;
+    //   tmp3_p.emplace_back(ColorSpinorField::Create(*x[0], csParam)); // ColorSpinorField::Create(csParam);
+    //   // tmp3_p->ExtendLastDimension();
+    // } else {
       tmp3_p = tmp_matsloppyp;
-    }
+    // }
 
-    ColorSpinorFieldVector &tmp3 = tmp3_p;
+    ColorSpinorFieldVector &tmp3 = tmp_matsloppyp;
 
     // Step 2: R = AX - B, using Y as a temporary with the right precision.
-#ifdef BLOCKSOLVE_DSLASH5D
-    mat(r, x, y, tmp3);
-#else
-    for (int i = 0; i < nsrc; i++) { mat(*r[i], *x[i], *y[i], *tmp3[i]); }
-#endif
+// #ifdef BLOCKSOLVE_DSLASH5D
+    // mat(r, x, y, tmp3);
+// #else
+    // for (int i = 0; i < nsrc; i++) { mat(*rp[i], *x[i], *yp[i], *tmp3_p[i]); }
+// #endif
+    for (int i = 0; i < nsrc; i++) {
+      // r2avg += H(i, i).real();
+      // printfQuda("r2[%i] %e\n", i, H(i, i).real());
+            // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
+      mat(*r[i], *x[i], *y[i], *tmp3[i]);
+      // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
+    }
 
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // blas::xpay(b, -1.0, r);
@@ -332,7 +343,8 @@ namespace quda
     // we're doing mixed precision or not. Based
     // on BiCGstab-L conventions.
     if (param.precision_sloppy == x[0]->Precision() || !param.use_sloppy_partial_accumulator) {
-      x_sloppyp = x;
+      
+      for(int i=0; i < nsrc; i++) x_sloppyp[i] = x[i];
       // x_sloppyp = std::shared_ptr<ColorSpinorField>(&x, ; // s_sloppy and x point to the same vector in memory.
       // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
       // blas::zero(*x_sloppyp); // x_sloppy is zeroed out (and, by extension, so is x)
@@ -417,6 +429,7 @@ namespace quda
     for (int i = 0; i < nsrc; i++) {
       r2avg += H(i, i).real();
       printfQuda("r2[%i] %e\n", i, H(i, i).real());
+      printfQuda("CHECK r2 %e\n",blas::norm2(*r[0]));
     }
 #else
     for (int i = 0; i < nsrc; i++) {
@@ -545,15 +558,15 @@ namespace quda
 
 #else
 
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    blas::copy(*tmpp, r);              // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
-    blas::caxpy_U(Linv_raw, tmpp, qp); // C is upper triangular, so its inverse is.
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+//     blas::copy(*tmpp, r);              // Need to do this b/c r is fine, q is sloppy, can't caxpy w/ x fine, y sloppy.
+//     blas::caxpy_U(Linv_raw, tmpp, qp); // C is upper triangular, so its inverse is.
+// #else
     for (int i = 0; i < nsrc; i++) {
-      blas::copy(tmpp[i], r[i]);
-      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), tmpp[i], qp[j]); }
+      blas::copy(*tmpp[i], *r[i]);
+      for (int j = i; j < nsrc; j++) { blas::caxpy(Linv(i, j), *tmpp[i], *qp[j]); }
     }
-#endif
+// #endif
 
 #endif // BLOCKSOLVER_PRECISE_Q
 
@@ -561,13 +574,13 @@ namespace quda
     for (int i = 0; i < nsrc; i++) blas::copy(*pp[i], *qp[i]);
 
 #ifdef BLOCKSOLVER_VERBOSE
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-    blas::hDotProduct(pTp_raw, pp, pp;
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+    // blas::hDotProduct(pTp_raw, pp, pp);
+// #else
     for (int i = 0; i < nsrc; i++) {
-      for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(pp[i], pp[j]); }
+      for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(*pp[i], *pp[j]); }
     }
-#endif
+// #endif
 
     std::cout << " pTp  " << std::endl << pTp << std::endl;
     std::cout << " L " << std::endl << L.adjoint() << std::endl;
@@ -684,12 +697,12 @@ namespace quda
 #endif
 
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
+      qp.swap(tmpp); // now Q actually is Q. tmp is the old Q.
 #else
       // Technically, this is a 5D function that should
       // be split into a bunch of 4D functions... but it's
       // pointer swapping, that gets messy.
-      std::swap(qp, tmpp); // now Q actually is Q. tmp is the old Q.
+      qp.swap(tmpp); // now Q actually is Q. tmp is the old Q.
 #endif
 
       // Step 22: Back up C (we need to have it if we trigger a reliable update)
@@ -928,10 +941,10 @@ namespace quda
       // #else
       for (int i = 0; i < nsrc; i++) { blas::copy(*p_oldp[i], *tmpp[i]); }
       // #endif
-      std::swap(pp, p_oldp);
+      pp.swap(p_oldp);
 
 #else
-      std::swap(pp, tmpp); // now P contains P, tmp now contains P_old
+      pp.swap(tmpp); // now P contains P, tmp now contains P_old
 #endif
 
       // Done with step 28.
@@ -987,7 +1000,7 @@ namespace quda
 
 #ifdef BLOCKSOLVER_VERBOSE
 #ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::hDotProduct(pTp_raw, pp, pp -);
+      blas::hDotProduct(pTp_raw, pp, pp );
 #else
       for (int i = 0; i < nsrc; i++) {
         for (int j = 0; j < nsrc; j++) { pTp(i, j) = blas::cDotProduct(pp[i], pp[j]); }
@@ -1019,14 +1032,14 @@ namespace quda
 #ifdef BLOCKSOLVER_PRECISE_Q
     // But remember p_oldp holds the old p.
     if (!just_reliable_updated) {
-#ifdef BLOCKSOLVER_MULTIFUNCTIONS
-      blas::caxpy(alpha_raw, p_oldp, x_sloppy);
-#else
+// #ifdef BLOCKSOLVER_MULTIFUNCTIONS
+      // blas::caxpy(alpha_raw, p_oldp, x_sloppy);
+// #else
       // temporary hack using AC
       for (int i = 0; i < nsrc; i++) {
-        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), p_oldp[i], x_sloppy[j]); }
+        for (int j = 0; j < nsrc; j++) { blas::caxpy(alpha(i, j), *p_oldp[i], *x_sloppy[j]); }
       }
-#endif
+// #endif
     }
 
 #else // !BLOCKSOLVER_PRECISE_Q
@@ -1153,25 +1166,25 @@ namespace quda
 
     switch (param.num_src) {
     case 1: solve_n<1>(x, b); break;
-    case 2: solve_n<2>(x, b); break;
-    case 3: solve_n<3>(x, b); break;
+    // case 2: solve_n<2>(x, b); break;
+    // case 3: solve_n<3>(x, b); break;
     case 4: solve_n<4>(x, b); break;
-    case 5: solve_n<5>(x, b); break;
-    case 6: solve_n<6>(x, b); break;
-    case 7: solve_n<7>(x, b); break;
-    case 8: solve_n<8>(x, b); break;
-    case 9: solve_n<9>(x, b); break;
-    case 10: solve_n<10>(x, b); break;
-    case 11: solve_n<11>(x, b); break;
-    case 12: solve_n<12>(x, b); break;
-    case 13: solve_n<13>(x, b); break;
-    case 14: solve_n<14>(x, b); break;
-    case 15: solve_n<15>(x, b); break;
-    case 16: solve_n<16>(x, b); break;
-    case 24: solve_n<24>(x, b); break;
-    case 32: solve_n<32>(x, b); break;
-    case 48: solve_n<48>(x, b); break;
-    case 64: solve_n<64>(x, b); break;
+    // case 5: solve_n<5>(x, b); break;
+    // case 6: solve_n<6>(x, b); break;
+    // case 7: solve_n<7>(x, b); break;
+    // case 8: solve_n<8>(x, b); break;
+    // case 9: solve_n<9>(x, b); break;
+    // case 10: solve_n<10>(x, b); break;
+    // case 11: solve_n<11>(x, b); break;
+    // case 12: solve_n<12>(x, b); break;
+    // case 13: solve_n<13>(x, b); break;
+    // case 14: solve_n<14>(x, b); break;
+    // case 15: solve_n<15>(x, b); break;
+    // case 16: solve_n<16>(x, b); break;
+    // case 24: solve_n<24>(x, b); break;
+    // case 32: solve_n<32>(x, b); break;
+    // case 48: solve_n<48>(x, b); break;
+    // case 64: solve_n<64>(x, b); break;
     default: errorQuda("Block-CG with dimension %d not supported", param.num_src);
     }
   }
