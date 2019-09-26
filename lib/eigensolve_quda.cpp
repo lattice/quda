@@ -243,7 +243,7 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    Complex*s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
     blas::cDotProduct(s, eig_vecs_ptr, vec);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i

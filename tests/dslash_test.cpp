@@ -207,7 +207,8 @@ void init(int argc, char **argv) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
@@ -283,7 +284,8 @@ void init(int argc, char **argv) {
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
@@ -301,7 +303,8 @@ void init(int argc, char **argv) {
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (compute_clover) printfQuda("Computing clover field on GPU\n");
     else printfQuda("Sending clover field to GPU\n");
     inv_param.compute_clover = compute_clover;
@@ -393,7 +396,8 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     free(hostClover);
     free(hostCloverInv);
   }
@@ -638,6 +642,46 @@ void dslashRef() {
     default:
       printfQuda("Test type not defined\n");
       exit(-1);
+    }
+  } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n", inv_param.kappa, inv_param.mu);
+    fflush(stdout);
+    switch (test_type) {
+    case 0:
+      // My dslash should be the same as the clover dslash
+      clover_dslash(spinorRef->V(), hostGauge, hostCloverInv, spinor->V(), parity, dagger, inv_param.cpu_prec,
+                    gauge_param);
+      break;
+    case 1:
+      // my matpc op
+      cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+
+      break;
+    case 2:
+      // my mat
+      cloverHasenbuchTwist_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                               dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+      break;
+    case 3:
+      // matpc^\dagger matpc
+      // my matpc op
+      cloverHasenbuschTwist_matpc(spinorTmp->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+
+      cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
+
+      break;
+    case 4:
+      // my mat
+      cloverHasenbuchTwist_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                               dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+      cloverHasenbuchTwist_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu,
+                               not_dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+
+      break;
+    default: printfQuda("Test type not defined\n"); exit(-1);
     }
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {

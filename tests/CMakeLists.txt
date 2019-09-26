@@ -122,8 +122,8 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(bielefeld_psibarpsi QUDA_BUILD_ALL_TESTS)
 
   if(QUDA_BLOCKSOLVER)
-    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp
-                        blas_reference.cpp)
+    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp
+                      llfat_reference.cpp)
     target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
@@ -323,6 +323,32 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
+ if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+    # symmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    # asymmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+  
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}

@@ -809,6 +809,37 @@ namespace quda {
     return alias;
   }
 
+  std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateSmartPtr(const ColorSpinorParam &param)
+  {
+
+    std::unique_ptr<ColorSpinorField> field; // = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = std::make_unique<cpuColorSpinorField>(param);
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
+      field = std::make_unique<cudaColorSpinorField>(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
+  std::unique_ptr<ColorSpinorField> ColorSpinorField::CreateSmartPtr(const ColorSpinorField &src,
+                                                                     const ColorSpinorParam &param)
+  {
+
+    std::unique_ptr<ColorSpinorField> field; // = NULL;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = std::make_unique<cpuColorSpinorField>(src, param);
+    } else if (param.location == QUDA_CUDA_FIELD_LOCATION) {
+      field = std::make_unique<cudaColorSpinorField>(src, param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
+  }
+
   ColorSpinorField* ColorSpinorField::CreateCoarse(const int *geoBlockSize, int spinBlockSize, int Nvec,
                                                    QudaPrecision new_precision, QudaFieldLocation new_location,
                                                    QudaMemoryType new_mem_type) {

@@ -418,11 +418,23 @@ namespace quda {
 				 void **ghost, bool extract) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
       extractGhostEx(u, dim, R, (double**)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       extractGhostEx(u, dim, R, (float**)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       extractGhostEx(u, dim, R, (short**)ghost, extract);      
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }

@@ -27,6 +27,7 @@ public:
       create_jitify_program("kernels/gauge_qcharge.cuh");
 #endif
     }
+
     virtual ~QChargeCompute() {}
 
     void apply(const cudaStream_t &stream)

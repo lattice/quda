@@ -5,6 +5,7 @@
 #include <quda.h>
 
 #include <iostream>
+#include <memory>
 
 #include <lattice_field.h>
 #include <random_quda.h>
@@ -18,6 +19,8 @@ namespace quda {
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
+  /** for convenience and potentially future updates to using smart pointer use this here*/
+  using ColorSpinorFieldVector = std::vector<ColorSpinorField*>;
 
   /**
      Any spinor object can be qualified in the following categories:
@@ -538,6 +541,8 @@ namespace quda {
 
     static ColorSpinorField* Create(const ColorSpinorParam &param);
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorParam &param);
+    static std::unique_ptr<ColorSpinorField> CreateSmartPtr(const ColorSpinorField &src, const ColorSpinorParam &param);
 
     /**
        @brief Create a field that aliases this field's storage.  The
@@ -579,6 +584,34 @@ namespace quda {
 
     friend std::ostream& operator<<(std::ostream &out, const ColorSpinorField &);
     friend class ColorSpinorParam;
+
+   /**
+    * 
+    * Currently, this is needed to convert 5-d into 4-d parity field and vice versa
+    */
+
+    void ReduceDimensionality() {
+      if (nDim-1 < 1) errorQuda("Cannot reduce field dimension less than 1");
+      nDim--;
+      x[nDim] = 1; //that is, after reduction/extension 5d direction is trivial
+      setTuningString();
+    }
+    void ExtendDimensionality() {
+      if (nDim+1 > QUDA_MAX_DIM) errorQuda("Cannot extend field dimension beyond QUDA_MAX_DIM=%d", QUDA_MAX_DIM);
+      x[nDim] = 1;
+      nDim++;
+      setTuningString();
+    }
+ 
+    void ExtendLastDimension() {
+      if(composite_descr.is_composite && (x[nDim-1] == 1)) {
+        x[nDim-1] = composite_descr.dim;
+      } else {
+        errorQuda("Cannot apply extension of dimension size.\n");
+      }
+      setTuningString();
+    } 
+
   };
 
   // CUDA implementation
@@ -973,9 +1006,6 @@ namespace quda {
 
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
-
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);
 
   void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
 

@@ -198,7 +198,7 @@ void initFields(int prec, int order)
   mH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-// create composite fields
+  // create composite fields
 
   // xmH = new cpuColorSpinorField(param);
   // ymH = new cpuColorSpinorField(param);
@@ -209,7 +209,6 @@ void initFields(int prec, int order)
   for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
   zmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
-
 
   static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   static_cast<cpuColorSpinorField*>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -259,6 +258,11 @@ void initFields(int prec, int order)
   default:
     errorQuda("Precision option not defined");
   }
+
+  // ensure we don't enable copying between precisions that are not compiled
+  if ( (high_aux_prec != QUDA_DOUBLE_PRECISION) && !(high_aux_prec & QUDA_PRECISION) ) high_aux_prec = getPrecision(prec);
+  if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
+  if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
   checkCudaError();
 

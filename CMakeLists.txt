@@ -104,7 +104,8 @@ set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
+set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
+set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
@@ -692,6 +693,11 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
   add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
                   -DGPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
+
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  add_definitions(-DGPU_CLOVER_HASENBUSCH_TWIST -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+                  -DGPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
 
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)

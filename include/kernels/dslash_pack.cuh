@@ -7,8 +7,7 @@
 
 namespace quda
 {
-
-  static int commDim[QUDA_MAX_DIM];
+  int *getPackComms();
 
   template <typename Float_, int nColor_, int nSpin_, bool spin_project_ = true> struct PackArg {
 
@@ -70,7 +69,7 @@ namespace quda
       for (int i = 0; i < 4; i++) {
         threadDimMapLower[i] = 0;
         threadDimMapUpper[i] = 0;
-        if (!commDim[i]) continue;
+        if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
         prev = i;
