@@ -419,14 +419,12 @@ namespace quda {
     if (inA.Nspin() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",inA.Nspin());
 
-#if 0
-    } else if (inA.Ncolor() == 4) {
+if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,yFloat,ghostFloat,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
-#if 0 // ESW HACK FOR STAGGERED COMPILE
-    if (inA.Ncolor() == 6) { // free field Wilson
+#ifdef NSPIN4
+    } else if (inA.Ncolor() == 6) { // free field Wilson
       ApplyCoarse<Float,yFloat,ghostFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
+#endif // NSPIN4
 #if 0
     } else if (inA.Ncolor() == 8) {
       ApplyCoarse<Float,yFloat,ghostFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
@@ -444,16 +442,16 @@ namespace quda {
     } else if (inA.Ncolor() == 28) {
       ApplyCoarse<Float,yFloat,ghostFloat,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif
-#if 0 // ESW HACK FOR STAGGERED COMPILE
+#ifdef NSPIN4
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,ghostFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
-#ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
     } else if (inA.Ncolor() == 64) {
       ApplyCoarse<Float,yFloat,ghostFloat,64,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else if (inA.Ncolor() == 96) { 
       ApplyCoarse<Float,yFloat,ghostFloat,96,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
+#endif // NSPIN1
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

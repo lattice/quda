@@ -210,24 +210,32 @@ namespace quda {
 
   // traits used to ensure we only instantiate arbitrary colors for nSpin=2,4 fields, and only 3 colors otherwise
   template<typename T, typename G, int nSpin, int nColor_> struct precision_spin_color_mapper { static constexpr int nColor = nColor_; };
-#ifndef GPU_STAGGERED_DIRAC
+#ifndef NSPIN1
   template<typename T, typename G, int nColor_> struct precision_spin_color_mapper<T,G,1,nColor_> { static constexpr int nColor = 3; };
 #endif
 
+#ifdef NSPIN4
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,4,nColor_> { static constexpr int nColor = 3; };
   template<int nColor_> struct precision_spin_color_mapper<float,char,4,nColor_> { static constexpr int nColor = 3; };
+#endif
 
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
   // never need block-float format with nSpin=4 fields for arbitrary colors
   template<int nColor_> struct precision_spin_color_mapper<float,short,1,nColor_> { static constexpr int nColor = 3; };
   template<int nColor_> struct precision_spin_color_mapper<float,char,1,nColor_> { static constexpr int nColor = 3; };
 #endif
 
 #ifndef GPU_MULTIGRID_DOUBLE
+#ifdef NSPIN1
   template<int nColor_> struct precision_spin_color_mapper<double,double,1,nColor_> { static constexpr int nColor = 3; };
+#endif
+#ifdef NSPIN2
   template<int nColor_> struct precision_spin_color_mapper<double,double,2,nColor_> { static constexpr int nColor = 3; };
+#endif
+#ifdef NSPIN4
   template<int nColor_> struct precision_spin_color_mapper<double,double,4,nColor_> { static constexpr int nColor = 3; };
+#endif
 #endif
 
   template <typename Float, typename ghostFloat, QudaFieldOrder order, int Ns>
@@ -292,7 +300,7 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,768>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 1024) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
     } else if (a.Ncolor() == 1536) { // staggered KD 24 -> 64 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 2304) { // staggered KD 24 -> 96 nvec
@@ -303,7 +311,7 @@ namespace quda {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6144>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 9216) { // staggered 96 -> 96 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,9216>::nColor>(ghost, a, parity, nFace, dagger, destination);
-#endif // GPU_STAGGERED_DIRAC
+#endif // NSPIN1
 #endif // GPU_MULTIGRID
     } else {
       errorQuda("Unsupported nColor = %d", a.Ncolor());

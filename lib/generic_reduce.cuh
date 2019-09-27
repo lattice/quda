@@ -75,22 +75,24 @@ ReduceType genericReduce(
   } else if (x.Ncolor() == 24) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 24, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
+#ifdef NSPIN4
   } else if (x.Ncolor() == 32) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 32, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-#ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
   } else if (x.Ncolor() == 64) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 64, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-#endif
+#endif // NSPIN1
   } else if (x.Ncolor() == 72) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 72, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
   } else if (x.Ncolor() == 96) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 96, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-#endif
+#endif // NSPIN1
   } else if (x.Ncolor() == 576) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 576, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
