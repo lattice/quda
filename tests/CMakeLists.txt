@@ -5,7 +5,7 @@ include_directories(. googletest/include googletest)
 # enable tests build a common library for all test utilities
 set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp test_params.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -15,10 +15,10 @@ if(QUDA_QDPJIT)
                                   ${QMP_LIB} ${MPI_CXX_LIBRARIES})
 endif()
 
-if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD)
+if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QIOHOME)
   add_dependencies(quda_test QIO)
 endif()
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
+if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
   add_dependencies(quda_test QMP)
 endif()
 

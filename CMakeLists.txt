@@ -433,7 +433,7 @@ if(QUDA_QMP)
                         )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set(QUDA_QMPHOME ${INSTALL_DIR})
+    set(QUDA_QMPHOME ${INSTALL_DIR} CACHE PATH "path to QMP" FORCE)
     set(QUDA_QMP_LDFLAGS
         "-L${QUDA_QMPHOME}/lib"
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
@@ -494,9 +494,9 @@ if(QUDA_QIO)
                         # LOG_OUTPUT_ON_FAILURE ON
                         )
     ExternalProject_Get_Property(QIO INSTALL_DIR)
-    set(QUDA_QIOHOME ${INSTALL_DIR})
-    set(QUDA_LIME_HOME ${INSTALL_DIR})
 
+    set(QUDA_QIOHOME ${INSTALL_DIR} CACHE PATH "path to QIO" FORCE)
+    set(QUDA_LIMEHOME ${INSTALL_DIR} CACHE PATH "path to LIME" FORCE)
     ExternalProject_Add_Step(QIO reconf
                              COMMAND ${AUTORECONF_EXE} -fi
                              WORKING_DIRECTORY <SOURCE_DIR>
