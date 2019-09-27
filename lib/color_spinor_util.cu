@@ -123,6 +123,7 @@ namespace quda {
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
     if (a.Ncolor() == 3) {
       genericSource<Float,nSpin,3,order>(a,sourceType, x, s, c);
+#ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 4) {
       genericSource<Float,nSpin,4,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 6) { // for Wilson free field
@@ -139,6 +140,7 @@ namespace quda {
       genericSource<Float,nSpin,24,order>(a,sourceType, x, s, c);
     } else if (a.Ncolor() == 32) {
       genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
+#endif
     } else {
       errorQuda("Unsupported nColor=%d\n", a.Ncolor());
     }
@@ -147,11 +149,23 @@ namespace quda {
   template <typename Float, QudaFieldOrder order>
   void genericSource(cpuColorSpinorField &a, QudaSourceType sourceType, int x, int s, int c) {
     if (a.Nspin() == 1) {
+#ifdef NSPIN1
       genericSource<Float,1,order>(a,sourceType, x, s, c);
+#else
+      errorQuda("nSpin=1 not enabled for this build");
+#endif
     } else if (a.Nspin() == 2) {
+#ifdef NSPIN2
       genericSource<Float,2,order>(a,sourceType, x, s, c);
+#else
+      errorQuda("nSpin=2 not enabled for this build");
+#endif
     } else if (a.Nspin() == 4) {
+#ifdef NSPIN4
       genericSource<Float,4,order>(a,sourceType, x, s, c);
+#else
+      errorQuda("nSpin=4 not enabled for this build");
+#endif
     } else {
       errorQuda("Unsupported nSpin=%d\n", a.Nspin());
     }

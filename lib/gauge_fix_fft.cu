@@ -316,7 +316,7 @@ namespace quda {
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
-      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
+      LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
       qudaDeviceSynchronize();
       argQ.result_h[0].x  /= (double)(3 * gauge_dir * 2 * argQ.threads);
       argQ.result_h[0].y  /= (double)(3 * 2 * argQ.threads);

@@ -141,10 +141,9 @@ namespace quda
                         double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
-      constexpr int nDim = 4;
-
       if (in.Nspin() == 1) {
 #ifdef GPU_STAGGERED_DIRAC
+        constexpr int nDim = 4;
         constexpr int nSpin = 1;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in);
@@ -158,6 +157,7 @@ namespace quda
 #endif
       } else if (in.Nspin() == 4) {
 #ifdef GPU_WILSON_DIRAC
+        constexpr int nDim = 4;
         constexpr int nSpin = 4;
         LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
         Laplace<decltype(arg)> laplace(arg, out, in);

@@ -40,17 +40,6 @@ namespace quda {
     flops += 1872ll*in.Volume();
   }
 
-  /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &k, const double &b) const
-  {
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    ApplyTwistedClover(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-    flops += 1872ll * in.Volume();
-  }
-
   // Public method to apply the clover term only
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
