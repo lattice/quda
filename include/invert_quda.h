@@ -277,7 +277,7 @@ namespace quda {
       preconditioner(param.preconditioner),
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
-      deflate(false),
+      deflate(param.eig_param != nullptr),
       use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       delta(param.reliable_delta),
@@ -335,6 +335,9 @@ namespace quda {
       mg_instance(false),
       extlib_type(param.extlib_type)
     {
+      if(deflate){
+        eig_param =*(static_cast<QudaEigParam*>(param.eig_param));
+      }
       for (int i=0; i<num_offset; i++) {
         offset[i] = param.offset[i];
         tol_offset[i] = param.tol_offset[i];
@@ -1181,6 +1184,16 @@ public:
     void PrintStats(const char*, int k, const double &r2, const double &b2, const double &hq2);
 
     /**
+       Deflation objects
+    */
+    EigenSolver *eig_solve;
+    bool deflate_init = false;
+    std::vector<ColorSpinorField *> defl_tmp1;
+    std::vector<ColorSpinorField *> defl_tmp2;
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd);
+
+
+    /**
   Prints out the summary of the solver convergence (requires a
   versbosity of QUDA_SUMMARIZE).  Assumes
   SolverParam.true_res and SolverParam.true_res_hq has
@@ -1194,6 +1207,7 @@ public:
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorFieldVector yp, rp, App, tmpp;
     ColorSpinorFieldVector p;
@@ -1205,10 +1219,11 @@ public:
     void solve_n(ColorSpinorFieldVector& out, ColorSpinorFieldVector& in);
     int block_reliable(double &rNorm, double &maxrx, double &maxrr, const double &r2, const double &delta);
 
+
     
 
   public:
-    BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~BlockCG();
     void operator()(ColorSpinorFieldVector &out, ColorSpinorFieldVector &in);
 
