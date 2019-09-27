@@ -104,7 +104,8 @@ set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
+set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
+set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
@@ -175,6 +176,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
+set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
@@ -200,9 +203,9 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
+mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -640,6 +643,10 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
+if(QUDA_REDUCE_SINGLE_WARP)
+add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+endif()
+
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
@@ -694,8 +701,13 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
                   -DGPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  add_definitions(-DGPU_CLOVER_HASENBUSCH_TWIST -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+                  -DGPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
+
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
+  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_LINK_ASQTAD)

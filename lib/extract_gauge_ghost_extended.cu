@@ -338,21 +338,37 @@ namespace quda {
         typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
         extractGhostEx<Float, length>(G(u, 0, Ghost), dim, u.SurfaceCB(), u.X(), R, extract, u, location);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+#if QUDA_RECONSTRUCT & 1
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost), 
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
+#if QUDA_RECONSTRUCT & 1
+	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type G;
 	extractGhostEx<Float,length>(G(u, 0, Ghost),
 				     dim, u.SurfaceCB(), u.X(), R, extract, u, location);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+#endif
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
       
@@ -418,11 +434,23 @@ namespace quda {
 				 void **ghost, bool extract) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
       extractGhostEx(u, dim, R, (double**)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       extractGhostEx(u, dim, R, (float**)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       extractGhostEx(u, dim, R, (short**)ghost, extract);      
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }

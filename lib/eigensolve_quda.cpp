@@ -209,7 +209,7 @@ namespace quda
     host_free(s);
     return sum;
   }
-
+  
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
 

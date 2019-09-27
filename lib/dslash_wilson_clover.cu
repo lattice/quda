@@ -80,6 +80,25 @@ namespace quda
     }
   };
 
+  template <typename Float, int nColor, QudaReconstructType recon> struct WilsonCloverWithTwistApply {
+
+    inline WilsonCloverWithTwistApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                      const CloverField &A, double a, double b, const ColorSpinorField &x, int parity,
+                                      bool dagger, const int *comm_override, TimeProfile &profile)
+    {
+      constexpr int nDim = 4;
+      WilsonCloverArg<Float, nColor, nDim, recon, true> arg(out, in, U, A, a, b, x, parity, dagger, comm_override);
+      WilsonClover<decltype(arg)> wilson(arg, out, in);
+
+      dslash::DslashPolicyTune<decltype(wilson)> policy(
+        wilson, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+        in.GhostFaceCB(), profile);
+      policy.apply(0);
+
+      checkCudaError();
+    }
+  };
+
   // Apply the Wilson-clover operator
   // out(x) = M*in = (A(x) + a * \sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu))
   // Uses the kappa normalization for the Wilson operator.

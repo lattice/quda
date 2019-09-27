@@ -278,11 +278,11 @@ namespace quda {
 
     if (out.Nspin() == 2) {
       Prolongate<Float,2>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (out.Nspin() == 4) {
       Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
