@@ -44,6 +44,7 @@ void genericBlas(
 {
   if (x.Ncolor() == 3) {
     genericBlas<Float, yFloat, nSpin, 3, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#ifdef GPU_MULTIGRID
   } else if (x.Ncolor() == 4) {
     genericBlas<Float, yFloat, nSpin, 4, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 6) { // free field Wilson
@@ -60,6 +61,7 @@ void genericBlas(
     genericBlas<Float, yFloat, nSpin, 24, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 32) {
     genericBlas<Float, yFloat, nSpin, 32, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif
   } else {
     errorQuda("nColor = %d not implemented", x.Ncolor());
   }
@@ -71,15 +73,23 @@ void genericBlas(
     ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, Functor f)
 {
   if (x.Nspin() == 4) {
+#ifdef NSPIN4
     genericBlas<Float, yFloat, 4, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Nspin() == 2) {
-    genericBlas<Float, yFloat, 2, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-#ifdef GPU_STAGGERED_DIRAC
-  } else if (x.Nspin() == 1) {
-    genericBlas<Float, yFloat, 1, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
 #endif
-  } else {
-    errorQuda("nSpin = %d not implemented", x.Nspin());
+  } else if (x.Nspin() == 2) {
+#ifdef NSPIN2
+    genericBlas<Float, yFloat, 2, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
+  } else if (x.Nspin() == 1) {
+#ifdef NSPIN1
+    genericBlas<Float, yFloat, 1, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
   }
 }
 

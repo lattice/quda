@@ -36,7 +36,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   dslash_pack2.cu
-  blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu

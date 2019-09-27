@@ -115,6 +115,15 @@ void initComms(int argc, char **argv, int *const commDims)
 
 }
 
+bool last_node_in_t()
+{
+  // only apply T-boundary at edge nodes
+#ifdef MULTI_GPU
+  return commCoords(3) == commDim(3) - 1;
+#else
+  return true;
+#endif
+}
 
 void finalizeComms()
 {
@@ -704,15 +713,8 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
     }
   }
 
-  // only apply T-boundary at edge nodes
-#ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
-#else
-  bool last_node_in_t = true;
-#endif
-
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
 	gauge[3][j*gaugeSiteSize+i] *= -1.0;
@@ -724,7 +726,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
   if (param->gauge_fix) {
     // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
-    int iMax = ( last_node_in_t ? (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1) : Vh );
+    int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
@@ -744,7 +746,6 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
-
   int X1h=param->X[0]/2;
   int X1 =param->X[0];
   int X2 =param->X[1];
@@ -827,17 +828,10 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 
   }
 
-  // only apply T-boundary at edge nodes
-#ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
-#else
-  bool last_node_in_t = true;
-#endif
-
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = 0; j < Vh; j++) {
-      int sign =1;
+      int sign = 1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
 	if (j >= (X4-3)*X1h*X2*X3 ){
 	  sign = -1;
@@ -854,7 +848,6 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
     }
   }
-
 }
 
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec) {
@@ -1239,13 +1232,6 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
     constructUnitaryGaugeField((float**)link);
   }
 
-  // only apply temporal boundary condition if I'm the last node in T
-#ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
-#else
-  bool last_node_in_t = true;
-#endif
-
   if(phase){
 
     for(int i=0;i < V;i++){
@@ -1289,10 +1275,8 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 	  break;
 
         case TUP:
-	  if (last_node_in_t && i4 == (X4-1)){
-	    coeff *= -1;
-	  }
-	  break;
+          if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
+          break;
 
 	default:
 	  printf("ERROR: wrong dir(%d)\n", dir);

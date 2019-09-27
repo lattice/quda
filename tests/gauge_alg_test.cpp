@@ -300,7 +300,7 @@ int main(int argc, char **argv){
   // return code for google test
   int test_rc = 0;
   xdim=ydim=zdim=tdim=32;
-  int i;
+
   // command line options
   auto app = make_app();
   // add_eigen_option_group(app);
