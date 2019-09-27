@@ -3,7 +3,7 @@ include_directories(. googletest/include googletest)
 # enable_language(Fortran)
 
 # enable tests build a common library for all test utilities
-set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp misc.cpp face_gauge.cpp)
+set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp test_params.cpp misc.cpp face_gauge.cpp)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD)
   add_dependencies(quda_test QMP)
@@ -139,12 +139,12 @@ if(QUDA_MULTIGRID)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
 
-  if(${QUDA_GAUGE_ALG})
-    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
-                        domain_wall_dslash_reference.cpp blas_reference.cpp)
-    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
-    quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-  endif()
+  #if(${QUDA_GAUGE_ALG})
+  #  cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
+  #                      domain_wall_dslash_reference.cpp blas_reference.cpp)
+  #  target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+  #  quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+  #endif()
 
 endif()
 
@@ -317,6 +317,32 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
+ if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+    # symmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+
+    # asymmetric preconditioning
+    add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type clover-hasenbusch-twist
+                     --test 3
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+    endif()
+  endif()
+  
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}

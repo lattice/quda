@@ -74,6 +74,7 @@ namespace quda {
 
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset) {
 
+#ifdef GPU_MULTIGRID
 #ifndef FINE_GRAINED_ACCESS
     if (u.Precision() == QUDA_HALF_PRECISION) errorQuda("Precision format not supported");
 #endif
@@ -85,12 +86,23 @@ namespace quda {
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       extractGhostMG(u, (float**)ghost, extract, offset);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       extractGhostMG(u, (short**)ghost, extract, offset);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
+#else
+    errorQuda("Multigrid has not been enabled");
+#endif
   }
 
 } // namespace quda

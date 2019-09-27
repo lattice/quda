@@ -1,9 +1,6 @@
-#include <iostream>
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
-
-#define NEW_DSLASH
 
 namespace quda {
 
@@ -41,6 +38,17 @@ namespace quda {
 
     ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
     flops += 1872ll*in.Volume();
+  }
+
+  /** Applies the operator (A + k D) */
+  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                               const ColorSpinorField &x, const double &k, const double &b) const
+  {
+    checkParitySpinor(in, out);
+    checkSpinorAlias(in, out);
+
+    ApplyTwistedClover(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
+    flops += 1872ll * in.Volume();
   }
 
   // Public method to apply the clover term only
@@ -95,6 +103,9 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
+  /*******
+   * DiracCloverPC Starts here
+   *******/
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
     DiracClover(param)
   {
@@ -160,16 +171,33 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     if (!symmetric) {
+
+      // No need to change order of calls for dagger
+      // because the asymmetric operator is actually symmetric
+      // A_oo -D_oe A^{-1}_ee D_eo -> A_oo -D^\dag_oe A^{-1}_ee D^\dag_eo
+      // the pieces in Dslash and DslashXPay respect the dagger
+
       // DiracCloverPC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, parity[0]);
       // DiracClover::DslashXpay applies (A - kappa^2 D)
       DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else if (!dagger) { // symmetric preconditioning
+      // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
+      // where A is actually a clover inverse.
+
+      // This is the non-dag case: AD
       Dslash(*tmp1, in, parity[0]);
+
+      // Then x + AD (AD)
       DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else { // symmetric preconditioning, dagger
+
+      // This is the dagger: 1 - DADA
+      //  i) Apply A
       CloverInv(out, in, parity[1]);
+      // ii) Apply A D => ADA
       Dslash(*tmp1, out, parity[0]);
+      // iii) Apply  x + D(ADA)
       DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     }
 
@@ -273,5 +301,6 @@ namespace quda {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
+
 
 } // namespace quda

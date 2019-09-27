@@ -45,9 +45,6 @@ namespace quda
 
       long long flops_ = 0;
 
-      // FIXME - should we count the xpay flops in the derived kernels
-      // since some kernels require the xpay in the exterior (preconditiond clover)
-
       switch (arg.kernel_type) {
       case EXTERIOR_KERNEL_X:
       case EXTERIOR_KERNEL_Y:
@@ -140,31 +137,52 @@ namespace quda
 
   template <typename Float, int nColor, QudaReconstructType recon> struct LaplaceApply {
 
-    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
-                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+    inline LaplaceApply(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir,
+                        double a, double b, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
                         TimeProfile &profile)
     {
       constexpr int nDim = 4;
-      LaplaceArg<Float, nColor, nDim, recon> arg(out, in, U, dir, a, x, parity, dagger, comm_override);
-      Laplace<decltype(arg)> laplace(arg, out, in);
 
-      dslash::DslashPolicyTune<decltype(laplace)> policy(
-        laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
-        in.GhostFaceCB(), profile);
-      policy.apply(0);
+      if (in.Nspin() == 1) {
+#ifdef GPU_STAGGERED_DIRAC
+        constexpr int nSpin = 1;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("nSpin=1 Laplace operator required staggered dslash to be enabled");
+#endif
+      } else if (in.Nspin() == 4) {
+#ifdef GPU_WILSON_DIRAC
+        constexpr int nSpin = 4;
+        LaplaceArg<Float, nSpin, nColor, nDim, recon> arg(out, in, U, dir, a, b, x, parity, dagger, comm_override);
+        Laplace<decltype(arg)> laplace(arg, out, in);
+
+        dslash::DslashPolicyTune<decltype(laplace)> policy(
+          laplace, const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
+          in.GhostFaceCB(), profile);
+        policy.apply(0);
+#else
+        errorQuda("nSpin=4 Laplace operator required wilsondslash to be enabled");
+#endif
+      } else {
+        errorQuda("Unsupported nSpin= %d", in.Nspin());
+      }
 
       checkCudaError();
     }
   };
 
   // Apply the Laplace operator
-  // out(x) = M*in = - kappa*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu)
-  // Uses the kappa normalization for the Wilson operator.
+  // out(x) = M*in = - a*\sum_mu U_{-\mu}(x)in(x+mu) + U^\dagger_mu(x-mu)in(x-mu) + b*in(x)
   // Omits direction 'dir' from the operator.
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
-
     if (in.V() == out.V()) errorQuda("Aliasing pointers");
     if (in.FieldOrder() != out.FieldOrder())
       errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
@@ -175,6 +193,6 @@ namespace quda
     // check all locations match
     checkLocation(out, in, U);
 
-    instantiate<LaplaceApply>(out, in, U, dir, kappa, x, parity, dagger, comm_override, profile);
+    instantiate<LaplaceApply>(out, in, U, dir, a, b, x, parity, dagger, comm_override, profile);
   }
 } // namespace quda

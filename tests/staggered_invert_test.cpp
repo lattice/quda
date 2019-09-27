@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -37,15 +38,16 @@
 
 #define mySpinorSiteSize 6
 
-extern void usage(char** argv);
+// extern void usage(char** argv);
 
 void** ghost_fatlink, **ghost_longlink;
 
-extern int device;
+// extern int device;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 size_t gSize = sizeof(double);
 
+<<<<<<< HEAD
 extern double reliable_delta;
 extern bool alternative_reliable;
 extern int test_type;
@@ -112,6 +114,8 @@ extern double tadpole_factor;
 extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
 // to construct one naik.
+=======
+>>>>>>> develop
 static int n_naiks = 1;
 
 // For loading the gauge fields
@@ -696,44 +700,58 @@ void display_test_info()
 
 }
 
-  void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
-  printfQuda("                                                0: Full parity inverter\n");
-  printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct to full parity\n");
-  printfQuda("                                                3: Even even spinor CG inverter\n");
-  printfQuda("                                                4: Odd odd spinor CG inverter\n");
-  printfQuda("                                                5: Even even spinor multishift CG inverter\n");
-  printfQuda("                                                6: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu-prec <double/single/half>             # Set CPU precision\n");
+//   void
+// usage_extra(char** argv )
+// {
+//   printfQuda("Extra options:\n");
+//   printfQuda("    --test <0/1/2/3/4/5/6>                      # Test method\n");
+//   printfQuda("                                                0: Full parity inverter\n");
+//   printfQuda("                                                1: Even even spinor CG inverter, reconstruct to full
+//   parity\n"); printfQuda("                                                2: Odd odd spinor CG inverter, reconstruct
+//   to full parity\n"); printfQuda("                                                3: Even even spinor CG
+//   inverter\n"); printfQuda("                                                4: Odd odd spinor CG inverter\n"); printfQuda("
+//   5: Even even spinor multishift CG inverter\n"); printfQuda("                                                6: Odd
+//   odd spinor multishift CG inverter\n"); printfQuda("    --cpu-prec <double/single/half>             # Set CPU
+//   precision\n");
 
-  return ;
-}
+//   return ;
+// }
 int main(int argc, char **argv)
 {
 
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
-
-  for (int i = 1; i < argc; i++) {
-
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    if (strcmp(argv[i], "--cpu-prec") == 0) {
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      cpu_prec= get_prec(argv[i+1]);
-      i++;
-      continue;
-    }
-
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
+                                          {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
+
+  // for (int i = 1; i < argc; i++) {
+
+  //   if (process_command_line_option(argc, argv, &i) == 0) { continue; }
+
+  //   if (strcmp(argv[i], "--cpu-prec") == 0) {
+  //     if (i+1 >= argc){
+  //       usage(argv);
+  //     }
+  //     cpu_prec= get_prec(argv[i+1]);
+  //     i++;
+  //     continue;
+  //   }
+
+  //   printf("ERROR: Invalid option:%s\n", argv[i]);
+  //   usage(argv);
+  // }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
