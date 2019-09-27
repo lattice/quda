@@ -287,7 +287,7 @@ namespace quda {
         recompute_evals = false;
       }
     }
-
+    
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -356,24 +356,28 @@ namespace quda {
     if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
-      // rhs b. use `x` as a temp.
-      blas::copy(x, r);
-      rhs.push_back(&x);
+      // rhs b.
+      blas::copy(*defl_tmp2[0], r);
+      rhs.push_back(defl_tmp2[0]);
 
       // Deflate
       eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0], tmp2, tmp3);
-      r2 = blas::xmyNorm(*rhs[0], r);
+      blas::copy(x, *defl_tmp1[0]); //prec copy
+      mat(r, x);
 
+      blas::copy(x, *rhs[0]); //prec copy
+      r2 = blas::xmyNorm(x, r);
+
+      blas::copy(x, *defl_tmp1[0]); //prec copy
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        // defl_tmp1 and y must be added to the solution at the end
-        blas::axpy(1.0, *defl_tmp1[0], y);
+        // xand y must be added to the solution at the end
+        blas::axpy(1.0, x, y);
       } else {
-        // Just add defl_tmp1 to y, which has been zeroed out
-        blas::copy(y, *defl_tmp1[0]);
-      }
+        // Just add x to y, which has been zeroed out
+        blas::copy(y, x);
+      }      
     }
 
     blas::zero(x);

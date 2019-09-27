@@ -324,19 +324,23 @@ namespace quda {
     if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
-      // rhs b. use `defl_tmp2` as a temp.
+      // rhs b.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
       
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
       eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
       
-      // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0]);
-      r2 = blas::xmyNorm(*rhs[0], r);
-      
+      // Compute r_defl = RHS - A * LHS      
+      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+      mat(r, tmp);
+
+      blas::copy(tmp, *rhs[0]); //prec copy
+      r2 = blas::xmyNorm(tmp, r);
+
+      blas::copy(tmp, *defl_tmp1[0]); //prec copy
       // defl_tmp must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);
+      blas::axpy(1.0, tmp, x);
     }
 
     // Check to see that we're not trying to invert on a zero-field source

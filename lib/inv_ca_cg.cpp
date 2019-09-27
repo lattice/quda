@@ -516,11 +516,15 @@ namespace quda {
       eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r_, *defl_tmp1[0], tmp, tmp2);
-      r2 = blas::xmyNorm(*rhs[0], r_);
+      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+      mat(r_, tmp);
 
+      blas::copy(tmp, *rhs[0]); //prec copy
+      r2 = blas::xmyNorm(tmp, r_);
+
+      blas::copy(tmp, *defl_tmp1[0]); //prec copy
       // defl_tmp1 must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);
+      blas::axpy(1.0, tmp, x);
     }
 
     // Use power iterations to approx lambda_max

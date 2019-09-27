@@ -75,6 +75,31 @@ extern QudaCABasis ca_basis; // basis for CA-CG solves
 extern double ca_lambda_min; // minimum eigenvalue for scaling Chebyshev CA-CG solves
 extern double ca_lambda_max; // maximum eigenvalue for scaling Chebyshev CA-CG solves
 
+// Deflation parameters
+extern bool deflate;
+extern int eig_nEv;
+extern int eig_nKr;
+extern int eig_nConv;
+extern bool eig_require_convergence;
+extern int eig_check_interval;
+extern int eig_max_restarts;
+extern double eig_tol;
+extern int eig_maxiter;
+extern bool eig_use_poly_acc;
+extern int eig_poly_deg;
+extern double eig_amin;
+extern double eig_amax;
+extern bool eig_use_normop;
+extern bool eig_use_dagger;
+extern bool eig_compute_svd;
+extern QudaEigSpectrumType eig_spectrum;
+extern QudaEigType eig_type;
+extern bool eig_arpack_check;
+extern char eig_arpack_logfile[];
+extern char eig_QUDA_logfile[];
+extern char eig_vec_infile[];
+extern char eig_vec_outfile[];
+
 // Dirac operator type
 extern QudaDslashType dslash_type;
 extern QudaMatPCType matpc_type; // preconditioning type
@@ -101,6 +126,53 @@ cpuColorSpinorField *ref;
 cpuColorSpinorField *tmp;
 
 static void end();
+
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  eig_param.cuda_prec_ritz = prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
@@ -242,7 +314,10 @@ int invert_test()
   setGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
-
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+  inv_param.eig_param = deflate ? &eig_param : nullptr;
+  
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 

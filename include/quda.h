@@ -24,7 +24,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+  
   /**
    * Parameters having to do with the gauge field or the
    * interpretation of the gauge field by various Dirac operators
@@ -278,6 +278,9 @@ extern "C" {
     /** defines deflation */
     void *eig_param;
 
+    /** If true, deflate the initial guess */
+    bool deflate;
+    
     /**
       Dirac Dslash used in preconditioner
     */

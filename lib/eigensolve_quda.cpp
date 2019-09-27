@@ -32,6 +32,8 @@ namespace quda
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
+    
     // Problem parameters
     nEv = eig_param->nEv;
     nKr = eig_param->nKr;
