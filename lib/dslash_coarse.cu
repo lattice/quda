@@ -436,7 +436,7 @@ if (inA.Ncolor() == 4) {
       ApplyCoarse<Float,yFloat,ghostFloat,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
     } else 
 #endif
-    if (inA.Ncolor() == 24) {
+    } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,yFloat,ghostFloat,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #if 0
     } else if (inA.Ncolor() == 28) {

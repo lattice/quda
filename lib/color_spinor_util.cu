@@ -141,7 +141,7 @@ namespace quda {
 #ifdef NSPIN4
     } else if (a.Ncolor() == 32) {
       genericSource<Float,nSpin,32,order>(a,sourceType, x, s, c);
-#endif NSPIN4
+#endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 64) {
       genericSource<Float,nSpin,64,order>(a,sourceType, x, s, c);

@@ -280,7 +280,7 @@ namespace quda {
     } else if (in.Nspin() == 4) {
       Restrict<Float,4>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 #endif
-#ifdef 0 // not needed until we have Laplace MG or staggered MG Lanczos
+#if 0 // not needed until we have Laplace MG or staggered MG Lanczos
 //#ifdef NSPIN1
     } else if (in.Nspin() == 1) {
       Restrict<Float,1>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
