@@ -15,6 +15,8 @@
 #include <iostream>
 #include <Eigen/Dense>
 
+#include <eigensolve_quda.h>
+
 namespace quda
 {
 
@@ -274,6 +276,11 @@ namespace quda
       }
       init = true;
     }
+
+     // Once the CG operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(*b[0], matPrecon, false); }
+
     ColorSpinorFieldVector &r = rp;
     ColorSpinorFieldVector &y = yp;
     // ColorSpinorFieldVector &x_sloppy_saved = x_sloppy_savedp;
@@ -324,15 +331,46 @@ namespace quda
       // printfQuda("r2[%i] %e\n", i, H(i, i).real());
             // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
       mat(*r[i], *x[i], *y[i], *tmp3[i]);
-      // printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
+      printfQuda("CHECK r2 %e\n",blas::norm2(*r[i]));
     }
+
+
 
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // blas::xpay(b, -1.0, r);
     // #else
     for (int i = 0; i < nsrc; i++) { blas::xpay(*b[i], -1.0, *r[i]); }
     // #endif
+    if (param.deflate == true) {
+      printfQuda("\n *** DEFLATION *** \n\n");
+      for (int i = 0; i < nsrc; i++) {
+        std::vector<ColorSpinorField *> rhs;
+        // Use residual from supplied guess r, or original
+        // rhs b.
+        blas::copy(*defl_tmp2[0], *r[i]);
+        rhs.push_back(defl_tmp2[0]);
 
+        // Deflate
+        eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+        // Compute r_defl = RHS - A * LHS
+        blas::copy(*x[i], *defl_tmp1[0]); // prec copy
+        mat(*r[i], *x[i], *y[i], *tmp3[i]);
+
+        blas::copy(*x[i], *rhs[0]); // prec copy
+        double r2 = blas::xmyNorm(*x[i], *r[i]);
+
+        blas::copy(*x[i], *defl_tmp1[0]); // prec copy
+        // if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        //   // xand y must be added to the solution at the end
+        //   blas::axpy(1.0, *x[i], *y[i]);
+        // } else {
+        //   // Just add x to y, which has been zeroed out
+        //   blas::copy(*y[i], *x[i]);
+        // }
+            printfQuda("CHECK2 r2 %e\n",r2);
+      }
+    }
     // Step 3: Y = X
     // #ifdef BLOCKSOLVER_MULTIFUNCTIONS
     // blas::copy(y, x);
@@ -1136,10 +1174,11 @@ namespace quda
     return;
   }
 
-  BlockCG::BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+  BlockCG::BlockCG(DiracMatrix &mat, DiracMatrix &matSloppy,  DiracMatrix &matPrecon,  SolverParam &param, TimeProfile &profile) :
     BlockSolver(param, profile),
     mat(mat),
     matSloppy(matSloppy),
+    matPrecon(matPrecon),
     // yp(nullptr),
     // rp(nullptr),
     // App(nullptr),
@@ -1161,6 +1200,12 @@ namespace quda
     if (init) {
       // for (auto pi : p) delete pi;
       init = false;
+    }
+    if (deflate_init) {
+      for (auto veci : param.evecs)
+        if (veci) delete veci;
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
     }
   }
 

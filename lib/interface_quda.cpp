@@ -3484,7 +3484,8 @@ for(int i=0; i < param->num_src; i++) {
     } else if (!mat_solution && direct_solve) { // perform the first of two solves: A^dag y = b
       DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      if(param->eig_param != nullptr) solverParam.deflate = true;
+      BlockCG bcg(m, mSloppy, mPre, solverParam, profileMulti);
       bcg(out, in);
       for(int i=0; i < param->num_src; i++) {
         blas::copy(*in[i], *out[i]);
@@ -3496,15 +3497,16 @@ for(int i=0; i < param->num_src; i++) {
     if (direct_solve) {
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
+      if(param->eig_param != nullptr) solverParam.deflate = true;
       // Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       // solve->solve(*out,*in);
-      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      BlockCG bcg(m, mSloppy, mPre, solverParam, profileMulti);
       bcg(out, in);
       solverParam.updateInvertParam(*param);
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
-      BlockCG bcg(m, mSloppy, solverParam, profileMulti);
+      BlockCG bcg(m, mSloppy, mPre, solverParam, profileMulti);
       bcg(out, in);
       solverParam.updateInvertParam(*param);
     } else { // norm_error_solve
