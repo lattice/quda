@@ -172,19 +172,19 @@ namespace quda {
   void spinorNoise(ColorSpinorField &src, RNG& randstates, QudaNoiseType type)
   {
     if (src.Nspin() == 4) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL)
+#ifdef NSPIN4
       spinorNoise<real,4>(src, randstates, type);
 #else
       errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
 #endif
     } else if (src.Nspin() == 2) {
-#ifdef GPU_MULTIGRID
+#ifdef NSPIN2
       spinorNoise<real,2>(src, randstates, type);
 #else
       errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
 #endif
     } else if (src.Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
       spinorNoise<real,1>(src, randstates, type);
 #else
       errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
