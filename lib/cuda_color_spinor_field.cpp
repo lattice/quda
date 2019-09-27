@@ -634,27 +634,22 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaColorSpinorField::copy(const cudaColorSpinorField &src) {
+  void cudaColorSpinorField::copy(const cudaColorSpinorField &src)
+  {
     checkField(*this, src);
-    if (this->GammaBasis() != src.GammaBasis()) errorQuda("cannot call this copy with different basis");
-    blas::copy(*this, src);
+    copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
   }
 
-  void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src) {
-    
-    // src is on the device and is native
-    if (typeid(src) == typeid(cudaColorSpinorField) && 
-	isNative() && dynamic_cast<const cudaColorSpinorField &>(src).isNative() &&
-	this->GammaBasis() == src.GammaBasis()) {
-      copy(dynamic_cast<const cudaColorSpinorField&>(src));
-    } else if (typeid(src) == typeid(cudaColorSpinorField)) {
+  void cudaColorSpinorField::copySpinorField(const ColorSpinorField &src)
+  {
+    if (typeid(src) == typeid(cudaColorSpinorField)) { // src is on the device
       copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION);
     } else if (typeid(src) == typeid(cpuColorSpinorField)) { // src is on the host
       loadSpinorField(src);
     } else {
       errorQuda("Unknown input ColorSpinorField %s", typeid(src).name());
     }
-  } 
+  }
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 

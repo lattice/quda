@@ -229,6 +229,7 @@ set(QUDA_CTEST_LAUNCH ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MA
 if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_CLOVER
    OR QUDA_DIRAC_TWISTED_MASS
+   OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL)
   add_test(NAME blas_test_parity_wilson
@@ -530,5 +531,12 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       endif()
     endif()
   endif()
+
+  if(QUDA_COVDEV)
+    add_test(NAME covdev_-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNC} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
+                     --dim 6 8 10 12
+                     --gtest_output=xml:covdev_test_pol${pol2}.xml)
+   endif()
 
 endforeach(pol)

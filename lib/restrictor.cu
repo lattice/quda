@@ -276,11 +276,12 @@ namespace quda {
 
     if (in.Nspin() == 2) {
       Restrict<Float,2>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (in.Nspin() == 4) {
       Restrict<Float,4>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 #endif
-#if 0 // not needed until we enable Laplace MG
+#ifdef 0 // not needed until we have Laplace MG or staggered MG Lanczos
+//#ifdef NSPIN1
     } else if (in.Nspin() == 1) {
       Restrict<Float,1>(out, in, v, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 #endif

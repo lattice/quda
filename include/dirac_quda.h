@@ -355,10 +355,6 @@ namespace quda {
     // APply clover
     void Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
-    // Overload to allow shift.
-    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                            const ColorSpinorField &x, const double &k, const double &b) const;
-
     virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
 			    const ColorSpinorField &x, const double &k) const;
 

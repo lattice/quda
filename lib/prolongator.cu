@@ -308,11 +308,12 @@ namespace quda {
 
     if (out.Nspin() == 2) {
       Prolongate<Float,2>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (out.Nspin() == 4) {
       Prolongate<Float,4>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif
-#if 0 // Not needed (until we enable Laplace MG)
+#if 0 // Not needed until we have Laplace MG or staggered MG Lanczos
+//#ifdef NSPIN1
     } else if (out.Nspin() == 1) {
       Prolongate<Float,1>(out, in, v, Nvec, fine_to_coarse, spin_map, parity);
 #endif

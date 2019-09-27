@@ -764,7 +764,7 @@ namespace quda {
      int Ns = dslash.inA.Nspin();
      int Nc = dslash.inA.Ncolor();
      int nParity = dslash.inA.SiteSubset();
-     int volumeCB = dslash.inA.VolumeCB();
+     long long volumeCB = dslash.inA.VolumeCB();
      return ((dslash.dslash*2*nDim+dslash.clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*volumeCB;
    }
 

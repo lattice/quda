@@ -41,8 +41,11 @@ namespace quda
     const GL L; /** the long gauge field */
 
     const real a; /** xpay scale factor */
-    const real tboundary;
+    const real tboundary; /** temporal boundary condition */
+    const bool is_first_time_slice; /** are we on the first (global) time slice */
+    const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
+
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
@@ -51,9 +54,11 @@ namespace quda
       in(in, improved_ ? 3 : 1),
       U(U),
       L(L),
-      tboundary(U.TBoundary()),
       x(x),
-      a(a)
+      a(a),
+      tboundary(U.TBoundary()),
+      is_first_time_slice(comm_coord(3) == 0 ? true : false),
+      is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -86,18 +91,14 @@ namespace quda
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ?
-              arg.U(d, x_cb, parity) :
-              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += (U * in);
 
           if (x_cb == 0 && parity == 0 && d == 0) printLink(U);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ?
-              arg.U(d, x_cb, parity) :
-              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, x_cb, parity) : arg.U(d, x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in);
         }
@@ -127,17 +128,15 @@ namespace quda
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
           const int back_idx = linkIndexM1(coord, arg.dim, d);
-          const Link U = arg.improved ?
-              arg.U.Ghost(d, ghost_idx2, 1 - parity) :
-              arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
+            arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
-          const Link U = arg.improved ?
-              arg.U(d, gauge_idx, 1 - parity) :
-              arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
+            arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in(back_idx, their_spinor_parity);
           out -= (conj(U) * in);
         }
