@@ -137,6 +137,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
+bool deflate = false;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
