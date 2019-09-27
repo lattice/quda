@@ -209,7 +209,7 @@ namespace quda
     host_free(s);
     return sum;
   }
-  
+
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
 
@@ -308,11 +308,9 @@ namespace quda
       Complex n_unit(-1.0, 0.0);
       blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
       residua[i] = sqrt(blas::norm2(*temp[0]));
-      
+
       if (getVerbosity() >= QUDA_SUMMARIZE)
-        printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i,
-		   evals[i].real(), evals[i].imag(), residua[i]);
-      
+        printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
     delete temp[0];
   }
@@ -351,7 +349,7 @@ namespace quda
 
     host_free(s);
   }
-  
+
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
 
@@ -481,7 +479,7 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-    //profile.TPSTART(QUDA_PROFILE_INIT);
+    // profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
@@ -498,7 +496,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    //profile.TPSTOP(QUDA_PROFILE_INIT);
+    // profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)

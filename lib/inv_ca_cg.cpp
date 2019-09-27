@@ -476,23 +476,23 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	// Construct the eigensolver and deflation space.
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	constructDeflationSpace(b, mat);
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	deflate_init = true;
+        // Construct the eigensolver and deflation space.
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        constructDeflationSpace(b, mat);
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        deflate_init = true;
       }
       if (deflate_compute) {
-	// compute the deflation space.
-	(*eig_solve)(evecs, evals);
-	deflate_compute = false;
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(mat, evecs, evals);
-	recompute_evals = false;
+        eig_solve->computeEvals(mat, evecs, evals);
+        recompute_evals = false;
       }
     }
-    
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);

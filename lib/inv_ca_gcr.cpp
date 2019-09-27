@@ -195,26 +195,26 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	// Construct the eigensolver and deflation space if requested.
-	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	deflate_init = true;
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        // Construct the eigensolver and deflation space if requested.
+        constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        deflate_init = true;
       }
       if (deflate_compute) {
-	// compute the deflation space.
-	(*eig_solve)(evecs, evals);
-	extendSVDDeflationSpace();
-	eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	deflate_compute = false;
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        extendSVDDeflationSpace();
+        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
-	eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	recompute_evals = false;
+        eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        recompute_evals = false;
       }
     }
-    
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp);
@@ -240,7 +240,7 @@ namespace quda {
 
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
       eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-      
+
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);

@@ -281,17 +281,17 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	// Construct the eigensolver and deflation space if requested.
-	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-	deflate_init = true;
+        // Construct the eigensolver and deflation space if requested.
+        constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+        deflate_init = true;
       }
       if (deflate_compute) {
         // compute the deflation space.
-	profile.TPSTOP(QUDA_PROFILE_INIT);
+        profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
         eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
-	profile.TPSTART(QUDA_PROFILE_INIT);
+        profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -300,7 +300,7 @@ namespace quda {
         recompute_evals = false;
       }
     }
-    
+
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
     ColorSpinorField &tmp = *tmpp;
@@ -327,14 +327,14 @@ namespace quda {
       // rhs b. use `defl_tmp2` as a temp.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
-      
+
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
       eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-      
+
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);
       r2 = blas::xmyNorm(*rhs[0], r);
-      
+
       // defl_tmp must be added to the solution at the end
       blas::axpy(1.0, *defl_tmp1[0], x);
     }
