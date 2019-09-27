@@ -47,7 +47,7 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, param, profile);
+      solver = new CG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
@@ -66,15 +66,15 @@ namespace quda {
       break;
     case QUDA_CA_CG_INVERTER:
       report("CA-CG");
-      solver = new CACG(mat, matSloppy, param, profile);
+      solver = new CACG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, param, profile);
+      solver = new CACGNE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, param, profile);
+      solver = new CACGNR(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
@@ -133,11 +133,11 @@ namespace quda {
       break;
     case QUDA_CGNE_INVERTER:
       report("CGNE");
-      solver = new CGNE(mat, matSloppy, param, profile);
+      solver = new CGNE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CGNR_INVERTER:
       report("CGNR");
-      solver = new CGNR(mat, matSloppy, param, profile);
+      solver = new CGNR(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
@@ -171,8 +171,8 @@ namespace quda {
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    // This is the vector precision used by matPrecon
+    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
     if (deflate_compute) {
       // Computing the deflation space, rather than transferring, so we create space. 
       for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
@@ -194,7 +194,7 @@ namespace quda {
     ColorSpinorParam csParam(*evecs[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
     for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++) {
       evecs.push_back(ColorSpinorField::Create(csParam));
     }

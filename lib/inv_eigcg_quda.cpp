@@ -276,7 +276,7 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = new CG(matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
@@ -617,7 +617,7 @@ namespace quda {
       defl(xProj, rProj);
       x = xProj;      
 
-      K = new CG(mat, matPrecon, Kparam, profile);
+      K = new CG(mat, matPrecon, matPrecon, Kparam, profile);
       (*K)(x, b);
       delete K;
 
@@ -709,7 +709,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, Kparam, profile);   
+           K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);   
          }
 
          eigcg_args->run_residual_correction = true;      

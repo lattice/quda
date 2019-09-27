@@ -19,8 +19,8 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
+  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), yp(nullptr), rp(nullptr),
     rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
     rSloppyp(nullptr), xSloppyp(nullptr), init(false)
   {
@@ -57,8 +57,8 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
+  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()), mmdagPrecon(matPrecon.Expose()),
     xp(nullptr), yp(nullptr), init(false) {
   }
 
@@ -139,11 +139,11 @@ namespace quda {
 
   }
 
-  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
+  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()), mdagmPrecon(matPrecon.Expose()),
     bp(nullptr), init(false) {
   }
-
+  
   CGNR::~CGNR() {
     if ( init ) {
       if (bp) delete bp;
@@ -272,7 +272,7 @@ namespace quda {
     if (param.deflate) {
       if (!deflate_init) {
         // Construct the eigensolver and deflation space if requested.
-        constructDeflationSpace(b, mat);
+        constructDeflationSpace(b, matPrecon);
 	deflate_init = true;
       }
       if (deflate_compute) {
@@ -283,7 +283,7 @@ namespace quda {
 	deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(mat, evecs, evals);
+        eig_solve->computeEvals(matPrecon, evecs, evals);
         recompute_evals = false;
       }
     }
