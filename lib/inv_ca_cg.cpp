@@ -474,7 +474,7 @@ namespace quda {
       if (!deflate_init) {
 	// Construct the eigensolver and deflation space.
 	profile.TPSTART(QUDA_PROFILE_INIT);
-	constructDeflationSpace(b, mat);
+	constructDeflationSpace(b, matPrecon);
 	profile.TPSTOP(QUDA_PROFILE_INIT);
 	deflate_init = true;
       }
@@ -484,7 +484,7 @@ namespace quda {
 	deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(mat, evecs, evals);
+	eig_solve->computeEvals(matPrecon, evecs, evals);
 	recompute_evals = false;
       }
     }

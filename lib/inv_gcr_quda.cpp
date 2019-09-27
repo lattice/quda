@@ -176,7 +176,7 @@ namespace quda {
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
       K = new SD(matSloppy, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
-      K = new CAGCR(matSloppy, matPrecon, Kparam, profile);
+      K = new CAGCR(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
       K = NULL;
     else 
@@ -282,7 +282,7 @@ namespace quda {
     if (param.deflate) {
       if (!deflate_init) {
 	// Construct the eigensolver and deflation space if requested.
-	constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+	constructDeflationSpace(b, DiracMdagM(matPrecon.Expose()));
 	deflate_init = true;
       }
       if (deflate_compute) {
@@ -290,13 +290,13 @@ namespace quda {
 	profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
 	profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeEvals(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
         recompute_evals = false;
       }
     }
