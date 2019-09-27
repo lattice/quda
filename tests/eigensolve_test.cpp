@@ -7,6 +7,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -26,74 +27,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_precondition;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa; // kappa of Dirac operator
-extern int laplace3D;
 double kappa5; // Derived, not given. Used in matVec checks.
-extern double mu;
-extern double anisotropy;
-extern double tol;    // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern char latfile[];
-extern bool unit_gauge;
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
-extern int pipeline;   // length of pipeline for fused operations in GCR or BiCGstab-l
-
-extern QudaVerbosity verbosity;
-
-extern QudaMatPCType matpc_type;
-extern QudaSolutionType solution_type;
-extern QudaSolveType solve_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char **);
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv;
-extern bool eig_require_convergence;
-extern int eig_check_interval;
-extern int eig_max_restarts;
-extern double eig_tol;
-extern int eig_maxiter;
-extern bool eig_use_poly_acc;
-extern int eig_poly_deg;
-extern double eig_amin;
-extern double eig_amax;
-extern bool eig_use_normop;
-extern bool eig_use_dagger;
-extern bool eig_compute_svd;
-extern QudaEigSpectrumType eig_spectrum;
-extern QudaEigType eig_type;
-extern bool eig_arpack_check;
-extern char eig_arpack_logfile[];
-extern char eig_QUDA_logfile[];
-extern char eig_vec_infile[];
-extern char eig_vec_outfile[];
-
-extern bool verify_results;
 
 namespace quda
 {
@@ -332,10 +266,15 @@ void setEigParam(QudaEigParam &eig_param)
 
 int main(int argc, char **argv)
 {
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;

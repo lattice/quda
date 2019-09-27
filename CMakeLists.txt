@@ -104,7 +104,8 @@ set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
+set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
+set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
@@ -200,7 +201,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_NVML)
@@ -694,6 +694,11 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
                   -DGPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  add_definitions(-DGPU_CLOVER_HASENBUSCH_TWIST -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+                  -DGPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
+
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
@@ -803,11 +808,11 @@ mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
 
 set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
 set(CMAKE_CUDA_FLAGS
-    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH}"
+    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr"
     CACHE STRING "Flags used by the CUDA compiler" FORCE)
 if(QUDA_VERBOSE_BUILD)
   set(CMAKE_CUDA_FLAGS
-      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --ptxas-options=-v"
+      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr --ptxas-options=-v"
       CACHE STRING "Flags used by the CUDA compiler" FORCE)
 endif(QUDA_VERBOSE_BUILD)
 

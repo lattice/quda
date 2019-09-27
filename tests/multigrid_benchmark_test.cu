@@ -6,6 +6,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <misc.h>
 
 // include because of nasty globals used in the tests
@@ -14,26 +15,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
-
-extern int Nsrc; // number of spinors to apply to simultaneously
-
-extern bool verify_results;
-
-extern int test_type;
-
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision smoother_halo_prec;
 
 extern void usage(char** );
 
@@ -233,12 +214,18 @@ int main(int argc, char** argv)
   // with default parameters.
   xdim = ydim = zdim = tdim = 8;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
 
