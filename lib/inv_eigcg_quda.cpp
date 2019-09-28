@@ -615,7 +615,7 @@ namespace quda {
       restart_idx += 1;
 
       defl(xProj, rProj);
-      x = xProj;      
+      x = xProj;
 
       K = new CG(mat, matPrecon, matPrecon, Kparam, profile);
       (*K)(x, b);
@@ -709,7 +709,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);   
+           K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
          }
 
          eigcg_args->run_residual_correction = true;      

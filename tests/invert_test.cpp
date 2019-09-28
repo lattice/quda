@@ -156,7 +156,7 @@ int main(int argc, char **argv)
   QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
   inv_param.eig_param = deflate ? &eig_param : nullptr;
-  
+
   double kappa5;
 
   gauge_param.X[0] = xdim;

@@ -12,11 +12,25 @@
 
 namespace quda {
 
-  CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false),
-      lambda_init(false), basis(param.ca_basis),
-      Q_AQandg(nullptr), Q_AS(nullptr), alpha(nullptr), beta(nullptr), rp(nullptr),
-      tmpp(nullptr), tmpp2(nullptr), tmp_sloppy(nullptr), tmp_sloppy2(nullptr) { }
+  CACG::CACG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    init(false),
+    lambda_init(false),
+    basis(param.ca_basis),
+    Q_AQandg(nullptr),
+    Q_AS(nullptr),
+    alpha(nullptr),
+    beta(nullptr),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmpp2(nullptr),
+    tmp_sloppy(nullptr),
+    tmp_sloppy2(nullptr)
+  {
+  }
 
   CACG::~CACG() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -58,9 +72,16 @@ namespace quda {
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CACGNE::CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CACG(mmdag, mmdagSloppy, mmdagPrecon, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()), mmdagPrecon(matPrecon.Expose()),
-    xp(nullptr), yp(nullptr), init(false) {
+  CACGNE::CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+                 TimeProfile &profile) :
+    CACG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+    mmdag(mat.Expose()),
+    mmdagSloppy(matSloppy.Expose()),
+    mmdagPrecon(matPrecon.Expose()),
+    xp(nullptr),
+    yp(nullptr),
+    init(false)
+  {
   }
 
   CACGNE::~CACGNE() {
@@ -140,9 +161,15 @@ namespace quda {
 
   }
 
-  CACGNR::CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CACG(mdagm, mdagmSloppy, mdagmPrecon, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()), mdagmPrecon(matPrecon.Expose()),
-    bp(nullptr), init(false) {
+  CACGNR::CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+                 TimeProfile &profile) :
+    CACG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+    mdagm(mat.Expose()),
+    mdagmSloppy(matSloppy.Expose()),
+    mdagmPrecon(matPrecon.Expose()),
+    bp(nullptr),
+    init(false)
+  {
   }
 
   CACGNR::~CACGNR() {
@@ -472,23 +499,23 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	// Construct the eigensolver and deflation space.
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	constructDeflationSpace(b, matPrecon);
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	deflate_init = true;
+        // Construct the eigensolver and deflation space.
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        constructDeflationSpace(b, matPrecon);
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        deflate_init = true;
       }
       if (deflate_compute) {
-	// compute the deflation space.
-	(*eig_solve)(evecs, evals);
-	deflate_compute = false;
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(matPrecon, evecs, evals);
-	recompute_evals = false;
+        eig_solve->computeEvals(matPrecon, evecs, evals);
+        recompute_evals = false;
       }
     }
-    
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);
@@ -516,13 +543,13 @@ namespace quda {
       eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
-      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+      blas::copy(tmp, *defl_tmp1[0]); // prec copy
       mat(r_, tmp);
 
-      blas::copy(tmp, *rhs[0]); //prec copy
+      blas::copy(tmp, *rhs[0]); // prec copy
       r2 = blas::xmyNorm(tmp, r_);
 
-      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+      blas::copy(tmp, *defl_tmp1[0]); // prec copy
       // defl_tmp1 must be added to the solution at the end
       blas::axpy(1.0, tmp, x);
     }

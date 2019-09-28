@@ -2708,7 +2708,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 
   bool refresh = mg_param->preserve_deflation ? false : true;
   mg->mg->reset(refresh);
-  
+
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted

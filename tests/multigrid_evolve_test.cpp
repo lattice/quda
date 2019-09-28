@@ -823,7 +823,7 @@ int main(int argc, char **argv)
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
-      
+
       updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new gauge and clover fields
       invertQuda(spinorOut, spinorIn, &inv_param);
 
@@ -855,7 +855,7 @@ int main(int argc, char **argv)
     invertQuda(spinorOut, spinorIn, &inv_param);
 
     freeGaugeQuda();
-    
+
     // Reunitarize gauge links...
     CallUnitarizeLinks(gaugeEx);
 
@@ -864,33 +864,34 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     for (int step = 0; step < nsteps; ++step) {
-      
+
       plaq = plaquette(*gaugeEx);
       charge = qChargeQuda();
       printfQuda("PERSIST: step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
-      // Increment the mass/kappa and mu values to emulate heavy/light flavour updates 
+      // Increment the mass/kappa and mu values to emulate heavy/light flavour updates
       if (kappa == -1.0) {
-        inv_param.mass = mass + 0.01*step;
-        inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01*step));
-        inv_param2.mass = mass + 0.01*step;;
-        inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01*step));
+        inv_param.mass = mass + 0.01 * step;
+        inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
+        inv_param2.mass = mass + 0.01 * step;
+        ;
+        inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
       } else {
-        inv_param.kappa = kappa - 0.001*step;
-        inv_param.mass = 0.5 / (kappa - 0.001*step) - (1 + 3 / anisotropy);
+        inv_param.kappa = kappa - 0.001 * step;
+        inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
         inv_param.kappa = kappa / pow(1.1, step);
-        inv_param.mass = 0.5 / (kappa - 0.001*step) - (1 + 3 / anisotropy);
-      }      
-      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-        inv_param.mu = mu + 0.01*step;
+        inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
       }
-      
-      //reference BiCGStab for comparison
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        inv_param.mu = mu + 0.01 * step;
+      }
+
+      // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
-      
+
       updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
       invertQuda(spinorOut, spinorIn, &inv_param);
-      
+
       if (inv_param.iter == inv_param.maxiter) {
         char vec_outfile[QUDA_MAX_MG_LEVEL][256];
         for (int i = 0; i < mg_param.n_level; i++) {
@@ -947,6 +948,6 @@ int main(int argc, char **argv)
   free(spinorIn);
   free(spinorCheck);
   free(spinorOut);
-  
+
   return 0;
 }

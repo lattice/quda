@@ -267,7 +267,7 @@ namespace quda {
       inv_type_precondition(param.inv_type_precondition),
       preconditioner(param.preconditioner),
       deflation_op(param.deflation_op),
-      residual_type(param.residual_type),	
+      residual_type(param.residual_type),
       deflate(param.eig_param != nullptr),
       use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
@@ -325,9 +325,7 @@ namespace quda {
       mg_instance(false),
       extlib_type(param.extlib_type)
     {
-      if (deflate) {
-	eig_param = *(static_cast<QudaEigParam*>(param.eig_param));
-      }
+      if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
       for (int i=0; i<num_offset; i++) {
         offset[i] = param.offset[i];
         tol_offset[i] = param.tol_offset[i];
@@ -1037,10 +1035,10 @@ namespace quda {
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
 public:
-    CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
-    virtual ~CAGCR();
+  CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+  virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   // Steepest descent solver used as a preconditioner

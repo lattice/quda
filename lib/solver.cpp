@@ -162,29 +162,29 @@ namespace quda {
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
   {
     if (deflate_init) return;
-    
+
     // Deflation requested + first instance of solver
     profile.TPSTOP(QUDA_PROFILE_INIT);
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
     profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matPrecon
     csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
     if (deflate_compute) {
-      // Computing the deflation space, rather than transferring, so we create space. 
+      // Computing the deflation space, rather than transferring, so we create space.
       for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
-    }    
+    }
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
     evals.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;    
+    for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
   }
-  
+
   void Solver::extendSVDDeflationSpace()
   {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");

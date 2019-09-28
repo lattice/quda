@@ -214,7 +214,7 @@ namespace quda {
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
-     if (param.inv_type_precondition == QUDA_CG_INVERTER) 
+     if (param.inv_type_precondition == QUDA_CG_INVERTER)
        K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
      else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) 
        K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);

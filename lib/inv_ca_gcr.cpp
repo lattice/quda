@@ -4,9 +4,20 @@
 
 namespace quda {
 
-  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false),
-      basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+               TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    init(false),
+    basis(param.ca_basis),
+    alpha(nullptr),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr)
+  {
+  }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -195,26 +206,26 @@ namespace quda {
 
     if (param.deflate) {
       if (!deflate_init) {
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	// Construct the eigensolver and deflation space if requested.
-	constructDeflationSpace(b, DiracMdagM(matPrecon.Expose()));
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	deflate_init = true;
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        // Construct the eigensolver and deflation space if requested.
+        constructDeflationSpace(b, DiracMdagM(matPrecon.Expose()));
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        deflate_init = true;
       }
       if (deflate_compute) {
-	// compute the deflation space.
-	(*eig_solve)(evecs, evals);
-	extendSVDDeflationSpace();
-	eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
-	deflate_compute = false;
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        extendSVDDeflationSpace();
+        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        deflate_compute = false;
       }
       if (recompute_evals) {
-	eig_solve->computeEvals(DiracMdagM(matPrecon.Expose()), evecs, evals);
-	eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
-	recompute_evals = false;
+        eig_solve->computeEvals(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        recompute_evals = false;
       }
     }
-    
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp);
@@ -237,18 +248,18 @@ namespace quda {
       // rhs b.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
-      
+
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
       eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
-      
-      // Compute r_defl = RHS - A * LHS      
-      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+
+      // Compute r_defl = RHS - A * LHS
+      blas::copy(tmp, *defl_tmp1[0]); // prec copy
       mat(r, tmp);
 
-      blas::copy(tmp, *rhs[0]); //prec copy
+      blas::copy(tmp, *rhs[0]); // prec copy
       r2 = blas::xmyNorm(tmp, r);
 
-      blas::copy(tmp, *defl_tmp1[0]); //prec copy
+      blas::copy(tmp, *defl_tmp1[0]); // prec copy
       // defl_tmp must be added to the solution at the end
       blas::axpy(1.0, tmp, x);
     }

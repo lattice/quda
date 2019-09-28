@@ -257,6 +257,7 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
+extern bool deflate;
 extern int eig_nEv;
 extern int eig_nKr;
 extern int eig_nConv; // If unchanged, will be set to nEv

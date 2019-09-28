@@ -20,9 +20,21 @@
 namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), yp(nullptr), rp(nullptr),
-    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
-    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    yp(nullptr),
+    rp(nullptr),
+    rnewp(nullptr),
+    pp(nullptr),
+    App(nullptr),
+    tmpp(nullptr),
+    tmp2p(nullptr),
+    tmp3p(nullptr),
+    rSloppyp(nullptr),
+    xSloppyp(nullptr),
+    init(false)
   {
   }
 
@@ -58,8 +70,14 @@ namespace quda {
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()), mmdagPrecon(matPrecon.Expose()),
-    xp(nullptr), yp(nullptr), init(false) {
+    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+    mmdag(mat.Expose()),
+    mmdagSloppy(matSloppy.Expose()),
+    mmdagPrecon(matPrecon.Expose()),
+    xp(nullptr),
+    yp(nullptr),
+    init(false)
+  {
   }
 
   CGNE::~CGNE() {
@@ -140,10 +158,15 @@ namespace quda {
   }
 
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()), mdagmPrecon(matPrecon.Expose()),
-    bp(nullptr), init(false) {
+    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+    mdagm(mat.Expose()),
+    mdagmSloppy(matSloppy.Expose()),
+    mdagmPrecon(matPrecon.Expose()),
+    bp(nullptr),
+    init(false)
+  {
   }
-  
+
   CGNR::~CGNR() {
     if ( init ) {
       if (bp) delete bp;
@@ -273,21 +296,21 @@ namespace quda {
       if (!deflate_init) {
         // Construct the eigensolver and deflation space if requested.
         constructDeflationSpace(b, matPrecon);
-	deflate_init = true;
+        deflate_init = true;
       }
       if (deflate_compute) {
         // compute the deflation space.
-	profile.TPSTOP(QUDA_PROFILE_INIT);
-	(*eig_solve)(evecs, evals);
-	profile.TPSTART(QUDA_PROFILE_INIT);
-	deflate_compute = false;
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
       }
       if (recompute_evals) {
         eig_solve->computeEvals(matPrecon, evecs, evals);
         recompute_evals = false;
       }
     }
-    
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
@@ -364,20 +387,20 @@ namespace quda {
       eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
-      blas::copy(x, *defl_tmp1[0]); //prec copy
+      blas::copy(x, *defl_tmp1[0]); // prec copy
       mat(r, x);
 
-      blas::copy(x, *rhs[0]); //prec copy
+      blas::copy(x, *rhs[0]); // prec copy
       r2 = blas::xmyNorm(x, r);
 
-      blas::copy(x, *defl_tmp1[0]); //prec copy
+      blas::copy(x, *defl_tmp1[0]); // prec copy
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
         // xand y must be added to the solution at the end
         blas::axpy(1.0, x, y);
       } else {
         // Just add x to y, which has been zeroed out
         blas::copy(y, x);
-      }      
+      }
     }
 
     blas::zero(x);
