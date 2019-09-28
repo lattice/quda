@@ -413,7 +413,9 @@ if(QUDA_DOWNLOAD_USQCD)
 endif()
 
 if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD)
+  find_library (QMP_FOUND qio PATHS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(QMP_FOUND)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
                         GIT_TAG qmp2-5-1
@@ -474,7 +476,9 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
-  if(QUDA_DOWNLOAD_USQCD)
+  find_library (QIO_FOUND qio PATHS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(QIO_FOUND)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     ExternalProject_Add(QIO
                         GIT_REPOSITORY https://github.com/usqcd-software/qio.git
                         GIT_TAG qio2-5-0
