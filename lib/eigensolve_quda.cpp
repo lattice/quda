@@ -592,7 +592,7 @@ namespace quda
 
       for (int step = num_keep; step < nKr; step++) lanczosStep(kSpace, step);
       iter += (nKr - num_keep);
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE printfQuda("Restart %d complete\n", restart_iter+1);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter+1);
 
       int arrow_pos = std::max(num_keep - num_locked + 1, 2);
       // The eigenvalues are returned in the alpha array
