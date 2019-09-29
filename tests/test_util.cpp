@@ -1646,7 +1646,7 @@ double ca_lambda_min = 0.0;
 double ca_lambda_max = -1.0;
 int pipeline = 0;
 int solution_accumulator_pipeline = 0;
-int test_type = 0;
+int test_type = 2;
 int nvec[QUDA_MAX_MG_LEVEL] = { };
 char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
 char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];

@@ -74,7 +74,6 @@ extern int pipeline; // length of pipeline for fused operations in GCR or BiCGst
 extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
 extern char latfile[];
 extern bool unit_gauge;
-
 extern void usage(char** );
 
 
@@ -138,7 +137,8 @@ int main(int argc, char **argv)
       dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
       dslash_type != QUDA_MOBIUS_DWF_DSLASH &&
       dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+      dslash_type != QUDA_DOMAIN_WALL_DSLASH &&
+	  dslash_type != QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
@@ -178,7 +178,6 @@ int main(int argc, char **argv)
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.dslash_type = dslash_type;
-
   if (kappa == -1.0) {
     inv_param.mass = mass;
     inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
@@ -188,7 +187,8 @@ int main(int argc, char **argv)
   }
   inv_param.mu = mu;
 
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
+		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.epsilon = epsilon;
     inv_param.twist_flavor = twist_flavor;
     inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
@@ -292,7 +292,8 @@ int main(int argc, char **argv)
   gauge_param.ga_pad = pad_size;    
 #endif
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
+		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
@@ -340,10 +341,10 @@ int main(int argc, char **argv)
     }
   }
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
+		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
-
     size_t cSize = inv_param.clover_cpu_prec;
     clover = malloc(V*cloverSiteSize*cSize);
     clover_inv = malloc(V*cloverSiteSize*cSize);
@@ -379,9 +380,9 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // load the clover term, if desired
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || 
+		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH)
     loadCloverQuda(clover, clover_inv, &inv_param);
-
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
@@ -477,7 +478,12 @@ int main(int argc, char **argv)
 		     inv_param.cpu_prec, gauge_param);
         clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
 		     inv_param.cpu_prec, gauge_param);
-      } else {
+	  } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+		  cloverHasenbuschTwist_matpc(spinorTmp, gauge, spinorOutMulti[i], clover,clover_inv, inv_param.kappa, 
+				  inv_param.mu, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+		  cloverHasenbuschTwist_matpc(spinorCheck, gauge, spinorTmp, clover,clover_inv, inv_param.kappa, 
+				  inv_param.mu, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  } else {
         printfQuda("Domain wall not supported for multi-shift\n");
         exit(-1);
       }
@@ -518,7 +524,10 @@ int main(int argc, char **argv)
         wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
-      } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+      } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+		cloverHasenbuchTwist_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, 0,
+				inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+	  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
@@ -575,7 +584,10 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
         clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
 		     inv_param.cpu_prec, gauge_param);
-      } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+      } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+		cloverHasenbuschTwist_matpc(spinorCheck, gauge, spinorOut, clover, clover_inv, inv_param.kappa, 
+				inv_param.mu, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
@@ -648,6 +660,11 @@ int main(int argc, char **argv)
 		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
         clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa,
 		     inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+      } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+		cloverHasenbuschTwist_matpc(spinorTmp, gauge, spinorOut, clover, clover_inv, inv_param.kappa, 
+				inv_param.mu, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+		cloverHasenbuschTwist_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, 
+				inv_param.mu, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
       } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
         dw_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
         dw_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
@@ -697,7 +714,8 @@ int main(int argc, char **argv)
 
   finalizeComms();
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
+		  dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
   }

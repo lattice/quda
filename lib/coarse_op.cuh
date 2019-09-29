@@ -19,6 +19,7 @@ namespace quda {
     COMPUTE_TWISTED_CLOVER_INV_MAX,
     COMPUTE_VUV,
     COMPUTE_COARSE_CLOVER,
+	COMPUTE_COARSE_THCLOVER,
     COMPUTE_REVERSE_Y,
     COMPUTE_DIAGONAL,
     COMPUTE_TMDIAGONAL,
@@ -68,6 +69,10 @@ namespace quda {
       case COMPUTE_COARSE_CLOVER:
 	// when the fine operator is truly fine the clover multiplication is block sparse which halves the number of operations
 	flops_ = 2l * arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / (!from_coarse ? coarseSpin : 1);
+	break;
+	  case COMPUTE_COARSE_THCLOVER:
+	// fine operator on single parity
+	flops_ = arg.fineVolumeCB * 8 * fineSpin * fineSpin * coarseColor * coarseColor * fineColor * fineColor / coarseSpin;
 	break;
       case COMPUTE_REVERSE_Y:
       case COMPUTE_CONVERT:
@@ -124,6 +129,9 @@ namespace quda {
       case COMPUTE_COARSE_CLOVER:
 	bytes_ = 2*arg.X.Bytes() + 2*arg.C.Bytes() + arg.V.Bytes(); // 2 from parity
 	break;
+	  case COMPUTE_COARSE_THCLOVER:
+	bytes_ = arg.X.Bytes() + arg.C.Bytes() + arg.V.Bytes();
+	break;
       case COMPUTE_REVERSE_Y:
 	bytes_ = 4*2*2*arg.Y.Bytes(); // 4 from direction, 2 from i/o, 2 from parity
       case COMPUTE_DIAGONAL:
@@ -153,6 +161,7 @@ namespace quda {
       case COMPUTE_TWISTED_CLOVER_INV_MAX:
       case COMPUTE_VUV:
       case COMPUTE_COARSE_CLOVER:
+	  case COMPUTE_COARSE_THCLOVER:
 	threads = arg.fineVolumeCB;
 	break;
       case COMPUTE_REVERSE_Y:
@@ -281,7 +290,11 @@ namespace quda {
 
           ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
 
-        } else if (type == COMPUTE_REVERSE_Y) {
+        } else if (type == COMPUTE_COARSE_THCLOVER) {
+		  if (from_coarse) errorQuda("ComputeCoarseTHClover should only be called from the fine grid");
+		  ComputeCoarseTHCloverCPU<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg,
+				  QUDA_ODD_PARITY); //here we work on the odd fine parity
+		} else if (type == COMPUTE_REVERSE_Y) {
 
           ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
 
@@ -535,7 +548,18 @@ namespace quda {
 	    <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
 #endif
 
-        } else if (type == COMPUTE_REVERSE_Y) {
+        } else if (type == COMPUTE_COARSE_THCLOVER) {
+			if (from_coarse) errorQuda("ComputeCoarseTHClover should only be called from the fine grid");
+#ifdef JITIFY
+			using namespace jitify::reflection;
+			jitify_error = program->kernel("quda::ComputeCoarseTHCloverGPU")
+			.instantiate(Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
+			.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+			ComputeCoarseTHCloverGPU<Float,fineSpin,coarseSpin,fineColor,coarseColor>
+				<<<tp.grid,tp.block,tp.shared_bytes>>>(arg, QUDA_ODD_PARITY);
+#endif
+		} else if (type == COMPUTE_REVERSE_Y) {
 
 #ifdef JITIFY
           using namespace jitify::reflection;
@@ -621,6 +645,7 @@ namespace quda {
         }
 	break;
       case COMPUTE_COARSE_CLOVER: // no shared atomic version so keep separate from above
+	  case COMPUTE_COARSE_THCLOVER:
       case COMPUTE_REVERSE_Y:
       case COMPUTE_CONVERT:
       case COMPUTE_RESCALE:
@@ -741,6 +766,7 @@ namespace quda {
         strcat(Aux, ",computeTwistedCloverInverseMax");
       else if (type == COMPUTE_VUV)                strcat(Aux,",computeVUV");
       else if (type == COMPUTE_COARSE_CLOVER)      strcat(Aux,",computeCoarseClover");
+	  else if (type == COMPUTE_COARSE_THCLOVER)      strcat(Aux,",computeCoarseTHClover");
       else if (type == COMPUTE_REVERSE_Y)          strcat(Aux,",computeYreverse");
       else if (type == COMPUTE_DIAGONAL)           strcat(Aux,",computeCoarseDiagonal");
       else if (type == COMPUTE_TMDIAGONAL)         strcat(Aux,",computeCoarseTmDiagonal");
@@ -789,6 +815,7 @@ namespace quda {
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
+	  case COMPUTE_COARSE_THCLOVER:
 	X_atomic.backup();
         break;
       case COMPUTE_CONVERT:
@@ -817,6 +844,7 @@ namespace quda {
       case COMPUTE_DIAGONAL:
       case COMPUTE_TMDIAGONAL:
       case COMPUTE_COARSE_CLOVER:
+	  case COMPUTE_COARSE_THCLOVER:
 	X_atomic.restore();
         break;
       case COMPUTE_CONVERT:
@@ -902,7 +930,8 @@ namespace quda {
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
-				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC);
+				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC ||
+				dirac == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
@@ -931,7 +960,8 @@ namespace quda {
     // If doing preconditioned clover then we first multiply the
     // null-space vectors by the clover inverse matrix, since this is
     // needed for the coarse link computation
-    if ( dirac == QUDA_CLOVERPC_DIRAC && (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
+    if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC)
+			&& (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing AV\n");
 
       if (av.Precision() == QUDA_HALF_PRECISION) {
@@ -1077,7 +1107,8 @@ namespace quda {
       }
     }
 
-    if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
+    if ( (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC || 
+			dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) &&
 	 (matpc == QUDA_MATPC_EVEN_EVEN || matpc == QUDA_MATPC_ODD_ODD) ) {
       av.exchangeGhost(QUDA_INVALID_PARITY, nFace, 0);
       arg.AV.resetGhost(av, av.Ghost());  // make sure we point to the correct pointer in the accessor
@@ -1176,12 +1207,20 @@ namespace quda {
       y.apply(0);
     }
 
-    if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC) {
+    if (arg.mu*arg.mu_factor!=0 || dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC ||
+			dirac == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
+		if (dirac == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC){
+			//add coarsened twisted-Hasenbusch clover term i\mu\gamma_5*A_oo to preconditioned op.
+			if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding twisted-Hasenbusch clover term\n");
+			y.setComputeType(COMPUTE_COARSE_THCLOVER);
+			y.apply(0);
+		} else {
       if (dirac == QUDA_TWISTED_MASS_DIRAC || dirac == QUDA_TWISTED_CLOVER_DIRAC)
 	arg.mu_factor += 1.;
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding mu = %e\n",arg.mu*arg.mu_factor);
       y.setComputeType(COMPUTE_TMDIAGONAL);
       y.apply(0);
+		}
     }
 
     // now convert from atomic to application computation format if necessary for X field

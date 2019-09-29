@@ -1013,7 +1013,106 @@ namespace quda {
     computeCoarseClover<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg, parity, x_cb, ic_c, jc_c);
   }
 
+  //Coarse twisted-Hasenbusch Clover term, i.e. coarse the i\mu\gamma_5 *
+  //A_oo or A_ee, only on finest level and single fine parity
+  template<typename Float, int fineSpin, int coarseSpin, int fineColor,
+	  int coarseColor, typename Arg>
+		  __device__ __host__ void computeCoarseTHClover(Arg& arg, int
+				  parity, int x_cb, int ic_c, int jc_c){
+			  const int nDim = 4;
+			  int coord[QUDA_MAX_DIM];
+			  int coord_coarse[QUDA_MAX_DIM];
 
+			  getCoords(coord, x_cb, arg.x_size, parity);
+			  for(int d=0; d<nDim; d++) coord_coarse[d] =
+				  coord[d]/arg.geo_bs[d];
+			  
+			  int coarse_parity = 0;
+			  for(int d=0; d<nDim; d++) coarse_parity +=
+				  coord_coarse[d];
+			  coarse_parity &= 1;
+			  coord_coarse[0] /= 2;
+			  int coarse_x_cb =
+				  ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2)
+				  + coord_coarse[0];
+
+			  complex<Float> X[coarseSpin*coarseSpin];
+			  for(int i=0; i<coarseSpin*coarseSpin; i++) X[i] = 0.0;
+
+			  complex<Float> mu(0., arg.mu); //i*\mu for upper two fine spin
+			  complex<Float> m_mu(0., -1.0*arg.mu); //-i*\mu for lower two fine spin
+			  
+			  for(int s=0; s<fineSpin/2; s++){ //Upper two fine spin row
+				  const int s_c = s / arg.spin_bs;
+				  for(int s_col = s_c*arg.spin_bs; s_col<(s_c+1)*arg.spin_bs;
+						  s_col++){ //fine spin column
+					  for(int ic=0; ic<fineColor; ic++){ //fine color row
+						  for(int jc=0; jc<fineColor; jc++){ //fine color column
+							  X[s_c*coarseSpin + s_c] +=
+								  mu * conj(arg.V(parity, x_cb, s, ic, ic_c)) * 
+								  arg.C(0, parity, x_cb, s, s_col, ic, jc) *
+								  arg.V(parity, x_cb, s_col, jc, jc_c);
+						  } //fine color column
+					  } //fine color row
+				  } //fine spin column
+			  } //Upper two fine spin row
+
+			  for(int s=fineSpin/2; s<fineSpin; s++){ //Lower two fine spin row
+				  const int s_c = s / arg.spin_bs;
+				  for(int s_col = s_c*arg.spin_bs; s_col<(s_c+1)*arg.spin_bs;
+						  s_col++){
+					  for(int ic=0; ic<fineColor; ic++){
+						  for(int jc=0; jc<fineColor; jc++){
+							  X[s_c*coarseSpin + s_c] +=
+								  m_mu * conj(arg.V(parity, x_cb, s, ic, ic_c)) *
+								  arg.C(0, parity, x_cb, s, s_col, ic, jc) *
+								  arg.V(parity, x_cb, s_col, jc, jc_c);
+						  }
+					  }
+				  }
+			  } //Lower two fine spin row
+
+			  for(int si=0; si<coarseSpin; si++){
+				  for(int sj=0; sj<coarseSpin; sj++){
+					  arg.X_atomic.atomicAdd(0, coarse_parity,
+							  coarse_x_cb, si, sj, ic_c, jc_c,
+							  X[si*coarseSpin+sj]);
+				  }
+			  }
+
+		  }
+
+  template<typename Float, int fineSpin, int coarseSpin, int fineColor,
+	  int coarseColor, typename Arg>
+		  void ComputeCoarseTHCloverCPU(Arg& arg, int parity){
+			  //only on single fine parity
+#pragma omp parallel for
+			  for(int x_cb=0; x_cb<arg.fineVolumeCB; x_cb++){
+				  for(int jc_c=0; jc_c<coarseColor; jc_c++){
+					  for(int ic_c=0; ic_c<coarseColor; ic_c++){
+						  computeCoarseTHClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg,
+								  parity, x_cb, ic_c, jc_c);
+					  }
+				  }
+			  }
+		  }
+
+  template<typename Float, int fineSpin, int coarseSpin, int fineColor,
+	  int coarseColor, typename Arg>
+		  __global__ void ComputeCoarseTHCloverGPU(Arg arg, int parity){
+			  //only on single fine parity
+			  int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
+			  if(x_cb >= arg.fineVolumeCB) return;
+
+			  int jc_c = blockDim.y * blockIdx.y + threadIdx.y;
+			  if(jc_c >= coarseColor) return;
+
+			  int ic_c = blockDim.z * blockIdx.z + threadIdx.z;
+			  if(ic_c >= coarseColor) return;
+
+			  computeCoarseTHClover<Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg,
+					  parity, x_cb, ic_c, jc_c);
+		  }
 
   //Adds the identity matrix to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>

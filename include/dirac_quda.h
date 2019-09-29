@@ -454,8 +454,8 @@ namespace quda {
     DiracCloverHasenbuschTwist(const DiracParam &param);
     DiracCloverHasenbuschTwist(const DiracCloverHasenbuschTwist &dirac);
     virtual ~DiracCloverHasenbuschTwist();
-    DiracCloverHasenbuschTwist &operator=(const DiracCloverHasenbuschTwist &dirac);
-
+    DiracCloverHasenbuschTwist& operator=(const DiracCloverHasenbuschTwist &dirac);
+	double Mu()const {return mu;}
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -473,55 +473,59 @@ namespace quda {
   };
 
   // Even-odd preconditioned clover
-  class DiracCloverHasenbuschTwistPC : public DiracCloverPC
-  {
-  protected:
-    double mu;
+   class DiracCloverHasenbuschTwistPC : public DiracCloverPC {
+   protected:
+	  double mu;
 
-  public:
-    DiracCloverHasenbuschTwistPC(const DiracParam &param);
-    DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac);
-    virtual ~DiracCloverHasenbuschTwistPC();
-    DiracCloverHasenbuschTwistPC &operator=(const DiracCloverHasenbuschTwistPC &dirac);
+   public:
+     DiracCloverHasenbuschTwistPC(const DiracParam &param);
+     DiracCloverHasenbuschTwistPC(const DiracCloverHasenbuschTwistPC &dirac);
+     virtual ~DiracCloverHasenbuschTwistPC();
+     DiracCloverHasenbuschTwistPC& operator=(const DiracCloverHasenbuschTwistPC &dirac);
+	 double Mu()const {return mu;}
 
-    // Clover is inherited from parent
+     // Clover is inherited from parent
 
-    // Clover Inv is inherited from parent
+     // Clover Inv is inherited from parent
 
-    // Dslash is defined as A_pp^{-1} D_p\bar{p} and is inherited
+     // Dslash is defined as A_pp^{-1} D_p\bar{p} and is inherited
 
-    // DslashXPay is inherited (for reconstructs and such)
+     // DslashXPay is override to do the D_c = P^\dagger D P check in multigrid
+	 void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+		    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+	 
+     // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
+     void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+         				 const QudaParity parity, const ColorSpinorField &x,
+         				 const double &k, const double& b) const;
 
-    // out = (1 +/- ig5 mu A)x  + k A^{-1} D in
-    void DslashXpayTwistClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                const ColorSpinorField &x, const double &k, const double &b) const;
+     // out = ( 1+/- i g5 mu A) x - D in
+     void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+         				 const QudaParity parity, const ColorSpinorField &x,
+         				 const double &k, const double& b) const;
 
-    // out = ( 1+/- i g5 mu A) x - D in
-    void DslashXpayTwistNoClovInv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                  const ColorSpinorField &x, const double &k, const double &b) const;
+     // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
+     //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
+     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
 
-    // Can implement: M as e.g. :  i) tmp_e = A^{-1}_ee D_eo in_o  (Dslash)
-    //                            ii) out_o = in_o + A_oo^{-1} D_oe tmp_e (AXPY)
-    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-
-    // squared op
-    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
-
-    /**
-     * @brief Create the coarse even-odd preconditioned clover
-     * operator.  Unlike the Wilson operator, the coarsening of the
-     * preconditioned clover operator differs from that of the
-     * unpreconditioned clover operator, so we need to specialize it.
-     *
-     * @param T[in] Transfer operator defining the coarse grid
-     * @param Y[out] Coarse link field
-     * @param X[out] Coarse clover field
-     * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (set to zero)
-     */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass = 0., double mu = 0.,
-                        double mu_factor = 0.) const;
-  };
+     // squared op
+     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+    
+     /**
+      * @brief Create the coarse even-odd preconditioned clover
+      * operator.  Unlike the Wilson operator, the coarsening of the
+      * preconditioned clover operator differs from that of the
+      * unpreconditioned clover operator, so we need to specialize it.
+      *
+      * @param T[in] Transfer operator defining the coarse grid
+      * @param Y[out] Coarse link field
+      * @param X[out] Coarse clover field
+      * @param kappa Kappa parameter for the coarse operator
+      * @param mass Mass parameter for the coarse operator (set to zero)
+      */
+     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+ 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+   };
 
   // Full domain wall
   class DiracDomainWall : public DiracWilson {

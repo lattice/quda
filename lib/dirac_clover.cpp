@@ -130,7 +130,6 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
-
     ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
