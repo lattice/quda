@@ -32,7 +32,7 @@ set (QUDA_OBJS
   dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
   dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
-  mdw_dslash5_tensor_core.cu mdw_fused_dslash.cu dslash5_mobius_eofa.cu
+  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu

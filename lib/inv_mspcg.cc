@@ -85,32 +85,11 @@ namespace quda {
 
     for (int i = 0; i < 4; i++) diracParam.commDim[i] = 1; // comms are always on
   }
-
-  /*
-    // set the required parameters for the inner solver
-    static void fillInnerSolverParam(SolverParam& inner, const SolverParam& outer)
-    {
-      //    inner.tol = outer.tol_precondition;
-      inner.tol = 5e-2;
-      inner.maxiter = outer.maxiter_precondition;
-      inner.delta = 1e-20; // no reliable updates within the inner solver
-      inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
-      inner.precision_sloppy = outer.precision_precondition;
-
-      inner.iter = 0;
-      inner.gflops = 0;
-      inner.secs = 0;
-
-      inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-      inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
-
-      inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    }
-  */
-  MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& _param, TimeProfile& profile, int ic)
-      : Solver(_param, profile)
+  
+  MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& param_, TimeProfile& profile)
+      : Solver(param_, profile)
       , solver_prec(0)
-      , solver_prec_param(_param)
+      , solver_prec_param(param_)
       , mat(nullptr)
       , mat_sloppy(nullptr)
       , mat_precondition(nullptr)
@@ -144,8 +123,7 @@ namespace quda {
       , ifp(nullptr)
       , iftmp(nullptr)
       , ifset(nullptr)
-      , inner_iterations(ic)
-      , reliable_update_delta(inv_param->reliable_delta) {
+      , inner_iterations(param.maxiter_precondition) {
 
     printfQuda("MSPCG constructor starts.\n");
 
@@ -189,10 +167,6 @@ namespace quda {
       dirac_param_precondition.commDim[i] = 0;
     }
 
-    // dirac_param.print();
-    // dirac_param_sloppy.print();
-    // dirac_param_precondition.print();
-
     mat = new DiracMobiusPC(dirac_param);
     nrm_op = new DiracMdagM(mat);
 
@@ -202,15 +176,19 @@ namespace quda {
     mat_precondition = new DiracMobiusPC(dirac_param_precondition);
     nrm_op_precondition = new DiracMdagM(mat_precondition);
 
-    //    fillInnerSolverParam(solver_prec_param, param);
+    
+    const char fname[] = "MSPCG::MSPCG(QudaInvertParam*, SolverParam&, TimeProfile&)";
+    const char cname[] = __FILE__;
 
+    copier_timer.Reset(fname, cname, __LINE__);
+    precise_timer.Reset(fname, cname, __LINE__);
+    sloppy_timer.Reset(fname, cname, __LINE__);
+    preconditioner_timer.Reset("woo", cname, __LINE__);
+    for (int i = 0; i < 2; i++){
+      linalg_timer[i].Reset(fname, cname, __LINE__);
+    }
+    
     printfQuda("MSPCG constructor ends.\n");
-
-    copier_timer.Reset("woo", "hoo", 0);
-    precise_timer.Reset("woo", "hoo", 0);
-    sloppy_timer.Reset("woo", "hoo", 0);
-    preconditioner_timer.Reset("woo", "hoo", 0);
-    for (int i = 0; i < 2; i++) linalg_timer[i].Reset("Woo", "Hoo", 0);
   }
 
   MSPCG::~MSPCG() {
@@ -420,34 +398,7 @@ namespace quda {
   }
 
   void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in, const double scale) {
-    int odd_bit = (mat_precondition->getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
-    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
-    if (tc && (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION)) {
-      if (R[0] == 2) {
-        mat_precondition->fused_f4(*iftmp, in, scale, parity[1], shift2, shift2);
-        mat_precondition->fused_f0(*ifset, *iftmp, scale, parity[0], shift1, shift2);
-        mat_precondition->fused_f1(*ifmmp, *ifset, *fz, in, scale, parity[1], shift0, shift1);
-        mat_precondition->fused_f2(*ifset, *ifmmp, scale, parity[0], shift1, shift1);
-        mat_precondition->fused_f3(out, *ifset, *fz, scale, parity[1], shift2, shift2);
-      } else {
-        errorQuda("Padding can only be 2\n");
-      }
-    } else {
-      errorQuda("Since the preconditioner does NOT use copy_color_spin_field_extended functionalities"
-                "anymore the legacy non-tensor-core code does Not work.\n");
-      /*
-      mat_precondition->Dagger(QUDA_DAG_NO);
-      mat_precondition->Dslash4prePartial(*iftmp, in, parity[1], sp_len0, RR0, Xs0);
-      mat_precondition->dslash4_dslash5inv_dslash4pre_partial(*ifset, *iftmp, parity[0], sp_len1, RR1, Xs1, true,
-      {2,2,2,2}); mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(*iftmp, *ifset, parity[1], in,
-      -1.0, sp_len2, RR2, Xs2, true, {1,1,1,1}); mat_precondition->Dagger(QUDA_DAG_YES);
-      mat_precondition->dslash5inv_sm_partial(out, *iftmp, parity[1], sp_len2, RR2, Xs2);
-      mat_precondition->Dagger(QUDA_DAG_NO);
-      mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(*ifset, out, parity[0], sp_len1, RR1,
-      Xs1); mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(out, *ifset, parity[1], *iftmp, -1.0,
-      sp_len0, RR0, Xs0);
-      */
-    }
+    mat_precondition->FusedMdagMLocal(out, in, iftmp, ifset, ifmmp, fz);
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
@@ -474,12 +425,7 @@ namespace quda {
       rk2 = rkp12;
 
       axpyZpbx(alpha, *ip, ix, ib, beta);
-
-      // Want to leave this debug code here since this might be useful.
-      /**
-      printf("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n",
-        local_loop_count, rk2, alpha, beta, Mpk2);
-      */
+    
     }
 
     commGlobalReductionSet(true);
@@ -718,18 +664,16 @@ namespace quda {
     delete vct_dtmp2;
   }
 
-  void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db) { errorQuda("Something is wrong! :( \n"); }
+  void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db) {
 
-  void MSPCG::reliable_update(ColorSpinorField& dx, ColorSpinorField& db) {
-
-    const char fname[] = "MSPCG::reliable_update(ColorSpinorField&, ColorSpinorField&)";
-    const char cname[] = "Hoo";
-    const int lname = 657;
+    const char fname[] = "MSPCG::operator()(ColorSpinorField&, ColorSpinorField&)";
+    const char cname[] = __FILE__;
 
     Gflops = 0.;
     fGflops = 0.;
 
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    
     // Check to see that we're not trying to invert on a zero-field source
     double b2 = norm2(db);
     if (b2 == 0.) {
@@ -756,9 +700,9 @@ namespace quda {
 
     // START of the main loop
 
-    precise_timer.Start(fname, cname, lname);
+    precise_timer.Start(fname, cname, __LINE__);
     (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
-    precise_timer.Stop(fname, cname, lname);
+    precise_timer.Stop(fname, cname, __LINE__);
 
     double r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
     printfQuda("True precise residual is %8.4e\n", r2);
@@ -809,11 +753,11 @@ namespace quda {
     k = 0;
     while (k < param.maxiter) {
 
-      sloppy_timer.Start(fname, cname, lname);
+      sloppy_timer.Start(fname, cname, __LINE__);
       (*nrm_op_sloppy)(*mmp, *p, *tmp, *tmp2);
-      sloppy_timer.Stop(fname, cname, lname);
+      sloppy_timer.Stop(fname, cname, __LINE__);
 
-      linalg_timer[0].Start(fname, cname, lname);
+      linalg_timer[0].Start(fname, cname, __LINE__);
       r2_old = rr2;
 #if 0
       rkzk = reDotProduct(*r, *z);
@@ -888,11 +832,11 @@ namespace quda {
 
       if (rr2 < stop) break;
 
-      linalg_timer[0].Stop(fname, cname, lname);
+      linalg_timer[0].Stop(fname, cname, __LINE__);
 
       Minv(*z, *r);
 
-      linalg_timer[1].Start(fname, cname, lname);
+      linalg_timer[1].Start(fname, cname, __LINE__);
       // replace with fused kernel?
       xpay(*r, -1., *r_old);
       zkP1rkp1 = reDotProduct(*z, *r_old);
@@ -901,7 +845,7 @@ namespace quda {
       beta = zkP1rkp1 / rkzk;
       xpay(*z, beta, *p);
 
-      linalg_timer[1].Stop(fname, cname, lname);
+      linalg_timer[1].Stop(fname, cname, __LINE__);
 
       k++;
       printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop,
@@ -957,9 +901,6 @@ namespace quda {
           linalg_timer[i].time, int(linalg_timer[i].time / param.secs * 100.), linalg_timer[i].count);
     }
     printfQuda("Total time %8.2f secs.\n", param.secs);
-    // printf("preconditioner desync #%03d: %8.4f msecs.\n", comm_rank(), preconditioner_timer.last*1e3);
-    // printfQuda("Flops ratio sloppy/preconditioner: %.2f.\n",
-    // preconditioner_tflops/sloppy_tflops/(double)inner_iterations);
 
     // reset the flops counters
     blas::flops = 0;

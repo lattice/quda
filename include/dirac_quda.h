@@ -473,15 +473,6 @@ public:
     void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
 		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    void Dslash4Partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity, int sp_idx_length,
-                        int R_[4], int_fastdiv Xs_[4], bool expanding_ = false,
-                        std::array<int, 4> Rz_ = {0, 0, 0, 0}) const;
-    void Dslash4prePartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-    void Dslash4preXpayPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &k, int sp_idx_length, int R_[4],
-                               int_fastdiv Xs_[4]) const;
-
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -509,36 +500,8 @@ public:
     DiracMobiusPC& operator=(const DiracMobiusPC &dirac);
 
     void Dslash5inv(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5invPartial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                           int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-
-    void dslash4_dslash5inv_dslash4pre_partial(ColorSpinorField &out, const ColorSpinorField &in,
-                                               const QudaParity parity, int sp_idx_length, int R_[4],
-                                               int_fastdiv Xs_[4], bool expanding_, std::array<int, 4> Rz_) const;
-
-    void dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
-                                                           const QudaParity parity, const ColorSpinorField &x,
-                                                           const double &k, int sp_idx_length, int R_[4],
-                                                           int_fastdiv Xs_[4], bool expanding_,
-                                                           std::array<int, 4> Rz_) const;
-
-    void dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(ColorSpinorField &out, const ColorSpinorField &in,
-                                                                    const QudaParity parity, int sp_idx_length,
-                                                                    int R_[4], int_fastdiv Xs_[4]) const;
-
-    void dslash4_dagger_dslash4pre_dagger_xpay_partial(ColorSpinorField &out, const ColorSpinorField &in,
-                                                       const QudaParity parity, const ColorSpinorField &x,
-                                                       const double &k, int sp_idx_length, int R_[4],
-                                                       int_fastdiv Xs_[4]) const;
-
-    void dslash5inv_sm_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
-
-    void dslash5inv_sm_tc_partial(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                                  const double scale, int sp_idx_length, int R_[4], int_fastdiv Xs_[4]) const;
 
     void fused_f0(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
                   int shift[4], int halo_shift[4]) const;
@@ -551,6 +514,12 @@ public:
                   const QudaParity parity, int shift[4], int halo_shift[4]) const;
     void fused_f4(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
                   int shift[4], int halo_shift[4]) const;
+    void FusedMdagMLocal(
+                  ColorSpinorField &out, const ColorSpinorField &in, 
+                  ColorSpinorField* iftmp,
+                  ColorSpinorField* ifset,
+                  ColorSpinorField* ifmmp,
+                  ColorSpinorField* fz) const; 
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1301,6 +1270,21 @@ public:
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
+
+  class DiracMdagMLocal : public DiracMatrix {
+    
+    private:
+      ... padded_gauge_field;
+
+    public:
+      DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
+      DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
+
+    void operator()(ColorSpinorField& out, ColorSpinorField& in){
+      
+    }
+  
+  } 
 
 
   class DiracMMdag : public DiracMatrix {

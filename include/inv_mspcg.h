@@ -22,7 +22,7 @@ namespace quda
     DiracMobiusPC *mat;
     DiracMobiusPC *mat_sloppy;
     DiracMobiusPC *mat_precondition;
-    //    DiracDubiusPC* mat_extended;
+    
     DiracMdagM *nrm_op;
     DiracMdagM *nrm_op_sloppy;
     DiracMdagM *nrm_op_precondition;
@@ -84,33 +84,35 @@ namespace quda
     int shift2[4] = {2, 2, 2, 2};
 
     bool tc;
+    
+    void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
+    void Minv(ColorSpinorField &out, const ColorSpinorField &in);
+
+    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
+    int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
 
   public:
-    MSPCG(QudaInvertParam *inv_param, SolverParam &_param, TimeProfile &profile, int ic = 6);
+    
+    /* --------------------------------------------------------------------------*
+     * 
+     * --------------------------------------------------------------------------*/
+    MSPCG(QudaInvertParam* inv_param, SolverParam& param_, TimeProfile& profile);
+    
+    ~MSPCG();
 
     int inner_iterations;
-
     double Gflops;
     double fGflops;
-
-    double reliable_update_delta;
 
     void allocate(ColorSpinorField &db);
     void deallocate();
 
+    void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in, const double scale = 1.);
+    
     void test_dslash(const ColorSpinorField &tb);
 
-    virtual ~MSPCG();
-
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-    void reliable_update(ColorSpinorField &dx, ColorSpinorField &db);
 
-    void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
-    void Minv(ColorSpinorField &out, const ColorSpinorField &in);
-
-    void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in, const double scale = 1.);
-    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
-    int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
   };
 
 } // namespace quda

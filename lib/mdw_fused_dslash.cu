@@ -61,17 +61,16 @@ namespace quda {
       real kappa;
       real fac_inv;
 
-      // (beta + alpha*m5inv) @ in
+      // (beta + alpha*m5inv) * in
       real alpha = 1.;
       real beta = 0.;
 
-      const float scale; // scale factor for the input color spin field
       real m_scale = 1.; // scale factor for the matrix
 
       MdwfFusedDslashType type;
       FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
           const ColorSpinorField& x, double m_f_, double m_5_, const Complex* b_5, const Complex* c_5, bool dagger_,
-          int parity, int shift_[4], int halo_shift_[4], const double scale_, MdwfFusedDslashType type_)
+          int parity, int shift_[4], int halo_shift_[4], MdwfFusedDslashType type_)
           : out(out)
           , in(in)
           , U(U)
@@ -93,7 +92,6 @@ namespace quda {
                 in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)}
           , shrinked_dim{dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]}
           , volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2)
-          , scale(scale_)
           , type(type_) {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
@@ -629,30 +627,30 @@ namespace quda {
     template <class storage_type>
     void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
+        int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
       // switch for Ls
       switch (in.X(4)) {
       case 8: {
         FusedDslashArg<storage_type, 8> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
       case 12: {
         FusedDslashArg<storage_type, 12> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
       case 16: {
         FusedDslashArg<storage_type, 16> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
       case 20: {
         FusedDslashArg<storage_type, 20> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
@@ -663,14 +661,14 @@ namespace quda {
 
     void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], const double scale, MdwfFusedDslashType type) {
+        int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
 
       if (checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3) {
-        apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
       } else if (checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3) {
-        apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, scale, type);
+        apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
       } else {
         errorQuda("Tensor core implemtation ONLY supports HALF/QUARTER precision and n_color = 3.\n");
       }

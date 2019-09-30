@@ -431,17 +431,12 @@ namespace quda {
   void ApplyDslash5(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double m_f,
                     double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger, Dslash5Type type);
 
-  void apply_dslash5_tensor_core(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
-                                 double m_f, double m_5, const Complex *b_5, const Complex *c_5, double a, bool dagger,
-                                 const double scale, Dslash5Type type);
-
   // Tensor core functions for Mobius DWF
   namespace mobius_tensor_core
   {
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
-                            bool dagger, int parity, int shift[4], int halo_shift[4], const double scale,
-                            MdwfFusedDslashType type);
+                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type);
   }
 
   // The EOFA stuff
