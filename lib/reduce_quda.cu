@@ -149,7 +149,7 @@ namespace quda {
         } else
 #endif
         {
-          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
+          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), qudaMemcpyDeviceToHost);
         }
       }
       doubleN cpu_sum = set(((ReduceType *)h_reduce)[0]);

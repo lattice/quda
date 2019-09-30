@@ -80,7 +80,7 @@ namespace quda {
 #endif
         if (compute_max_only) {
           if (!activeTuning()) { // only do copy once tuning is done
-            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost, stream);
+            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), qudaMemcpyDeviceToHost, stream);
             qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
           }
         }

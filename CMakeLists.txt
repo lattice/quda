@@ -398,6 +398,11 @@ else()
 endif()
 
 if(QUDA_QDPJIT)
+
+  if(QUDA_BUILD_ALL_TESTS)
+    message(WARNING "Specifying QUDA_QDPJIT and QUDA_BUILD_ALL_TESTS might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+  endif()
+
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()

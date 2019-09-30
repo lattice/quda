@@ -71,7 +71,7 @@ namespace quda {
 #endif
         {
           qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z * sizeof(ReduceType) * NXZ * arg.NYW,
-              cudaMemcpyDeviceToHost);
+              qudaMemcpyDeviceToHost);
         }
       }
 
@@ -305,7 +305,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, qudaMemcpyHostToDevice,
                                 *getStream());
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
       }
@@ -317,7 +317,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, qudaMemcpyHostToDevice,
                                 *getStream());
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
       }
@@ -329,7 +329,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, qudaMemcpyHostToDevice,
                                 *getStream());
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }

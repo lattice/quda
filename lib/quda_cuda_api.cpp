@@ -45,7 +45,7 @@ namespace quda {
 
       if (!async) {
         switch (kind) {
-        case cudaMemcpyDeviceToHost:   name = "cudaMemcpyDeviceToHost";   break;
+        case qudaMemcpyDeviceToHost:   name = "qudaMemcpyDeviceToHost";   break;
         case cudaMemcpyHostToDevice:   name = "cudaMemcpyHostToDevice";   break;
         case cudaMemcpyHostToHost:     name = "cudaMemcpyHostToHost";     break;
         case cudaMemcpyDeviceToDevice: name = "cudaMemcpyDeviceToDevice"; break;
@@ -54,7 +54,7 @@ namespace quda {
         }
       } else {
         switch(kind) {
-        case cudaMemcpyDeviceToHost:   name = "cudaMemcpyAsyncDeviceToHost";   break;
+        case qudaMemcpyDeviceToHost:   name = "cudaMemcpyAsyncDeviceToHost";   break;
         case cudaMemcpyHostToDevice:   name = "cudaMemcpyAsyncHostToDevice";   break;
         case cudaMemcpyHostToHost:     name = "cudaMemcpyAsyncHostToHost";     break;
         case cudaMemcpyDeviceToDevice: name = "cudaMemcpyAsyncDeviceToDevice"; break;
@@ -76,7 +76,7 @@ namespace quda {
       if (async) {
 #ifdef USE_DRIVER_API
         switch (kind) {
-        case cudaMemcpyDeviceToHost:
+        case qudaMemcpyDeviceToHost:
           PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
           break;
         case cudaMemcpyHostToDevice:
@@ -90,12 +90,12 @@ namespace quda {
         }
 #else
         PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
-                kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+                kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
       } else {
 #ifdef USE_DRIVER_API
         switch(kind) {
-        case cudaMemcpyDeviceToHost:   cuMemcpyDtoH(dst, (CUdeviceptr)src, count);              break;
+        case qudaMemcpyDeviceToHost:   cuMemcpyDtoH(dst, (CUdeviceptr)src, count);              break;
         case cudaMemcpyHostToDevice:   cuMemcpyHtoD((CUdeviceptr)dst, src, count);              break;
         case cudaMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
         case cudaMemcpyDeviceToDevice: cuMemcpyDtoD((CUdeviceptr)dst, (CUdeviceptr)src, count); break;
@@ -144,7 +144,7 @@ namespace quda {
     } else {
 #ifdef USE_DRIVER_API
       switch (kind) {
-      case cudaMemcpyDeviceToHost:
+      case qudaMemcpyDeviceToHost:
         PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
         break;
       case cudaMemcpyHostToDevice:
@@ -158,7 +158,7 @@ namespace quda {
       }
 #else
       PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
-              kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+              kind == qudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
     }
   }
@@ -179,7 +179,7 @@ namespace quda {
     param.Height = height;
 
     switch (kind) {
-    case cudaMemcpyDeviceToHost:
+    case qudaMemcpyDeviceToHost:
       param.srcDevice = (CUdeviceptr)src;
       param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
       param.dstHost = dst;

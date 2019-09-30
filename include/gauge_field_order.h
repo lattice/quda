@@ -2021,7 +2021,7 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
 	checkCudaError();
       }
 
@@ -2029,7 +2029,7 @@ namespace quda {
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = nullptr;
 	checkCudaError();

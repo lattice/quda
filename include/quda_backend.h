@@ -29,6 +29,9 @@
 #define qudaError_t cudaError_t
 #define qudaTextureObject_t cudaTextureObject_t
 #define qudaMemcpyKind cudaMemcpyKind
+#define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
+#define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
+#define qudaMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
 #define qudaTextureDesc cudaTextureDesc
@@ -49,6 +52,9 @@
 #define qudaError_t hipError_t
 #define qudaTextureObject_t hipTextureObject_t
 #define qudaMemcpyKind hipMemcpyKind
+#define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define qudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define qudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define qudaFuncAttribute hipFuncAttribute
 #define qudaDeviceProp hipDeviceProp
 #define qudaTextureDesc hipTextureDesc

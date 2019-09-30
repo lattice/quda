@@ -286,18 +286,18 @@ namespace quda {
           if (dir==0) count++;
 	}
       }
-      qudaMemcpy(input_path_d[dir], input_path_h, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(input_path_d[dir], input_path_h, bytes, qudaMemcpyHostToDevice);
 
       host_free(input_path_h);
     }
       
     //length
     int* length_d = (int*)pool_device_malloc(num_paths*sizeof(int));
-    qudaMemcpy(length_d, length_h, num_paths*sizeof(int), cudaMemcpyHostToDevice);
+    qudaMemcpy(length_d, length_h, num_paths*sizeof(int), qudaMemcpyHostToDevice);
 
     //path_coeff
     double* path_coeff_d = (double*)pool_device_malloc(num_paths*sizeof(double));
-    qudaMemcpy(path_coeff_d, path_coeff_h, num_paths*sizeof(double), cudaMemcpyHostToDevice);
+    qudaMemcpy(path_coeff_d, path_coeff_h, num_paths*sizeof(double), qudaMemcpyHostToDevice);
 
     GaugeForceArg<Mom,Gauge> arg(mom, u, num_paths, path_max_length, coeff, input_path_d,
 				 length_d, path_coeff_d, count, meta_mom, meta_u);
