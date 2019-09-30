@@ -413,7 +413,7 @@ namespace quda {
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && in.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot restrict a full field since only have single parity null-space components");
 
-      // ESW assumption for staggered MG
+      // Check for KD preconditioned staggered op
       if (input->Nspin() == 1) {
         
       } else { // (wilson or coarse)->coarse}

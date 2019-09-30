@@ -239,13 +239,14 @@ namespace quda {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 24) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-#endif // GPU_WILSON_DIRAC
+#endif // NSPIN4
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#ifdef NSPIN4
     } else if (out.Ncolor() == 6) { // for coarsening coarsened Wilson free field.
       const int fineColor = 6;
       if (nVec == 6) { // these are probably only for debugging only
@@ -253,24 +254,25 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#endif // NSPIN4
     } else if (out.Ncolor() == 24) {
       const int fineColor = 24;
       if (nVec == 24) { // to keep compilation under control coarse grids have same or more colors
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
       } else if (nVec == 32) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,32>(out, in, v, fine_to_coarse, parity);
-#endif // GPU_WILSON_DIRAC
-  #ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
       } else if (nVec == 64) { 
         Prolongate<Float,fineSpin,fineColor,coarseSpin,64>(out, in, v, fine_to_coarse, parity);
       } else if (nVec == 96) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,96>(out, in, v, fine_to_coarse, parity);
-  #endif // GPU_STAGGERED_DIRAC
+#endif // NSPIN1
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (out.Ncolor() == 32) {
       const int fineColor = 32;
       if (nVec == 32) {
@@ -278,8 +280,8 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
-#endif // GPU_WILSON_DIRAC
-#ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
     } else if (out.Ncolor() == 64) {
       const int fineColor = 64;
       if (nVec == 64) {
@@ -296,7 +298,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
-#endif // GPU_STAGGERED_DIRAC
+#endif // NSPIN1
     } else {
       errorQuda("Unsupported nColor %d", out.Ncolor());
     }

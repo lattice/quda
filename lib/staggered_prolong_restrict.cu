@@ -202,10 +202,7 @@ namespace quda {
         }
       } else {
         if (out.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) {
-          //TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-          // ESW version
-          TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
+          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
           StaggeredProlongRestrictArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_FLOAT2_FIELD_ORDER,transferType>
             arg(out, in, fine_to_coarse, parity);

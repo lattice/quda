@@ -908,6 +908,8 @@ public:
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
       double kappa, double mass, double mu=0., double mu_factor=0.) const;
@@ -972,6 +974,8 @@ public:
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
       double kappa, double mass, double mu=0., double mu_factor=0.) const;

@@ -390,7 +390,8 @@ namespace quda {
     for(int d = 0; d < nDim; d++) geo_bs[d] = x_size[d]/xc_size[d];
     int spin_bs = 0; // 0 -> spin-less types.
 
-    //Calculate UV and then VUV for each dimension, accumulating directly into the coarse gauge field Y
+    // Calculate VUV in one pass (due to KD-transform) for each dimension, 
+    // accumulating directly into the coarse gauge field Y
 
     typedef CalculateStaggeredYArg<Float,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, G, mass, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine);

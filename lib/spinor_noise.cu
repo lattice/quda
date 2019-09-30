@@ -168,7 +168,7 @@ namespace quda {
     } else if (src.Ncolor() == 96) {
       spinorNoise<real,Ns,96>(src, randstates, type);
     } else {
-      errorQuda("Ncolor = %d not implemented", src.Ncolor());
+      errorQuda("nColor = %d not implemented", src.Ncolor());
     }
   }
 
@@ -179,19 +179,19 @@ namespace quda {
 #ifdef NSPIN4
       spinorNoise<real,4>(src, randstates, type);
 #else
-      errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
 #endif
     } else if (src.Nspin() == 2) {
 #ifdef NSPIN2
       spinorNoise<real,2>(src, randstates, type);
 #else
-      errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
 #endif
     } else if (src.Nspin() == 1) {
 #ifdef NSPIN1
       spinorNoise<real,1>(src, randstates, type);
 #else
-      errorQuda("spinorNoise has not been built for Nspin=%d fields", src.Nspin());
+      errorQuda("spinorNoise has not been built for nSpin=%d fields", src.Nspin());
 #endif
     } else {
       errorQuda("Nspin = %d not implemented", src.Nspin());

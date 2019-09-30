@@ -99,24 +99,18 @@ namespace quda {
 
     if (coarseColor == 6) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#if 0
-    } else if (coarseColor == 8) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 16) {
-      calculateYcoarse<Float,vFloat,fineColor,fineSpin,16,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#endif
     } else if (coarseColor == 24) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (coarseColor == 32) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#endif // GPU_WILSON_DIRAC
-#ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
     } else if (coarseColor == 64) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 96) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc);
-#endif // GPU_STAGGERED_DIRAC
+#endif // NSPIN1
     } else {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }

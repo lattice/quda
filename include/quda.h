@@ -623,12 +623,6 @@ extern "C" {
     /** Whether to run null vector oblique checks once set up is complete */
     QudaBoolean run_oblique_proj_check;
 
-    /** Whether to use eigenvectors for the nullspace */
-    QudaBoolean use_low_modes;
-
-    /** Deflate the coarsest grid  */
-    QudaBoolean deflate_coarsest;
-
     /** Whether to load the null-space vectors to disk (requires QIO) */
     QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 

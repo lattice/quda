@@ -145,10 +145,10 @@ template <int MAX>
 struct IterateThreadStore<MAX, MAX>
 {
     template <CacheStoreModifier MODIFIER, typename T>
-    static __device__ __forceinline__ void Store(T *ptr, T *vals) {}
+    static __device__ __forceinline__ void Store(T * /*ptr*/, T * /*vals*/) {}
 
     template <typename OutputIteratorT, typename T>
-    static __device__ __forceinline__ void Dereference(OutputIteratorT ptr, T *vals) {}
+    static __device__ __forceinline__ void Dereference(OutputIteratorT /*ptr*/, T * /*vals*/) {}
 };
 
 

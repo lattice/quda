@@ -425,23 +425,8 @@ if (inA.Ncolor() == 4) {
     } else if (inA.Ncolor() == 6) { // free field Wilson
       ApplyCoarse<Float,yFloat,ghostFloat,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
 #endif // NSPIN4
-#if 0
-    } else if (inA.Ncolor() == 8) {
-      ApplyCoarse<Float,yFloat,ghostFloat,8,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else if (inA.Ncolor() == 12) {
-      ApplyCoarse<Float,yFloat,ghostFloat,12,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else if (inA.Ncolor() == 16) {
-      ApplyCoarse<Float,yFloat,ghostFloat,16,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else if (inA.Ncolor() == 20) {
-      ApplyCoarse<Float,yFloat,ghostFloat,20,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-    } else 
-#endif
     } else if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,yFloat,ghostFloat,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#if 0
-    } else if (inA.Ncolor() == 28) {
-      ApplyCoarse<Float,yFloat,ghostFloat,28,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);
-#endif
 #ifdef NSPIN4
     } else if (inA.Ncolor() == 32) {
       ApplyCoarse<Float,yFloat,ghostFloat,32,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, dagger, type, halo_location);

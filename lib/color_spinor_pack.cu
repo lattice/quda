@@ -262,44 +262,24 @@ namespace quda {
 #ifdef GPU_MULTIGRID
     } else if (a.Ncolor() == 4) {
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,4>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 6) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,6>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 8) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,8>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 12) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,12>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 16) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,16>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 18) { // Needed for two level free field Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,18>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 20) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,20>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 24) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,24>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 28) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,28>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 32) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,32>::nColor>(ghost, a, parity, nFace, dagger, destination);
     } else if (a.Ncolor() == 36) { // Needed for three level free field Wilson
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,36>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 48) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,48>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 64) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,64>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 72) {
+    } else if (a.Ncolor() == 72) { // wilson 3 -> 24 nvec, or staggered 3 -> 24 nvec, which could end up getting used for Laplace...
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,72>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 96) {
+#ifdef NSPIN4
+    } else if (a.Ncolor() == 96) { // wilson 3 -> 32 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,96>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 128) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,128>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 256) {
-      genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,256>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 576) {
+#endif // NSPIN4
+    } else if (a.Ncolor() == 576) { // staggered KD free-field or wilson 24 -> 24 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,576>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 768) {
+#ifdef NSPIN4
+    } else if (a.Ncolor() == 768) { // wilson 24 -> 32 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,768>::nColor>(ghost, a, parity, nFace, dagger, destination);
-    } else if (a.Ncolor() == 1024) {
+    } else if (a.Ncolor() == 1024) { // wilson 32 -> 32 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1024>::nColor>(ghost, a, parity, nFace, dagger, destination);
+#endif // NSPIN4
 #ifdef NSPIN1
     } else if (a.Ncolor() == 1536) { // staggered KD 24 -> 64 nvec
       genericPackGhost<Float,ghostFloat,order,Ns,precision_spin_color_mapper<Float,ghostFloat,Ns,1536>::nColor>(ghost, a, parity, nFace, dagger, destination);

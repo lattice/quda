@@ -126,7 +126,7 @@ namespace quda
     diracSmoother = param.matSmooth->Expose();
     diracSmootherSloppy = param.matSmoothSloppy->Expose();
 
-    // ESW HACK GENERATE STAGGERED WITHOUT CORRECT INTERFACE
+    // Check if we're on the top level of a staggered MG build.
     if (param.level != 0 || param.is_staggered == QUDA_BOOLEAN_NO) {
       // Refresh the null-space vectors if we need to
       if (refresh && param.level < param.Nlevel-1) {

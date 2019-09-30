@@ -146,18 +146,17 @@ namespace quda {
     if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
 
-    printfQuda("ESW: About to run createYhat\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
 
     createYhat(gpu_setup);
 
-    printfQuda("ESW: Finished createYhat\n");
-    printfQuda("ESW: About to run createPreconditionedCoarseOp\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
-    // ESW: skip for now
     if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
     else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
 
-    printfQuda("ESW: Finished createPreconditionedCoarseOp\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
 
     if (gpu_setup) {
       enable_gpu = true;
