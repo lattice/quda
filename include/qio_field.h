@@ -8,7 +8,7 @@ void write_gauge_field(const char *filename, void* gauge[], QudaPrecision prec, 
           int argc, char* argv[]);
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
 		       int nColor, int nSpin, int Nvec, int argc, char *argv[]);
-void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
+void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset, QudaParity parity,
 			int nColor, int nSpin, int Nvec, int argc, char *argv[]);
 #else
 inline void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec,

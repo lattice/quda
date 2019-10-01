@@ -229,23 +229,17 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   // Prepare a string.
   std::string xml_record = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><quda";
   switch (len) {
-#ifdef NSPIN1
     case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-#endif
     case 18: xml_record += "GaugeFieldFile>"; break; // SU(3) gauge field
-#ifdef NSPIN4
     case 24: xml_record += "WilsonColorSpinorField>"; break; // SU(3) Wilson
-#endif
-#if defined(GPU_MULTIGRID) 
     case 48:
     case 64: 
     case 128: 
     case 192: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-#endif
     default: errorQuda("Invalid element length for QIO writing."); break;
   }
   xml_record += "<version>BETA</version>";
-  xml_record += "<type>" + type + "</type><info>";
+  xml_record += "<type>" + std::string(type) + "</type><info>";
 
   // if parity+even, it's a half-x-dim even only vector
   // if parity+odd, it's a half-x-dim odd only vector
@@ -260,24 +254,17 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   else { xml_record += "<parity>full</parity>"; } // abuse/hack
    
   // A lot of this is redundant of the record info, but eh.
-  xml_record += "<nColor>" + to_string(nColor) + "</nColor>";
-  xml_record += "<nSpin>" + to_string(nSpin) + "</nSpin>";
+  xml_record += "<nColor>" + std::to_string(nColor) + "</nColor>";
+  xml_record += "<nSpin>" + std::to_string(nSpin) + "</nSpin>";
   xml_record += "</info></quda";
    switch (len) {
-#ifdef NSPIN1
     case 6: xml_record += "StaggeredColorSpinorField>"; break; // SU(3) staggered
-#endif
     case 18: xml_record += "GaugeFieldFile>"; break; // SU(3) gauge field
-A
-#ifdef NSPIN4
     case 24: xml_record += "WilsonColorSpinorField>"; break; // SU(3) Wilson
-#endif
-#if defined(GPU_MULTIGRID)
     case 48:
     case 64:
     case 128:
     case 192: xml_record += "MGColorSpinorField>"; break; // Color spinor vector
-#endif
     default: errorQuda("Invalid element length for QIO writing."); break;
   }
 
@@ -299,7 +286,7 @@ A
 
   // Create the record XML for the field
   QIO_String *xml_record_out = QIO_string_create();
-  QIO_string_set(xml_record_out,xml_write.c_str());
+  QIO_string_set(xml_record_out,xml_record.c_str());
 
   /* Write the field record converting to desired file precision*/
   size_t rec_size = file_prec*count*len;
@@ -387,7 +374,7 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
   return status;
 }
 
-void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, QudaSiteSubset subset, QudaParity parity, const int *X, int nColor, int nSpin,
+void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset, QudaParity parity, int nColor, int nSpin,
                         int Nvec, int argc, char *argv[])
 {
   this_node = mynode();

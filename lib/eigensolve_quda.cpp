@@ -455,8 +455,8 @@ namespace quda
     }
 
     // assumes even parity if a single-parity field...
-    auto parity = (tmp[0]->siteSubset == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->siteSubset, parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
+    auto parity = (tmp[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
                        Nvec, 0, (char **)0);
 
     host_free(V);
