@@ -1986,6 +1986,7 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   case dslash_test_type::Dslash: dirac.Dslash4(out, in, parity); break;
   case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
   case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity, inv_param->kappa); break;
+  default: errorQuda("Unsupported dslash_test_type in dslashQuda_4dpc.");
   }
 
   cpuParam.v = h_out;
@@ -2050,6 +2051,7 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
   case dslash_test_type::Dslash4pre: dirac.Dslash4pre(out, in, parity); break;
   case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity); break;
+  default: errorQuda("Unsupported dslash_test_type in dslashQuda_mdwf.");
   }
 
   cpuParam.v = h_out;
