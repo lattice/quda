@@ -406,7 +406,7 @@ namespace quda {
       mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *gauge, *unextended_tmp1, in, mass, m5,
           b_5, c_5, dagger, parity[1], shift0, shift1, dslash4_dslash5inv_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp3, *extended_tmp1,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp2, *extended_tmp1,
           mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1, dslash4dag_dslash5predag_dslash5invdag);
 
       mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *gauge, out, *unextended_tmp1, mass, m5, b_5, c_5,

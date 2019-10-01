@@ -25,7 +25,7 @@ namespace quda
     
     DiracMdagM *nrm_op;
     DiracMdagM *nrm_op_sloppy;
-    DiracMdagM *nrm_op_precondition;
+    DiracMdagMLocal *nrm_op_precondition;
 
     DiracParam dirac_param;
     DiracParam dirac_param_sloppy;

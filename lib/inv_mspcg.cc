@@ -75,10 +75,6 @@ namespace quda {
     diracParam.matpcType = inv_param->matpc_type;
     diracParam.dagger = inv_param->dagger;
     diracParam.gauge = gaugePrecise;
-    //    diracParam.fatGauge = gaugeFatPrecise;
-    //    diracParam.longGauge = gaugeLongPrecise;
-    //    diracParam.clover = cloverPrecise;
-    //    diracParam.kappa = kappa;
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
@@ -164,7 +160,7 @@ namespace quda {
     nrm_op_sloppy = new DiracMdagM(mat_sloppy);
 
     mat_precondition = new DiracMobiusPC(dirac_param_precondition);
-    nrm_op_precondition = new DiracMdagM(mat_precondition);
+    nrm_op_precondition = new DiracMdagMLocal(mat_precondition);
     
     const char fname[] = "MSPCG::MSPCG(QudaInvertParam*, SolverParam&, TimeProfile&)";
     const char cname[] = __FILE__;
@@ -277,7 +273,7 @@ namespace quda {
   }
 
   void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in) {
-    mat_precondition->MdagMLocal(out, in);
+    (*nrm_op_precondition)(out, in);
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {

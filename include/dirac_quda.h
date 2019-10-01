@@ -93,6 +93,7 @@ namespace quda {
   class DiracMatrix;
   class DiracM;
   class DiracMdagM;
+  class DiracMdagMLocal;
   class DiracMMdag;
   class DiracMdag;
   //Forward declaration of multigrid Transfer class
@@ -104,6 +105,7 @@ namespace quda {
     friend class DiracMatrix;
     friend class DiracM;
     friend class DiracMdagM;
+    friend class DiracMdagMLocal;
     friend class DiracMMdag;
     friend class DiracMdag;
 
@@ -153,6 +155,11 @@ namespace quda {
 			    const double &k) const = 0;
     virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
+    
+    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const {
+      errorQuda("Not implemented!\n");
+    }
+    
     void Mdag(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MMdag(ColorSpinorField &out, const ColorSpinorField &in) const;
 
@@ -1255,22 +1262,41 @@ public:
     }
   };
 
-/**
   class DiracMdagMLocal : public DiracMatrix {
-    
-    private:
-      ... padded_gauge_field;
 
     public:
-      DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
-      DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
+      DiracMdagMLocal(const Dirac& d) : DiracMatrix(d) { }
+      DiracMdagMLocal(const Dirac* d) : DiracMatrix(d) { }
 
-    void operator()(ColorSpinorField& out, ColorSpinorField& in){
-      
+    void operator()(ColorSpinorField& out, const ColorSpinorField& in) const {
+      dirac->MdagMLocal(out, in);
+    }
+    
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+    {
+      dirac->tmp1 = &tmp;
+      dirac->MdagMLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      dirac->tmp1 = NULL;
+    }
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    {
+      dirac->tmp1 = &Tmp1;
+      dirac->tmp2 = &Tmp2;
+      dirac->MdagMLocal(out, in);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      dirac->tmp2 = NULL;
+      dirac->tmp1 = NULL;
+    }
+ 
+    int getStencilSteps() const
+    {
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   
-  } 
-*/
+  }; 
 
   class DiracMMdag : public DiracMatrix {
 
