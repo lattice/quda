@@ -107,7 +107,7 @@ namespace quda
     void allocate(ColorSpinorField &db);
     void deallocate();
 
-    void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in, const double scale = 1.);
+    void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in);
     
     void test_dslash(const ColorSpinorField &tb);
 

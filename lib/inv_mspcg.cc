@@ -109,15 +109,7 @@ namespace quda {
       , tmp2(nullptr)
       , fr(nullptr)
       , fz(nullptr)
-      ,
-#ifdef PIPELINED_PRECONDITIONER
-      iz(nullptr)
-      , is(nullptr)
-      , iw(nullptr)
-      , iq(nullptr)
-      ,
-#endif
-      immp(nullptr)
+      , immp(nullptr)
       , ip(nullptr)
       , ifmmp(nullptr)
       , ifp(nullptr)
@@ -162,8 +154,6 @@ namespace quda {
     dirac_param_precondition.gauge = padded_gauge_field_precondition;
 
     for (int i = 0; i < 4; i++) {
-      dirac_param.commDim[i] = 1;
-      dirac_param_sloppy.commDim[i] = 1;
       dirac_param_precondition.commDim[i] = 0;
     }
 
@@ -175,7 +165,6 @@ namespace quda {
 
     mat_precondition = new DiracMobiusPC(dirac_param_precondition);
     nrm_op_precondition = new DiracMdagM(mat_precondition);
-
     
     const char fname[] = "MSPCG::MSPCG(QudaInvertParam*, SolverParam&, TimeProfile&)";
     const char cname[] = __FILE__;
@@ -193,19 +182,7 @@ namespace quda {
 
   MSPCG::~MSPCG() {
     profile.TPSTART(QUDA_PROFILE_FREE);
-    /*
-       if(solver_prec)
-       delete solver_prec;
-
-       if( MdagM )
-       delete MdagM;
-       if( MdagM_precondition )
-       delete MdagM_precondition;
-       if( mat )
-       delete mat;
-       if( mat_precondition )
-       delete mat_precondition;
-       */
+    
     delete nrm_op_precondition;
     delete mat_precondition;
 
@@ -278,112 +255,14 @@ namespace quda {
 
     // double fx2 = norm2(*fx);
     for (double s = 1.526624328e-5; s < 65504.1; s *= 1.189207115) { // 2^-8 ~ 2^+8
-      inner_dslash(*cx, *cb, s * sqrt(b2 / cb->Volume() / 24.));
+      inner_dslash(*cx, *cb);
       blas::copy(*tt, *cx);
 
       double x2_ = blas::norm2(*tt);
       double dd = xmyNorm(*tx, *tt);
       printfQuda(" loss scale, | a |^2, |a-b|^2, |a-b|^2/|b|^2: %8.4e %16.12e %16.12e %16.12e\n", s, x2_, dd, dd / x2);
     }
-
-#ifdef USE_LAGECY_DSLASH
-    if (tc && (fb->Precision() == QUDA_HALF_PRECISION || false)) {
-      blas::zero(*fy);
-      printfQuda("Detailed test of fused kernels with tensor cores. \n"
-                 "Since the legacy kernel does NOT support quarter precision, This test is ONLY available for half "
-                 "precision\n");
-      double ft2, mdd;
-      // f0
-      {
-        blas::zero(*fx);
-        blas::zero(*ft);
-        mat_precondition->dslash4_dslash5inv_dslash4pre_partial(
-            *ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1, true, {2, 2, 2, 2});
-        mat_precondition->fused_f0(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift2);
-        printfQuda("f0: <------\n");
-        ft2 = blas::norm2(*ft);
-        printfQuda("           ft2 = %16.12e.\n", ft2);
-        fx2 = blas::norm2(*fx);
-        printfQuda("           fx2 = %16.12e.\n", fx2);
-        mdd = xmyNorm(*ft, *fx);
-        printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-        printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd / ft2);
-        printfQuda("f0: ------>\n");
-      }
-      // f1
-      {
-        blas::zero(*fx);
-        blas::zero(*ft);
-        mat_precondition->dslash4_dslash5inv_xpay_dslash5inv_dagger_partial(
-            *fx, *fb, static_cast<QudaParity>(0), *fb, -1.0, sp_len2, RR2, Xs2, true, {1, 1, 1, 1});
-        mat_precondition->Dagger(QUDA_DAG_YES);
-        mat_precondition->Dslash5inv(*ft, *fx, static_cast<QudaParity>(0));
-        mat_precondition->Dagger(QUDA_DAG_NO);
-        mat_precondition->fused_f1(*fx, *fb, *fy, *cb, 1., static_cast<QudaParity>(0), shift0, shift1);
-        printfQuda("f1: <------\n");
-        ft2 = blas::norm2(*ft);
-        printfQuda("           ft2 = %16.12e.\n", ft2);
-        fx2 = blas::norm2(*fx);
-        printfQuda("           fx2 = %16.12e.\n", fx2);
-        mdd = xmyNorm(*ft, *fx);
-        printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-        printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd / ft2);
-        printfQuda("f1: ------>\n");
-      }
-      // f2
-      {
-        blas::zero(*fx);
-        blas::zero(*ft);
-        mat_precondition->dslash4_dagger_dslash4pre_dagger_dslash5inv_dagger_partial(
-            *ft, *fb, static_cast<QudaParity>(0), sp_len1, RR1, Xs1);
-        mat_precondition->fused_f2(*fx, *fb, 1., static_cast<QudaParity>(0), shift1, shift1);
-        printfQuda("f2: <------\n");
-        ft2 = blas::norm2(*ft);
-        printfQuda("           ft2 = %16.12e.\n", ft2);
-        fx2 = blas::norm2(*fx);
-        printfQuda("           fx2 = %16.12e.\n", fx2);
-        mdd = xmyNorm(*ft, *fx);
-        printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-        printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd / ft2);
-        printfQuda("f2: ------>\n");
-      }
-      // f3
-      {
-        blas::zero(*fx);
-        blas::zero(*ft);
-        mat_precondition->dslash4_dagger_dslash4pre_dagger_xpay_partial(
-            *ft, *fb, static_cast<QudaParity>(0), *fy, -1.0, sp_len0, RR0, Xs0);
-        mat_precondition->fused_f3(*cx, *fb, *fy, 1., static_cast<QudaParity>(0), shift2, shift1);
-        copyExtendedColorSpinor(
-            *fx, *cx, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
-        printfQuda("f3: <------\n");
-        ft2 = blas::norm2(*ft);
-        printfQuda("           ft2 = %16.12e.\n", ft2);
-        fx2 = blas::norm2(*fx);
-        printfQuda("           fx2 = %16.12e.\n", fx2);
-        mdd = xmyNorm(*ft, *fx);
-        printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-        printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd / ft2);
-        printfQuda("f3: ------>\n");
-      }
-      // f4
-      {
-        blas::zero(*fx);
-        blas::zero(*ft);
-        mat_precondition->Dslash4prePartial(*ft, *fb, static_cast<QudaParity>(0), sp_len0, RR0, Xs0);
-        mat_precondition->fused_f4(*fx, *cb, 1., static_cast<QudaParity>(0), shift2, shift1);
-        printfQuda("f4: <------\n");
-        ft2 = blas::norm2(*ft);
-        printfQuda("           ft2 = %16.12e.\n", ft2);
-        fx2 = blas::norm2(*fx);
-        printfQuda("           fx2 = %16.12e.\n", fx2);
-        mdd = xmyNorm(*ft, *fx);
-        printfQuda("     diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd);
-        printfQuda(" avg diff   m2 = %16.12e. (This number is SUPPOSED to be tiny).\n", mdd / ft2);
-        printfQuda("f4: ------>\n");
-      }
-    }
-#endif
+    
     delete tx;
     delete tt;
     delete tb;
@@ -397,8 +276,8 @@ namespace quda {
     printfQuda("dslash test completed. ----->\n");
   }
 
-  void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in, const double scale) {
-    mat_precondition->FusedMdagMLocal(out, in, iftmp, ifset, ifmmp, fz);
+  void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in) {
+    mat_precondition->FusedMdagMLocal(out, in);
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
@@ -407,6 +286,11 @@ namespace quda {
     blas::zero(ix);
 
     double rk2 = blas::norm2(ib);
+    if(rk2 == 0.0){
+      commGlobalReductionSet(true);
+      return;
+    }
+    
     double Mpk2, alpha, beta, rkp12;
 
     blas::copy(*ip, ib);
@@ -417,11 +301,11 @@ namespace quda {
 
       Mpk2 = reDotProduct(*ip, *immp);
 
-      alpha = rk2 / (Mpk2 == 0.0 ? 1.0 : Mpk2);
+      alpha = rk2 / Mpk2;
 
       rkp12 = axpyNorm(-alpha, *immp, ib);
 
-      beta = rkp12 / (rk2 == 0.0 ? 1.0 : rk2);
+      beta = rkp12 / rk2;
       rk2 = rkp12;
 
       axpyZpbx(alpha, *ip, ix, ib, beta);
@@ -429,63 +313,8 @@ namespace quda {
     }
 
     commGlobalReductionSet(true);
-
     return;
   }
-
-#ifdef PIPELINED_PRECONDITIONER
-  void MSPCG::pipelined_inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
-    commGlobalReductionSet(false);
-
-    blas::zero(ix);
-    inner_dslash(*iw, ib);
-
-    double gamma, gamma_old, delta, beta, alpha, alpha_old;
-
-    for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
-      inner_dslash(*iq, *iw);
-
-      double3 aaab = cDotProductNormA(ib, *iw);
-
-      gamma_old = gamma;
-      gamma = aaab.z;
-      delta = aaab.x;
-
-      if (local_loop_count == 0) {
-        beta = 0.;
-        alpha = gamma / delta;
-
-        blas::copy(*is, *iw);
-        blas::copy(*ip, ib);
-
-        blas::copy(*iz, *iq);
-      } else {
-        beta = gamma / gamma_old;
-        alpha_old = alpha;
-        alpha = 1. / (delta / gamma - beta / alpha_old);
-
-        xpay(*iw, beta, *is);
-        xpay(ib, beta, *ip);
-
-        xpay(*iq, beta, *iz);
-      }
-
-      axpy(+alpha, *ip, ix);
-      axpy(-alpha, *is, ib);
-      axpy(-alpha, *iz, *iw);
-
-      // Want to leave this debug code here since this might be useful.
-      /**
-      printfQuda("inner_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e\n",
-        local_loop_count, gamma, alpha, beta);
-      */
-    }
-
-    commGlobalReductionSet(true);
-
-    return;
-  }
-#endif
 
   int MSPCG::outer_cg(ColorSpinorField& dx, ColorSpinorField& db, double quit) {
     double Mpk2, alpha, beta, rkp12;
@@ -533,17 +362,9 @@ namespace quda {
     } else {
       blas::copy(*fr, in);
       if (dirac_param_sloppy.gauge->Precision() == dirac_param_precondition.gauge->Precision()) {
-#ifdef PIPELINED_PRECONDITIONER
-        pipelined_inner_cg(out, *fr);
-#else
         inner_cg(out, *fr);
-#endif
       } else {
-#ifdef PIPELINED_PRECONDITIONER
-        pipelined_inner_cg(*fz, *fr);
-#else
         inner_cg(*fz, *fr);
-#endif
         blas::copy(out, *fz);
       }
     }
@@ -585,13 +406,6 @@ namespace quda {
     // i* means inner preconditioning
     immp = new cudaColorSpinorField(csParam);
     ip = new cudaColorSpinorField(csParam);
-
-#ifdef PIPELINED_PRECONDITIONER
-    iz = new cudaColorSpinorField(csParam);
-    is = new cudaColorSpinorField(csParam);
-    iw = new cudaColorSpinorField(csParam);
-    iq = new cudaColorSpinorField(csParam);
-#endif
 
     csParam.x[0] += 2 * R[0] / 2; // x direction is checkerboarded
     for (int i = 1; i < 4; ++i) { csParam.x[i] += 2 * R[i]; }
@@ -644,13 +458,6 @@ namespace quda {
 
     delete immp;
     delete ip;
-
-#ifdef PIPELINED_PRECONDITIONER
-    delete iz;
-    delete is;
-    delete iw;
-    delete iq;
-#endif
 
     delete ifmmp;
     delete ifp;

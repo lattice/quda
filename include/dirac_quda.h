@@ -514,12 +514,7 @@ public:
                   const QudaParity parity, int shift[4], int halo_shift[4]) const;
     void fused_f4(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
                   int shift[4], int halo_shift[4]) const;
-    void FusedMdagMLocal(
-                  ColorSpinorField &out, const ColorSpinorField &in, 
-                  ColorSpinorField* iftmp,
-                  ColorSpinorField* ifset,
-                  ColorSpinorField* ifmmp,
-                  ColorSpinorField* fz) const; 
+    void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const; 
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1271,6 +1266,7 @@ public:
     }
   };
 
+/**
   class DiracMdagMLocal : public DiracMatrix {
     
     private:
@@ -1285,7 +1281,7 @@ public:
     }
   
   } 
-
+*/
 
   class DiracMMdag : public DiracMatrix {
 
