@@ -14,18 +14,19 @@ set (QUDA_OBJS
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu gauge_covdev.cpp 
+  gauge_covdev.cpp 
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
   extract_gauge_ghost_mg.cu max_gauge.cu gauge_update_quda.cu
   max_clover.cu dirac_clover.cpp dirac_wilson.cpp dirac_staggered.cpp
+  dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
   dirac_twisted_mass.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
-  blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
@@ -63,6 +64,7 @@ set (QUDA_OBJS
 # current workaround for nvshmem
 set(QUDA_DSLASH_OBJS dslash_pack2.cu 
 dslash_wilson.cu dslash_wilson_clover.cu dslash5_domain_wall.cu dslash_wilson_clover_preconditioned.cu 
+dslash_wilson_clover_hasenbusch_twist.cu dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
 dslash_twisted_mass.cu dslash_twisted_mass_preconditioned.cu
 dslash_ndeg_twisted_mass.cu dslash_ndeg_twisted_mass_preconditioned.cu
 dslash_twisted_clover.cu dslash_twisted_clover_preconditioned.cu
@@ -175,7 +177,7 @@ if(QUDA_BACKWARDS)
 endif()
 
 if(QUDA_QIO)
-  if(QUDA_DOWNLOAD_USQCD)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
   endif()
@@ -189,7 +191,7 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
   endif()

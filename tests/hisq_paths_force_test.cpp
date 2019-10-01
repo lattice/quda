@@ -4,6 +4,7 @@
 
 #include <quda.h>
 #include "test_util.h"
+#include <test_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -16,8 +17,6 @@
 
 using namespace quda;
 
-extern void usage(char** argv);
-extern int device;
 cudaGaugeField *cudaGauge = NULL;
 cpuGaugeField  *cpuGauge  = NULL;
 
@@ -39,13 +38,8 @@ cudaGaugeField *cudaOprod = NULL;
 cpuGaugeField *cpuLongLinkOprod = NULL;
 cudaGaugeField *cudaLongLinkOprod = NULL;
 
-extern bool verify_results;
 int ODD_BIT = 1;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
 
-extern QudaPrecision prec;
-extern QudaReconstructType link_recon;
 QudaPrecision link_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision hw_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision cpu_hw_prec = QUDA_DOUBLE_PRECISION;
@@ -424,32 +418,20 @@ static void display_test_info()
 
 int main(int argc, char **argv)
 {
-  int i;
-  for (i =1;i < argc; i++){
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
 
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }    
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
+  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
 
-    if( strcmp(argv[i], "--gauge-order") == 0){
-      if(i+1 >= argc){
-        usage(argv);
-      }
-
-      if(strcmp(argv[i+1], "milc") == 0){
-        gauge_order = QUDA_MILC_GAUGE_ORDER;
-      }else if(strcmp(argv[i+1], "qdp") == 0){
-        gauge_order = QUDA_QDP_GAUGE_ORDER;
-      }else{
-        fprintf(stderr, "Error: unsupported gauge-field order\n");
-        exit(1);
-      }
-      i++;
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if(gauge_order == QUDA_MILC_GAUGE_ORDER){
@@ -471,7 +453,4 @@ int main(int argc, char **argv)
   }else{
     return -1;
   }
-
 }
-
-

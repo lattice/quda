@@ -304,8 +304,8 @@ namespace{
     
     int num_failures = 0;
     Matrix<complex<double>,3> inlink, outlink;
-      
-    for (int i=0; i<infield.Volume(); ++i){
+
+    for (unsigned int i = 0; i < infield.Volume(); ++i) {
       for (int dir=0; dir<4; ++dir){
 	if (infield.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&inlink, ((float*)(infield.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
@@ -317,7 +317,7 @@ namespace{
 	  copyLinkToArray(((double*)(outfield.Gauge_p()) + (i*4 + dir)*18), outlink); 
 	} // precision?
       } // dir
-    }  // loop over volume
+    }   // loop over volume
     return;
 #else
     errorQuda("Unitarization has not been built");
@@ -330,8 +330,8 @@ namespace{
   {
 #ifdef GPU_UNITARIZE
     Matrix<complex<double>,3> link, identity;
-      
-    for(int i=0; i<field.Volume(); ++i){
+
+    for (unsigned int i = 0; i < field.Volume(); ++i) {
       for(int dir=0; dir<4; ++dir){
 	if(field.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
@@ -349,7 +349,7 @@ namespace{
 	  return false;
 	}
       } // dir
-    } // i	  
+    }   // i
     return true;
 #else
     errorQuda("Unitarization has not been built");

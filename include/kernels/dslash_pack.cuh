@@ -11,6 +11,7 @@
 
 namespace quda
 {
+  int *getPackComms();
 
   __device__ static unsigned int retirementCount[2 * QUDA_MAX_DIM] = {0};
 
@@ -103,7 +104,7 @@ namespace quda
       for (int i = 0; i < 4; i++) {
         threadDimMapLower[i] = 0;
         threadDimMapUpper[i] = 0;
-        if (!commDim[i]) continue;
+        if (!getPackComms()[i]) continue;
         threadDimMapLower[i] = (prev >= 0 ? threadDimMapUpper[prev] : 0);
         threadDimMapUpper[i] = threadDimMapLower[i] + 2 * nFace * dc.ghostFaceCB[i];
         prev = i;
@@ -350,49 +351,49 @@ namespace quda
       const bool pack_internode = (!arg.packkernel) != (!(arg.shmem & 2));
 
       if (arg.shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
-        switch (dim) {
-        case 0:
-          while (local_tid < arg.dc.ghostFaceCB[0]) {
-            int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
-            if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
-            else
-              pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 1:
-          while (local_tid < arg.dc.ghostFaceCB[1]) {
-            int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
-            if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
-            else
-              pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 2:
-          while (local_tid < arg.dc.ghostFaceCB[2]) {
-            int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
-            if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
-            else
-              pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 3:
-          while (local_tid < arg.dc.ghostFaceCB[3]) {
-            int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
-            if (pc == QUDA_5D_PC)
-              pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
-            else
-              pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
+      switch (dim) {
+      case 0:
+        while (local_tid < arg.dc.ghostFaceCB[0]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[0] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 0, pc>(arg, ghost_idx + s * arg.dc.ghostFace[0], 0, parity);
+          else
+            pack<dagger, twist, 0, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
         }
+        break;
+      case 1:
+        while (local_tid < arg.dc.ghostFaceCB[1]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[1] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 1, pc>(arg, ghost_idx + s * arg.dc.ghostFace[1], 0, parity);
+          else
+            pack<dagger, twist, 1, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 2:
+        while (local_tid < arg.dc.ghostFaceCB[2]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[2] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 2, pc>(arg, ghost_idx + s * arg.dc.ghostFace[2], 0, parity);
+          else
+            pack<dagger, twist, 2, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 3:
+        while (local_tid < arg.dc.ghostFaceCB[3]) {
+          int ghost_idx = dir * arg.dc.ghostFaceCB[3] + local_tid;
+          if (pc == QUDA_5D_PC)
+            pack<dagger, twist, 3, pc>(arg, ghost_idx + s * arg.dc.ghostFace[3], 0, parity);
+          else
+            pack<dagger, twist, 3, pc>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
       }
+    }
 
 #ifdef NVSHMEM_COMMS
       // MWTODO: This can probably be merged
@@ -534,49 +535,49 @@ namespace quda
       bool pack_internode = (!arg.packkernel) != (!(shmem & 2));
 
       if (shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
-        switch (dim) {
-        case 0:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
-            if (arg.nFace == 1)
-              packStaggered<0, 1>(arg, ghost_idx, s, parity);
-            else
-              packStaggered<0, 3>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 1:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
-            if (arg.nFace == 1)
-              packStaggered<1, 1>(arg, ghost_idx, s, parity);
-            else
-              packStaggered<1, 3>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 2:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
-            if (arg.nFace == 1)
-              packStaggered<2, 1>(arg, ghost_idx, s, parity);
-            else
-              packStaggered<2, 3>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
-        case 3:
-          while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
-            int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
-            if (arg.nFace == 1)
-              packStaggered<3, 1>(arg, ghost_idx, s, parity);
-            else
-              packStaggered<3, 3>(arg, ghost_idx, s, parity);
-            local_tid += arg.blocks_per_dir * blockDim.x;
-          }
-          break;
+      switch (dim) {
+      case 0:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<0, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<0, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
         }
+        break;
+      case 1:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<1, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<1, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 2:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<2, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<2, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
+      case 3:
+        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
+          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
+          if (arg.nFace == 1)
+            packStaggered<3, 1>(arg, ghost_idx, s, parity);
+          else
+            packStaggered<3, 3>(arg, ghost_idx, s, parity);
+          local_tid += arg.blocks_per_dir * blockDim.x;
+        }
+        break;
       }
+    }
 
 #ifdef NVSHMEM_COMMS
       // MWTO -> clean up and merge with non-staggered version

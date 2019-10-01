@@ -58,6 +58,13 @@ extern "C" {
   void clover_matpc(void *out, void **gauge, void *clover, void *clover_inv, void *in, double kappa,
 		    QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param);
 
+  void cloverHasenbuchTwist_mat(void *out, void **gauge, void *clover, void *in, double kappa, double mu, int dagger,
+                                QudaPrecision precision, QudaGaugeParam &gauge_param, QudaMatPCType matpc_type);
+
+  void cloverHasenbuschTwist_matpc(void *out, void **gauge, void *in, void *clover, void *cInv, double kappa, double mu,
+                                   QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+                                   QudaGaugeParam &gauge_param);
+
 #ifdef __cplusplus
 }
 #endif

@@ -123,7 +123,7 @@ using namespace gauge;
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION){
 	arg.result_h[0] = 0.0;
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	LAUNCH_KERNEL_LOCAL_PARITY(computeMomAction, tp, stream, arg, Float, Mom);
+	LAUNCH_KERNEL_LOCAL_PARITY(computeMomAction, (*this), tp, stream, arg, Float, Mom);
       } else {
 	errorQuda("CPU not supported yet\n");
       }
@@ -274,7 +274,7 @@ using namespace gauge;
     void apply(const cudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, tp, stream, arg, Float);
+	LAUNCH_KERNEL_LOCAL_PARITY(UpdateMomKernel, (*this), tp, stream, arg, Float);
       } else {
 	errorQuda("CPU not supported yet\n");
       }

@@ -864,30 +864,35 @@ namespace quda {
      @param[in] dir Direction of the unit hop (+1 or -1)
      @param[in] tboundary Boundary condition
    */
-  template <QudaStaggeredPhase phase, typename Float, typename I>
-  __device__ __host__ inline Float StaggeredPhase(const int coords[], const I X[], int dim, int dir, Float tboundary)
+  template <typename Arg>
+  __device__ __host__ inline auto StaggeredPhase(const int coords[], int dim, int dir, const Arg &arg) -> typename Arg::real
   {
+    using real = typename Arg::real;
+    constexpr auto phase = Arg::phase;
     static_assert(
         phase == QUDA_STAGGERED_PHASE_MILC || phase == QUDA_STAGGERED_PHASE_TIFR, "Unsupported staggered phase");
-    Float sign;
+    real sign;
 
+    const auto *X = arg.dim;
     if (phase == QUDA_STAGGERED_PHASE_MILC) {
       switch (dim) {
-      case 0: sign = (coords[3]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
-      case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0); break;
+      case 0: sign = (coords[3]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0); break;
+      case 1: sign = (coords[3] + coords[0]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0); break;
       case 2:
-        sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<Float>(1.0) : static_cast<Float>(-1.0);
+        sign = (coords[3] + coords[1] + coords[0]) % 2 == 0 ? static_cast<real>(1.0) : static_cast<real>(-1.0);
         break;
-      case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
-      default: sign = static_cast<Float>(1.0);
+      case 3: sign = (coords[3] + dir >= X[3] && arg.is_last_time_slice) || (coords[3] + dir < 0 && arg.is_first_time_slice) ?
+          arg.tboundary : static_cast<real>(1.0); break;
+      default: sign = static_cast<real>(1.0);
       }
     } else if (phase == QUDA_STAGGERED_PHASE_TIFR) {
       switch (dim) {
       case 0: sign = (coords[3] + coords[2] + coords[1]) % 2 == 0 ? -1 : 1; break;
       case 1: sign = ((coords[3] + coords[2]) % 2 == 1) ? -1 : 1; break;
       case 2: sign = (coords[3] % 2 == 0) ? -1 : 1; break;
-      case 3: sign = (coords[3] + dir >= X[3] || coords[3] + dir < 0) ? tboundary : static_cast<Float>(1.0); break;
-      default: sign = static_cast<Float>(1.0);
+      case 3: sign = (coords[3] + dir >= X[3] && arg.is_last_time_slice) || (coords[3] + dir < 0 && arg.is_first_time_slice) ?
+          arg.tboundary : static_cast<real>(1.0); break;
+      default: sign = static_cast<real>(1.0);
       }
     }
     return sign;

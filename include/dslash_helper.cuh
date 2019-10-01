@@ -398,6 +398,13 @@ namespace quda
     out << "twist_a = " << arg.twist_a;
     out << "twist_b = " << arg.twist_b;
     out << "twist_c = " << arg.twist_c;
+    out << "pack_threads = " << arg.pack_threads;
+    out << "blocks_per_dir = " << arg.blocks_per_dir;
+    out << "dim_map = { ";
+    for (int i = 0; i < 4; i++) out << arg.dim_map[i] << (i < 3 ? ", " : " }");
+    out << "active_dims = " << arg.active_dims;
+    out << "pack_blocks = " << arg.pack_blocks;
+
     return out;
   }
 

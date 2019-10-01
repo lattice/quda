@@ -243,15 +243,15 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    double *s = (double *)safe_malloc(n_defl * sizeof(double));
-    blas::reDotProduct(s, eig_vecs_ptr, vec);
+    Complex*s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    blas::cDotProduct(s, eig_vecs_ptr, vec);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     blas::zero(*vec_defl[0]);
-    blas::axpy(s, eig_vecs_ptr, vec_defl);
+    blas::caxpy(s, eig_vecs_ptr, vec_defl);
     // FIXME - we can optimize the zeroing out with a "multi-caxy"
     // function that just writes over vec_defl and doesn't sum.  When
     // we exceed the multi-blas limit this would deompose into caxy

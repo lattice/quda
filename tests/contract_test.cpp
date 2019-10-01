@@ -6,6 +6,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <contract_reference.h>
 #include "misc.h"
@@ -23,26 +24,9 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_precondition;
-extern QudaPrecision prec_null;
-
-extern QudaContractType contract_type;
 
 // If you add a new contraction type, this must be updated++
-const int NcontractType = 2;
-
-extern bool verify_results;
-
-extern void usage(char **);
+constexpr int NcontractType = 2;
 
 namespace quda
 {
@@ -101,10 +85,15 @@ int main(int argc, char **argv)
 
   // QUDA initialise
   //-----------------------------------------------------------------------------
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
