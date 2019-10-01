@@ -26,7 +26,7 @@ inline void read_spinor_field(const char *filename, void *V[], QudaPrecision pre
   printf("QIO support has not been enabled\n");
   exit(-1);
 }
-inline void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X,
+inline void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset, QudaParity parity,
 			       int nColor, int nSpin, int Nvec, int argc, char *argv[]) {
   printf("QIO support has not been enabled\n");
   exit(-1);

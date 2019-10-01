@@ -404,7 +404,7 @@ namespace quda
 	}
       }
 
-      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+      write_spinor_field(vec_outfile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->siteSubset, parity,
 			 B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
 
       host_free(V);

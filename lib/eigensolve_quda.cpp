@@ -421,12 +421,26 @@ namespace quda
       csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
                                                                               eig_vecs[0]->Precision());
       csParam.location = QUDA_CPU_FIELD_LOCATION;
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      for (int i = 0; i < Nvec; i++) {
-        tmp.push_back(ColorSpinorField::Create(csParam));
-        *tmp[i] = *eig_vecs[i];
+
+      if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || csParam.nColor != 3) { // we don't care for MG vectors
+        // We're good, copy as is.
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        for (int i = 0; i < Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+          *tmp[i] = *eig_vecs[i];
+        }
+      } else { // QUDA_PARITY_SITE_SUBSET
+        csParam.x[0] *= 2; // corrects for the factor of two in the X direction
+        csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // create a full-parity field.
+        csParam.create = QUDA_ZERO_FIELD_CREATE; // to explicitly zero the odd sites.
+        for (int i = 0; i < Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+          // copy the even-parity only eigen/singular vector into the even components of the full parity vector
+          tmp[i]->Even() = *eig_vecs[i];
+        }
       }
     } else {
+      // FIXME: add conversion to full site subset from single parity fields.
       for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
     }
 
@@ -440,7 +454,9 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->Ncolor(), tmp[0]->Nspin(),
+    // assumes even parity if a single-parity field...
+    auto parity = (tmp[0]->siteSubset == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->siteSubset, parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
                        Nvec, 0, (char **)0);
 
     host_free(V);
