@@ -1,31 +1,41 @@
 #pragma once
 
 // TBD: API calls
-// cudaCreateTextureObject
 
+// cuMemAlloc
+// cuMemFree
+
+// cudaFree
+// cudaFreeHost
+
+// cudaCreateTextureObject
 // cudaDestroyTextureObject
 // cudaDeviceCanAccessPeer
 // cudaDeviceGetStreamPriorityRange
 // cudaDeviceReset
 // cudaDeviceSetCacheConfig
+// cudaDeviceSynchronize
 // cudaDriverGetVersion
 
-// cudaEventSynchronize
 // cudaEventCreate
 // cudaEventDestroy
+// cudaEventElapsedTime
+// cudaEventRecord
+// cudaEventSynchronize
 
 // cudaGetTextureObjectResourceDesc
 // cudaGetDeviceCount 
 // cudaGetDeviceProperties
 // cudaGetErrorString
+// cudaGetLastError
 
 // cudaHostGetDevicePointer
 
+// cudaHostAlloc
 // cudaHostRegister
 // cudaHostRegisterDefault
 // cudaHostRegisterMapped
 // cudaHostRegisterPortable
-
 // cudaHostUnregister
 
 // cudaIpcCloseMemHandle
