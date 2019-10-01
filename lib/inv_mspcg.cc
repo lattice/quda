@@ -277,7 +277,7 @@ namespace quda {
   }
 
   void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in) {
-    mat_precondition->FusedMdagMLocal(out, in);
+    mat_precondition->MdagMLocal(out, in);
   }
 
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {

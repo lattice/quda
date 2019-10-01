@@ -374,98 +374,7 @@ namespace quda {
 
     deleteTmp(&tmp1, reset1);
   }
-
-  // The "new" fused kernel
-  void DiracMobiusPC::fused_f0(ColorSpinorField& out, const ColorSpinorField& in, const double scale,
-      const QudaParity parity, int shift[4], int halo_shift[4]) const {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    mobius_tensor_core::apply_fused_dslash(
-        out, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity, shift, halo_shift, dslash4_dslash5pre_dslash5inv);
-
-    long long Ls = in.X(4);
-    long long vol = (2 * in.X(0) - 2 * shift[0]) * (in.X(1) - 2 * shift[1]) * (in.X(2) - 2 * shift[2])
-        * (in.X(3) - 2 * shift[3]) * Ls / 2ll;
-    long long halo_vol = (2 * in.X(0) - 2 * halo_shift[0]) * (in.X(1) - 2 * halo_shift[1])
-        * (in.X(2) - 2 * halo_shift[2]) * (in.X(3) - 2 * halo_shift[3]) * Ls / 2ll;
-    const long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-    const long long mat = 2ll * 4ll * Ls - 1ll;
-    flops += halo_vol * 24ll * hop + vol * 24ll * mat;
-  }
-
-  void DiracMobiusPC::fused_f2(ColorSpinorField& out, const ColorSpinorField& in, const double scale,
-      const QudaParity parity, int shift[4], int halo_shift[4]) const {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity, shift,
-        halo_shift, dslash4dag_dslash5predag_dslash5invdag);
-
-    long long Ls = in.X(4);
-    long long vol = (2 * in.X(0) - 2 * shift[0]) * (in.X(1) - 2 * shift[1]) * (in.X(2) - 2 * shift[2])
-        * (in.X(3) - 2 * shift[3]) * Ls / 2ll;
-    const long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-    const long long mat = 2ll * 4ll * Ls - 1ll;
-    flops += vol * 24ll * (hop + mat);
-  }
-
-  void DiracMobiusPC::fused_f1(ColorSpinorField& out, const ColorSpinorField& in, ColorSpinorField& aux_out,
-      const ColorSpinorField& aux_in, const double scale, const QudaParity parity, int shift[4],
-      int halo_shift[4]) const {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    mobius_tensor_core::apply_fused_dslash(out, in, *gauge, aux_out, aux_in, mass, m5, b_5, c_5, dagger, parity, shift,
-        halo_shift, dslash4_dslash5inv_dslash5invdag);
-
-    long long Ls = in.X(4);
-    long long vol = (2 * in.X(0) - 2 * shift[0]) * (in.X(1) - 2 * shift[1]) * (in.X(2) - 2 * shift[2])
-        * (in.X(3) - 2 * shift[3]) * Ls / 2ll;
-    long long halo_vol = (2 * in.X(0) - 2 * halo_shift[0]) * (in.X(1) - 2 * halo_shift[1])
-        * (in.X(2) - 2 * halo_shift[2]) * (in.X(3) - 2 * halo_shift[3]) * Ls / 2ll;
-    const long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-    const long long mat = 2ll * 4ll * Ls - 1ll;
-    flops += halo_vol * 24ll * hop + vol * 24ll * 2ll * mat;
-  }
-
-  void DiracMobiusPC::fused_f3(ColorSpinorField& out, const ColorSpinorField& in, const ColorSpinorField& aux_in,
-      const double scale, const QudaParity parity, int shift[4], int halo_shift[4]) const {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    // checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    mobius_tensor_core::apply_fused_dslash(
-        out, in, *gauge, out, aux_in, mass, m5, b_5, c_5, dagger, parity, shift, halo_shift, dslash4dag_dslash5predag);
-
-    long long Ls = in.X(4);
-    long long vol = (2 * in.X(0) - 2 * shift[0]) * (in.X(1) - 2 * shift[1]) * (in.X(2) - 2 * shift[2])
-        * (in.X(3) - 2 * shift[3]) * Ls / 2ll;
-    const long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-    const long long mat = 2ll * 4ll * Ls - 1ll;
-    flops += vol * 24ll * (hop + mat);
-  }
-
-  void DiracMobiusPC::fused_f4(ColorSpinorField& out, const ColorSpinorField& in, const double scale,
-      const QudaParity parity, int shift[4], int halo_shift[4]) const {
-    if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
-    // checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    mobius_tensor_core::apply_fused_dslash(
-        out, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity, shift, halo_shift, dslash5pre);
-
-    long long Ls = in.X(4);
-    long long vol = (2 * in.X(0) - 2 * shift[0]) * (in.X(1) - 2 * shift[1]) * (in.X(2) - 2 * shift[2])
-        * (in.X(3) - 2 * shift[3]) * Ls / 2ll;
-    // const long long hop = 7ll*8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-    const long long mat = 2ll * 4ll * Ls - 1ll;
-    flops += vol * 24ll * mat;
-  }
-
+  
   void DiracMobiusPC::MdagMLocal(ColorSpinorField& out, const ColorSpinorField& in) const {
 
     checkSpinorAlias(in, out);
@@ -479,7 +388,6 @@ namespace quda {
     for (int i = 1; i < 4; ++i) { csParam.x[i] += 4; }
     ColorSpinorField* extended_tmp1 = new cudaColorSpinorField(csParam);
     ColorSpinorField* extended_tmp2 = new cudaColorSpinorField(csParam);
-    ColorSpinorField* extended_tmp3 = new cudaColorSpinorField(csParam);
 
     int shift0[4] = {0, 0, 0, 0};
     int shift1[4] = {1, 1, 1, 1};
@@ -490,18 +398,18 @@ namespace quda {
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
 
       mobius_tensor_core::apply_fused_dslash(
-          *extended_tmp2, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity[1], shift2, shift2, dslash5pre);
+          *extended_tmp1, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity[1], shift2, shift2, dslash5pre);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp3, *extended_tmp2, *gauge, *extended_tmp3, *extended_tmp2,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp2, *extended_tmp1,
           mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2, dslash4_dslash5pre_dslash5inv);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp3, *gauge, *unextended_tmp1, in, mass, m5,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *gauge, *unextended_tmp1, in, mass, m5,
           b_5, c_5, dagger, parity[1], shift0, shift1, dslash4_dslash5inv_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp3, *extended_tmp1, *gauge, *extended_tmp3, *extended_tmp1,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp3, *extended_tmp1,
           mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1, dslash4dag_dslash5predag_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp3, *gauge, out, *unextended_tmp1, mass, m5, b_5, c_5,
+      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *gauge, out, *unextended_tmp1, mass, m5, b_5, c_5,
           dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
 
       const long long Ls = in.X(4);
@@ -530,7 +438,6 @@ namespace quda {
 
       delete extended_tmp2;
       delete extended_tmp1;
-      delete extended_tmp3;
 
       delete unextended_tmp1;
 

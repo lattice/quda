@@ -503,17 +503,6 @@ public:
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    void fused_f0(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
-                  int shift[4], int halo_shift[4]) const;
-    void fused_f2(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
-                  int shift[4], int halo_shift[4]) const;
-    void fused_f1(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &aux_out,
-                  const ColorSpinorField &aux_in, const double scale, const QudaParity parity, int shift[4],
-                  int halo_shift[4]) const;
-    void fused_f3(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &aux_in, const double scale,
-                  const QudaParity parity, int shift[4], int halo_shift[4]) const;
-    void fused_f4(ColorSpinorField &out, const ColorSpinorField &in, const double scale, const QudaParity parity,
-                  int shift[4], int halo_shift[4]) const;
     void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const; 
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
