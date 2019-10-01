@@ -78,8 +78,8 @@ namespace quda {
     }
 
     // FIXME: understand why this leads to slower perf and variable correctness
-    //int blockStep() const { return deviceProp.warpSize/4; }
-    //int blockMin() const { return deviceProp.warpSize/4; }
+    //int blockStep() const { return deviceProp.hipWarpSize/4; }
+    //int blockMin() const { return deviceProp.hipWarpSize/4; }
 
     // Experimental autotuning of the color column stride
     bool advanceAux(TuneParam &param) const
@@ -88,7 +88,7 @@ namespace quda {
 #ifdef DOT_PRODUCT_SPLIT
       // we can only split the dot product on Kepler and later since we need the __shfl instruction
       if (2*param.aux.x <= max_color_col_stride && Nc % (2*param.aux.x) == 0 &&
-	  param.block.x % deviceProp.warpSize == 0) {
+	  param.block.x % deviceProp.hipWarpSize == 0) {
 	// An x-dimension block size that is not a multiple of the
 	// warp size is incompatible with splitting the dot product
 	// across the warp so we must skip this
@@ -163,8 +163,8 @@ namespace quda {
       dim_threads = param.aux.y;
 
       TunableVectorY::defaultTuneParam(param);
-      // ensure that the default x block size is divisible by the warpSize
-      param.block.x = deviceProp.warpSize;
+      // ensure that the default x block size is divisible by the hipWarpSize
+      param.block.x = deviceProp.hipWarpSize;
       param.grid.x = (minThreads()+param.block.x-1)/param.block.x;
       param.block.z = dim_threads * 2;
       param.grid.z = 2*(Nc/Mc);

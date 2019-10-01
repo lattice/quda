@@ -768,9 +768,9 @@ protected:
 
   /** Helper function to set the shared memory size from the 3-d block size */
   int sharedBytes(const dim3 &block) const { 
-    int warpSize = 32; // FIXME - query from device properties
+    int fixedWarpSize = 32; // FIXME - query from device properties //FIXME - HIPIFY
     int block_xy = block.x*block.y;
-    if (block_xy % warpSize != 0) block_xy = ((block_xy / warpSize) + 1)*warpSize;
+    if (block_xy % fixedWarpSize != 0) block_xy = ((block_xy / fixedWarpSize) + 1)*fixedWarpSize;
     return block_xy*block.z*sharedBytesPerThread();
   }
 

@@ -1,11 +1,10 @@
 #ifndef _BLAS_MAGMA_H
 #define _BLAS_MAGMA_H
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_backend.h>
 #include <string>
 #include <complex>
-#include <cuComplex.h>
+#include <qudaComplex.h>
 #include <stdio.h>
 #include <enum_quda.h>
 

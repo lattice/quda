@@ -1,7 +1,6 @@
 #pragma once
 
 #include <invert_quda.h>
-//#include <eigensolve_quda.h>
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>

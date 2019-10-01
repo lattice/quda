@@ -2,6 +2,11 @@
 
 // TBD: API calls
 
+// curand_normal
+// curand_normal_double
+// curand_uniform
+// curand_uniform_double
+
 // cuMemAlloc
 // cuMemFree
 
@@ -23,6 +28,10 @@
 // cudaEventRecord
 // cudaEventSynchronize
 
+// cufftExecC2C
+// cufftExecZ2Z
+// cufftPlanMany
+ 
 // cudaGetTextureObjectResourceDesc
 // cudaGetDeviceCount 
 // cudaGetDeviceProperties
@@ -63,12 +72,17 @@
 #define QUDA_MEMORYTYPE_DEVICE CU_MEMORYTYPE_DEVICE
 #define QUDA_MEMORYTYPE_UNIFIED CU_MEMORYTYPE_UNIFIED
 #define QUDA_MEMORYTYPE_HOST CU_MEMORYTYPE_HOST
+#define QUDAFFT_C2C CUFFT_C2C
 #define qudaChannelFormatDesc cudaChannelFormatDesc
 #define qudaChannelFormatKindFloat cudaChannelFormatKindFloat
 #define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
 #define qudaEventDisableTiming cudaEventDisableTiming
 #define qudaEventInterprocess cudaEventInterprocess
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
+#define qudafftComplex cufftComplex
+#define qudafftDoubleComplex cufftDoubleComplex
+#define qudafftHandle cufftHandle
+#define qudafftResult cufftResult
 #define qudaIpcEventHandle_t cudaIpcEventHandle_t
 #define qudaIpcMemHandle_t cudaIpcMemHandle_t
 #define qudaIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
@@ -104,7 +118,7 @@
 #define QUDA_MEMORYTYPE_DEVICE hipMemoryTypeDevice
 #define QUDA_MEMORYTYPE_UNIFIED hipMemoryTypeUnified
 #define QUDA_MEMORYTYPE_HOST hipMemoryTypeHost
-
+#define QUDAFFT_C2C HIPFFT_C2C
 #define qudaChannelFormatDesc hipChannelFormatDesc
 #define qudaChannelFormatKindFloat hipChannelFormatKindFloat
 #define qudaChannelFormatKindSigned hipChannelFormatKindSigned
@@ -113,6 +127,10 @@
 #define qudaEventInterprocess hipEventInterprocess
 
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
+#define qudafftComplex hipfftComplex
+#define qudafftDoubleComplex hipfftDoubleComplex
+#define qudafftHandle hipfftHandle
+#define qudafftResult hipfftResult
 
 #define qudaIpcEventHandle_t hipIpcEventHandle_t
 #define qudaIpcMemHandle_t hipIpcMemHandle_t
