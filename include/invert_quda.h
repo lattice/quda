@@ -1210,8 +1210,6 @@ public:
   using ColorSpinorFieldSet = ColorSpinorField;
 
   //forward declaration
-  class EigCGArgs;
-
   class IncEigCG : public Solver {
 
   private:
@@ -1231,8 +1229,6 @@ public:
 
     std::shared_ptr<ColorSpinorField> r_pre;    // residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    // preconditioner result
-
-    std::shared_ptr<EigCGArgs> eigcg_args;
 
     TimeProfile &profile; // time profile for initCG solver
 
@@ -1281,8 +1277,6 @@ public:
     ColorSpinorField *p_pre;    //! preconditioner result
 
     TimeProfile &profile;    //time profile for initCG solver
-
-    GMResDRArgs *gmresdr_args;
 
     bool init;
 

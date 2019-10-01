@@ -189,6 +189,8 @@ namespace quda {
        return;
     }
 
+   static std::unique_ptr<GMResDRArgs> gmresdr_args = nullptr;
+
     void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
       inner.tol = outer.tol_precondition;
       inner.maxiter = outer.maxiter_precondition;
@@ -215,7 +217,7 @@ namespace quda {
 
  GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
+    Vm(nullptr), Zm(nullptr), profile(profile), init(false)
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
@@ -238,7 +240,7 @@ namespace quda {
 
  GMResDR::GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false) { }
+    Vm(nullptr), Zm(nullptr), profile(profile), init(false) { }
 
 
  GMResDR::~GMResDR() {
@@ -265,8 +267,6 @@ namespace quda {
       delete tmpp;
       delete yp;
       delete rp;
-
-      delete gmresdr_args;
     }
 
    profile.TPSTOP(QUDA_PROFILE_FREE);
@@ -476,7 +476,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     if (!init) {
 
-      gmresdr_args = new GMResDRArgs(param.m, param.nev);
+      gmresdr_args = std::make_unique< GMResDRArgs> (param.m, param.nev);
 
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;

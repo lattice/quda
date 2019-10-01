@@ -115,7 +115,7 @@ namespace quda {
        std::shared_ptr<ColorSpinorField> hAz;             // mat * conjugate vector from the previous iteration
        std::shared_ptr<ColorSpinorFieldSet> hVm;          //eigCG search vectors  (spinor matrix of size eigen_vector_length x m)
 
-							DeflationParam &deflparam;
+       DeflationParam &deflparam;
 
        EigCGArgs(const int m, const int k, const int pipe_l, DeflationParam &deflParam, const QudaPrecision solver_prec, const QudaPrecision search_space_prec, const bool is_host_location = false) :
           Tm(RealMatrix::Zero(m,m)),
@@ -661,6 +661,9 @@ namespace quda {
 
    };
 
+
+  static std::unique_ptr<EigCGArgs> eigcg_args = nullptr;
+
   // set the required parameters for the inner solver
   static void fillEigCGInnerSolverParam(SolverParam &inner, const SolverParam &outer, bool use_sloppy_partial_accumulator = true)
   {
@@ -707,7 +710,7 @@ namespace quda {
     Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
 				K(nullptr), Kparam(param),
     ep(nullptr), ep_sloppy(nullptr), rp(nullptr), rp_sloppy(nullptr),
-    work_space(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+    work_space(nullptr), r_pre(nullptr), p_pre(nullptr), profile(profile), init(false)
   {
 
     if (2 * param.nev >= param.m)
@@ -1220,7 +1223,7 @@ namespace quda {
 
        const bool host_computing = param.pipeline == 0 ? false : host_flag;
 
-       eigcg_args = std::make_shared <EigCGArgs> (param.m, param.nev, param.pipeline, deflParam, param.precision_sloppy, param.precision_ritz, host_computing);
+       eigcg_args = std::make_unique <EigCGArgs>(param.m, param.nev, param.pipeline, deflParam, param.precision_sloppy, param.precision_ritz, host_computing);
 
        csParam.create = QUDA_ZERO_FIELD_CREATE;
 
@@ -1338,6 +1341,8 @@ namespace quda {
        const int max_nev = defl.size();//param.m;
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", max_nev, param.eigenval_tol);
        eigcg_args->reduce(param.eigenval_tol, max_nev);
+
+       eigcg_args.reset(nullptr);//deallocate resources manually
      }
      return;
   }
