@@ -472,7 +472,7 @@ namespace quda {
     public:
     GaugeFixINVPSP(GaugeFixArg<Float> &arg)
       : arg(arg){
-      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   qudaFuncCachePreferL1);
     }
     ~GaugeFixINVPSP () {
     }
@@ -652,7 +652,7 @@ namespace quda {
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
       : dataOr(dataOr), arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   qudaFuncCachePreferL1);
     }
     ~GaugeFixNEW () { }
 
@@ -769,7 +769,7 @@ namespace quda {
     GaugeFix_GX(GaugeFixArg<Float> &arg, Float alpha)
       : arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   qudaFuncCachePreferL1);
     }
     ~GaugeFix_GX () {
     }
@@ -892,7 +892,7 @@ namespace quda {
     public:
     GaugeFix(Gauge & dataOr, GaugeFixArg<Float> &arg)
       : dataOr(dataOr), arg(arg) {
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   qudaFuncCachePreferL1);
     }
     ~GaugeFix () { }
 

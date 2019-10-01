@@ -11,6 +11,8 @@
 // cudaDriverGetVersion
 
 // cudaEventSynchronize
+// cudaEventCreate
+// cudaEventDestroy
 
 // cudaGetTextureObjectResourceDesc
 // cudaGetDeviceCount 
@@ -25,6 +27,12 @@
 // cudaHostRegisterPortable
 
 // cudaHostUnregister
+
+// cudaIpcCloseMemHandle
+// cudaIpcGetEventHandle
+// cudaIpcGetMemHandle
+// cudaIpcOpenEventHandle
+// cudaIpcOpenMemHandle
 
 // cudaProfilerStart
 // cudaProfilerStop
@@ -45,38 +53,33 @@
 #define QUDA_MEMORYTYPE_DEVICE CU_MEMORYTYPE_DEVICE
 #define QUDA_MEMORYTYPE_UNIFIED CU_MEMORYTYPE_UNIFIED
 #define QUDA_MEMORYTYPE_HOST CU_MEMORYTYPE_HOST
-
 #define qudaChannelFormatDesc cudaChannelFormatDesc
 #define qudaChannelFormatKindFloat cudaChannelFormatKindFloat
 #define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
-
+#define qudaEventDisableTiming cudaEventDisableTiming
+#define qudaEventInterprocess cudaEventInterprocess
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
-
+#define qudaIpcEventHandle_t cudaIpcEventHandle_t
+#define qudaIpcMemHandle_t cudaIpcMemHandle_t
+#define qudaIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
 #define qudaTextureDesc cudaTextureDesc
 #define qudaTextureObject_t cudaTextureObject_t
-
 #define qudaReadModeElementType cudaReadModeElementType
 #define qudaReadModeNormalizedFloat cudaReadModeNormalizedFloat
-
 #define qudaResourceDesc cudaResourceDesc
 #define qudaResourceTypeLinear cudaResourceTypeLinear
-
 #define qudaStreamDefault cudaStreamDefault
-
 #define qudaStream_t cudaStream_t
 #define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
-
 #define qudaDeviceptr_t CUdeviceptr
 #define qudaMemoryType CUmemorytype
 #define qudaCUresult CUresult
-
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
 #define qudaMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
-
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
 
@@ -96,7 +99,14 @@
 #define qudaChannelFormatKindFloat hipChannelFormatKindFloat
 #define qudaChannelFormatKindSigned hipChannelFormatKindSigned
 
+#define qudaEventDisableTiming hipEventDisableTiming
+#define qudaEventInterprocess hipEventInterprocess
+
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
+
+#define qudaIpcEventHandle_t hipIpcEventHandle_t
+#define qudaIpcMemHandle_t hipIpcMemHandle_t
+#define qudaIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
 
 #define qudaReadModeElementType hipReadModeElementType
 #define qudaReadModeNormalizedFloat hipReadModeNormalizedFloat

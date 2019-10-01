@@ -614,7 +614,7 @@ void initQudaDevice(int dev) {
 
 
 
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  cudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   // cudaGetDeviceProperties(&deviceProp, dev);
 

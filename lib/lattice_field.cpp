@@ -417,7 +417,7 @@ namespace quda {
       errorQuda("ghost_field appears not to be allocated");
 
     // handles for obtained ghost pointers
-    cudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
+    qudaIpcMemHandle_t ipcRemoteGhostDestHandle[2][2][QUDA_MAX_DIM];
 
     for (int b=0; b<2; b++) {
       for (int dim=0; dim<4; ++dim) {
@@ -434,7 +434,7 @@ namespace quda {
 							  sizeof(ipcRemoteGhostDestHandle[b][1-dir][dim]));
 	  }
 	  // now send
-          cudaIpcMemHandle_t ipcLocalGhostDestHandle;
+          qudaIpcMemHandle_t ipcLocalGhostDestHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaIpcGetMemHandle(&ipcLocalGhostDestHandle, ghost_recv_buffer_d[b]);
 	    sendHandle = comm_declare_send_relative(&ipcLocalGhostDestHandle,
@@ -463,7 +463,7 @@ namespace quda {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
 	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-			       cudaIpcMemLazyEnablePeerAccess);
+			       qudaIpcMemLazyEnablePeerAccess);
 	}
 	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
@@ -472,7 +472,7 @@ namespace quda {
     checkCudaError();
 
     // handles for obtained events
-    cudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
+    qudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
 
     // Note that no b index is necessary here
     // Now communicate the event handles
@@ -492,7 +492,7 @@ namespace quda {
 	  }
 
 	  // now send
-          cudaIpcEventHandle_t ipcLocalEventHandle;
+          qudaIpcEventHandle_t ipcLocalEventHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
 	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
