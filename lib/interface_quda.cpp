@@ -78,7 +78,7 @@
 #include <momentum.h>
 
 
-#include <cuda_profiler_api.h>
+#include <quda_profiler_api.h>
 
 using namespace quda;
 
@@ -650,9 +650,9 @@ void initQudaMemory()
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+    cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+  cudaStreamCreateWithPriority(&streams[Nstream-1], qudaStreamDefault, leastPriority);
 
   checkCudaError();
   createDslashEvents();

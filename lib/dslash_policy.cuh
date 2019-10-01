@@ -21,7 +21,7 @@ namespace quda
 
 #if CUDA_VERSION >= 8000
     extern cuuint32_t *commsEnd_h;
-    extern CUdeviceptr commsEnd_d[Nstream];
+    extern qudaDeviceptr_t commsEnd_d[Nstream];
 #endif
 
     // these variables are used for benchmarking the dslash components in isolation
@@ -861,8 +861,8 @@ namespace quda
 #ifdef HOST_DEBUG
 #define CUDA_CALL( call )						\
   {									\
-    CUresult cudaStatus = call;						\
-    if ( CUDA_SUCCESS != cudaStatus ) {					\
+    qudaCUresult cudaStatus = call;						\
+    if ( QUDA_SUCCESS != cudaStatus ) {					\
       const char *err_str = nullptr;					\
       cuGetErrorString(cudaStatus, &err_str);				\
       fprintf(stderr, "ERROR: CUDA call \"%s\" in line %d of file %s failed with %s (%d).\n", #call, __LINE__, __FILE__, err_str, cudaStatus); \

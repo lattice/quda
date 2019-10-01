@@ -443,21 +443,21 @@ int comm_coord(int dim)
 
 inline bool isHost(const void *buffer)
 {
-  CUmemorytype memType;
+  qudaMemoryType memType;
   void *attrdata[] = {(void *)&memType};
   CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
+  qudaCUresult err = cuPointerGetAttributes(1, attributes, attrdata, (qudaDeviceptr_t)buffer);
+  if (err != QUDA_SUCCESS) {
     const char *str;
     cuGetErrorName(err, &str);
     errorQuda("cuPointerGetAttributes returned error %s", str);
   }
 
   switch (memType) {
-  case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_HOST:
+  case QUDA_MEMORYTYPE_DEVICE: return false;
+  case QUDA_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
+  case QUDA_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
+  case QUDA_MEMORYTYPE_HOST:
   default: // memory not allocated by CUDA allocaters will default to being host memory
     return true;
   }

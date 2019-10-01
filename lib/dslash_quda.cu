@@ -88,7 +88,7 @@ namespace quda {
 
 #if CUDA_VERSION >= 8000
     cuuint32_t *commsEnd_h;
-    CUdeviceptr commsEnd_d[Nstream];
+    qudaDeviceptr_t commsEnd_d[Nstream];
 #endif
   }
 

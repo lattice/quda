@@ -772,16 +772,16 @@ namespace quda {
 	  }
 
 	  elapsed_time /= (1e3 * tunable.tuningIter());
-	  if ( (elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS) ) {
+	  if ( (elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == QUDA_SUCCESS) ) {
 	    best_time = elapsed_time;
 	    best_param = param;
 	  }
 	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == qudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
+	    if (error == qudaSuccess && tunable.jitifyError() == QUDA_SUCCESS) {
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
             } else {
-	      if (tunable.jitifyError() == CUDA_SUCCESS) {
+	      if (tunable.jitifyError() == QUDA_SUCCESS) {
                 // if not jitify error must be regular error
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
 	      } else {
@@ -793,7 +793,7 @@ namespace quda {
             }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
-	  tunable.jitifyError() = CUDA_SUCCESS;
+	  tunable.jitifyError() = QUDA_SUCCESS;
 	}
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);
