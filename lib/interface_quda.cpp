@@ -1983,15 +1983,9 @@ void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   DiracDomainWall4DPC dirac(diracParam); // create the Dirac operator
   printfQuda("kappa for QUDA input : %e\n",inv_param->kappa);
   switch (test_type) {
-    case dslash_test_type::Dslash:
-      dirac.Dslash4(out, in, parity);
-      break;
-    case dslash_test_type::M5:
-      dirac.Dslash5(out, in, parity);
-      break;
-    case dslash_test_type::M5inv:
-      dirac.Dslash5inv(out, in, parity, inv_param->kappa);
-      break;
+  case dslash_test_type::Dslash: dirac.Dslash4(out, in, parity); break;
+  case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
+  case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity, inv_param->kappa); break;
   }
 
   cpuParam.v = h_out;
@@ -2052,18 +2046,10 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
 
   DiracMobiusPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
-    case dslash_test_type::Dslash:
-      dirac.Dslash4(out, in, parity);
-      break;
-    case dslash_test_type::M5:
-      dirac.Dslash5(out, in, parity);
-      break;
-    case dslash_test_type::Dslash4pre:
-      dirac.Dslash4pre(out, in, parity);
-      break;
-    case dslash_test_type::M5inv:
-      dirac.Dslash5inv(out, in, parity);
-      break;
+  case dslash_test_type::Dslash: dirac.Dslash4(out, in, parity); break;
+  case dslash_test_type::M5: dirac.Dslash5(out, in, parity); break;
+  case dslash_test_type::Dslash4pre: dirac.Dslash4pre(out, in, parity); break;
+  case dslash_test_type::M5inv: dirac.Dslash5inv(out, in, parity); break;
   }
 
   cpuParam.v = h_out;

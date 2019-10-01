@@ -132,10 +132,10 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 
-
-template <typename T>
-std::string inline get_string(CLI::TransformPairs<T> &map, T val){
-  auto it = std::find_if(map.begin(), map.end(), [&val](const decltype(map.back()) &p) -> bool {return p.second == val;} );
+template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
+{
+  auto it
+    = std::find_if(map.begin(), map.end(), [&val](const decltype(map.back()) &p) -> bool { return p.second == val; });
   return it->first;
 }
 
