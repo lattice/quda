@@ -284,7 +284,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_wilson-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type wilson
-                     --test 3
+                     --test MatPCDagMatPC
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
     if(polenv)
@@ -297,7 +297,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_clover-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
@@ -309,7 +309,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_clover-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
@@ -323,7 +323,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover-hasenbusch-twist
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
@@ -335,7 +335,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_clover_hasenbusch_twist-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type clover-hasenbusch-twist
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
@@ -348,7 +348,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
@@ -361,7 +361,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
@@ -376,7 +376,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_ndeg-twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
@@ -390,7 +390,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_ndeg-twisted-mass-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-mass
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
@@ -406,7 +406,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_twisted-clover-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-clover
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
@@ -419,7 +419,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_twisted-clover-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type twisted-clover
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
@@ -433,7 +433,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_domain-wall-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall
-                     --test 3
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
@@ -446,7 +446,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_domain-wall-4d-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d
-                     --test 4
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
@@ -454,7 +454,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_mobius-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
-                     --test 5
+                     --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
@@ -469,7 +469,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_domain-wall-4d-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type domain-wall-4d
-                     --test 4
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
@@ -477,7 +477,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_mobius-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
-                     --test 5
+                     --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4

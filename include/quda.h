@@ -975,7 +975,7 @@ extern "C" {
    * @param test_type Choose a type of dslash operators
    */
   void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
+      QudaParity parity, dslash_test_type test_type);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
@@ -987,7 +987,7 @@ extern "C" {
    * @param test_type Choose a type of dslash operators
    */
   void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
+      QudaParity parity, dslash_test_type test_type);
 
   /**
    * Apply the clover operator or its inverse.

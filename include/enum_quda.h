@@ -526,6 +526,8 @@ extern "C" {
     QUDA_EXTLIB_INVALID = QUDA_INVALID_ENUM
   } QudaExtLibType;
 
+enum class dslash_test_type {Dslash=0, MatPC, Mat, MatPCDagMatPC, MatDagMat, M5, M5inv, Dslash4pre};
+
 #ifdef __cplusplus
 }
 #endif
