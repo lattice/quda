@@ -106,6 +106,7 @@
 #define qudaMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
+#define qudaWarpSize warpSize
 
 #endif
 
@@ -161,7 +162,7 @@
 #define qudaFuncAttribute hipFuncAttribute
 #define qudaDeviceProp hipDeviceProp
 #define qudaTextureDesc hipTextureDesc
-
+#define qudaWarpSize hipWarpSize
 
 
 #endif

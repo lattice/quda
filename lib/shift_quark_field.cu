@@ -132,7 +132,7 @@ namespace quda {
           const unsigned int max_threads = deviceProp.maxThreadsDim[0];
           const unsigned int max_blocks = deviceProp.maxGridSize[0];
           const unsigned int max_shared = 16384;
-          const int step = deviceProp.hipWarpSize;
+          const int step = deviceProp.qudaWarpSize;
           const int threads = arg.length;
           bool ret;
 
@@ -173,7 +173,7 @@ namespace quda {
           const unsigned int max_threads = deviceProp.maxThreadsDim[0];
           const unsigned int max_blocks = deviceProp.maxGridSize[0];
           const int threads = arg.length;
-          const int step = deviceProp.hipWarpSize;
+          const int step = deviceProp.qudaWarpSize;
           param.block = dim3((threads+max_blocks-1)/max_blocks, 1, 1); // ensure the blockDim is large enough, given the limit on gridDim
           param.block.x = ((param.block.x+step-1) / step) * step; // round up to the nearest "step"
           if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");

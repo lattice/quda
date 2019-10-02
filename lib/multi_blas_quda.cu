@@ -212,8 +212,8 @@ namespace quda {
 #endif
       }
 
-      int blockStep() const { return deviceProp.hipWarpSize / warp_split; }
-      int blockMin() const { return deviceProp.hipWarpSize / warp_split; }
+      int blockStep() const { return deviceProp.qudaWarpSize / warp_split; }
+      int blockMin() const { return deviceProp.qudaWarpSize / warp_split; }
 
       void initTuneParam(TuneParam &param) const
       {

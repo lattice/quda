@@ -106,8 +106,8 @@ namespace quda {
     */
     virtual int gridStep() const { return 1; }
 
-    virtual int blockStep() const { return deviceProp.hipWarpSize; }
-    virtual int blockMin() const { return deviceProp.hipWarpSize; }
+    virtual int blockStep() const { return deviceProp.qudaWarpSize; }
+    virtual int blockMin() const { return deviceProp.qudaWarpSize; }
 
     virtual void resetBlockDim(TuneParam &param) const {
       if (tuneGridDim()) {

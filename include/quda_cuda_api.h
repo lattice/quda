@@ -34,9 +34,9 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
-                        const char *func, const char *file, const char *line);
-
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, 
+			const qudaStream_t &stream, const char *func, const char *file, const char *line);
+  
   /**
      @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
      Potentially add auto-profiling support.
