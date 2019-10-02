@@ -430,14 +430,26 @@ namespace quda
           *tmp[i] = *eig_vecs[i];
         }
       } else { // QUDA_PARITY_SITE_SUBSET
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+
+        // intermediate host single-parity field
+        ColorSpinorField* tmp_intermediate = ColorSpinorField::Create(csParam);
+
         csParam.x[0] *= 2; // corrects for the factor of two in the X direction
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // create a full-parity field.
         csParam.create = QUDA_ZERO_FIELD_CREATE; // to explicitly zero the odd sites.
         for (int i = 0; i < Nvec; i++) {
           tmp.push_back(ColorSpinorField::Create(csParam));
+
+          // copy the even-parity only eigen/singular vector into an
+          // intermediate device-side vector
+          *tmp_intermediate = *eig_vecs[i];
+
           // copy the even-parity only eigen/singular vector into the even components of the full parity vector
-          tmp[i]->Even() = *eig_vecs[i];
+          blas::copy(tmp[i]->Even(), *tmp_intermediate);
+
         }
+        delete tmp_intermediate;
       }
     } else {
       // FIXME: add conversion to full site subset from single parity fields.
