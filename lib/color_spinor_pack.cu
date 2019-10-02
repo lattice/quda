@@ -295,14 +295,24 @@ namespace quda {
 			       int nFace, int dagger, MemoryLocation *destination) {
 
     if (a.Nspin() == 4) {
+#ifdef NSPIN4
       genericPackGhost<Float,ghostFloat,order,4>(ghost, a, parity, nFace, dagger, destination);
+#else
+      errorQuda("nSpin=4 not enabled for this build");
+#endif
     } else if (a.Nspin() == 2) {
+#ifdef NSPIN2
       if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
       genericPackGhost<Float,ghostFloat,spin_order_mapper<2,order>::order,2>(ghost, a, parity, nFace, dagger, destination);
-#ifdef GPU_STAGGERED_DIRAC
+#else
+      errorQuda("nSpin=2 not enabled for this build");
+#endif
     } else if (a.Nspin() == 1) {
+#ifdef NSPIN1
       if (order == QUDA_FLOAT4_FIELD_ORDER) errorQuda("Field order %d with nSpin = %d not supported", order, a.Nspin());
       genericPackGhost<Float,ghostFloat,spin_order_mapper<1,order>::order,1>(ghost, a, parity, nFace, dagger, destination);
+#else
+      errorQuda("nSpin=1 not enabled for this build");
 #endif
     } else {
       errorQuda("Unsupported nSpin = %d", a.Nspin());

@@ -15,6 +15,7 @@ namespace quda
 
     typedef typename clover_mapper<Float, length>::type C;
     typedef typename mapper<Float>::type real;
+
     const C A;    /** the clover field */
     const real a; /** xpay scale factor */
     const real b; /** chiral twist factor (twisted-clover only) */

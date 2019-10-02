@@ -9,6 +9,7 @@
 #include "quda.h"
 #include "gauge_field.h"
 #include "test_util.h"
+#include <test_params.h>
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
@@ -28,11 +29,6 @@
 
 using namespace quda;
 
-
-extern void usage(char** argv);
-
-extern int device;
-
 static double unitarize_eps  = 1e-6;
 static bool reunit_allow_svd = true;
 static bool reunit_svd_only  = false;
@@ -40,27 +36,20 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern bool verify_results;
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
 cudaGaugeField *cudaFatLink, *cudaULink;
 
-const double tol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
+const double unittol = (prec == QUDA_DOUBLE_PRECISION) ? 1e-10 : 1e-6;
 
 TEST(unitarization, verify) {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
-    
-  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(),
-			   4*cudaResult->Volume()*gaugeSiteSize, tol, cpu_prec);
+
+  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gaugeSiteSize,
+                           unittol, cpu_prec);
 
 #ifdef MULTI_GPU
   comm_allreduce_int(&res);
@@ -235,13 +224,10 @@ display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("link_precision      link_reconstruct           space_dimension        T_dimension    algorithm           max allowed error  deviation tolerance\n");
-  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g             %g\n",
-	     get_prec_str(prec),
-	     get_recon_str(link_recon),
-	     xdim, ydim, zdim, tdim,
-	     get_unitarization_str(reunit_svd_only),
-	     max_allowed_error,
-	     tol);
+  printfQuda("%8s              %s                         %d/%d/%d/                 %d            %s         %g        "
+             "     %g\n",
+             get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim,
+             get_unitarization_str(reunit_svd_only), max_allowed_error, unittol);
 
 #ifdef MULTI_GPU
   printfQuda("Grid partition info:     X  Y  Z  T\n");
@@ -267,14 +253,14 @@ int main(int argc, char **argv)
   link_recon = QUDA_RECONSTRUCT_NO;
   xdim=ydim=zdim=tdim=8;
 
-  int i;
-  for (i=1; i<argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

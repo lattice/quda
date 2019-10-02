@@ -299,11 +299,11 @@ namespace quda {
   {
     if(V.Nspin() ==2 && spin_bs == 1) { //coarsening coarse fermions w/ chirality.
       BlockOrthogonalize<vFloat, bFloat, 2, 1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
       BlockOrthogonalize<vFloat, bFloat, 4, 2>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
     } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
       BlockOrthogonalize<vFloat, bFloat, 1, 1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif

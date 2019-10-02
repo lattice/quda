@@ -113,12 +113,7 @@ namespace quda
         TimeProfile &profile)
     {
       constexpr int nDim = 4;
-#ifdef DYNAMIC_CLOVER
-      constexpr bool dynamic_clover = true;
-#else
-      constexpr bool dynamic_clover = false;
-#endif
-      WilsonCloverArg<Float, nColor, nDim, recon, dynamic_clover> arg(out, in, U, A, a, x, parity, dagger, comm_override);
+      WilsonCloverArg<Float, nColor, nDim, recon> arg(out, in, U, A, a, x, parity, dagger, comm_override);
       WilsonCloverPreconditioned<decltype(arg)> wilson(arg, out, in);
 
       dslash::DslashPolicyTune<decltype(wilson)> policy(wilson,

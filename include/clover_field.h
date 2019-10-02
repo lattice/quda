@@ -411,6 +411,20 @@ namespace quda {
    */
   void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
 
+  /**
+     @brief Helper function that returns whether we have enabled
+     dyanmic clover inversion or not.
+   */
+  constexpr bool dynamic_clover_inverse()
+  {
+#ifdef DYNAMIC_CLOVER
+    return true;
+#else
+    return false;
+#endif
+  }
+
+
 } // namespace quda
 
 #endif // _CLOVER_QUDA_H

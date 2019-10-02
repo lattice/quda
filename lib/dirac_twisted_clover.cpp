@@ -68,7 +68,7 @@ namespace quda {
   }
 
   void DiracTwistedClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+                                      const ColorSpinorField &x, const double &k) const
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {

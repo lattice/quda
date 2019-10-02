@@ -149,10 +149,14 @@ public:
         printfQuda("Creating Gaussian distrbuted gauge field with sigma = %e\n", sigma);
       switch (U.Reconstruct()) {
       case QUDA_RECONSTRUCT_NO: genGauss<Float, QUDA_RECONSTRUCT_NO, true>(U, rngstate, sigma); break;
+#if QUDA_RECONSTRUCT & 2
       case QUDA_RECONSTRUCT_13: genGauss<Float, QUDA_RECONSTRUCT_13, true>(U, rngstate, sigma); break;
       case QUDA_RECONSTRUCT_12: genGauss<Float, QUDA_RECONSTRUCT_12, true>(U, rngstate, sigma); break;
+#endif
+#if QUDA_RECONSTRUCT &1
       case QUDA_RECONSTRUCT_9: genGauss<Float, QUDA_RECONSTRUCT_9, true>(U, rngstate, sigma); break;
       case QUDA_RECONSTRUCT_8: genGauss<Float, QUDA_RECONSTRUCT_8, true>(U, rngstate, sigma); break;
+#endif
       default: errorQuda("Reconstruction type %d of gauge field not supported", U.Reconstruct());
       }
     } else if (U.LinkType() == QUDA_MOMENTUM_LINKS) { // generate Gaussian distributed su(3) field

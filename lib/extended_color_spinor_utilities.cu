@@ -441,13 +441,13 @@ namespace quda {
         errorQuda("source and destination spins must match");
 
       if(dst.Nspin() == 4){
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#ifdef NSPIN4
         copyExtendedColorSpinor<4>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields",dst.Nspin());
 #endif
       }else if(dst.Nspin() == 1){
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
         copyExtendedColorSpinor<1>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields", dst.Nspin());
@@ -463,6 +463,7 @@ namespace quda {
       QudaFieldLocation location, const int parity, void *Dst, void *Src, 
       void *dstNorm, void *srcNorm){
 
+#if 0
     if(dst.Precision() == QUDA_DOUBLE_PRECISION){
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<double*>(Dst), static_cast<double*>(Src));
@@ -496,6 +497,9 @@ namespace quda {
     }else{
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
+#else
+    errorQuda("Disabled");
+#endif
   }
 
 } // quda

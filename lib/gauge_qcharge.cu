@@ -9,9 +9,7 @@
 namespace quda
 {
 
-#ifdef GPU_GAUGE_TOOLS
-
-  template <typename Float, typename Arg> class QChargeCompute : TunableLocalParity
+  template <typename Arg> class QChargeCompute : TunableLocalParity
   {
     Arg &arg;
     const GaugeField &meta;
@@ -27,7 +25,6 @@ public:
       create_jitify_program("kernels/gauge_qcharge.cuh");
 #endif
     }
-    virtual ~QChargeCompute() {}
 
     void apply(const qudaStream_t &stream)
     {
@@ -37,13 +34,12 @@ public:
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::qChargeComputeKernel")
-                         .instantiate((int)tp.block.x, Type<Float>(), Type<Arg>())
+                         .instantiate((int)tp.block.x, Type<Arg>())
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-	LAUNCH_KERNEL(qChargeComputeKernel, tp, stream, arg, Float);
+	LAUNCH_KERNEL(qChargeComputeKernel, (*this), tp, stream, arg, Arg);
 #endif
-        qudaDeviceSynchronize();
       } else { // run the CPU code
         errorQuda("qChargeComputeKernel not supported on CPU");
       }
@@ -51,84 +47,59 @@ public:
 
     TuneKey tuneKey() const
     {
-      std::stringstream aux;
-      aux << "threads=" << arg.threads << ",prec=" << sizeof(Float);
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
     }
 
     long long flops() const { return 2 * arg.threads * (3 * 198 + 9); }
-    long long bytes() const { return 2 * arg.threads * ((6 * 18) + Arg::density) * sizeof(Float); }
+    long long bytes() const { return 2 * arg.threads * ((6 * 18) + Arg::density) * sizeof(typename Arg::Float); }
   }; // QChargeCompute
 
-  template <typename Float, typename Gauge, bool density>
-  void computeQCharge(const Gauge data, const GaugeField &Fmunu, Float *qDensity, Float &qChg)
-  {
-    QChargeArg<Float, Gauge, density> arg(data, Fmunu, qDensity);
-    QChargeCompute<Float, decltype(arg)> qChargeCompute(arg, Fmunu);
-    qChargeCompute.apply(0);
-    checkCudaError();
-    comm_allreduce((double *)arg.result_h);
-    qChg = arg.result_h[0];
-  }
+  template <typename Float, int nColor, QudaReconstructType recon> struct QCharge {
+    QCharge(const GaugeField &Fmunu, double &charge, void *qDensity, bool density)
+    {
+      if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
 
-  template <typename Float, bool density> Float computeQCharge(const GaugeField &Fmunu, Float *qDensity = nullptr)
-  {
-    Float qChg = 0.0;
+      if (density) {
+        QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qDensity);
+        QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
+        qChargeCompute.apply(0);
+        qudaDeviceSynchronize();
 
-    if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
+        checkCudaError();
+        comm_allreduce((double *)arg.result_h);
+        charge = arg.result_h[0];
+      } else {
+        QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qDensity);
+        QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
+        qChargeCompute.apply(0);
+        qudaDeviceSynchronize();
 
-    if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type Gauge;
-      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
-    } else if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_12) {
-      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_12>::type Gauge;
-      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
-    } else if (Fmunu.Reconstruct() == QUDA_RECONSTRUCT_8) {
-      typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_8>::type Gauge;
-      computeQCharge<Float, Gauge, density>(Gauge(Fmunu), Fmunu, qDensity, qChg);
-    } else {
-      errorQuda("Reconstruction type %d of gauge field not supported", Fmunu.Reconstruct());
+        checkCudaError();
+        comm_allreduce((double *)arg.result_h);
+        charge = arg.result_h[0];
+      }
     }
-
-    return qChg;
-  }
-#endif // GPU_GAUGE_TOOLS
+  };
 
   double computeQCharge(const GaugeField &Fmunu)
   {
-    double qChg = 0.0;
+    double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    if (!Fmunu.isNative()) errorQuda("Order %d with %d reconstruct not supported", Fmunu.Order(), Fmunu.Reconstruct());
-
-    if (Fmunu.Precision() == QUDA_SINGLE_PRECISION) {
-      qChg = computeQCharge<float, false>(Fmunu);
-    } else if (Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      qChg = computeQCharge<double, false>(Fmunu);
-    } else {
-      errorQuda("Precision %d not supported", Fmunu.Precision());
-    }
+    instantiate<QCharge>(Fmunu, charge, nullptr, false);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
-    return qChg;
+    return charge;
   }
 
   double computeQChargeDensity(const GaugeField &Fmunu, void *qDensity)
   {
-    double qChg = 0.0;
+    double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    if (!Fmunu.isNative()) errorQuda("Order %d with %d reconstruct not supported", Fmunu.Order(), Fmunu.Reconstruct());
-
-    if (Fmunu.Precision() == QUDA_SINGLE_PRECISION) {
-      qChg = computeQCharge<float, true>(Fmunu, (float *)qDensity);
-    } else if (Fmunu.Precision() == QUDA_DOUBLE_PRECISION) {
-      qChg = computeQCharge<double, true>(Fmunu, (double *)qDensity);
-    } else {
-      errorQuda("Precision %d not supported", Fmunu.Precision());
-    }
+    instantiate<QCharge>(Fmunu, charge, qDensity, true);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
-    return qChg;
+    return charge;
   }
 } // namespace quda

@@ -611,7 +611,6 @@ namespace quda {
 
     void create(const QudaFieldCreate);
     void destroy();
-    void copy(const cudaColorSpinorField &);
 
     /**
        @brief Zero the padded regions added on to the field.  Ensures
@@ -641,6 +640,8 @@ namespace quda {
     ColorSpinorField& operator=(const ColorSpinorField &);
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
+
+    void copy(const cudaColorSpinorField &);
 
     void switchBufferPinned();
 
@@ -974,10 +975,7 @@ namespace quda {
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);
-
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p);
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);

@@ -467,10 +467,10 @@ namespace quda {
      @tparam nColor Number of colors
      @tparam dynamic_clover Whether we are inverting the clover field on the fly
   */
-  template <typename Float, int nSpin, int nColor, bool dynamic_clover_=false>
+  template <typename Float, int nSpin, int nColor>
   struct CloverArg {
     static constexpr int length = (nSpin / (nSpin/2)) * 2 * nColor * nColor * (nSpin/2) * (nSpin/2) / 2;
-    static constexpr bool dynamic_clover = dynamic_clover_;
+    static constexpr bool dynamic_clover = dynamic_clover_inverse();
 
     typedef typename colorspinor_mapper<Float,nSpin,nColor>::type F;
     typedef typename clover_mapper<Float,length>::type C;
@@ -607,17 +607,12 @@ namespace quda {
     constexpr int nSpin = 4;
 
     if (inverse) {
-#ifdef DYNAMIC_CLOVER
-      constexpr bool dynamic_clover = true;
-#else
-      constexpr bool dynamic_clover = false;
-#endif
-      CloverArg<Float, nSpin, nColor, dynamic_clover> arg(out, in, clover, inverse, parity);
-      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, dynamic_clover>> worker(arg, in);
+      CloverArg<Float, nSpin, nColor> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, decltype(arg)> worker(arg, in);
       worker.apply(streams[Nstream - 1]);
     } else {
-      CloverArg<Float, nSpin, nColor, false> arg(out, in, clover, inverse, parity);
-      Clover<Float, nSpin, nColor, CloverArg<Float, nSpin, nColor, false>> worker(arg, in);
+      CloverArg<Float, nSpin, nColor> arg(out, in, clover, inverse, parity);
+      Clover<Float, nSpin, nColor, decltype(arg)> worker(arg, in);
       worker.apply(streams[Nstream - 1]);
     }
 
@@ -773,14 +768,8 @@ namespace quda {
     constexpr int nSpin = 4;
     bool inverse = twist == QUDA_TWIST_GAMMA5_DIRECT ? false : true;
 
-#ifdef DYNAMIC_CLOVER
-    constexpr bool dynamic_clover = true;
-#else
-    constexpr bool dynamic_clover = false;
-#endif
-
-    CloverArg<Float,nSpin,nColor,dynamic_clover> arg(out, in, clover, inverse, parity, kappa, mu, epsilon, dagger, twist);
-    TwistClover<Float,nSpin,nColor,CloverArg<Float,nSpin,nColor,dynamic_clover> > worker(arg, in);
+    CloverArg<Float,nSpin,nColor> arg(out, in, clover, inverse, parity, kappa, mu, epsilon, dagger, twist);
+    TwistClover<Float,nSpin,nColor,decltype(arg)> worker(arg, in);
     worker.apply(streams[Nstream-1]);
 
     checkCudaError();

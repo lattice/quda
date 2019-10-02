@@ -180,6 +180,9 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 {
   int status = 0;
   switch (Ninternal) {
+  case 6:
+    status = read_field<6>(infile, count, field_in, cpu_prec);
+    break;
   case 24:
     status = read_field<24>(infile, count, field_in, cpu_prec);
     break;
@@ -308,6 +311,9 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 {
   int status = 0;
   switch (Ninternal) {
+  case 6:
+    status = write_field<6>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    break;
   case 24:
     status = write_field<24>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
     break;
