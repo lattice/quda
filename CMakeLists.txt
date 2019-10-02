@@ -198,6 +198,10 @@ set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requeste
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
+# force colored output with Ninja
+option (NINJA_FORCE_COLORED_OUTPUT "Always produce colored output (GNU/Clang only)." TRUE)
+mark_as_advanced(NINJA_FORCE_COLORED_OUTPUT)
+
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
