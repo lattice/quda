@@ -202,7 +202,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetAsync_(void *dst, int val, size_t count, qudaStream_t &stream, 
+  void qudaMemsetAsync_(void *dst, int val, size_t count, const qudaStream_t &stream, 
 			const char *func, const char *file, const char *line) {
     if (count == 0) return;
     cudaMemsetAsync(dst, val, count, stream);
@@ -219,7 +219,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, qudaStream_t &stream, const char *func, const char *file, const char *line) {
+  void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream, const char *func, const char *file, const char *line) {
     if (pitch == 0) return;
     cudaMemset2DAsync(dst, val, pitch, width, height, stream);
     qudaError_t error = cudaGetLastError();
