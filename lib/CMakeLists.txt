@@ -151,6 +151,15 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_MULTIGRID)
+  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+endif(QUDA_MULTIGRID)
+
+if(QUDA_JITIFY)
+  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
+  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
+endif()
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})

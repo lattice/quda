@@ -226,6 +226,9 @@ int invert_test()
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
 
+  // for load, etc
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
   // load a field WITHOUT PHASES
   if (strcmp(latfile, "")) {
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
@@ -264,7 +267,7 @@ int invert_test()
       }
     }
 
-    // Compute fat link plaquette.
+    // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
@@ -352,11 +355,8 @@ int invert_test()
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct
-      = (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    gauge_param.reconstruct_sloppy
-      = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 :
-                                                                                                link_recon_sloppy;
+    gauge_param.reconstruct = link_recon; 
+    gauge_param.reconstruct_sloppy = link_recon_sloppy; 
     gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
     gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
     loadGaugeQuda(milc_longlink, &gauge_param);
