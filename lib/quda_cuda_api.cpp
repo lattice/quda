@@ -374,6 +374,45 @@ namespace quda {
 #endif
   }
 
+  qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuTexObjectDestroy(pTexObject), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuTexObjectDestroy returned error %s (%s:%s in %s())\n", str, file, line, func);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(qudaError_t error =  cuTexObjectDestroy(pTexObject), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+#endif
+  }
+
+  qudaError_t qudaDeviceCanAccessPeer_(int* canAccessPeer, int device, int peerDevice, const char *func, const char *file, const char *line) {
+    cudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaDeviceGetStreamPriorityRange_(int* leastPriority, int* greatestPriority, const char *func, const char *file, const char *line) {
+    cudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
+
+  
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
   {

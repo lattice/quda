@@ -13,9 +13,9 @@
 // cudaFree
 // cudaFreeHost
 
-// cudaCreateTextureObject
-// cudaDestroyTextureObject
-// cudaDeviceCanAccessPeer
+// * cudaCreateTextureObject
+// * cudaDestroyTextureObject
+// * cudaDeviceCanAccessPeer
 // cudaDeviceGetStreamPriorityRange
 // cudaDeviceReset
 // cudaDeviceSetCacheConfig

@@ -481,17 +481,17 @@ namespace quda {
 
   void cudaColorSpinorField::destroyTexObject() {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && texInit) {
-      cudaDestroyTextureObject(tex);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaDestroyTextureObject(texNorm);
+      qudaDestroyTextureObject(tex);
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) qudaDestroyTextureObject(texNorm);
       texInit = false;
     }
   }
 
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
-      for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
+      for (int i=0; i<4; i++) qudaDestroyTextureObject(ghostTex[i]);
       if (ghost_precision_tex == QUDA_HALF_PRECISION || ghost_precision_tex == QUDA_QUARTER_PRECISION)
-        for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
+        for (int i=0; i<4; i++) qudaDestroyTextureObject(ghostTexNorm[i]);
       ghostTexInit = false;
       ghost_precision_tex = QUDA_INVALID_PRECISION;
     }

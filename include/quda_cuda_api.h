@@ -149,6 +149,22 @@ namespace quda {
      @brief Wrapper around cudaCreateTextureObject
   */
   qudaError_t qudaCreateTextureObject_(qudaTextureObject_t* pTexObject, const qudaResourceDesc* pResDesc, const qudaTextureDesc* pTexDesc, const qudaResourceViewDesc* pResViewDesc, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDestroyTextureObject
+  */
+  qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file, const char *line);
+
+  //QUDA Device
+  /**
+     @brief Wrapper around cudaDeviceCanAccessPeer
+  */
+  qudaError_t qudaDeviceCanAccessPeer_(int* canAccessPeer, int device, int peerDevice, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceGetStreamPriorityRange
+  */
+  qudaError_t qudaDeviceGetStreamPriorityRange_(int* leastPriority, int* greatestPrioriy, const char *func, const char *file, const char *line);
   
   
 
@@ -223,5 +239,24 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc) \
   ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDestroyTextureObject(pTexObject) \
+  ::quda::qudaDestroyTextureObject_(pTexObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END texture
+//-------------------------------------------------------------------------------------
+
+//START Device
+//-------------------------------------------------------------------------------------
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice) \
+  ::quda::qudaDeviceCanAccessPeer_(canAccessPeer, device, peerDevice, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority) \
+  ::quda::qudaDeviceGetStreamPriorityRange_(leastPriority, greatestPriority, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #endif
