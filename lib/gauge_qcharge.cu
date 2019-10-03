@@ -5,6 +5,7 @@
 #include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_qcharge.cuh>
+#include <instantiate.h>
 
 namespace quda
 {
@@ -85,7 +86,7 @@ public:
   {
     double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    instantiate<QCharge>(Fmunu, charge, nullptr, false);
+    instantiate<QCharge,ReconstructNone>(Fmunu, charge, nullptr, false);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
@@ -96,7 +97,7 @@ public:
   {
     double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    instantiate<QCharge>(Fmunu, charge, qDensity, true);
+    instantiate<QCharge,ReconstructNone>(Fmunu, charge, qDensity, true);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
