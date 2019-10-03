@@ -144,6 +144,14 @@ namespace quda {
    */
   qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
+  //QUDA texture objects
+  /**
+     @brief Wrapper around cudaCreateTextureObject
+  */
+  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t* pTexObject, const qudaResourceDesc* pResDesc, const qudaTextureDesc* pTexDesc, const qudaResourceViewDesc* pResViewDesc, const char *func, const char *file, const char *line);
+  
+  
+
 #if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around qudaFuncSetAttribute
@@ -208,5 +216,12 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+//START texture
+//-------------------------------------------------------------------------------------
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc) \
+  ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #endif

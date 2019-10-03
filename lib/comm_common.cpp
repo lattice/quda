@@ -446,7 +446,7 @@ inline bool isHost(const void *buffer)
   qudaMemoryType memType;
   void *attrdata[] = {(void *)&memType};
   CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  qudaCUresult err = cuPointerGetAttributes(1, attributes, attrdata, (qudaDeviceptr_t)buffer);
+  qudaResult err = cuPointerGetAttributes(1, attributes, attrdata, (qudaDeviceptr_t)buffer);
   if (err != QUDA_SUCCESS) {
     const char *str;
     cuGetErrorName(err, &str);

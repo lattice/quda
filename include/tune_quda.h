@@ -273,7 +273,7 @@ namespace quda {
     }
 
     /** This is the return result from kernels launched using jitify */
-    qudaCUresult jitify_error;
+    qudaResult jitify_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -387,8 +387,8 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
-    qudaCUresult jitifyError() const { return jitify_error; }
-    qudaCUresult& jitifyError() { return jitify_error; }
+    qudaResult jitifyError() const { return jitify_error; }
+    qudaResult& jitifyError() { return jitify_error; }
   };
 
   

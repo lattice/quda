@@ -352,6 +352,27 @@ namespace quda {
     return error;
 #endif
   }
+  
+  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t* pTexObject, const qudaResourceDesc* pResDesc, const qudaTextureDesc* pTexDesc, const qudaResourceViewDesc* pResViewDesc, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuTexObjectCreate(pTexObject, (CUDA_RESOURCE_DESC*)pResDesc, (CUDA_TEXTURE_DESC*)pTexDesc, (CUDA_RESOURCE_VIEW_DESC*)pResViewDesc), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuTexObjectCreate returned error %s (%s:%s in %s())\n", str, file, line, func);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(qudaError_t error =  cuTexObjectCreate(pTexObject, pResDesc, pTexDesc, pResViewDesc), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+#endif
+  }
 
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)

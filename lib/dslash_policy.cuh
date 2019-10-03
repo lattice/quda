@@ -861,7 +861,7 @@ namespace quda
 #ifdef HOST_DEBUG
 #define CUDA_CALL( call )						\
   {									\
-    qudaCUresult cudaStatus = call;						\
+    qudaResult cudaStatus = call;						\
     if ( QUDA_SUCCESS != cudaStatus ) {					\
       const char *err_str = nullptr;					\
       cuGetErrorString(cudaStatus, &err_str);				\

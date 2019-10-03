@@ -206,7 +206,7 @@ namespace quda {
       else
         texDesc.readMode = qudaReadModeElementType;
 
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
       
       // create the texture for the norm components
@@ -232,7 +232,7 @@ namespace quda {
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
       }
     }

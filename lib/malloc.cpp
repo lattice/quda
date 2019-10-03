@@ -222,7 +222,7 @@ namespace quda {
 
     a.size = a.base_size = size;
 
-    qudaCUresult err = cuMemAlloc((qudaDeviceptr_t*)&ptr, size);
+    qudaResult err = cuMemAlloc((qudaDeviceptr_t*)&ptr, size);
     if (err != QUDA_SUCCESS) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -373,7 +373,7 @@ namespace quda {
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    qudaCUresult err = cuMemFree((qudaDeviceptr_t)ptr);
+    qudaResult err = cuMemFree((qudaDeviceptr_t)ptr);
     if (err != QUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
@@ -460,7 +460,7 @@ namespace quda {
     CUpointer_attribute attribute[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
     qudaMemoryType mem_type;
     void *data[] = { &mem_type };
-    qudaCUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<qudaDeviceptr_t>(ptr));
+    qudaResult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<qudaDeviceptr_t>(ptr));
     if (error != QUDA_SUCCESS) {
       const char *string;
       cuGetErrorString(error, &string);

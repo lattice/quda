@@ -345,7 +345,7 @@ namespace quda {
         errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       checkCudaError();
 
@@ -373,7 +373,7 @@ namespace quda {
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 
         checkCudaError();
       }
@@ -425,7 +425,7 @@ namespace quda {
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
 	else texDesc.readMode = qudaReadModeElementType;
 
-	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
+	qudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
 
 	// second set of ghost texture map to the host-mapped pinned receive buffers
 	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
@@ -433,7 +433,7 @@ namespace quda {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
-        cudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
 
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
           qudaChannelFormatDesc desc;
@@ -457,14 +457,14 @@ namespace quda {
           memset(&texDesc, 0, sizeof(texDesc));
           texDesc.readMode = qudaReadModeElementType;
 
-          cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
+          qudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 
 	  resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
             errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                       resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
           }
-          cudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
+          qudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
         }
 
         ghost_field_tex[b] = ghost_recv_buffer_d[b];

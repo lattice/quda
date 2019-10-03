@@ -92,6 +92,7 @@
 #define qudaReadModeNormalizedFloat cudaReadModeNormalizedFloat
 #define qudaResourceDesc cudaResourceDesc
 #define qudaResourceTypeLinear cudaResourceTypeLinear
+#define qudaResourceViewDesc cudaResourceViewDesc
 #define qudaStreamDefault cudaStreamDefault
 #define qudaStream_t cudaStream_t
 #define qudaSuccess cudaSuccess
@@ -99,7 +100,7 @@
 #define qudaError_t cudaError_t
 #define qudaDeviceptr_t CUdeviceptr
 #define qudaMemoryType CUmemorytype
-#define qudaCUresult CUresult
+#define qudaResult CUresult
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
@@ -142,6 +143,7 @@
 
 #define qudaResourceDesc hipResourceDesc
 #define qudaResourceTypeLinear hipResourceTypeLinear
+#define qudaResourceViewDesc hipResourceViewDesc
 
 #define qudaStreamDefault hipStreamDefault
 
@@ -152,7 +154,7 @@
 #define qudaTextureObject_t hipTextureObject_t
 #define qudaDeviceptr_t hipDeviceptr_t
 #define qudaMemoryType hipMemoryType
-#define qudaCUresult  hipError_t
+#define qudaResult  hipError_t
 
 #define qudaMemcpyKind hipMemcpyKind
 #define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
