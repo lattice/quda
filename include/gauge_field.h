@@ -750,6 +750,37 @@ namespace quda {
   */
   uint64_t Checksum(const GaugeField &u, bool mini=false);
 
+  /**
+     @brief Helper function for determining if the reconstruct of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If reconstruct is unique return the reconstruct
+   */
+  inline QudaReconstructType Reconstruct_(const char *func, const char *file, int line,
+                                          const GaugeField &a, const GaugeField &b) {
+    QudaReconstructType reconstruct = QUDA_RECONSTRUCT_INVALID;
+    if (a.Reconstruct() == b.Reconstruct()) reconstruct = a.Reconstruct();
+    else errorQuda("Reconstruct %d %d do not match (%s:%d in %s())\n",
+		   a.Reconstruct(), b.Reconstruct(), file, line, func);
+    return reconstruct;
+  }
+
+  /**
+     @brief Helper function for determining if the reconstruct of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check reconstruct on
+     @return If reconstruct is unique return the reconstrict
+   */
+  template <typename... Args>
+  inline QudaReconstructType Reconstruct_(const char *func, const char *file, int line,
+                                          const GaugeField &a, const GaugeField &b,
+                                          const Args &... args) {
+    return static_cast<QudaReconstructType>(Reconstruct_(func,file,line,a,b) & Reconstruct_(func,file,line,a,args...));
+  }
+
+#define checkReconstruct(...) Reconstruct_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
 } // namespace quda
 
 #endif // _GAUGE_QUDA_H

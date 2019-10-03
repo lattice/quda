@@ -51,6 +51,7 @@ namespace quda {
     site_offset(param.site_offset),
     site_size(param.site_size)
   {
+    if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
     if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
 
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
