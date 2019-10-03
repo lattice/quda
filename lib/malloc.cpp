@@ -11,11 +11,16 @@
 #include "qdp_config.h"
 #endif
 
-namespace quda {
+#ifdef QUDA_BACKWARDSCPP
+#include "backward.hpp"
+#endif
+namespace quda
+{
 
   enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
 
-  class MemAlloc {
+  class MemAlloc
+  {
 
   public:
     std::string func;
@@ -23,25 +28,35 @@ namespace quda {
     int line;
     size_t size;
     size_t base_size;
+#ifdef QUDA_BACKWARDSCPP
+    backward::StackTrace st;
+#endif
 
-    MemAlloc()
-      : line(-1), size(0), base_size(0) { }
+    MemAlloc() : line(-1), size(0), base_size(0) {}
 
-    MemAlloc(std::string func, std::string file, int line)
-      : func(func), file(file), line(line), size(0), base_size(0) { }
+    MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
+    {
+#ifdef QUDA_BACKWARDSCPP
+      st.load_here(32);
+      st.skip_n_firsts(1);
+#endif
+    }
 
-    MemAlloc& operator=(const MemAlloc &a) {
+    MemAlloc &operator=(const MemAlloc &a)
+    {
       if (&a != this) {
-	func = a.func;
-	file = a.file;
-	line = a.line;
-	size = a.size;
-	base_size = a.base_size;
+        func = a.func;
+        file = a.file;
+        line = a.line;
+        size = a.size;
+        base_size = a.base_size;
+#ifdef QUDA_BACKWARDSCPP
+        st = a.st;
+#endif
       }
       return *this;
     }
   };
-
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
   static long total_bytes[N_ALLOC_TYPE] = {0};
@@ -76,7 +91,6 @@ namespace quda {
     printfQuda("----------------------------------------------------------\n");
   }
 
-
   static void print_alloc(AllocType type)
   {
     const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
@@ -85,11 +99,16 @@ namespace quda {
     for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
       void *ptr = entry->first;
       MemAlloc a = entry->second;
-      printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long) a.base_size,
-		 a.func.c_str(), a.file.c_str(), a.line);
+      printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
+                 a.file.c_str(), a.line);
+#ifdef QUDA_BACKWARDSCPP
+      if (getRankVerbosity()) {
+        backward::Printer p;
+        p.print(a.st);
+      }
+#endif
     }
   }
-
 
   static void track_malloc(const AllocType &type, const MemAlloc &a, void *ptr)
   {
