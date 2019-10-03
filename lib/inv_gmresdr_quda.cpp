@@ -651,6 +651,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    param.rhs_idx += 1;
 
+   //to avoid a (misleading) postrun report about non-deallocated resources 
+   gmresdr_args.reset(nullptr);
+
    if(ep) delete ep;
    return;
  }

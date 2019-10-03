@@ -369,8 +369,8 @@ namespace quda {
            blas::reDotProduct(s.data(), Az_, v2k_);
          }
 
-         //for(int j = 0; j < 2*k; j++)  blas::copy(vm[j], v2k[j]);
-         vm.CopySubset(v2k, 2*k, 0);
+         for(int j = 0; j < 2*k; j++)  blas::copy(vm[j], v2k[j]);
+         //vm.CopySubset(v2k, 2*k, 0);
 
          return;
        }
@@ -415,7 +415,8 @@ namespace quda {
             const int dst_offset = cid-elements;
             const int src_offset = l-elements+(l == 0 ? Vm->CompositeDim() : 0);
 
-            hvm.CopySubset(vm, elements, dst_offset, src_offset);
+            //hvm.CopySubset(vm, elements, dst_offset, src_offset);
+	    for(int i = 0; i < elements; i++) blas::copy( hvm[dst_offset+i], vm[src_offset+i] );
 
             if(last_stage) blas::copy(*hAz.get(), *Az.get());
             blas::unregisterAuxBlasStream();
