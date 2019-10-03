@@ -694,20 +694,14 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
 					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
 {
   profile.TPSTART(QUDA_PROFILE_INIT);
-  int y[4];
-  for (int dir=0; dir<4; ++dir) y[dir] = in.X()[dir] + 2*R[dir];
-  int pad = 0;
-
-  GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
-			   in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
-  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-  gParamEx.order = in.Order();
-  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParamEx.t_boundary = in.TBoundary();
+  GaugeFieldParam gParamEx(in);
+  gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  gParamEx.pad = 0;
   gParamEx.nFace = 1;
-  gParamEx.tadpole = in.Tadpole();
-  for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
-
+  for (int d=0; d<4; d++) {
+    gParamEx.x[d] += 2*R[d];
+    gParamEx.r[d] = R[d];
+  }
   auto *out = new cudaGaugeField(gParamEx);
 
   // copy input field into the extended device gauge field
@@ -4055,8 +4049,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 #else
   errorQuda("Fat-link has not been built");
 #endif // GPU_FATLINK
-
-  return;
 }
 
 int getGaugePadding(GaugeFieldParam& param){
