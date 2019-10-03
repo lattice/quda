@@ -148,6 +148,15 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_MULTIGRID)
+  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+endif(QUDA_MULTIGRID)
+
+if(QUDA_JITIFY)
+  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
+  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
+endif()
+
 if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD)
     add_dependencies(quda QIO)
