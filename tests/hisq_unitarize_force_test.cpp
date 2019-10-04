@@ -103,7 +103,6 @@ static void hisq_force_init()
   cudaOprod->loadCPUField(*cpuOprod);
 }
 
-
 static void hisq_force_end()
 {
   delete cpuFatLink;
@@ -173,7 +172,7 @@ static void display_test_info()
 	 xdim, ydim, zdim, tdim);
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
   auto app = make_app();
   // app->get_formatter()->column_width(40);

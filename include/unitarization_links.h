@@ -33,11 +33,11 @@ namespace quda {
 				  bool allow_svd, bool svd_only,
 				  double svd_rel_error, double svd_abs_error);
 
-  void unitarizeLinksCPU(GaugeField& outfield, const GaugeField &infield);
+  void unitarizeLinksCPU(GaugeField &outfield, const GaugeField &infield);
 
-  void unitarizeLinks(GaugeField& outfield, const GaugeField &infield, int *fails);
-  void unitarizeLinks(GaugeField& outfield, int *fails);
-  
+  void unitarizeLinks(GaugeField &outfield, const GaugeField &infield, int *fails);
+  void unitarizeLinks(GaugeField &outfield, int *fails);
+
   bool isUnitary(const cpuGaugeField& field, double max_error);
 
   /**
@@ -50,7 +50,7 @@ namespace quda {
    * @param fails Number of link failures (device pointer)
    */
   void projectSU3(GaugeField &U, double tol, int *fails);
-  
+
 } // namespace quda
 
 

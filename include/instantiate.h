@@ -19,68 +19,76 @@ namespace quda
 #endif
 
   struct ReconstructFull {
-    static constexpr std::array<QudaReconstructType,5> recon =
-      {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8};
+    static constexpr std::array<QudaReconstructType, 5> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_9, QUDA_RECONSTRUCT_8};
   };
 
   struct ReconstructWilson {
-    static constexpr std::array<QudaReconstructType,3> recon =
-      {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
   };
 
   struct ReconstructStaggered {
-    static constexpr std::array<QudaReconstructType,3> recon =
-      {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
   };
 
   struct ReconstructNo12 {
-    static constexpr std::array<QudaReconstructType,2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12};
+    static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12};
   };
 
   struct ReconstructNone {
-    static constexpr std::array<QudaReconstructType,1> recon = {QUDA_RECONSTRUCT_NO};
+    static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_NO};
   };
 
   struct ReconstructMom {
-    static constexpr std::array<QudaReconstructType,2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_10};
+    static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_10};
   };
 
   // instantiate and recurse to prior element
-  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
-    typename Recon, int i, typename G, typename... Args>
-    struct instantiateR {
+  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
+            int i, typename G, typename... Args>
+  struct instantiateR {
 
-      template <bool enabled, typename dummy=void> void instantiate(G &U, Args &&...args) { Apply<Float, nColor, Recon::recon[i]>(U, args...); }
-      template <typename dummy> void instantiate<false,dummy>(G &U, Args &&...args) {
-        errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[i]);
-      }
+    template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
+    {
+      Apply<Float, nColor, Recon::recon[i]>(U, args...);
+    }
+    template <typename dummy> void instantiate<false, dummy>(G &U, Args &&... args)
+    {
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[i]);
+    }
 
-      instantiateR(G &U, Args &&... args) {
+    instantiateR(G &U, Args &&... args)
+    {
       if (U.Reconstruct() == Recon::recon[i]) {
         instantiate<is_enabled<Recon::recon[i]>()>(U, args...);
       } else {
-        instantiateR<Apply, Float, nColor, Recon, i-1, G, Args...> (U, args...);
+        instantiateR<Apply, Float, nColor, Recon, i - 1, G, Args...>(U, args...);
       }
     }
   };
 
   // termination specialization
-  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
-    typename Recon, typename G, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
+            typename G, typename... Args>
   struct instantiateR<Apply, Float, nColor, Recon, 0, G, Args...> {
 
-    template <bool enabled, typename dummy=void> void instantiate(G &U, Args &&...args) {
+    template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
+    {
       Apply<Float, nColor, Recon::recon[0]>(U, args...);
     }
-    template <typename dummy> void instantiate<false,dummy>(G &U, Args &&...args) {
+    template <typename dummy> void instantiate<false, dummy>(G &U, Args &&... args)
+    {
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[0]);
     }
 
-    instantiateR(G &U, Args &&... args) {
+    instantiateR(G &U, Args &&... args)
+    {
       if (U.Reconstruct() == Recon::recon[0]) {
         instantiate<is_enabled<Recon::recon[0]>()>(U, args...);
       } else {
-        errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());        
+        errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
       }
     }
   };
@@ -90,12 +98,13 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Additional arguments for kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, typename G,
+            typename... Args>
   constexpr void instantiate(G &U, Args &&... args)
   {
     if (U.Ncolor() == 3) {
-      constexpr int i = Recon::recon.size()-1;
-      instantiateR<Apply, Float, 3, Recon, i, G, Args...> (U, args...);
+      constexpr int i = Recon::recon.size() - 1;
+      instantiateR<Apply, Float, 3, Recon, i, G, Args...>(U, args...);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
@@ -106,7 +115,8 @@ namespace quda
      @param[in] U Gauge field
      @param[in,out] args Additional arguments for different dslash kernels
   */
-  template <template <typename, int, QudaReconstructType> class Apply, typename Recon=ReconstructFull, typename G, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
+            typename... Args>
   constexpr void instantiate(G &U, Args &&... args)
   {
     if (U.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -126,4 +136,4 @@ namespace quda
     }
   }
 
-}
+} // namespace quda

@@ -2913,8 +2913,8 @@ namespace quda {
 
   // Use traits to reduce the template explosion
   template <typename T, QudaReconstructType, int N = 18, QudaStaggeredPhase stag = QUDA_STAGGERED_PHASE_NO,
-      bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
-    bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
+            bool huge_alloc = gauge::default_huge_alloc, QudaGhostExchange ghostExchange = QUDA_GHOST_EXCHANGE_INVALID,
+            bool use_inphase = false, QudaGaugeFieldOrder order = QUDA_NATIVE_GAUGE_ORDER>
   struct gauge_mapper {
   };
 
@@ -3022,12 +3022,14 @@ namespace quda {
     typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
-  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
+            QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_MILC_GAUGE_ORDER> {
     typedef gauge::MILCOrder<T, N> type;
   };
 
-  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
+  template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,
+            QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<T, recon, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_QDP_GAUGE_ORDER> {
     typedef gauge::QDPOrder<T, N> type;
   };

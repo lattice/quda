@@ -698,8 +698,8 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParamEx.pad = 0;
   gParamEx.nFace = 1;
-  for (int d=0; d<4; d++) {
-    gParamEx.x[d] += 2*R[d];
+  for (int d = 0; d < 4; d++) {
+    gParamEx.x[d] += 2 * R[d];
     gParamEx.r[d] = R[d];
   }
   auto *out = new cudaGaugeField(gParamEx);

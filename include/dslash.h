@@ -507,13 +507,13 @@ namespace quda
   };
 
   struct WilsonReconstruct {
-    static constexpr std::array<QudaReconstructType,3> recon =
-      {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
   };
 
   struct StaggeredReconstruct {
-    static constexpr std::array<QudaReconstructType,3> recon =
-      {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
   };
 
   /**
@@ -524,7 +524,7 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-    typename... Args>
+            typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
   {
     if (U.Reconstruct() == Recon::recon[0]) {
