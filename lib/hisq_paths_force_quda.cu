@@ -7,6 +7,7 @@
 #include <tune_quda.h>
 #include <index_helper.cuh>
 #include <gauge_field_order.h>
+#include <instantiate.h>
 
 #ifdef GPU_HISQ_FORCE
 
@@ -37,20 +38,20 @@ namespace quda {
       FORCE_INVALID
     };
 
-    __device__ __host__ constexpr inline int opp_dir(int dir) { return 7-dir; }
-    __device__ __host__ constexpr inline int goes_forward(int dir) { return dir<=3; }
-    __device__ __host__ constexpr inline int goes_backward(int dir) { return dir>3; }
-    __device__ __host__ constexpr inline int CoeffSign(int pos_dir, int odd_lattice) { return 2*((pos_dir + odd_lattice + 1) & 1) - 1; }
-    __device__ __host__ constexpr inline int Sign(int parity) { return parity ? -1 : 1; }
-    __device__ __host__ constexpr inline int posDir(int dir) { return (dir >= 4) ? 7-dir : dir; }
+    constexpr int opp_dir(int dir) { return 7-dir; }
+    constexpr int goes_forward(int dir) { return dir<=3; }
+    constexpr int goes_backward(int dir) { return dir>3; }
+    constexpr int CoeffSign(int pos_dir, int odd_lattice) { return 2*((pos_dir + odd_lattice + 1) & 1) - 1; }
+    constexpr int Sign(int parity) { return parity ? -1 : 1; }
+    constexpr int posDir(int dir) { return (dir >= 4) ? 7-dir : dir; }
 
     template <int dir, typename Arg>
-    inline __device__ __host__ void updateCoords(int x[], int shift, const Arg &arg) {
+    constexpr void updateCoords(int x[], int shift, const Arg &arg) {
       x[dir] = (x[dir] + shift + arg.E[dir]) % arg.E[dir];
     }
 
     template <typename Arg>
-    inline __device__ __host__ void updateCoords(int x[], int dir, int shift, const Arg &arg) {
+    constexpr void updateCoords(int x[], int dir, int shift, const Arg &arg) {
       switch (dir) {
       case 0: updateCoords<0>(x, shift, arg); break;
       case 1: updateCoords<1>(x, shift, arg); break;
@@ -74,8 +75,10 @@ namespace quda {
           seven(path_coeff_array[4]), lepage(path_coeff_array[5]) { }
     };
 
-    template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    template <typename real_, int nColor_, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
     struct BaseForceArg {
+      using real = real_;
+      static constexpr int nColor = nColor_;
       typedef typename gauge_mapper<real,reconstruct>::type G;
       const G link;
       int threads;
@@ -110,9 +113,9 @@ namespace quda {
       }
     };
 
-    template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct FatLinkArg : public BaseForceArg<real,reconstruct> {
-
+    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    struct FatLinkArg : public BaseForceArg<real, nColor, reconstruct> {
+      using BaseForceArg = BaseForceArg<real, nColor, reconstruct>;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       F outA;
       F outB;
@@ -131,7 +134,7 @@ namespace quda {
       const bool q_prev;
 
       FatLinkArg(GaugeField &force, const GaugeField &oProd, const GaugeField &link, real coeff, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
+        : BaseForceArg(link, 0), outA(force), outB(force), pMu(oProd), p3(oProd), qMu(oProd),
         oProd(oProd), qProd(oProd), qPrev(oProd), coeff(coeff), accumu_coeff(0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_ONE_LINK) errorQuda("This constructor is for FORCE_ONE_LINK"); }
@@ -139,51 +142,51 @@ namespace quda {
       FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &qPrev, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
         oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(true)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &pMu, GaugeField &P3, GaugeField &qMu,
                  const GaugeField &oProd, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(pMu), p3(P3), qMu(qMu),
         oProd(oProd), qProd(oProd), qPrev(qMu), coeff(coeff), accumu_coeff(0), p_mu(true), q_mu(true), q_prev(false)
       { if (type != FORCE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &oProd,
                  const GaugeField &qPrev, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod), pMu(P3), p3(P3), qMu(qPrev),
         oProd(oProd), qProd(oProd), qPrev(qPrev), coeff(coeff), accumu_coeff(0), p_mu(false), q_mu(false), q_prev(true)
       { if (type != FORCE_LEPAGE_MIDDLE_LINK) errorQuda("This constructor is for FORCE_MIDDLE_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &P3,
                  const GaugeField &qProd, const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), pMu(P3), p3(P3), qMu(qProd), oProd(qProd), qProd(qProd),
         qPrev(qProd), coeff(coeff), accumu_coeff(accumu_coeff),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_SIDE_LINK) errorQuda("This constructor is for FORCE_SIDE_LINK or FORCE_ALL_LINK"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &P3, const GaugeField &link,
                  real coeff, int overlap, HisqForceType type)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(newOprod),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(newOprod),
         pMu(P3), p3(P3), qMu(P3), oProd(P3), qProd(P3), qPrev(P3), coeff(coeff), accumu_coeff(0.0),
         p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_SIDE_LINK_SHORT) errorQuda("This constructor is for FORCE_SIDE_LINK_SHORT"); }
 
       FatLinkArg(GaugeField &newOprod, GaugeField &shortP, const GaugeField &oProd, const GaugeField &qPrev,
                  const GaugeField &link, real coeff, real accumu_coeff, int overlap, HisqForceType type, bool dummy)
-        : BaseForceArg<real,reconstruct>(link, overlap), outA(newOprod), outB(shortP), oProd(oProd), qPrev(qPrev),
+        : BaseForceArg(link, overlap), outA(newOprod), outB(shortP), oProd(oProd), qPrev(qPrev),
         pMu(shortP), p3(shortP), qMu(qPrev), qProd(qPrev), // dummy
         coeff(coeff), accumu_coeff(accumu_coeff), p_mu(false), q_mu(false), q_prev(false)
       { if (type != FORCE_ALL_LINK) errorQuda("This constructor is for FORCE_ALL_LINK"); }
 
     };
 
-    template <typename real, typename Arg>
+    template <typename Arg>
     __global__ void oneLinkTermKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -226,10 +229,10 @@ namespace quda {
      *             else                     (4,2)
      *
      ************************************************************************************************/
-    template<typename real, int sig_positive, int mu_positive, typename Arg>
+    template <int sig_positive, int mu_positive, typename Arg>
     __global__ void allLinkKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
 
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
@@ -241,7 +244,7 @@ namespace quda {
       int e_cb = linkIndex(x,arg.E);
       parity = parity^arg.oddness_change;
 
-      real mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
+      auto mycoeff = CoeffSign(sig_positive,parity)*arg.coeff;
 
       int y[4] = {x[0], x[1], x[2], x[3]};
       int mysig = posDir(arg.sig);
@@ -335,10 +338,10 @@ namespace quda {
      *   (Lepage)    else                  (2, 0)
      *
      ****************************************************************************/
-    template <typename real, int sig_positive, int mu_positive, bool pMu, bool qMu, bool qPrev, typename Arg>
+    template <int sig_positive, int mu_positive, bool pMu, bool qMu, bool qPrev, typename Arg>
     __global__ void middleLinkKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
 
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
@@ -451,10 +454,10 @@ namespace quda {
      *   call 2:       (0, 1)
      *
      *********************************************************************************/
-    template <typename real, int mu_positive, typename Arg>
+    template <int mu_positive, typename Arg>
     __global__ void sideLinkKernel(Arg arg)
     {
-      typedef Matrix<complex<real>, 3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -498,7 +501,7 @@ namespace quda {
         Link Ox = arg.qProd(0, point_d, 1-parity);
         Link Ow = mu_positive ? Oy*Ox : conj(Ox)*conj(Oy);
 
-        real mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+        auto mycoeff = CoeffSign(goes_forward(arg.sig), parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
         Link oprod = arg.outA(mu_positive ? arg.mu : opp_dir(arg.mu), mu_positive ? point_d : e_cb, mu_positive ? 1-parity : parity);
         oprod += mycoeff * Ow;
@@ -508,10 +511,10 @@ namespace quda {
 
     // Flop count, in two-number pair (matrix_mult, matrix_add)
     // 		(0,1)
-    template<typename real, int mu_positive, typename Arg>
+    template <int mu_positive, typename Arg>
     __global__ void sideLinkShortKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -538,7 +541,7 @@ namespace quda {
       int point_d = mu_positive ? linkIndex(y,arg.E) : e_cb;
 
       int parity_ = mu_positive ? 1-parity : parity;
-      real mycoeff = CoeffSign(goes_forward(arg.sig),parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
+      auto mycoeff = CoeffSign(goes_forward(arg.sig),parity)*CoeffSign(goes_forward(arg.mu),parity)*arg.coeff;
 
       Link Oy = arg.p3(0, e_cb, parity);
       Link oprod = arg.outA(posDir(arg.mu), point_d, parity_);
@@ -546,10 +549,9 @@ namespace quda {
       arg.outA(posDir(arg.mu), point_d, parity_) = oprod;
     }
 
-    template <typename real, typename Arg>
+    template <typename Arg>
     class FatLinkForce : public TunableVectorYZ {
 
-    private:
       Arg &arg;
       const GaugeField &meta;
       const HisqForceType type;
@@ -563,16 +565,14 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
       }
-      virtual ~FatLinkForce() { }
 
       TuneKey tuneKey() const {
         std::stringstream aux;
-        if (type == FORCE_ONE_LINK) aux << "threads=" << arg.threads;
-        else if (type == FORCE_MIDDLE_LINK || type == FORCE_LEPAGE_MIDDLE_LINK)
-          aux << "threads=" << arg.threads << ",sig=" << arg.sig << ",mu=" << arg.mu <<
-            ",pMu=" << arg.p_mu << ",q_muu=" << arg.q_mu << ",q_prev=" << arg.q_prev;
-        else
-          aux << "threads=" << arg.threads << ",mu=" << arg.mu; // no sig dependence needed for side link
+        aux << meta.AuxString() << comm_dim_partitioned_string() << ",threads=" << arg.threads;
+        if (type == FORCE_MIDDLE_LINK || type == FORCE_LEPAGE_MIDDLE_LINK)
+          aux << ",sig=" << arg.sig << ",mu=" << arg.mu << ",pMu=" << arg.p_mu << ",q_muu=" << arg.q_mu << ",q_prev=" << arg.q_prev;
+        else if (type != FORCE_ONE_LINK)
+          aux << ",mu=" << arg.mu; // no sig dependence needed for side link
 
         switch (type) {
         case FORCE_ONE_LINK:           aux << ",ONE_LINK";           break;
@@ -590,62 +590,62 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_ONE_LINK:
-          oneLinkTermKernel<real,Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          oneLinkTermKernel<Arg> <<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         case FORCE_ALL_LINK:
           if (goes_forward(arg.sig) && goes_forward(arg.mu))
-            allLinkKernel<real,1,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            allLinkKernel<1,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-            allLinkKernel<real,1,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            allLinkKernel<1,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-            allLinkKernel<real,0,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            allLinkKernel<0,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else
-            allLinkKernel<real,0,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            allLinkKernel<0,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         case FORCE_MIDDLE_LINK:
           if (!arg.p_mu || !arg.q_mu) errorQuda("Expect p_mu=%d and q_mu=%d to both be true", arg.p_mu, arg.q_mu);
           if (arg.q_prev) {
             if (goes_forward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<real,1,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<1,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-              middleLinkKernel<real,1,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<1,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<real,0,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<0,1,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else
-              middleLinkKernel<real,0,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<0,0,true,true,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           } else {
             if (goes_forward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<real,1,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<1,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-              middleLinkKernel<real,1,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<1,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-              middleLinkKernel<real,0,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<0,1,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
             else
-              middleLinkKernel<real,0,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+              middleLinkKernel<0,0,true,true,false,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           }
           break;
         case FORCE_LEPAGE_MIDDLE_LINK:
           if (arg.p_mu || arg.q_mu || !arg.q_prev)
             errorQuda("Expect p_mu=%d and q_mu=%d to both be false and q_prev=%d true", arg.p_mu, arg.q_mu, arg.q_prev);
           if (goes_forward(arg.sig) && goes_forward(arg.mu))
-            middleLinkKernel<real,1,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            middleLinkKernel<1,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else if (goes_forward(arg.sig) && goes_backward(arg.mu))
-            middleLinkKernel<real,1,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            middleLinkKernel<1,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else if (goes_backward(arg.sig) && goes_forward(arg.mu))
-            middleLinkKernel<real,0,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            middleLinkKernel<0,1,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           else
-            middleLinkKernel<real,0,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+            middleLinkKernel<0,0,false,false,true,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         case FORCE_SIDE_LINK:
-          if (goes_forward(arg.mu)) sideLinkKernel<real,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else                      sideLinkKernel<real,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(arg.mu)) sideLinkKernel<1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          else                      sideLinkKernel<0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         case FORCE_SIDE_LINK_SHORT:
-          if (goes_forward(arg.mu)) sideLinkShortKernel<real,1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
-          else                      sideLinkShortKernel<real,0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          if (goes_forward(arg.mu)) sideLinkShortKernel<1,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
+          else                      sideLinkShortKernel<0,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
           break;
         default:
-            errorQuda("Undefined force type %d", type);
+          errorQuda("Undefined force type %d", type);
         }
       }
 
@@ -744,80 +744,82 @@ namespace quda {
       }
     };
 
-    template<typename real>
-    static void hisqStaplesForce(GaugeField &Pmu, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu,
-                                 GaugeField &Qmu, GaugeField &Qnumu, GaugeField &newOprod,
-                                 const GaugeField &oprod, const GaugeField &link,
-                                 const PathCoefficients<real> &act_path_coeff)
-    {
-      real OneLink = act_path_coeff.one;
-      real ThreeSt = act_path_coeff.three;
-      real mThreeSt = -ThreeSt;
-      real FiveSt  = act_path_coeff.five;
-      real mFiveSt  = -FiveSt;
-      real SevenSt = act_path_coeff.seven;
-      real Lepage  = act_path_coeff.lepage;
-      real mLepage  = -Lepage;
+    template <typename real, int nColor, QudaReconstructType recon>
+    struct HisqStaplesForce {
+      HisqStaplesForce(GaugeField &Pmu, GaugeField &P3, GaugeField &P5, GaugeField &Pnumu,
+                       GaugeField &Qmu, GaugeField &Qnumu, GaugeField &newOprod,
+                       const GaugeField &oprod, const GaugeField &link,
+                       const double *path_coeff_array)
+      {
+        PathCoefficients<real> act_path_coeff(path_coeff_array);
+        real OneLink = act_path_coeff.one;
+        real ThreeSt = act_path_coeff.three;
+        real mThreeSt = -ThreeSt;
+        real FiveSt  = act_path_coeff.five;
+        real mFiveSt  = -FiveSt;
+        real SevenSt = act_path_coeff.seven;
+        real Lepage  = act_path_coeff.lepage;
+        real mLepage  = -Lepage;
 
-      FatLinkArg<real> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
-      FatLinkForce<real, FatLinkArg<real> > oneLink(arg, link, 0, 0, FORCE_ONE_LINK);
-      oneLink.apply(0);
+        FatLinkArg<real, nColor> arg(newOprod, oprod, link, OneLink, FORCE_ONE_LINK);
+        FatLinkForce<decltype(arg)> oneLink(arg, link, 0, 0, FORCE_ONE_LINK);
+        oneLink.apply(0);
 
-      for (int sig=0; sig<8; sig++) {
-        for (int mu=0; mu<8; mu++) {
-          if ( (mu == sig) || (mu == opp_dir(sig))) continue;
+        for (int sig=0; sig<8; sig++) {
+          for (int mu=0; mu<8; mu++) {
+            if ( (mu == sig) || (mu == opp_dir(sig))) continue;
 
-          //3-link
-          //Kernel A: middle link
-          FatLinkArg<real> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
-          FatLinkForce<real, FatLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
-          middleLink.apply(0);
-
-          for (int nu=0; nu < 8; nu++) {
-            if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
-
-            //5-link: middle link
-            //Kernel B
-            FatLinkArg<real> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
-            FatLinkForce<real, FatLinkArg<real> > middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
+            //3-link
+            //Kernel A: middle link
+            FatLinkArg<real, nColor> middleLinkArg( newOprod, Pmu, P3, Qmu, oprod, link, mThreeSt, 2, FORCE_MIDDLE_LINK);
+            FatLinkForce<decltype(arg)> middleLink(middleLinkArg, link, sig, mu, FORCE_MIDDLE_LINK);
             middleLink.apply(0);
 
-            for (int rho = 0; rho < 8; rho++) {
-              if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
+            for (int nu=0; nu < 8; nu++) {
+              if (nu == sig || nu == opp_dir(sig) || nu == mu || nu == opp_dir(mu)) continue;
 
-              //7-link: middle link and side link
-              FatLinkArg<real> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
-              FatLinkForce<real, FatLinkArg<real> > all(arg, link, sig, rho, FORCE_ALL_LINK);
-              all.apply(0);
+              //5-link: middle link
+              //Kernel B
+              FatLinkArg<real, nColor> middleLinkArg( newOprod, Pnumu, P5, Qnumu, Pmu, Qmu, link, FiveSt, 1, FORCE_MIDDLE_LINK);
+              FatLinkForce<decltype(arg)> middleLink(middleLinkArg, link, sig, nu, FORCE_MIDDLE_LINK);
+              middleLink.apply(0);
 
-            }//rho
+              for (int rho = 0; rho < 8; rho++) {
+                if (rho == sig || rho == opp_dir(sig) || rho == mu || rho == opp_dir(mu) || rho == nu || rho == opp_dir(nu)) continue;
 
-            //5-link: side link
-            FatLinkArg<real> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
-            FatLinkForce<real, FatLinkArg<real> > side(arg, link, sig, nu, FORCE_SIDE_LINK);
+                //7-link: middle link and side link
+                FatLinkArg<real, nColor> arg(newOprod, P5, Pnumu, Qnumu, link, SevenSt, FiveSt != 0 ? SevenSt/FiveSt : 0, 1, FORCE_ALL_LINK, true);
+                FatLinkForce<decltype(arg)> all(arg, link, sig, rho, FORCE_ALL_LINK);
+                all.apply(0);
+
+              }//rho
+
+              //5-link: side link
+              FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mFiveSt, (ThreeSt != 0 ? FiveSt/ThreeSt : 0), 1, FORCE_SIDE_LINK);
+              FatLinkForce<decltype(arg)> side(arg, link, sig, nu, FORCE_SIDE_LINK);
+              side.apply(0);
+
+            } //nu
+
+            //lepage
+            if (Lepage != 0.) {
+              FatLinkArg<real, nColor> middleLinkArg( newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
+              FatLinkForce<decltype(arg)> middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
+              middleLink.apply(0);
+
+              FatLinkArg<real, nColor> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
+              FatLinkForce<decltype(arg)> side(arg, link, sig, mu, FORCE_SIDE_LINK);
+              side.apply(0);
+            } // Lepage != 0.0
+
+            // 3-link side link
+            FatLinkArg<real, nColor> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
+            FatLinkForce<decltype(arg)> side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
             side.apply(0);
-
-          } //nu
-
-          //lepage
-          if (Lepage != 0.) {
-            FatLinkArg<real> middleLinkArg( newOprod, P5, Pmu, Qmu, link, Lepage, 2, FORCE_LEPAGE_MIDDLE_LINK);
-            FatLinkForce<real, FatLinkArg<real> > middleLink(middleLinkArg, link, sig, mu, FORCE_LEPAGE_MIDDLE_LINK);
-            middleLink.apply(0);
-
-            FatLinkArg<real> arg(newOprod, P3, P5, Qmu, link, mLepage, (ThreeSt != 0 ? Lepage/ThreeSt : 0), 2, FORCE_SIDE_LINK);
-            FatLinkForce<real, FatLinkArg<real> > side(arg, link, sig, mu, FORCE_SIDE_LINK);
-            side.apply(0);
-          } // Lepage != 0.0
-
-          // 3-link side link
-          FatLinkArg<real> arg(newOprod, P3, link, ThreeSt, 1, FORCE_SIDE_LINK_SHORT);
-          FatLinkForce<real, FatLinkArg<real> > side(arg, P3, sig, mu, FORCE_SIDE_LINK_SHORT);
-          side.apply(0);
-        }//mu
-      }//sig
-
-    } // hisqStaplesForce
+          }//mu
+        }//sig
+      }
+    };
 
     void hisqStaplesForce(GaugeField &newOprod, const GaugeField &oprod, const GaugeField &link, const double path_coeff_array[6])
     {
@@ -840,22 +842,14 @@ namespace quda {
       cudaGaugeField Qnumu(gauge_param);
 
       QudaPrecision precision = checkPrecision(oprod, link, newOprod);
-      if (precision ==  QUDA_DOUBLE_PRECISION) {
-        PathCoefficients<double> act_path_coeff(path_coeff_array);
-        hisqStaplesForce<double>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, act_path_coeff);
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        PathCoefficients<float> act_path_coeff(path_coeff_array);
-        hisqStaplesForce<float>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, act_path_coeff);
-      } else {
-        errorQuda("Unsupported precision");
-      }
+      instantiate<HisqStaplesForce, ReconstructNone>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, path_coeff_array);
 
       cudaDeviceSynchronize();
       checkCudaError();
     }
 
-    template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct CompleteForceArg : public BaseForceArg<real,reconstruct> {
+    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    struct CompleteForceArg : public BaseForceArg<real, nColor, reconstruct> {
 
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
       F outA;        // force output accessor
@@ -863,16 +857,16 @@ namespace quda {
       const real coeff;
 
       CompleteForceArg(GaugeField &force, const GaugeField &link)
-        : BaseForceArg<real,reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
+        : BaseForceArg<real, nColor, reconstruct>(link, 0), outA(force), oProd(force), coeff(0.0)
       { }
 
     };
 
     // Flops count: 4 matrix multiplications per lattice site = 792 Flops per site
-    template <typename real, typename Arg>
+    template <typename Arg>
     __global__ void completeForceKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -891,13 +885,13 @@ namespace quda {
 
         makeAntiHerm(Ow);
 
-        real coeff = (parity==1) ? -1.0 : 1.0;
+        typename Arg::real coeff = (parity==1) ? -1.0 : 1.0;
         arg.outA(sig, e_cb, parity) = coeff*Ow;
       }
     }
 
-    template <typename real, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
-    struct LongLinkArg : public BaseForceArg<real,reconstruct> {
+    template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
+    struct LongLinkArg : public BaseForceArg<real, nColor, reconstruct> {
 
       typedef typename gauge::FloatNOrder<real,18,2,11> M;
       typedef typename gauge_mapper<real,QUDA_RECONSTRUCT_NO>::type F;
@@ -906,7 +900,7 @@ namespace quda {
       const real coeff;
 
       LongLinkArg(GaugeField &newOprod, const GaugeField &link, const GaugeField &oprod, real coeff)
-        : BaseForceArg<real,reconstruct>(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
+        : BaseForceArg<real, nColor, reconstruct>(link,0), outA(newOprod), oProd(oprod), coeff(coeff)
       { }
 
     };
@@ -914,10 +908,10 @@ namespace quda {
     // Flops count, in two-number pair (matrix_mult, matrix_add)
     // 				   (24, 12)
     // 4968 Flops per site in total
-    template <typename real, typename Arg>
+    template <typename Arg>
     __global__ void longLinkKernel(Arg arg)
     {
-      typedef Matrix<complex<real>,3> Link;
+      typedef Matrix<complex<typename Arg::real>, Arg::nColor> Link;
       int x_cb = blockIdx.x * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
       int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -976,7 +970,7 @@ namespace quda {
 
     }
 
-    template <typename real, typename Arg>
+    template <typename Arg>
     class HisqForce : public TunableVectorY {
 
       Arg &arg;
@@ -992,15 +986,14 @@ namespace quda {
         arg.sig = sig;
         arg.mu = mu;
       }
-      virtual ~HisqForce() { }
 
       void apply(const cudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (type) {
         case FORCE_LONG_LINK:
-          longLinkKernel<real,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          longLinkKernel<Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
         case FORCE_COMPLETE:
-          completeForceKernel<real,Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
+          completeForceKernel<Arg><<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg); break;
         default:
           errorQuda("Undefined force type %d", type);
         }
@@ -1008,7 +1001,7 @@ namespace quda {
 
       TuneKey tuneKey() const {
         std::stringstream aux;
-        aux << "threads=" << arg.threads << ",prec=" << sizeof(real);
+        aux << meta.AuxString() << comm_dim_partitioned_string() << ",threads=" << arg.threads;
         switch (type) {
         case FORCE_LONG_LINK: aux << ",LONG_LINK"; break;
         case FORCE_COMPLETE:  aux << ",COMPLETE";  break;
@@ -1054,71 +1047,51 @@ namespace quda {
       }
     };
 
+    template <typename real, int nColor, QudaReconstructType recon>
+    struct HisqLongLinkForce {
+      HisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
+      {
+        LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
+        HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
+        longLink.apply(0);
+        cudaDeviceSynchronize();
+        checkCudaError();
+      }
+    };
+
     void hisqLongLinkForce(GaugeField &newOprod, const GaugeField &oldOprod, const GaugeField &link, double coeff)
     {
       if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
       if (!oldOprod.isNative()) errorQuda("Unsupported gauge order %d", oldOprod.Order());
       if (!newOprod.isNative()) errorQuda("Unsupported gauge order %d", newOprod.Order());
       if (checkLocation(newOprod,oldOprod,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
-
-      QudaPrecision precision = checkPrecision(newOprod, link, oldOprod);
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          typedef LongLinkArg<double,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(newOprod, link, oldOprod, coeff);
-          HisqForce<double,Arg> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
-          longLink.apply(0);
-        } else {
-          errorQuda("Reconstruct %d not supported", link.Reconstruct());
-        }
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          typedef LongLinkArg<float,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(newOprod, link, oldOprod, coeff);
-          HisqForce<float, Arg> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
-          longLink.apply(0);
-        } else {
-          errorQuda("Reconstruct %d not supported", link.Reconstruct());
-        }
-      } else {
-        errorQuda("Unsupported precision %d", precision);
-      }
-      checkCudaError();
-      cudaDeviceSynchronize();
+      checkPrecision(newOprod, link, oldOprod);
+      instantiate<HisqLongLinkForce, ReconstructNone>(newOprod, oldOprod, link, coeff);
     }
+
+    template <typename real, int nColor, QudaReconstructType recon>
+    struct HisqCompleteForce {
+      HisqCompleteForce(GaugeField &force, const GaugeField &link)
+      {
+        CompleteForceArg<real, nColor, recon> arg(force, link);
+        HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
+        completeForce.apply(0);
+        cudaDeviceSynchronize();
+        checkCudaError();
+      }
+    };
 
     void hisqCompleteForce(GaugeField &force, const GaugeField &link)
     {
       if (!link.isNative()) errorQuda("Unsupported gauge order %d", link.Order());
       if (!force.isNative()) errorQuda("Unsupported gauge order %d", force.Order());
       if (checkLocation(force,link) == QUDA_CPU_FIELD_LOCATION) errorQuda("CPU not implemented");
-
-      QudaPrecision precision = checkPrecision(link, force);
-      if (precision == QUDA_DOUBLE_PRECISION) {
-        if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          typedef CompleteForceArg<double,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(force, link);
-          HisqForce<double,Arg> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
-          completeForce.apply(0);
-        } else {
-          errorQuda("Reconstruct %d not supported", link.Reconstruct());
-        }
-      } else if (precision == QUDA_SINGLE_PRECISION) {
-        if (link.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-          typedef CompleteForceArg<float,QUDA_RECONSTRUCT_NO> Arg;
-          Arg arg(force, link);
-          HisqForce<float, Arg> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
-          completeForce.apply(0);
-        } else {
-          errorQuda("Reconstruct %d not supported", link.Reconstruct());
-        }
-      } else {
-        errorQuda("Unsupported precision %d", precision);
-      }
-      checkCudaError();
-      cudaDeviceSynchronize();
+      checkPrecision(link, force);
+      instantiate<HisqCompleteForce, ReconstructNone>(force, link);
     }
+
   } // namespace fermion_force
+
 } // namespace quda
 
 #endif // GPU_HISQ_FORCE
