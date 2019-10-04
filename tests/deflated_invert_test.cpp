@@ -219,25 +219,24 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;
-}
 
-void setDeflationParam(QudaEigParam &df_param) {
+  QudaEigParam *df_param_p = reinterpret_cast<QudaEigParam *>(inv_param.eig_param);	
 
-  df_param.is_complete    = QUDA_BOOLEAN_NO;
-  df_param.import_vectors = QUDA_BOOLEAN_NO;
-  df_param.run_verify     = QUDA_BOOLEAN_NO;
+  df_param_p->is_complete    = QUDA_BOOLEAN_NO;
+  df_param_p->import_vectors = QUDA_BOOLEAN_NO;
+  df_param_p->run_verify     = QUDA_BOOLEAN_NO;
 
-  df_param.nk             = df_param.invert_param->nev;
-  df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
-  df_param.extlib_type    = deflation_ext_lib;
+  df_param_p->nk             = inv_param.nev;
+  df_param_p->np             = inv_param.nev*inv_param.deflation_grid;
+  df_param_p->extlib_type    = deflation_ext_lib;
 
-  df_param.cuda_prec_ritz = prec_ritz;
-  df_param.location       = location_ritz;
-  df_param.mem_type_ritz  = mem_type_ritz;
+  df_param_p->cuda_prec_ritz = prec_ritz;
+  df_param_p->location       = location_ritz;
+  df_param_p->mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, eig_vec_infile);
-  strcpy(df_param.vec_outfile, eig_vec_outfile);
+  strcpy(df_param_p->vec_infile, eig_vec_infile);
+  strcpy(df_param_p->vec_outfile, eig_vec_outfile);
 }
 
 int main(int argc, char **argv)
@@ -282,8 +281,13 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
+  //set eigenspace parameters first:
+  QudaEigParam  df_param = newQudaEigParam();
 
   QudaInvertParam inv_param = newQudaInvertParam();
+
+  inv_param.eig_param  = static_cast<void*>(&df_param);
+
   setInvertParam(inv_param);
 
   double kappa5 = 0.0;
@@ -306,9 +310,7 @@ int main(int argc, char **argv)
     }
   }
 
-  QudaEigParam  df_param = newQudaEigParam();
   df_param.invert_param = &inv_param;
-  setDeflationParam(df_param);
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
