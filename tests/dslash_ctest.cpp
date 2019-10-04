@@ -17,6 +17,7 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
+#include "dslash_test_helpers.h"
 
 #include <qio_field.h>
 // google test frame work

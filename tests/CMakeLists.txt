@@ -57,9 +57,9 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL)
-  cuda_add_executable(dslash_test dslash_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
+  cuda_add_executable(dslash_test dslash_test.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
                       clover_reference.cpp blas_reference.cpp)
-  cuda_add_executable(dslash_ctest dslash_ctest.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
+  cuda_add_executable(dslash_ctest dslash_ctest.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
                       clover_reference.cpp blas_reference.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
   target_link_libraries(dslash_ctest ${TEST_LIBS})
