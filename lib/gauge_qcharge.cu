@@ -48,7 +48,7 @@ public:
 
     TuneKey tuneKey() const
     {
-      return TuneKey(meta.VolString(), typeid(*this).name(), aux);
+      return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
     }
 
     long long flops() const { return 2 * arg.threads * (3 * 198 + 9); }
