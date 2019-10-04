@@ -962,7 +962,7 @@ extern "C" {
    * @param param Contains all metadata regarding host and device
    * storage etc.
    */
-  void updateDeflationQuda(void *df_instance, QudaEigParam *param);
+  void updateDeflationQuda(void *df_instance, QudaInvertParam *param);
 
   /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
@@ -1354,7 +1354,7 @@ extern "C" {
   *
   **/
 
-  void* newDeflationQuda(QudaEigParam *param);
+  void* newDeflationQuda(QudaInvertParam *param);
 
   /**
    * Free resources allocated by the deflated solver

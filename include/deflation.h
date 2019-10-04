@@ -153,7 +153,7 @@ namespace quda {
     Deflation *defl;
     TimeProfile &profile;
 
-    deflated_solver(QudaEigParam &eig_param, TimeProfile &profile);
+    deflated_solver(QudaInvertParam &inv_param, TimeProfile &profile);
 
     virtual ~deflated_solver()
     {

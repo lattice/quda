@@ -2739,42 +2739,40 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profilerStop(__func__);
 }
 
-deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
+deflated_solver::deflated_solver(QudaInvertParam &param, TimeProfile &profile)
   : d(nullptr), m(nullptr), RV(0), deflParam(nullptr), defl(nullptr),  profile(profile) {
 
-  QudaInvertParam *param = eig_param.invert_param;
+  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
+  QudaEigParam& eig_param = *eig_param_p;
 
-  if (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER) return;
+  if (param.inv_type != QUDA_EIGCG_INVERTER && param.inv_type != QUDA_INC_EIGCG_INVERTER) return;
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
-  cudaGaugeField *cudaGauge = checkGauge(param);
+  cudaGaugeField *cudaGauge = checkGauge(&param);
   eig_param.secs   = 0;
   eig_param.gflops = 0;
 
   DiracParam diracParam;
-  if(eig_param.cuda_prec_ritz == param->cuda_prec)
+  if(eig_param.cuda_prec_ritz == param.cuda_prec)
   {
-    setDiracParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+    setDiracParam(diracParam, &param, (param.solve_type == QUDA_DIRECT_PC_SOLVE) || (param.solve_type == QUDA_NORMOP_PC_SOLVE));
   } else {
-    setDiracSloppyParam(diracParam, param, (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE));
+    setDiracSloppyParam(diracParam, &param, (param.solve_type == QUDA_DIRECT_PC_SOLVE) || (param.solve_type == QUDA_NORMOP_PC_SOLVE));
   }
 
-  const bool pc_solve = (param->solve_type == QUDA_NORMOP_PC_SOLVE);
+  const bool pc_solve = (param.solve_type == QUDA_NORMOP_PC_SOLVE);
 
   d = Dirac::create(diracParam);
   m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
 
-  ColorSpinorParam ritzParam(nullptr, *param, cudaGauge->X(), pc_solve, eig_param.location);
+  ColorSpinorParam ritzParam(nullptr, param, cudaGauge->X(), pc_solve, eig_param.location);
 
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
-  //ritzParam.is_composite  = true;
-  //ritzParam.is_component  = false;
-  //ritzParam.composite_dim = param->nev*param->deflation_grid;
-  ritzParam.setPrecision(param->cuda_prec_ritz);
+  ritzParam.setPrecision(param.cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
-    ritzParam.setPrecision(param->cuda_prec_ritz, param->cuda_prec_ritz, true); // set native field order
+    ritzParam.setPrecision(param.cuda_prec_ritz, param.cuda_prec_ritz, true); // set native field order
     if (ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     //select memory location here, by default ritz vectors will be allocated on the device
@@ -2784,20 +2782,7 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
     ritzParam.mem_type = QUDA_MEMORY_PINNED;
   }
 
-  int ritzVolume = 1;
-  for(int d = 0; d < ritzParam.nDim; d++) ritzVolume *= ritzParam.x[d];
-
-  if (getVerbosity() == QUDA_DEBUG_VERBOSE) {
-
-    size_t byte_estimate = (size_t)ritzParam.composite_dim*(size_t)ritzVolume*(ritzParam.nColor*ritzParam.nSpin*ritzParam.Precision());
-    printfQuda("allocating bytes: %lu (lattice volume %d, prec %d)", byte_estimate, ritzVolume, ritzParam.Precision());
-    if(ritzParam.mem_type == QUDA_MEMORY_DEVICE) printfQuda("Using device memory type.\n");
-    else if (ritzParam.mem_type == QUDA_MEMORY_MAPPED)
-      printfQuda("Using mapped memory type.\n");
-  }
-
-  //RV = ColorSpinorField::Create(ritzParam);
-  for (int i = 0; i < (param->nev*param->deflation_grid); i++) { RV.push_back(ColorSpinorField::Create(ritzParam)); }
+  for (int i = 0; i < (param.nev*param.deflation_grid); i++) { RV.push_back(ColorSpinorField::Create(ritzParam)); }
 
   deflParam = new DeflationParam(eig_param, RV, *m);
 
@@ -2806,9 +2791,10 @@ deflated_solver::deflated_solver(QudaEigParam &eig_param, TimeProfile &profile)
   profile.TPSTOP(QUDA_PROFILE_INIT);
 }
 
-void* newDeflationQuda(QudaEigParam *eig_param) {
+void* newDeflationQuda(QudaInvertParam *inv_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-  auto *defl = new deflated_solver(*eig_param, profileInvert);
+
+  auto *defl = new deflated_solver(*inv_param, profileInvert);
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -2817,13 +2803,15 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
   return static_cast<void*>(defl);
 }
 
-void updateDeflationQuda(void *df, QudaEigParam *eig_param) {
+void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+
+  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);  
 
   auto *defl_p = static_cast<deflated_solver*>(df);
   Deflation &defl = *(defl_p->defl);
 
-  eig_param->is_complete = defl.is_complete() ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param_p->is_complete = defl.is_complete() ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 

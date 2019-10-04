@@ -309,9 +309,6 @@ int main(int argc, char **argv)
       inv_param.c_5[k] = 0.452;
     }
   }
-
-  df_param.invert_param = &inv_param;
-
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
@@ -380,7 +377,7 @@ int main(int argc, char **argv)
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
-  void *df_preconditioner  = newDeflationQuda(&df_param);
+  void *df_preconditioner  = newDeflationQuda(&inv_param);
   inv_param.deflation_op   = df_preconditioner;
 
   for (int i=0; i<Nsrc; i++) {
@@ -406,7 +403,7 @@ int main(int argc, char **argv)
 
     invertQuda(spinorOut, spinorIn, &inv_param);
 
-    if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ) updateDeflationQuda(df_preconditioner, &df_param);
+    if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ) updateDeflationQuda(df_preconditioner, &inv_param);
     //
     printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
   }
