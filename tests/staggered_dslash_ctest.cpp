@@ -347,7 +347,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   // printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   checkCudaError();
 
   tmp = new cudaColorSpinorField(csParam);

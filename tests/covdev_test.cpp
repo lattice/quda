@@ -205,7 +205,7 @@ void init(int argc, char **argv)
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
     checkCudaError();
 	
     double spinor_norm2 = blas::norm2(*spinor);

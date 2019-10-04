@@ -332,27 +332,6 @@ namespace quda {
 #endif
   }
 
-  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(qudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    if (error != cudaSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-    return error;
-#endif
-  }
-  
   qudaError_t qudaCreateTextureObject_(qudaTextureObject_t* pTexObject, const qudaResourceDesc* pResDesc, const qudaTextureDesc* pTexDesc, const qudaResourceViewDesc* pResViewDesc, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -410,11 +389,81 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
   }
-  
 
+  qudaError_t qudaDeviceReset_(const char *func, const char *file, const char *line) {
+    cudaDeviceReset();
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
+  qudaError_t qudaDeviceSetCacheConfig_(qudaFuncCache cacheConfig, const char *func, const char *file, const char *line) {
+    cudaDeviceSetCacheConfig(cacheConfig);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
+  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line) {
+    cudaDeviceSynchronize();
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+    }
+
+  qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line) {
+    cudaGetDeviceCount(count);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaGetDeviceProperties_(qudaDeviceProp* prop, int device, const char *func, const char *file, const char *line) {
+    cudaGetDeviceProperties(prop, device);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int flags,  const char *func, const char *file, const char *line) {
+    cudaHostGetDevicePointer(pDevice, pHost, flags);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaDriverGetVersion_(int* driverVersion, const char *func, const char *file, const char *line) {
+    cudaDriverGetVersion(driverVersion);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaRuntimeGetVersion_(int* runtimeVersion, const char *func, const char *file, const char *line) {
+    cudaRintimeGetVersion(runtimeVersion);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line) {
+    cudaGetDeviceCount(count);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
   
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  qudaError_t qudaFuncSetAttribute_(const void* func, cudaFuncAttribute attr, int value)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(qudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);

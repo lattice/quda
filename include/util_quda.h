@@ -152,7 +152,7 @@ namespace quda {
 #ifdef HOST_DEBUG
 
 #define checkCudaError() do {  \
-  cudaDeviceSynchronize();     \
+  qudaDeviceSynchronize();     \
   checkCudaErrorNoSync();      \
 } while (0)
 

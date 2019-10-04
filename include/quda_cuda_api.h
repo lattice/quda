@@ -139,11 +139,6 @@ namespace quda {
    */
   qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
 
-  /**
-     @brief Wrapper around qudaDeviceSynchronize or quDeviceSynchronize
-   */
-  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
-
   //QUDA texture objects
   /**
      @brief Wrapper around cudaCreateTextureObject
@@ -165,9 +160,38 @@ namespace quda {
      @brief Wrapper around cudaDeviceGetStreamPriorityRange
   */
   qudaError_t qudaDeviceGetStreamPriorityRange_(int* leastPriority, int* greatestPrioriy, const char *func, const char *file, const char *line);
-  
-  
 
+  /**
+     @brief Wrapper around cudaDeviceGetStreamPriorityRange
+  */
+  qudaError_t qudaDeviceReset_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceSetCacheConfig
+  */
+  qudaError_t qudaDeviceSetCacheConfig_(qudaFuncCache cacheConfig, const char *func, const char *file, const char *line);
+  
+  /**
+     @brief Wrapper around cudaDeviceSynchronize
+  */
+  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceSynchronize
+  */
+  qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceSynchronize
+  */
+  qudaError_t qudaGetDeviceProperties_(qudaDeviceProp* prop, int  device, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceSynchronize
+  */
+  qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int  flags, const char *func, const char *file, const char *line);
+  
+  
 #if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around qudaFuncSetAttribute
@@ -228,11 +252,6 @@ namespace quda {
 //END Memset
 //-------------------------------------------------------------------------------------
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceSynchronize() \
-  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
 //START texture
 //-------------------------------------------------------------------------------------
 #define STRINGIFY__(x) #x
@@ -258,5 +277,50 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority) \
   ::quda::qudaDeviceGetStreamPriorityRange_(leastPriority, greatestPriority, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceReset() \
+  ::quda::qudaDeviceReset_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceSetCacheConfig(cacheConfig) \
+  ::quda::qudaDeviceSetCacheConfig_(cacheConfig, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceSynchronize() \
+  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceSynchronize() \
+  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaGetDeviceCount(count) \
+  ::quda::qudaGetDeviceCount_(count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaGetDeviceProperties(prop, device)					\
+  ::quda::qudaGetDeviceProperties_(prop, device, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaHostGetDevicePointer(pDevice, pHost, flags)		\
+  ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDriverGetVersion(driverVersion)		\
+  ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaRuntimeGetVersion(runtimeVersion)		\
+  ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #endif

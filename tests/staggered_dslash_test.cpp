@@ -334,7 +334,7 @@ void init()
   *cudaSpinor = *spinor;
   tmp = new cudaColorSpinorField(csParam);
 
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   checkCudaError();
 
   bool pc = (test_type == 1); // For test_type 0, can use either pc or not pc

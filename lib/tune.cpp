@@ -743,7 +743,7 @@ namespace quda {
 
         tunable.initTuneParam(param);
 	while (tuning) {
-	  cudaDeviceSynchronize();
+	  qudaDeviceSynchronize();
 	  cudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
 	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
@@ -762,11 +762,11 @@ namespace quda {
 	  cudaEventRecord(end, 0);
 	  cudaEventSynchronize(end);
 	  cudaEventElapsedTime(&elapsed_time, start, end);
-	  cudaDeviceSynchronize();
+	  qudaDeviceSynchronize();
 	  error = cudaGetLastError();
 
 	  { // check that error state is cleared
-	    cudaDeviceSynchronize();
+	    qudaDeviceSynchronize();
 	    qudaError_t error = cudaGetLastError();
 	    if (error != qudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
 	  }

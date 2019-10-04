@@ -219,7 +219,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
     cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, gpuid);
+    qudaGetDeviceProperties(&prop, gpuid);
     if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
@@ -663,7 +663,7 @@ bool comm_gdr_blacklist() {
       std::stringstream blacklist_list(blacklist_env);
 
       int device_count;
-      cudaGetDeviceCount(&device_count);
+      qudaGetDeviceCount(&device_count);
 
       int excluded_device;
       while (blacklist_list >> excluded_device) {
@@ -707,7 +707,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   }
 
   int device_count;
-  cudaGetDeviceCount(&device_count);
+  qudaGetDeviceCount(&device_count);
   if (device_count == 0) { errorQuda("No CUDA devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
@@ -740,7 +740,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
 
       int device;
       int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
+      qudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
         if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }

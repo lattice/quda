@@ -417,7 +417,7 @@ invert_test(void)
 
         invertMultiShiftQuda(outArray, in->V(), &inv_param);
 
-        cudaDeviceSynchronize();
+        qudaDeviceSynchronize();
         time0 += clock(); // stop the timer
         time0 /= CLOCKS_PER_SEC;
 

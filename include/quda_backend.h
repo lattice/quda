@@ -15,11 +15,17 @@
 
 // * cudaCreateTextureObject
 // * cudaDestroyTextureObject
+
 // * cudaDeviceCanAccessPeer
-// cudaDeviceGetStreamPriorityRange
-// cudaDeviceReset
-// cudaDeviceSetCacheConfig
-// cudaDeviceSynchronize
+// * cudaDeviceGetStreamPriorityRange
+// * cudaDeviceReset
+// * cudaDeviceSetCacheConfig
+// * cudaDeviceSynchronize
+// * cudaGetDeviceCount 
+// * cudaGetDeviceProperties
+// * cudaHostGetDevicePointer
+// * cudaSetDevice
+
 // cudaDriverGetVersion
 
 // cudaEventCreate
@@ -33,12 +39,10 @@
 // cufftPlanMany
  
 // cudaGetTextureObjectResourceDesc
-// cudaGetDeviceCount 
-// cudaGetDeviceProperties
 // cudaGetErrorString
 // cudaGetLastError
 
-// cudaHostGetDevicePointer
+
 
 // cudaHostAlloc
 // cudaHostRegister
@@ -57,7 +61,6 @@
 // cudaProfilerStop
 
 // cudaRuntimeGetVersion
-// cudaSetDevice
 
 // cudaStreamCreateWithPriority
 // cudaStreamDestroy
@@ -78,6 +81,7 @@
 #define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
 #define qudaEventDisableTiming cudaEventDisableTiming
 #define qudaEventInterprocess cudaEventInterprocess
+#define qudaFuncCache cudaFuncCache
 #define qudaFuncCachePreferL1 cudaFuncCachePreferL1
 #define qudafftComplex cufftComplex
 #define qudafftDoubleComplex cufftDoubleComplex
@@ -128,6 +132,7 @@
 #define qudaEventDisableTiming hipEventDisableTiming
 #define qudaEventInterprocess hipEventInterprocess
 
+#define qudaFuncCache hipFuncCache
 #define qudaFuncCachePreferL1 hipFuncCachePreferL1
 #define qudafftComplex hipfftComplex
 #define qudafftDoubleComplex hipfftDoubleComplex
