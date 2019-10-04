@@ -26,13 +26,14 @@
 // * cudaHostGetDevicePointer
 // * cudaSetDevice
 
-// cudaDriverGetVersion
+// * cudaDriverGetVersion
+// * cudaRuntimeGetVersion
 
-// cudaEventCreate
-// cudaEventDestroy
-// cudaEventElapsedTime
-// cudaEventRecord
-// cudaEventSynchronize
+// * cudaEventCreate
+// * cudaEventDestroy
+// * cudaEventElapsedTime
+// * cudaEventRecord
+// * cudaEventSynchronize
 
 // cufftExecC2C
 // cufftExecZ2Z
@@ -59,8 +60,6 @@
 
 // cudaProfilerStart
 // cudaProfilerStop
-
-// cudaRuntimeGetVersion
 
 // cudaStreamCreateWithPriority
 // cudaStreamDestroy

@@ -254,8 +254,8 @@ void end(void)
 double dslashCUDA(int niter, int mu) {
 
   qudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
+  qudaEventCreate(&start);
+  qudaEventRecord(start, 0);
   cudaEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) {
@@ -266,8 +266,8 @@ double dslashCUDA(int niter, int mu) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
+  qudaEventCreate(&end);
+  qudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);

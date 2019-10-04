@@ -371,9 +371,9 @@ double benchmark(int kernel, const int niter) {
   double *Ar = new double[Nsrc * Msrc];
 
   qudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  qudaEventCreate(&start);
+  qudaEventCreate(&end);
+  qudaEventRecord(start, 0);
 
   {
     switch (kernel) {
@@ -558,7 +558,7 @@ double benchmark(int kernel, const int niter) {
     }
   }
 
-  cudaEventRecord(end, 0);
+  qudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);

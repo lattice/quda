@@ -421,11 +421,11 @@ DslashTime dslashCUDA(int niter) {
   timeval tstart, tstop;
 
   qudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
+  qudaEventCreate(&start);
+  qudaEventCreate(&end);
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  qudaEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
 
@@ -567,7 +567,7 @@ DslashTime dslashCUDA(int niter) {
     }
   }
     
-  cudaEventRecord(end, 0);
+  qudaEventRecord(end, 0);
   cudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);

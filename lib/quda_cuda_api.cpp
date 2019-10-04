@@ -235,46 +235,51 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaEventQuery(qudaEvent_t& event)
+  qudaError_t qudaEventCreate_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    case CUDA_ERROR_NOT_READY: // this is the only return value care about
-      return cudaErrorNotReady;
-    default:
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuEventQuery returned error %s", str);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(qudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    cudaEventCreate((CUevent*)event);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
-#endif
   }
 
-  qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream)
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t &event, unsigned int flags, const char *func, const char *file, const char *line)
   {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuEventrecord returned error %s", str);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(qudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    cudaEventCreateWithFlags((CUevent*)event, flags);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
-#endif
+  }
+  
+  qudaError_t qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
+  {
+    cudaEventDestroy((CUevent)event);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
   }
 
+  qudaError_t qudaEventQuery_(qudaEvent_t& event, const char *func, const char *file, const char *line)
+  {
+    cudaEventQuery(event);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
+  qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
+  {
+    cudaEventRecord(event, stream);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
   qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
@@ -412,7 +417,7 @@ namespace quda {
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
-    }
+  }
 
   qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line) {
     cudaGetDeviceCount(count);
@@ -447,21 +452,13 @@ namespace quda {
   }
 
   qudaError_t qudaRuntimeGetVersion_(int* runtimeVersion, const char *func, const char *file, const char *line) {
-    cudaRintimeGetVersion(runtimeVersion);
+    cudaRuntimeGetVersion(runtimeVersion);
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
   }
 
-  qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line) {
-    cudaGetDeviceCount(count);
-    qudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-  
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute_(const void* func, cudaFuncAttribute attr, int value)
   {

@@ -105,7 +105,7 @@ namespace quda {
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 
-      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+      qudaEventCreateWithFlagsWithFlags(&reduceEnd, cudaEventDisableTiming);
 
       // enable fast reductions with CPU spin waiting as opposed to using CUDA events
       char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");

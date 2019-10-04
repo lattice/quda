@@ -731,8 +731,8 @@ namespace quda {
 	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
 	tunable.preTune();
 
-	cudaEventCreate(&start);
-	cudaEventCreate(&end);
+	qudaEventCreate(start);
+	qudaEventCreate(end);
 
 	if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
@@ -755,11 +755,11 @@ namespace quda {
 		       param.aux.x, param.aux.y, param.aux.z);
 	  }
 
-	  cudaEventRecord(start, 0);
+	  qudaEventRecord(start, 0);
 	  for (int i=0; i<tunable.tuningIter(); i++) {
 	    tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	  }
-	  cudaEventRecord(end, 0);
+	  qudaEventRecord(end, 0);
 	  cudaEventSynchronize(end);
 	  cudaEventElapsedTime(&elapsed_time, start, end);
 	  qudaDeviceSynchronize();
@@ -811,8 +811,8 @@ namespace quda {
 	best_param.comment += ctime(&now); // includes a newline
 	best_param.time = best_time;
 
-	cudaEventDestroy(start);
-	cudaEventDestroy(end);
+	qudaEventDestroy(start);
+	qudaEventDestroy(end);
 
 	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
 	tunable.postTune();

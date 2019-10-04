@@ -9,7 +9,7 @@
 
    Wrappers around CUDA API function calls allowing us to easily
    profile and switch between using the CUDA runtime and driver APIs.
- */
+*/
 
 namespace quda {
 
@@ -105,38 +105,59 @@ namespace quda {
   qudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream);
 
   /**
-     @brief Wrapper around qudaEventQuery or quEventQuery
+     @brief Wrapper around qudaEventCreate
      @param[in] event Event we are querying
      @return Status of event query
-   */
-  qudaError_t qudaEventQuery(qudaEvent_t &event);
+  */
+  qudaError_t qudaEventCreate_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventRecord or quEventRecord
+     @brief Wrapper around qudaEventCreateWithFlags
+     @param[in] event Event we are querying
+     @return Status of event query
+  */
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t &event, unsigned int flags, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around qudaEventDestroy
+     @param[in] event Event we are querying
+     @return Status of event query
+  */
+  qudaError_t qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around qudaEventQuery 
+     @param[in] event Event we are querying
+     @return Status of event query
+  */
+  qudaError_t qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around qudaEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
-   */
-  qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream=0);
-
+  */
+  qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
+  
   /**
-     @brief Wrapper around qudaEventSynchronize or quEventSynchronize
+     @brief Wrapper around qudaEventSynchronize 
      @param[in] event Event which we are synchronizing with respect to
-   */
+  */
   qudaError_t qudaEventSynchronize(qudaEvent_t &event);
 
 
   /**
-     @brief Wrapper around qudaEventRecord or quEventRecord
+     @brief Wrapper around qudaStreamWaitEvent
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
-   */
+  */
   qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags);
 
   /**
      @brief Wrapper around qudaStreamSynchronize or quStreamSynchronize
      @param[in] stream Stream which we are synchronizing with respect to
-   */
+  */
   qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
 
   //QUDA texture objects
@@ -191,6 +212,12 @@ namespace quda {
   */
   qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int  flags, const char *func, const char *file, const char *line);
   
+  /**
+     @brief Call API wrapper
+  */
+  qudaError_t qudaDriverGetVersion_(int* driverVersion, const char *func, const char *file, const char *line);
+  
+  qudaError_t qudaRuntimeGetVersion_(int* runtimeVersion, const char *func, const char *file, const char *line);
   
 #if CUDA_VERSION >= 9000
   /**
@@ -204,7 +231,7 @@ namespace quda {
 
   /**
      @brief Print out the timer profile for CUDA API calls
-   */
+  */
   void printAPIProfile();
 
 } // namespace quda
@@ -213,12 +240,12 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpy(dst, src, count, kind) \
+#define qudaMemcpy(dst, src, count, kind)				\
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemcpyAsync(dst, src, count, kind, stream) \
+#define qudaMemcpyAsync(dst, src, count, kind, stream)			\
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
@@ -226,6 +253,34 @@ namespace quda {
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Memcpy
+//-------------------------------------------------------------------------------------
+
+//START Event
+//-------------------------------------------------------------------------------------
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventCreate(event)						\
+  ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventCreateWithFlags(event, flags)				\
+  ::quda::qudaEventCreateWithFlags_(event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventDestroy(event)						\
+  ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventQuery(event)						\
+  ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventRecord(event, stream)					\
+  ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //-------------------------------------------------------------------------------------
 
 //START Memset
@@ -237,7 +292,7 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemsetAsync(dst, val, count, stream)				\
+#define qudaMemsetAsync(dst, val, count, stream)			\
   ::quda::qudaMemsetAsync_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
@@ -247,7 +302,7 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemset2DAsync(dst, val, pitch, width, height, stream)		\
+#define qudaMemset2DAsync(dst, val, pitch, width, height, stream)	\
   ::quda::qudaMemset2DAsync_(dst, val, pitch, width, height, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Memset
 //-------------------------------------------------------------------------------------
@@ -261,7 +316,7 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDestroyTextureObject(pTexObject) \
+#define qudaDestroyTextureObject(pTexObject)				\
   ::quda::qudaDestroyTextureObject_(pTexObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END texture
 //-------------------------------------------------------------------------------------
@@ -270,7 +325,7 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice) \
+#define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice)	\
   ::quda::qudaDeviceCanAccessPeer_(canAccessPeer, device, peerDevice, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
@@ -280,47 +335,47 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceReset() \
+#define qudaDeviceReset()						\
   ::quda::qudaDeviceReset_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceSetCacheConfig(cacheConfig) \
+#define qudaDeviceSetCacheConfig(cacheConfig)				\
   ::quda::qudaDeviceSetCacheConfig_(cacheConfig, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceSynchronize() \
+#define qudaDeviceSynchronize()						\
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDeviceSynchronize() \
+#define qudaDeviceSynchronize()						\
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaGetDeviceCount(count) \
+#define qudaGetDeviceCount(count)					\
   ::quda::qudaGetDeviceCount_(count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaGetDeviceProperties(prop, device)					\
+#define qudaGetDeviceProperties(prop, device)				\
   ::quda::qudaGetDeviceProperties_(prop, device, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaHostGetDevicePointer(pDevice, pHost, flags)		\
-  ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaHostGetDevicePointer(pDevice, pHost, flags)			\
+    ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaDriverGetVersion(driverVersion)		\
+#define qudaDriverGetVersion(driverVersion)				\
   ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaRuntimeGetVersion(runtimeVersion)		\
+#define qudaRuntimeGetVersion(runtimeVersion)				\
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #endif

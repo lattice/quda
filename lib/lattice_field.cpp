@@ -494,7 +494,7 @@ namespace quda {
 	  // now send
           qudaIpcEventHandle_t ipcLocalEventHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
-	    cudaEventCreate(&ipcCopyEvent[b][dir][dim], cudaEventDisableTiming | cudaEventInterprocess);
+	    qudaEventCreateWithFlags(ipcCopyEvent[b][dir][dim], (cudaEventDisableTiming | cudaEventInterprocess) );
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
@@ -601,12 +601,14 @@ namespace quda {
 
   bool LatticeField::ipcCopyComplete(int dir, int dim)
   {
-    return (qudaSuccess == qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    bool result = qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]);
+    return (result);
   }
-
+  
   bool LatticeField::ipcRemoteCopyComplete(int dir, int dim)
   {
-    return (qudaSuccess == qudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
+    bool result = qudaEventQuery(ipcCopyEvent[bufferIndex][dir][dim]);
+    return (result);
   }
 
   const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
