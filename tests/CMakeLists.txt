@@ -493,13 +493,13 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     add_test(NAME dslash_improved_staggered-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type asqtad
-                     --test 1
+                     --test MatPC
                      --dim 6 8 10 12
                      --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
     add_test(NAME dslash_naive_staggered-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
-                     --test 1
+                     --test MatPC
                      --dim 2 4 6 8
                      --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
     if(polenv)
@@ -512,7 +512,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       add_test(NAME dslash_improved_staggered_build-policy${pol2}
                COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                        --dslash-type asqtad
-                       --test 1
+                       --test MatPC
                        --dim 6 8 10 12
                        --compute-fat-long true
                        --epsilon-naik

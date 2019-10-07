@@ -540,17 +540,6 @@ using ::testing::Bool;
 using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
-
-
-void usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: Even destination spinor\n");
-  printfQuda("                                                1: Odd destination spinor\n");
-  return ;
-}
-
 using ::testing::TestWithParam;
 using ::testing::Bool;
 using ::testing::Values;
@@ -734,7 +723,6 @@ TEST_P(StaggeredDslashTest, benchmark) {
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
     auto app = make_app();
-    // CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}};
     app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
     // add_eigen_option_group(app);
     // add_deflation_option_group(app);

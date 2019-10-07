@@ -613,7 +613,6 @@ int main(int argc, char **argv)
 
   // command line options
   auto app = make_app();
-  // CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}};
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
   // app->get_formatter()->column_width(40);
   // add_eigen_option_group(app);
