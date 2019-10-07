@@ -47,7 +47,7 @@ endif()
 # define tests
 
 # if we build with QDP JIT the tests cannot run anyway
-if(QUDA_INTERFACE_QDPJIT)
+if(QUDA_QDPJIT)
   set(QUDA_BUILD_ALL_TESTS OFF)
 endif()
 
