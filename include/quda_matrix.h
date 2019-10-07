@@ -83,6 +83,12 @@ namespace quda {
 	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
 	}
 
+        template <class U>
+	__device__ __host__ inline Matrix(const Matrix<U,N> &a) {
+#pragma unroll
+	  for (int i=0; i<N*N; i++) data[i] = a.data[i];
+	}
+
 	__device__ __host__ inline Matrix(const T data_[]) {
 #pragma unroll
 	  for (int i=0; i<N*N; i++) data[i] = data_[i];
