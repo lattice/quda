@@ -2043,8 +2043,8 @@ namespace quda {
       };
 
   /**
-      The LegacyOrder defines the ghost zone storage and ordering for
-      all cpuGaugeFields, which use the same ghost zone storage.
+     @brief The LegacyOrder defines the ghost zone storage and ordering for
+     all cpuGaugeFields, which use the same ghost zone storage.
   */
   template <typename Float, int length>
     struct LegacyOrder {
@@ -2352,7 +2352,7 @@ namespace quda {
       { ; }
     virtual ~MILCOrder() { ; }
 
-    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
     {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
@@ -2362,6 +2362,7 @@ namespace quda {
       auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
 #endif
       for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+      for (int i = length / 2; i < 9; i++) v[i] = complex(0.0, 0.0); // this is to surpress a compiler warning from reading from mom fields
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
@@ -2465,7 +2466,7 @@ namespace quda {
 
     virtual ~MILCSiteOrder() { ; }
 
-    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+    __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
     {
       // get base pointer
       const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
@@ -2478,6 +2479,7 @@ namespace quda {
       auto v_ = &gauge0[dir * length];
 #endif
       for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+      for (int i = length / 2; i < 9; i++) v[i] = complex(0.0, 0.0); // this is to surpress a compiler warning from reading from mom fields
     }
 
     __device__ __host__ inline void save(const complex v[length / 2], int x, int dir, int parity)
