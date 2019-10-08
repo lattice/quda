@@ -601,7 +601,7 @@ void end() {
   }
 
   qudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);
   cudaEventDestroy(start);

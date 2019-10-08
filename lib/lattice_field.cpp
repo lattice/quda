@@ -494,7 +494,7 @@ namespace quda {
 	  // now send
           qudaIpcEventHandle_t ipcLocalEventHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
-	    qudaEventCreateWithFlags(ipcCopyEvent[b][dir][dim], (cudaEventDisableTiming | cudaEventInterprocess) );
+	    qudaEventCreateWithFlags(ipcCopyEvent[b][dir][dim], (qudaEventDisableTiming | cudaEventInterprocess) );
 	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,

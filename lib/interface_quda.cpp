@@ -5200,7 +5200,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
 void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
+  qudaHostRegister(ptr, *bytes, qudaHostRegisterDefault);
   checkCudaError();
 }
 

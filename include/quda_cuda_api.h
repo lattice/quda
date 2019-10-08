@@ -170,7 +170,12 @@ namespace quda {
      @brief Wrapper around cudaDestroyTextureObject
   */
   qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file, const char *line);
-
+  
+  /**
+     @brief Wrapper around cudaDestroyTextureObject
+  */
+  qudaError_t qudaGetTextureObjectResourceDesc_(qudaResourceDesc* pResDesc, qudaTextureObject_t texObject, const char *func, const char *file, const char *line);
+  
   //QUDA Device
   /**
      @brief Wrapper around cudaDeviceCanAccessPeer
@@ -218,6 +223,11 @@ namespace quda {
   qudaError_t qudaDriverGetVersion_(int* driverVersion, const char *func, const char *file, const char *line);
   
   qudaError_t qudaRuntimeGetVersion_(int* runtimeVersion, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaHostRegister
+  */
+  qudaError_t qudaHostRegister_(void* ptr, size_t size, unsigned int flags, const char *func, const char *file, const char *line);
   
 #if CUDA_VERSION >= 9000
   /**
@@ -318,6 +328,12 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaDestroyTextureObject(pTexObject)				\
   ::quda::qudaDestroyTextureObject_(pTexObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaGetTextureObjectResourceDesc(pResDesc, texObject)		\
+  ::quda::qudaGetTextureObjectResourceDesc_(pResDesc, texObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 //END texture
 //-------------------------------------------------------------------------------------
 
@@ -377,5 +393,27 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaRuntimeGetVersion(runtimeVersion)				\
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END Device
+//-------------------------------------------------------------------------------------
 
+//START Host
+//-------------------------------------------------------------------------------------
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaHostRegister(ptr, size, flags)				\
+  ::quda::qudaHostRegister_(ptr, size, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END Host
+//-------------------------------------------------------------------------------------
+
+
+
+
+//START ErrorString
+//-------------------------------------------------------------------------------------#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaRuntimeGetVersion(runtimeVersion)				\
+  ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+//END ErrorString
+//-------------------------------------------------------------------------------------
 #endif

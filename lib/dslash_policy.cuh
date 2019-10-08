@@ -574,7 +574,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            qudaEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 
@@ -656,7 +656,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            qudaEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 

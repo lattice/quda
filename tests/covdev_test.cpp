@@ -256,7 +256,7 @@ double dslashCUDA(int niter, int mu) {
   qudaEvent_t start, end;
   qudaEventCreate(&start);
   qudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  qudaEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) {
     if (transfer){
@@ -268,7 +268,7 @@ double dslashCUDA(int niter, int mu) {
 
   qudaEventCreate(&end);
   qudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);
   cudaEventDestroy(start);

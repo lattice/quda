@@ -40,11 +40,11 @@ namespace quda {
 
 
   void createCloverForceEvents(){
-    qudaEventCreateWithFlags(&packEnd, cudaEventDisableTiming);
-    createEventArray(gatherEnd, cudaEventDisableTiming);
-    createEventArray(scatterEnd, cudaEventDisableTiming);
-    qudaEventCreateWithFlags(&oprodStart, cudaEventDisableTiming);
-    qudaEventCreateWithFlags(&oprodEnd, cudaEventDisableTiming);
+    qudaEventCreateWithFlags(&packEnd, qudaEventDisableTiming);
+    createEventArray(gatherEnd, qudaEventDisableTiming);
+    createEventArray(scatterEnd, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodStart, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodEnd, qudaEventDisableTiming);
     return;
   }
 

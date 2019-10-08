@@ -191,7 +191,7 @@ double benchmark(int test, const int niter) {
   }
 
   qudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventSynchronize(end);
   float runTime;
   cudaEventElapsedTime(&runTime, start, end);
   cudaEventDestroy(start);

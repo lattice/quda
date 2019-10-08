@@ -128,7 +128,7 @@ namespace quda {
 
 
   /**
-   * Under CUDA 4.0, cudaHostRegister seems to require that both the
+   * Under CUDA 4.0, qudaHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
    * This local function takes care of the alignment and gets called
    * by pinned_malloc_() and mapped_malloc_()
@@ -268,7 +268,7 @@ namespace quda {
     MemAlloc a(func, file, line);
     void *ptr = aligned_malloc(a, size);
     
-    qudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterDefault);
+    qudaError_t err = qudaHostRegister(ptr, a.base_size, qudaHostRegisterDefault);
     if (err != qudaSuccess) {
       errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -292,11 +292,11 @@ namespace quda {
 
 #ifdef HOST_ALLOC
     void *ptr;
-    qudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
+    qudaError_t err = cudaHostAlloc(&ptr, size, qudaHostRegisterMapped | qudaHostRegisterPortable);
     if (err != qudaSuccess) { errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
 #else
     void *ptr = aligned_malloc(a, size);
-    qudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
+    qudaError_t err = qudaHostRegister(ptr, a.base_size, qudaHostRegisterMapped);
     if (err != qudaSuccess) {
       errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }

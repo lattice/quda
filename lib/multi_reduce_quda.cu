@@ -50,7 +50,7 @@ namespace quda {
             completeFastReduce(words);
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
-            while (qudaSuccess != qudaEventQuery(*getReduceEvent())) {}
+            while (qudaSuccess != qudaEventQuery(*getReduceEvent())) { ; }
           }
         } else
 #endif

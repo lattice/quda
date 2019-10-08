@@ -760,7 +760,7 @@ namespace quda {
 	    tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	  }
 	  qudaEventRecord(end, 0);
-	  cudaEventSynchronize(end);
+	  qudaEventSynchronize(end);
 	  cudaEventElapsedTime(&elapsed_time, start, end);
 	  qudaDeviceSynchronize();
 	  error = cudaGetLastError();

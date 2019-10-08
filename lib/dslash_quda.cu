@@ -95,16 +95,16 @@ namespace quda {
   void createDslashEvents()
   {
     using namespace dslash;
-    // add cudaEventDisableTiming for lower sync overhead
+    // add qudaEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      qudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
-      qudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
-      qudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
-      qudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+      qudaEventCreateWithFlags(gatherStart[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(gatherEnd[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(scatterStart[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(scatterEnd[i], qudaEventDisableTiming);
     }
     for (int i=0; i<2; i++) {
-      qudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
-      qudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
+      qudaEventCreateWithFlags(packEnd[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(dslashStart[i], qudaEventDisableTiming);
     }
 
     aux_worker = NULL;

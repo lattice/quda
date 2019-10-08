@@ -7,6 +7,10 @@
 // curand_uniform
 // curand_uniform_double
 
+// cufftExecC2C
+// cufftExecZ2Z
+// cufftPlanMany
+
 // cuMemAlloc
 // cuMemFree
 
@@ -34,12 +38,8 @@
 // * cudaEventElapsedTime
 // * cudaEventRecord
 // * cudaEventSynchronize
-
-// cufftExecC2C
-// cufftExecZ2Z
-// cufftPlanMany
  
-// cudaGetTextureObjectResourceDesc
+// * cudaGetTextureObjectResourceDesc
 // cudaGetErrorString
 // cudaGetLastError
 
@@ -86,6 +86,10 @@
 #define qudafftDoubleComplex cufftDoubleComplex
 #define qudafftHandle cufftHandle
 #define qudafftResult cufftResult
+#define qudaHostRegisterDefault cudaHostRegisterDefault
+#define qudaHostRegisterMapped cudaHostRegisterMapped
+#define qudaHostRegisterPortable cudaHostRegisterPortable
+
 #define qudaIpcEventHandle_t cudaIpcEventHandle_t
 #define qudaIpcMemHandle_t cudaIpcMemHandle_t
 #define qudaIpcMemLazyEnablePeerAccess cudaIpcMemLazyEnablePeerAccess
@@ -141,6 +145,10 @@
 #define qudaIpcEventHandle_t hipIpcEventHandle_t
 #define qudaIpcMemHandle_t hipIpcMemHandle_t
 #define qudaIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
+
+#define qudaHostRegisterDefault hipHostRegisterDefault
+#define qudaHostRegisterMapped hipHostRegisterMapped
+#define qudaHostRegisterPortable hipHostRegisterPortable
 
 #define qudaReadModeElementType hipReadModeElementType
 #define qudaReadModeNormalizedFloat hipReadModeNormalizedFloat
