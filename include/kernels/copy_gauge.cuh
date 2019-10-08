@@ -1,4 +1,5 @@
 #include <gauge_field_order.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -31,22 +32,21 @@ namespace quda {
   void copyGauge(Arg &arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Ncolor(length); i++)
-	    for (int j=0; j<Ncolor(length); j++) {
+	  for (int i=0; i<nColor; i++)
+	    for (int j=0; j<nColor; j++) {
 	      arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 	    }
 #else
-	  RegTypeIn in[length];
-	  RegTypeOut out[length];
-	  arg.in.load(in, x, d, parity);
-	  for (int i=0; i<length; i++) out[i] = in[i];
-	  arg.out.save(out, x, d, parity);
+	  Matrix<complex<RegTypeIn>, nColor> in = arg.in(d, x, parity);
+	  Matrix<complex<RegTypeOut>, nColor> out = in;
+	  arg.out(d, x, parity) = out;
 #endif
 	}
       }
@@ -60,26 +60,25 @@ namespace quda {
   template <typename Float, int length, typename Arg>
   void checkNan(Arg &arg) {
     typedef typename mapper<Float>::type RegType;
+    constexpr int nColor = Ncolor(length);
 
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.geometry; d++) {
 	for (int x=0; x<arg.volume/2; x++) {
 #ifdef FINE_GRAINED_ACCESS
-	  for (int i=0; i<Ncolor(length); i++)
-	    for (int j=0; j<Ncolor(length); j++) {
+	  for (int i=0; i<nColor; i++)
+	    for (int j=0; j<nColor; j++) {
               complex<Float> u = arg.in(d, parity, x, i, j);
 	      if (isnan(u.real()))
 	        errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j));
 	      if (isnan(u.imag()))
 		errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, 2*(i*Ncolor(length)+j+1));
-	}
+            }
 #else
-	  RegType u[length];
-	  arg.in.load(u, x, d, parity);
-	  for (int i=0; i<length; i++)
-	    if (isnan(u[i]))
-	      errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
+	  Matrix<complex<RegType>, nColor> u = arg.in(d, x, parity);
+	  for (int i=0; i<length/2; i++)
+	    if (isnan(u(i).real()) || isnan(u(i).imag())) errorQuda("Nan detected at parity=%d, dir=%d, x=%d, i=%d", parity, d, x, i);
 #endif
 	}
       }
@@ -95,6 +94,7 @@ namespace quda {
   __global__ void copyGaugeKernel(Arg arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*geometry + d
@@ -106,14 +106,12 @@ namespace quda {
 
 #ifdef FINE_GRAINED_ACCESS
     int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i >= Ncolor(length)) return;
-    for (int j=0; j<Ncolor(length); j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
+    if (i >= nColor) return;
+    for (int j=0; j<nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 #else
-    RegTypeIn in[length];
-    RegTypeOut out[length];
-    arg.in.load(in, x, d, parity);
-    for (int i=0; i<length; i++) out[i] = in[i];
-    arg.out.save(out, x, d, parity);
+    Matrix<complex<RegTypeIn>, nColor> in = arg.in(d, x, parity);
+    Matrix<complex<RegTypeOut>, nColor> out = in;
+    arg.out(d, x, parity) = out;
 #endif
   }
 
@@ -124,21 +122,20 @@ namespace quda {
   void copyGhost(Arg &arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
     for (int parity=0; parity<2; parity++) {
 
       for (int d=0; d<arg.nDim; d++) {
         for (int x=0; x<arg.faceVolumeCB[d]; x++) {
 #ifdef FINE_GRAINED_ACCESS
-          for (int i=0; i<Ncolor(length); i++)
-            for (int j=0; j<Ncolor(length); j++)
+          for (int i=0; i<nColor; i++)
+            for (int j=0; j<nColor; j++)
               arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-          RegTypeIn in[length];
-          RegTypeOut out[length];
-          arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
-          for (int i=0; i<length; i++) out[i] = in[i];
-          arg.out.saveGhost(out, x, d+arg.out_offset, parity);
+          Matrix<complex<RegTypeIn>, nColor> in = arg.in.Ghost(d+arg.in_offset, x, parity); // assumes we are loading
+          Matrix<complex<RegTypeOut>, nColor> out = in;
+          arg.out.Ghost(d+arg.out_offset, x, parity) = out;
 #endif
         }
       }
@@ -154,6 +151,7 @@ namespace quda {
   __global__ void copyGhostKernel(Arg arg) {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int parity_d = blockIdx.z * blockDim.z + threadIdx.z; //parity_d = parity*nDim + d
@@ -163,16 +161,14 @@ namespace quda {
 
     if (x < arg.faceVolumeCB[d]) {
 #ifdef FINE_GRAINED_ACCESS
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i >= Ncolor(length)) return;
-    for (int j=0; j<Ncolor(length); j++)
-      arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
+      int i = blockIdx.y * blockDim.y + threadIdx.y;
+      if (i >= nColor) return;
+      for (int j=0; j<nColor; j++)
+        arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-      RegTypeIn in[length];
-      RegTypeOut out[length];
-      arg.in.loadGhost(in, x, d+arg.in_offset, parity); // assumes we are loading
-      for (int i=0; i<length; i++) out[i] = in[i];
-	arg.out.saveGhost(out, x, d+arg.out_offset, parity);
+      Matrix<complex<RegTypeIn>, nColor> in = arg.in.Ghost(d+arg.in_offset, x, parity); // assumes we are loading
+      Matrix<complex<RegTypeOut>, nColor> out = in;
+      arg.out.Ghost(d+arg.out_offset, x, parity) = out;
 #endif
     }
 

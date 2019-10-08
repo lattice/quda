@@ -117,14 +117,17 @@ namespace quda {
     typedef complex<Float> Complex;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
-    RegType data[18];
+    Complex data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Complex*)tmp)[i];
+      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) ((Complex*)tmp)[i] = array[idx + size * i];
+      for ( int i = 0; i < NElems / 2; ++i ) {
+        tmp[2*i+0] = array[idx + size * i].real();
+        tmp[2*i+1] = array[idx + size * i].imag();
+      }
       arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }

@@ -251,10 +251,10 @@ namespace quda {
 	  D_shift = (D_shift.project(dim,-1)).reconstruct(dim,-1);
 	  result += outerProdSpinTrace(D_shift,C);
 
-	  arg.force.load(reinterpret_cast<real*>(temp.data), idx, dim, arg.parity);
-	  arg.gauge.load(reinterpret_cast<real*>(U.data), idx, dim, arg.parity);
+	  temp = arg.force(dim, idx, arg.parity);
+	  U = arg.gauge(dim, idx, arg.parity);
 	  result = temp + U*result*arg.coeff;
-	  arg.force.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity);
+	  arg.force(dim, idx, arg.parity) = result;
 	}
       } // dim
 
@@ -289,10 +289,10 @@ namespace quda {
       D_shift = projected_tmp.reconstruct(dim,-1);
       result += outerProdSpinTrace(D_shift,C);
 
-      arg.force.load(reinterpret_cast<real*>(temp.data), bulk_cb_idx, dim, arg.parity);
-      arg.gauge.load(reinterpret_cast<real*>(U.data), bulk_cb_idx, dim, arg.parity);
+      temp = arg.force(dim, bulk_cb_idx, arg.parity);
+      U = arg.gauge(dim, bulk_cb_idx, arg.parity);
       result = temp + U*result*arg.coeff;
-      arg.force.save(reinterpret_cast<real*>(result.data), bulk_cb_idx, dim, arg.parity);
+      arg.force(dim, bulk_cb_idx, arg.parity) = result;
 
       cb_idx += gridDim.x*blockDim.x;
     }

@@ -33,8 +33,8 @@ namespace quda {
 
     Matrix<Complex,3> link, result, mom;
     for(int dir=0; dir<arg.nDim; ++dir){
-      arg.in.load((Float*)(link.data), x, dir, parity);
-      arg.momentum.load((Float*)(mom.data), x, dir, parity);
+      link = arg.in(dir, x, parity);
+      mom = arg.momentum(dir, x, parity);
 
       Complex trace = getTrace(mom);
       mom(0,0) -= trace/static_cast<Float>(3.0);
@@ -65,7 +65,7 @@ namespace quda {
         result = link;
       }
 
-      arg.out.save((Float*)(result.data), x, dir, parity);
+      arg.out(dir, x, parity) = result;
     } // dir
 
   }

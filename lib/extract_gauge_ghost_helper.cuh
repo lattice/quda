@@ -1,8 +1,11 @@
 #include <tune_quda.h>
+#include <quda_matrix.h>
 
 #pragma once
 
 namespace quda {
+
+  using namespace gauge;
 
   template <typename Order, int nDim>
   struct ExtractGhostArg {
@@ -39,7 +42,8 @@ namespace quda {
   */
   template <typename Float, int length, int nDim, typename Order, bool extract>
   void extractGhost(ExtractGhostArg<Order,nDim> arg) {  
-    typedef typename mapper<Float>::type RegType;
+    using real = typename mapper<Float>::type;
+    constexpr int nColor = Ncolor(length);
 
     for (int parity=0; parity<2; parity++) {
 
@@ -63,8 +67,8 @@ namespace quda {
 		int oddness = (a+b+c+d) & 1;
 		if (oddness == parity) {
 #ifdef FINE_GRAINED_ACCESS
-		  for (int i=0; i<gauge::Ncolor(length); i++) {
-		    for (int j=0; j<gauge::Ncolor(length); j++) {
+		  for (int i=0; i<nColor; i++) {
+		    for (int j=0; j<nColor; j++) {
 		      if (extract) {
 			arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, indexGhost, i, j)
 			  = arg.order(dim+arg.offset, parity, indexCB, i, j);
@@ -76,13 +80,12 @@ namespace quda {
 		  }
 #else
 		  if (extract) {
-		    RegType u[length];
-		    arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
-		    arg.order.saveGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
+                    // load the ghost element from the bulk
+                    Matrix<complex<real>, nColor> u = arg.order(dim+arg.offset, indexCB, parity);
+		    arg.order.Ghost(dim, indexGhost, (parity+arg.localParity[dim])&1) = u;
 		  } else { // injection
-		    RegType u[length];
-		    arg.order.loadGhost(u, indexGhost, dim, (parity+arg.localParity[dim])&1);
-		    arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
+		    Matrix <complex<real>, nColor> u = arg.order.Ghost(dim, indexGhost, (parity+arg.localParity[dim])&1);
+		    arg.order(dim+arg.offset, indexCB, parity) = u; // save the ghost element to the bulk
 		  }
 #endif
 		  indexGhost++;
@@ -106,7 +109,8 @@ namespace quda {
   */
   template <typename Float, int length, int nDim, typename Order, bool extract>
   __global__ void extractGhostKernel(ExtractGhostArg<Order,nDim> arg) {  
-    typedef typename mapper<Float>::type RegType;
+    using real = typename mapper<Float>::type;
+    constexpr int nColor = Ncolor(length);
 
     int parity_dim = blockIdx.z * blockDim.z + threadIdx.z; //parity_dim = parity*nDim + dim
     int parity = parity_dim / nDim;
@@ -136,8 +140,8 @@ namespace quda {
     if (oddness == parity) {
 #ifdef FINE_GRAINED_ACCESS
       int i = blockIdx.y * blockDim.y + threadIdx.y;
-      if (i >= Ncolor(length)) return;
-      for (int j=0; j<gauge::Ncolor(length); j++) {
+      if (i >= nColor) return;
+      for (int j=0; j<nColor; j++) {
 	if (extract) {
 	  arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j)
 	    = arg.order(dim+arg.offset, parity, indexCB, i, j);
@@ -148,13 +152,12 @@ namespace quda {
       }
 #else
       if (extract) {
-	RegType u[length];
-	arg.order.load(u, indexCB, dim+arg.offset, parity); // load the ghost element from the bulk
-	arg.order.saveGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
-      } else {
-	RegType u[length];
-	arg.order.loadGhost(u, X>>1, dim, (parity+arg.localParity[dim])&1);
-	arg.order.save(u, indexCB, dim+arg.offset, parity); // save the ghost element to the bulk
+        // load the ghost element from the bulk
+        Matrix<complex<real>, nColor> u = arg.order(dim+arg.offset, indexCB, parity);
+        arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1) = u;
+      } else { // injection
+        Matrix <complex<real>, nColor> u = arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1);
+        arg.order(dim+arg.offset, indexCB, parity) = u; // save the ghost element to the bulk
       }
 #endif
     } // oddness == parity

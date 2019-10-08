@@ -58,10 +58,9 @@ namespace quda
 
     result -= conj(result);
 
-    Matrix<Complex, 3> temp;
-    arg.oprod.load(reinterpret_cast<real *>(temp.data), idx, (mu - 1) * mu / 2 + nu, parity);
+    Matrix<Complex, 3> temp = arg.oprod((mu - 1) * mu / 2 + nu, idx, parity);
     temp = result + temp;
-    arg.oprod.save(reinterpret_cast<real *>(temp.data), idx, (mu - 1) * mu / 2 + nu, parity);
+    arg.oprod((mu - 1) * mu / 2 + nu, idx, parity) = temp;
   }
 
   template <int nvector, typename real, typename Arg> __global__ void sigmaOprodKernel(Arg arg)

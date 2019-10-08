@@ -261,16 +261,14 @@ namespace quda {
       setZero(&delta);
       //idx = linkIndex(x,X);
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float *)(U.data), idx_cb, mu, parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, idx_cb, parity);
         delta -= U;
       }
       //18*gauge_dir
       data.x += -delta(0, 0).x - delta(1, 1).x - delta(2, 2).x;
       //2
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),linkIndexM1(x,argQ.X,mu), mu, 1 - parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndexM1(x,argQ.X,mu), 1 - parity);
         delta += U;
       }
       //18*gauge_dir
@@ -596,9 +594,8 @@ namespace quda {
 
 
     for ( int mu = 0; mu < 4; mu++ ) {
-      Matrix<Cmplx,3> U;
+      Matrix<Cmplx,3> U = dataOr(mu, id, parity);
       Matrix<Cmplx,3> g0;
-      dataOr.load((Float*)(U.data),id, mu, parity);
       U = g * U;
       //198
       idx = linkNormalIndexP1(x,arg.X,mu);
@@ -630,7 +627,7 @@ namespace quda {
 
       U = U * conj(g0);
       //198
-      dataOr.save((Float*)(U.data),id, mu, parity);
+      dataOr(mu, id, parity) = U;
     }
   }
 
@@ -838,9 +835,8 @@ namespace quda {
     int x[4];
     getCoords(x, id, arg.X, parity);
     for ( int mu = 0; mu < 4; mu++ ) {
-      Matrix<Cmplx,3> U;
+      Matrix<Cmplx,3> U = dataOr(mu, id, parity);
       Matrix<Cmplx,3> g0;
-      dataOr.load((Float*)(U.data),id, mu, parity);
       U = g * U;
       //198
       int idm1 = linkIndexP1(x,arg.X,mu);
@@ -861,7 +857,7 @@ namespace quda {
       }
       U = U * conj(g0);
       //198
-      dataOr.save((Float*)(U.data),id, mu, parity);
+      dataOr.save(mu, id, parity) = U;
     }
     //T=42+4*(198*2+42) Elems=6
     //T=4*(198*2) Elems=9
