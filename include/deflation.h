@@ -53,11 +53,11 @@ namespace quda {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
         //redesign: param.nk => param.nev, param.np => param.deflation_grid*param.nev;
-	tot_dim     = param.np;
-        ld          = param.np;
+	tot_dim     = param.nEv;
+        ld          = param.nEv;
 
-        matProj     = (double *)safe_malloc(param.np * param.np * sizeof(double));        //Qmat
-        invRitzVals = (double *)safe_malloc(param.np * sizeof(double));
+        matProj     = (double *)safe_malloc(param.nEv * param.nEv * sizeof(double));        //Qmat
+        invRitzVals = (double *)safe_malloc(param.nEv * sizeof(double));
      }
 
      ~DeflationParam(){
@@ -122,6 +122,12 @@ namespace quda {
        and therefore cannot be further extended
      */
     void reset_deflation_space() {param.tot_dim = param.cur_dim;}
+
+				/**
+							@brief Test whether the deflation space is complete
+							and therefore cannot be further extended
+					*/
+				void reset_current_dim(const int cur_dim) {param.cur_dim = cur_dim;}
 
     /**
        @brief return deflation space size

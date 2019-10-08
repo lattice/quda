@@ -343,6 +343,11 @@ namespace quda {
           && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
+
+      if(param.eig_param) {
+        QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
+        eig_param = *eig_param_p;
+      }
     }
 
     SolverParam(const SolverParam &param) :
@@ -445,8 +450,13 @@ namespace quda {
 	  param.true_res_hq_offset[i] = true_res_hq_offset[i];
 	}
       }
-      //for incremental eigCG:
+      //for mrhs solvers:
       param.rhs_idx = rhs_idx;
+
+      if(param.eig_param) {
+        QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
+        eig_param_p->nConv = eig_param.nConv;
+      }      
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
@@ -546,6 +556,10 @@ namespace quda {
     */
     EigenSolver *eig_solve;
     bool deflate_init = false;
+    bool deflate_compute;
+    bool recompute_evals;
+    std::vector<ColorSpinorField *> evecs;
+    std::vector<Complex> evals;
     std::vector<ColorSpinorField *> defl_tmp1;
     std::vector<ColorSpinorField *> defl_tmp2;
 
@@ -1216,12 +1230,13 @@ public:
     DiracMatrix &mat;
     DiracMatrix &matSloppy;
     DiracMatrix &matPrecon;
+    DiracMatrix &matDefl;
 
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
     std::shared_ptr<ColorSpinorField> ep;//full precision accumulator
-    std::shared_ptr<ColorSpinorField> ep_sloppy;    
+    std::shared_ptr<ColorSpinorField> ep_sloppy;
     std::shared_ptr<ColorSpinorField> rp;//full precision residual
     std::shared_ptr<ColorSpinorField> rp_sloppy;
 
