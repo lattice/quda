@@ -966,30 +966,6 @@ extern "C" {
       QudaParity parity);
 
   /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
-
-  /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
-
-  /**
    * Apply the clover operator or its inverse.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
