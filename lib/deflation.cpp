@@ -371,7 +371,8 @@ namespace quda
     }
 
     if (strcmp(vec_infile.c_str(),"")!=0) {
-      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(),
+      auto parity = (B[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+      read_spinor_field(vec_infile.c_str(), &V[0], B[0]->Precision(), B[0]->X(), B[0]->SiteSubset(), parity,
 			B[0]->Ncolor(), B[0]->Nspin(), Nvec, 0,  (char**)0);
     } else {
       errorQuda("No eigenspace file defined");

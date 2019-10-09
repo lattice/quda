@@ -376,8 +376,14 @@ namespace quda
                                                                                 eig_vecs[0]->Precision());
         csParam.location = QUDA_CPU_FIELD_LOCATION;
         csParam.create = QUDA_NULL_FIELD_CREATE;
+        // if we're loading nColor == 3 fields, they'll always be full-field. Copy into a single parity afterwards.
+        if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+          csParam.x[0] *= 2; 
+          csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+        }
         for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
       } else {
+        // FIXME: add conversion for single parity CPU fields
         for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
       }
 
@@ -389,14 +395,36 @@ namespace quda
         }
       }
 
-      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->Ncolor(), tmp[0]->Nspin(),
+      auto parity = (tmp[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
                         Nvec, 0, (char **)0);
 
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
-        for (int i = 0; i < Nvec; i++) {
-          *eig_vecs[i] = *tmp[i];
-          delete tmp[i];
+
+        ColorSpinorParam csParam(*eig_vecs[0]);
+        if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || csParam.nColor != 3) { // we don't care for MG vectors
+          for (int i = 0; i < Nvec; i++) {
+            *eig_vecs[i] = *tmp[i];
+            delete tmp[i];
+          }
+        } else { // nColor == 3 field with a single parity: need to copy it out of the full-field vector.
+          // Create a temporary single-parity CPU field
+          csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+          csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
+                                                                                eig_vecs[0]->Precision());
+          csParam.location = QUDA_CPU_FIELD_LOCATION;
+          csParam.create = QUDA_NULL_FIELD_CREATE;
+
+          ColorSpinorField* tmp_intermediate = ColorSpinorField::Create(csParam);
+
+          for (int i = 0; i < Nvec; i++) {
+            blas::copy(*tmp_intermediate, tmp[i]->Even());
+            *eig_vecs[i] = *tmp_intermediate;
+            delete tmp[i];
+          }
+
+          delete tmp_intermediate;
         }
       }
 
@@ -467,8 +495,8 @@ namespace quda
     }
 
     // assumes even parity if a single-parity field...
-    auto parity = (tmp[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
+    auto parity = (eig_vecs[0]->SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_INVALID_PARITY : QUDA_EVEN_PARITY);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(), parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
                        Nvec, 0, (char **)0);
 
     host_free(V);
