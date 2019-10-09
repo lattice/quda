@@ -44,8 +44,10 @@ namespace quda {
 	      arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 	    }
 #else
-	  Matrix<complex<RegTypeIn>, nColor> in = arg.in(d, x, parity);
-	  Matrix<complex<RegTypeOut>, nColor> out = in;
+	  Matrix<complex<RegTypeIn>, nColor> in;
+	  Matrix<complex<RegTypeOut>, nColor> out;
+          in = arg.in(d, x, parity);
+          out = in;
 	  arg.out(d, x, parity) = out;
 #endif
 	}
@@ -109,8 +111,10 @@ namespace quda {
     if (i >= nColor) return;
     for (int j=0; j<nColor; j++) arg.out(d, parity, x, i, j) = arg.in(d, parity, x, i, j);
 #else
-    Matrix<complex<RegTypeIn>, nColor> in = arg.in(d, x, parity);
-    Matrix<complex<RegTypeOut>, nColor> out = in;
+    Matrix<complex<RegTypeIn>, nColor> in;
+    Matrix<complex<RegTypeOut>, nColor> out;
+    in = arg.in(d, x, parity);
+    out = in;
     arg.out(d, x, parity) = out;
 #endif
   }
@@ -133,8 +137,10 @@ namespace quda {
             for (int j=0; j<nColor; j++)
               arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-          Matrix<complex<RegTypeIn>, nColor> in = arg.in.Ghost(d+arg.in_offset, x, parity); // assumes we are loading
-          Matrix<complex<RegTypeOut>, nColor> out = in;
+          Matrix<complex<RegTypeIn>, nColor> in;
+          Matrix<complex<RegTypeOut>, nColor> out;
+          in = arg.in.Ghost(d+arg.in_offset, x, parity);
+          out = in;
           arg.out.Ghost(d+arg.out_offset, x, parity) = out;
 #endif
         }
@@ -166,8 +172,10 @@ namespace quda {
       for (int j=0; j<nColor; j++)
         arg.out.Ghost(d+arg.out_offset, parity, x, i, j) = arg.in.Ghost(d+arg.in_offset, parity, x, i, j);
 #else
-      Matrix<complex<RegTypeIn>, nColor> in = arg.in.Ghost(d+arg.in_offset, x, parity); // assumes we are loading
-      Matrix<complex<RegTypeOut>, nColor> out = in;
+      Matrix<complex<RegTypeIn>, nColor> in;
+      Matrix<complex<RegTypeOut>, nColor> out;
+      in = arg.in.Ghost(d+arg.in_offset, x, parity);
+      out = in;
       arg.out.Ghost(d+arg.out_offset, x, parity) = out;
 #endif
     }
