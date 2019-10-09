@@ -136,8 +136,9 @@ if(QUDA_NVSHMEM)
   target_include_directories(quda_pack PRIVATE dslash_core)
   target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
   target_include_directories(quda_pack PRIVATE .)
-  target_link_libraries(quda INTERFACE quda_pack)
+  target_link_libraries(quda PUBLIC quda_pack)
   set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  set_property(TARGET quda_pack PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
   # set_source_files_properties(dslash_wilson.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
   # set_source_files_properties(dslash_pack2.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
   target_include_directories(quda_pack PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
@@ -215,7 +216,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_NVSHMEM)
-    target_link_libraries(quda INTERFACE ${NVSHMEM_LIBS} ${MPI_CXX_LIBRARIES})
+    target_link_libraries(quda_pack PUBLIC -L${QUDA_NVSHMEM_HOME}/lib -lnvshmem  ${MPI_CXX_LIBRARIES})
 endif()
 
 
