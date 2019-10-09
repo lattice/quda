@@ -300,10 +300,10 @@ void computeStaggeredPlaquetteQDPOrder(void** qdp_link, double plaq[3], const Qu
   gauge_param.cpu_prec = gauge_param_in.cpu_prec;
 
   gauge_param.cuda_prec = gauge_param_in.cuda_prec;
-  gauge_param.reconstruct = gauge_param_in.reconstruct; //QUDA_RECONSTRUCT_NO;
+  gauge_param.reconstruct = gauge_param_in.reconstruct;
 
   gauge_param.cuda_prec_sloppy = gauge_param_in.cuda_prec; // for ease of use
-  gauge_param.reconstruct_sloppy = gauge_param_in.reconstruct_sloppy; //QUDA_RECONSTRUCT_NO;
+  gauge_param.reconstruct_sloppy = gauge_param_in.reconstruct_sloppy;
 
   gauge_param.anisotropy = 1;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
