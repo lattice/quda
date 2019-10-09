@@ -142,8 +142,6 @@ namespace quda {
     long long bytes() const { return 4*2*arg.threads*arg.mom.Bytes(); }
   };
 
-  struct Reconstruct10 { static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_10}; };
-
   double computeMomAction(const GaugeField& mom) {
     double action = 0.0;
 #ifdef GPU_GAUGE_TOOLS

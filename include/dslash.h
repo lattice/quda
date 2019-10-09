@@ -7,6 +7,7 @@
 #include <dslash_quda.h>
 #include <dslash_helper.cuh>
 #include <jitify_helper.cuh>
+#include <instantiate.h>
 
 namespace quda
 {
@@ -504,16 +505,6 @@ namespace quda
       }
       return bytes_;
     }
-  };
-
-  struct WilsonReconstruct {
-    static constexpr std::array<QudaReconstructType, 3> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
-  };
-
-  struct StaggeredReconstruct {
-    static constexpr std::array<QudaReconstructType, 3> recon
-      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
   };
 
   /**

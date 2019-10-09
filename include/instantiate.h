@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <enum_quda.h>
+#include <util_quda.h>
 
 namespace quda
 {
@@ -45,10 +47,14 @@ namespace quda
     static constexpr std::array<QudaReconstructType, 2> recon = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_10};
   };
 
+  struct Reconstruct10 {
+    static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_10};
+  };
+
   // instantiate and recurse to prior element
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             int i, typename G, typename... Args>
-  struct instantiateR {
+  class instantiateR {
 
     template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
     {
@@ -59,6 +65,7 @@ namespace quda
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[i]);
     }
 
+  public:
     instantiateR(G &U, Args &&... args)
     {
       if (U.Reconstruct() == Recon::recon[i]) {
@@ -72,7 +79,7 @@ namespace quda
   // termination specialization
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             typename G, typename... Args>
-  struct instantiateR<Apply, Float, nColor, Recon, 0, G, Args...> {
+  class instantiateR<Apply, Float, nColor, Recon, 0, G, Args...> {
 
     template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
     {
@@ -83,6 +90,7 @@ namespace quda
       errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[0]);
     }
 
+  public:
     instantiateR(G &U, Args &&... args)
     {
       if (U.Reconstruct() == Recon::recon[0]) {
@@ -135,5 +143,17 @@ namespace quda
       errorQuda("Unsupported precision %d\n", U.Precision());
     }
   }
+
+  // these are used in dslash.h
+
+  struct WilsonReconstruct {
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_12, QUDA_RECONSTRUCT_8};
+  };
+
+  struct StaggeredReconstruct {
+    static constexpr std::array<QudaReconstructType, 3> recon
+      = {QUDA_RECONSTRUCT_NO, QUDA_RECONSTRUCT_13, QUDA_RECONSTRUCT_9};
+  };
 
 } // namespace quda
