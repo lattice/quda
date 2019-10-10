@@ -11,9 +11,7 @@
 #include <gauge_field_order.h>
 #include <instantiate.h>
 
-#ifdef GPU_HISQ_FORCE
-
-namespace quda{
+namespace quda {
 
   namespace { // anonymous
 #include <svd_quda.h>
@@ -419,6 +417,7 @@ namespace quda{
     void unitarizeForce(GaugeField &newForce, const GaugeField &oldForce, const GaugeField &u,
 			int* fails)
     {
+#ifdef GPU_HISQ_FORCE
       checkReconstruct(u, oldForce, newForce);
       checkPrecision(u, oldForce, newForce);
 
@@ -426,6 +425,9 @@ namespace quda{
         errorQuda("Only native order supported");
 
       instantiate<UnitarizeForce,ReconstructNone>(newForce, oldForce, u, fails);
+#else
+      errorQuda("HISQ force has not been built");
+#endif
     }
 
     template <typename Float, typename Arg>
@@ -452,6 +454,7 @@ namespace quda{
 
     void unitarizeForceCPU(GaugeField& newForce, const GaugeField& oldForce, const GaugeField& u)
     {
+#ifdef GPU_HISQ_FORCE
       if (checkLocation(newForce, oldForce, u) != QUDA_CPU_FIELD_LOCATION) errorQuda("Location must be CPU");
       int num_failures = 0;
       constexpr int nColor = 3;
@@ -488,11 +491,11 @@ namespace quda{
         errorQuda("Only MILC and QDP gauge orders supported\n");
       }
       if (num_failures) errorQuda("Unitarization failed, failures = %d", num_failures);
+#else
+      errorQuda("HISQ force has not been built");
+#endif
     } // unitarize_force_cpu
 
   } // namespace fermion_force
 
 } // namespace quda
-
-
-#endif

@@ -17,7 +17,7 @@
 namespace quda {
 
 namespace {
-  #include <svd_quda.h>
+#include <svd_quda.h>
 }
 
 #ifndef FL_UNITARIZE_PI
