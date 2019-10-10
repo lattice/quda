@@ -51,50 +51,59 @@ namespace quda
     static constexpr std::array<QudaReconstructType, 1> recon = {QUDA_RECONSTRUCT_10};
   };
 
-  // instantiate and recurse to prior element
+  /**
+     @brief This class instantiates the Apply class based on the
+     instantiated templates below.
+  */
+  template <bool enabled, template <typename, int, QudaReconstructType> class Apply,
+    typename Float, int nColor, QudaReconstructType recon, typename G, typename... Args>
+  struct instantiateApply {
+    instantiateApply(G &U, Args &&... args)
+    {
+      Apply<Float, nColor, recon>(U, args...);
+    }
+  };
+
+  /**
+     @brief This class is a specialization which does not instantiate
+     the Apply class if the is_enabled has evaluated to false.
+  */
+  template <template <typename, int, QudaReconstructType> class Apply,
+    typename Float, int nColor, QudaReconstructType recon, typename G, typename... Args>
+  struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
+    instantiateApply(G &U, Args &&... args)
+    {
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, recon);
+    }
+  };
+
+  /**
+     @brief Instantiate the reconstruction template at index i and
+     recurse to prior element
+  */
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             int i, typename G, typename... Args>
-  class instantiateR {
-
-    template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
-    {
-      Apply<Float, nColor, Recon::recon[i]>(U, args...);
-    }
-    template <typename dummy> void instantiate<false, dummy>(G &U, Args &&... args)
-    {
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[i]);
-    }
-
-  public:
-    instantiateR(G &U, Args &&... args)
+  struct instantiateReconstruct {
+    instantiateReconstruct(G &U, Args &&... args)
     {
       if (U.Reconstruct() == Recon::recon[i]) {
-        instantiate<is_enabled<Recon::recon[i]>()>(U, args...);
+        instantiateApply<is_enabled<Recon::recon[i]>(), Apply, Float, nColor, Recon::recon[i], G, Args...>(U, args...);
       } else {
-        instantiateR<Apply, Float, nColor, Recon, i - 1, G, Args...>(U, args...);
+        instantiateReconstruct<Apply, Float, nColor, Recon, i - 1, G, Args...>(U, args...);
       }
     }
   };
 
-  // termination specialization
+  /**
+     @brief Termination specialization of instantiateReconstruct
+  */
   template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename Recon,
             typename G, typename... Args>
-  class instantiateR<Apply, Float, nColor, Recon, 0, G, Args...> {
-
-    template <bool enabled, typename dummy = void> void instantiate(G &U, Args &&... args)
-    {
-      Apply<Float, nColor, Recon::recon[0]>(U, args...);
-    }
-    template <typename dummy> void instantiate<false, dummy>(G &U, Args &&... args)
-    {
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable %d", QUDA_RECONSTRUCT, Recon::recon[0]);
-    }
-
-  public:
-    instantiateR(G &U, Args &&... args)
+  struct instantiateReconstruct<Apply, Float, nColor, Recon, 0, G, Args...> {
+    instantiateReconstruct(G &U, Args &&... args)
     {
       if (U.Reconstruct() == Recon::recon[0]) {
-        instantiate<is_enabled<Recon::recon[0]>()>(U, args...);
+        instantiateApply<is_enabled<Recon::recon[0]>(), Apply, Float, nColor, Recon::recon[0], G, Args...>(U, args...);
       } else {
         errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
       }
@@ -112,7 +121,7 @@ namespace quda
   {
     if (U.Ncolor() == 3) {
       constexpr int i = Recon::recon.size() - 1;
-      instantiateR<Apply, Float, 3, Recon, i, G, Args...>(U, args...);
+      instantiateReconstruct<Apply, Float, 3, Recon, i, G, Args...>(U, args...);
     } else {
       errorQuda("Unsupported number of colors %d\n", U.Ncolor());
     }
