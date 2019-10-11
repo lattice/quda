@@ -57,20 +57,20 @@ namespace quda {
       */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-	field.save((Float*)a.data, x_cb, parity, chirality);
+	field.save(a.data, x_cb, parity, chirality);
       }
     };
 
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline void HMatrix<T,N>::operator=(const clover_wrapper<T,S> &a) {
-    a.field.load((T*)data, a.x_cb, a.parity, a.chirality);
+    a.field.load(data, a.x_cb, a.parity, a.chirality);
   }
 
   template <typename T, int N>
     template <typename S>
     __device__ __host__ inline HMatrix<T,N>::HMatrix(const clover_wrapper<T,S> &a) {
-    a.field.load((T*)data, a.x_cb, a.parity, a.chirality);
+    a.field.load(data, a.x_cb, a.parity, a.chirality);
   }
 
   namespace clover {
