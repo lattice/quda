@@ -1504,10 +1504,10 @@ namespace quda {
             out[i] = complex(in[2 * i + 0], in[2 * i + 1]); // these elements are copied directly
 
           real tmp[2];
-          Trig<isFixed<Float>::value, real>::SinCos(in[0], &tmp[0], &tmp[1]);
+          Trig<isFixed<Float>::value, real>::SinCos(in[0], &tmp[1], &tmp[0]);
           out[0] = complex(tmp[0], tmp[1]);
 
-          Trig<isFixed<Float>::value, real>::SinCos(in[1], &tmp[0], &tmp[1]);
+          Trig<isFixed<Float>::value, real>::SinCos(in[1], &tmp[1], &tmp[0]);
           out[6] = complex(tmp[0], tmp[1]);
 
           // First, reconstruct first row
