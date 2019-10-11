@@ -17,6 +17,8 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
+#include <inv_mspcg.h>
+
 #include <qio_field.h>
 // google test frame work
 #include <gtest/gtest.h>
@@ -80,6 +82,35 @@ extern double epsilon;
 extern QudaVerbosity verbosity;
 
 extern int eofa_pm;
+
+static cudaGaugeField* createExtendedGauge(cudaGaugeField& in, const int* R, 
+    bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID) {
+  int y[4];
+  for (int dir = 0; dir < 4; ++dir) y[dir] = in.X()[dir] + 2 * R[dir];
+  int pad = 0;
+
+  GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
+      in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
+  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+  gParamEx.order = in.Order();
+  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+  gParamEx.t_boundary = in.TBoundary();
+  gParamEx.nFace = 1;
+  gParamEx.tadpole = in.Tadpole();
+  for (int d = 0; d < 4; d++) gParamEx.r[d] = R[d];
+
+  gParamEx.setPrecision(in.Precision(), true);
+
+  cudaGaugeField* out = new cudaGaugeField(gParamEx);
+
+  // copy input field into the extended device gauge field
+  copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+
+  // now fill up the halos
+  out->exchangeExtendedGhost(R, redundant_comms);
+
+  return out;
+}
 
 double getTolerance(QudaPrecision prec)
 {
@@ -218,6 +249,7 @@ void init(int argc, char **argv) {
         inv_param.solution_type = QUDA_MATPC_SOLUTION;
         break;
       case 5: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+      case 8:
       case 6: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
       case 7: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
       default:
@@ -407,6 +439,13 @@ void init(int argc, char **argv) {
 
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
+    
+    if(dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8){
+      int gR[4] = {2, 2, 2, 2};
+      extern cudaGaugeField* gaugePrecise;
+      diracParam.gauge = createExtendedGauge(*gaugePrecise, gR, true);
+    }
+    
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
     dirac = Dirac::create(diracParam);
@@ -558,6 +597,12 @@ DslashTime dslashCUDA(int niter) {
             dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
           }
           break;
+        case 8:
+          if (transfer) {
+            errorQuda("(transfer == true) version NOT yet available!\n");
+          } else {
+            dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
+          }         
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (test_type) {
@@ -949,6 +994,15 @@ void dslashRef() {
       mdw_mat(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, not_dagger, gauge_param.cpu_prec,
           gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
+    case 8:
+      // reference for MdagM local operator
+#if 0
+      mdw_matpc(spinorTmp->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      mdw_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, inv_param.matpc_type, not_dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+#else
+      mdw_mdagm_local(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+#endif
+      break;
     default:
       printf("Test type not supported for domain wall\n");
       exit(-1);
@@ -968,15 +1022,14 @@ void dslashRef() {
       kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
       kappa_mdwf[xs] = -kappa_5[xs];
     }
-    printfQuda("Testing EOFA! :) \n");
     switch (test_type) {
-    case 1:
-      mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
-                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
-      break;
-    case 2: spinorRef->copy(*spinor); break;
-    default: printf("Test type not supported for domain wall\n"); exit(-1);
+      case 1:
+        mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                        (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                        inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+        break;
+      case 2: spinorRef->copy(*spinor); break;
+      default: printf("Test type not supported for domain wall\n"); exit(-1);
     }
     free(kappa_b);
     free(kappa_c);
@@ -1016,6 +1069,8 @@ extern void usage(char**);
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
+  // If we are using tensor core we tolerate a greater deviation
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8) tol *= 10;
   if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8) tol *= 10; // if recon 8, we tolerate a greater deviation
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";
@@ -1074,6 +1129,7 @@ int main(int argc, char **argv)
 
     double norm2_cpu = blas::norm2(*spinorRef);
     double norm2_cpu_cuda = blas::norm2(*spinorOut);
+
     if (!transfer) {
       double norm2_cuda= blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);

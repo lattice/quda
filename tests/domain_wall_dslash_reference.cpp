@@ -1090,6 +1090,142 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
   free(kappa_mdwf);
 }
 
+// helper for creating extended gauge fields
+static cpuGaugeField* create_extended_gauge(void** gauge, QudaGaugeParam& gauge_param, const int* R)
+{
+  GaugeFieldParam gauge_field_param(gauge, gauge_param);
+  cpuGaugeField cpu(gauge_field_param);
+  
+  gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
+  gauge_field_param.create = QUDA_ZERO_FIELD_CREATE;
+  for(int d = 0; d < 4; d++){
+    gauge_field_param.x[d] += 2 * R[d]; 
+    gauge_field_param.r[d] = R[d]; 
+  }
+  cpuGaugeField* padded_cpu = new cpuGaugeField(gauge_field_param);
+
+  copyExtendedGauge(*padded_cpu, cpu, QUDA_CPU_FIELD_LOCATION);
+  padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true
+
+  return padded_cpu;
+}
+
+inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]) {
+  return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) >> 1;
+}
+
+inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index,
+    const int shrinked_dim[4], const int shift[4], int parity) // s is the 5d stuff,
+{
+  int aux[4];
+  aux[0] = shrinked_index * 2;
+
+  for (int i = 0; i < 3; i++) { aux[i + 1] = aux[i] / shrinked_dim[i]; }
+
+  coordinate[0] = aux[0] - aux[1] * shrinked_dim[0];
+  coordinate[1] = aux[1] - aux[2] * shrinked_dim[1];
+  coordinate[2] = aux[2] - aux[3] * shrinked_dim[2];
+  coordinate[3] = aux[3];
+
+  // Find the full coordinate in the shrinked volume.
+  coordinate[0] += (parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
+
+  // if(shrinked_index == 3691) printfQuda("coordinate[0] = %d\n", coordinate[0]);
+  for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
+}
+
+void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
+    QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
+    double _Complex *b5, double _Complex *c5){
+  
+  const int R[4] = {2,2,2,2};
+
+  cpuGaugeField* padded_gauge = create_extended_gauge(gauge, gauge_param, R); 
+
+  int padded_V = 1;
+  int W[4];
+  for(int d = 0; d < 4; d++){
+    W[d] = Z[d] + 2 * R[d];
+    padded_V *= Z[d] + 2 * R[d];
+  }
+  int padded_V5 = padded_V * Ls;
+  int padded_Vh = padded_V / 2;
+  int padded_V5h = padded_Vh * Ls;
+
+  static_assert(sizeof(char) == 1);
+
+  char* padded_in  = (char*)malloc(padded_V5h*spinorSiteSize*precision);
+  memset(padded_in,  0, padded_V5h*spinorSiteSize*precision);
+  char* padded_out = (char*)malloc(padded_V5h*spinorSiteSize*precision);
+  memset(padded_out, 0, padded_V5h*spinorSiteSize*precision);
+  char* padded_tmp = (char*)malloc(padded_V5h*spinorSiteSize*precision);
+  memset(padded_tmp, 0, padded_V5h*spinorSiteSize*precision);
+
+  char* in_alias = (char*)in;
+  char* out_alias = (char*)out;
+
+  for(int s = 0; s < Ls; s++){
+  for(int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++){
+    // calculate padded_index_cb_4d
+    int x[4];
+    coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
+    int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
+    // copy data
+    memcpy(&padded_in[spinorSiteSize*precision*(s*padded_Vh + padded_index_cb_4d)], 
+        &in_alias[spinorSiteSize*precision*(s*Vh + index_cb_4d)], spinorSiteSize*precision);
+  }}
+  
+  QudaGaugeParam padded_gauge_param(gauge_param);
+  for(int d = 0; d < 4; d++){
+    padded_gauge_param.X[d] += 2 * R[d];
+  }
+  
+  void** padded_gauge_p = (void**)(padded_gauge->Gauge_p());
+
+// Extend these global variables then restore them
+  int V5_old = V5;
+  V5 = padded_V5;
+  int Vh_old = Vh;
+  Vh = padded_Vh;
+  int V5h_old = V5h;
+  V5h = padded_V5h;
+  int Z_old[4]; 
+  for(int d = 0; d < 4; d++){
+    Z_old[d] = Z[d];
+    Z[d] = W[d];
+  }
+
+  // dagger = 0
+  mdw_matpc(padded_tmp, padded_gauge_p, padded_in, kappa_b, kappa_c, matpc_type, 0, precision, padded_gauge_param, mferm, b5, c5);
+  // dagger = 1
+  mdw_matpc(padded_out, padded_gauge_p, padded_tmp, kappa_b, kappa_c, matpc_type, 1, precision, padded_gauge_param, mferm, b5, c5);
+
+// Restore them
+  V5 = V5_old;
+  Vh = Vh_old;
+  V5h = V5h_old;
+  for(int d = 0; d < 4; d++){
+    Z[d] = Z_old[d];
+  }
+
+  for(int s = 0; s < Ls; s++){
+  for(int index_cb_4d = 0; index_cb_4d < Vh; index_cb_4d++){
+    // calculate padded_index_cb_4d
+    int x[4];
+    coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
+    int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
+    // copy data
+    memcpy(&out_alias[spinorSiteSize*precision*(s*Vh + index_cb_4d)],
+        &padded_out[spinorSiteSize*precision*(s*padded_Vh + padded_index_cb_4d)], spinorSiteSize*precision);
+  }}
+
+  free(padded_in);
+  free(padded_out);
+  free(padded_tmp);
+
+  delete padded_gauge;
+}
+
 /*
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>

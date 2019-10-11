@@ -3209,17 +3209,18 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     // MSPCG here.
     if (param->inv_type == QUDA_MSPCG_INVERTER) {
+#if 0
       DiracMdagMLocal mPreLocal(diracPre);
       Solver* solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete solve;
-/**
+#else
       MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert);
       (*mspcg)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete mspcg;
-*/
+#endif
     } else {
       Solver* solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
