@@ -7,9 +7,10 @@ namespace quda {
 
   using namespace gauge;
 
-  template <typename Float, typename Order, int nDim>
+  template <typename Float, int nColor_, typename Order, int nDim>
   struct ExtractGhostArg {
     using real = typename mapper<Float>::type;
+    static constexpr int nColor = nColor_;
     Order order;
     const unsigned char nFace;
     unsigned short X[nDim];
@@ -41,11 +42,11 @@ namespace quda {
      Generic CPU gauge ghost extraction and packing
      NB This routines is specialized to four dimensions
   */
-  template <int length, int nDim, bool extract, typename Arg>
+  template <int nDim, bool extract, typename Arg>
   void extractGhost(Arg &arg)
   {
     using real = typename Arg::real;
-    constexpr int nColor = Ncolor(length);
+    constexpr int nColor = Arg::nColor;
 
     for (int parity=0; parity<2; parity++) {
 
@@ -109,11 +110,11 @@ namespace quda {
      NB This routines is specialized to four dimensions
      FIXME this implementation will have two-way warp divergence
   */
-  template <int length, int nDim, bool extract, typename Arg>
+  template <int nDim, bool extract, typename Arg>
   __global__ void extractGhostKernel(Arg arg)
   {
     using real = typename Arg::real;
-    constexpr int nColor = Ncolor(length);
+    constexpr int nColor = Arg::nColor;
 
     int parity_dim = blockIdx.z * blockDim.z + threadIdx.z; //parity_dim = parity*nDim + dim
     int parity = parity_dim / nDim;
@@ -166,7 +167,7 @@ namespace quda {
     } // oddness == parity
   }
 
-  template <int length, int nDim, typename Arg>
+  template <int nDim, typename Arg>
   class ExtractGhost : TunableVectorYZ {
     Arg &arg;
     int size;
@@ -186,7 +187,7 @@ namespace quda {
 #ifndef FINE_GRAINED_ACCESS
       : TunableVectorYZ(1, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
 #else
-      : TunableVectorYZ(gauge::Ncolor(length), 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
+      : TunableVectorYZ(Arg::nColor, 2*nDim), arg(arg), meta(meta), location(location), extract(extract) {
 #endif
       int faceMax = 0;
       for (int d=0; d<nDim; d++)
@@ -204,14 +205,14 @@ namespace quda {
 
     void apply(const cudaStream_t &stream) {
       if (location==QUDA_CPU_FIELD_LOCATION) {
-	if (extract) extractGhost<length,nDim,true>(arg);
-	else extractGhost<length,nDim,false>(arg);
+	if (extract) extractGhost<nDim,true>(arg);
+	else extractGhost<nDim,false>(arg);
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (extract) {
-	  extractGhostKernel<length, nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  extractGhostKernel<nDim, true> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	} else {
-	  extractGhostKernel<length, nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	  extractGhostKernel<nDim, false> <<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
 	}
       }
     }
@@ -261,8 +262,8 @@ namespace quda {
       //localParity[dim] = (X[dim]%2==0 || commDim(dim)) ? 0 : 1;
       localParity[dim] = ((X[dim] % 2 ==1) && (commDim(dim) > 1)) ? 1 : 0;
 
-    ExtractGhostArg<Float, Order, nDim> arg(order, u, A, B, C, f, localParity, offset);
-    ExtractGhost<length, nDim, decltype(arg)> extractor(arg, u, location, extract);
+    ExtractGhostArg<Float, gauge::Ncolor(length), Order, nDim> arg(order, u, A, B, C, f, localParity, offset);
+    ExtractGhost<nDim, decltype(arg)> extractor(arg, u, location, extract);
     extractor.apply(0);
   }
 

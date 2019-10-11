@@ -12,8 +12,8 @@
  *  also.
  */
 
-// trove requires the warp shuffle instructions introduced with Kepler
-#if __COMPUTE_CAPABILITY__ >= 300
+// trove requires the warp shuffle instructions introduced with Kepler and has issues with device debug
+#if __COMPUTE_CAPABILITY__ >= 300 && !defined(DEVICE_DEBUG)
 #include <trove/ptr.h>
 #else
 #define DISABLE_TROVE

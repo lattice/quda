@@ -303,10 +303,10 @@ set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
@@ -324,9 +324,9 @@ set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING "Flags used by the C compi
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING "Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall -DDEVICE_DEBUG" CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline -DHOST_DEBUG"
+    "-Wall -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
     "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
@@ -818,10 +818,10 @@ set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "${QUDA_NVCC_FLAGS} -G"
+    "${QUDA_NVCC_FLAGS} -G -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G"
+    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -DDEVICE_DEBUG -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined"
