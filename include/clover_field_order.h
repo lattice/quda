@@ -57,7 +57,7 @@ namespace quda {
       */
       template<typename C>
       __device__ __host__ inline void operator=(const C &a) {
-	field.save(a.data, x_cb, parity, chirality);
+        field.save(a.data, x_cb, parity, chirality);
       }
     };
 
