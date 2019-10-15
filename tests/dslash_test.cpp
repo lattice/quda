@@ -45,6 +45,8 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = NULL;
 
+cudaGaugeField* padded_gauge_field = nullptr;
+
 // What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
 extern int test_type;
 
@@ -443,7 +445,8 @@ void init(int argc, char **argv) {
     if(dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8){
       int gR[4] = {2, 2, 2, 2};
       extern cudaGaugeField* gaugePrecise;
-      diracParam.gauge = createExtendedGauge(*gaugePrecise, gR, true);
+      padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, true);
+      diracParam.gauge = padded_gauge_field;
     }
     
     diracParam.tmp1 = tmp1;
@@ -468,6 +471,10 @@ void end() {
     delete cudaSpinorOut;
     delete tmp1;
     delete tmp2;
+  }
+
+  if(padded_gauge_field){
+    delete padded_gauge_field;
   }
 
   // release memory
