@@ -158,10 +158,10 @@ namespace quda {
       if (extract) {
         // load the ghost element from the bulk
         Matrix<complex<real>, nColor> u = arg.order(dim+arg.offset, indexCB, parity);
-        //arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1) = u;
+        arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1) = u;
       } else { // injection
-        Matrix <complex<real>, nColor> u;// = arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1);
-        //arg.order(dim+arg.offset, indexCB, parity) = u; // save the ghost element to the bulk
+        Matrix <complex<real>, nColor> u = arg.order.Ghost(dim, X>>1, (parity+arg.localParity[dim])&1);
+        arg.order(dim+arg.offset, indexCB, parity) = u; // save the ghost element to the bulk
       }
 #endif
     } // oddness == parity
