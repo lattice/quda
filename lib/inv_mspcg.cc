@@ -194,84 +194,6 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void MSPCG::test_dslash(const ColorSpinorField& b) {
-
-    ColorSpinorParam csParam(b);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // csParam.print();
-    // TODO: def
-    cudaColorSpinorField* tx = nullptr;
-    cudaColorSpinorField* tt = nullptr;
-    cudaColorSpinorField* tb = nullptr;
-
-    tx = new cudaColorSpinorField(csParam);
-    tt = new cudaColorSpinorField(csParam);
-    tb = new cudaColorSpinorField(csParam);
-
-    blas::copy(*tb, b);
-
-    double b2 = blas::norm2(*tb);
-    printfQuda("Test b2 before = %16.12e.\n", b2);
-    if (comm_rank()) { blas::zero(*tb); }
-    b2 = blas::norm2(*tb);
-    printfQuda("Test b2 after  = %16.12e.\n", b2);
-    (*nrm_op)(*tx, *tb, *tt);
-    //    mat->Dslash4(*tx, *tb, QUDA_EVEN_PARITY);
-    double x2 = blas::norm2(*tx);
-    printfQuda("Test     x2/b2 = %16.12e/%16.12e.\n", x2, b2);
-    if (comm_rank()) { blas::zero(*tx); }
-    x2 = blas::norm2(*tx);
-    printfQuda("Chopping x2/b2 = %16.12e/%16.12e.\n", x2, b2);
-
-    csParam.setPrecision(dirac_param_precondition.gauge->Precision());
-    cudaColorSpinorField* cb = new cudaColorSpinorField(csParam);
-    cudaColorSpinorField* cx = new cudaColorSpinorField(csParam);
-    blas::copy(*cb, *tb);
-
-    cudaColorSpinorField* fx = nullptr;
-    cudaColorSpinorField* fy = nullptr;
-    cudaColorSpinorField* fb = nullptr;
-    cudaColorSpinorField* ft = nullptr;
-
-    constexpr int test_shift = 2;
-    csParam.x[0] += 2 * test_shift / 2;
-    for (int i = 1; i < 4; ++i) { csParam.x[i] += 2 * test_shift; }
-
-    // csParam.print();
-
-    // TODO: def
-    fx = new cudaColorSpinorField(csParam);
-    fy = new cudaColorSpinorField(csParam);
-    fb = new cudaColorSpinorField(csParam);
-    ft = new cudaColorSpinorField(csParam);
-    blas::zero(*fb);
-    blas::zero(*fx);
-
-    copyExtendedColorSpinor(*fb, *tb, QUDA_CUDA_FIELD_LOCATION, 0, nullptr, nullptr, nullptr, nullptr); // parity = 0
-
-    // double fx2 = norm2(*fx);
-    for (double s = 1.526624328e-5; s < 65504.1; s *= 1.189207115) { // 2^-8 ~ 2^+8
-      inner_dslash(*cx, *cb);
-      blas::copy(*tt, *cx);
-
-      double x2_ = blas::norm2(*tt);
-      double dd = xmyNorm(*tx, *tt);
-      printfQuda(" loss scale, | a |^2, |a-b|^2, |a-b|^2/|b|^2: %8.4e %16.12e %16.12e %16.12e\n", s, x2_, dd, dd / x2);
-    }
-    
-    delete tx;
-    delete tt;
-    delete tb;
-    delete cb;
-    delete cx;
-    delete fx;
-    delete fy;
-    delete fb;
-    delete ft;
-
-    printfQuda("dslash test completed. ----->\n");
-  }
-
   void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in) {
     (*nrm_op_precondition)(out, in);
   }
@@ -493,8 +415,6 @@ namespace quda {
     //    int parity = nrm_op->getMatPCType();
     double alpha, beta, rkzk, pkApk, zkP1rkp1;
     double stop = stopping(param.tol, b2, param.residual_type);
-
-    test_dslash(db);
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
 
