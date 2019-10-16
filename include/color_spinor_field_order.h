@@ -1173,31 +1173,22 @@ namespace quda {
 
   __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
   {
-    real v[length];
-#pragma unroll
-    for (int i = 0; i < length / 2; i++) {
-      v[i] = in[2 * i + 0].real();
-      v[i] = in[2 * i + 1].imag();
-    }
-
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_;
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        for (int z=0; z<2; z++) {
-          v_.v[(c*Ns + s)*2 + z] = (Float)v[(s*Nc+c)*2+z];
-        }
+        v_.v[(c*Ns + s)*2 + 0] = (Float)v[s*Nc+c].real();
+        v_.v[(c*Ns + s)*2 + 1] = (Float)v[s*Nc+c].imag();
       }
     }
     field_[parity*volumeCB + x] = v_;
 #else
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
-        for (int z=0; z<2; z++) {
-          field[parity*offset + ((x*Nc + c)*Ns + s)*2 + z] = v[(s*Nc+c)*2+z];
-        }
+        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 0] = v[s*Nc+c].real();
+        field[parity*offset + ((x*Nc + c)*Ns + s)*2 + 1] = v[s*Nc+c].imag();
       }
     }
 #endif
