@@ -1171,7 +1171,7 @@ namespace quda {
 #endif
   }
 
-  __device__ __host__ inline void save(const complex in[length / 2], int x, int parity = 0)
+  __device__ __host__ inline void save(const complex v[length / 2], int x, int parity = 0)
   {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
