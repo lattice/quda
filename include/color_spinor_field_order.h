@@ -533,11 +533,6 @@ namespace quda {
         }
       }
 
-      /**
-       * Destructor for the FieldOrderCB class
-       */
-      virtual ~FieldOrderCB() { ; }
-
 #ifndef DISABLE_GHOST
       void resetGhost(const ColorSpinorField &a, void * const *ghost_) const
       {
@@ -867,7 +862,6 @@ namespace quda {
     }
 #endif
   }
-  virtual ~FloatNOrder() { ; }
 
   void resetGhost(const ColorSpinorField &a, void *const *ghost_) const
   {
@@ -1028,9 +1022,9 @@ namespace quda {
   {
     real v[length_ghost];
 #pragma unroll
-    for (int i = 0; i < length_ghost; i++) {
-      v[i] = in[2 * i + 0].real();
-      v[i] = in[2 * i + 1].imag();
+    for (int i = 0; i < length_ghost / 2; i++) {
+      v[2 * i + 0] = in[i].real();
+      v[2 * i + 1] = in[i].imag();
     }
 
     if (isFixed<Float>::value) {
@@ -1132,6 +1126,7 @@ namespace quda {
 
     template <typename Float, int Ns, int Nc>
       struct SpaceColorSpinorOrder {
+        using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       static const int length = 2 * Ns * Nc;
@@ -1153,7 +1148,6 @@ namespace quda {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
   }
-  virtual ~SpaceColorSpinorOrder() { ; }
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
@@ -1215,10 +1209,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, SpaceColorSpinorOrder<Float, Ns, Nc>> operator()(int x_cb,
-                                                                                                        int parity)
+  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
   {
-    return colorspinor_wrapper<real, SpaceColorSpinorOrder<Float, Ns, Nc>>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -1230,11 +1223,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<real, SpaceColorSpinorOrder<Float, Ns, Nc>>
-  operator()(int x_cb, int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, SpaceColorSpinorOrder<Float, Ns, Nc>>(
-      const_cast<SpaceColorSpinorOrder<Float, Ns, Nc> &>(*this), x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1262,6 +1253,7 @@ namespace quda {
 
     template <typename Float, int Ns, int Nc>
       struct SpaceSpinorColorOrder {
+      using Accessor = SpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       static const int length = 2 * Ns * Nc;
@@ -1283,7 +1275,6 @@ namespace quda {
       faceVolumeCB[i] = a.SurfaceCB(i)*nFace;
     }
   }
-  virtual ~SpaceSpinorColorOrder() { ; }
 
   __device__ __host__ inline void load(complex v[length / 2], int x, int parity = 0) const
   {
@@ -1336,10 +1327,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, SpaceSpinorColorOrder<Float, Ns, Nc>> operator()(int x_cb,
-                                                                                                        int parity)
+  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
   {
-    return colorspinor_wrapper<real, SpaceSpinorColorOrder<Float, Ns, Nc>>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -1351,11 +1341,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<real, SpaceSpinorColorOrder<Float, Ns, Nc>>
-  operator()(int x_cb, int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, SpaceSpinorColorOrder<Float, Ns, Nc>>(
-      const_cast<SpaceSpinorColorOrder<Float, Ns, Nc> &>(*this), x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1384,6 +1372,7 @@ namespace quda {
     // custom accessor for TIFR z-halo padded arrays
     template <typename Float, int Ns, int Nc>
       struct PaddedSpaceSpinorColorOrder {
+      using Accessor = PaddedSpaceSpinorColorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       static const int length = 2 * Ns * Nc;
@@ -1415,7 +1404,6 @@ namespace quda {
 
     offset = exVolumeCB*Ns*Nc*2; // compute manually since Bytes is likely wrong due to z-padding
   }
-  virtual ~PaddedSpaceSpinorColorOrder() { ; }
 
   /**
      @brief Compute the index into the padded field.  Assumes that
@@ -1486,10 +1474,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, PaddedSpaceSpinorColorOrder<Float, Ns, Nc>> operator()(int x_cb,
-                                                                                                              int parity)
+  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
   {
-    return colorspinor_wrapper<real, PaddedSpaceSpinorColorOrder<Float, Ns, Nc>>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -1501,11 +1488,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<real, PaddedSpaceSpinorColorOrder<Float, Ns, Nc>>
-  operator()(int x_cb, int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, PaddedSpaceSpinorColorOrder<Float, Ns, Nc>>(
-      const_cast<PaddedSpaceSpinorColorOrder<Float, Ns, Nc> &>(*this), x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dim, int dir, int parity = 0) const
@@ -1534,6 +1519,7 @@ namespace quda {
 
     template <typename Float, int Ns, int Nc>
       struct QDPJITDiracOrder {
+      using Accessor = QDPJITDiracOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *field;
@@ -1543,7 +1529,6 @@ namespace quda {
       QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
   { if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
-  virtual ~QDPJITDiracOrder() { ; }
 
   __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
   {
@@ -1574,9 +1559,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline colorspinor_wrapper<real, QDPJITDiracOrder<Float, Ns, Nc>> operator()(int x_cb, int parity)
+  __device__ __host__ inline colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity)
   {
-    return colorspinor_wrapper<real, QDPJITDiracOrder<Float, Ns, Nc>>(*this, x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(*this, x_cb, parity);
   }
 
   /**
@@ -1588,11 +1573,9 @@ namespace quda {
      @return Instance of a colorspinor_wrapper that curries in access to
      this field at the above coordinates.
   */
-  __device__ __host__ inline const colorspinor_wrapper<real, QDPJITDiracOrder<Float, Ns, Nc>> operator()(int x_cb,
-                                                                                                         int parity) const
+  __device__ __host__ inline const colorspinor_wrapper<real, Accessor> operator()(int x_cb, int parity) const
   {
-    return colorspinor_wrapper<real, QDPJITDiracOrder<Float, Ns, Nc>>(
-      const_cast<QDPJITDiracOrder<Float, Ns, Nc> &>(*this), x_cb, parity);
+    return colorspinor_wrapper<real, Accessor>(const_cast<Accessor &>(*this), x_cb, parity);
   }
 
   size_t Bytes() const { return nParity * volumeCB * Nc * Ns * 2 * sizeof(Float); }

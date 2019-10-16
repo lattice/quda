@@ -414,8 +414,6 @@ namespace quda {
 	
 	CloverField& Field() { return A; }
 	
-	virtual ~FieldOrder() { ; } 
-    
     	/**
 	 * @brief Read-only complex-member accessor function
 	 *

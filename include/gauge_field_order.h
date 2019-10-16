@@ -1,3 +1,4 @@
+
 #ifndef _GAUGE_ORDER_H
 #define _GAUGE_ORDER_H
 
@@ -926,8 +927,6 @@ namespace quda {
 	  accessor(o.accessor), ghostAccessor(o.ghostAccessor)
 	{ }
 
-	virtual ~FieldOrder() { ; }
-
 	void resetScale(double max) {
 	  accessor.resetScale(max);
 	  ghostAccessor.resetScale(max);
@@ -1770,7 +1769,6 @@ namespace quda {
 	  faceVolumeCB[i] = order.faceVolumeCB[i];
 	}
       }
-      virtual ~FloatNOrder() { ; }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -1900,7 +1898,7 @@ namespace quda {
       __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
       {
         if (!ghost[dir]) { // store in main field not separate array
-	  save(v, volumeCB+x, dir, parity); // an offset of size volumeCB puts us at the padded region
+	  save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
         } else {
           const int M = reconLen / N;
           real tmp[reconLen];
@@ -2084,31 +2082,29 @@ namespace quda {
           }
         }
 
-        virtual ~LegacyOrder() { ; }
-
         __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
-	structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
+          typedef S<Float,length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+          structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
 #else
           auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
 #endif
-        for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
+          for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
         }
 
         __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
-	structure v_;
-        for (int i = 0; i < length / 2; i++) {
-          v_.v[2 * i + 0] = (Float)v[i].real();
-          v_.v[2 * i + 1] = (Float)v[i].imag();
-        }
-        ghost_[parity * faceVolumeCB[dir] + x] = v_;
+          typedef S<Float,length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+          structure v_;
+          for (int i = 0; i < length / 2; i++) {
+            v_[2 * i + 0] = (Float)v[i].real();
+            v_[2 * i + 1] = (Float)v[i].imag();
+          }
+          ghost_[parity * faceVolumeCB[dir] + x] = v_;
 #else
           auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
           for (int i = 0; i < length / 2; i++) {
@@ -2167,14 +2163,14 @@ namespace quda {
                                                     int g, int parity, const int R[])
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-	typedef S<Float,length> structure;
-	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
-	structure v_;
-        for (int i = 0; i < length / 2; i++) {
-          v_.v[2 * i + 0] = (Float)v[i].real();
-          v_.v[2 * i + 1] = (Float)v[i].imag();
-        }
-        ghost_[((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g] = v_;
+          typedef S<Float,length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+          structure v_;
+          for (int i = 0; i < length / 2; i++) {
+            v_[2 * i + 0] = (Float)v[i].real();
+            v_[2 * i + 1] = (Float)v[i].imag();
+          }
+          ghost_[((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g] = v_;
 #else
           auto v_ = &ghost[dim][(((dir * 2 + parity) * R[dim] * faceVolumeCB[dim] + x) * geometry + g) * length];
           for (int i = 0; i < length / 2; i++) {
@@ -2190,6 +2186,7 @@ namespace quda {
        [[dim]] [[parity][volumecb][row][col]]
     */
     template <typename Float, int length> struct QDPOrder : public LegacyOrder<Float,length> {
+      using Accessor = QDPOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
@@ -2200,7 +2197,6 @@ namespace quda {
     QDPOrder(const QDPOrder &order) : LegacyOrder<Float,length>(order), volumeCB(order.volumeCB) {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
-      virtual ~QDPOrder() { ; }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -2221,8 +2217,8 @@ namespace quda {
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
 	structure v_;
         for (int i = 0; i < length / 2; i++) {
-          v_.v[2 * i + 0] = (Float)v[i].real();
-          v_.v[2 * i + 1] = (Float)v[i].imag();
+          v_[2 * i + 0] = (Float)v[i].real();
+          v_[2 * i + 1] = (Float)v[i].imag();
         }
         gauge_[parity * volumeCB + x] = v_;
 #else
@@ -2244,9 +2240,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<real, QDPOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
       {
-        return gauge_wrapper<real, QDPOrder<Float, length>>(*this, dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
       }
 
       /**
@@ -2259,11 +2255,10 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, QDPOrder<Float, length>> operator()(int dim, int x_cb,
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb,
                                                                                                int parity) const
       {
-        return gauge_wrapper<real, QDPOrder<Float, length>>(const_cast<QDPOrder<Float, length> &>(*this), dim, x_cb,
-                                                            parity);
+        return gauge_wrapper<real, QDPOrder<Float, length>>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return length * sizeof(Float); }
@@ -2274,6 +2269,7 @@ namespace quda {
        [[dim]] [[parity][complex][row][col][volumecb]]
     */
     template <typename Float, int length> struct QDPJITOrder : public LegacyOrder<Float,length> {
+      using Accessor = QDPJITOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge[QUDA_MAX_DIM];
@@ -2284,7 +2280,6 @@ namespace quda {
     QDPJITOrder(const QDPJITOrder &order) : LegacyOrder<Float,length>(order), volumeCB(order.volumeCB) {
 	for(int i=0; i<4; i++) gauge[i] = order.gauge[i];
       }
-      virtual ~QDPJITOrder() { ; }
 
       __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -2312,9 +2307,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<real, QDPJITOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
       {
-        return gauge_wrapper<real, QDPJITOrder<Float, length>>(*this, dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
       }
 
       /**
@@ -2327,11 +2322,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, QDPJITOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                  int parity) const
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
       {
-        return gauge_wrapper<real, QDPJITOrder<Float, length>>(const_cast<QDPJITOrder<Float, length> &>(*this), dim,
-                                                               x_cb, parity);
+        return gauge_wrapper<real, QDPJITOrder<Float, length>>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return length * sizeof(Float); }
@@ -2342,6 +2335,7 @@ namespace quda {
      [parity][dim][volumecb][row][col]
   */
   template <typename Float, int length> struct MILCOrder : public LegacyOrder<Float,length> {
+    using Accessor = MILCOrder<Float, length>;
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
@@ -2353,7 +2347,6 @@ namespace quda {
   MILCOrder(const MILCOrder &order) : LegacyOrder<Float,length>(order),
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
-    virtual ~MILCOrder() { ; }
 
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
     {
@@ -2374,8 +2367,8 @@ namespace quda {
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_;
       for (int i = 0; i < length / 2; i++) {
-        v_.v[2 * i + 0] = v[i].real();
-        v_.v[2 * i + 1] = v[i].imag();
+        v_[2 * i + 0] = v[i].real();
+        v_[2 * i + 1] = v[i].imag();
       }
       gauge_[(parity*volumeCB+x)*geometry + dir] = v_;
 #else
@@ -2397,9 +2390,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline gauge_wrapper<real, MILCOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+    __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
     {
-      return gauge_wrapper<real, MILCOrder<Float, length>>(*this, dim, x_cb, parity);
+      return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
     }
 
     /**
@@ -2412,11 +2405,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline const gauge_wrapper<real, MILCOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                              int parity) const
+    __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
     {
-      return gauge_wrapper<real, MILCOrder<Float, length>>(const_cast<MILCOrder<Float, length> &>(*this), dim, x_cb,
-                                                           parity);
+      return gauge_wrapper<real, MILCOrder<Float, length>>(const_cast<Accessor &>(*this), dim, x_cb, parity);
     }
 
     size_t Bytes() const { return length * sizeof(Float); }
@@ -2438,6 +2429,7 @@ namespace quda {
      allocation in MILC.
   */
   template <typename Float, int length> struct MILCSiteOrder : public LegacyOrder<Float,length> {
+    using Accessor = MILCSiteOrder<Float, length>;
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
@@ -2466,8 +2458,6 @@ namespace quda {
     {
     }
 
-    virtual ~MILCSiteOrder() { ; }
-
     __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
     {
       // get base pointer
@@ -2493,8 +2483,8 @@ namespace quda {
       trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
       structure v_;
       for (int i = 0; i < length / 2; i++) {
-        v_.v[2 * i + 0] = v[i].real();
-        v_.v[2 * i + 1] = v[i].imag();
+        v_[2 * i + 0] = v[i].real();
+        v_[2 * i + 1] = v[i].imag();
       }
       gauge_[dir] = v_;
 #else
@@ -2515,9 +2505,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline gauge_wrapper<real, MILCSiteOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+    __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
     {
-      return gauge_wrapper<real, MILCSiteOrder<Float, length>>(*this, dim, x_cb, parity);
+      return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
     }
 
     /**
@@ -2530,11 +2520,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline const gauge_wrapper<real, MILCSiteOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                  int parity) const
+    __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
     {
-      return gauge_wrapper<real, MILCSiteOrder<Float, length>>(const_cast<MILCSiteOrder<Float, length> &>(*this), dim,
-                                                               x_cb, parity);
+      return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
     }
 
     size_t Bytes() const { return length * sizeof(Float); }
@@ -2546,6 +2534,7 @@ namespace quda {
      [parity][dim][volumecb][col][row]
   */
   template <typename Float, int length> struct CPSOrder : LegacyOrder<Float,length> {
+    using Accessor = CPSOrder<Float, length>;
     using real = typename mapper<Float>::type;
     using complex = complex<real>;
     Float *gauge;
@@ -2574,7 +2563,6 @@ namespace quda {
     {
       ;
     }
-    virtual ~CPSOrder() { ; }
 
     // we need to transpose and scale for CPS ordering
     __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, Float inphase = 1.0) const
@@ -2601,8 +2589,8 @@ namespace quda {
       structure v_;
       for (int i=0; i<Nc; i++)
         for (int j = 0; j < Nc; j++) {
-          v_.v[(j * Nc + i) * 2 + 0] = anisotropy * v[i * Nc + j].real();
-          v_.v[(j * Nc + i) * 2 + 1] = anisotropy * v[i * Nc + j].imag();
+          v_[(j * Nc + i) * 2 + 0] = anisotropy * v[i * Nc + j].real();
+          v_[(j * Nc + i) * 2 + 1] = anisotropy * v[i * Nc + j].imag();
         }
       gauge_[((parity*volumeCB+x)*geometry + dir)] = v_;
 #else
@@ -2626,9 +2614,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline gauge_wrapper<real, CPSOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+    __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
     {
-      return gauge_wrapper<real, CPSOrder<Float, length>>(*this, dim, x_cb, parity);
+      return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
     }
 
     /**
@@ -2641,11 +2629,9 @@ namespace quda {
        @return Instance of a gauge_wrapper that curries in access to
        this field at the above coordinates.
     */
-    __device__ __host__ inline const gauge_wrapper<real, CPSOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                             int parity) const
+    __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
     {
-      return gauge_wrapper<real, CPSOrder<Float, length>>(const_cast<CPSOrder<Float, length> &>(*this), dim, x_cb,
-                                                          parity);
+      return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
     }
 
     size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -2659,6 +2645,7 @@ namespace quda {
        [mu][parity][volumecb+halos][col][row]
     */
     template <typename Float, int length> struct BQCDOrder : LegacyOrder<Float,length> {
+      using Accessor = BQCDOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
@@ -2684,8 +2671,6 @@ namespace quda {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
-      virtual ~BQCDOrder() { ; }
-
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -2709,16 +2694,16 @@ namespace quda {
 	structure v_;
 	for (int i=0; i<Nc; i++)
           for (int j = 0; j < Nc; j++) {
-            v_.v[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
-            v_.v[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
           }
         gauge_[(dir * 2 + parity) * exVolumeCB + x] = v_;
 #else
         auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
         for (int i = 0; i < Nc; i++) {
           for (int j=0; j<Nc; j++) {
-            v_[((Nc + j) * Nc + i) * 2 + 0] = v[i * Nc + j].real();
-            v_[((Nc + j) * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
           }
         }
 #endif
@@ -2734,9 +2719,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<real, BQCDOrder<Float, length>> operator()(int dim, int x_cb, int parity)
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
       {
-        return gauge_wrapper<real, BQCDOrder<Float, length>>(*this, dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
       }
 
       /**
@@ -2749,11 +2734,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, BQCDOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                int parity) const
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
       {
-        return gauge_wrapper<real, BQCDOrder<Float, length>>(const_cast<BQCDOrder<Float, length> &>(*this), dim, x_cb,
-                                                             parity);
+        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -2764,6 +2747,7 @@ namespace quda {
        [mu][parity][volumecb][col][row]
     */
     template <typename Float, int length> struct TIFROrder : LegacyOrder<Float,length> {
+      using Accessor = TIFROrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
@@ -2790,8 +2774,6 @@ namespace quda {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
 
-      virtual ~TIFROrder() { ; }
-
       // we need to transpose for TIFR ordering
       __device__ __host__ inline void load(complex v[9], int x, int dir, int parity, real inphase = 1.0) const
       {
@@ -2817,16 +2799,16 @@ namespace quda {
 	structure v_;
 	for (int i=0; i<Nc; i++)
           for (int j = 0; j < Nc; j++) {
-            v_.v[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_.v[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
         gauge_[(dir * 2 + parity) * volumeCB + x] = v_;
 #else
         auto v_ = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
         for (int i = 0; i < Nc; i++) {
           for (int j=0; j<Nc; j++) {
-            v_[((Nc + j) * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[((Nc + j) * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
         }
 #endif
@@ -2842,9 +2824,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<real, TIFROrder<Float, length>> operator()(int dim, int x_cb, int parity)
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
       {
-        return gauge_wrapper<real, TIFROrder<Float, length>>(*this, dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
       }
 
       /**
@@ -2857,11 +2839,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, TIFROrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                int parity) const
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
       {
-        return gauge_wrapper<real, TIFROrder<Float, length>>(const_cast<TIFROrder<Float, length> &>(*this), dim, x_cb,
-                                                             parity);
+        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
@@ -2872,6 +2852,7 @@ namespace quda {
        [mu][parity][t][z+4][y][x/2][col][row]
     */
     template <typename Float, int length> struct TIFRPaddedOrder : LegacyOrder<Float,length> {
+      using Accessor = TIFRPaddedOrder<Float, length>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       Float *gauge;
@@ -2911,8 +2892,6 @@ namespace quda {
       {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
       }
-
-      virtual ~TIFRPaddedOrder() { ; }
 
       /**
 	 @brief Compute the index into the padded field.  Assumes that
@@ -2957,16 +2936,16 @@ namespace quda {
 	structure v_;
 	for (int i=0; i<Nc; i++)
           for (int j = 0; j < Nc; j++) {
-            v_.v[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_.v[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
         gauge_[(dir * 2 + parity) * exVolumeCB + y] = v_;
 #else
         auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
         for (int i = 0; i < Nc; i++) {
           for (int j=0; j<Nc; j++) {
-            v_[((Nc + j) * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
-            v_[((Nc + j) * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
+            v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
+            v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
         }
 #endif
@@ -2982,10 +2961,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline gauge_wrapper<real, TIFRPaddedOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                int parity)
+      __device__ __host__ inline gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity)
       {
-        return gauge_wrapper<real, TIFRPaddedOrder<Float, length>>(*this, dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(*this, dim, x_cb, parity);
       }
 
       /**
@@ -2998,11 +2976,9 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, TIFRPaddedOrder<Float, length>> operator()(int dim, int x_cb,
-                                                                                                      int parity) const
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
       {
-        return gauge_wrapper<real, TIFRPaddedOrder<Float, length>>(const_cast<TIFRPaddedOrder<Float, length> &>(*this),
-                                                                   dim, x_cb, parity);
+        return gauge_wrapper<real, Accessor>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
 
       size_t Bytes() const { return Nc * Nc * 2 * sizeof(Float); }
