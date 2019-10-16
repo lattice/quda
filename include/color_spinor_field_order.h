@@ -249,7 +249,8 @@ namespace quda {
     AccessorCB() : offset_cb(0) { }
     __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
     {
-      return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v; }
+      return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
+    }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -287,7 +288,8 @@ namespace quda {
     AccessorCB(): stride(0), offset_cb(0) { }
     __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
     {
-      return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb; }
+      return parity * offset_cb + ((s * nColor + c) * nVec + v) * stride + x_cb;
+    }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -317,7 +319,8 @@ namespace quda {
     AccessorCB() : stride(0), offset_cb(0) { }
     __device__ __host__ inline int index(int parity, int x_cb, int s, int c, int v) const
     {
-      return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride); }
+      return parity * offset_cb + indexFloatN<nSpin, nColor, nVec, 4>(x_cb, s, c, v, stride);
+    }
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -1126,7 +1129,7 @@ namespace quda {
 
     template <typename Float, int Ns, int Nc>
       struct SpaceColorSpinorOrder {
-        using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
+      using Accessor = SpaceColorSpinorOrder<Float, Ns, Nc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
       static const int length = 2 * Ns * Nc;

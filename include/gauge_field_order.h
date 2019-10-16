@@ -1898,7 +1898,7 @@ namespace quda {
       __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
       {
         if (!ghost[dir]) { // store in main field not separate array
-	  save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
+          save(v, volumeCB + x, dir, parity); // an offset of size volumeCB puts us at the padded region
         } else {
           const int M = reconLen / N;
           real tmp[reconLen];
@@ -1976,7 +1976,7 @@ namespace quda {
                           + R[dim] * faceVolumeCB[dim] * M * N + buff_idx]);
 
         // use the extended_idx to determine the boundary condition
-        reconstruct.Unpack(v, tmp, extended_idx, g, 2.*M_PI*phase, X, R);
+        reconstruct.Unpack(v, tmp, extended_idx, g, 2. * M_PI * phase, X, R);
       }
 
       __device__ __host__ inline void saveGhostEx(const complex v[length / 2], int buff_idx, int extended_idx, int dir,
@@ -2085,9 +2085,9 @@ namespace quda {
         __device__ __host__ inline void loadGhost(complex v[length / 2], int x, int dir, int parity, real phase = 1.0) const
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float,length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
-          structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
+          typedef S<Float, length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dir]);
+          structure v_ = ghost_[parity * faceVolumeCB[dir] + x];
 #else
           auto v_ = &ghost[dir][(parity * faceVolumeCB[dir] + x) * length];
 #endif
@@ -2097,8 +2097,8 @@ namespace quda {
         __device__ __host__ inline void saveGhost(const complex v[length / 2], int x, int dir, int parity)
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float,length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
+          typedef S<Float, length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dir]);
           structure v_;
           for (int i = 0; i < length / 2; i++) {
             v_[2 * i + 0] = (Float)v[i].real();
@@ -2163,8 +2163,8 @@ namespace quda {
                                                     int g, int parity, const int R[])
         {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
-          typedef S<Float,length> structure;
-          trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
+          typedef S<Float, length> structure;
+          trove::coalesced_ptr<structure> ghost_((structure *)ghost[dim]);
           structure v_;
           for (int i = 0; i < length / 2; i++) {
             v_[2 * i + 0] = (Float)v[i].real();
@@ -2179,7 +2179,7 @@ namespace quda {
           }
 #endif
         }
-    };
+      };
 
     /**
        struct to define QDP ordered gauge fields:
@@ -2255,8 +2255,7 @@ namespace quda {
 	 @return Instance of a gauge_wrapper that curries in access to
 	 this field at the above coordinates.
        */
-      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb,
-                                                                                               int parity) const
+      __device__ __host__ inline const gauge_wrapper<real, Accessor> operator()(int dim, int x_cb, int parity) const
       {
         return gauge_wrapper<real, QDPOrder<Float, length>>(const_cast<Accessor &>(*this), dim, x_cb, parity);
       }
@@ -2348,14 +2347,14 @@ namespace quda {
       gauge(order.gauge), volumeCB(order.volumeCB), geometry(order.geometry)
       { ; }
 
-    __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
-    {
+      __device__ __host__ inline void load(complex v[length / 2], int x, int dir, int parity, real inphase = 1.0) const
+      {
 #if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_ = gauge_[(parity*volumeCB+x)*geometry + dir];
 #else
-      auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
+        auto v_ = &gauge[((parity * volumeCB + x) * geometry + dir) * length];
 #endif
       for (int i = 0; i < length / 2; i++) v[i] = complex(v_[2 * i + 0], v_[2 * i + 1]);
     }
@@ -2659,7 +2658,7 @@ namespace quda {
       {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
         // compute volumeCB + halo region
-	exVolumeCB = u.X()[0]/2 + 2;
+        exVolumeCB = u.X()[0]/2 + 2;
 	for (int i=1; i<4; i++) exVolumeCB *= u.X()[i] + 2;
       }
       BQCDOrder(const BQCDOrder &order) :
@@ -2701,7 +2700,7 @@ namespace quda {
 #else
         auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + x) * length];
         for (int i = 0; i < Nc; i++) {
-          for (int j=0; j<Nc; j++) {
+          for (int j = 0; j < Nc; j++) {
             v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real();
             v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag();
           }
@@ -2806,7 +2805,7 @@ namespace quda {
 #else
         auto v_ = &gauge[((dir * 2 + parity) * volumeCB + x) * length];
         for (int i = 0; i < Nc; i++) {
-          for (int j=0; j<Nc; j++) {
+          for (int j = 0; j < Nc; j++) {
             v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
             v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
@@ -2876,7 +2875,7 @@ namespace quda {
         if (length != 18) errorQuda("Gauge length %d not supported", length);
 
         // exVolumeCB is the padded checkboard volume
-	for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
+        for (int i=0; i<4; i++) exVolumeCB *= exDim[i];
 	exVolumeCB /= 2;
       }
 
@@ -2943,7 +2942,7 @@ namespace quda {
 #else
         auto v_ = &gauge[((dir * 2 + parity) * exVolumeCB + y) * length];
         for (int i = 0; i < Nc; i++) {
-          for (int j=0; j<Nc; j++) {
+          for (int j = 0; j < Nc; j++) {
             v_[(j * Nc + i) * 2 + 0] = v[i * Nc + j].real() * scale;
             v_[(j * Nc + i) * 2 + 1] = v[i * Nc + j].imag() * scale;
           }
