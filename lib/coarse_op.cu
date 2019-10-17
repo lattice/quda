@@ -18,6 +18,9 @@ namespace quda {
 
     QudaFieldLocation location = Y.Location();
 
+    QudaBoolean need_bidirectional = QUDA_BOOLEAN_NO;
+    if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_YES; }
+
     if (location == QUDA_CPU_FIELD_LOCATION) {
 
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -49,9 +52,10 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
+
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -87,7 +91,7 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     }
