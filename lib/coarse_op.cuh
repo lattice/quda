@@ -861,6 +861,8 @@ namespace quda {
      @param kappa[in] Kappa parameter
      @param mu[in] Twisted-mass parameter
      @param matpc[in] The type of preconditioning of the source fine-grid operator
+     @param need_bidirectional[in] If we need to force bi-directional build or not. Required
+     if some previous level was preconditioned, even if this one isn't
    */
   template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
 	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineClover>
@@ -870,7 +872,7 @@ namespace quda {
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
                   ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
-		  const int *fine_to_coarse, const int *coarse_to_fine) {
+		  QudaBoolean need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine) {
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -902,7 +904,7 @@ namespace quda {
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
-				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC);
+				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || need_bidirectional == QUDA_BOOLEAN_YES);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");

@@ -348,6 +348,15 @@ namespace quda
     diracParam.mu = diracParam.dirac->Mu();
     diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
+    // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
+    // preconditioned, we have to force bi-directional builds.
+    diracParam.need_bidirectional = QUDA_BOOLEAN_NO;
+    for (int i = 0; i <= param.level; i++) {
+      if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        diracParam.need_bidirectional = QUDA_BOOLEAN_YES;
+      }
+    }
+
     diracParam.dagger = QUDA_DAG_NO;
     diracParam.matpcType = matpc_type;
     diracParam.type = QUDA_COARSE_DIRAC;
@@ -764,8 +773,9 @@ namespace quda
       printfQuda("L2 norms: Emulated = %e, Native = %e, relative deviation = %e\n", norm2(*x_coarse), r_nrm, deviation);
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
-    // check the preconditioned operator construction if applicable
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+    // check the preconditioned operator construction on the lower level if applicable
+    bool coarse_was_preconditioned = (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION && param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE);
+    if (coarse_was_preconditioned) {
       // check eo
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Checking Deo of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");

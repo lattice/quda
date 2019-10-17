@@ -440,10 +440,14 @@ public:
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
+     @param need_bidirectional[in] Whether or not we need to force a bi-directional
+     build, even if the given level isn't preconditioned---if any previous level is
+     preconditioned, we've violated that symmetry.
    */
   void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
-		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+                      QudaBoolean need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
