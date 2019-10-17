@@ -444,10 +444,9 @@ public:
      build, even if the given level isn't preconditioned---if any previous level is
      preconditioned, we've violated that symmetry.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
-		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
-                      QudaBoolean need_bidirectional);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, QudaBoolean need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field

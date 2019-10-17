@@ -352,7 +352,8 @@ namespace quda
     // preconditioned, we have to force bi-directional builds.
     diracParam.need_bidirectional = QUDA_BOOLEAN_NO;
     for (int i = 0; i <= param.level; i++) {
-      if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+      if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+          && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
         diracParam.need_bidirectional = QUDA_BOOLEAN_YES;
       }
     }
@@ -774,7 +775,8 @@ namespace quda
     if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
 
     // check the preconditioned operator construction on the lower level if applicable
-    bool coarse_was_preconditioned = (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION && param.mg_global.smoother_solve_type[param.level+1] == QUDA_DIRECT_PC_SOLVE);
+    bool coarse_was_preconditioned = (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION
+                                      && param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE);
     if (coarse_was_preconditioned) {
       // check eo
       if (getVerbosity() >= QUDA_SUMMARIZE)
