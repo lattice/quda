@@ -877,9 +877,7 @@ namespace quda
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    char prefix_bkup[100];
-    strncpy(prefix_bkup, prefix, 100);
-    setOutputPrefix(prefix);
+    pushOutputPrefix(prefix);
 
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
@@ -954,7 +952,6 @@ namespace quda
 
         // recurse to the next lower level
         (*coarse_solver)(*x_coarse, *r_coarse);
-        setOutputPrefix(prefix); // restore prefix after return from coarse grid
         if (debug) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 
         // prolongate back to this grid
@@ -997,7 +994,7 @@ namespace quda
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
     }
 
-    setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
+    popOutputPrefix();
   }
 
   // supports separate reading or single file read

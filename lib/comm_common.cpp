@@ -402,8 +402,8 @@ void comm_set_neighbor_ranks(Topology *topo){
   }
      
   for(int d=0; d<4; ++d){
-    int pos_displacement[4] = {0,0,0,0};
-    int neg_displacement[4] = {0,0,0,0};
+    int pos_displacement[QUDA_MAX_DIM] = { };
+    int neg_displacement[QUDA_MAX_DIM] = { };
     pos_displacement[d] = +1;
     neg_displacement[d] = -1;
     neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);

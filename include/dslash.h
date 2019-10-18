@@ -19,7 +19,7 @@ protected:
 
     const int nDimComms;
 
-    char aux_base[TuneKey::aux_n];
+    char aux_base[TuneKey::aux_n - 32];
     char aux[8][TuneKey::aux_n];
 
 #ifdef JITIFY
