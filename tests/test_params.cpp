@@ -238,8 +238,10 @@ namespace
                                                            {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
                                                            {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
-  CLI::TransformPairs<QudaPrecision>
-    precision_map({{"double", QUDA_DOUBLE_PRECISION}, {"single", QUDA_SINGLE_PRECISION}, {"half", QUDA_HALF_PRECISION}});
+  CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
+                                                    {"single", QUDA_SINGLE_PRECISION},
+                                                    {"half", QUDA_HALF_PRECISION},
+                                                    {"quarter", QUDA_QUARTER_PRECISION}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
