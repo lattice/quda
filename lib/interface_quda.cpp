@@ -112,7 +112,6 @@ void closeMagma(){
     printfQuda("\nMAGMA library was not initialized..\n");
   }
 
-  return;
 }
 
 cudaGaugeField *gaugePrecise = nullptr;
@@ -706,6 +705,7 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   gParamEx.t_boundary = in.TBoundary();
   gParamEx.nFace = 1;
   gParamEx.tadpole = in.Tadpole();
+  gParamEx.anisotropy = in.Anisotropy();
   for (int d=0; d<4; d++) gParamEx.r[d] = R[d];
 
   auto *out = new cudaGaugeField(gParamEx);
@@ -4056,8 +4056,6 @@ void computeKSLinkQuda(void* fatlink, void* longlink, void* ulink, void* inlink,
 #else
   errorQuda("Fat-link has not been built");
 #endif // GPU_FATLINK
-
-  return;
 }
 
 int getGaugePadding(GaugeFieldParam& param){
@@ -4226,8 +4224,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
   // FIXME always preserve the extended gauge
   extendedGaugeResident = gauge;
-
-  return;
 }
 
 void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
@@ -4432,7 +4428,6 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
   checkCudaError();
-  return;
 }
 
 void computeHISQForceQuda(void* const milc_momentum,
@@ -4681,7 +4676,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  return;
 #else
   errorQuda("HISQ force has not been built");
 #endif
@@ -4868,7 +4862,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   checkCudaError();
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 
@@ -4973,7 +4966,6 @@ void updateGaugeFieldQuda(void* gauge,
   checkCudaError();
 
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param) {
@@ -5426,7 +5418,6 @@ void plaq_quda_(double plaq[3]) {
 
 void plaqQuda(double plaq[3])
 {
-
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
@@ -5442,7 +5433,6 @@ void plaqQuda(double plaq[3])
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 /*
@@ -5462,7 +5452,6 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   copyExtendedGauge(*io_gauge, *extendedGaugeResident, loc);
 
   //profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)
