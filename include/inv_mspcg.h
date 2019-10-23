@@ -113,6 +113,9 @@ namespace quda
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
+    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat);
+    void ATx(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v);
+
   };
 
 } // namespace quda

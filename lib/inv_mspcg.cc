@@ -18,6 +18,8 @@
 
 #include <gauge_tools.h>
 
+#include <copy_color_spinor_field_5d.h>
+
 extern quda::cudaGaugeField* gaugePrecondition;
 extern quda::cudaGaugeField* gaugePrecise;
 extern quda::cudaGaugeField* gaugeSloppy;
@@ -198,38 +200,156 @@ namespace quda {
     (*nrm_op_precondition)(out, in);
   }
 
+  static int transfer_index_from_st(int s, int t, int Ls_in, int Ls_out){
+    return (s * Ls_in + t);
+  }
+
+  double MSPCG::calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat){
+    
+    ColorSpinorParam csParam(in);
+    
+    cudaColorSpinorField tmp(csParam);
+    
+    csParam.x[4] = Ls_hat;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    dirac_param_precondition.Ls = Ls_hat;
+    
+    DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
+
+    cudaColorSpinorField truncated_cs_field_in(csParam);
+    cudaColorSpinorField truncated_cs_field_out(csParam);
+   
+    // T * phi
+    transfer_5d_hh(truncated_cs_field_in, in, reinterpret_cast<complex<float>*>(v.data()), false);
+    // A * T * phi
+    mat_precondition_truncated.MdagMLocal(truncated_cs_field_out, truncated_cs_field_in);
+    // T^ * A * T * phi
+    transfer_5d_hh(tmp, truncated_cs_field_out, reinterpret_cast<complex<float>*>(v.data()), true);
+
+    // B * phi
+    inner_dslash(out, in);
+   
+    // T^ * A * T * phi - B * phi
+    return xmyNorm(tmp, out);
+  }
+  
+  void MSPCG::ATx(ColorSpinorField& out,  const ColorSpinorField& in, std::vector<float>& v){
+  
+    int Ls_out = out.X(4);
+
+    ColorSpinorParam csParam(in);
+    
+    csParam.x[4] = Ls_out;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    
+    dirac_param_precondition.Ls = Ls_out;
+    
+    DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
+    cudaColorSpinorField truncated_cs_field_in(csParam);
+   
+    // T * phi
+    transfer_5d_hh(truncated_cs_field_in, in, reinterpret_cast<complex<float>*>(v.data()), false);
+    // A * T * phi
+    mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
+  }
+
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
+  
     commGlobalReductionSet(false);
+    
+    constexpr int color_spin_dim = 12;
+
+    int Ls_in = ib.X(4);
+    int Ls_out = 8;
+
+    std::vector<float> v(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
+    for(int s = 0; s < Ls_out; s++){
+      for(int row = 0; row < color_spin_dim; row++){
+        for(int t = 0; t < Ls_in; t++){
+          int transfer_index = transfer_index_from_st(s, t, Ls_in, Ls_out);
+          float value;
+          if(s == 0 && t == 0 || s == Ls_out-1 && t == Ls_in-1){
+            value = 1.2f;
+          }else if(s > 0 && s < Ls_out-1 && t > 0 && t < Ls_in-1){
+            value = 0.12f;
+          }else{
+            value = 0.0f;
+          }
+          v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + row)*2] = value;
+        }
+      } 
+    }
+
+    ColorSpinorParam csParam(ib);
+    cudaColorSpinorField chi(csParam);
+    
+    double chi2 = calculate_chi(chi, ib, v, Ls_out);
+    printfQuda("     b2 norm = %f\n", blas::norm2(ib));
+    printfQuda("   chi2 norm = %f\n", chi2);
+
+    csParam.x[4] = Ls_out;
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+ 
+    cudaColorSpinorField ATchi(csParam);
+    cudaColorSpinorField ATphi(csParam);
+
+    ATx(ATphi, ib, v);
+    ATx(ATchi, chi, v);
+
+    std::vector<float> d1(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
+    std::vector<float> d2(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
+
+    tensor_5d_hh(ATphi, chi, reinterpret_cast<complex<float>*>(d1.data()));
+    tensor_5d_hh(ATchi, ib, reinterpret_cast<complex<float>*>(d2.data()));
+
+
+    double d = 0.01;
+for(int i = 0; i < 372; i++){
+
+    v[i] += d;
+    double chi2_new = calculate_chi(chi, ib, v, Ls_out);
+    printfQuda("d_chi2 norm [%d]  = %f vs. %f \n", i, (chi2_new - chi2)/d, (2*(d1[i]+d2[i])));
+    v[i] -= d;
+}
+/**
+    
+    for(int s = 0; s < 1; s++){
+      for(int t = 0; t < 1; t++){
+        for(int row = 0; row < color_spin_dim; row++){
+          for(int col = 0; col < color_spin_dim; col++){
+            int transfer_index = transfer_index_from_st(s, t, Ls_in, Ls_out);
+            float real_value = v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + col)*2+0];
+            float imag_value = v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + col)*2+1];
+            printfQuda("(%02d,%02d) = (%+.4e,%+.4e)\n", row, col, real_value, imag_value);
+          }
+        }
+      } 
+    }
+*/
+
+#if 0
 
     blas::zero(ix);
-
     double rk2 = blas::norm2(ib);
     if(rk2 == 0.0){
       commGlobalReductionSet(true);
       return;
     }
-    
     double Mpk2, alpha, beta, rkp12;
-
     blas::copy(*ip, ib);
-
     for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
-
       inner_dslash(*immp, *ip);
-
       Mpk2 = reDotProduct(*ip, *immp);
-
       alpha = rk2 / Mpk2;
-
       rkp12 = axpyNorm(-alpha, *immp, ib);
-
       beta = rkp12 / rk2;
       rk2 = rkp12;
-
       axpyZpbx(alpha, *ip, ix, ib, beta);
-    
     }
 
+#endif
+    
     commGlobalReductionSet(true);
     return;
   }

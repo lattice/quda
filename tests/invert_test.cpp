@@ -395,8 +395,9 @@ int main(int argc, char **argv)
   rng->Init();
 
   for (int i = 0; i < Nsrc; i++) {
-
-    construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    for(int s = 0; s < inv_param.Ls; s++){
+      construct_spinor_source(spinorIn+s*V*spinorSiteSize*sSize, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    }
 
     if (multishift) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);

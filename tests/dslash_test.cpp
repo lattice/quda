@@ -609,7 +609,13 @@ DslashTime dslashCUDA(int niter) {
             errorQuda("(transfer == true) version NOT yet available!\n");
           } else {
             dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
-          }         
+          }
+        case 9:
+          if (transfer) {
+            errorQuda("(transfer == true) version NOT yet available!\n");
+          } else {
+            dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
+          }  
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (test_type) {

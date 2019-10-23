@@ -629,13 +629,13 @@ namespace quda {
         const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
         int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
       // switch for Ls
-      switch (in.X(4)) { /**
+      switch (in.X(4)) { 
       case 8: {
         FusedDslashArg<storage_type, 8> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; */
+      } break; 
       case 12: {
         FusedDslashArg<storage_type, 12> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);

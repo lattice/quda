@@ -62,7 +62,7 @@ set (QUDA_OBJS
   extended_color_spinor_utilities.cu
   blas_cublas.cu blas_magma.cu
   inv_mpcg_quda.cpp inv_mpbicgstab_quda.cpp inv_gmresdr_quda.cpp
-  inv_mspcg.cc
+  inv_mspcg.cc copy_color_spinor_5d_hh.cu
   pgauge_exchange.cu pgauge_init.cu pgauge_heatbath.cu random.cu
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
