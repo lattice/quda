@@ -130,7 +130,7 @@ namespace quda
   /**
      @brief This instantiate function is used to instantiate the precisions
      @param[in] U Gauge field
-     @param[in,out] args Additional arguments for different dslash kernels
+     @param[in,out] args Any additional arguments required for the computation at hand
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = ReconstructFull, typename G,
             typename... Args>
