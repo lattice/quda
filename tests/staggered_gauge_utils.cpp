@@ -26,7 +26,6 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
                          void **qdp_inlink, QudaGaugeParam &gauge_param_in, double **act_path_coeffs, double eps_naik,
                          size_t gSize, int n_naiks)
 {
-
   // since a lot of intermediaries can be general matrices, override the recon in `gauge_param_in`
   auto gauge_param = gauge_param_in;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -101,7 +100,6 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
 
 void setActionPaths(double **act_paths)
 {
-
   ///////////////////////////
   // Set path coefficients //
   ///////////////////////////
@@ -162,9 +160,7 @@ void setActionPaths(double **act_paths)
 void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlink, QudaGaugeParam &gauge_param,
                        size_t gSize, int n_naiks, double eps_naik)
 {
-
-  double **act_paths;
-  act_paths = new double *[3];
+  double **act_paths = new double *[3];
   for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
   setActionPaths(act_paths);
 
@@ -203,17 +199,15 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
     }
   }
 
-  for (int i = 0; i < 3; i++) delete act_paths[i];
-  delete act_paths;
+  for (int i = 0; i < 3; i++) delete [] act_paths[i];
+  delete [] act_paths;
 }
 
 void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
                              void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gSize,
                              int n_naiks, double eps_naik)
 {
-
-  double **act_paths;
-  act_paths = new double *[3];
+  double **act_paths = new double *[3];
   for (int i = 0; i < 3; i++) act_paths[i] = new double[6];
   setActionPaths(act_paths);
 
@@ -272,8 +266,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
     }
   }
 
-  for (int i = 0; i < 3; i++) delete act_paths[i];
-  delete act_paths;
+  for (int i = 0; i < 3; i++) delete [] act_paths[i];
+  delete [] act_paths;
 }
 
 
