@@ -76,7 +76,7 @@ namespace quda {
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
 
-    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_9) &&
+    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) &&
         link_type != QUDA_SU3_LINKS) {
       errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
     }
