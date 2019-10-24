@@ -20,6 +20,8 @@
 
 #include <copy_color_spinor_field_5d.h>
 
+#include <random>
+
 extern quda::cudaGaugeField* gaugePrecondition;
 extern quda::cudaGaugeField* gaugePrecise;
 extern quda::cudaGaugeField* gaugeSloppy;
@@ -262,20 +264,27 @@ namespace quda {
 
     int Ls_in = ib.X(4);
     int Ls_out = 8;
-
+		
+    std::random_device rd;
+		// the good rng
+  	std::mt19937 rng(23ul*comm_rank());
+		// The gaussian distribution
+  	std::normal_distribution<double> n(0., 1.);
+    
     std::vector<float> v(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
     for(int s = 0; s < Ls_out; s++){
       for(int row = 0; row < color_spin_dim; row++){
         for(int t = 0; t < Ls_in; t++){
           int transfer_index = transfer_index_from_st(s, t, Ls_in, Ls_out);
           float value;
-          if(s == 0 && t == 0 || s == Ls_out-1 && t == Ls_in-1){
-            value = 1.2f;
-          }else if(s > 0 && s < Ls_out-1 && t > 0 && t < Ls_in-1){
-            value = 0.12f;
-          }else{
-            value = 0.0f;
-          }
+          value = 1e-1*n(rng);
+          // if(s == 0 && t == 0 || s == Ls_out-1 && t == Ls_in-1){
+          //   value = 1.2f;
+          // }else if(s > 0 && s < Ls_out-1 && t > 0 && t < Ls_in-1){
+          //   value = 0.12f;
+          // }else{
+          //   value = 0.0f;
+          // }
           v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + row)*2] = value;
         }
       } 
@@ -283,8 +292,11 @@ namespace quda {
 
     ColorSpinorParam csParam(ib);
     cudaColorSpinorField chi(csParam);
-    
-    double chi2 = calculate_chi(chi, ib, v, Ls_out);
+    cudaColorSpinorField phi(csParam);
+   
+    phi = ib;
+
+    double chi2 = calculate_chi(chi, phi, v, Ls_out);
     printfQuda("     b2 norm = %f\n", blas::norm2(ib));
     printfQuda("   chi2 norm = %f\n", chi2);
 
@@ -293,40 +305,64 @@ namespace quda {
  
     cudaColorSpinorField ATchi(csParam);
     cudaColorSpinorField ATphi(csParam);
+    
+    cudaColorSpinorField truncated_cs_field_in(csParam);
 
-    ATx(ATphi, ib, v);
+    ATx(ATphi, phi, v);
     ATx(ATchi, chi, v);
 
     std::vector<float> d1(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
     std::vector<float> d2(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
 
     tensor_5d_hh(ATphi, chi, reinterpret_cast<complex<float>*>(d1.data()));
-    tensor_5d_hh(ATchi, ib, reinterpret_cast<complex<float>*>(d2.data()));
+    tensor_5d_hh(ATchi, phi, reinterpret_cast<complex<float>*>(d2.data()));
 
+    transfer_5d_hh(truncated_cs_field_in, phi, reinterpret_cast<complex<float>*>(v.data()), false);
+    double test_dot = reDotProduct(ATchi, truncated_cs_field_in);
 
-    double d = 0.01;
-for(int i = 0; i < 372; i++){
-
-    v[i] += d;
-    double chi2_new = calculate_chi(chi, ib, v, Ls_out);
-    printfQuda("d_chi2 norm [%d]  = %f vs. %f \n", i, (chi2_new - chi2)/d, (2*(d1[i]+d2[i])));
-    v[i] -= d;
-}
-/**
+    transfer_5d_hh(*ip, ATphi, reinterpret_cast<complex<float>*>(v.data()), true);
+    double test_dot_high_wo = reDotProduct(chi, *ip);
+    auto c = cDotProduct(phi, *ip);
     
-    for(int s = 0; s < 1; s++){
-      for(int t = 0; t < 1; t++){
-        for(int row = 0; row < color_spin_dim; row++){
-          for(int col = 0; col < color_spin_dim; col++){
-            int transfer_index = transfer_index_from_st(s, t, Ls_in, Ls_out);
-            float real_value = v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + col)*2+0];
-            float imag_value = v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + col)*2+1];
-            printfQuda("(%02d,%02d) = (%+.4e,%+.4e)\n", row, col, real_value, imag_value);
-          }
-        }
-      } 
+    printfQuda(" test_dot_new diff. = %8.4e\n", (test_dot - test_dot_high_wo)/test_dot);
+    printfQuda(" test_dot_new real. = (%f,%f)\n", c.real(), c.imag());
+
+    printfQuda("   dot2 norm = %f\n", test_dot/2);
+    
+    
+    float alpha = 1e-8f;
+/**
+    for(int iteration = 0; iteration < 100; iteration++){
+      
+      chi2 = calculate_chi(chi, phi, v, Ls_out);
+     
+      printfQuda("gradient min iteration %04d chi2 = %8.4e\n", iteration, chi2);
+
+      ATx(ATphi, phi, v);
+      ATx(ATchi, chi, v);
+
+      tensor_5d_hh(ATphi, chi, reinterpret_cast<complex<float>*>(d1.data()));
+      tensor_5d_hh(ATchi, phi, reinterpret_cast<complex<float>*>(d2.data()));
+    
+      for(int i = 0; i < v.size(); i++){
+        v[i] -= alpha * 2.0f * (d1[i] + d2[i]);
+      }
+
     }
 */
+#if 1
+    
+    double d = 0.4;
+    for(int i = 0; i < 197; i++){
+      v[i] += d/2;
+      double chi2_p = calculate_chi(chi, phi, v, Ls_out);
+      v[i] -= d;
+      double chi2_m = calculate_chi(chi, phi, v, Ls_out);
+      printfQuda("d_chi2 norm [%04d]  = %f vs. %f \n", i, (chi2_p - chi2_m)/d, (2*(d1[i]+d2[i])));
+      v[i] += d/2;
+    }
+
+#endif
 
 #if 0
 

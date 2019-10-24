@@ -89,8 +89,8 @@ namespace quda {
       for(int row = 0; row < color_spin_dim; row++){
         #pragma unroll
         for(int column = 0; column < color_spin_dim; column++){
-          // m(row, column) = conj(conj(v(row)) * w(column));
-          m(row, column) = conj(v(row)) * w(column);
+          m(row, column) = conj(conj(v(row)) * w(column));
+          // m(row, column) = conj(v(row)) * w(column);
         }
       }
       return m;
@@ -135,7 +135,7 @@ namespace quda {
             errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
         }
   };
-
+  
   template<class storage_type, class Arg>
     __global__ void tensor_5d_kernel(Arg arg) {
 
@@ -154,18 +154,20 @@ namespace quda {
       if (index_4d_cb >= volume_4d_cb) return;
       if (s >= Ls_out) return;
       if (parity >= arg.nParity) return;
-     
+    
       // t -> s_in, s-> s_out
+      const Vector v = arg.out(s * volume_4d_cb + index_4d_cb, parity); 
       for(int t = 0; t < Ls_in; t++){
-        const Vector in = arg.in(s * volume_4d_cb + index_4d_cb, parity); 
-        const Vector out = arg.out(t * volume_4d_cb + index_4d_cb, parity); 
-        WilsonMatrix<real> wm = vector_tensor_matrix(in, out);
-
-        for(int i = 0; i < color_spin_dim; i++){
-        for(int j = 0; j < color_spin_dim; j++){
-          real* p = reinterpret_cast<real*>(&wm_p[s*Ls_in+t]);
-          atomicAdd(&p[(i * 12 + j)*2], wm(i*12+j).real());
-          // atomicAdd(&p[2*i+1], wm(i).imag());
+        const Vector w = arg.in(t * volume_4d_cb + index_4d_cb, parity); 
+        WilsonMatrix<real> wm = vector_tensor_matrix(v, w);
+        int wm_index = s*Ls_in+t;
+        real* p = reinterpret_cast<real*>(&wm_p[wm_index]);
+        for(int a = 0; a < color_spin_dim; a++){
+        for(int b = 0; b < color_spin_dim; b++){
+          int cs = a * color_spin_dim + b;
+          auto z = conj(conj(v(a)) * w(b));
+          atomicAdd(&p[cs*2+0], z.real());
+          atomicAdd(&p[cs*2+1], z.imag());
         }}
       }
 
@@ -222,7 +224,7 @@ namespace quda {
       Transfer5d(const ColorSpinorField &meta, Arg& arg)
         : TunableVectorYZ(arg.Ls_out, arg.nParity), arg(arg), meta(meta) {
         strcpy(aux, meta.AuxString());
-        strcat(aux, arg.transfer?",tranfer_5d":",tensor_5d");
+        strcat(aux, arg.transfer?",transfer_5d":",tensor_5d");
         if (arg.dagger) strcat(aux, ",Dagger");
       }
 
