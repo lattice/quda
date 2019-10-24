@@ -408,7 +408,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon>
   struct Staple_ {
-    Staple_(const GaugeField &u, GaugeField &fat,  GaugeField &staple, const GaugeField &mulink,
+    Staple_(const GaugeField &u, GaugeField &fat, GaugeField &staple, const GaugeField &mulink,
             int nu, int dir1, int dir2, double coeff, bool save_staple)
     { // FIXME - incorporate another level of reconstruct peel off in instantiate
       typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type L;
@@ -434,7 +434,7 @@ namespace quda {
     instantiate<Staple_, ReconstructNo12>(u, fat, staple, mulink, nu, dir1, dir2, coeff, save_staple);
   }
 
-  void fatLongKSLink(GaugeField *fat, GaugeField *lng,  const GaugeField& u, const double *coeff)
+  void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField& u, const double *coeff)
   {
 #ifdef GPU_FATLINK
     GaugeFieldParam gParam(u);
@@ -444,7 +444,7 @@ namespace quda {
     auto staple = GaugeField::Create(gParam);
     auto staple1 = GaugeField::Create(gParam);
 
-    if( ((fat->X()[0] % 2 != 0) || (fat->X()[1] % 2 != 0) || (fat->X()[2] % 2 != 0) || (fat->X()[3] % 2 != 0))
+    if ( ((fat->X()[0] % 2 != 0) || (fat->X()[1] % 2 != 0) || (fat->X()[2] % 2 != 0) || (fat->X()[3] % 2 != 0))
 	&& (u.Reconstruct()  != QUDA_RECONSTRUCT_NO)){
       errorQuda("Reconstruct %d and odd dimensionsize is not supported by link fattening code (yet)\n",
 		u.Reconstruct());
@@ -456,29 +456,30 @@ namespace quda {
     if (lng) computeLongLink(*lng, u, coeff[1]);
 
     // Check the coefficients. If all of the following are zero, return.
-    if (fabs(coeff[2]) < MIN_COEFF && fabs(coeff[3]) < MIN_COEFF &&
-	fabs(coeff[4]) < MIN_COEFF && fabs(coeff[5]) < MIN_COEFF) return;
+    if (fabs(coeff[2]) >= MIN_COEFF || fabs(coeff[3]) >= MIN_COEFF ||
+	fabs(coeff[4]) >= MIN_COEFF || fabs(coeff[5]) >= MIN_COEFF) {
 
-    for (int nu = 0; nu < 4; nu++) {
-      computeStaple(*fat, *staple, u, u, nu, -1, -1, coeff[2], 1);
+      for (int nu = 0; nu < 4; nu++) {
+        computeStaple(*fat, *staple, u, u, nu, -1, -1, coeff[2], 1);
 
-      if (coeff[5] != 0.0) computeStaple(*fat, *staple, *staple, u, nu, -1, -1, coeff[5], 0);
+        if (coeff[5] != 0.0) computeStaple(*fat, *staple, *staple, u, nu, -1, -1, coeff[5], 0);
 
-      for (int rho = 0; rho < 4; rho++) {
-        if (rho != nu) {
+        for (int rho = 0; rho < 4; rho++) {
+          if (rho != nu) {
 
-          computeStaple(*fat, *staple1, *staple, u, rho, nu, -1, coeff[3], 1);
+            computeStaple(*fat, *staple1, *staple, u, rho, nu, -1, coeff[3], 1);
 
-	  if (fabs(coeff[4]) > MIN_COEFF) {
-	    for (int sig = 0; sig < 4; sig++) {
-              if (sig != nu && sig != rho) {
-                computeStaple(*fat, *staple, *staple1, u, sig, nu, rho, coeff[4], 0);
-              }
-	    } //sig
-	  } // MIN_COEFF
-	}
-      } //rho
-    } //nu
+            if (fabs(coeff[4]) > MIN_COEFF) {
+              for (int sig = 0; sig < 4; sig++) {
+                if (sig != nu && sig != rho) {
+                  computeStaple(*fat, *staple, *staple1, u, sig, nu, rho, coeff[4], 0);
+                }
+              } //sig
+            } // MIN_COEFF
+          }
+        } //rho
+      } //nu
+    }
 
     qudaDeviceSynchronize();
     checkCudaError();
