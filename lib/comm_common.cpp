@@ -8,7 +8,7 @@
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 namespace backward {
-  backward::SignalHandling sh;
+  static backward::SignalHandling sh;
 } // namespace backward
 #endif 
 
@@ -618,6 +618,10 @@ void comm_finalize(void)
 }
 
 
+static char partition_string[16]; /** string that contains the job partitioning */
+static char topology_string[128]; /** string that contains the job topology */
+static char partition_override_string[16]; /** string that contains any overridden partitioning */
+
 static int manual_set_partition[QUDA_MAX_DIM] = {0};
 
 void comm_dim_partitioned_set(int dim)
@@ -625,10 +629,16 @@ void comm_dim_partitioned_set(int dim)
 #ifdef MULTI_GPU
   manual_set_partition[dim] = 1;
 #endif
+
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1),comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 void comm_dim_partitioned_reset(){
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
+
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1),comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 int comm_dim_partitioned(int dim)
@@ -693,11 +703,6 @@ bool comm_gdr_blacklist() {
 
   return blacklist;
 }
-
-static char partition_string[16]; /** static string that contains a string of the machine partition */
-static char topology_string[128]; /** static string that contains a string of the machine partition */
-static char
-  partition_override_string[16]; /** static string that contains a string of overridden communication partitioning */
 
 static bool deterministic_reduce = false;
 
