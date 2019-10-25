@@ -399,18 +399,15 @@ namespace quda
       // nothing to do
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
-        int defl_size = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs.size();
+        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver();
+        int defl_size = coarse_solver_inner.evecs.size();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // Deflation space exists and we are going to create a new solver. Transfer deflation space.
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferring deflation space size %d to MG\n", defl_size);
-          ColorSpinorParam csParam(*(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[0]));
-          // Create space in MG to hold deflation space, destroy space in coarse solver.
           for (int i = 0; i < defl_size; i++) {
-            evecs.push_back(ColorSpinorField::Create(csParam));
-            blas::copy(*evecs[i], *(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[i]));
-            delete (reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[i]);
+            evecs.push_back(coarse_solver_inner.evecs[i]);
           }
-          (reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs.resize(0));
+          coarse_solver_inner.evecs.resize(0);
         }
         delete coarse_solver;
         coarse_solver = nullptr;
@@ -1051,7 +1048,8 @@ namespace quda
   // supports separate reading or single file read
   void MG::loadVectors(std::vector<ColorSpinorField *> &B)
   {
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
+    if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
     std::string vec_infile(param.mg_global.vec_infile[param.level]);
@@ -1062,12 +1060,13 @@ namespace quda
     EigenSolver::loadVectors(B, vec_infile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
+    if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
   void MG::saveVectors(const std::vector<ColorSpinorField *> &B) const
   {
-    profile_global.TPSTOP(QUDA_PROFILE_INIT);
+    bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
+    if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
     profile_global.TPSTART(QUDA_PROFILE_IO);
     pushLevel(param.level);
     std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
@@ -1078,7 +1077,7 @@ namespace quda
     EigenSolver::saveVectors(B, vec_outfile);
     popLevel(param.level);
     profile_global.TPSTOP(QUDA_PROFILE_IO);
-    profile_global.TPSTART(QUDA_PROFILE_INIT);
+    if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
   }
 
   void MG::dumpNullVectors() const
