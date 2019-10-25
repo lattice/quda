@@ -623,7 +623,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-eig-check-interval", mg_eig_check_interval, CLI::Validator(),
     "Perform a convergence check every nth restart/iteration (only used in Implicit Restart types)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-coarse-guess", mg_eig_use_poly_acc, CLI::Validator(),
+  quda_app->add_mgoption(opgroup, "--mg-eig-coarse-guess", mg_eig_coarse_guess, CLI::Validator(),
+                         "If deflating on the coarse grid, optionaly use an initial guess (default = false)");
+    quda_app->add_mgoption(opgroup, "--mg-eig-preserve-deflation", mg_eig_preserve_deflation, CLI::Validator(),
                          "If deflating on the coarse grid, optionaly use an initial guess (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
