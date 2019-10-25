@@ -5,30 +5,38 @@
 namespace quda
 {
 
-  template <typename Float, typename Fmunu, typename Gauge> struct FmunuArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_> struct FmunuArg
+  {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
+    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static constexpr QudaReconstructType recon = recon_;
+    typedef typename gauge_mapper<Float,recon>::type G;
+    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type F;
+
+    G u;
+    F f;
+
     int threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
-    Fmunu f;
-    Gauge gauge;
 
-    FmunuArg(Fmunu &f, Gauge &gauge, const GaugeField &meta, const GaugeField &meta_ex) :
-        threads(meta.VolumeCB()),
-        f(f),
-        gauge(gauge)
+    FmunuArg(GaugeField &f, const GaugeField &u) :
+      threads(f.VolumeCB()),
+      f(f),
+      u(u)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        X[dir] = meta.X()[dir];
-        border[dir] = (meta_ex.X()[dir] - X[dir]) / 2;
+        X[dir] = f.X()[dir];
+        border[dir] = (u.X()[dir] - X[dir]) / 2;
       }
     }
   };
 
-  template <int mu, int nu, typename Float, typename Arg>
+  template <int mu, int nu, typename Arg>
   __device__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
   {
-
-    typedef Matrix<complex<Float>, 3> Link;
+    typedef Matrix<complex<typename Arg::Float>, 3> Link;
 
     int x[4];
     auto &X = arg.X;
@@ -44,20 +52,20 @@ namespace quda
 
       // load U(x)_(+mu)
       int dx[4] = {0, 0, 0, 0};
-      Link U1 = arg.gauge(mu, linkIndexShift(x, dx, X), parity);
+      Link U1 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+mu)_(+nu)
       dx[mu]++;
-      Link U2 = arg.gauge(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U2 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]--;
 
       // load U(x+nu)_(+mu)
       dx[nu]++;
-      Link U3 = arg.gauge(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U3 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]--;
 
       // load U(x)_(+nu)
-      Link U4 = arg.gauge(nu, linkIndexShift(x, dx, X), parity);
+      Link U4 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // compute plaquette
       F = U1 * U2 * conj(U3) * conj(U4);
@@ -67,23 +75,23 @@ namespace quda
 
       // load U(x)_(+nu)
       int dx[4] = {0, 0, 0, 0};
-      Link U1 = arg.gauge(nu, linkIndexShift(x, dx, X), parity);
+      Link U1 = arg.u(nu, linkIndexShift(x, dx, X), parity);
 
       // load U(x+nu)_(-mu) = U(x+nu-mu)_(+mu)
       dx[nu]++;
       dx[mu]--;
-      Link U2 = arg.gauge(mu, linkIndexShift(x, dx, X), parity);
+      Link U2 = arg.u(mu, linkIndexShift(x, dx, X), parity);
       dx[mu]++;
       dx[nu]--;
 
       // load U(x-mu)_nu
       dx[mu]--;
-      Link U3 = arg.gauge(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U3 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
 
       // load U(x)_(-mu) = U(x-mu)_(+mu)
       dx[mu]--;
-      Link U4 = arg.gauge(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U4 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
 
       // sum this contribution to Fmunu
@@ -95,23 +103,23 @@ namespace quda
       // load U(x)_(-nu)
       int dx[4] = {0, 0, 0, 0};
       dx[nu]--;
-      Link U1 = arg.gauge(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U1 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
 
       // load U(x-nu)_(+mu)
       dx[nu]--;
-      Link U2 = arg.gauge(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U2 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
 
       // load U(x+mu-nu)_(+nu)
       dx[mu]++;
       dx[nu]--;
-      Link U3 = arg.gauge(nu, linkIndexShift(x, dx, X), parity);
+      Link U3 = arg.u(nu, linkIndexShift(x, dx, X), parity);
       dx[nu]++;
       dx[mu]--;
 
       // load U(x)_(+mu)
-      Link U4 = arg.gauge(mu, linkIndexShift(x, dx, X), parity);
+      Link U4 = arg.u(mu, linkIndexShift(x, dx, X), parity);
 
       // sum this contribution to Fmunu
       F += conj(U1) * U2 * U3 * conj(U4);
@@ -122,26 +130,26 @@ namespace quda
       // load U(x)_(-mu)
       int dx[4] = {0, 0, 0, 0};
       dx[mu]--;
-      Link U1 = arg.gauge(mu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U1 = arg.u(mu, linkIndexShift(x, dx, X), 1 - parity);
       dx[mu]++;
 
       // load U(x-mu)_(-nu) = U(x-mu-nu)_(+nu)
       dx[mu]--;
       dx[nu]--;
-      Link U2 = arg.gauge(nu, linkIndexShift(x, dx, X), parity);
+      Link U2 = arg.u(nu, linkIndexShift(x, dx, X), parity);
       dx[nu]++;
       dx[mu]++;
 
       // load U(x-nu)_mu
       dx[mu]--;
       dx[nu]--;
-      Link U3 = arg.gauge(mu, linkIndexShift(x, dx, X), parity);
+      Link U3 = arg.u(mu, linkIndexShift(x, dx, X), parity);
       dx[nu]++;
       dx[mu]++;
 
       // load U(x)_(-nu) = U(x-nu)_(+nu)
       dx[nu]--;
-      Link U4 = arg.gauge(nu, linkIndexShift(x, dx, X), 1 - parity);
+      Link U4 = arg.u(nu, linkIndexShift(x, dx, X), 1 - parity);
       dx[nu]++;
 
       // sum this contribution to Fmunu
@@ -156,7 +164,7 @@ namespace quda
     // 3*18 + 12*198 =  54 + 2376 = 2430
     {
       F -= conj(F);                   // 18 real subtractions + one matrix conjugation
-      F *= static_cast<Float>(0.125); // 18 real multiplications
+      F *= static_cast<typename Arg::Float>(0.125); // 18 real multiplications
                                       // 36 floating point operations here
     }
 
@@ -164,7 +172,7 @@ namespace quda
     arg.f(munu_idx, idx, parity) = F;
   }
 
-  template <typename Float, typename Arg> __global__ void computeFmunuKernel(Arg arg)
+  template <typename Arg> __global__ void computeFmunuKernel(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
@@ -173,16 +181,16 @@ namespace quda
     if (mu_nu >= 6) return;
 
     switch (mu_nu) { // F[1,0], F[2,0], F[2,1], F[3,0], F[3,1], F[3,2]
-    case 0: computeFmunuCore<1, 0, Float>(arg, x_cb, parity); break;
-    case 1: computeFmunuCore<2, 0, Float>(arg, x_cb, parity); break;
-    case 2: computeFmunuCore<2, 1, Float>(arg, x_cb, parity); break;
-    case 3: computeFmunuCore<3, 0, Float>(arg, x_cb, parity); break;
-    case 4: computeFmunuCore<3, 1, Float>(arg, x_cb, parity); break;
-    case 5: computeFmunuCore<3, 2, Float>(arg, x_cb, parity); break;
+    case 0: computeFmunuCore<1, 0>(arg, x_cb, parity); break;
+    case 1: computeFmunuCore<2, 0>(arg, x_cb, parity); break;
+    case 2: computeFmunuCore<2, 1>(arg, x_cb, parity); break;
+    case 3: computeFmunuCore<3, 0>(arg, x_cb, parity); break;
+    case 4: computeFmunuCore<3, 1>(arg, x_cb, parity); break;
+    case 5: computeFmunuCore<3, 2>(arg, x_cb, parity); break;
     }
   }
 
-  template <typename Float, typename Arg> void computeFmunuCPU(Arg &arg)
+  template <typename Arg> void computeFmunuCPU(Arg &arg)
   {
     for (int parity = 0; parity < 2; parity++) {
       for (int x_cb = 0; x_cb < arg.threads; x_cb++) {
@@ -190,12 +198,12 @@ namespace quda
           for (int nu = 0; nu < mu; nu++) {
             int mu_nu = (mu * (mu - 1)) / 2 + nu;
             switch (mu_nu) { // F[1,0], F[2,0], F[2,1], F[3,0], F[3,1], F[3,2]
-            case 0: computeFmunuCore<1, 0, Float>(arg, x_cb, parity); break;
-            case 1: computeFmunuCore<2, 0, Float>(arg, x_cb, parity); break;
-            case 2: computeFmunuCore<2, 1, Float>(arg, x_cb, parity); break;
-            case 3: computeFmunuCore<3, 0, Float>(arg, x_cb, parity); break;
-            case 4: computeFmunuCore<3, 1, Float>(arg, x_cb, parity); break;
-            case 5: computeFmunuCore<3, 2, Float>(arg, x_cb, parity); break;
+            case 0: computeFmunuCore<1, 0>(arg, x_cb, parity); break;
+            case 1: computeFmunuCore<2, 0>(arg, x_cb, parity); break;
+            case 2: computeFmunuCore<2, 1>(arg, x_cb, parity); break;
+            case 3: computeFmunuCore<3, 0>(arg, x_cb, parity); break;
+            case 4: computeFmunuCore<3, 1>(arg, x_cb, parity); break;
+            case 5: computeFmunuCore<3, 2>(arg, x_cb, parity); break;
             }
           }
         }

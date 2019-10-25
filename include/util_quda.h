@@ -73,7 +73,6 @@ namespace quda {
     if (zeroThread) printf(__VA_ARGS__);				\
   } while (0)
 
-
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
@@ -162,5 +161,11 @@ namespace quda {
 
 #endif // HOST_DEBUG
 
+#ifdef __CUDA_ARCH__
+// hide from device code
+#undef errorQuda
+#define errorQuda(...)
+
+#endif
 
 #endif // _UTIL_QUDA_H

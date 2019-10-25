@@ -2,6 +2,7 @@
 #include <gauge_field.h>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_plaq.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
