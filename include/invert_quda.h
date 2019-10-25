@@ -555,6 +555,11 @@ namespace quda {
     void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
+       @brief Destroy the allocated deflation space
+    */
+    void destroyDeflationSpace();
+
+    /**
        @brief Extends the deflation space to twice its size for SVD deflation
     */
     void extendSVDDeflationSpace();

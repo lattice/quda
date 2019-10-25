@@ -226,16 +226,8 @@ namespace quda {
     if (tmpp) delete tmpp;
     if (rp) delete rp;
 
-    if (deflate_init) {
-      for (auto veci : evecs) {
-        if (veci) delete veci;
-      }
-      evecs.resize(0);
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-      defl_tmp1.resize(0);
-      defl_tmp2.resize(0);
-    }
+    destroyDeflationSpace();
+
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -280,11 +272,9 @@ namespace quda {
     }
 
     if (param.deflate) {
-      if (!deflate_init) {
-        // Construct the eigensolver and deflation space if requested.
-        constructDeflationSpace(b, DiracMdagM(mat.Expose()));
-        deflate_init = true;
-      }
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);

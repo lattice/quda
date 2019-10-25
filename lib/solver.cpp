@@ -164,9 +164,10 @@ namespace quda {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
@@ -183,6 +184,24 @@ namespace quda {
 
     evals.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
+
+    deflate_init = true;
+
+    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+  }
+
+  void Solver::destroyDeflationSpace()
+  {
+    if (deflate_init) {
+      for (auto veci : evecs)
+        if (veci) delete veci;
+      evecs.resize(0);
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+      defl_tmp1.resize(0);
+      defl_tmp2.resize(0);
+      deflate_init = false;
+    }
   }
 
   void Solver::extendSVDDeflationSpace()

@@ -48,12 +48,7 @@ namespace quda {
       if (rp) delete rp;
     }
 
-    if (deflate_init) {
-      for (auto veci : evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -475,13 +470,9 @@ namespace quda {
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
-      if (!deflate_init) {
-        // Construct the eigensolver and deflation space.
-        profile.TPSTART(QUDA_PROFILE_INIT);
-        constructDeflationSpace(b, mat);
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        deflate_init = true;
-      }
+      // Construct the eigensolver and deflation space.
+      constructDeflationSpace(b, mat);
+
       if (deflate_compute) {
         // compute the deflation space.
         (*eig_solve)(evecs, evals);

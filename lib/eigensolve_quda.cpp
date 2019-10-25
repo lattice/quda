@@ -30,7 +30,8 @@ namespace quda
     tmp1(nullptr),
     tmp2(nullptr)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Problem parameters
     nEv = eig_param->nEv;
@@ -86,7 +87,8 @@ namespace quda
       reverse = true;
       spectrum[0] = 'S';
     }
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
@@ -293,13 +295,15 @@ namespace quda
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
-                                 std::vector<Complex> &evals)
+                                 std::vector<Complex> &evals, int size)
   {
+    if (size > evecs.size() || size > evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
     ColorSpinorParam csParam(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
     temp.push_back(ColorSpinorField::Create(csParam));
 
-    for (int i = 0; i < nConv; i++) {
+    for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *temp[0], *evecs[i]);
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
