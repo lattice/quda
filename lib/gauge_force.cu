@@ -3,13 +3,61 @@
 #include <index_helper.cuh>
 #include <generics/ldg.h>
 #include <tune_quda.h>
+#include <instantiate.h>
 
 namespace quda {
 
-#ifdef GPU_GAUGE_FORCE
+  struct paths {
+    const int num_paths;
+    const int max_length;
+    int *input_path[4];
+    const int *length;
+    const double *path_coeff;
+    int count;
 
-  template <typename Mom, typename Gauge>
+    paths(void *buffer, size_t bytes, int ***input_path, int *length_h, double *path_coeff_h, int num_paths, int max_length) :
+      num_paths(num_paths),
+      max_length(max_length),
+      count(0)
+    {
+      void *path_h = safe_malloc(bytes);
+      memset(path_h, 0, bytes);
+
+      int *input_path_h = (int*)path_h;
+      for (int dir=0; dir<4; dir++) {
+        // flatten the input_path array for copying to the device
+        for (int i=0; i < num_paths; i++) {
+          for (int j=0; j < length_h[i]; j++) {
+            input_path_h[dir*num_paths*max_length + i*max_length + j] = input_path[dir][i][j];
+            if (dir==0) count++;
+          }
+        }
+      }
+
+      // length array
+      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int), length_h, num_paths*sizeof(int));
+
+      // path_coeff array
+      memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int), path_coeff_h, num_paths*sizeof(double));
+
+      qudaMemcpy(buffer, path_h, bytes, cudaMemcpyHostToDevice);
+      host_free(path_h);
+
+      // finally set the pointers to the correct offsets in the buffer
+      for (int d=0; d < 4; d++) this->input_path[d] = (int*)((char*)buffer + d*num_paths*max_length*sizeof(int));
+      length = (int*)((char*)buffer + 4*num_paths*max_length*sizeof(int));
+      path_coeff = (double*)((char*)buffer + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int));
+    }
+  };
+
+  template <typename Float_, int nColor_, QudaReconstructType recon_u, QudaReconstructType recon_m>
   struct GaugeForceArg {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
+    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    typedef typename gauge_mapper<Float,recon_u>::type Gauge;
+    typedef typename gauge_mapper<Float,recon_m>::type Mom;
+
     Mom mom;
     const Gauge u;
 
@@ -18,41 +66,28 @@ namespace quda {
     int E[4]; // the extended volume parameters
     int border[4]; // radius of border
 
-    int num_paths;
-    int path_max_length;
+    Float epsilon; // stepsize and any other overall scaling factor
+    const paths p;
 
-    double coeff;
-
-    const int *input_path_d[4];
-    const int *length_d;
-    const double *path_coeff_d;
-
-    int count; // equal to sum of all path lengths.  Used a convenience for computing perf
-
-    GaugeForceArg(Mom &mom, const Gauge &u, int num_paths, int path_max_length, double coeff,
-                  int **input_path_d, const int *length_d, const double* path_coeff_d, int count,
-		  const GaugeField &meta_mom, const GaugeField &meta_u)
-      : mom(mom), u(u), threads(meta_mom.VolumeCB()), num_paths(num_paths),
-	path_max_length(path_max_length), coeff(coeff),
-	input_path_d{ input_path_d[0], input_path_d[1], input_path_d[2], input_path_d[3] },
-	length_d(length_d), path_coeff_d(path_coeff_d), count(count)
+    GaugeForceArg(GaugeField &mom, const GaugeField &u, double epsilon, const paths &p)
+      : mom(mom), u(u),
+        threads(mom.VolumeCB()),
+	epsilon(epsilon),
+        p(p)
     {
-      for(int i=0; i<4; i++) {
-	X[i] = meta_mom.X()[i];
-	E[i] = meta_u.X()[i];
+      for (int i=0; i<4; i++) {
+	X[i] = mom.X()[i];
+	E[i] = u.X()[i];
 	border[i] = (E[i] - X[i])/2;
       }
     }
-
-    virtual ~GaugeForceArg() { }
   };
 
-  __device__ __host__ inline static int flipDir(int dir) { return (7-dir); }
-  __device__ __host__ inline static bool isForwards(int dir) { return (dir <= 3); }
+  constexpr int flipDir(int dir) { return (7-dir); }
+  constexpr bool isForwards(int dir) { return (dir <= 3); }
 
   // this ensures that array elements are held in cache
-  template <typename T>
-  __device__ __host__ inline static T cache(const T *ptr, int idx) {
+  template <typename T> constexpr T cache(const T *ptr, int idx) {
 #ifdef __CUDA_ARCH__
     return __ldg(ptr+idx);
 #else
@@ -60,10 +95,11 @@ namespace quda {
 #endif
   }
 
-  template<typename Float, typename Arg, int dir>
+  template <typename Arg, int dir>
   __device__ __host__ inline void GaugeForceKernel(Arg &arg, int idx, int parity)
   {
-    typedef Matrix<complex<Float>,3> Link;
+    using real = typename Arg::Float;
+    typedef Matrix<complex<real>,Arg::nColor> Link;
 
     int x[4] = {0, 0, 0, 0};
     getCoords(x, idx, arg.X, parity);
@@ -82,11 +118,11 @@ namespace quda {
     int dx[4] = {0, 0, 0, 0};
 #endif
 
-    for (int i=0; i<arg.num_paths; i++) {
-      Float coeff = cache(arg.path_coeff_d,i);
+    for (int i=0; i<arg.p.num_paths; i++) {
+      real coeff = cache(arg.p.path_coeff, i);
       if (coeff == 0) continue;
 
-      const int* path = arg.input_path_d[dir] + i*arg.path_max_length;
+      const int* path = arg.p.input_path[dir] + i*arg.p.max_length;
 
       // start from end of link in direction dir
       int nbr_oddbit = (parity^1);
@@ -106,8 +142,8 @@ namespace quda {
 	linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
         linkA = conj(linkB);
       }
-	
-      for (int j=1; j<cache(arg.length_d,i); j++) {
+
+      for (int j=1; j<cache(arg.p.length,i); j++) {
 
         int pathj = cache(path,j);
         int lnkdir = isForwards(pathj) ? pathj : flipDir(pathj);
@@ -116,7 +152,7 @@ namespace quda {
           linkB = arg.u(lnkdir, linkIndexShift(x,dx,arg.E), nbr_oddbit);
           linkA = linkA * linkB;
           dx[lnkdir]++; // now have to update to new location
-          nbr_oddbit = nbr_oddbit^1;	
+          nbr_oddbit = nbr_oddbit^1;
         } else {
           dx[lnkdir]--; // if we are going backwards the link is on the adjacent site
 	  nbr_oddbit = nbr_oddbit^1;
@@ -133,232 +169,84 @@ namespace quda {
 
     // update mom(x)
     Link mom = arg.mom(dir, idx, parity);
-    mom = mom - arg.coeff * linkA;
+    mom = mom - arg.epsilon * linkA;
     makeAntiHerm(mom);
     arg.mom(dir, idx, parity) = mom;
-    return;
   }
 
-  template <typename Float, typename Arg>
-  void GaugeForceCPU(Arg &arg) {
-    for (int dir=0; dir<4; dir++) {
-      for (int parity=0; parity<2; parity++) {
-        for (int idx=0; idx<arg.threads; idx++) {
-	  switch(dir) {
-	  case 0:
-	    GaugeForceKernel<Float,Arg,0>(arg, idx, parity);
-	    break;
-	  case 1:
-	    GaugeForceKernel<Float,Arg,1>(arg, idx, parity);
-	    break;
-	  case 2:
-	    GaugeForceKernel<Float,Arg,2>(arg, idx, parity);
-	    break;
-	  case 3:
-	    GaugeForceKernel<Float,Arg,3>(arg, idx, parity);
-	    break;
-	  }
-        }
-      }
-    }
-    return;
-  }
-
-  template <typename Float, typename Arg>
-  __global__ void GaugeForceGPU(Arg arg) {
+  template <typename Arg>
+  __global__ void GaugeForceKernel(Arg arg) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= arg.threads) return;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     int dir = blockIdx.z * blockDim.z + threadIdx.z;
+    if (dir >= 4) return;
+
     switch(dir) {
-    case 0:
-      GaugeForceKernel<Float,Arg,0>(arg, idx, parity);
-      break;
-    case 1:
-      GaugeForceKernel<Float,Arg,1>(arg, idx, parity);
-      break;
-    case 2:
-      GaugeForceKernel<Float,Arg,2>(arg, idx, parity);
-      break;
-    case 3:
-      GaugeForceKernel<Float,Arg,3>(arg, idx, parity);
-      break;
+    case 0: GaugeForceKernel<Arg,0>(arg, idx, parity); break;
+    case 1: GaugeForceKernel<Arg,1>(arg, idx, parity); break;
+    case 2: GaugeForceKernel<Arg,2>(arg, idx, parity); break;
+    case 3: GaugeForceKernel<Arg,3>(arg, idx, parity); break;
     }
-    return;
   }
 
-  template <typename Float, typename Arg>
-  class GaugeForce : public TunableVectorY {
+  template <typename Float, int nColor, QudaReconstructType recon_u> class GaugeForce : public TunableVectorYZ {
 
-  private:
-    Arg &arg;
-    QudaFieldLocation location;
-    const char *vol_str;
+    GaugeForceArg<Float, nColor, recon_u, QUDA_RECONSTRUCT_10> arg;
+    const GaugeField &meta;
+
     unsigned int sharedBytesPerThread() const { return 4; } // for dynamic indexing array
     unsigned int minThreads() const { return arg.threads; }
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
   public:
-    GaugeForce(Arg &arg, const GaugeField &meta_mom, const GaugeField &meta_u)
-      : TunableVectorY(2), arg(arg), location(meta_mom.Location()), vol_str(meta_mom.VolString()) { }
-    virtual ~GaugeForce() { }
+    GaugeForce(const GaugeField &u, GaugeField &mom, double epsilon, const paths &p) :
+      TunableVectorYZ(2,4),
+      arg(mom, u, epsilon, p),
+      meta(u)
+    {
+      apply(0);
+      qudaDeviceSynchronize();
+      checkCudaError();
+    }
 
     void apply(const cudaStream_t &stream) {
-      if (location == QUDA_CUDA_FIELD_LOCATION) {
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	GaugeForceGPU<Float,Arg><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-      } else {
-	GaugeForceCPU<Float,Arg>(arg);
-      }
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      GaugeForceKernel<decltype(arg)><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }
-  
+
     void preTune() { arg.mom.save(); }
-    void postTune() { arg.mom.load(); } 
-  
-    long long flops() const { return (arg.count - arg.num_paths + 1) * 198ll * 2 * arg.mom.volumeCB * 4; }
-    long long bytes() const { return ((arg.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4; }
+    void postTune() { arg.mom.load(); }
+
+    long long flops() const { return (arg.p.count - arg.p.num_paths + 1) * 198ll * 2 * arg.mom.volumeCB * 4; }
+    long long bytes() const { return ((arg.p.count + 1ll) * arg.u.Bytes() + 2ll*arg.mom.Bytes()) * 2 * arg.mom.volumeCB * 4; }
 
     TuneKey tuneKey() const {
       std::stringstream aux;
-      char comm[5];
-      comm[0] = (commDimPartitioned(0) ? '1' : '0');
-      comm[1] = (commDimPartitioned(1) ? '1' : '0');
-      comm[2] = (commDimPartitioned(2) ? '1' : '0');
-      comm[3] = (commDimPartitioned(3) ? '1' : '0');
-      comm[4] = '\0';
-      aux << "comm=" << comm << ",threads=" << arg.threads << ",num_paths=" << arg.num_paths;
-      return TuneKey(vol_str, typeid(*this).name(), aux.str().c_str());
-    }  
-
-    bool advanceBlockDim(TuneParam &param) const {
-      dim3 block = param.block;
-      dim3 grid = param.grid;
-      bool rtn = TunableVectorY::advanceBlockDim(param);
-      param.block.z = block.z;
-      param.grid.z = grid.z;
-
-      if (!rtn) {
-	if (param.block.z < 4) {
-	  param.block.z *= 2;
-	  param.grid.z = 4 / param.block.z;
-	  rtn = true;
-	} else {
-	  param.block.z = 1;
-	  param.grid.z = 4;
-	  rtn = false;
-	}
-      }
-      return rtn;
-    }
-    
-    void initTuneParam(TuneParam &param) const {
-      TunableVectorY::initTuneParam(param);
-      param.block.z = 1;
-      param.grid.z = 4;
-    }
-
-    void defaultTuneParam(TuneParam &param) const {
-      TunableVectorY::defaultTuneParam(param);
-      param.block.z = 1;
-      param.grid.z = 4;
+      aux << meta.AuxString() << ",num_paths=" << arg.p.num_paths << comm_dim_partitioned_string();
+      return TuneKey(meta.VolString(), typeid(*this).name(), aux.str().c_str());
     }
   };
-  
-  template <typename Float, typename Mom, typename Gauge>
-  void gaugeForce(Mom mom, const Gauge &u, GaugeField& meta_mom, const GaugeField& meta_u, const double coeff,
-		  int ***input_path, const int* length_h, const double* path_coeff_h, const int num_paths, const int path_max_length)
+
+  void gaugeForce(GaugeField& mom, const GaugeField& u, double epsilon, int ***input_path,
+                  int *length_h, double *path_coeff_h, int num_paths, int path_max_length)
   {
-    size_t bytes = num_paths*path_max_length*sizeof(int);
-    int *input_path_d[4];
+    checkPrecision(mom, u);
+    checkLocation(mom, u);
+    if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
 
-    int count = 0;
-    for (int dir=0; dir<4; dir++) {
-      input_path_d[dir] = (int*)pool_device_malloc(bytes);
-      cudaMemset(input_path_d[dir], 0, bytes);
+    // create path struct in a single allocation
+    size_t bytes = 4 * num_paths * path_max_length * sizeof(int) + num_paths*sizeof(int) + num_paths*sizeof(double);
+    void *buffer = pool_device_malloc(bytes);
+    paths p(buffer, bytes, input_path, length_h, path_coeff_h, num_paths, path_max_length);
 
-      int* input_path_h = (int*)safe_malloc(bytes);
-      memset(input_path_h, 0, bytes);
-      
-      // flatten the input_path array for copying to the device
-      for (int i=0; i < num_paths; i++) {
-	for (int j=0; j < length_h[i]; j++) {
-	  input_path_h[i*path_max_length + j] = input_path[dir][i][j];
-          if (dir==0) count++;
-	}
-      }
-      qudaMemcpy(input_path_d[dir], input_path_h, bytes, cudaMemcpyHostToDevice);
-
-      host_free(input_path_h);
-    }
-      
-    //length
-    int* length_d = (int*)pool_device_malloc(num_paths*sizeof(int));
-    qudaMemcpy(length_d, length_h, num_paths*sizeof(int), cudaMemcpyHostToDevice);
-
-    //path_coeff
-    double* path_coeff_d = (double*)pool_device_malloc(num_paths*sizeof(double));
-    qudaMemcpy(path_coeff_d, path_coeff_h, num_paths*sizeof(double), cudaMemcpyHostToDevice);
-
-    GaugeForceArg<Mom,Gauge> arg(mom, u, num_paths, path_max_length, coeff, input_path_d,
-				 length_d, path_coeff_d, count, meta_mom, meta_u);
-    GaugeForce<Float,GaugeForceArg<Mom,Gauge> > gauge_force(arg, meta_mom, meta_u);
-    gauge_force.apply(0);
-    checkCudaError();
-
-    pool_device_free(length_d);
-    pool_device_free(path_coeff_d);
-    for (int dir=0; dir<4; dir++) pool_device_free(input_path_d[dir]);
-    qudaDeviceSynchronize();
-  }
-
-  template <typename Float>
-  void gaugeForce(GaugeField& mom, const GaugeField& u, const double coeff, int ***input_path,
-		  const int* length, const double* path_coeff, const int num_paths, const int max_length)
-  {
-    if (mom.Reconstruct() != QUDA_RECONSTRUCT_10)
-      errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
-
-    if (mom.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
-      typedef typename gauge::FloatNOrder<Float,18,2,11> M;
-      if (u.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type G;
-	gaugeForce<Float,M,G>(M(mom), G(u), mom, u, coeff, input_path, length, path_coeff, num_paths, max_length);
-      } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
-	gaugeForce<Float,M,G>(M(mom), G(u), mom, u, coeff, input_path, length, path_coeff, num_paths, max_length);	
-      } else {
-	errorQuda("Reconstruction type %d not supported", u.Reconstruct());
-      }
-    } else {
-      errorQuda("Gauge Field order %d not supported", mom.Order());
-    }
-
-  }
-#endif // GPU_GAUGE_FORCE
-
-
-  void gaugeForce(GaugeField& mom, const GaugeField& u, double coeff, int ***input_path, 
-		  int *length, double *path_coeff, int num_paths, int max_length)
-  {
 #ifdef GPU_GAUGE_FORCE
-    if (mom.Precision() != u.Precision()) errorQuda("Mixed precision not supported");
-    if (mom.Location() != u.Location()) errorQuda("Mixed field locations not supported");
-
-    switch(mom.Precision()) {
-    case QUDA_DOUBLE_PRECISION:
-      gaugeForce<double>(mom, u, coeff, input_path, length, path_coeff, num_paths, max_length);
-      break;
-    case QUDA_SINGLE_PRECISION:
-      gaugeForce<float>(mom, u, coeff, input_path, length, path_coeff, num_paths, max_length);
-      break;
-    default:
-      errorQuda("Unsupported precision %d", mom.Precision());
-    }
+    // gauge field must be passed as first argument so we peel off its reconstruct type
+    instantiate<GaugeForce,ReconstructNo12>(u, mom, epsilon, p);
 #else
     errorQuda("Gauge force has not been built");
 #endif // GPU_GAUGE_FORCE
+    pool_device_free(buffer);
   }
 
 } // namespace quda
-
-
