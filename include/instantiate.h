@@ -55,21 +55,18 @@ namespace quda
      @brief This class instantiates the Apply class based on the
      instantiated templates below.
   */
-  template <bool enabled, template <typename, int, QudaReconstructType> class Apply,
-    typename Float, int nColor, QudaReconstructType recon, typename G, typename... Args>
+  template <bool enabled, template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
+            QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply {
-    instantiateApply(G &U, Args &&... args)
-    {
-      Apply<Float, nColor, recon>(U, args...);
-    }
+    instantiateApply(G &U, Args &&... args) { Apply<Float, nColor, recon>(U, args...); }
   };
 
   /**
      @brief This class is a specialization which does not instantiate
      the Apply class if the is_enabled has evaluated to false.
   */
-  template <template <typename, int, QudaReconstructType> class Apply,
-    typename Float, int nColor, QudaReconstructType recon, typename G, typename... Args>
+  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor,
+            QudaReconstructType recon, typename G, typename... Args>
   struct instantiateApply<false, Apply, Float, nColor, recon, G, Args...> {
     instantiateApply(G &U, Args &&... args)
     {

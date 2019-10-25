@@ -199,8 +199,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
     }
   }
 
-  for (int i = 0; i < 3; i++) delete [] act_paths[i];
-  delete [] act_paths;
+  for (int i = 0; i < 3; i++) delete[] act_paths[i];
+  delete[] act_paths;
 }
 
 void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
@@ -266,8 +266,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
     }
   }
 
-  for (int i = 0; i < 3; i++) delete [] act_paths[i];
-  delete [] act_paths;
+  for (int i = 0; i < 3; i++) delete[] act_paths[i];
+  delete[] act_paths;
 }
 
 

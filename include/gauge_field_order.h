@@ -1132,14 +1132,14 @@ namespace quda {
         RegType scale;
         RegType scale_inv;
         Reconstruct(const GaugeField &u) :
-          scale( isFixed<Float>::value ? u.LinkMax() : 1.0),
-          scale_inv( isFixed<Float>::value ? 1.0 / scale : 1.0)
-        { }
+          scale(isFixed<Float>::value ? u.LinkMax() : 1.0),
+          scale_inv(isFixed<Float>::value ? 1.0 / scale : 1.0)
+        {
+        }
 
-        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon) :
-          scale(recon.scale),
-          scale_inv(recon.scale_inv)
-        { }
+        Reconstruct(const Reconstruct<N, Float, ghostExchange_> &recon) : scale(recon.scale), scale_inv(recon.scale_inv)
+        {
+        }
 
         __device__ __host__ inline void Pack(RegType out[N], const RegType in[N], int idx) const
         {

@@ -7,7 +7,8 @@
    these are inline variables in instantiate.h.
  */
 
-namespace quda {
+namespace quda
+{
 
   // declared in instantiate.h
   constexpr std::array<QudaReconstructType, 5> ReconstructFull::recon;
@@ -22,4 +23,4 @@ namespace quda {
   constexpr std::array<QudaReconstructType, 3> WilsonReconstruct::recon;
   constexpr std::array<QudaReconstructType, 3> StaggeredReconstruct::recon;
 
-}
+} // namespace quda
