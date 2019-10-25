@@ -179,6 +179,7 @@ quda::mgarray<bool> mg_eig_use_dagger = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 bool mg_eig_coarse_guess = false;
+bool mg_eig_preserve_deflation = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
