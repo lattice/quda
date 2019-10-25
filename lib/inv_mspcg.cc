@@ -256,6 +256,19 @@ namespace quda {
     mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
   }
 
+  void fill_random(std::vector<float>& v){
+    static std::random_device rd;
+		// the good rng
+  	static std::mt19937 rng(23ul*comm_rank());
+		// The gaussian distribution
+  	static std::normal_distribution<double> n(0., 1.);
+   
+    for(auto& x : v){
+      x = 1e-1*n(rng);
+    }
+  
+  }
+
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
   
     commGlobalReductionSet(false);
@@ -264,41 +277,15 @@ namespace quda {
 
     int Ls_in = ib.X(4);
     int Ls_out = 8;
-		
-    std::random_device rd;
-		// the good rng
-  	std::mt19937 rng(23ul*comm_rank());
-		// The gaussian distribution
-  	std::normal_distribution<double> n(0., 1.);
-    
+  
     std::vector<float> v(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
-    for(int s = 0; s < Ls_out; s++){
-      for(int row = 0; row < color_spin_dim; row++){
-        for(int t = 0; t < Ls_in; t++){
-          int transfer_index = transfer_index_from_st(s, t, Ls_in, Ls_out);
-          float value;
-          value = 1e-1*n(rng);
-          // if(s == 0 && t == 0 || s == Ls_out-1 && t == Ls_in-1){
-          //   value = 1.2f;
-          // }else if(s > 0 && s < Ls_out-1 && t > 0 && t < Ls_in-1){
-          //   value = 0.12f;
-          // }else{
-          //   value = 0.0f;
-          // }
-          v[(transfer_index * color_spin_dim*color_spin_dim + row * color_spin_dim + row)*2] = value;
-        }
-      } 
-    }
-
+    fill_random(v);
+    
     ColorSpinorParam csParam(ib);
     cudaColorSpinorField chi(csParam);
     cudaColorSpinorField phi(csParam);
    
     phi = ib;
-
-    double chi2 = calculate_chi(chi, phi, v, Ls_out);
-    printfQuda("     b2 norm = %f\n", blas::norm2(ib));
-    printfQuda("   chi2 norm = %f\n", chi2);
 
     csParam.x[4] = Ls_out;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -306,35 +293,14 @@ namespace quda {
     cudaColorSpinorField ATchi(csParam);
     cudaColorSpinorField ATphi(csParam);
     
-    cudaColorSpinorField truncated_cs_field_in(csParam);
-
-    ATx(ATphi, phi, v);
-    ATx(ATchi, chi, v);
-
     std::vector<float> d1(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
     std::vector<float> d2(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
 
-    tensor_5d_hh(ATphi, chi, reinterpret_cast<complex<float>*>(d1.data()));
-    tensor_5d_hh(ATchi, phi, reinterpret_cast<complex<float>*>(d2.data()));
-
-    transfer_5d_hh(truncated_cs_field_in, phi, reinterpret_cast<complex<float>*>(v.data()), false);
-    double test_dot = reDotProduct(ATchi, truncated_cs_field_in);
-
-    transfer_5d_hh(*ip, ATphi, reinterpret_cast<complex<float>*>(v.data()), true);
-    double test_dot_high_wo = reDotProduct(chi, *ip);
-    auto c = cDotProduct(phi, *ip);
-    
-    printfQuda(" test_dot_new diff. = %8.4e\n", (test_dot - test_dot_high_wo)/test_dot);
-    printfQuda(" test_dot_new real. = (%f,%f)\n", c.real(), c.imag());
-
-    printfQuda("   dot2 norm = %f\n", test_dot/2);
-    
-    
     float alpha = 1e-8f;
-/**
-    for(int iteration = 0; iteration < 100; iteration++){
+
+    for(int iteration = 0; iteration < 10000; iteration++){
       
-      chi2 = calculate_chi(chi, phi, v, Ls_out);
+      double chi2 = calculate_chi(chi, phi, v, Ls_out);
      
       printfQuda("gradient min iteration %04d chi2 = %8.4e\n", iteration, chi2);
 
@@ -349,8 +315,10 @@ namespace quda {
       }
 
     }
-*/
-#if 1
+      
+    blas::copy(ix, ib);
+
+#if 0
     
     double d = 0.4;
     for(int i = 0; i < 197; i++){

@@ -67,6 +67,33 @@ public:
     }
 
     /**
+     ...
+     */
+    __device__ inline void save(int index, int ld, const Vector &a)
+    {
+#pragma unroll
+      for (int i = 0; i < 2 * a.size; i++) {
+        cache()[index] = *(reinterpret_cast<const real *>(a.data) + i);
+        index += ld;
+      }
+    }
+
+    /**
+     ...
+     */
+    __device__ inline Vector load(int index, int ld)
+    {
+      Vector a;
+#pragma unroll
+      for (int i = 0; i < 2 * a.size; i++) {
+        *(reinterpret_cast<real *>(a.data) + i) = cache()[index];
+        index += ld;
+      }
+      return a;
+    }
+
+
+    /**
        @brief Synchronize the cache
     */
     __device__ inline void sync() { __syncthreads(); }

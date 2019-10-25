@@ -6,6 +6,8 @@
 #include <math_helper.cuh>
 #include <shared_memory_cache_helper.cuh>
 
+#include <cub/cub.cuh>
+
 namespace quda {
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
@@ -154,20 +156,36 @@ namespace quda {
       if (index_4d_cb >= volume_4d_cb) return;
       if (s >= Ls_out) return;
       if (parity >= arg.nParity) return;
-    
+   
+      VectorCache<real, Vector> cache;
+      
+      int ld = Ls_in * blockDim.x;
+      int t = s;
+      while(t < Ls_in){
+        int index = t * blockDim.x + threadIdx.x;
+        cache.save(index, ld, arg.in(t * volume_4d_cb + index_4d_cb, parity)); 
+        t += blockDim.y;
+      }
+      cache.sync();
+
+      typedef cub::WarpReduce<complex<real>> WarpReduce;
+      __shared__ typename WarpReduce::TempStorage temp_storage;
+
       // t -> s_in, s-> s_out
       const Vector v = arg.out(s * volume_4d_cb + index_4d_cb, parity); 
-      for(int t = 0; t < Ls_in; t++){
-        const Vector w = arg.in(t * volume_4d_cb + index_4d_cb, parity); 
-        WilsonMatrix<real> wm = vector_tensor_matrix(v, w);
-        int wm_index = s*Ls_in+t;
+      for(t = 0; t < Ls_in; t++){
+        const Vector w = cache.load(t * blockDim.x + threadIdx.x, ld); 
+        int wm_index = s * Ls_in + t;
         real* p = reinterpret_cast<real*>(&wm_p[wm_index]);
         for(int a = 0; a < color_spin_dim; a++){
         for(int b = 0; b < color_spin_dim; b++){
           int cs = a * color_spin_dim + b;
           auto z = conj(conj(v(a)) * w(b));
-          atomicAdd(&p[cs*2+0], z.real());
-          atomicAdd(&p[cs*2+1], z.imag());
+          complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
+          if(threadIdx.x == 0) {
+            atomicAdd(&p[cs*2+0], aggregate.real());
+            atomicAdd(&p[cs*2+1], aggregate.imag());
+          }
         }}
       }
 
@@ -210,13 +228,22 @@ namespace quda {
   template <class storage_type, class Arg>
     class Transfer5d : public TunableVectorYZ {
 
+      typedef typename mapper<storage_type>::type real;
+
       Arg& arg;
       const ColorSpinorField& meta; // this reference is for meta data only
 
       private:
-      unsigned int sharedBytesPerThread() const { return 0; }
+      unsigned int sharedBytesPerThread() const { 
+        if(arg.transfer){
+          return 0;
+        }else{
+          return (arg.Ls_in) * color_spin_dim * 2 * sizeof(typename mapper<storage_type>::type) / arg.Ls_out; 
+        }
+      }
+      
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-      bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
+      // bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
       unsigned int minThreads() const { return arg.volume_4d_cb; }
 
@@ -248,6 +275,7 @@ namespace quda {
         TunableVectorYZ::initTuneParam(param);
         param.block.y = arg.Ls_out; // Ls must be contained in the block
         param.grid.y = 1;
+        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
       void defaultTuneParam(TuneParam &param) const
@@ -255,6 +283,7 @@ namespace quda {
         TunableVectorYZ::defaultTuneParam(param);
         param.block.y = arg.Ls_out; // Ls must be contained in the block
         param.grid.y = 1;
+        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -273,7 +302,6 @@ namespace quda {
       case QUDA_HALF_PRECISION:
         {
           int wm_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
-          // printfQuda("wm_size = %03d\n", wm_size);
           void* wm_d = device_malloc_(__func__, __FILE__, __LINE__, wm_size);
           cudaMemcpyAsync(wm_d, transfer_matrix, wm_size, cudaMemcpyHostToDevice, streams[Nstream - 1]);
           Transfer5dArg<short> arg(out, in, reinterpret_cast<WilsonMatrix<float>*>(wm_d), dagger);
@@ -298,7 +326,6 @@ namespace quda {
       case QUDA_HALF_PRECISION:
         {
           int wm_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
-          printfQuda("wm_size = %03d\n", wm_size);
           void* wm_d = device_malloc_(__func__, __FILE__, __LINE__, wm_size);
           cudaMemsetAsync(wm_d, 0, wm_size, streams[Nstream - 1]);
           Transfer5dArg<short> arg(out, in, reinterpret_cast<WilsonMatrix<float>*>(wm_d), false, false);
