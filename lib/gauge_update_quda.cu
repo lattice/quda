@@ -25,8 +25,7 @@ namespace quda {
     Mom mom;
     Float dt;
     int nDim;
-    UpdateGaugeArg(const Gauge &out, const Gauge &in,
-		   const Mom &mom, Float dt, int nDim)
+    UpdateGaugeArg(GaugeField &out, const GaugeField &in, const GaugeField &mom, Float dt, int nDim)
       : out(out), in(in), mom(mom), dt(dt), nDim(nDim) { }
   };
 
@@ -35,7 +34,7 @@ namespace quda {
   {
     using Float = typename Arg::Float;
     typedef complex<Float> Complex;
-    Matrix<Complex,Arg::nColor> link, result, mom;
+    Matrix<Complex, Arg::nColor> link, result, mom;
 
     for (int dir=0; dir<arg.nDim; ++dir) {
       link = arg.in(dir, x, parity);
@@ -77,7 +76,7 @@ namespace quda {
   {
     int x_cb = blockIdx.x*blockDim.x + threadIdx.x;
     if (x_cb >= arg.out.volumeCB) return;
-    int parity = blockIdx.x*blockDim.x + threadIdx.x;
+    int parity = blockIdx.y*blockDim.y + threadIdx.y;
     compute<conj_mom,exact>(arg, x_cb, parity);
   }
 
@@ -109,12 +108,12 @@ namespace quda {
 
     long long bytes() const { return arg.nDim*2*arg.in.volumeCB*(arg.in.Bytes() + arg.out.Bytes() + arg.mom.Bytes()); }
 
-    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString()); }
   };
 
   template <typename Float, int nColor, QudaReconstructType recon_u> struct UpdateGauge
   {
-    UpdateGauge(const GaugeField &in, GaugeField &out, const GaugeField &mom, double dt, bool conj_mom, bool exact)
+    UpdateGauge(GaugeField &out, const GaugeField &in, const GaugeField &mom, double dt, bool conj_mom, bool exact)
     {
       if (mom.Reconstruct() != QUDA_RECONSTRUCT_10) errorQuda("Reconstruction type %d not supported", mom.Reconstruct());
       constexpr QudaReconstructType recon_m = QUDA_RECONSTRUCT_10;
@@ -147,7 +146,7 @@ namespace quda {
     checkPrecision(out, in, mom);
     checkLocation(out, in, mom);
     checkReconstruct(out, in);
-    instantiate<UpdateGauge,ReconstructNo12>(in, out, mom, dt, conj_mom, exact);
+    instantiate<UpdateGauge,ReconstructNo12>(out, in, mom, dt, conj_mom, exact);
 #else
     errorQuda("Gauge tools are not build");
 #endif
