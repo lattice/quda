@@ -873,17 +873,22 @@ int main(int argc, char **argv)
       if (kappa == -1.0) {
         inv_param.mass = mass + 0.01 * step;
         inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
+	mg_param.invert_param->mass = inv_param.mass;
+	mg_param.invert_param->kappa = inv_param.kappa;
         inv_param2.mass = mass + 0.01 * step;
-        ;
         inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
       } else {
         inv_param.kappa = kappa - 0.001 * step;
         inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
-        inv_param.kappa = kappa / pow(1.1, step);
-        inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
+	mg_param.invert_param->mass = inv_param.mass;
+	mg_param.invert_param->kappa = inv_param.kappa;
+	inv_param2.kappa = kappa - 0.001 * step;
+        inv_param2.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
       }
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         inv_param.mu = mu + 0.01 * step;
+	inv_param2.mu = mu + 0.01 * step;
+	mg_param.invert_param->mu = inv_param.mu;
       }
 
       // reference BiCGStab for comparison
