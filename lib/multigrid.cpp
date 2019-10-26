@@ -116,7 +116,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -217,7 +217,7 @@ namespace quda
       if (param.mg_global.run_verify) verify();
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d done\n", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
     popLevel(param.level);
   }
