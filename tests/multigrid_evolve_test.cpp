@@ -216,6 +216,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
       printfQuda("Twisted-mass doublet non supported (yet)\n");
       exit(0);
     }
+  } else {
+    inv_param.mu = 0.0;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -458,6 +460,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
       printfQuda("Twisted-mass doublet non supported (yet)\n");
       exit(0);
     }
+  } else {
+    inv_param.mu = 0.0;
   }
 
   inv_param.clover_coeff = clover_coeff;
@@ -532,6 +536,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
 int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
+  solve_type = QUDA_DIRECT_PC_SOLVE;
   for (int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
@@ -604,7 +609,7 @@ int main(int argc, char **argv)
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+  for (int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
     if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
   }
@@ -762,7 +767,14 @@ int main(int argc, char **argv)
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette(*gaugeEx);
     double charge = qChargeQuda();
-    printfQuda("INITIAL: plaquette = %e topological charge = %e\n", plaq.x, charge);
+
+    // Demonstrate MG evolution on an evolving gauge field
+    //----------------------------------------------------
+    printfQuda("\n======================================================\n");
+    printfQuda("Running MG gauge evolution test at constant quark mass\n");
+    printfQuda("======================================================\n");
+    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
+               0, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
     // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
@@ -799,14 +811,12 @@ int main(int argc, char **argv)
 
     invertQuda(spinorOut, spinorIn, &inv_param2);
 
-    // Demonstrate MG evolution on an evolving gauge field
-    //----------------------------------------------------
     // setup the multigrid solver
     void *mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
     invertQuda(spinorOut, spinorIn, &inv_param);
 
-    for (int step = 0; step < nsteps; ++step) {
+    for (int step = 1; step < nsteps; ++step) {
       freeGaugeQuda();
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
@@ -819,7 +829,8 @@ int main(int argc, char **argv)
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       plaq = plaquette(*gaugeEx);
       charge = qChargeQuda();
-      printfQuda("EVOLVE: step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
+                 step, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
@@ -849,6 +860,12 @@ int main(int argc, char **argv)
     // Demonstrate MG evolution on a fixed gauge field and different masses
     //---------------------------------------------------------------------
     // setup the multigrid solver
+    printfQuda("\n====================================================\n");
+    printfQuda("Running MG mass scaling test at constant gauge field\n");
+    printfQuda("====================================================\n");
+
+    invertQuda(spinorOut, spinorIn, &inv_param2);
+
     mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
@@ -863,11 +880,10 @@ int main(int argc, char **argv)
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    for (int step = 0; step < nsteps; ++step) {
+    for (int step = 1; step < nsteps; ++step) {
 
       plaq = plaquette(*gaugeEx);
       charge = qChargeQuda();
-      printfQuda("PERSIST: step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
       // Increment the mass/kappa and mu values to emulate heavy/light flavour updates
       if (kappa == -1.0) {
@@ -890,6 +906,9 @@ int main(int argc, char **argv)
 	inv_param2.mu = mu + 0.01 * step;
 	mg_param.invert_param->mu = inv_param.mu;
       }
+
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
+                 step, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
