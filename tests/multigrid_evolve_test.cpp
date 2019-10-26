@@ -609,7 +609,7 @@ int main(int argc, char **argv)
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
-  for (int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
     if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
   }
@@ -773,8 +773,8 @@ int main(int argc, char **argv)
     printfQuda("\n======================================================\n");
     printfQuda("Running MG gauge evolution test at constant quark mass\n");
     printfQuda("======================================================\n");
-    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-               0, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
+    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", 0, plaq.x, charge,
+               inv_param.mass, inv_param.kappa, inv_param.mu);
 
     // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
@@ -829,8 +829,8 @@ int main(int argc, char **argv)
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       plaq = plaquette(*gaugeEx);
       charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-                 step, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step, plaq.x,
+                 charge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
@@ -889,26 +889,26 @@ int main(int argc, char **argv)
       if (kappa == -1.0) {
         inv_param.mass = mass + 0.01 * step;
         inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
-	mg_param.invert_param->mass = inv_param.mass;
-	mg_param.invert_param->kappa = inv_param.kappa;
+        mg_param.invert_param->mass = inv_param.mass;
+        mg_param.invert_param->kappa = inv_param.kappa;
         inv_param2.mass = mass + 0.01 * step;
         inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
       } else {
         inv_param.kappa = kappa - 0.001 * step;
         inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
-	mg_param.invert_param->mass = inv_param.mass;
-	mg_param.invert_param->kappa = inv_param.kappa;
-	inv_param2.kappa = kappa - 0.001 * step;
+        mg_param.invert_param->mass = inv_param.mass;
+        mg_param.invert_param->kappa = inv_param.kappa;
+        inv_param2.kappa = kappa - 0.001 * step;
         inv_param2.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
       }
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
         inv_param.mu = mu + 0.01 * step;
-	inv_param2.mu = mu + 0.01 * step;
-	mg_param.invert_param->mu = inv_param.mu;
+        inv_param2.mu = mu + 0.01 * step;
+        mg_param.invert_param->mu = inv_param.mu;
       }
 
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-                 step, plaq.x, charge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step, plaq.x,
+                 charge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
