@@ -250,7 +250,7 @@ namespace
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {
-    {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
+    {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}, {"jd", QUDA_EIG_JD}};
 
   CLI::TransformPairs<QudaSolveType> solve_type_map {
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},

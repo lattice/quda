@@ -496,6 +496,7 @@ namespace quda
     host_free(residua);
     host_free(Qmat);
   }
+  
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
 
@@ -651,18 +652,18 @@ namespace quda
       num_locked += iter_locked;
 
       if (getVerbosity() >= QUDA_VERBOSE) {
-        // printfQuda("iter Conv = %d\n", iter_converged);
-        // printfQuda("iter Keep = %d\n", iter_keep);
-        // printfQuda("iter Lock = %d\n", iter_locked);
+	printfQuda("iter Conv = %d\n", iter_converged);
+	printfQuda("iter Keep = %d\n", iter_keep);
+	printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
-        // printfQuda("num_converged = %d\n", num_converged);
-        // printfQuda("num_keep = %d\n", num_keep);
-        // printfQuda("num_locked = %d\n", num_locked);
+	printfQuda("num_converged = %d\n", num_converged);
+	printfQuda("num_keep = %d\n", num_keep);
+	printfQuda("num_locked = %d\n", num_locked);
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         for (int i = 0; i < nKr; i++) {
-          // printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+	  printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
@@ -950,7 +951,7 @@ namespace quda
       if (eigSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
         eigSpace[0]->Source(QUDA_RANDOM_SOURCE);
       } else {
-        RNG *rng = new RNG(eigSpace[0]->Volume(), 1234, eigSpace[0]->X());
+        RNG *rng = new RNG(*eigSpace[0], 1234);
         rng->Init();
         spinorNoise(*eigSpace[0], *rng, QUDA_NOISE_UNIFORM);
         rng->Release();
@@ -964,8 +965,6 @@ namespace quda
     // Init a zero residual
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
-
-    double t1 = clock();
 
     // Convergence and locking criteria
     double epsilon = DBL_EPSILON;
@@ -1171,7 +1170,6 @@ namespace quda
 
         // TODO: remove the following hardcoded exit
         norm = 1.0;
-
       }
 
       // Restart: shrink the acceleration subspace
@@ -1228,8 +1226,10 @@ namespace quda
       // TODO: remove 6th param ?
       // Proposing a new vector t through the solution of a shifted-and-projected MMdag
 
+      printfQuda("Flag 1\n"); 
       invertProjMat(eigSpace, theta, mat, *t[0], *r[0], 0);
-
+      printfQuda("Flag 2\n"); 
+      
       blas::ax(-1.0, *t[0]); // TODO: evaluate through numerical tests the behaviour when using -t vs t
 
       // TODO: simply remove this ?
@@ -1264,13 +1264,13 @@ namespace quda
 
     //TODO: is this pruning step necessary for JD ?
     /*
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("kSpace size at convergence/max restarts = %d\n", kSpace.size());
-    // Prune the Krylov space back to size when passed to eigensolver
-    for (int i = nKr; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(nKr);
+      // Prune the Krylov space back to size when passed to eigensolver
+      for (int i = nKr; i < kSpace.size(); i++) { delete kSpace[i]; }
+      kSpace.resize(nKr);
     */
-
+    
     // Post computation report
 
     if (!converged) {
@@ -1287,11 +1287,11 @@ namespace quda
 
         // Dump all Ritz values and residua
         //for (int i = 0; i < nEv; i++) {
-          //printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
-          //TODO: how to print this in the case of JD ?? Is it really necessary to display/analyze ??
+	//printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+	//TODO: how to print this in the case of JD ?? Is it really necessary to display/analyze ??
         //}
       }
-
+      
       // Compute eigenvalues //TODO: double-check that computeEvals(...) is general/applicable for JD
       //computeEvals(mat, kSpace, evals, nEv);
       //if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -1307,27 +1307,6 @@ namespace quda
       if (eig_param->compute_svd) computeSVD(kSpace, d_vecs_tmp, evals, reverse);
       time_svd += clock();
       */
-    }
-
-    double t2 = clock() - t1;
-    double total;
-
-    if (eig_param->compute_svd)
-      total = (time_e + time_mv + time_mb + time_svd) / CLOCKS_PER_SEC;
-    else
-      total = (time_e + time_mv + time_mb) / CLOCKS_PER_SEC;
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("Time to solve problem using JD = %e\n", t2 / CLOCKS_PER_SEC);
-      printfQuda("Time spent using EIGEN           = %e  %.1f%%\n", time_e / CLOCKS_PER_SEC,
-                 100 * (time_e / CLOCKS_PER_SEC) / total);
-      printfQuda("Time spent in matVec             = %e  %.1f%%\n", time_mv / CLOCKS_PER_SEC,
-                 100 * (time_mv / CLOCKS_PER_SEC) / total);
-      printfQuda("Time spent in (multi)blas        = %e  %.1f%%\n", time_mb / CLOCKS_PER_SEC,
-                 100 * (time_mb / CLOCKS_PER_SEC) / total);
-      if (eig_param->compute_svd)
-        printfQuda("Time spent computing svd         = %e  %.1f%%\n", time_svd / CLOCKS_PER_SEC,
-                   100 * (time_svd / CLOCKS_PER_SEC) / total);
     }
 
     // Local clean-up
@@ -1403,6 +1382,8 @@ namespace quda
     //solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
     solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
 
+    printfQuda("here 1\n");
+    
     // Add projected-preconditioning to the inversion in the JD eigensolver
     if(precJD){
 
@@ -1421,7 +1402,7 @@ namespace quda
 
       CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
 
-      //printfQuda("\n SIZE qSpace =  %d\n\n", qSpace.size());
+      printfQuda("\n SIZE qSpace =  %d\n\n", qSpace.size());
 
       setVerbosity(QUDA_VERBOSE);
 
@@ -1438,7 +1419,7 @@ namespace quda
 
       setVerbosity(QUDA_SILENT);
 
-      //printfQuda("\nDimensionality of projection space = %d\n\n", qSpace.size());
+      printfQuda("\nDimensionality of projection space = %d\n\n", qSpace.size());
       //errorQuda("\nUNDER CONSTRUCTION...\n\n");
 
       // Switching back the shift parameters
@@ -1458,7 +1439,7 @@ namespace quda
           M(i,j) = resultDotProd[i*sizePS + j];
         }
       }
-
+      
       // 4. r_tilde = Ktilde^-1 * r
 
       // Switching to the appropriate shift for JD
@@ -1522,7 +1503,9 @@ namespace quda
 
       double tolBuff = eig_param->invert_param->tol;
       eig_param->invert_param->tol = 0.5;
+      printfQuda("here 2\n");
       invertShifted(x, b, 1, qSpace, theta);
+      printfQuda("here 3\n");
       eig_param->invert_param->tol = tolBuff;
     }
 
@@ -1645,6 +1628,7 @@ namespace quda
       double bareShift_mSloppy = mSloppy.shift;
       mSloppy.shift = bareShift_mSloppy - theta;
 
+      printfQuda("shift 1\n");
       Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profile);
       (*solve)(*out, *in);
       delete solve;
@@ -1661,7 +1645,7 @@ namespace quda
       m.shift = bareShift_m - theta;
       double bareShift_mSloppy = mSloppy.shift;
       mSloppy.shift = bareShift_mSloppy - theta;
-
+      printfQuda("shift 2\n");
       Solver *solve = Solver::create(solverParam, mSloppy, mSloppy, mSloppy, profile);
       (*solve)(*out, *in);
       delete solve;

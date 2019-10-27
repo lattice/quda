@@ -215,7 +215,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.matpc_type = matpc_type;
   inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.verbosity = verbosity;
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  //inv_param.inv_type_precondition = QUDA_MG_INVERTER;
   inv_param.tol = tol;
 
   // require both L2 relative and heavy quark residual to determine
@@ -325,14 +325,7 @@ int main(int argc, char **argv)
   // inv_param structure inside the eig_param structure
   // to avoid any confusion
   QudaInvertParam eig_inv_param = newQudaInvertParam();
-
   setInvertParam(eig_inv_param);
-  eig_inv_param.inv_type = inv_type;
-  eig_inv_param.solution_type = solution_type;
-  eig_inv_param.solve_type = solve_type;
-  eig_inv_param.matpc_type = matpc_type;
-  eig_inv_param.inv_type_precondition = precon_type;
-
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
 

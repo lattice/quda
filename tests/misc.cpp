@@ -865,7 +865,7 @@ const char *get_eig_spectrum_str(QudaEigSpectrumType type)
 QudaEigType get_eig_type(char *s)
 {
 
-  QudaEigType ret = QUDA_INVALID_EIG;
+  QudaEigType ret = QUDA_EIG_INVALID;
 
   if (strcmp(s, "trlm") == 0) {
     ret = QUDA_EIG_TR_LANCZOS;
