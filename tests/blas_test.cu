@@ -6,6 +6,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
@@ -13,27 +14,7 @@
 // google test
 #include <gtest/gtest.h>
 
-extern int test_type;
-extern QudaPrecision prec;
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec[QUDA_MAX_MG_LEVEL];
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
-
-extern bool verify_results;
-extern int Nsrc;
-extern int Msrc;
-extern QudaSolveType solve_type;
-
-extern void usage(char** );
-
-const int Nkernels = 40;
+constexpr int Nkernels = 43;
 
 using namespace quda;
 
@@ -45,10 +26,12 @@ std::vector<cpuColorSpinorField*> zmH;
 int Nspin;
 int Ncolor;
 
-void setPrec(ColorSpinorParam &param, const QudaPrecision precision)
+void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
 {
   param.setPrecision(precision);
-  if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
+  if (order == 1) {
+    param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  } else if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else {
     param.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
@@ -71,7 +54,63 @@ void display_test_info()
 
 int Nprec = 4;
 
-bool skip_kernel(int precision, int kernel) {
+const char *prec_str[] = {"quarter", "half", "single", "double"};
+const char *order_str[] = {"default", "float2"};
+
+// For googletest names must be non-empty, unique, and may only contain ASCII
+// alphanumeric characters or underscore
+const char *names[] = {"copyHS",
+                       "copyMS",
+                       "copyLS",
+                       "axpby",
+                       "xpy",
+                       "axpy",
+                       "xpay",
+                       "mxpy",
+                       "ax",
+                       "caxpy",
+                       "caxpby",
+                       "cxpaypbz",
+                       "axpyBzpcx",
+                       "axpyZpbx",
+                       "caxpbypzYmbw",
+                       "cabxpyAx",
+                       "caxpyXmaz",
+                       "norm",
+                       "reDotProduct",
+                       "axpyNorm",
+                       "xmyNorm",
+                       "caxpyNorm",
+                       "caxpyXmazNormX",
+                       "cabxpyzAxNorm",
+                       "cDotProduct",
+                       "caxpyDotzy",
+                       "cDotProductNormA",
+                       "cDotProductNormB",
+                       "caxpbypzYmbwcDotProductUYNormY",
+                       "HeavyQuarkResidualNorm",
+                       "xpyHeavyQuarkResidualNorm",
+                       "tripleCGReduction",
+                       "tripleCGUpdate",
+                       "axpyReDot",
+                       "caxpy_block",
+                       "axpyBzpcx_block",
+                       "caxpyBxpz",
+                       "caxpyBzpx",
+                       "cDotProductNorm_block",
+                       "cDotProduct_block",
+                       "reDotProductNorm_block",
+                       "reDotProduct_block",
+                       "axpy_block"};
+
+// kernels that utilize multi-blas
+bool is_multi(int kernel) { return std::string(names[kernel]).find("_block") != std::string::npos ? true : false; }
+
+// kernels that require site unrolling
+bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQuark") != std::string::npos ? true : false; }
+
+bool skip_kernel(int precision, int kernel, int order)
+{
   if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
   // if we've selected a given kernel then make sure we only run that
@@ -87,7 +126,7 @@ bool skip_kernel(int precision, int kernel) {
   } else if (Nspin == 2 && (kernel == 1 || kernel == 2)) {
     // avoid low-precision copy if doing coarse fields
     return true;
-  } else if (Ncolor != 3 && (kernel == 31 || kernel == 32)) {
+  } else if (Ncolor != 3 && is_site_unroll(kernel)) {
     // only benchmark heavy-quark norm if doing 3 colors
     return true;
   } else if ((Nprec < 4) && (kernel == 0)) {
@@ -95,10 +134,27 @@ bool skip_kernel(int precision, int kernel) {
     return true;
   }
 
+  if (order == 1) {
+#ifdef GPU_MULTIGRID
+    // order == 1 represents the case of multigrid testing for float-2
+    // ordered nspin-4 fields in single precision and less, skip all other cases
+    if (Nspin == 1 || Nspin == 2 || this_prec == QUDA_DOUBLE_PRECISION) {
+      return true;
+    } else if (Nspin == 4 && (this_prec != QUDA_DOUBLE_PRECISION && is_multi(kernel) ||
+                              this_prec == QUDA_SINGLE_PRECISION && is_site_unroll(kernel))) {
+      // we don't instantiate multi-blas kernels for float-2 nspin-4
+      // fields, so skip these
+      return true;
+    }
+#else
+    return true;
+#endif
+  }
+
   return false;
 }
 
-void initFields(int prec)
+void initFields(int prec, int order)
 {
   // precisions used for the source field in the copyCuda() benchmark
   QudaPrecision high_aux_prec = QUDA_INVALID_PRECISION;
@@ -112,12 +168,12 @@ void initFields(int prec)
 
   param.pad = 0; // padding must be zero for cpu fields
 
-  if (solve_type == QUDA_DIRECT_PC_SOLVE) {
-    param.siteSubset = QUDA_PARITY_SITE_SUBSET;
-  } else if (solve_type == QUDA_DIRECT_SOLVE) {
-    param.siteSubset = QUDA_FULL_SITE_SUBSET;
-  } else {
-    errorQuda("Unexpected solve_type=%d\n", solve_type);
+  switch (solve_type) {
+  case QUDA_DIRECT_PC_SOLVE:
+  case QUDA_NORMOP_PC_SOLVE: param.siteSubset = QUDA_PARITY_SITE_SUBSET; break;
+  case QUDA_DIRECT_SOLVE:
+  case QUDA_NORMOP_SOLVE: param.siteSubset = QUDA_FULL_SITE_SUBSET; break;
+  default: errorQuda("Unexpected solve_type=%d\n", solve_type);
   }
 
   if (param.siteSubset == QUDA_PARITY_SITE_SUBSET) param.x[0] = xdim/2;
@@ -142,12 +198,10 @@ void initFields(int prec)
   mH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-// create composite fields
+  // create composite fields
 
   // xmH = new cpuColorSpinorField(param);
   // ymH = new cpuColorSpinorField(param);
-
-
 
   xmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) xmH.push_back(new cpuColorSpinorField(param));
@@ -155,7 +209,6 @@ void initFields(int prec)
   for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
   zmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
-
 
   static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   static_cast<cpuColorSpinorField*>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -179,25 +232,25 @@ void initFields(int prec)
 
   switch(prec) {
   case 0:
-    setPrec(param, QUDA_QUARTER_PRECISION);
+    setPrec(param, QUDA_QUARTER_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_HALF_PRECISION;
     break;
   case 1:
-    setPrec(param, QUDA_HALF_PRECISION);
+    setPrec(param, QUDA_HALF_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_SINGLE_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 2:
-    setPrec(param, QUDA_SINGLE_PRECISION);
+    setPrec(param, QUDA_SINGLE_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
     break;
   case 3:
-    setPrec(param, QUDA_DOUBLE_PRECISION);
+    setPrec(param, QUDA_DOUBLE_PRECISION, order);
     high_aux_prec = QUDA_SINGLE_PRECISION;
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
@@ -205,6 +258,11 @@ void initFields(int prec)
   default:
     errorQuda("Precision option not defined");
   }
+
+  // ensure we don't enable copying between precisions that are not compiled
+  if ( (high_aux_prec != QUDA_DOUBLE_PRECISION) && !(high_aux_prec & QUDA_PRECISION) ) high_aux_prec = getPrecision(prec);
+  if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
+  if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
   checkCudaError();
 
@@ -217,7 +275,7 @@ void initFields(int prec)
   param.is_composite = true;
   param.is_component = false;
 
-// create composite fields
+  // create composite fields
   param.composite_dim = Nsrc;
   xmD = new cudaColorSpinorField(param);
 
@@ -249,6 +307,7 @@ void initFields(int prec)
                                 low_aux_prec == QUDA_QUARTER_PRECISION || mid_aux_prec == QUDA_QUARTER_PRECISION) );
 
   if ( flag ) {
+
     *vD = *vH;
     *wD = *wH;
     *xD = *xH;
@@ -257,6 +316,7 @@ void initFields(int prec)
     *hD = *hH;
     *mD = *mH;
     *lD = *lH;
+
     // for (int i=0; i < Nsrc; i++){
     //   xmD->Component(i) = *(xmH[i]);
     //   ymD->Component(i) = *(ymH[i]);
@@ -308,6 +368,7 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * B = new quda::Complex[Nsrc*Msrc];
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
+  double *Ar = new double[Nsrc * Msrc];
 
   cudaEvent_t start, end;
   cudaEventCreate(&start);
@@ -480,6 +541,18 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
       break;
 
+    case 40:
+      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+      break;
+
+    case 41:
+      for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+      break;
+
+    case 42:
+      for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
+      break;
+
     default:
       errorQuda("Undefined blas kernel %d\n", kernel);
     }
@@ -495,6 +568,7 @@ double benchmark(int kernel, const int niter) {
   delete[] B;
   delete[] C;
   delete[] A2;
+  delete[] Ar;
   double secs = runTime / 1000;
   return secs;
 }
@@ -511,14 +585,17 @@ double test(int kernel) {
   quda::Complex * C = new quda::Complex[Nsrc*Msrc];
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   quda::Complex * B2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
-  for(int i=0; i < Nsrc*Msrc; i++){
-    A[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
-    B[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
-    C[i] = a2*  (1.0*((M_PI/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Msrc/2-i));
+  double *Ar = new double[Nsrc * Msrc];
+
+  for (int i = 0; i < Nsrc * Msrc; i++) {
+    A[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    B[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    C[i] = a2 * (1.0 * ((M_PI / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Msrc - i));
+    Ar[i] = A[i].real();
   }
-  for(int i=0; i < Nsrc*Nsrc; i++){
-    A2[i] = a2*  (1.0*((i/Nsrc) + i)) + b2 * (1.0*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
-    B2[i] = a2*  (1.0*((i/Nsrc) + i)) - b2 * (M_PI*i) + c2 *(1.0*(Nsrc*Nsrc/2-i));
+  for (int i = 0; i < Nsrc * Nsrc; i++) {
+    A2[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) + b2 * (1.0 * i) + c2 * (1.0 * (0.5 * Nsrc * Nsrc - i));
+    B2[i] = a2 * (1.0 * ((i / (double)Nsrc) + i)) - b2 * (M_PI * i) + c2 * (1.0 * (0.5 * Nsrc * Nsrc - i));
   }
   // A[0] = a2;
   // A[1] = 0.;
@@ -895,6 +972,49 @@ double test(int kernel) {
     error /= Nsrc*Msrc;
     break;
 
+  case 40:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Nsrc; j++) {
+        ((double*)B2)[i*Nsrc+j] = blas::reDotProduct(xmD->Component(i), xmD->Component(j));
+        error += std::abs(((double*)A2)[i*Nsrc+j] - ((double*)B2)[i*Nsrc+j])/std::abs(((double*)B2)[i*Nsrc+j]);
+      }
+    }
+    error /= Nsrc*Nsrc;
+    break;
+
+  case 41:
+    for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+    blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+    error = 0.0;
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Msrc; j++) {
+        ((double*)B)[i*Msrc+j] = blas::reDotProduct(xmD->Component(i), ymD->Component(j));
+        error += std::abs(((double*)A)[i*Msrc+j] - ((double*)B)[i*Msrc+j])/std::abs(((double*)B)[i*Msrc+j]);
+      }
+    }
+    error /= Nsrc*Msrc;
+    break;
+
+  case 42:
+    for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
+    for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
+
+    blas::axpy(Ar, *xmD, *ymD);
+    for (int i = 0; i < Nsrc; i++) {
+      for (int j = 0; j < Msrc; j++) { blas::axpy(Ar[Msrc * i + j], *(xmH[i]), *(ymH[j])); }
+    }
+
+    error = 0;
+    for (int i = 0; i < Msrc; i++) {
+      error += fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
+    }
+    error /= Msrc;
+    break;
+
   default:
     errorQuda("Undefined blas kernel %d\n", kernel);
   }
@@ -903,56 +1023,9 @@ double test(int kernel) {
   delete[] C;
   delete[] A2;
   delete[] B2;
+  delete[] Ar;
   return error;
 }
-
-const char *prec_str[] = {"quarter", "half", "single", "double"};
-
-
-// For googletest names must be non-empty, unique, and may only contain ASCII
-// alphanumeric characters or underscore
-const char *names[] = {
-  "copyHS",
-  "copyMS",
-  "copyLS",
-  "axpby",
-  "xpy",
-  "axpy",
-  "xpay",
-  "mxpy",
-  "ax",
-  "caxpy",
-  "caxpby",
-  "cxpaypbz",
-  "axpyBzpcx",
-  "axpyZpbx",
-  "caxpbypzYmbw",
-  "cabxpyAx",
-  "caxpyXmaz",
-  "norm",
-  "reDotProduct",
-  "axpyNorm",
-  "xmyNorm",
-  "caxpyNorm",
-  "caxpyXmazNormX",
-  "cabxpyzAxNorm",
-  "cDotProduct",
-  "caxpyDotzy",
-  "cDotProductNormA",
-  "cDotProductNormB",
-  "caxpbypzYmbwcDotProductUYNormY",
-  "HeavyQuarkResidualNorm",
-  "xpyHeavyQuarkResidualNorm",
-  "tripleCGReduction",
-  "tripleCGUpdate",
-  "axpyReDot",
-  "caxpy_block",
-  "axpyBzpcx_block",
-  "caxpyBxpz",
-  "caxpyBzpx",
-  "cDotProductNorm_block",
-  "cDotProduct_block",
-};
 
 int main(int argc, char** argv)
 {
@@ -963,12 +1036,17 @@ int main(int argc, char** argv)
   prec = QUDA_INVALID_PRECISION;
   test_type = -1;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+
+  app->add_option("--test", test_type, "Kernel to test (-1: -> all kernels)")->check(CLI::Range(0, Nkernels - 1));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // override spin setting if mg solver is set to test coarse grids
@@ -988,17 +1066,15 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
-  setVerbosity(QUDA_SILENT);
+  setVerbosity(verbosity);
 
   // clear the error state
   cudaGetLastError();
 
   // lastly check for correctness
-  if (verify_results) {
-    ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
-    if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
-    result = RUN_ALL_TESTS();
-  }
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+  result = RUN_ALL_TESTS();
 
   endQuda();
 
@@ -1014,25 +1090,37 @@ using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
 
-class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int>> {
+class BlasTest : public ::testing::TestWithParam<::testing::tuple<int, int, int>>
+{
 protected:
-  ::testing::tuple<int, int> param;
+  ::testing::tuple<int, int, int> param;
+  const int &prec;
+  const int &kernel;
+  const int &order;
 
 public:
+  BlasTest() :
+    param(GetParam()),
+    prec(::testing::get<0>(param)),
+    kernel(::testing::get<1>(param)),
+    order(::testing::get<2>(param))
+  {
+  }
   virtual ~BlasTest() { }
   virtual void SetUp() {
-    param = GetParam();
-    initFields(::testing::get<0>(GetParam()));
+    if (!skip_kernel(prec, kernel, order)) initFields(prec, order);
   }
-  virtual void TearDown() { freeFields(); }
-
+  virtual void TearDown()
+  {
+    if (!skip_kernel(prec, kernel, order)) freeFields();
+  }
 };
-
 
 TEST_P(BlasTest, verify) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec, kernel)) GTEST_SKIP();
+  int order = ::testing::get<2>(GetParam());
+  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
 
   // certain tests will fail to run for coarse grids so mark these as
   // failed without running
@@ -1046,7 +1134,8 @@ TEST_P(BlasTest, verify) {
 TEST_P(BlasTest, benchmark) {
   int prec = ::testing::get<0>(GetParam());
   int kernel = ::testing::get<1>(GetParam());
-  if (skip_kernel(prec, kernel)) GTEST_SKIP();
+  int order = ::testing::get<2>(GetParam());
+  if (skip_kernel(prec, kernel, order)) GTEST_SKIP();
 
   // do the initial tune
   benchmark(kernel, 1);
@@ -1064,14 +1153,16 @@ TEST_P(BlasTest, benchmark) {
   printfQuda("%-31s: Gflop/s = %6.1f, GB/s = %6.1f\n", names[kernel], gflops, gbytes);
 }
 
-std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int>> param){
+std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> param)
+{
   int prec = ::testing::get<0>(param.param);
   int kernel = ::testing::get<1>(param.param);
+  int order = ::testing::get<2>(param.param);
   std::string str(names[kernel]);
-  str += std::string("_");
-  str += std::string(prec_str[prec]);
-  return str; // names[kernel] + "_" + prec_str[prec];
+  str += std::string("_") + std::string(prec_str[prec]);
+  str += std::string("_") + std::string(order_str[order]);
+  return str;
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, 4), Range(0, Nkernels)), getblasname);
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 2)), getblasname);

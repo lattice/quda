@@ -10,10 +10,23 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) : param(param), profile(profile), node_parity(0) {
+  Solver::Solver(SolverParam &param, TimeProfile &profile) :
+    param(param),
+    profile(profile),
+    node_parity(0),
+    eig_solve(nullptr)
+  {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
     node_parity = node_parity % 2;
+  }
+
+  Solver::~Solver()
+  {
+    if (eig_solve) {
+      delete eig_solve;
+      eig_solve = nullptr;
+    }
   }
 
   // solver factory
@@ -141,6 +154,45 @@ namespace quda {
     }
 
     return solver;
+  }
+
+  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd)
+  {
+    if (deflate_init) return;
+
+    // Deflation requested + first instance of solver
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    // Clone from an existing vector
+    ColorSpinorParam csParam(meta);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    param.evecs.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+
+    // Construct vectors to hold deflated RHS
+    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
+    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+
+    param.evals.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
+    profile.TPSTOP(QUDA_PROFILE_INIT);
+    (*eig_solve)(param.evecs, param.evals);
+    profile.TPSTART(QUDA_PROFILE_INIT);
+
+    if (svd) {
+      // Resize deflation space and compute left SV of M
+      for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++)
+        param.evecs.push_back(ColorSpinorField::Create(csParam));
+
+      // Populate latter half of the array with left SV
+      eig_solve->computeSVD(mat, param.evecs, param.evals);
+    }
+
+    deflate_init = true;
   }
 
   void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){

@@ -42,10 +42,12 @@ namespace quda {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
   }
 
+  // Destroy
   Dirac::~Dirac() {   
     if (getVerbosity() > QUDA_VERBOSE) profile.Print();
   }
 
+  // Assignment
   Dirac& Dirac::operator=(const Dirac &dirac)
   {
     if (&dirac != this) {
@@ -116,11 +118,6 @@ namespace quda {
 		in.Precision(), out.Precision());
     }
 
-    if (in.Stride() != out.Stride()) {
-      errorQuda("Input %d and output %d spinor strides don't match in dslash_quda", 
-		in.Stride(), out.Stride());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
@@ -132,13 +129,13 @@ namespace quda {
     if (out.Ndim() != 5) {
       if ((out.Volume() != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	  (out.Volume() != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
+        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
       }
     } else {
       // Domain wall fermions, compare 4d volumes not 5d
       if ((out.Volume()/out.X(4) != gauge->Volume() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
 	  (out.Volume()/out.X(4) != gauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
-	errorQuda("Spinor volume %d doesn't match gauge volume %d", out.Volume(), gauge->VolumeCB());
+        errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), gauge->VolumeCB());
       }
     }
   }
@@ -167,6 +164,12 @@ namespace quda {
     } else if (param.type == QUDA_CLOVER_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracClover operator\n");
       return new DiracClover(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwist operator\n");
+      return new DiracCloverHasenbuschTwist(param);
+    } else if (param.type == QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverHasenbuschTwistPC operator\n");
+      return new DiracCloverHasenbuschTwistPC(param);
     } else if (param.type == QUDA_CLOVERPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracCloverPC operator\n");
       return new DiracCloverPC(param);
@@ -260,6 +263,7 @@ namespace quda {
 	break;
       case QUDA_WILSON_DIRAC:
       case QUDA_CLOVER_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC:
       case QUDA_DOMAIN_WALL_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALL_DIRAC:
       case QUDA_STAGGERED_DIRAC:
@@ -270,6 +274,7 @@ namespace quda {
         break;
       case QUDA_WILSONPC_DIRAC:
       case QUDA_CLOVERPC_DIRAC:
+      case QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC:
       case QUDA_DOMAIN_WALLPC_DIRAC:
       case QUDA_DOMAIN_WALL_4DPC_DIRAC:
       case QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC:

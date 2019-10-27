@@ -44,6 +44,9 @@ namespace quda {
     /** Number of vectors used to define coarse space */
     int Nvec;
 
+    /** Number of times to apply Gram-Schmidt within a block */
+    int NblockOrtho;
+
     /** This is the next lower level */
     MG *coarse;
 
@@ -110,6 +113,7 @@ namespace quda {
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
+      NblockOrtho(param.n_block_ortho[level]),
       B(B),
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
@@ -140,6 +144,7 @@ namespace quda {
       Nlevel(param.Nlevel),
       spinBlockSize(param.mg_global.spin_block_size[level]),
       Nvec(param.mg_global.n_vec[level]),
+      NblockOrtho(param.mg_global.n_block_ortho[level]),
       coarse(param.coarse),
       fine(param.fine),
       B(B),
@@ -199,9 +204,6 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
-    MG *fine;
-
     /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
     Solver *coarse_solver;
 
@@ -216,9 +218,6 @@ namespace quda {
 
     /** Storage for the parameter struct for the coarse solver */
     SolverParam *param_coarse_solver;
-
-    /** The fine-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B;
 
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B_coarse;
@@ -237,6 +236,9 @@ namespace quda {
 
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
+
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp2_coarse;
 
     /** The fine operator used for computing inter-grid residuals */
     const Dirac *diracResidual;
@@ -445,7 +447,7 @@ public:
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
-     @param Yhat[out] Preconidtioned coarse link field
+     @param Yhat[out] Preconditioned coarse link field
      @param Xinv[out] Coarse clover inverse field
      @param Y[in] Coarse link field
      @param X[in] Coarse clover field

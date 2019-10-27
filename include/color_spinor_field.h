@@ -34,9 +34,9 @@ namespace quda {
      int  dim;//individual component has dim = 0
      int  id;
 
-     int volume;       // volume of a single eigenvector
-     int volumeCB;     // CB volume of a single eigenvector
-     int stride;       // stride of a single eigenvector
+     size_t volume;       // volume of a single eigenvector
+     size_t volumeCB;     // CB volume of a single eigenvector
+     size_t stride;       // stride of a single eigenvector
      size_t real_length;  // physical length of a single eigenvector
      size_t length;       // length including pads (but not ghost zones)
 
@@ -156,7 +156,6 @@ namespace quda {
 
       if (!pc_solution) {
         siteSubset = QUDA_FULL_SITE_SUBSET;
-        ;
       } else {
         x[0] /= 2; // X defined the full lattice dimensions
         siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -175,8 +174,8 @@ namespace quda {
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
-        fieldOrder
-            = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+        fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER :
+                                                                                        QUDA_FLOAT4_FIELD_ORDER;
         siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
       } else if (inv_param.dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) {
         fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -219,8 +218,8 @@ namespace quda {
         component_id(0)
     {
       siteSubset = cpuParam.siteSubset;
-      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
-      }
+      fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+    }
 
     /**
        If using CUDA native fields, this function will ensure that the
@@ -330,10 +329,10 @@ namespace quda {
     int nDim;
     int x[QUDA_MAX_DIM];
 
-    int volume;
-    int volumeCB;
-    int pad;
-    int stride;
+    size_t volume;
+    size_t volumeCB;
+    size_t pad;
+    size_t stride;
 
     QudaTwistFlavorType twistFlavor;
 
@@ -412,9 +411,9 @@ namespace quda {
     int X(int d) const { return x[d]; }
     size_t RealLength() const { return real_length; }
     size_t Length() const { return length; }
-    int Stride() const { return stride; }
-    int Volume() const { return volume; }
-    int VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
+    size_t Stride() const { return stride; }
+    size_t Volume() const { return volume; }
+    size_t VolumeCB() const { return siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume / 2; }
     int Pad() const { return pad; }
     size_t Bytes() const { return bytes; }
     size_t NormBytes() const { return norm_bytes; }
@@ -541,6 +540,16 @@ namespace quda {
     static ColorSpinorField* Create(const ColorSpinorField &src, const ColorSpinorParam &param);
 
     /**
+       @brief Create a field that aliases this field's storage.  The
+       alias field can use a different precision than this field,
+       though it cannot be greater.  This functionality is useful for
+       the case where we have multiple temporaries in different
+       precisions, but do not need them simultaneously.  Use this functionality with caution.
+       @param[in] param Parameters for the alias field
+    */
+    ColorSpinorField* CreateAlias(const ColorSpinorParam &param);
+
+    /**
        @brief Create a coarse color-spinor field, using this field to set the meta data
        @param[in] geoBlockSize Geometric block size that defines the coarse grid dimensions
        @param[in] spinlockSize Geometric block size that defines the coarse spin dimension
@@ -602,7 +611,6 @@ namespace quda {
 
     void create(const QudaFieldCreate);
     void destroy();
-    void copy(const cudaColorSpinorField &);
 
     /**
        @brief Zero the padded regions added on to the field.  Ensures
@@ -632,6 +640,8 @@ namespace quda {
     ColorSpinorField& operator=(const ColorSpinorField &);
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
+
+    void copy(const cudaColorSpinorField &);
 
     void switchBufferPinned();
 
@@ -965,9 +975,6 @@ namespace quda {
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double A, double B);
-  void wuppertalStep(ColorSpinorField &out, const ColorSpinorField &in, int parity, const GaugeField& U, double alpha);
-
   void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
@@ -1000,7 +1007,7 @@ namespace quda {
      @param seed Seed
      @param type The type of noise to create (QUDA_NOISE_GAUSSIAN or QUDA_NOISE_UNIFORM)
   */
-  void spinorNoise(ColorSpinorField &src, int seed, QudaNoiseType type);
+  void spinorNoise(ColorSpinorField &src, unsigned long long seed, QudaNoiseType type);
 
   /**
      @brief Helper function for determining if the preconditioning

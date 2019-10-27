@@ -692,8 +692,8 @@ namespace quda {
 
       // before we do policy tuning we must ensure the kernel
       // constituents have been tuned since we can't do nested tuning
-      if (getTuning() && getTuneCache().find(tuneKey()) == getTuneCache().end()) {
-	disableProfileCount();
+      if (!tuned()) {
+        disableProfileCount();
 	for (auto &i : policies) if(i!= DslashCoarsePolicy::DSLASH_COARSE_POLICY_DISABLED) dslash(i);
 	enableProfileCount();
 	setPolicyTuning(true);
@@ -749,7 +749,7 @@ namespace quda {
      int Ns = dslash.inA.Nspin();
      int Nc = dslash.inA.Ncolor();
      int nParity = dslash.inA.SiteSubset();
-     int volumeCB = dslash.inA.VolumeCB();
+     long long volumeCB = dslash.inA.VolumeCB();
      return ((dslash.dslash*2*nDim+dslash.clover*1)*(8*Ns*Nc*Ns*Nc)-2*Ns*Nc)*nParity*volumeCB;
    }
 

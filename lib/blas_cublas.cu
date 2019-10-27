@@ -1,5 +1,7 @@
+#ifdef CUBLAS_LIB
 #include <blas_cublas.h>
 #include <cublas_v2.h>
+#endif
 #include <malloc_quda.h>
 
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
@@ -129,7 +131,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
 #endif // CUBLAS_LIB
-      
+
       return flops;
     }
 

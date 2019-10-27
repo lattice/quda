@@ -18,6 +18,27 @@
 #include <qmp.h>
 #endif
 
+// these are helper macros used to enable spin-1, spin-2 and spin-4 building blocks as needed
+#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_CLOVER_DIRAC)                           \
+  || defined(GPU_TWISTED_MASS_DIRAC) || defined(GPU_TWISTED_CLOVER_DIRAC) || defined(GPU_NDEG_TWISTED_MASS_DIRAC)      \
+  || defined(GPU_CLOVER_HASENBUSCH_TWIST) || defined(GPU_COVDEV)
+#define NSPIN4
+#endif
+
+#if defined(GPU_MULTIGRID)
+#define NSPIN2
+#endif
+
+#if defined(GPU_STAGGERED_DIRAC)
+#define NSPIN1
+#endif
+
+// this is a helper macro for stripping the path information from
+// __FILE__.  FIXME - convert this into a consexpr routine
+#define KERNEL_FILE                                                                                                    \
+  (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 :                                                               \
+                            strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+
 #define TEX_ALIGN_REQ (512*2) //Fermi, factor 2 comes from even/odd
 #define ALIGNMENT_ADJUST(n) ( (n+TEX_ALIGN_REQ-1)/TEX_ALIGN_REQ*TEX_ALIGN_REQ)
 #include <enum_quda.h>

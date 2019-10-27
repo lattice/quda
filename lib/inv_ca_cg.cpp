@@ -48,6 +48,13 @@ namespace quda {
       if (rp) delete rp;
     }
 
+    if (deflate_init) {
+      for (auto veci : param.evecs)
+        if (veci) delete veci;
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+    }
+
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -254,6 +261,10 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
 
+      // Once the CACG operator is called, we are able to construct an appropriate
+      // Krylov space for deflation
+      if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
+
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
       tmp_sloppy2 = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -298,6 +309,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_alpha_N<1>(Q_AQandg, alpha); break;
       case 2: compute_alpha_N<2>(Q_AQandg, alpha); break;
       case 3: compute_alpha_N<3>(Q_AQandg, alpha); break;
@@ -310,6 +322,7 @@ namespace quda {
       case 10: compute_alpha_N<10>(Q_AQandg, alpha); break;
       case 11: compute_alpha_N<11>(Q_AQandg, alpha); break;
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
+#endif
       default: // failsafe
         using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
@@ -372,6 +385,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_beta_N<1>(Q_AQandg, Q_AS, beta); break;
       case 2: compute_beta_N<2>(Q_AQandg, Q_AS, beta); break;
       case 3: compute_beta_N<3>(Q_AQandg, Q_AS, beta); break;
@@ -384,6 +398,7 @@ namespace quda {
       case 10: compute_beta_N<10>(Q_AQandg, Q_AS, beta); break;
       case 11: compute_beta_N<11>(Q_AQandg, Q_AS, beta); break;
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
+#endif
       default: // failsafe
         using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
@@ -477,6 +492,24 @@ namespace quda {
       r2 = b2;
       blas::copy(r_, b);
       blas::zero(x);
+    }
+
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `x` as a temp.
+      blas::copy(*defl_tmp2[0], r_);
+      rhs.push_back(defl_tmp2[0]);
+
+      // Deflate
+      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r_, *defl_tmp1[0], tmp, tmp2);
+      r2 = blas::xmyNorm(*rhs[0], r_);
+
+      // defl_tmp1 must be added to the solution at the end
+      blas::axpy(1.0, *defl_tmp1[0], x);
     }
 
     // Use power iterations to approx lambda_max

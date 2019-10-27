@@ -8,6 +8,7 @@
 
 #include <comm_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_tools.h>
 #include "misc.h"
 
@@ -27,31 +28,6 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
-extern char gauge_outfile[];
-
-extern double heatbath_beta_value;
-extern int heatbath_warmup_steps;
-extern int heatbath_num_steps;
-extern int heatbath_num_heatbath_per_step;
-extern int heatbath_num_overrelax_per_step;
-extern bool heatbath_coldstart;
-
-extern void usage(char** );
 
 
 namespace quda {
@@ -149,12 +125,16 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
 int main(int argc, char **argv)
 {
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -225,9 +205,8 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
     // CURAND random generator initialization
-    RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
+    RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
 
     int nsteps = heatbath_num_steps;
@@ -250,7 +229,7 @@ int main(int argc, char **argv)
       // Get pointer to internal resident gauge field
       cudaGaugeField* extendedGaugeResident = new cudaGaugeField(gParamEx);
       copyExtendedResidentGaugeQuda((void*)extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
-      InitGaugeField( *gaugeEx);
+      InitGaugeField(*gaugeEx);
       copyExtendedGauge(*gaugeEx, *extendedGaugeResident, QUDA_CUDA_FIELD_LOCATION);
       delete extendedGaugeResident;
 

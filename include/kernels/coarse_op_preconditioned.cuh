@@ -3,8 +3,7 @@
 
 namespace quda {
 
-  template <typename PreconditionedGauge, typename Gauge, int n>
-  struct CalculateYhatArg {
+  template <typename Float, typename PreconditionedGauge, typename Gauge, int n> struct CalculateYhatArg {
     PreconditionedGauge Yhat;
     const Gauge Y;
     const Gauge Xinv;
@@ -13,11 +12,22 @@ namespace quda {
     int nFace;
     const int coarseVolumeCB;   /** Coarse grid volume */
 
-    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim, const int *comm_dim, int nFace)
-      : Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), coarseVolumeCB(Y.VolumeCB()) {
+    Float *max_h;  // host scalar that stores the maximum element of Yhat. Pointer b/c pinned.
+    Float *max_d; // device scalar that stores the maximum element of Yhat
+
+    CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
+                     const int *comm_dim, int nFace) :
+      Yhat(Yhat),
+      Y(Y),
+      Xinv(Xinv),
+      nFace(nFace),
+      coarseVolumeCB(Y.VolumeCB()),
+      max_h(nullptr),
+      max_d(nullptr)
+    {
       for (int i=0; i<4; i++) {
-	this->comm_dim[i] = comm_dim[i];
-	this->dim[i] = dim[i];
+        this->comm_dim[i] = comm_dim[i];
+        this->dim[i] = dim[i];
       }
     }
   };
@@ -31,14 +41,17 @@ namespace quda {
     y.y += a.x*x.y;
   }
 
-  template<typename Float, int n, typename Arg>
-  inline __device__ __host__ void computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j) {
+  template <typename Float, int n, bool compute_max_only, typename Arg>
+  inline __device__ __host__ Float computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j)
+  {
 
     constexpr int nDim = 4;
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
 
     const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
+
+    Float yHatMax = 0.0;
 
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
@@ -48,7 +61,11 @@ namespace quda {
       for(int k = 0; k<n; k++) {
         caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
-      arg.Yhat.Ghost(d,1-parity,ghost_idx,i,j) = yHat;
+      if (compute_max_only) {
+        yHatMax = fmax(fabs(yHat.x), fabs(yHat.y));
+      } else {
+        arg.Yhat.Ghost(d, 1 - parity, ghost_idx, i, j) = yHat;
+      }
 
     } else {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
@@ -58,8 +75,11 @@ namespace quda {
       for (int k = 0; k<n; k++) {
         caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
-      arg.Yhat(d,1-parity,back_idx,i,j) = yHat;
-
+      if (compute_max_only) {
+        yHatMax = fmax(fabs(yHat.x), fabs(yHat.y));
+      } else {
+        arg.Yhat(d, 1 - parity, back_idx, i, j) = yHat;
+      }
     }
 
     // now do the forwards links X^{-1} * Y^{-\mu}
@@ -68,27 +88,35 @@ namespace quda {
     for (int k = 0; k<n; k++) {
       caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
     }
-    arg.Yhat(d+4,parity,x_cb,i,j) = yHat;
+    if (compute_max_only) {
+      yHatMax = fmax(yHatMax, fmax(fabs(yHat.x), fabs(yHat.y)));
+    } else {
+      arg.Yhat(d + 4, parity, x_cb, i, j) = yHat;
+    }
 
+    return yHatMax;
   }
 
-  template<typename Float, int n, typename Arg>
-  void CalculateYhatCPU(Arg &arg) {
-
+  template <typename Float, int n, bool compute_max_only, typename Arg> void CalculateYhatCPU(Arg &arg)
+  {
+    Float max = 0.0;
     for (int d=0; d<4; d++) {
       for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
-	for (int x_cb=0; x_cb<arg.Y.VolumeCB(); x_cb++) {
-	  for (int i=0; i<n; i++)
-            for (int j=0; j<n; j++)
-              computeYhat<Float,n>(arg, d, x_cb, parity, i, j);
-	} // x_cb
+        for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
+          for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+              Float max_x = computeYhat<Float, n, compute_max_only>(arg, d, x_cb, parity, i, j);
+              if (compute_max_only) max = max > max_x ? max : max_x;
+            }
+        }
       } //parity
     } // dimension
+    if (compute_max_only) *arg.max_h = max;
   }
 
-  template<typename Float, int n, typename Arg>
-  __global__ void CalculateYhatGPU(Arg arg) {
+  template <typename Float, int n, bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
+  {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
@@ -100,8 +128,9 @@ namespace quda {
     int parity = i_parity / n;
     int j = j_d % n;
     int d = j_d / n;
-    
-    computeYhat<Float,n>(arg, d, x_cb, parity, i, j);
+
+    Float max = computeYhat<Float, n, compute_max_only>(arg, d, x_cb, parity, i, j);
+    if (compute_max_only) atomicMax(arg.max_d, max);
   }
 
 } // namespace quda

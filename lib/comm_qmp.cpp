@@ -1,5 +1,4 @@
 #include <qmp.h>
-#include <csignal>
 #include <algorithm>
 #include <numeric>
 #include <quda_internal.h>
@@ -277,6 +276,7 @@ void comm_allreduce_array(double* data, size_t size)
 
 void comm_allreduce_max_array(double* data, size_t size)
 {
+
   for (size_t i = 0; i < size; i++) { QMP_CHECK(QMP_max_double(data + i)); }
 }
 
@@ -303,10 +303,7 @@ void comm_barrier(void)
 }
 
 
-void comm_abort(int status)
+void comm_abort_(int status)
 {
-#ifdef HOST_DEBUG
-  raise(SIGINT);
-#endif
   QMP_abort(status);
 }

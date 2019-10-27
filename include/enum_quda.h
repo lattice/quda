@@ -36,15 +36,16 @@ extern "C" {
 
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
-    QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
-    QUDA_FLOAT4_GAUGE_ORDER = 4, // 8 and 12 reconstruct half and single
-    QUDA_QDP_GAUGE_ORDER, // expect *gauge[mu], even-odd, spacetime, row-column color
-    QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
-    QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
-    QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
-    QUDA_MILC_SITE_GAUGE_ORDER, // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-    QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
-    QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
+    QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
+    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 and 12 reconstruct half and single
+    QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
+    QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
+    QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime
+    QUDA_CPS_WILSON_GAUGE_ORDER,  // expect *gauge, even-odd, mu, spacetime, column-row color
+    QUDA_MILC_GAUGE_ORDER,        // expect *gauge, even-odd, mu, spacetime, row-column order
+    QUDA_MILC_SITE_GAUGE_ORDER,   // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+    QUDA_BQCD_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime+halos, column-row order
+    QUDA_TIFR_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime, column-row order
     QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
@@ -86,6 +87,7 @@ extern "C" {
   typedef enum QudaDslashType_s {
     QUDA_WILSON_DSLASH,
     QUDA_CLOVER_WILSON_DSLASH,
+    QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH,
     QUDA_DOMAIN_WALL_DSLASH,
     QUDA_DOMAIN_WALL_4D_DSLASH,
     QUDA_MOBIUS_DWF_DSLASH,
@@ -129,10 +131,11 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_EIG_LANCZOS, // Thick restarted lanczos solver
-    QUDA_EIG_ARNOLDI, // Arnoldi solver (not implemented)
-    QUDA_EIG_JD, // JD solver
-    QUDA_INVALID_EIG = QUDA_INVALID_ENUM
+    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_JD,         // Jacobi Davidson solver (not implemented)
+    QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
 
   /** S=smallest L=largest
@@ -297,6 +300,8 @@ extern "C" {
     QUDA_WILSON_DIRAC,
     QUDA_WILSONPC_DIRAC,
     QUDA_CLOVER_DIRAC,
+    QUDA_CLOVER_HASENBUSCH_TWIST_DIRAC,
+    QUDA_CLOVER_HASENBUSCH_TWISTPC_DIRAC,
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
@@ -490,19 +495,32 @@ extern "C" {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT,
-    QUDA_CONTRACT_PLUS,
-    QUDA_CONTRACT_MINUS,
-    QUDA_CONTRACT_GAMMA5,
-    QUDA_CONTRACT_GAMMA5_PLUS,
-    QUDA_CONTRACT_GAMMA5_MINUS,
-    QUDA_CONTRACT_TSLICE,
-    QUDA_CONTRACT_TSLICE_PLUS,
-    QUDA_CONTRACT_TSLICE_MINUS,
-    QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
+    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 
-  //Allows to choose an appropriate external library
+  typedef enum QudaContractGamma_s {
+    QUDA_CONTRACT_GAMMA_I = 0,
+    QUDA_CONTRACT_GAMMA_G1 = 1,
+    QUDA_CONTRACT_GAMMA_G2 = 2,
+    QUDA_CONTRACT_GAMMA_G3 = 3,
+    QUDA_CONTRACT_GAMMA_G4 = 4,
+    QUDA_CONTRACT_GAMMA_G5 = 5,
+    QUDA_CONTRACT_GAMMA_G1G5 = 6,
+    QUDA_CONTRACT_GAMMA_G2G5 = 7,
+    QUDA_CONTRACT_GAMMA_G3G5 = 8,
+    QUDA_CONTRACT_GAMMA_G4G5 = 9,
+    QUDA_CONTRACT_GAMMA_S12 = 10,
+    QUDA_CONTRACT_GAMMA_S13 = 11,
+    QUDA_CONTRACT_GAMMA_S14 = 12,
+    QUDA_CONTRACT_GAMMA_S21 = 13,
+    QUDA_CONTRACT_GAMMA_S23 = 14,
+    QUDA_CONTRACT_GAMMA_S34 = 15,
+    QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
+  } QudaContractGamma;
+
+  // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,
     QUDA_EIGEN_EXTLIB,

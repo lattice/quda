@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <staggered_dslash_reference.h>
@@ -22,7 +23,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define mySpinorSiteSize 6
 
-extern void usage(char** argv);
 void *qdp_fatlink[4];
 void *qdp_longlink[4];
 
@@ -33,18 +33,9 @@ void *longlink;
 void** ghost_fatlink, **ghost_longlink;
 #endif
 
-extern int device;
-extern int niter;
-extern int Nsrc; // number of spinors to apply to simultaneously
 
-
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision  prec_sloppy;
 cpuColorSpinorField* in;
 cpuColorSpinorField* out;
 cpuColorSpinorField* ref;
@@ -52,23 +43,6 @@ cpuColorSpinorField* tmp;
 
 cpuGaugeField *cpuFat = NULL;
 cpuGaugeField *cpuLong = NULL;
-
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern int test_type;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-
-extern QudaInverterType inv_type;
-extern double mass; // the mass of the Dirac operator
-
-extern double mass;
 
 static void end();
 
@@ -320,7 +294,7 @@ invert_test(void)
       inv_param.num_src=Nsrc; // number of spinors to apply to simultaneously
       void* outArray[NUM_SRC];
       void* inArray[NUM_SRC];
-      int len;
+      // int len;
 
       cpuColorSpinorField* spinorOutArray[NUM_SRC];
       cpuColorSpinorField* spinorInArray[NUM_SRC];
@@ -360,8 +334,8 @@ invert_test(void)
 
 
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
+      // matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+      // out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_EVEN_PARITY);
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
@@ -390,8 +364,8 @@ invert_test(void)
       time0 /= CLOCKS_PER_SEC;
 
 #ifdef MULTI_GPU
-      matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-          out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
+      // matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+      // out, mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp, QUDA_ODD_PARITY);
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
 #endif
@@ -468,9 +442,9 @@ invert_test(void)
         for(int i=0;i < inv_param.num_offset;i++){
           printfQuda("%dth solution: mass=%f, ", i, masses[i]);
 #ifdef MULTI_GPU
-          matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-              spinorOutArray[i], masses[i], 0, inv_param.cpu_prec,
-              gaugeParam.cpu_prec, tmp, parity);
+          // matdagmat_mg4dir(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+          //     spinorOutArray[i], masses[i], 0, inv_param.cpu_prec,
+          //     gaugeParam.cpu_prec, tmp, parity);
 #else
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
@@ -564,40 +538,20 @@ display_test_info()
 
 }
 
-  void
-usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: Even even spinor CG inverter\n");
-  printfQuda("                                                1: Odd odd spinor CG inverter\n");
-  printfQuda("                                                3: Even even spinor multishift CG inverter\n");
-  printfQuda("                                                4: Odd odd spinor multishift CG inverter\n");
-  printfQuda("    --cpu_prec <double/single/half>          # Set CPU precision\n");
-
-  return ;
-}
 int main(int argc, char** argv)
 {
-  for (int i = 1; i < argc; i++) {
-
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-
-
-    if( strcmp(argv[i], "--cpu_prec") == 0){
-      if (i+1 >= argc){
-        usage(argv);
-      }
-      cpu_prec= get_prec(argv[i+1]);
-      i++;
-      continue;
-    }
-
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3}, {"odd", 4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION){

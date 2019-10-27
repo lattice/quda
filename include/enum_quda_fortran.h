@@ -45,14 +45,15 @@
 #define QUDA_FLOAT_GAUGE_ORDER 1
 #define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
 #define QUDA_FLOAT4_GAUGE_ORDER 4 //8 and 12 reconstruct half and single
-#define QUDA_QDP_GAUGE_ORDER 5 //expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_QDPJIT_GAUGE_ORDER 6 //expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_CPS_WILSON_GAUGE_ORDER 7 //expect *gauge even-odd spacetime column-row color
-#define QUDA_MILC_GAUGE_ORDER 8 //expect *gauge even-odd mu spacetime row-column order
-#define QUDA_MILC_SITE_GAUGE_ORDER 9 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-#define QUDA_BQCD_GAUGE_ORDER 10 //expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 11
-#define QUDA_TIFR_PADDED_GAUGE_ORDER 12
+#define QUDA_NATIVE_GAUGE_ORDER 5 // used to denote one of the above types in a trait, not used directly
+#define QUDA_QDP_GAUGE_ORDER 6    // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_QDPJIT_GAUGE_ORDER 7 // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_CPS_WILSON_GAUGE_ORDER 8 // expect *gauge even-odd spacetime column-row color
+#define QUDA_MILC_GAUGE_ORDER 9       // expect *gauge even-odd mu spacetime row-column order
+#define QUDA_MILC_SITE_GAUGE_ORDER 10 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 11 // expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_TIFR_GAUGE_ORDER 12
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 13
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -126,9 +127,10 @@
 #define QUDA_INVALID_INVERTER QUDA_INVALID_ENUM
 
 #define QudaEigType integer(4)
-#define QUDA_EIG_LANCZOS 0 // Implicitly restarted lanczos solver
-#define QUDA_EIG_ARNOLDI 1 // Arnoldi solver (not yet implemented)
-#define QUDA_EIG_JD 2 // JD solver
+#define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
+#define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
+#define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_JD 2         // Jacobi Davidson solver
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
 #define QudaEigSpectrumType integer(4)
@@ -435,16 +437,29 @@
 #define QUDA_STAGGERED_PHASE_INVALID QUDA_INVALID_ENUM
 
 #define QudaContractType integer(4)
-#define QUDA_CONTRACT 0
-#define QUDA_CONTRACT_PLUS 1
-#define QUDA_CONTRACT_MINUS 2
-#define QUDA_CONTRACT_GAMMA5 3
-#define QUDA_CONTRACT_GAMMA5_PLUS 4
-#define QUDA_CONTRACT_GAMMA5_MINUS 5
-#define QUDA_CONTRACT_TSLICE 6
-#define QUDA_CONTRACT_TSLICE_PLUS 7
-#define QUDA_CONTRACT_TSLICE_MINUS 8
-#define QUDA_CONTRACT_INVALID QUDA_INVALID_ENUM
+#define QUDA_CONTRACT_TYPE_OPEN ,
+#define QUDA_CONTRACT_TYPE_DR ,
+#define QUDA_CONTRACT_TYPE_DP ,
+#define QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
+
+#define QudaContractGamma integer(4)
+#define QUDA_CONTRACT_GAMMA_I 0
+#define QUDA_CONTRACT_GAMMA_G1 1
+#define QUDA_CONTRACT_GAMMA_G2 2
+#define QUDA_CONTRACT_GAMMA_G3 3
+#define QUDA_CONTRACT_GAMMA_G4 4
+#define QUDA_CONTRACT_GAMMA_G5 5
+#define QUDA_CONTRACT_GAMMA_G1G5 6
+#define QUDA_CONTRACT_GAMMA_G2G5 7
+#define QUDA_CONTRACT_GAMMA_G3G5 8
+#define QUDA_CONTRACT_GAMMA_G4G5 9
+#define QUDA_CONTRACT_GAMMA_S12 10
+#define QUDA_CONTRACT_GAMMA_S13 11
+#define QUDA_CONTRACT_GAMMA_S14 12
+#define QUDA_CONTRACT_GAMMA_S21 13
+#define QUDA_CONTRACT_GAMMA_S23 14
+#define QUDA_CONTRACT_GAMMA_S34 15
+#define QUDA_CONTRACT_GAMMA_INVALID QUDA_INVALID_ENUM
 
 #define QudaExtLibType integer(4)
 #define QUDA_CUSOLVE_EXTLIB 0

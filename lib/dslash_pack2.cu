@@ -1,5 +1,3 @@
-#ifndef USE_LEGACY_DSLASH
-
 #include <color_spinor_field.h>
 
 // STRIPED - spread the blocks throughout the workload to ensure we
@@ -12,6 +10,10 @@
 
 namespace quda
 {
+
+  static int commDim[QUDA_MAX_DIM];
+
+  int* getPackComms() { return commDim; }
 
   void setPackComms(const int *comm_dim)
   {
@@ -378,18 +380,32 @@ public:
     if (!nDimPack) return; // if zero then we have nothing to pack
 
     if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
       PackGhost<double>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
     } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       PackGhost<float>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       PackGhost<short>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
       PackGhost<char>(ghost, in, location, nFace, dagger, parity, spin_project, a, b, c, stream);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable quarter precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unsupported precision %d\n", in.Precision());
     }
   }
 
 } // namespace quda
-
-#endif // USE_LEGACY_DSLASH

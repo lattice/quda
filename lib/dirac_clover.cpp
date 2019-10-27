@@ -1,9 +1,6 @@
-#include <iostream>
 #include <dirac_quda.h>
 #include <blas_quda.h>
 #include <multigrid.h>
-
-#define NEW_DSLASH
 
 namespace quda {
 
@@ -27,8 +24,7 @@ namespace quda {
     Dirac::checkParitySpinor(out, in);
 
     if (out.Volume() != clover.VolumeCB()) {
-      errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d",
-		out.Volume(), clover.VolumeCB());
+      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover.VolumeCB());
     }
   }
 
@@ -40,19 +36,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not implemented");
-    }
-#endif
-
     flops += 1872ll*in.Volume();
   }
 
@@ -60,19 +44,15 @@ namespace quda {
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
     flops += 1872ll * in.Volume();
-#else
-    DslashXpay(out.Odd(), in.Even(), QUDA_ODD_PARITY, in.Odd(), -kappa);
-    DslashXpay(out.Even(), in.Odd(), QUDA_EVEN_PARITY, in.Even(), -kappa);
-#endif
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -112,6 +92,9 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
+  /*******
+   * DiracCloverPC Starts here
+   *******/
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
     DiracClover(param)
   {
@@ -136,6 +119,7 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
@@ -149,18 +133,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, 0.0, in, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1824ll*in.Volume();
   }
 
@@ -172,19 +145,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-#ifndef USE_LEGACY_DSLASH
     ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
-#else
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-#endif
-
     flops += 1872ll*in.Volume();
   }
 
@@ -199,16 +160,33 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     if (!symmetric) {
+
+      // No need to change order of calls for dagger
+      // because the asymmetric operator is actually symmetric
+      // A_oo -D_oe A^{-1}_ee D_eo -> A_oo -D^\dag_oe A^{-1}_ee D^\dag_eo
+      // the pieces in Dslash and DslashXPay respect the dagger
+
       // DiracCloverPC::Dslash applies A^{-1}Dslash
       Dslash(*tmp1, in, parity[0]);
       // DiracClover::DslashXpay applies (A - kappa^2 D)
       DiracClover::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else if (!dagger) { // symmetric preconditioning
+      // We need two cases because M = 1-ADAD and M^\dag = 1-D^\dag A D^dag A
+      // where A is actually a clover inverse.
+
+      // This is the non-dag case: AD
       Dslash(*tmp1, in, parity[0]);
+
+      // Then x + AD (AD)
       DslashXpay(out, *tmp1, parity[1], in, kappa2);
     } else { // symmetric preconditioning, dagger
+
+      // This is the dagger: 1 - DADA
+      //  i) Apply A
       CloverInv(out, in, parity[1]);
+      // ii) Apply A D => ADA
       Dslash(*tmp1, out, parity[0]);
+      // iii) Apply  x + D(ADA)
       DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
     }
 
@@ -312,5 +290,6 @@ namespace quda {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
+
 
 } // namespace quda

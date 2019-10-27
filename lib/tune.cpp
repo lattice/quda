@@ -229,10 +229,11 @@ namespace quda {
       strncpy(tmp, key.aux, 13);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
+      bool is_nested_policy = (strncmp(tmp, "nested_policy", 6) == 0) ? true : false; // nested policies not included
 
       // synchronous profile
-      if (param.n_calls > 0 && !is_policy) {
-	double time = param.n_calls * param.time;
+      if (param.n_calls > 0 && !is_policy && !is_nested_policy) {
+        double time = param.n_calls * param.time;
 
 	out << std::setw(12) << param.n_calls * param.time << "\t" << std::setw(12) << (time / total_time) * 100 << "\t";
 	out << std::setw(12) << param.n_calls << "\t" << std::setw(12) << param.time << "\t" << std::setw(16) << key.volume << "\t";
@@ -346,6 +347,13 @@ namespace quda {
       resource_path = path;
     }
 
+    bool version_check = true;
+    char *override_version_env = getenv("QUDA_TUNE_VERSION_CHECK");
+    if (override_version_env && strcmp(override_version_env, "0") == 0) {
+      version_check = false;
+      warningQuda("Disabling QUDA tunecache version check");
+    }
+
 #ifdef MULTI_GPU
     if (comm_rank() == 0) {
 #endif
@@ -362,21 +370,32 @@ namespace quda {
 	ls >> token;
 	if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
 	ls >> token;
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
-	ls >> token;
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
+        ls >> token;
 #ifdef GITVERSION
-	if (token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(gitversion))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #else
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #endif
 	ls >> token;
-	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(quda_hash))
+          errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 
+        if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+        getline(cache_file, line); // eat the blank line
 
-	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-	getline(cache_file, line); // eat the blank line
-
-	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+        if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the description line
 
 	deserializeTuneCache(cache_file);
@@ -630,7 +649,8 @@ namespace quda {
     launchTimer.TPSTART(QUDA_PROFILE_INIT);
 #endif
 
-    const TuneKey key = tunable.tuneKey();
+    TuneKey key = tunable.tuneKey();
+    if (use_managed_memory()) strcat(key.aux, ",managed");
     last_key = key;
     static TuneParam param;
 

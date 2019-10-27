@@ -47,8 +47,8 @@ namespace quda {
   protected:
     size_t bytes; // bytes allocated per clover full field 
     size_t norm_bytes; // sizeof each norm full field
-    int length;
-    int real_length;
+    size_t length;
+    size_t real_length;
     int nColor;
     int nSpin;
 
@@ -410,6 +410,20 @@ namespace quda {
      @param parity The field parity we are working on 
    */
   void cloverDerivative(cudaGaugeField &force, cudaGaugeField& gauge, cudaGaugeField& oprod, double coeff, QudaParity parity);
+
+  /**
+     @brief Helper function that returns whether we have enabled
+     dyanmic clover inversion or not.
+   */
+  constexpr bool dynamic_clover_inverse()
+  {
+#ifdef DYNAMIC_CLOVER
+    return true;
+#else
+    return false;
+#endif
+  }
+
 
 } // namespace quda
 

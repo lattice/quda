@@ -404,6 +404,9 @@ extern "C" {
     /** Performs an MdagM solve, then constructs the left and right SVD. **/
     QudaBoolean compute_svd;
 
+    /** If true, the solver will error out if the convergence criteria are not met **/
+    QudaBoolean require_convergence;
+
     /** Which part of the spectrum to solve **/
     QudaEigSpectrumType spectrum;
 
@@ -490,6 +493,9 @@ extern "C" {
 
     /** Precision to store the null-space vectors in (post block orthogonalization) */
     QudaPrecision precision_null[QUDA_MAX_MG_LEVEL];
+
+    /** Number of times to repeat Gram-Schmidt in block orthogonalization */
+    int n_block_ortho[QUDA_MAX_MG_LEVEL];
 
     /** Verbosity on each level of the multigrid */
     QudaVerbosity verbosity[QUDA_MAX_MG_LEVEL];
@@ -594,6 +600,9 @@ extern "C" {
     /** Location where the coarse-operator construction will be computedn */
     QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
 
+    /** Whether to use eigenvectors for the nullspace or, if the coarsest instance deflate*/
+    QudaBoolean use_eig_solver[QUDA_MAX_MG_LEVEL];
+
     /** Minimize device memory allocations during the adaptive setup,
         placing temporary fields in mapped memory instad of device
         memory */
@@ -614,23 +623,20 @@ extern "C" {
     /** Whether to run null vector oblique checks once set up is complete */
     QudaBoolean run_oblique_proj_check;
 
-    /** Whether to use eigenvectors for the nullspace */
-    QudaBoolean use_low_modes;
-
-    /** Deflate the coarsest grid  */
-    QudaBoolean deflate_coarsest;
-
     /** Whether to load the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_load;
+    QudaBoolean vec_load[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix where to load the null-space vectors */
-    char vec_infile[256];
+    char vec_infile[QUDA_MAX_MG_LEVEL][256];
 
     /** Whether to store the null-space vectors to disk (requires QIO) */
-    QudaBoolean vec_store;
+    QudaBoolean vec_store[QUDA_MAX_MG_LEVEL];
 
     /** Filename prefix for where to save the null-space vectors */
-    char vec_outfile[256];
+    char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+
+    /** Whether to use and initial guess during coarse grid deflation */
+    QudaBoolean coarse_guess;
 
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
@@ -760,11 +766,11 @@ extern "C" {
    */
   void endQuda(void);
 
-/**
- * @brief update the radius for halos. 
- * @details This should only be needed for automated testing when
- * different partitioning is applied within a single run.
- */
+  /**
+   * @brief update the radius for halos.
+   * @details This should only be needed for automated testing when
+   * different partitioning is applied within a single run.
+   */
   void updateR();
 
   /**
@@ -877,11 +883,11 @@ extern "C" {
    * Perform the eigensolve. The problem matrix is defined by the invert param, the
    * mode of solution is specified by the eig param. It is assumed that the gauge
    * field has already been loaded via  loadGaugeQuda().
-   * @param h_els  Host side eigenvalues
-   * @param h_evs  Host side eigenvectors
-   * @param param  Contains all metadata regarding the type of solve.
+   * @param h_evecs  Array of pointers to application eigenvectors
+   * @param h_evals  Host side eigenvalues
+   * @param param Contains all metadata regarding the type of solve.
    */
-  void eigensolveQuda(void *h_evals, void *h_evecs, QudaEigParam *param);
+  void eigensolveQuda(void **h_evecs, double_complex *h_evals, QudaEigParam *param);
 
   /**
    * Perform the solve, according to the parameters set in param.  It
@@ -958,30 +964,6 @@ extern "C" {
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
       QudaParity parity);
-
-  /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
-
-  /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
 
   /**
    * Apply the clover operator or its inverse.
@@ -1188,10 +1170,17 @@ extern "C" {
                             QudaGaugeParam* param);
 
   /**
-   * Generate Gaussian distributed gauge field
-   * @param seed Seed
-   */
-  void gaussGaugeQuda(long seed);
+     @brief Generate Gaussian distributed fields and store in the
+     resident gauge field.  We create a Gaussian-distributed su(n)
+     field and exponentiate it, e.g., U = exp(sigma * H), where H is
+     the distributed su(n) field and beta is the width of the
+     distribution (beta = 0 results in a free field, and sigma = 1 has
+     maximum disorder).
+
+     @param seed The seed used for the RNG
+     @param sigma Width of Gaussian distrubution
+  */
+  void gaussGaugeQuda(unsigned long long seed, double sigma);
 
   /**
    * Computes the total, spatial and temporal plaquette averages of the loaded gauge configuration.
@@ -1207,7 +1196,7 @@ extern "C" {
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
 
   /**
-   * Performs Wuppertal smearing on a given spinor using the gauge field 
+   * Performs Wuppertal smearing on a given spinor using the gauge field
    * gaugeSmeared, if it exist, or gaugePrecise if no smeared field is present.
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1216,8 +1205,7 @@ extern "C" {
    * @param nSteps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, 
-                             unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
@@ -1245,6 +1233,18 @@ extern "C" {
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeQuda();
+
+  /**
+   * Public function to perform color contractions of the host spinors x and y.
+   * @param[in] x pointer to host data
+   * @param[in] y pointer to host data
+   * @param[out] result pointer to the 16 spin projections per lattice site
+   * @param[in] cType Which type of contraction (open, degrand-rossi, etc)
+   * @param[in] param meta data for construction of ColorSpinorFields.
+   * @param[in] X spacetime data for construction of ColorSpinorFields.
+   */
+  void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
+                    const int *X);
 
   /**
      @brief Calculates the topological charge from gaugeSmeared, if it exist,

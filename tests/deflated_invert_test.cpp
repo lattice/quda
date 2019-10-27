@@ -7,6 +7,8 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
+
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -23,73 +25,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-//extern bool tune;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision  prec;
-extern QudaPrecision  prec_sloppy;
-extern QudaPrecision  prec_precondition;
-extern QudaPrecision  prec_ritz;
-extern QudaPrecision prec_refinement_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa;
-extern double mu;
-extern double anisotropy;
-extern double epsilon;
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern char latfile[];
-extern bool unit_gauge;
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int nvec[];
-
-extern QudaInverterType inv_type;
-extern QudaInverterType precon_type;
-
-extern QudaMatPCType matpc_type;
-extern QudaSolveType solve_type;
-
-extern char vec_infile[];
-extern char vec_outfile[];
-
-//Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char** );
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern int nev;
-extern int max_search_dim;
-extern int deflation_grid;
-extern double tol_restart;
-
-extern int eigcg_max_restarts;
-extern int max_restart_num;
-extern double inc_tol;
-extern double eigenval_tol;
-
-extern QudaExtLibType   solver_ext_lib;
-extern QudaExtLibType   deflation_ext_lib;
-
-extern QudaFieldLocation location_ritz;
-extern QudaMemoryType    mem_type_ritz;
-
-extern QudaMassNormalization normalization; // mass normalization of Dirac operators
-extern QudaVerbosity verbosity;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -298,19 +233,22 @@ void setDeflationParam(QudaEigParam &df_param) {
   df_param.mem_type_ritz  = mem_type_ritz;
 
   // set file i/o parameters
-  strcpy(df_param.vec_infile, vec_infile);
-  strcpy(df_param.vec_outfile, vec_outfile);
+  strcpy(df_param.vec_infile, eig_vec_infile);
+  strcpy(df_param.vec_outfile, eig_vec_outfile);
 }
 
 int main(int argc, char **argv)
 {
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;

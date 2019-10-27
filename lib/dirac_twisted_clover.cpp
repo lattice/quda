@@ -41,7 +41,7 @@ namespace quda {
     Dirac::checkParitySpinor(out, in);
 
     if (out.Volume() != clover.VolumeCB())
-      errorQuda("Parity spinor volume %d doesn't match clover checkboard volume %d", out.Volume(), clover.VolumeCB());
+      errorQuda("Parity spinor volume %lu doesn't match clover checkboard volume %lu", out.Volume(), clover.VolumeCB());
   }
 
   // Protected method for applying twist
@@ -68,24 +68,12 @@ namespace quda {
   }
 
   void DiracTwistedClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, QudaParity parity,
-      const ColorSpinorField &x, const double &k) const
+                                      const ColorSpinorField &x, const double &k) const
   {
 
     if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
       // k * D * in + (1 + i*2*mu*kappa*gamma_5) *x
-#ifndef USE_LEGACY_DSLASH
       ApplyTwistedClover(out, in, *gauge, clover, k, 2 * mu * kappa, x, parity, dagger, commDim, profile);
-#else
-      FullClover *cs = new FullClover(clover, false);
-      FullClover *cI = new FullClover(clover, true);
-      double a = 2.0 * kappa * mu; // for direct twist (must be daggered separately)
-
-      twistedCloverDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, cs, cI,
-          &static_cast<const cudaColorSpinorField &>(in), parity, dagger, &static_cast<const cudaColorSpinorField &>(x),
-          QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, k, 0.0, 0.0, commDim, profile);
-      delete cs;
-      delete cI;
-#endif
       flops += (1320ll + 552ll) * in.Volume();
 
     } else {
@@ -103,29 +91,8 @@ namespace quda {
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
     }
 
-#ifndef USE_LEGACY_DSLASH
     ApplyTwistedClover(
         out, in, *gauge, clover, -kappa, 2.0 * kappa * mu, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
-#else
-    FullClover *cs = new FullClover(clover, false);
-    FullClover *cI = new FullClover(clover, true);
-
-    if(in.TwistFlavor() == QUDA_TWIST_SINGLET){
-      double a = 2.0 * kappa * mu; // for direct twist (must be daggered separately)
-      twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out.Odd()),
-			      *gauge, cs, cI, &static_cast<const cudaColorSpinorField&>(in.Even()),
-			      QUDA_ODD_PARITY, dagger, &static_cast<const cudaColorSpinorField&>(in.Odd()),
-			      QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, -kappa, 0.0, 0.0, commDim, profile);
-      twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out.Even()),
-			      *gauge, cs, cI, &static_cast<const cudaColorSpinorField&>(in.Odd()),
-			      QUDA_EVEN_PARITY, dagger, &static_cast<const cudaColorSpinorField&>(in.Even()),
-			      QUDA_DEG_DSLASH_CLOVER_TWIST_XPAY, a, -kappa, 0.0, 0.0, commDim, profile);
-    } else {
-      errorQuda("Non-degenerate operator is not implemented");
-    }
-    delete cs;
-    delete cI;
-#endif
     flops += (1320ll + 552ll) * in.Volume();
   }
 
@@ -206,7 +173,6 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
-#ifndef USE_LEGACY_DSLASH
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
       bool reset = newTmp(&tmp2, in);
@@ -218,34 +184,6 @@ namespace quda {
                                        commDim, profile);
       flops += (1320ll + 552ll) * in.Volume();
     }
-#else
-    FullClover *cs = new FullClover(clover, false);
-    FullClover *cI = new FullClover(clover, true);
-
-    if (in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * mu;  //for invert twist (not daggered)
-      double b = 1.;                 // / (1.0 + a*a);                     //for invert twist
-      if (!dagger || matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-	twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
-				&static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0,
-				QUDA_DEG_DSLASH_CLOVER_TWIST_INV, a, b, 0.0, 0.0, commDim, profile);
-
-        flops += (1320ll + 552ll) * in.Volume();
-      } else {
-        bool reset = newTmp(&tmp2, in);
-        TwistCloverInv(*tmp2, in, 1 - parity);
-        twistedCloverDslashCuda(&static_cast<cudaColorSpinorField &>(out), *gauge, cs, cI,
-            &static_cast<const cudaColorSpinorField &>(*tmp2), parity, dagger, 0, QUDA_DEG_CLOVER_TWIST_INV_DSLASH, a,
-            b, 0.0, 0.0, commDim, profile);
-        deleteTmp(&tmp2, reset);
-        flops += 1320ll*in.Volume();
-      }
-    } else {//TWIST doublet :
-      errorQuda("Non-degenerate operator is not implemented");
-    }
-    delete cs;
-    delete cI;
-#endif
   }
 
   // xpay version of the above
@@ -259,7 +197,6 @@ namespace quda {
     if (in.TwistFlavor() == QUDA_TWIST_NO || in.TwistFlavor() == QUDA_TWIST_INVALID)
       errorQuda("Twist flavor not set %d", in.TwistFlavor());
 
-#ifndef USE_LEGACY_DSLASH
     bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     if (dagger && symmetric && !reverse) {
       bool reset = newTmp(&tmp2, in);
@@ -271,33 +208,6 @@ namespace quda {
           out, in, *gauge, clover, k, -2.0 * kappa * mu, true, x, parity, dagger, commDim, profile);
       flops += (1320ll + 552ll) * in.Volume();
     }
-#else
-    FullClover *cs = new FullClover(clover, false);
-    FullClover *cI = new FullClover(clover, true);
-
-    if(in.TwistFlavor() == QUDA_TWIST_SINGLET) {
-      double a = -2.0 * kappa * in.TwistFlavor() * mu;  //for invert twist
-      //      double b = k / (1.0 + a*a);                     //for invert twist	NO HABRÍA QUE APLICAR CLOVER_TWIST_INV???
-      double b = k;                     //for invert twist	NO HABRÍA QUE APLICAR CLOVER_TWIST_INV???
-      if (!dagger) {
-	twistedCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, cI,
-				&static_cast<const cudaColorSpinorField&>(in), parity, dagger,
-				&static_cast<const cudaColorSpinorField&>(x),
-				QUDA_DEG_DSLASH_CLOVER_TWIST_INV, a, b, 0.0, 0.0, commDim, profile);
-
-        flops += (1320ll + 552ll) * in.Volume();
-      } else { //
-        bool reset = newTmp(&tmp2, in);
-        TwistCloverInv(*tmp2, in, 1 - parity);
-        DiracWilson::DslashXpay(out, *tmp2, parity, x, k);
-        deleteTmp(&tmp2, reset);
-      }
-    } else {//TWIST_DOUBLET:
-      errorQuda("Non-degenerate operator is not implemented");
-    }
-    delete cs;
-    delete cI;
-#endif
   }
 
   void DiracTwistedCloverPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -317,18 +227,11 @@ namespace quda {
         Dslash(*tmp1, in, parity[0]);
         DslashXpay(out, *tmp1, parity[1], in, kappa2);
       } else { // symmetric preconditioning, dagger
-#ifndef USE_LEGACY_DSLASH
         TwistCloverInv(out, in, parity[1]);
         reverse = true;
         Dslash(*tmp1, out, parity[0]);
         reverse = false;
         DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
-#else
-        TwistCloverInv(*tmp1, in, parity[1]);
-        DiracWilson::Dslash(out, *tmp1, parity[0]);
-        TwistCloverInv(*tmp1, out, parity[0]);
-        DiracWilson::DslashXpay(out, *tmp1, parity[1], in, kappa2);
-#endif
       }
     } else { //Twist doublet
       errorQuda("Non-degenerate operator is not implemented");

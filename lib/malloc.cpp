@@ -11,18 +11,16 @@
 #include "qdp_config.h"
 #endif
 
-namespace quda {
+#ifdef QUDA_BACKWARDSCPP
+#include "backward.hpp"
+#endif
+namespace quda
+{
 
-  enum AllocType {
-    DEVICE,
-    DEVICE_PINNED,
-    HOST,
-    PINNED,
-    MAPPED,
-    N_ALLOC_TYPE
-  };
+  enum AllocType { DEVICE, DEVICE_PINNED, HOST, PINNED, MAPPED, MANAGED, N_ALLOC_TYPE };
 
-  class MemAlloc {
+  class MemAlloc
+  {
 
   public:
     std::string func;
@@ -30,25 +28,35 @@ namespace quda {
     int line;
     size_t size;
     size_t base_size;
+#ifdef QUDA_BACKWARDSCPP
+    backward::StackTrace st;
+#endif
 
-    MemAlloc()
-      : line(-1), size(0), base_size(0) { }
+    MemAlloc() : line(-1), size(0), base_size(0) {}
 
-    MemAlloc(std::string func, std::string file, int line)
-      : func(func), file(file), line(line), size(0), base_size(0) { }
+    MemAlloc(std::string func, std::string file, int line) : func(func), file(file), line(line), size(0), base_size(0)
+    {
+#ifdef QUDA_BACKWARDSCPP
+      st.load_here(32);
+      st.skip_n_firsts(1);
+#endif
+    }
 
-    MemAlloc& operator=(const MemAlloc &a) {
+    MemAlloc &operator=(const MemAlloc &a)
+    {
       if (&a != this) {
-	func = a.func;
-	file = a.file;
-	line = a.line;
-	size = a.size;
-	base_size = a.base_size;
+        func = a.func;
+        file = a.file;
+        line = a.line;
+        size = a.size;
+        base_size = a.base_size;
+#ifdef QUDA_BACKWARDSCPP
+        st = a.st;
+#endif
       }
       return *this;
     }
   };
-
 
   static std::map<void *, MemAlloc> alloc[N_ALLOC_TYPE];
   static long total_bytes[N_ALLOC_TYPE] = {0};
@@ -61,6 +69,8 @@ namespace quda {
   long pinned_allocated_peak() { return max_total_bytes[PINNED]; }
 
   long mapped_allocated_peak() { return max_total_bytes[MAPPED]; }
+
+  long managed_allocated_peak() { return max_total_bytes[MANAGED]; }
 
   long host_allocated_peak() { return max_total_bytes[HOST]; }
 
@@ -81,20 +91,24 @@ namespace quda {
     printfQuda("----------------------------------------------------------\n");
   }
 
-
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
       void *ptr = entry->first;
       MemAlloc a = entry->second;
-      printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long) a.base_size,
-		 a.func.c_str(), a.file.c_str(), a.line);
+      printfQuda("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long)a.base_size, a.func.c_str(),
+                 a.file.c_str(), a.line);
+#ifdef QUDA_BACKWARDSCPP
+      if (getRankVerbosity()) {
+        backward::Printer p;
+        p.print(a.st);
+      }
+#endif
     }
   }
-
 
   static void track_malloc(const AllocType &type, const MemAlloc &a, void *ptr)
   {
@@ -160,6 +174,25 @@ namespace quda {
     return ptr;
   }
 
+  bool use_managed_memory()
+  {
+    static bool managed = false;
+    static bool init = false;
+
+    if (!init) {
+      char *enable_managed_memory = getenv("QUDA_ENABLE_MANAGED_MEMORY");
+      if (enable_managed_memory && strcmp(enable_managed_memory, "1") == 0) {
+        warningQuda("Using managed memory for CUDA allocations");
+        managed = true;
+
+        if (deviceProp.major < 6) warningQuda("Using managed memory on pre-Pascal architecture is limited");
+      }
+
+      init = true;
+    }
+
+    return managed;
+  }
 
   /**
    * Perform a standard cudaMalloc() with error-checking.  This
@@ -168,7 +201,9 @@ namespace quda {
    */
   void *device_malloc_(const char *func, const char *file, int line, size_t size)
   {
- #ifndef QDP_USE_CUDA_MANAGED_MEMORY
+    if (use_managed_memory()) return managed_malloc_(func, file, line, size);
+
+#ifndef QDP_USE_CUDA_MANAGED_MEMORY
     MemAlloc a(func, file, line);
     void *ptr;
 
@@ -290,8 +325,30 @@ namespace quda {
     memset(ptr, 0xff, a.base_size);
 #endif
     return ptr;
-  }  
+  }
 
+  /**
+   * Perform a standard cudaMallocManaged() with error-checking.  This
+   * function should only be called via the managed_malloc() macro,
+   * defined in malloc_quda.h
+   */
+  void *managed_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr;
+
+    a.size = a.base_size = size;
+
+    cudaError_t err = cudaMallocManaged(&ptr, size);
+    if (err != cudaSuccess) {
+      errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
+    track_malloc(MANAGED, a, ptr);
+#ifdef HOST_DEBUG
+    cudaMemset(ptr, 0xff, size);
+#endif
+    return ptr;
+  }
 
   /**
    * Free device memory allocated with device_malloc().  This function
@@ -300,6 +357,11 @@ namespace quda {
    */
   void device_free_(const char *func, const char *file, int line, void *ptr)
   {
+    if (use_managed_memory()) {
+      managed_free_(func, file, line, ptr);
+      return;
+    }
+
 #ifndef QDP_USE_CUDA_MANAGED_MEMORY
     if (!ptr) { errorQuda("Attempt to free NULL device pointer (%s:%d in %s())\n", file, line, func); }
     if (!alloc[DEVICE].count(ptr)) {
@@ -335,6 +397,21 @@ namespace quda {
     track_free(DEVICE_PINNED, ptr);
   }
 
+  /**
+   * Free device memory allocated with device_malloc().  This function
+   * should only be called via the device_free() macro, defined in
+   * malloc_quda.h
+   */
+  void managed_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorQuda("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
+    if (!alloc[MANAGED].count(ptr)) {
+      errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
+    }
+    cudaError_t err = cudaFree(ptr);
+    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    track_free(MANAGED, ptr);
+  }
 
   /**
    * Free host memory allocated with safe_malloc(), pinned_malloc(),
@@ -376,6 +453,7 @@ namespace quda {
   {
     printfQuda("Device memory used = %.1f MB\n", max_total_bytes[DEVICE] / (double)(1<<20));
     printfQuda("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED] / (double)(1<<20));
+    printfQuda("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED] / (double)(1 << 20));
     printfQuda("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
     printfQuda("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
   }

@@ -7,6 +7,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
+#include <cuda_runtime.h>
 
 /**
  * @file lattice_field.h
@@ -144,19 +145,19 @@ namespace quda {
 
   protected:
     /** Lattice volume */
-    int volume;
+    size_t volume;
 
     /** Checkerboarded volume */
-    int volumeCB;
+    size_t volumeCB;
 
-    int stride;
+    size_t stride;
     int pad;
 
     size_t total_bytes;
 
     /** Number of field dimensions */
     int nDim;
-    
+
     /** Array storing the length of dimension */
     int x[QUDA_MAX_DIM];
 
@@ -168,7 +169,7 @@ namespace quda {
 
     /** Precision of the field */
     QudaPrecision precision;
-    
+
     /** Precision of the ghost */
     mutable QudaPrecision ghost_precision;
 
@@ -189,7 +190,7 @@ namespace quda {
     /** The number of dimensions we partition for communication */
     int nDimComms;
 
-    /* 
+    /*
        The need for persistent message handlers (for GPUDirect support)
        means that we allocate different message handlers for each number of
        faces we can send.
@@ -312,7 +313,7 @@ namespace quda {
 
     /** Local pointers to the device ghost_recv buffer */
     void *from_face_dim_dir_d[2][QUDA_MAX_DIM][2];
-    
+
     /** Message handles for receiving from forwards */
     MsgHandle *mh_recv_fwd[2][QUDA_MAX_DIM];
 
@@ -338,16 +339,16 @@ namespace quda {
     MsgHandle *mh_send_rdma_back[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_fwd[2][QUDA_MAX_DIM];
+    static MsgHandle *mh_send_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_send_p2p_back[2][QUDA_MAX_DIM];
+    static MsgHandle *mh_send_p2p_back[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
+    static MsgHandle *mh_recv_p2p_fwd[2][QUDA_MAX_DIM];
 
     /** Peer-to-peer message handler for signaling event posting */
-    static MsgHandle* mh_recv_p2p_back[2][QUDA_MAX_DIM];
+    static MsgHandle *mh_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Buffer used by peer-to-peer message handler */
     static int buffer_send_p2p_fwd[2][QUDA_MAX_DIM];
@@ -375,7 +376,7 @@ namespace quda {
 
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
-    
+
     /** used as a label in the autotuner */
     char aux_string[TuneKey::aux_n];
 
@@ -385,15 +386,14 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
-    void precisionCheck() {
-      switch(precision) {
+    void precisionCheck()
+    {
+      switch (precision) {
       case QUDA_QUARTER_PRECISION:
       case QUDA_HALF_PRECISION:
       case QUDA_SINGLE_PRECISION:
-      case QUDA_DOUBLE_PRECISION:
-	break;
-      default:
-	errorQuda("Unknown precision %d\n", precision);
+      case QUDA_DOUBLE_PRECISION: break;
+      default: errorQuda("Unknown precision %d\n", precision);
       }
     }
 
@@ -496,17 +496,17 @@ namespace quda {
        @return The pointer to the lattice-dimension array
     */
     const int* X() const { return x; }
-    
+
     /**
        @return The full-field volume
     */
-    int Volume() const { return volume; }
-    
+    size_t Volume() const { return volume; }
+
     /**
        @return The single-parity volume
     */
-    int VolumeCB() const { return volumeCB; }
-    
+    size_t VolumeCB() const { return volumeCB; }
+
     /**
        @param i The dimension of the requested surface 
        @return The single-parity surface of dimension i
@@ -518,12 +518,12 @@ namespace quda {
        @return The single-parity surface of dimension i
     */
     int SurfaceCB(const int i) const { return surfaceCB[i]; }
-    
+
     /**
-       @return The single-parity stride of the field     
+       @return The single-parity stride of the field
     */
-    int Stride() const { return stride; }
-    
+    size_t Stride() const { return stride; }
+
     /**
        @return The field padding
     */
@@ -603,7 +603,45 @@ namespace quda {
        @param filename The name of the file to write
     */
     virtual void write(char *filename);
-    
+
+    /**
+       @brief Return pointer to the local pinned my_face buffer in a
+       given direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void *myFace_h(int dir, int dim) const { return my_face_dim_dir_h[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return pointer to the local mapped my_face buffer in a
+       given direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void *myFace_hd(int dir, int dim) const { return my_face_dim_dir_hd[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return pointer to the device send buffer in a given
+       direction and dimension
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to pinned memory buffer
+    */
+    void *myFace_d(int dir, int dim) const { return my_face_dim_dir_d[bufferIndex][dim][dir]; }
+
+    /**
+       @brief Return base pointer to a remote device buffer for direct
+       sending in a given direction and dimension.  Since this is a
+       base pointer, one still needs to take care of offsetting to the
+       correct point for each direction/dimension.
+       @param[in] dir Direction we are requesting
+       @param[in] dim Dimension we are requesting
+       @return Pointer to remote memory buffer
+    */
+    void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
+
     virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 

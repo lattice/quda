@@ -283,6 +283,8 @@ namespace quda {
       solution_accumulator_pipeline(param.solution_accumulator_pipeline),
       max_res_increase(param.max_res_increase),
       max_res_increase_total(param.max_res_increase_total),
+      max_hq_res_increase(param.max_hq_res_increase),
+      max_hq_res_restart_total(param.max_hq_res_restart_total),
       heavy_quark_check(param.heavy_quark_check),
       pipeline(param.pipeline),
       tol(param.tol),
@@ -464,7 +466,7 @@ namespace quda {
 
   public:
     Solver(SolverParam &param, TimeProfile &profile);
-    virtual ~Solver() { ; }
+    virtual ~Solver();
 
     virtual void operator()(ColorSpinorField &out, ColorSpinorField &in) = 0;
 
@@ -546,6 +548,15 @@ namespace quda {
     std::vector<ColorSpinorField *> defl_tmp2;
 
     /**
+       @brief Constructs the deflation space
+       @param[in] meta A sample ColorSpinorField with which to instantiate
+       the eigensolver
+       @param[in] mat The operator to eigensolve
+       @param[in] Whether to compute the SVD
+    */
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd);
+
+    /**
      * Return flops
      * @return flops expended by this operator
      */
@@ -587,8 +598,6 @@ namespace quda {
      * @param r2_old_init [description]
      */
     void operator()(ColorSpinorField &out, ColorSpinorField &in, ColorSpinorField *p_init, double r2_old_init);
-
-    void constructDeflationSpace();
 
     void blocksolve(ColorSpinorField& out, ColorSpinorField& in);
   };
@@ -829,9 +838,8 @@ namespace quda {
     bool init;
 
     ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
     ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *y_sloppy; //! sloppy solution vector
+    ColorSpinorField *tmp_sloppy; //! temporary for sloppy mat-vec
     ColorSpinorField *r_sloppy; //! sloppy residual vector
 
     std::vector<ColorSpinorField*> p;  // GCR direction vectors
@@ -843,9 +851,9 @@ namespace quda {
 
     /**
        @param K Preconditioner
-     */
-    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon,
-	SolverParam &param, TimeProfile &profile);
+    */
+    GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+        TimeProfile &profile);
     virtual ~GCR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1015,7 +1023,7 @@ namespace quda {
     */
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
-  public:
+public:
     CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CAGCR();
 
@@ -1247,7 +1255,7 @@ public:
 
     /**
        @brief Expands deflation space.
-       @param V container of new eigenvectors
+       @param V Composite field container of new eigenvectors
        @param nev number of vectors to load
      */
     void increment(ColorSpinorField &V, int nev);

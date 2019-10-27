@@ -6,6 +6,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -32,101 +33,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-extern bool tune;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_precondition;
-extern QudaPrecision prec_null;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa; // kappa of Dirac operator
-extern double mu;
-extern double epsilon;
-extern double anisotropy;
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern double reliable_delta;
-extern char latfile[];
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
-extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int nvec[];
-extern int mg_levels;
-
-extern bool generate_nullspace;
-extern bool generate_all_levels;
-extern int nu_pre[QUDA_MAX_MG_LEVEL];
-extern int nu_post[QUDA_MAX_MG_LEVEL];
-extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
-extern double mu_factor[QUDA_MAX_MG_LEVEL];
-
-extern QudaVerbosity verbosity;
-extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
-
-extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
-extern QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
-
-extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
-extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol[QUDA_MAX_MG_LEVEL];
-extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-extern int setup_maxiter_refresh[QUDA_MAX_MG_LEVEL];
-extern QudaSetupType setup_type;
-extern bool pre_orthonormalize;
-extern bool post_orthonormalize;
-extern double omega;
-extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
-extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
-
-extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-
-extern double smoother_tol[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
-
-extern QudaPrecision smoother_halo_prec;
-extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
-extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
-
-extern QudaMatPCType matpc_type;
-extern QudaSolveType solve_type;
-
-extern char vec_infile[];
-extern char vec_outfile[];
-
-//Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char** );
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern bool verify_results;
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -292,6 +198,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
     mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i]; // default to 24 vectors if not set
+    mg_param.n_block_ortho[i] = n_block_ortho[i];    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null; // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = nu_pre[i];
@@ -422,10 +329,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   // set file i/o parameters
-  strcpy(mg_param.vec_infile, vec_infile);
-  strcpy(mg_param.vec_outfile, vec_outfile);
-  if (strcmp(mg_param.vec_infile,"")!=0) mg_param.vec_load = QUDA_BOOLEAN_YES;
-  if (strcmp(mg_param.vec_outfile,"")!=0) mg_param.vec_store = QUDA_BOOLEAN_YES;
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+  }
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -580,6 +489,7 @@ int main(int argc, char **argv)
     setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
     nu_pre[i] = 2;
     nu_post[i] = 2;
+    n_block_ortho[i] = 1;
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
@@ -590,15 +500,21 @@ int main(int argc, char **argv)
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
     coarse_solver_ca_lambda_max[i] = -1.0;
+
+    strcpy(mg_vec_infile[i], "");
+    strcpy(mg_vec_outfile[i], "");
   }
   reliable_delta = 1e-4;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -723,9 +639,8 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
-    int halfvolume = xdim*ydim*zdim*tdim >> 1;
     // CURAND random generator initialization
-    RNG *randstates = new RNG(halfvolume, 1234, gauge_param.X);
+    RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
 
     int nsteps = 10;
@@ -742,7 +657,7 @@ int main(int argc, char **argv)
     setReunitarizationConsts();
     plaquette(*gaugeEx);
 
-    Monte( *gaugeEx, *randstates, beta_value, 100*nhbsteps, 100*novrsteps);
+    Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -819,12 +734,18 @@ int main(int argc, char **argv)
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_param.iter == inv_param.maxiter) {
-        sprintf(mg_param.vec_outfile, "dump_step_%d", step);
+        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+        }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
-                    mg_param.vec_outfile);
+                    mg_param.vec_outfile[0]);
 
         dumpMultigridQuda(mg_preconditioner, &mg_param);
-        strcpy(mg_param.vec_outfile, vec_outfile); // restore output file name
+        for (int i=0; i<mg_param.n_level; i++) {
+          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+        }
       }
 
       freeGaugeQuda();
