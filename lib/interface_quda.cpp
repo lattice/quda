@@ -2556,7 +2556,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   if(mg->mgParam->mg_global.invert_param != param)
     mg->mgParam->mg_global.invert_param = param;
 
-  bool refresh = mg_param->preserve_deflation ? false : true;
+  bool refresh = true;
   mg->mg->reset(refresh);
 
   setOutputPrefix("");

@@ -868,6 +868,8 @@ int main(int argc, char **argv)
     invertQuda(spinorOut, spinorIn, &inv_param2);
 
     mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    for (int i=0; i < mg_param.n_level; i++) mg_param.setup_maxiter_refresh[i] = 0;
+
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
     invertQuda(spinorOut, spinorIn, &inv_param);
