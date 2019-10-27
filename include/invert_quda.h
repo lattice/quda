@@ -827,6 +827,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     const DiracMatrix &matPrecon;
+    const DiracMdagM matMdagM; // used by the eigensolver
 
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
@@ -999,6 +1000,7 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMdagM matMdagM; // used by the eigensolver
     bool init;
 
     // Basis. Currently anything except POWER_BASIS causes a warning

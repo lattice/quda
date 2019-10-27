@@ -162,7 +162,8 @@ namespace quda {
 
   GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
 	   TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
+    matMdagM(DiracMdagM(mat.Expose())), K(0), Kparam(param),
     nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
   {
     fillInnerSolveParam(Kparam, param);
@@ -193,7 +194,8 @@ namespace quda {
 
   GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
 	   SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
+    matMdagM(mat.Expose()), K(&K), Kparam(param),
     nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
   {
     p.resize(nKrylov+1);
@@ -273,20 +275,20 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+      constructDeflationSpace(b, matMdagM);
 
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeSVD(matMdagM), evecs, evals);
         profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeEvals(matMdagM), evecs, evals);
+        eig_solve->computeSVD(matMdagM), evecs, evals);
         recompute_evals = false;
       }
     }

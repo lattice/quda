@@ -5,8 +5,8 @@
 namespace quda {
 
   CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false),
-      basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+    : Solver(param, profile), mat(mat), matSloppy(matSloppy), matMdagM(mat.Expose()),
+      init(false), basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
@@ -187,18 +187,18 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, DiracMdagM(mat.Expose()));
+      constructDeflationSpace(b, matMdagM);
 
       if (deflate_compute) {
         // compute the deflation space.
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(DiracMdagM(mat.Expose()), evecs, evals);
-        eig_solve->computeSVD(DiracMdagM(mat.Expose()), evecs, evals);
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
         recompute_evals = false;
       }
     }

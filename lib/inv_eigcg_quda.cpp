@@ -43,10 +43,9 @@ namespace quda {
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
-
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
-   class EigCGArgs{
+   class EigCGArgs {
 
      public:
        //host Lanczos matrice, and its eigenvalue/vector arrays:
@@ -108,9 +107,9 @@ namespace quda {
        {
          Tm.setZero();
 
-         std::unique_ptr<Complex[] > s(new Complex[2*k]);
+         auto s = std::make_unique<Complex[]>(2*k);
 
-         for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
+         for (int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
 
 	 std::vector<ColorSpinorField*> w_;
 	 w_.push_back(w);
@@ -119,13 +118,11 @@ namespace quda {
 
 	 blas::cDotProduct(s.get(), w_, v_);
 
-	 Map<VectorXcd, Unaligned > s_(s.get(), 2*k);
+	 Map<VectorXcd, Unaligned> s_(s.get(), 2*k);
 	 s_ *= inv_sqrt_r2;
 
 	 Tm.col(2*k).segment(0, 2*k) = s_;
 	 Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-	 return;
        }
    };
 
