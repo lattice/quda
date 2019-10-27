@@ -19,15 +19,28 @@ namespace quda {
         typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_NO>::type G;
         extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_12) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_12", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_8) {
+#if QUDA_RECONSTRUCT & 1
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_8", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_13) {
+#if QUDA_RECONSTRUCT & 2
 	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type G;
 	extractGhost<Float,length>(G(u, 0, Ghost), u, location, extract, offset);
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_13", QUDA_RECONSTRUCT);
+#endif
       } else if (u.Reconstruct() == QUDA_RECONSTRUCT_9) {
+#if QUDA_RECONSTRUCT & 1
         if (u.StaggeredPhase() == QUDA_STAGGERED_PHASE_MILC) {
           typedef typename gauge_mapper<Float, QUDA_RECONSTRUCT_9, 18, QUDA_STAGGERED_PHASE_MILC>::type G;
           extractGhost<Float, length>(G(u, 0, Ghost), u, location, extract, offset);
@@ -37,6 +50,9 @@ namespace quda {
         } else {
           errorQuda("Staggered phase type %d not supported", u.StaggeredPhase());
         }
+#else
+        errorQuda("QUDA_RECONSTRUCT = %d does not enable QUDA_RECONSTRUCT_9", QUDA_RECONSTRUCT);
+#endif
       }
     } else if (u.Order() == QUDA_QDP_GAUGE_ORDER) {
 

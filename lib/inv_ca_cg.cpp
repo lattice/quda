@@ -332,6 +332,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_alpha_N<1>(Q_AQandg, alpha); break;
       case 2: compute_alpha_N<2>(Q_AQandg, alpha); break;
       case 3: compute_alpha_N<3>(Q_AQandg, alpha); break;
@@ -344,6 +345,7 @@ namespace quda {
       case 10: compute_alpha_N<10>(Q_AQandg, alpha); break;
       case 11: compute_alpha_N<11>(Q_AQandg, alpha); break;
       case 12: compute_alpha_N<12>(Q_AQandg, alpha); break;
+#endif
       default: // failsafe
         using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;
@@ -406,6 +408,7 @@ namespace quda {
 
     const int N = Q.size();
     switch (N) {
+#if 0 // since CA-CG is not used anywhere at the moment, no point paying for this compilation cost
       case 1: compute_beta_N<1>(Q_AQandg, Q_AS, beta); break;
       case 2: compute_beta_N<2>(Q_AQandg, Q_AS, beta); break;
       case 3: compute_beta_N<3>(Q_AQandg, Q_AS, beta); break;
@@ -418,6 +421,7 @@ namespace quda {
       case 10: compute_beta_N<10>(Q_AQandg, Q_AS, beta); break;
       case 11: compute_beta_N<11>(Q_AQandg, Q_AS, beta); break;
       case 12: compute_beta_N<12>(Q_AQandg, Q_AS, beta); break;
+#endif
       default: // failsafe
         using namespace Eigen;
         typedef Matrix<Complex, Dynamic, Dynamic, RowMajor> matrix;

@@ -47,7 +47,7 @@ namespace quda {
           if (arg.twist) {
 	    errorQuda("Not instantiated");
 	  } else {
-	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, tp, stream, arg, Float, Arg, true, false);
+	    LAUNCH_KERNEL_LOCAL_PARITY(cloverInvertKernel, (*this), tp, stream, arg, Float, Arg, true, false);
 	  }
         } else {
           if (arg.twist) {

@@ -213,13 +213,6 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
 
-  // only apply temporal boundary condition if I'm the last node in T
-#ifdef MULTI_GPU
-  bool last_node_in_t = (comm_coord(3) == comm_dim(3)-1);
-#else
-  bool last_node_in_t = true;
-#endif
-
 #if 1        
     double coeff= 1.0;
    
@@ -247,9 +240,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
            }
        }
        if (dir == TUP){
-	 if (last_node_in_t && i4 == (X4-1) ){
-	   coeff *= -1;
-	 } 
+         if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
        }       
    }
  

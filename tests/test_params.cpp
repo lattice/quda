@@ -239,8 +239,10 @@ namespace
                                                            {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
                                                            {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
-  CLI::TransformPairs<QudaPrecision>
-    precision_map({{"double", QUDA_DOUBLE_PRECISION}, {"single", QUDA_SINGLE_PRECISION}, {"half", QUDA_HALF_PRECISION}});
+  CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
+                                                    {"single", QUDA_SINGLE_PRECISION},
+                                                    {"half", QUDA_HALF_PRECISION},
+                                                    {"quarter", QUDA_QUARTER_PRECISION}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -381,7 +383,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
-  quda_app->add_option("--prec-precondition", precon_type, "Preconditioner precision in GPU")->transform(prec_transform);
+  quda_app->add_option("--prec-precondition", prec_precondition, "Preconditioner precision in GPU")->transform(prec_transform);
   ;
   quda_app->add_option("--prec-refine", prec_refinement_sloppy, "Sloppy precision for refinement in GPU")
     ->transform(prec_transform);
@@ -393,7 +395,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--prec-null", prec_null, "Precison TODO")->transform(prec_transform);
   ;
 
-  quda_app->add_option("--precon-type", prec_precondition, "The type of solver to use (default none (=unspecified)).")
+  quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
 
   CLI::TransformPairs<int> rank_order_map {{"col", 0}, {"row", 1}};

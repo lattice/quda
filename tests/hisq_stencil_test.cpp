@@ -444,9 +444,6 @@ static void display_test_info()
       dimPartitioned(3));
 
   printfQuda("Number of Naiks: %d\n", n_naiks);
-
-  return ;
-
 }
 
 

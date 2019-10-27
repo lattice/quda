@@ -611,7 +611,6 @@ namespace quda {
 
     void create(const QudaFieldCreate);
     void destroy();
-    void copy(const cudaColorSpinorField &);
 
     /**
        @brief Zero the padded regions added on to the field.  Ensures
@@ -641,6 +640,8 @@ namespace quda {
     ColorSpinorField& operator=(const ColorSpinorField &);
     cudaColorSpinorField& operator=(const cudaColorSpinorField&);
     cudaColorSpinorField& operator=(const cpuColorSpinorField&);
+
+    void copy(const cudaColorSpinorField &);
 
     void switchBufferPinned();
 
