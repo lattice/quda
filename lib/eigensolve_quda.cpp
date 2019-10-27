@@ -369,6 +369,7 @@ namespace quda
                                                                                 eig_vecs[0]->Precision());
         csParam.location = QUDA_CPU_FIELD_LOCATION;
         csParam.create = QUDA_NULL_FIELD_CREATE;
+	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) csParam.print();
         for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
       } else {
         for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
@@ -415,6 +416,7 @@ namespace quda
                                                                               eig_vecs[0]->Precision());
       csParam.location = QUDA_CPU_FIELD_LOCATION;
       csParam.create = QUDA_NULL_FIELD_CREATE;
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) csParam.print();
       for (int i = 0; i < Nvec; i++) {
         tmp.push_back(ColorSpinorField::Create(csParam));
         *tmp[i] = *eig_vecs[i];
