@@ -831,7 +831,7 @@ int main(int argc, char **argv)
         char vec_outfile[QUDA_MAX_MG_LEVEL][256];
         for (int i=0; i<mg_param.n_level; i++) {
           strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
-          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+          sprintf(mg_param.vec_outfile[i], "dump_step_evolve_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
                     mg_param.vec_outfile[0]);
@@ -901,7 +901,7 @@ int main(int argc, char **argv)
         char vec_outfile[QUDA_MAX_MG_LEVEL][256];
         for (int i = 0; i < mg_param.n_level; i++) {
           strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
-          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+          sprintf(mg_param.vec_outfile[i], "dump_step_shift_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
                     mg_param.vec_outfile[0]);
