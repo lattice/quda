@@ -116,7 +116,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -217,7 +217,7 @@ namespace quda
       if (param.mg_global.run_verify) verify();
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d done\n", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
     popLevel(param.level);
   }
@@ -399,14 +399,12 @@ namespace quda
       // nothing to do
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
-        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver*>(coarse_solver)->ExposeSolver();
+        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
         int defl_size = coarse_solver_inner.evecs.size();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // Deflation space exists and we are going to create a new solver. Transfer deflation space.
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transferring deflation space size %d to MG\n", defl_size);
-          for (int i = 0; i < defl_size; i++) {
-            evecs.push_back(coarse_solver_inner.evecs[i]);
-          }
+          for (int i = 0; i < defl_size; i++) { evecs.push_back(coarse_solver_inner.evecs[i]); }
           coarse_solver_inner.evecs.resize(0);
         }
         delete coarse_solver;

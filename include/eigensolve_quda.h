@@ -140,7 +140,8 @@ public:
        @param[in] evals The eigenvalues
        @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int size);
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+                      int size);
 
     /**
        @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
