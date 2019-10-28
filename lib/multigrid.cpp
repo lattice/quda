@@ -531,8 +531,9 @@ namespace quda
 
         // Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
         int defl_size = evecs.size();
+        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
-          reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->deflate_compute = false;
+          coarse_solver_inner.deflate_compute = false;
         }
 
         // Run a first dummy solve so that the deflation space is constructed and computed if needed during the MG setup
@@ -546,19 +547,12 @@ namespace quda
         if (defl_size > 0) {
           if (getVerbosity() >= QUDA_VERBOSE)
             printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
-          ColorSpinorParam csParam(*evecs[0]);
           // Create space in coarse solver to hold deflation space, destroy space in MG.
-          for (int i = 0; i < defl_size; i++) {
-            (reinterpret_cast<PreconditionedSolver *>(coarse_solver)
-               ->ExposeSolver()
-               ->evecs.push_back(ColorSpinorField::Create(csParam)));
-            blas::copy(*(reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->evecs[i]), *evecs[i]);
-            delete evecs[i];
-          }
+          for (int i = 0; i < defl_size; i++) coarse_solver_inner.evecs.push_back(evecs[i]);
           evecs.resize(0);
           if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
             // Run a second dummy solve so that the deflation eigenvalues are recomputed
-            reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver()->recompute_evals = true;
+            coarse_solver_inner.recompute_evals = true;
             param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
             (*coarse_solver)(*x_coarse, *r_coarse);
             setOutputPrefix(prefix); // restore since we just popped back from coarse grid
