@@ -231,11 +231,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<4; j++) {
+    for (int j = 0; j < 4; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
-    for (int j=4; j<QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
+    for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
     mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
     mg_param.spin_block_size[i] = 1;
     mg_param.verbosity[i] = mg_verbosity[i];
@@ -868,7 +868,7 @@ int main(int argc, char **argv)
     invertQuda(spinorOut, spinorIn, &inv_param2);
 
     mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-    for (int i=0; i < mg_param.n_level; i++) mg_param.setup_maxiter_refresh[i] = 0;
+    for (int i = 0; i < mg_param.n_level; i++) mg_param.setup_maxiter_refresh[i] = 0;
 
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;

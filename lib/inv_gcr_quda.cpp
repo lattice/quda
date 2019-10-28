@@ -160,11 +160,20 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
-	   TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
-    matMdagM(DiracMdagM(mat.Expose())), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    matMdagM(DiracMdagM(mat.Expose())),
+    K(0),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     fillInnerSolveParam(Kparam, param);
 
@@ -192,11 +201,21 @@ namespace quda {
     gamma = new double[nKrylov];
   }
 
-  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
-	   SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon),
-    matMdagM(mat.Expose()), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    matMdagM(mat.Expose()),
+    K(&K),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     p.resize(nKrylov+1);
     Ap.resize(nKrylov);

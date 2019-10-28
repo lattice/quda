@@ -4,9 +4,19 @@
 
 namespace quda {
 
-  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile)
-    : Solver(param, profile), mat(mat), matSloppy(matSloppy), matMdagM(mat.Expose()),
-      init(false), basis(param.ca_basis), alpha(nullptr), rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr) { }
+  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matMdagM(mat.Expose()),
+    init(false),
+    basis(param.ca_basis),
+    alpha(nullptr),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr)
+  {
+  }
 
   CAGCR::~CAGCR() {
     if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
