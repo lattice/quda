@@ -564,11 +564,13 @@ namespace quda {
 
     /**
        @brief Transfers the deflation space to the solver from the argument
+       @param defl_space the vectors to transfer to the solver vectors
     */
     void transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space);
 
     /**
        @brief Extracts the deflation space from the solver to the argumnet
+       @param defl_space the vectors to hold the extracted solver vectors
     */
     void extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space);
 
@@ -579,11 +581,13 @@ namespace quda {
 
     /**
        @brief Sets the deflation compute boolean
+       @param flag Set to this boolean value
     */
     void setDeflateCompute(bool flag) { deflate_compute = flag; };
 
     /**
        @brief Sets the recompute evals boolean
+       @param flag Set to this boolean value
     */
     void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
