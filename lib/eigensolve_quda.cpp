@@ -483,7 +483,8 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-    // profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
@@ -500,7 +501,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    // profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
