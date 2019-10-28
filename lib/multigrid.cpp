@@ -400,14 +400,14 @@ namespace quda
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
         auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
-        //int defl_size = coarse_solver_inner.evecs.size();
-	int defl_size = coarse_solver_inner.deflationSpaceSize();
+        // int defl_size = coarse_solver_inner.evecs.size();
+        int defl_size = coarse_solver_inner.deflationSpaceSize();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // Deflation space exists and we are going to create a new solver. Extract deflation space.
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Extracting deflation space size %d to MG\n", defl_size);
-	  coarse_solver_inner.extractDeflationSpaceFromSolver(evecs);
-          //for (int i = 0; i < defl_size; i++) { evecs.push_back(coarse_solver_inner.evecs[i]); }
-          //coarse_solver_inner.evecs.resize(0);
+          coarse_solver_inner.extractDeflationSpaceFromSolver(evecs);
+          // for (int i = 0; i < defl_size; i++) { evecs.push_back(coarse_solver_inner.evecs[i]); }
+          // coarse_solver_inner.evecs.resize(0);
         }
         delete coarse_solver;
         coarse_solver = nullptr;
@@ -534,29 +534,29 @@ namespace quda
         // Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
         int defl_size = evecs.size();
         auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
-        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {	  
-	  // We shall not recompute the deflation space, we shall transfer
-	  // vectors stored in the parent MG instead
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          // We shall not recompute the deflation space, we shall transfer
+          // vectors stored in the parent MG instead
           coarse_solver_inner.setDeflateCompute(false);
-	  if (getVerbosity() >= QUDA_VERBOSE)
+          if (getVerbosity() >= QUDA_VERBOSE)
             printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
-	  
+
           // Create space in coarse solver to hold deflation space, destroy space in MG.
-	  coarse_solver_inner.transferDeflationSpaceToSolver(evecs);
-          //for (int i = 0; i < defl_size; i++) coarse_solver_inner.evecs.push_back(evecs[i]);
-          //evecs.resize(0);
+          coarse_solver_inner.transferDeflationSpaceToSolver(evecs);
+          // for (int i = 0; i < defl_size; i++) coarse_solver_inner.evecs.push_back(evecs[i]);
+          // evecs.resize(0);
           coarse_solver_inner.setRecomputeEvals(true);
-	}
-	
-	// Run a dummy solve so that the deflation space is constructed and computed if needed during the MG setup,
-	// or the eigenvalues are recomputed during transfer.
-	spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
-	param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
-	(*coarse_solver)(*x_coarse, *r_coarse);
-	setOutputPrefix(prefix); // restore since we just popped back from coarse grid
-	param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];	  
+        }
+
+        // Run a dummy solve so that the deflation space is constructed and computed if needed during the MG setup,
+        // or the eigenvalues are recomputed during transfer.
+        spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+        param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
+        (*coarse_solver)(*x_coarse, *r_coarse);
+        setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
       }
-      
+
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
     } else {
       errorQuda("Multigrid cycle type %d not supported", param.cycle_type);

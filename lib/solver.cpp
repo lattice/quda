@@ -204,16 +204,18 @@ namespace quda {
     }
   }
 
-  void Solver::transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space) {
-    for (int i=0; i<(int)defl_space.size(); i++) { evecs.push_back(defl_space[i]); }
+  void Solver::transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space)
+  {
+    for (int i = 0; i < (int)defl_space.size(); i++) { evecs.push_back(defl_space[i]); }
     defl_space.resize(0);
   }
-  
-  void Solver::extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space) {
-    for (int i=0; i<(int)evecs.size(); i++) { defl_space.push_back(evecs[i]); }
+
+  void Solver::extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space)
+  {
+    for (int i = 0; i < (int)evecs.size(); i++) { defl_space.push_back(evecs[i]); }
     evecs.resize(0);
   }
-  
+
   void Solver::extendSVDDeflationSpace()
   {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");
