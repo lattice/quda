@@ -452,12 +452,22 @@ namespace quda {
   };
 
   class Solver {
-
+    
   protected:
     SolverParam &param;
     TimeProfile &profile;
-    int node_parity;
-
+    int node_parity;    
+    EigenSolver *eig_solve; /** Eigensolver object. */
+    bool deflate_init; /** If true, the deflation space has been computed. */
+    bool deflate_compute; /** If true, instruct the solver to create a deflation space. */
+    bool recompute_evals; /** If true, instruct the solver to recompute evals from an existing deflation space. */
+    std::vector<ColorSpinorField *> evecs; /** Holds the eigenvectors. */
+    std::vector<Complex> evals; /** Holds the eigenvalues. */
+    std::vector<ColorSpinorField *> defl_tmp1; /** temp space needed for deflation. */
+    std::vector<ColorSpinorField *> defl_tmp2; /** temp space needed for deflation. */
+    
+    //friend void MG::destroyCoarseSolver();
+    
   public:
     Solver(SolverParam &param, TimeProfile &profile);
     virtual ~Solver();
@@ -467,7 +477,7 @@ namespace quda {
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       Solver factory
+       @brief Solver factory
     */
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
@@ -534,27 +544,6 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
-       @brief Deflation objects
-       @param eig_solve Eigensolver object
-       @param deflate_compute If true, instruct the solver to create a deflation space
-       @param deflate_init If true, the deflation space has been computed.
-       @param recompute_evals If true, instruct the solver to recompute evals from an existing deflation space
-       @param evecs Holds the eigenvectors 
-       @param evals Holds the eigenvalues
-       @param defl_tmp1 temp space needed for deflation
-       @param defl_tmp2 temp space needed for deflation
-    */
-    EigenSolver *eig_solve; // Eigensolver object
-    bool deflate_compute; // If true, instruct the solver to create a deflation space
-    bool deflate_init; // If true, the deflation space has been computed.
-    bool recompute_evals; // If true, instruct the solver to recompute evals from an existing deflation space
-    std::vector<ColorSpinorField *> evecs; // Holds the eigenvectors 
-    std::vector<Complex> evals; // Holds the eigenvalues
-    // temp space needed for deflation
-    std::vector<ColorSpinorField *> defl_tmp1; 
-    std::vector<ColorSpinorField *> defl_tmp2;
-
-    /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver
@@ -573,6 +562,31 @@ namespace quda {
     */
     void extendSVDDeflationSpace();
 
+    /**
+       @brief Transfers the deflation space to the solver from the argument 
+    */
+    void transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space);
+    
+    /**
+       @brief Extracts the deflation space from the solver to the argumnet
+    */
+    void extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space);
+
+    /**
+       @brief Returns the size of deflation space
+    */
+    int deflationSpaceSize() { return (int)evecs.size(); };
+
+    /**
+       @brief Sets the deflation compute boolean
+    */
+    void setDeflateCompute(bool flag) { deflate_compute = flag; };
+    
+    /**
+       @brief Sets the recompute evals boolean
+    */
+    void setRecomputeEvals(bool flag) { recompute_evals = flag; };
+    
     /**
      * @brief Return flops
      * @return flops expended by this operator
@@ -593,7 +607,7 @@ namespace quda {
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
     bool init;
-
+    
   public:
     CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
@@ -1120,7 +1134,7 @@ public:
     /**
      * @brief Return a pointer to the solver. Used when mass/mu rescaling
      *        an MG instance
-     */    
+     */
     Solver *ExposeSolver() const { return solver; }
   };
 
