@@ -535,14 +535,23 @@ namespace quda {
 
     /**
        @brief Deflation objects
+       @param eig_solve Eigensolver object
+       @param deflate_compute If true, instruct the solver to create a deflation space
+       @param deflate_init If true, the deflation space has been computed.
+       @param recompute_evals If true, instruct the solver to recompute evals from an existing deflation space
+       @param evecs Holds the eigenvectors 
+       @param evals Holds the eigenvalues
+       @param defl_tmp1 temp space needed for deflation
+       @param defl_tmp2 temp space needed for deflation
     */
-    EigenSolver *eig_solve;
-    bool deflate_init;
-    bool deflate_compute;
-    bool recompute_evals;
-    std::vector<ColorSpinorField *> evecs;
-    std::vector<Complex> evals;
-    std::vector<ColorSpinorField *> defl_tmp1;
+    EigenSolver *eig_solve; // Eigensolver object
+    bool deflate_compute; // If true, instruct the solver to create a deflation space
+    bool deflate_init; // If true, the deflation space has been computed.
+    bool recompute_evals; // If true, instruct the solver to recompute evals from an existing deflation space
+    std::vector<ColorSpinorField *> evecs; // Holds the eigenvectors 
+    std::vector<Complex> evals; // Holds the eigenvalues
+    // temp space needed for deflation
+    std::vector<ColorSpinorField *> defl_tmp1; 
     std::vector<ColorSpinorField *> defl_tmp2;
 
     /**
