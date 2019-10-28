@@ -406,8 +406,6 @@ namespace quda
           // Deflation space exists and we are going to create a new solver. Extract deflation space.
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Extracting deflation space size %d to MG\n", defl_size);
           coarse_solver_inner.extractDeflationSpaceFromSolver(evecs);
-          // for (int i = 0; i < defl_size; i++) { evecs.push_back(coarse_solver_inner.evecs[i]); }
-          // coarse_solver_inner.evecs.resize(0);
         }
         delete coarse_solver;
         coarse_solver = nullptr;
@@ -538,16 +536,13 @@ namespace quda
           // We shall not recompute the deflation space, we shall transfer
           // vectors stored in the parent MG instead
           coarse_solver_inner.setDeflateCompute(false);
+	  coarse_solver_inner.setRecomputeEvals(true);
           if (getVerbosity() >= QUDA_VERBOSE)
             printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
-
           // Create space in coarse solver to hold deflation space, destroy space in MG.
-          coarse_solver_inner.transferDeflationSpaceToSolver(evecs);
-          // for (int i = 0; i < defl_size; i++) coarse_solver_inner.evecs.push_back(evecs[i]);
-          // evecs.resize(0);
-          coarse_solver_inner.setRecomputeEvals(true);
+          coarse_solver_inner.transferDeflationSpaceToSolver(evecs);	  
         }
-
+	
         // Run a dummy solve so that the deflation space is constructed and computed if needed during the MG setup,
         // or the eigenvalues are recomputed during transfer.
         spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
