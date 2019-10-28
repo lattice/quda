@@ -1107,7 +1107,11 @@ public:
 
       setOutputPrefix("");
     }
-
+    
+    /**
+     * @brief Return a pointer to the solver. Used when mass/mu rescaling
+     *        an MG instance
+     */    
     Solver *ExposeSolver() const { return solver; }
   };
 
