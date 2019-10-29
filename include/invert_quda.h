@@ -1143,10 +1143,10 @@ public:
     }
 
     /**
-     * @brief Return a pointer to the solver. Used when mass/mu rescaling
-     *        an MG instance
+     * @brief Return reference to the solver. Used when mass/mu
+     *        rescaling an MG instance
      */
-    Solver *ExposeSolver() const { return solver; }
+    Solver &ExposeSolver() const { return *solver; }
   };
 
   class MultiShiftSolver {

@@ -399,7 +399,7 @@ namespace quda
       // nothing to do
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
-        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
+        auto &coarse_solver_inner = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
         // int defl_size = coarse_solver_inner.evecs.size();
         int defl_size = coarse_solver_inner.deflationSpaceSize();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
@@ -531,7 +531,7 @@ namespace quda
 
         // Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
         int defl_size = evecs.size();
-        auto &coarse_solver_inner = *reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
+        auto &coarse_solver_inner = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // We shall not recompute the deflation space, we shall transfer
           // vectors stored in the parent MG instead
