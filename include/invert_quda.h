@@ -268,7 +268,7 @@ namespace quda {
       preconditioner(param.preconditioner),
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
-      deflate(param.eig_param != nullptr),
+      deflate(param.eig_param != 0),
       use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       delta(param.reliable_delta),

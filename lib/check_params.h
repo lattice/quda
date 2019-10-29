@@ -282,6 +282,10 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dslash_type, QUDA_INVALID_DSLASH);
   P(inv_type, QUDA_INVALID_INVERTER);
 
+#ifdef INIT_PARAM
+  P(eig_param, 0);
+#endif
+  
 #if defined INIT_PARAM
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
