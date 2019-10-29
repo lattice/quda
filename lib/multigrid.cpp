@@ -550,7 +550,6 @@ namespace quda
         (*coarse_solver)(*x_coarse, *r_coarse);
         setOutputPrefix(prefix); // restore since we just popped back from coarse grid
         param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
-	
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");

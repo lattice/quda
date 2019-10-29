@@ -509,7 +509,7 @@ namespace quda {
         recompute_evals = false;
       }
     }
-    
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);

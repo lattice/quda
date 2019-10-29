@@ -184,7 +184,7 @@ namespace quda {
 
     evals.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
-    
+
     deflate_init = true;
 
     if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
