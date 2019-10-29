@@ -10,7 +10,7 @@ namespace quda {
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
-    matMdagM(mat.Expose()),
+    matMdagM(matPrecon.Expose()),
     init(false),
     basis(param.ca_basis),
     alpha(nullptr),

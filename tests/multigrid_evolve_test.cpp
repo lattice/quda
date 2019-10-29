@@ -405,6 +405,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
   inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.eig_param = nullptr;
   inv_param.tol = 1e-10;
   inv_param.maxiter = 1000;
   inv_param.reliable_delta = 1e-10;
@@ -415,6 +416,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -478,7 +480,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.matpc_type = matpc_type;
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
-
+  
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = mg_verbosity[0];
 
