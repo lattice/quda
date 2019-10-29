@@ -59,12 +59,7 @@ namespace quda {
       if (rnewp) delete rnewp;
       init = false;
 
-      if (deflate_init) {
-        for (auto veci : evecs)
-          if (veci) delete veci;
-        delete defl_tmp1[0];
-        delete defl_tmp2[0];
-      }
+      destroyDeflationSpace();
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -293,11 +288,8 @@ namespace quda {
     }
 
     if (param.deflate) {
-      if (!deflate_init) {
-        // Construct the eigensolver and deflation space if requested.
-        constructDeflationSpace(b, matPrecon);
-        deflate_init = true;
-      }
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, mat);
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);

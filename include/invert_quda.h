@@ -458,6 +458,16 @@ namespace quda {
     SolverParam &param;
     TimeProfile &profile;
     int node_parity;
+    EigenSolver *eig_solve; /** Eigensolver object. */
+    bool deflate_init;      /** If true, the deflation space has been computed. */
+    bool deflate_compute;   /** If true, instruct the solver to create a deflation space. */
+    bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
+    std::vector<ColorSpinorField *> evecs;     /** Holds the eigenvectors. */
+    std::vector<Complex> evals;                /** Holds the eigenvalues. */
+    std::vector<ColorSpinorField *> defl_tmp1; /** temp space needed for deflation. */
+    std::vector<ColorSpinorField *> defl_tmp2; /** temp space needed for deflation. */
+
+    // friend void MG::destroyCoarseSolver();
 
   public:
     Solver(SolverParam &param, TimeProfile &profile);
@@ -468,7 +478,7 @@ namespace quda {
     virtual void blocksolve(ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       Solver factory
+       @brief Solver factory
     */
     static Solver* create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
 			  DiracMatrix &matPrecon, TimeProfile &profile);
@@ -535,18 +545,6 @@ namespace quda {
     void PrintSummary(const char *name, int k, double r2, double b2, double r2_tol, double hq_tol);
 
     /**
-       @brief Deflation objects
-    */
-    EigenSolver *eig_solve;
-    bool deflate_init;
-    bool deflate_compute;
-    bool recompute_evals;
-    std::vector<ColorSpinorField *> evecs;
-    std::vector<Complex> evals;
-    std::vector<ColorSpinorField *> defl_tmp1;
-    std::vector<ColorSpinorField *> defl_tmp2;
-
-    /**
        @brief Constructs the deflation space and eigensolver
        @param[in] meta A sample ColorSpinorField with which to instantiate
        the eigensolver
@@ -556,9 +554,51 @@ namespace quda {
     void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
+       @brief Destroy the allocated deflation space
+    */
+    void destroyDeflationSpace();
+
+    /**
        @brief Extends the deflation space to twice its size for SVD deflation
     */
     void extendSVDDeflationSpace();
+
+    /**
+       @brief Injects a deflation space into the solver from the
+       vector argument.  Note the input space is reduced to zero size as a
+       result of calling this function, with responsibility for the
+       space transferred to the solver.
+       @param[in,out] defl_space the deflation space we wish to
+       transfer to the solver.
+    */
+    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+
+    /**
+       @brief Extracts the deflation space from the solver to the
+       vector argument.  Note the solver deflation space is reduced to
+       zero size as a result of calling this function, with
+       responsibility for the space transferred to the argument.
+       @param[in,out] defl_space the extracted deflation space.  On
+       input, this vector should have zero size.
+    */
+    void extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+
+    /**
+       @brief Returns the size of deflation space
+    */
+    int deflationSpaceSize() const { return (int)evecs.size(); };
+
+    /**
+       @brief Sets the deflation compute boolean
+       @param[in] flag Set to this boolean value
+    */
+    void setDeflateCompute(bool flag) { deflate_compute = flag; };
+
+    /**
+       @brief Sets the recompute evals boolean
+       @param[in] flag Set to this boolean value
+    */
+    void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
     /**
      * @brief Return flops
@@ -570,7 +610,6 @@ namespace quda {
   /**
      @brief  Conjugate-Gradient Solver.
    */
-
   class CG : public Solver {
 
   private:
@@ -826,6 +865,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     const DiracMatrix &matPrecon;
+    const DiracMdagM matMdagM; // used by the eigensolver
 
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
@@ -1002,6 +1042,7 @@ namespace quda {
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
     const DiracMatrix &matPrecon;
+    const DiracMdagM matMdagM; // used by the eigensolver
     bool init;
 
     // Basis. Currently anything except POWER_BASIS causes a warning
@@ -1109,7 +1150,11 @@ public:
       setOutputPrefix("");
     }
 
-    Solver *ExposeSolver() const { return solver; }
+    /**
+     * @brief Return reference to the solver. Used when mass/mu
+     *        rescaling an MG instance
+     */
+    Solver &ExposeSolver() const { return *solver; }
   };
 
   class MultiShiftSolver {

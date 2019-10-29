@@ -164,9 +164,10 @@ namespace quda {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
@@ -183,13 +184,45 @@ namespace quda {
 
     evals.resize(param.eig_param.nConv);
     for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
+    
+    deflate_init = true;
+
+    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+  }
+
+  void Solver::destroyDeflationSpace()
+  {
+    if (deflate_init) {
+      for (auto veci : evecs)
+        if (veci) delete veci;
+      evecs.resize(0);
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+      defl_tmp1.resize(0);
+      defl_tmp2.resize(0);
+      deflate_init = false;
+    }
+  }
+
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : defl_space) { evecs.push_back(e); }
+    defl_space.resize(0);
+  }
+
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : evecs ) { defl_space.push_back(e); }
+    evecs.resize(0);
   }
 
   void Solver::extendSVDDeflationSpace()
   {
     if (!deflate_init) errorQuda("Deflation space for this solver not computed");
 
-    // Resize deflation space and compute left singular vectors of M
+    // Double the size deflation space to accomodate for the extra singular vectors
     // Clone from an existing vector
     ColorSpinorParam csParam(*evecs[0]);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -200,7 +233,8 @@ namespace quda {
     }
   }
 
-  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in)
+  {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;
@@ -208,8 +242,8 @@ namespace quda {
     }
   }
 
-  double Solver::stopping(double tol, double b2, QudaResidualType residual_type) {
-
+  double Solver::stopping(double tol, double b2, QudaResidualType residual_type)
+  {
     double stop=0.0;
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {

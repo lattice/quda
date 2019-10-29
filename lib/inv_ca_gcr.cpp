@@ -10,6 +10,7 @@ namespace quda {
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
+    matMdagM(mat.Expose()),
     init(false),
     basis(param.ca_basis),
     alpha(nullptr),
@@ -38,15 +39,7 @@ namespace quda {
       if (rp) delete rp;
     }
 
-    if (deflate_init) {
-      for (auto veci : evecs)
-        if (veci) delete veci;
-      evecs.resize(0);
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-      defl_tmp1.resize(0);
-      defl_tmp2.resize(0);
-    }
+    destroyDeflationSpace();
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -205,27 +198,22 @@ namespace quda {
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
     if (param.deflate) {
-      if (!deflate_init) {
-        profile.TPSTART(QUDA_PROFILE_INIT);
-        // Construct the eigensolver and deflation space if requested.
-        constructDeflationSpace(b, DiracMdagM(matPrecon.Expose()));
-        profile.TPSTOP(QUDA_PROFILE_INIT);
-        deflate_init = true;
-      }
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matMdagM);
       if (deflate_compute) {
         // compute the deflation space.
         (*eig_solve)(evecs, evals);
         extendSVDDeflationSpace();
-        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
         deflate_compute = false;
       }
       if (recompute_evals) {
-        eig_solve->computeEvals(DiracMdagM(matPrecon.Expose()), evecs, evals);
-        eig_solve->computeSVD(DiracMdagM(matPrecon.Expose()), evecs, evals);
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
         recompute_evals = false;
       }
     }
-
+    
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r, x, tmp);

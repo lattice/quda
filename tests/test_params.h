@@ -310,6 +310,7 @@ extern quda::mgarray<bool> mg_eig_use_dagger;
 extern quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum;
 extern quda::mgarray<QudaEigType> mg_eig_type;
 extern bool mg_eig_coarse_guess;
+extern bool mg_eig_preserve_deflation;
 
 extern double heatbath_beta_value;
 extern int heatbath_warmup_steps;

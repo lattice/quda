@@ -30,7 +30,8 @@ namespace quda
     tmp1(nullptr),
     tmp2(nullptr)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
@@ -88,7 +89,8 @@ namespace quda
       reverse = true;
       spectrum[0] = 'S';
     }
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
@@ -295,13 +297,16 @@ namespace quda
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
-                                 std::vector<Complex> &evals)
+                                 std::vector<Complex> &evals, int size)
   {
+    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+
     ColorSpinorParam csParam(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
     temp.push_back(ColorSpinorField::Create(csParam));
 
-    for (int i = 0; i < nConv; i++) {
+    for (int i = 0; i < size; i++) {
       // r = A * v_i
       matVec(mat, *temp[0], *evecs[i]);
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
@@ -483,7 +488,8 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-    // profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
@@ -500,7 +506,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    // profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
@@ -596,7 +602,7 @@ namespace quda
 
       for (int step = num_keep; step < nKr; step++) lanczosStep(kSpace, step);
       iter += (nKr - num_keep);
-      // if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Restart %d complete\n", restart_iter+1);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter + 1);
 
       int arrow_pos = std::max(num_keep - num_locked + 1, 2);
       // The eigenvalues are returned in the alpha array
