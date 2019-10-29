@@ -138,9 +138,21 @@ public:
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
-       @param[in] k The number to compute
+       @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+                      int size);
+
+    /**
+       @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+    */
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+    {
+      computeEvals(mat, evecs, evals, nConv);
+    }
 
     /**
        @brief Load vectors from file

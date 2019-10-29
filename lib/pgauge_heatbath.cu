@@ -782,7 +782,7 @@ namespace quda {
         }
       }
     }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
+    if ( getVerbosity() >= QUDA_VERBOSE ) {
       qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
@@ -795,7 +795,7 @@ namespace quda {
     #endif
     }
 
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_VERBOSE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, false> relax(montearg);
     for ( int step = 0; step < nover; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -808,7 +808,7 @@ namespace quda {
         }
       }
     }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
+    if ( getVerbosity() >= QUDA_VERBOSE ) {
       qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);

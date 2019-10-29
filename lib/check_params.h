@@ -782,8 +782,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 #ifdef INIT_PARAM
   P(coarse_guess, QUDA_BOOLEAN_NO);
+  P(preserve_deflation, QUDA_BOOLEAN_NO);
 #else
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
 #endif
 
   for (int i = 0; i < n_level - 1; i++) {

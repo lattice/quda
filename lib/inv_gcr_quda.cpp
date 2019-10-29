@@ -160,10 +160,20 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
-	   TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    matMdagM(DiracMdagM(mat.Expose())),
+    K(0),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     fillInnerSolveParam(Kparam, param);
 
@@ -191,10 +201,21 @@ namespace quda {
     gamma = new double[nKrylov];
   }
 
-  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
-	   SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    matMdagM(mat.Expose()),
+    K(&K),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     p.resize(nKrylov+1);
     Ap.resize(nKrylov);
@@ -207,6 +228,7 @@ namespace quda {
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
+
     delete []alpha;
     for (int i=0; i<nKrylov; i++) delete []beta[i];
     delete []beta;
@@ -225,12 +247,8 @@ namespace quda {
     if (tmpp) delete tmpp;
     if (rp) delete rp;
 
-    if (deflate_init) {
-      for (auto veci : param.evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
+
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -274,9 +292,26 @@ namespace quda {
       init = true;
     }
 
-    // Once the GCR operator is called, we are able to construct an appropriate
-    // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matMdagM);
+      if (deflate_compute) {
+        // compute the deflation space.
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        // double the size of the Krylov space
+        extendSVDDeflationSpace();
+        // populate extra memory with L/R singular vectors
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
@@ -298,15 +333,15 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
+    if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
       // rhs b. use `defl_tmp2` as a temp.
       blas::copy(*defl_tmp2[0], r);
       rhs.push_back(defl_tmp2[0]);
 
-      // Deflate: Hardcoded to SVD
-      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
       mat(r, *defl_tmp1[0]);

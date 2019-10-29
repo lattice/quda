@@ -30,7 +30,8 @@ namespace quda
     tmp1(nullptr),
     tmp2(nullptr)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Problem parameters
     nEv = eig_param->nEv;
@@ -87,21 +88,7 @@ namespace quda
       spectrum[0] = 'S';
     }
 
-    // Print Eigensolver params
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("spectrum %s\n", spectrum);
-      printfQuda("tol %.4e\n", tol);
-      printfQuda("nConv %d\n", nConv);
-      printfQuda("nEv %d\n", nEv);
-      printfQuda("nKr %d\n", nKr);
-      if (eig_param->use_poly_acc) {
-        printfQuda("polyDeg %d\n", eig_param->poly_deg);
-        printfQuda("a-min %f\n", eig_param->a_min);
-        printfQuda("a-max %f\n", eig_param->a_max);
-      }
-    }
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
@@ -225,41 +212,6 @@ namespace quda
     return sum;
   }
 
-  // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                            std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
-  {
-    // number of evecs
-    int n_defl = eig_param->nConv;
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
-
-    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
-    // for all i computed eigenvectors and values.
-
-    // Pointers to the required Krylov space vectors,
-    // no extra memory is allocated.
-    std::vector<ColorSpinorField *> eig_vecs_ptr;
-    for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
-
-    // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex*s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, eig_vecs_ptr, vec);
-
-    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
-    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    blas::zero(*vec_defl[0]);
-    blas::caxpy(s, eig_vecs_ptr, vec_defl);
-    // FIXME - we can optimize the zeroing out with a "multi-caxy"
-    // function that just writes over vec_defl and doesn't sum.  When
-    // we exceed the multi-blas limit this would deompose into caxy
-    // for the kernel call and caxpy for the subsequent ones
-
-    host_free(s);
-  }
-
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
 
@@ -345,18 +297,62 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
+    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+
+    ColorSpinorParam csParam(*evecs[0]);
+    std::vector<ColorSpinorField *> temp;
+    temp.push_back(ColorSpinorField::Create(csParam));
+
     for (int i = 0; i < size; i++) {
       // r = A * v_i
-      matVec(mat, *r[0], *evecs[i]);
-
+      matVec(mat, *temp[0], *evecs[i]);
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      evals[i] = blas::cDotProduct(*evecs[i], *r[0]) / sqrt(blas::norm2(*evecs[i]));
-
+      evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
       // Measure ||lambda_i*v_i - A*v_i||
       Complex n_unit(-1.0, 0.0);
-      blas::caxpby(evals[i], *evecs[i], n_unit, *r[0]);
-      residua[i] = sqrt(blas::norm2(*r[0]));
+      blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
+      residua[i] = sqrt(blas::norm2(*temp[0]));
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
+    delete temp[0];
+  }
+
+  // Deflate vec, place result in vec_defl
+  void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
+                            std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  {
+    // number of evecs
+    int n_defl = eig_param->nConv;
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
+
+    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
+    // for all i computed eigenvectors and values.
+
+    // Pointers to the required Krylov space vectors,
+    // no extra memory is allocated.
+    std::vector<ColorSpinorField *> eig_vecs_ptr;
+    for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
+
+    // 1. Take block inner product: (V_i)^dag * vec = A_i
+    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    blas::cDotProduct(s, eig_vecs_ptr, vec);
+
+    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
+    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    blas::zero(*vec_defl[0]);
+    blas::caxpy(s, eig_vecs_ptr, vec_defl);
+    // FIXME - we can optimize the zeroing out with a "multi-caxy"
+    // function that just writes over vec_defl and doesn't sum.  When
+    // we exceed the multi-blas limit this would deompose into caxy
+    // for the kernel call and caxpy for the subsequent ones
+
+    host_free(s);
   }
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
@@ -469,13 +465,7 @@ namespace quda
     r.push_back(ColorSpinorField::Create(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
-    computeEvals(mat, kSpace, evals, nConv);
-    for (int i = 0; i < nConv; i++) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
-      }
-    }
-
+    computeEvals(mat, kSpace, evals);
     delete r[0];
   }
 
@@ -494,7 +484,8 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
@@ -511,7 +502,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
@@ -586,6 +577,20 @@ namespace quda
       printfQuda("*****************************\n");
     }
 
+    // Print Eigensolver params
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("spectrum %s\n", spectrum);
+      printfQuda("tol %.4e\n", tol);
+      printfQuda("nConv %d\n", nConv);
+      printfQuda("nEv %d\n", nEv);
+      printfQuda("nKr %d\n", nKr);
+      if (eig_param->use_poly_acc) {
+        printfQuda("polyDeg %d\n", eig_param->poly_deg);
+        printfQuda("a-min %f\n", eig_param->a_min);
+        printfQuda("a-max %f\n", eig_param->a_max);
+      }
+    }
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
@@ -593,7 +598,7 @@ namespace quda
 
       for (int step = num_keep; step < nKr; step++) lanczosStep(kSpace, step);
       iter += (nKr - num_keep);
-      // if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Restart %d complete\n", restart_iter+1);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter + 1);
 
       int arrow_pos = std::max(num_keep - num_locked + 1, 2);
       // The eigenvalues are returned in the alpha array
@@ -641,18 +646,18 @@ namespace quda
       num_locked += iter_locked;
 
       if (getVerbosity() >= QUDA_VERBOSE) {
-        // printfQuda("iter Conv = %d\n", iter_converged);
-        // printfQuda("iter Keep = %d\n", iter_keep);
-        // printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
-        // printfQuda("num_converged = %d\n", num_converged);
-        // printfQuda("num_keep = %d\n", num_keep);
-        // printfQuda("num_locked = %d\n", num_locked);
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("iter Conv = %d\n", iter_converged);
+        printfQuda("iter Keep = %d\n", iter_keep);
+        printfQuda("iter Lock = %d\n", iter_locked);
+        printfQuda("num_converged = %d\n", num_converged);
+        printfQuda("num_keep = %d\n", num_keep);
+        printfQuda("num_locked = %d\n", num_locked);
         for (int i = 0; i < nKr; i++) {
-          // printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
@@ -698,13 +703,7 @@ namespace quda
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals, nConv);
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        for (int i = 0; i < nConv; i++) {
-          printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
-                     residua[i]);
-        }
-      }
+      computeEvals(mat, kSpace, evals);
     }
 
     // Local clean-up

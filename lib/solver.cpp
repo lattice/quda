@@ -14,7 +14,10 @@ namespace quda {
     param(param),
     profile(profile),
     node_parity(0),
-    eig_solve(nullptr)
+    eig_solve(nullptr),
+    deflate_init(false),
+    deflate_compute(true),
+    recompute_evals(false)
   {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
@@ -156,46 +159,82 @@ namespace quda {
     return solver;
   }
 
-  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd)
+  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
   {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     // This is the vector precision used by matResidual
     csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
-
+    if (deflate_compute) {
+      // Computing the deflation space, rather than transferring, so we create space.
+      for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
+    }
     // Construct vectors to hold deflated RHS
     defl_tmp1.push_back(ColorSpinorField::Create(csParam));
     defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
-    param.evals.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    (*eig_solve)(param.evecs, param.evals);
-    profile.TPSTART(QUDA_PROFILE_INIT);
-
-    if (svd) {
-      // Resize deflation space and compute left SV of M
-      for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++)
-        param.evecs.push_back(ColorSpinorField::Create(csParam));
-
-      // Populate latter half of the array with left SV
-      eig_solve->computeSVD(mat, param.evecs, param.evals);
-    }
+    evals.resize(param.eig_param.nConv);
+    for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
 
     deflate_init = true;
+
+    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::destroyDeflationSpace()
+  {
+    if (deflate_init) {
+      for (auto veci : evecs)
+        if (veci) delete veci;
+      evecs.resize(0);
+      delete defl_tmp1[0];
+      delete defl_tmp2[0];
+      defl_tmp1.resize(0);
+      defl_tmp2.resize(0);
+      deflate_init = false;
+    }
+  }
+
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : defl_space) { evecs.push_back(e); }
+    defl_space.resize(0);
+  }
+
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : evecs ) { defl_space.push_back(e); }
+    evecs.resize(0);
+  }
+
+  void Solver::extendSVDDeflationSpace()
+  {
+    if (!deflate_init) errorQuda("Deflation space for this solver not computed");
+
+    // Double the size deflation space to accomodate for the extra singular vectors
+    // Clone from an existing vector
+    ColorSpinorParam csParam(*evecs[0]);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
+    for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++) {
+      evecs.push_back(ColorSpinorField::Create(csParam));
+    }
+  }
+
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in)
+  {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;
@@ -203,8 +242,8 @@ namespace quda {
     }
   }
 
-  double Solver::stopping(double tol, double b2, QudaResidualType residual_type) {
-
+  double Solver::stopping(double tol, double b2, QudaResidualType residual_type)
+  {
     double stop=0.0;
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
