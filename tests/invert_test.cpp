@@ -104,7 +104,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
+  add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
-  inv_param.eig_param = deflate ? &eig_param : nullptr;
+  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
   double kappa5;
 

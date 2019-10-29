@@ -251,7 +251,7 @@ int invert_test()
   setInvertParam(inv_param);
   QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
-  inv_param.eig_param = deflate ? &eig_param : nullptr;
+  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
