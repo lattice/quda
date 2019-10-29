@@ -115,7 +115,7 @@ namespace quda
 
     void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp);
 
-    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat);
+    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat, ColorSpinorField* x = nullptr);
     void ATx(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v);
 
   };

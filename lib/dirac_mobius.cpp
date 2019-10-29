@@ -377,6 +377,8 @@ namespace quda {
   
   void DiracMobiusPC::MdagMLocal(ColorSpinorField& out, const ColorSpinorField& in) const {
 
+    checkDWF(in, out);
+    // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
@@ -537,6 +539,7 @@ namespace quda {
   void DiracMobiusPCEofa::m5_eofa(ColorSpinorField& out, const ColorSpinorField& in) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -551,6 +554,7 @@ namespace quda {
       ColorSpinorField& out, const ColorSpinorField& in, const ColorSpinorField& x, double a) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -566,6 +570,7 @@ namespace quda {
   void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField& out, const ColorSpinorField& in) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -580,6 +585,7 @@ namespace quda {
       ColorSpinorField& out, const ColorSpinorField& in, const ColorSpinorField& x, double a) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 

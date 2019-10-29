@@ -21,6 +21,8 @@
 #include <copy_color_spinor_field_5d.h>
 
 #include <random>
+#include <deque>
+#include <polynomial.h>
 
 extern quda::cudaGaugeField* gaugePrecondition;
 extern quda::cudaGaugeField* gaugePrecise;
@@ -202,21 +204,15 @@ namespace quda {
     (*nrm_op_precondition)(out, in);
   }
 
-  static int transfer_index_from_st(int s, int t, int Ls_in, int Ls_out){
-    return (s * Ls_in + t);
-  }
-
-  double MSPCG::calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat){
+  double MSPCG::calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, int Ls_hat, ColorSpinorField* x){
     
     ColorSpinorParam csParam(in);
     
     cudaColorSpinorField tmp(csParam);
-    cudaColorSpinorField in_alias(csParam);
     cudaColorSpinorField ip(csParam);
-    cudaColorSpinorField immp(csParam);
     
     csParam.x[4] = Ls_hat;
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
     
     dirac_param_precondition.Ls = Ls_hat;
     
@@ -226,31 +222,25 @@ namespace quda {
    
     // A * T * phi
     ATx(truncated_cs_field_out, in, v);
-    
+   
+    if(x){
+    // T^ * A * T * phi
+    transfer_5d_hh(*x, truncated_cs_field_out, reinterpret_cast<complex<float>*>(v.data()), true);
+
+    // M * T^ * A * T * phi
+    inner_dslash(ip, *x);
+   
+    }else{
     // T^ * A * T * phi
     transfer_5d_hh(tmp, truncated_cs_field_out, reinterpret_cast<complex<float>*>(v.data()), true);
 
-    // B * phi
-    in_alias = in;
-    
-    blas::zero(out);
-    double rk2 = blas::norm2(in_alias);
-    double Mpk2, alpha, beta, rkp12;
-    blas::copy(ip, in_alias);
-    for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
-      inner_dslash(immp, ip);
-      Mpk2 = reDotProduct(ip, immp);
-      alpha = rk2 / Mpk2;
-      rkp12 = axpyNorm(-alpha, immp, in_alias);
-      beta = rkp12 / rk2;
-      rk2 = rkp12;
-      axpyZpbx(alpha, ip, out, in_alias, beta);
-      // printfQuda("  r2 = %8.4e\n", rk2);
+    // M * T^ * A * T * phi
+    inner_dslash(ip, tmp);
     }
-    // inner_cg(out, in_alias, false);
-   
-    // T^ * A * T * phi - B * phi
-    return xmyNorm(tmp, out);
+
+    copy(out, in);
+    // M * T^ * A * T * phi - phi
+    return xmyNorm(ip, out);
   }
   
   void MSPCG::ATx(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v){
@@ -260,7 +250,7 @@ namespace quda {
     ColorSpinorParam csParam(in);
     
     csParam.x[4] = Ls_out;
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.create = QUDA_NULL_FIELD_CREATE;
     
     dirac_param_precondition.Ls = Ls_out;
     
@@ -299,108 +289,10 @@ namespace quda {
   	static std::normal_distribution<double> n(0., 1.);
    
     for(auto& x : v){
-      x = 1e-2*n(rng);
+      x = 1e-1*n(rng);
     }
   
   }
-
-constexpr double CV_PI = 3.14159265359;
-
-int solve_deg2(double a, double b, double c, double & x1, double & x2)
-{
-  double delta = b * b - 4 * a * c;
-
-  if (delta < 0) return 0;
-
-  double inv_2a = 0.5 / a;
-
-  if (delta == 0) {
-    x1 = -b * inv_2a;
-    x2 = x1;
-    return 1;
-  }
-
-  double sqrt_delta = sqrt(delta);
-  x1 = (-b + sqrt_delta) * inv_2a;
-  x2 = (-b - sqrt_delta) * inv_2a;
-  return 2;
-}
-
-
-/// Reference : Eric W. Weisstein. "Cubic Equation." From MathWorld--A Wolfram Web Resource.
-/// http://mathworld.wolfram.com/CubicEquation.html
-/// \return Number of real roots found.
-int solve_deg3(double a, double b, double c, double d,
-               double & x0, double & x1, double & x2)
-{
-  if (a == 0) {
-    // Solve second order system
-    if (b == 0)	{
-      // Solve first order system
-      if (c == 0)
-    return 0;
-
-      x0 = -d / c;
-      return 1;
-    }
-
-    x2 = 0;
-    return solve_deg2(b, c, d, x0, x1);
-  }
-
-  // Calculate the normalized form x^3 + a2 * x^2 + a1 * x + a0 = 0
-  double inv_a = 1. / a;
-  double b_a = inv_a * b, b_a2 = b_a * b_a;
-  double c_a = inv_a * c;
-  double d_a = inv_a * d;
-
-  // Solve the cubic equation
-  double Q = (3 * c_a - b_a2) / 9;
-  double R = (9 * b_a * c_a - 27 * d_a - 2 * b_a * b_a2) / 54;
-  double Q3 = Q * Q * Q;
-  double D = Q3 + R * R;
-  double b_a_3 = (1. / 3.) * b_a;
-
-  if (Q == 0) {
-    if(R == 0) {
-      x0 = x1 = x2 = - b_a_3;
-      return 3;
-    }
-    else {
-      x0 = pow(2 * R, 1 / 3.0) - b_a_3;
-      return 1;
-    }
-  }
-
-  if (D <= 0) {
-    // Three real roots
-    double theta = acos(R / sqrt(-Q3));
-    double sqrt_Q = sqrt(-Q);
-    x0 = 2 * sqrt_Q * cos(theta             / 3.0) - b_a_3;
-    x1 = 2 * sqrt_Q * cos((theta + 2 * CV_PI)/ 3.0) - b_a_3;
-    x2 = 2 * sqrt_Q * cos((theta + 4 * CV_PI)/ 3.0) - b_a_3;
-
-    return 3;
-  }
-
-  // D > 0, only one real root
-  double AD = pow(fabs(R) + sqrt(D), 1.0 / 3.0) * (R > 0 ? 1 : (R < 0 ? -1 : 0));
-  double BD = (AD == 0) ? 0 : -Q / AD;
-
-  // Calculate the only real root
-  x0 = AD + BD - b_a_3;
-
-  return 1;
-}
-
-inline double eval_deg4(double a, double b, double c, double d, double e, double x){
-  
-  double x2 = x * x;
-  double x3 = x * x2;
-  double x4 = x2* x2;
-
-  return a * x4 + b * x3 + c * x2 + d * x + e;
-}
 
   void MSPCG::train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp) {
   
@@ -409,7 +301,9 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     int Ls_in = in[0]->X(4);
     int Ls_out = 8;
 
-    if(tp.size() != Ls_in*Ls_out*color_spin_dim*color_spin_dim*2){
+    size_t param_size = Ls_in*Ls_out * color_spin_dim*color_spin_dim * 2;
+
+    if(tp.size() != param_size){
       errorQuda("wrong param size.\n");
     }
 
@@ -417,16 +311,18 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     cudaColorSpinorField chi(csParam);
     cudaColorSpinorField tmp(csParam);
     cudaColorSpinorField theta(csParam);
-    cudaColorSpinorField beta(csParam);
+    cudaColorSpinorField lambda(csParam);
+        
+    cudaColorSpinorField Mchi(csParam);
     
     double ref = 0.0;
     int count = 0;
     for(const auto& phi : in){
       ref += norm2(*phi);
-      printfQuda("reference dslash norm %d = %12.8e\n", count, norm2(*phi));
+      printfQuda("reference dslash norm %03d = %8.4e\n", count, norm2(*phi));
       count++;
     }
-    printfQuda("reference dslash norm = %12.8e\n", ref);
+    printfQuda("reference dslash norm = %8.4e\n", ref);
 
     csParam.x[4] = Ls_out;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -434,6 +330,8 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     cudaColorSpinorField ATchi(csParam);
     cudaColorSpinorField ATphi(csParam);
     cudaColorSpinorField ADphi(csParam);
+    
+    cudaColorSpinorField ATMchi(csParam);
     
     std::vector<float> d1(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
     std::vector<float> d2(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
@@ -443,7 +341,7 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     float alpha;
     float b = 0.99;
     printfQuda("beta = %f\n", b);
-    for(int iteration = 0; iteration < 3000; iteration++){
+    for(int iteration = 0; iteration < 1600; iteration++){
       
       std::vector<float> D(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
       double chi2 = 0.0;
@@ -454,22 +352,35 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
         chi2 += calculate_chi(chi, *phi, tp, Ls_out);
      
         ATx(ATphi, *phi, tp);
-        ATx(ATchi, chi, tp);
+        inner_dslash(Mchi, chi);
+        ATx(ATMchi, Mchi, tp);
 
-        tensor_5d_hh(ATphi, chi, reinterpret_cast<complex<float>*>(d1.data()));
-        tensor_5d_hh(ATchi, *phi, reinterpret_cast<complex<float>*>(d2.data()));
+        tensor_5d_hh(ATphi, Mchi, reinterpret_cast<complex<float>*>(d1.data()));
+        tensor_5d_hh(ATMchi, *phi, reinterpret_cast<complex<float>*>(d2.data()));
   
-        for(int i = 0; i < D.size(); i++){
+        for(size_t i = 0; i < D.size(); i++){
           D[i] += 2.0f * (d1[i] + d2[i]);
         }
-
+#if 0
+        double d = 0.4;
+        for(int i = 0; i < 14; i++){
+          tp[i] += d/2;
+          double chi2_p = calculate_chi(chi, *phi, tp, Ls_out);
+          tp[i] -= d;
+          double chi2_m = calculate_chi(chi, *phi, tp, Ls_out);
+          printfQuda("d_chi2 norm [%04d]  = %f vs. %f \n", i, (chi2_p - chi2_m)/d, (2.0f*(d1[i]+d2[i])));
+          tp[i] += d/2;
+        }
+#endif
       }
+      
+      // printfQuda("D[0] = %+8.4e\n", D[0]);
  
-      for(int i = 0; i < tp.size(); i++){
+      for(size_t i = 0; i < tp.size(); i++){
         P[i] = b * P[i] + (1-b) * D[i];
       }
   
-      printfQuda("P[0] = %+8.4e\n", P[0]);
+      // printfQuda("P[0] = %+8.4e\n", P[0]);
 
       chi2 = 0.0;
       // line search
@@ -479,19 +390,24 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
         chi2 += ind_chi2;
      
         ATx(ATphi, *phi, tp);
-
         // D' * A * T * phi
-        transfer_5d_hh(tmp, ATphi, reinterpret_cast<complex<float>*>(P.data()), true);
+        transfer_5d_hh(theta, ATphi, reinterpret_cast<complex<float>*>(P.data()), true);
+        
         ATx(ADphi, *phi, P);  
         // T' * A * D * phi
-        transfer_5d_hh(theta, ADphi, reinterpret_cast<complex<float>*>(tp.data()), true);
+        transfer_5d_hh(tmp, ADphi, reinterpret_cast<complex<float>*>(tp.data()), true);
         // theta
-        axpy(1.0, tmp, theta);
-        // beta = D' * A * D * phi
-        transfer_5d_hh(beta, ADphi, reinterpret_cast<complex<float>*>(P.data()), true);
-        
-        std::vector<ColorSpinorField*> lhs {&chi, &theta, &beta};
-        std::vector<ColorSpinorField*> rhs {&chi, &theta, &beta};
+        axpy(1.0, theta, tmp);
+
+        inner_dslash(theta, tmp);
+
+        // lambda = D' * A * D * phi
+        transfer_5d_hh(tmp, ADphi, reinterpret_cast<complex<float>*>(P.data()), true);
+       
+        inner_dslash(lambda, tmp);
+
+        std::vector<ColorSpinorField*> lhs {&chi, &theta, &lambda};
+        std::vector<ColorSpinorField*> rhs {&chi, &theta, &lambda};
         Complex dot[9];
         cDotProduct(dot, lhs, rhs);
 
@@ -511,10 +427,10 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
       double r[3] = {0.0, 0.0, 0.0};
       solve_deg3(4.0*a[4], 3.0*a[3], 2.0*a[2], a[1], r[0], r[1], r[2]);
 
-      for(int i = 0; i < 3; i++){
-        printfQuda("r[%d] = %+8.4e, ", i, r[i]);
-      }
-      printfQuda("\n");
+      // for(int i = 0; i < 3; i++){
+      //   printfQuda("r[%d] = %+8.4e, ", i, r[i]);
+      // }
+      // printfQuda("\n");
 
       // try the three roots
       double try_root[3];
@@ -522,10 +438,10 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
         try_root[i] = eval_deg4(a[4], a[3], a[2], a[1], a[0], r[i]);
       }
       
-      for(int i = 0; i < 3; i++){
-        printfQuda("e[%d] = %+8.4e, ", i, try_root[i]);
-      }
-      printfQuda("\n");
+      // for(int i = 0; i < 3; i++){
+      //   printfQuda("e[%d] = %+8.4e, ", i, try_root[i]);
+      // }
+      // printfQuda("\n");
 
       if(try_root[0] < try_root[1] && try_root[0] < try_root[2]){
         alpha = r[0];
@@ -534,29 +450,28 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
       }else{
         alpha = r[2]; 
       }
-      for(int i = 0; i < tp.size(); i++){
+      for(size_t i = 0; i < tp.size(); i++){
         tp[i] -= alpha * P[i];
       }
-      printfQuda("training_param[0] = %8.4e\n", tp[0]);
+      // printfQuda("training_param[0] = %8.4e\n", tp[0]);
 
       printfQuda("gradient min iteration %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e\n", iteration, chi2, chi2/ref, alpha);
 
     }
-
-#if 0
-    
-    double d = 0.4;
-    for(int i = 0; i < 197; i++){
-      v[i] += d/2;
-      double chi2_p = calculate_chi(chi, phi, v, Ls_out);
-      v[i] -= d;
-      double chi2_m = calculate_chi(chi, phi, v, Ls_out);
-      printfQuda("d_chi2 norm [%04d]  = %f vs. %f \n", i, (chi2_p - chi2_m)/d, (2*(d1[i]+d2[i])));
-      v[i] += d/2;
+   
+    printfQuda("Training finished ...\n");
+    count = 0;
+    for(const auto& phi : in){
+      double ind_chi2 = calculate_chi(chi, *phi, tp, Ls_out);
+      printfQuda("chi2 %03d = %8.4e, phi2 = %8.4e\n", count, ind_chi2, norm2(*phi));
+      count++;
     }
 
-#endif
-
+    std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
+    save_param_path += "/training_param_" + std::to_string(comm_rank()) + ".dat";
+    FILE* fp = fopen(save_param_path.c_str(), "w");
+    fwrite(tp.data(), tp.size()*sizeof(float), 1, fp);
+    printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
     return;
   }
 
@@ -564,49 +479,67 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib, bool does_training) {
     
     commGlobalReductionSet(false);
-    
-    if(does_training){ 
-      int training_size = 30;
+#if 1    
+    const size_t training_size = 16;
 
-      static bool trained = false;
-      static std::vector<ColorSpinorField*> vs(0);
-      if(!trained){
-        ColorSpinorParam csParam(ib);
-        ColorSpinorField* p = new cudaColorSpinorField(csParam); 
-        axpby(5e2/sqrt(norm2(ib)), ib, 0.0, *p);
-        vs.push_back(p);
+    // static bool trained = false;
+    static bool trained = true;
+    static bool load_from_file = true;
+    static bool loaded_from_file = false;
+    static std::vector<ColorSpinorField*> vs(0);
+    if(!trained){
+      ColorSpinorParam csParam(ib);
+      ColorSpinorField* p = new cudaColorSpinorField(csParam); 
+      axpby(5e2/sqrt(norm2(ib)), ib, 0.0, *p);
+      vs.push_back(p);
+    }
+    static std::vector<float> training_param(12*8*144*2, 0.1f);
+
+    if(!trained && vs.size() >= training_size){
+      fill_random(training_param);
+      train_param(vs, training_param);
+      trained = true;
+    }
+   
+    if(load_from_file){
+      std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
+      save_param_path += "/training_param_" + std::to_string(comm_rank()) + ".dat";
+      FILE* fp = fopen(save_param_path.c_str(), "rb");
+      if(!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
+      fread(training_param.data(), training_param.size()*sizeof(float), 1, fp);
+      printfQuda("Training params loaded from %s.\n", save_param_path.c_str());
+      load_from_file = false;
+      loaded_from_file = true;
+    }
+    double chi2 = calculate_chi(*ip, ib, training_param, 8, &ix);
+    double persistent_b2 = norm2(ib);
+    printfQuda("chi2 %% = %8.4e, ix2 = %8.4e ", chi2 / persistent_b2, norm2(ix));
+    if(!trained || loaded_from_file){
+#endif
+      // blas::zero(ix);
+      // axpby(-1.0, *ip, 0.0, ib);
+      inner_dslash(*ip, ix);
+      double rk2 = blas::xmyNorm(ib, *ip);
+      // double rk2 = blas::norm2(ib);
+      printfQuda(" r2 %% = %8.4e \n", rk2/persistent_b2);
+      if(rk2 == 0.0){
+        commGlobalReductionSet(true);
+        return;
       }
-      static std::vector<float> training_param(12*8*144*2, 0.1f);
-
-      if(!trained && vs.size() > training_size){
-        fill_random(training_param);
-        train_param(vs, training_param);
-        trained = true;
+      double Mpk2, alpha, beta, rkp12;
+      // blas::copy(*ip, ib);
+      blas::copy(ib, *ip);
+      for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
+        inner_dslash(*immp, *ip);
+        Mpk2 = reDotProduct(*ip, *immp);
+        alpha = rk2 / Mpk2;
+        rkp12 = axpyNorm(-alpha, *immp, ib);
+        beta = rkp12 / rk2;
+        rk2 = rkp12;
+        axpyZpbx(alpha, *ip, ix, ib, beta);
+        printfQuda(" %02d r2 %% = %8.4e \n", local_loop_count, rk2/persistent_b2);
       }
-      double chi2 = calculate_chi(*ip, ib, training_param, 8);
-      printfQuda("chi2 %% = %8.4e\n", chi2 / norm2(ib));
     }
-
-    blas::zero(ix);
-    double rk2 = blas::norm2(ib);
-    double persistent_b2 = rk2;
-    if(rk2 == 0.0){
-      commGlobalReductionSet(true);
-      return;
-    }
-    double Mpk2, alpha, beta, rkp12;
-    blas::copy(*ip, ib);
-    for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
-      inner_dslash(*immp, *ip);
-      Mpk2 = reDotProduct(*ip, *immp);
-      alpha = rk2 / Mpk2;
-      rkp12 = axpyNorm(-alpha, *immp, ib);
-      beta = rkp12 / rk2;
-      rk2 = rkp12;
-      axpyZpbx(alpha, *ip, ix, ib, beta);
-    }
-    if(does_training) printfQuda("  r2 %% = %8.4e\n", rk2/persistent_b2);
-  
     commGlobalReductionSet(true);
     return;
   }
