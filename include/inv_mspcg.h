@@ -88,7 +88,7 @@ namespace quda
     void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     void Minv(ColorSpinorField &out, const ColorSpinorField &in);
 
-    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
+    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib, bool does_training = true);
     int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
 
   public:

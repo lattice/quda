@@ -211,6 +211,9 @@ namespace quda {
     ColorSpinorParam csParam(in);
     
     cudaColorSpinorField tmp(csParam);
+    cudaColorSpinorField in_alias(csParam);
+    cudaColorSpinorField ip(csParam);
+    cudaColorSpinorField immp(csParam);
     
     csParam.x[4] = Ls_hat;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -219,24 +222,38 @@ namespace quda {
     
     DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
 
-    cudaColorSpinorField truncated_cs_field_in(csParam);
     cudaColorSpinorField truncated_cs_field_out(csParam);
    
-    // T * phi
-    transfer_5d_hh(truncated_cs_field_in, in, reinterpret_cast<complex<float>*>(v.data()), false);
     // A * T * phi
-    mat_precondition_truncated.MdagMLocal(truncated_cs_field_out, truncated_cs_field_in);
+    ATx(truncated_cs_field_out, in, v);
+    
     // T^ * A * T * phi
     transfer_5d_hh(tmp, truncated_cs_field_out, reinterpret_cast<complex<float>*>(v.data()), true);
 
     // B * phi
-    inner_dslash(out, in);
+    in_alias = in;
+    
+    blas::zero(out);
+    double rk2 = blas::norm2(in_alias);
+    double Mpk2, alpha, beta, rkp12;
+    blas::copy(ip, in_alias);
+    for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
+      inner_dslash(immp, ip);
+      Mpk2 = reDotProduct(ip, immp);
+      alpha = rk2 / Mpk2;
+      rkp12 = axpyNorm(-alpha, immp, in_alias);
+      beta = rkp12 / rk2;
+      rk2 = rkp12;
+      axpyZpbx(alpha, ip, out, in_alias, beta);
+      // printfQuda("  r2 = %8.4e\n", rk2);
+    }
+    // inner_cg(out, in_alias, false);
    
     // T^ * A * T * phi - B * phi
     return xmyNorm(tmp, out);
   }
   
-  void MSPCG::ATx(ColorSpinorField& out,  const ColorSpinorField& in, std::vector<float>& v){
+  void MSPCG::ATx(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v){
   
     int Ls_out = out.X(4);
 
@@ -249,11 +266,29 @@ namespace quda {
     
     DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
     cudaColorSpinorField truncated_cs_field_in(csParam);
+    cudaColorSpinorField ip(csParam);
+    cudaColorSpinorField immp(csParam);
    
     // T * phi
     transfer_5d_hh(truncated_cs_field_in, in, reinterpret_cast<complex<float>*>(v.data()), false);
     // A * T * phi
-    mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
+    // mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
+  
+    blas::zero(out);
+    double rk2 = blas::norm2(truncated_cs_field_in);
+    double Mpk2, alpha, beta, rkp12;
+    blas::copy(ip, truncated_cs_field_in);
+    for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
+      mat_precondition_truncated.MdagMLocal(immp, ip);
+      Mpk2 = reDotProduct(ip, immp);
+      alpha = rk2 / Mpk2;
+      rkp12 = axpyNorm(-alpha, immp, truncated_cs_field_in);
+      beta = rkp12 / rk2;
+      rk2 = rkp12;
+      axpyZpbx(alpha, ip, out, truncated_cs_field_in, beta);
+      // printfQuda("  r2 = %8.4e\n", rk2);
+    }
+  
   }
 
   void fill_random(std::vector<float>& v){
@@ -264,7 +299,7 @@ namespace quda {
   	static std::normal_distribution<double> n(0., 1.);
    
     for(auto& x : v){
-      x = 1e-1*n(rng);
+      x = 1e-2*n(rng);
     }
   
   }
@@ -369,8 +404,6 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
 
   void MSPCG::train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp) {
   
-    commGlobalReductionSet(false);
-    
     constexpr int color_spin_dim = 12;
 
     int Ls_in = in[0]->X(4);
@@ -389,9 +422,7 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     double ref = 0.0;
     int count = 0;
     for(const auto& phi : in){
-      inner_dslash(*ip, *phi);
-      ref += norm2(*ip);
-      printfQuda("reference dslash norm %d = %12.8e\n", count, norm2(*ip));
+      ref += norm2(*phi);
       printfQuda("reference dslash norm %d = %12.8e\n", count, norm2(*phi));
       count++;
     }
@@ -410,8 +441,9 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
     std::vector<float> P(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
 
     float alpha;
-    float b = 0.9;
-    for(int iteration = 0; iteration < 2000; iteration++){
+    float b = 0.99;
+    printfQuda("beta = %f\n", b);
+    for(int iteration = 0; iteration < 3000; iteration++){
       
       std::vector<float> D(Ls_in*Ls_out*color_spin_dim*color_spin_dim*2, 0.0f);
       double chi2 = 0.0;
@@ -443,7 +475,8 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
       // line search
       for(const auto& phi : in){
         
-        chi2 += calculate_chi(chi, *phi, tp, Ls_out);
+        double ind_chi2 = calculate_chi(chi, *phi, tp, Ls_out);
+        chi2 += ind_chi2;
      
         ATx(ATphi, *phi, tp);
 
@@ -467,7 +500,7 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
         a[2] += dot[4].real() + 2.0*dot[2].real();
         a[3] += -2.0*dot[5].real();
         a[4] += dot[8].real();
-
+        
       }
 
       // for(int i = 0; i < 5; i++){
@@ -504,8 +537,10 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
       for(int i = 0; i < tp.size(); i++){
         tp[i] -= alpha * P[i];
       }
+      printfQuda("training_param[0] = %8.4e\n", tp[0]);
 
       printfQuda("gradient min iteration %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e\n", iteration, chi2, chi2/ref, alpha);
+
     }
 
 #if 0
@@ -522,37 +557,39 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
 
 #endif
 
-    commGlobalReductionSet(true);
     return;
   }
 
 
-  void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib) {
+  void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib, bool does_training) {
     
     commGlobalReductionSet(false);
-   
-    int training_size = 10;
-
-    static bool trained = false;
-    static std::vector<ColorSpinorField*> vs(0);
-    if(!trained){
-      ColorSpinorParam csParam(ib);
-      ColorSpinorField* p = new cudaColorSpinorField(csParam); 
-      axpby(5e2/sqrt(norm2(ib)), ib, 0.0, *p);
-      vs.push_back(p);
-    }
-    static std::vector<float> training_param(12*8*144*2, 0.1f);
-
-    if(!trained && vs.size() > training_size){
-      fill_random(training_param);
-      train_param(vs, training_param);
-      trained = true;
-    }
     
-    double chi2 = calculate_chi(*ip, ib, training_param, 8);
+    if(does_training){ 
+      int training_size = 30;
+
+      static bool trained = false;
+      static std::vector<ColorSpinorField*> vs(0);
+      if(!trained){
+        ColorSpinorParam csParam(ib);
+        ColorSpinorField* p = new cudaColorSpinorField(csParam); 
+        axpby(5e2/sqrt(norm2(ib)), ib, 0.0, *p);
+        vs.push_back(p);
+      }
+      static std::vector<float> training_param(12*8*144*2, 0.1f);
+
+      if(!trained && vs.size() > training_size){
+        fill_random(training_param);
+        train_param(vs, training_param);
+        trained = true;
+      }
+      double chi2 = calculate_chi(*ip, ib, training_param, 8);
+      printfQuda("chi2 %% = %8.4e\n", chi2 / norm2(ib));
+    }
 
     blas::zero(ix);
     double rk2 = blas::norm2(ib);
+    double persistent_b2 = rk2;
     if(rk2 == 0.0){
       commGlobalReductionSet(true);
       return;
@@ -568,9 +605,8 @@ inline double eval_deg4(double a, double b, double c, double d, double e, double
       rk2 = rkp12;
       axpyZpbx(alpha, *ip, ix, ib, beta);
     }
-    printfQuda("  r2 = %8.4e\n", rk2);
-    printfQuda("chi2 = %8.4e\n", chi2);
-   
+    if(does_training) printfQuda("  r2 %% = %8.4e\n", rk2/persistent_b2);
+  
     commGlobalReductionSet(true);
     return;
   }
