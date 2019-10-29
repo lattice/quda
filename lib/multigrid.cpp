@@ -405,7 +405,7 @@ namespace quda
         if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
           // Deflation space exists and we are going to create a new solver. Extract deflation space.
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Extracting deflation space size %d to MG\n", defl_size);
-          coarse_solver_inner.extractDeflationSpaceFromSolver(evecs);
+          coarse_solver_inner.extractDeflationSpace(evecs);
         }
         delete coarse_solver;
         coarse_solver = nullptr;
@@ -540,7 +540,7 @@ namespace quda
           if (getVerbosity() >= QUDA_VERBOSE)
             printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
           // Create space in coarse solver to hold deflation space, destroy space in MG.
-          coarse_solver_inner.transferDeflationSpaceToSolver(evecs);
+          coarse_solver_inner.injectDeflationSpace(evecs);
         }
 
         // Run a dummy solve so that the deflation space is constructed and computed if needed during the MG setup,

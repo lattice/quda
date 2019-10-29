@@ -563,31 +563,39 @@ namespace quda {
     void extendSVDDeflationSpace();
 
     /**
-       @brief Transfers the deflation space to the solver from the argument
-       @param defl_space the vectors to transfer to the solver vectors
+       @brief Injects a deflation space into the solver from the
+       vector argument.  Note the input space is reduced to zero size as a
+       result of calling this function, with responsibility for the
+       space transferred to the solver.
+       @param[in,out] defl_space the deflation space we wish to
+       transfer to the solver.
     */
-    void transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space);
+    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
 
     /**
-       @brief Extracts the deflation space from the solver to the argumnet
-       @param defl_space the vectors to hold the extracted solver vectors
+       @brief Extracts the deflation space from the solver to the
+       vector argument.  Note the solver deflation space is reduced to
+       zero size as a result of calling this function, with
+       responsibility for the space transferred to the argument.
+       @param[in,out] defl_space the extracted deflation space.  On
+       input, this vector should have zero size.
     */
-    void extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space);
+    void extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
 
     /**
        @brief Returns the size of deflation space
     */
-    int deflationSpaceSize() { return (int)evecs.size(); };
+    int deflationSpaceSize() const { return (int)evecs.size(); };
 
     /**
        @brief Sets the deflation compute boolean
-       @param flag Set to this boolean value
+       @param[in] flag Set to this boolean value
     */
     void setDeflateCompute(bool flag) { deflate_compute = flag; };
 
     /**
        @brief Sets the recompute evals boolean
-       @param flag Set to this boolean value
+       @param[in] flag Set to this boolean value
     */
     void setRecomputeEvals(bool flag) { recompute_evals = flag; };
 
@@ -601,7 +609,6 @@ namespace quda {
   /**
      @brief  Conjugate-Gradient Solver.
    */
-
   class CG : public Solver {
 
   private:

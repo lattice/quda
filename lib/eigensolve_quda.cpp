@@ -297,8 +297,9 @@ namespace quda
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
-    if (size > (int)evecs.size() || size > (int)evals.size())
-      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+
     ColorSpinorParam csParam(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
     temp.push_back(ColorSpinorField::Create(csParam));

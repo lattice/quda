@@ -204,15 +204,17 @@ namespace quda {
     }
   }
 
-  void Solver::transferDeflationSpaceToSolver(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
   {
-    for (int i = 0; i < (int)defl_space.size(); i++) { evecs.push_back(defl_space[i]); }
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : defl_space) { evecs.push_back(e); }
     defl_space.resize(0);
   }
 
-  void Solver::extractDeflationSpaceFromSolver(std::vector<ColorSpinorField *> &defl_space)
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
   {
-    for (int i = 0; i < (int)evecs.size(); i++) { defl_space.push_back(evecs[i]); }
+    if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
+    for (auto &e : evecs ) { defl_space.push_back(e); }
     evecs.resize(0);
   }
 
@@ -231,7 +233,8 @@ namespace quda {
     }
   }
 
-  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in)
+  {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;
@@ -239,8 +242,8 @@ namespace quda {
     }
   }
 
-  double Solver::stopping(double tol, double b2, QudaResidualType residual_type) {
-
+  double Solver::stopping(double tol, double b2, QudaResidualType residual_type)
+  {
     double stop=0.0;
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {
