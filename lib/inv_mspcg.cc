@@ -479,7 +479,7 @@ namespace quda {
   void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib, bool does_training) {
     
     commGlobalReductionSet(false);
-#if 1    
+    
     const size_t training_size = 16;
 
     // static bool trained = false;
@@ -487,7 +487,9 @@ namespace quda {
     static bool load_from_file = true;
     static bool loaded_from_file = false;
     static std::vector<ColorSpinorField*> vs(0);
-    if(!trained){
+    static int v_count = 0;
+    v_count++;
+    if(!trained && v_count > 400){
       ColorSpinorParam csParam(ib);
       ColorSpinorField* p = new cudaColorSpinorField(csParam); 
       axpby(5e2/sqrt(norm2(ib)), ib, 0.0, *p);
@@ -513,22 +515,28 @@ namespace quda {
     }
     double chi2 = calculate_chi(*ip, ib, training_param, 8, &ix);
     double persistent_b2 = norm2(ib);
-    printfQuda("chi2 %% = %8.4e, ix2 = %8.4e ", chi2 / persistent_b2, norm2(ix));
-    if(!trained || loaded_from_file){
-#endif
-      // blas::zero(ix);
+    printf("chi2 %% = %8.4e, ix2 = %8.4e ", chi2 / persistent_b2, norm2(ix));
+    // blas::zero(ix);
+    axpy(1.0, ib, ix);
+    // if(!trained || loaded_from_file){
+    if(false){
+      ColorSpinorParam csParam(ib);
+      cudaColorSpinorField b(csParam);
+      b = ib;
+      
+      blas::zero(ix);
       // axpby(-1.0, *ip, 0.0, ib);
-      inner_dslash(*ip, ix);
-      double rk2 = blas::xmyNorm(ib, *ip);
-      // double rk2 = blas::norm2(ib);
+      // inner_dslash(*ip, ix);
+      // double rk2 = blas::xmyNorm(ib, *ip);
+      double rk2 = blas::norm2(ib);
       printfQuda(" r2 %% = %8.4e \n", rk2/persistent_b2);
       if(rk2 == 0.0){
         commGlobalReductionSet(true);
         return;
       }
       double Mpk2, alpha, beta, rkp12;
-      // blas::copy(*ip, ib);
-      blas::copy(ib, *ip);
+      blas::copy(*ip, ib);
+      // blas::copy(ib, *ip);
       for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
         inner_dslash(*immp, *ip);
         Mpk2 = reDotProduct(*ip, *immp);
@@ -537,7 +545,7 @@ namespace quda {
         beta = rkp12 / rk2;
         rk2 = rkp12;
         axpyZpbx(alpha, *ip, ix, ib, beta);
-        printfQuda(" %02d r2 %% = %8.4e \n", local_loop_count, rk2/persistent_b2);
+        printfQuda(" %02d r2 %% = %8.4e \n", local_loop_count, rk2);
       }
     }
     commGlobalReductionSet(true);
