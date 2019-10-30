@@ -75,6 +75,11 @@
 #define QUDA_MEMORYTYPE_UNIFIED CU_MEMORYTYPE_UNIFIED
 #define QUDA_MEMORYTYPE_HOST CU_MEMORYTYPE_HOST
 #define QUDAFFT_C2C CUFFT_C2C
+
+#define QUdeviceptr CUdeviceptr
+#define QUmemorytype CUmemorytype
+#define QUresult CUresult
+
 #define qudaChannelFormatDesc cudaChannelFormatDesc
 #define qudaChannelFormatKindFloat cudaChannelFormatKindFloat
 #define qudaChannelFormatKindSigned cudaChannelFormatKindSigned
@@ -105,9 +110,9 @@
 #define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
-#define qudaDeviceptr_t CUdeviceptr
-#define qudaMemoryType CUmemorytype
-#define qudaResult CUresult
+#define QUdeviceptr CUdeviceptr
+#define QUmemorytype CUmemorytype
+#define QUresult CUresult
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
@@ -128,6 +133,11 @@
 #define QUDA_MEMORYTYPE_UNIFIED hipMemoryTypeUnified
 #define QUDA_MEMORYTYPE_HOST hipMemoryTypeHost
 #define QUDAFFT_C2C HIPFFT_C2C
+
+#define QUdeviceptr hipDeviceptr_t
+#define QUmemorytype hipMemoryType
+#define QUresult  hipError_t
+
 #define qudaChannelFormatDesc hipChannelFormatDesc
 #define qudaChannelFormatKindFloat hipChannelFormatKindFloat
 #define qudaChannelFormatKindSigned hipChannelFormatKindSigned
@@ -164,9 +174,6 @@
 #define qudaEvent_t hipEvent_t
 #define qudaError_t hipError_t
 #define qudaTextureObject_t hipTextureObject_t
-#define qudaDeviceptr_t hipDeviceptr_t
-#define qudaMemoryType hipMemoryType
-#define qudaResult  hipError_t
 
 #define qudaMemcpyKind hipMemcpyKind
 #define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
