@@ -282,10 +282,6 @@ void printQudaInvertParam(QudaInvertParam *param) {
   P(dslash_type, QUDA_INVALID_DSLASH);
   P(inv_type, QUDA_INVALID_INVERTER);
 
-#ifdef INIT_PARAM
-  P(eig_param, 0);
-#endif
-
 #if defined INIT_PARAM
   P(mass, INVALID_DOUBLE);
   P(kappa, INVALID_DOUBLE);
@@ -479,6 +475,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
     P(verbosity_precondition, QUDA_INVALID_VERBOSITY);
     P(schwarz_type, QUDA_INVALID_SCHWARZ);
     P(precondition_cycle, 0);
+  }
+#endif
+
+#if defined(INIT_PARAM)
+  P(eig_param, 0);
+#elif defined(CHECK_PARAM)
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
+    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
   }
 #endif
 

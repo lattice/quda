@@ -1728,9 +1728,9 @@ namespace quda {
 
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : true ;//inc eigCG needs 2 sloppy precisions.
+    // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
+    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ?  true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
@@ -1747,9 +1747,9 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracRefineParam(diracRefParam, &param, pc_solve);
-    bool comms_flag = (param.inv_type != QUDA_INC_EIGCG_INVERTER) ?  false : true ;//inc eigCG needs 2 sloppy precisions.
+    // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
+    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ?  true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-
 
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
