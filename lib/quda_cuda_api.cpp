@@ -235,7 +235,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaEventCreate_(qudaEvent_t &event, const char *func, const char *file, const char *line)
+  qudaError_t qudaEventCreate_(qudaEvent_t event, const char *func, const char *file, const char *line)
   {
     cudaEventCreate((CUevent*)event);
     qudaError_t error = cudaGetLastError();
@@ -244,7 +244,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t &event, unsigned int flags, const char *func, const char *file, const char *line)
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line)
   {
     cudaEventCreateWithFlags((CUevent*)event, flags);
     qudaError_t error = cudaGetLastError();
@@ -274,6 +274,15 @@ namespace quda {
   qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line)
   {
     cudaEventRecord(event, stream);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+
+  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t &start, qudaEvent_t &end, const char *func, const char *file, const char *line)
+  {
+    cudaEventElapsedTime(ms, start, end);
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
@@ -427,7 +436,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaSetDevice_(int* dev, const char *func, const char *file, const char *line) {
+  qudaError_t qudaSetDevice_(int dev, const char *func, const char *file, const char *line) {
     cudaSetDevice(dev);
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)

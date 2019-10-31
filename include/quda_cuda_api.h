@@ -109,14 +109,14 @@ namespace quda {
      @param[in] event Event we are querying
      @return Status of event query
   */
-  qudaError_t qudaEventCreate_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+  qudaError_t qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaEventCreateWithFlags
      @param[in] event Event we are querying
      @return Status of event query
   */
-  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t &event, unsigned int flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t *event, unsigned int flags, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaEventDestroy
@@ -138,6 +138,14 @@ namespace quda {
      @param[in,out] stream Stream where to record the event
   */
   qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around qudaEventElapsedTime
+     @param[out] ms Time in ms
+     @param[in,out] start Start event we are recording
+     @param[in,out] end End event we are recording
+  */
+  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t &start, qudaEvent_t &end, const char *func, const char *file, const char *line);
   
   /**
      @brief Wrapper around qudaEventSynchronize 
@@ -210,7 +218,7 @@ namespace quda {
   /**
      @brief Wrapper around cudaSetDevice
   */
-  qudaError_t qudaSetDevice_(int* dev, const char *func, const char *file, const char *line);
+  qudaError_t qudaSetDevice_(int dev, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaDeviceSynchronize
@@ -220,7 +228,7 @@ namespace quda {
   /**
      @brief Wrapper around cudaDeviceSynchronize
   */
-  qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int  flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int flags, const char *func, const char *file, const char *line);
   
   /**
      @brief Call API wrapper
@@ -241,7 +249,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  qudaError_t qudaFuncSetAttribute(const void* func, qudaFuncAttribute attr, int value);
+  qudaError_t qudaFuncSetAttribute_(const void* func, qudaFuncAttribute attr, int value);
 #endif
 
   /**
@@ -296,6 +304,11 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaEventRecord(event, stream)					\
   ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaEventElapsedTime(ms, start, end)				\
+  ::quda::qudaEventElapsedTime_(ms, start, end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //-------------------------------------------------------------------------------------
 
 //START Memset
