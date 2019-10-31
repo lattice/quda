@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef __CUDACC_RTC__
-#include <quda_backend.h>
+#include <quda_backend_api.h>
 #include <quda_cuda_api.h>
 
 /**
@@ -208,6 +208,11 @@ namespace quda {
   qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaSetDevice
+  */
+  qudaError_t qudaSetDevice_(int* dev, const char *func, const char *file, const char *line);
+
+  /**
      @brief Wrapper around cudaDeviceSynchronize
   */
   qudaError_t qudaGetDeviceProperties_(qudaDeviceProp* prop, int  device, const char *func, const char *file, const char *line);
@@ -373,6 +378,11 @@ namespace quda {
 #define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaGetDeviceCount(count)					\
   ::quda::qudaGetDeviceCount_(count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaSetDevice(dev)						\
+  ::quda::qudaSetDevice_(dev, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)

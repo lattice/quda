@@ -110,9 +110,6 @@
 #define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
-#define QUdeviceptr CUdeviceptr
-#define QUmemorytype CUmemorytype
-#define QUresult CUresult
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
@@ -120,6 +117,12 @@
 #define qudaFuncAttribute cudaFuncAttribute
 #define qudaDeviceProp cudaDeviceProp
 #define qudaWarpSize warpSize
+
+//?
+#define qudaFuncAttributeMaxDynamicSharedMemorySize cudaFuncAttributeMaxDynamicSharedMemorySize 
+#define qudaFuncAttributePreferredSharedMemoryCarveout cudaFuncAttributePreferredSharedMemoryCarveout
+#define qudaSharedmemCarveoutMaxShared cudaSharedmemCarveoutMaxShared
+
 
 #endif
 

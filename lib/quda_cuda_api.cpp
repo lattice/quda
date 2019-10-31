@@ -427,6 +427,14 @@ namespace quda {
     return error;
   }
 
+  qudaError_t qudaSetDevice_(int* dev, const char *func, const char *file, const char *line) {
+    cudaSetDevice(dev);
+    qudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+  }
+  
   qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line) {
     cudaGetDeviceCount(count);
     qudaError_t error = cudaGetLastError();
@@ -476,7 +484,7 @@ namespace quda {
   }
 
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute_(const void* func, cudaFuncAttribute attr, int value)
+  qudaError_t qudaFuncSetAttribute_(const void* func, qudaFuncAttribute attr, int value)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(qudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
