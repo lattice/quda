@@ -249,7 +249,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  qudaError_t qudaFuncSetAttribute_(const void* func, qudaFuncAttribute attr, int value);
+  qudaError_t qudaFuncSetAttribute(const void* func, qudaFuncAttribute attr, int value);
 #endif
 
   /**

@@ -493,7 +493,7 @@ namespace quda {
   }
 
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute_(const void* func, qudaFuncAttribute attr, int value)
+  qudaError_t qudaFuncSetAttribute(const void* func, qudaFuncAttribute attr, int value)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(qudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
