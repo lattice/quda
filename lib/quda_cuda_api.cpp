@@ -235,7 +235,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaEventCreate_(qudaEvent_t event, const char *func, const char *file, const char *line)
+  qudaError_t qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line)
   {
     cudaEventCreate((CUevent*)event);
     qudaError_t error = cudaGetLastError();
@@ -244,7 +244,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line)
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t *event, unsigned int flags, const char *func, const char *file, const char *line)
   {
     cudaEventCreateWithFlags((CUevent*)event, flags);
     qudaError_t error = cudaGetLastError();
