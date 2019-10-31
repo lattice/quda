@@ -630,10 +630,16 @@ namespace quda {
         int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
       // switch for Ls
       switch (in.X(4)) { 
-      case 8: {
-        FusedDslashArg<storage_type, 8> arg(
+      case 4: {
+        FusedDslashArg<storage_type,  4> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
-        FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
+        FusedDslash<storage_type,  4, FusedDslashArg<storage_type,  4>> dslash(arg, in);
+        dslash.apply(streams[Nstream - 1]);
+      } break; 
+      case 8: {
+        FusedDslashArg<storage_type,  8> arg(
+            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+        FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break; 
       case 12: {
