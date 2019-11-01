@@ -9,6 +9,8 @@
 
 #include <invert_quda.h>
 
+#include <madwf_ml.h>
+
 namespace quda
 {
 
@@ -113,10 +115,10 @@ namespace quda
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, double& mu);
+    void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, double& mu, int Ls_cheap);
 
-    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v, double mu, int Ls_hat, ColorSpinorField* x = nullptr);
-    void ATx(ColorSpinorField& out, const ColorSpinorField& in, std::vector<float>& v);
+    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp, double mu, int Ls_hat, ColorSpinorField* x = nullptr);
+    void ATx(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp);
 
   };
 

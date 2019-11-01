@@ -8,108 +8,108 @@
 
 #include <cub/cub.cuh>
 
-namespace quda {
-#ifdef GPU_DOMAIN_WALL_DIRAC
+#include <madwf_ml.h>
 
-  constexpr int color_spin_dim = 12;
-  constexpr int wm_dim = color_spin_dim*color_spin_dim;
+namespace quda {
+namespace madwf_ml {
 
   template<class real>
-    class WilsonMatrix {
-     
-      static constexpr int size = wm_dim;
-      complex<real> data[size];
-      
-    public:
-      
-      __device__ __host__ inline WilsonMatrix<real>() {
-        #pragma unroll
-        for (int i = 0; i < size; i++) { data[i] = 0; }
-      }
+  using WilsonVector = ColorSpinor<real, 3, 4>;
 
-      __device__ __host__ inline WilsonMatrix<real>(const WilsonMatrix<real>& a) {
+  template<class real>
+  class WilsonMatrix {
+   
+    static constexpr int size = wm_dim;
+    complex<real> data[size];
+    
+  public:
+    
+    __device__ __host__ inline WilsonMatrix<real>() {
+      #pragma unroll
+      for (int i = 0; i < size; i++) { data[i] = 0; }
+    }
+
+    __device__ __host__ inline WilsonMatrix<real>(const WilsonMatrix<real>& a) {
+      #pragma unroll
+      for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
+    }
+
+    __device__ __host__ inline WilsonMatrix<real>& operator=(const WilsonMatrix<real>& a) {
+      if (this != &a) {
         #pragma unroll
         for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
       }
-
-      __device__ __host__ inline WilsonMatrix<real>& operator=(const WilsonMatrix<real>& a) {
-        if (this != &a) {
-          #pragma unroll
-          for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
-        }
-        return *this;
-      }
-      
-      __device__ __host__ inline complex<real>& operator()(int index) {
-        return data[index];
-      }
-      
-      __device__ __host__ inline const complex<real>& operator()(int index) const {
-        return data[index];
-      }
-
-      // Wilson Matrix is row major
-      __device__ __host__ inline complex<real>& operator()(int row, int column) {
-        return data[row * color_spin_dim + column];
-      }
-      
-      __device__ __host__ inline const complex<real>& operator()(int row, int column) const {
-        return data[row * color_spin_dim + column];
-      }
-
-    };
-
-  template<class real>
-    using WilsonVector = ColorSpinor<real, 3, 4>;
-
-  template<bool dagger, class real>
-    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const WilsonMatrix<real>& m, const WilsonVector<real>& v){
-      
-      WilsonVector<real> out; // out is initialized to zero
-      
-      #pragma unroll
-      for(int column = 0; column < color_spin_dim; column++){
-        auto v_col = v(column);
-        #pragma unroll
-        for(int row = 0; row < color_spin_dim; row++){
-          if(dagger){
-            out(row) += conj(m(column, row)) * v_col;
-          }else{
-            out(row) += m(row, column) * v_col;
-          }
-        }
-      }
-
-      return out;
+      return *this;
+    }
     
+    __device__ __host__ inline complex<real>& operator()(int index) {
+      return data[index];
+    }
+    
+    __device__ __host__ inline const complex<real>& operator()(int index) const {
+      return data[index];
     }
 
-  template<class real>
-    __device__ __host__ inline WilsonMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
-      WilsonMatrix<real> m;
+    // Wilson Matrix is row major
+    __device__ __host__ inline complex<real>& operator()(int row, int column) {
+      return data[row * color_spin_dim + column];
+    }
+    
+    __device__ __host__ inline const complex<real>& operator()(int row, int column) const {
+      return data[row * color_spin_dim + column];
+    }
+  
+  };
+  
+  template<bool dagger, class real>
+  __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const WilsonMatrix<real>& m, const WilsonVector<real>& v){
+    WilsonVector<real> out; // out is initialized to zero
+    #pragma unroll
+    for(int column = 0; column < color_spin_dim; column++){
+      auto v_col = v(column);
       #pragma unroll
       for(int row = 0; row < color_spin_dim; row++){
-        #pragma unroll
-        for(int column = 0; column < color_spin_dim; column++){
-          m(row, column) = conj(conj(v(row)) * w(column));
-          // m(row, column) = conj(v(row)) * w(column);
+        if(dagger){
+          out(row) += conj(m(column, row)) * v_col;
+        }else{
+          out(row) += m(row, column) * v_col;
         }
       }
-      return m;
     }
+    return out;
+  }
 
-  template <typename storage_type> struct Transfer5dArg {
+  template<class real>
+  __device__ __host__ inline WilsonMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
+    WilsonMatrix<real> m;
+    #pragma unroll
+    for(int row = 0; row < color_spin_dim; row++){
+      #pragma unroll
+      for(int column = 0; column < color_spin_dim; column++){
+        m(row, column) = conj(conj(v(row)) * w(column));
+        // m(row, column) = conj(v(row)) * w(column);
+      }
+    }
+    return m;
+  }
+
+#ifdef GPU_DOMAIN_WALL_DIRAC
+
+  template <typename storage_type> struct MadwfMlArg {
 
     typedef typename colorspinor_mapper<storage_type, 4, 3>::type F;
     typedef typename mapper<storage_type>::type real;
 
     F out; // output vector field
     const F in; // input vector field
+    
     const int Ls_out; // length of 5th dimension
     const int Ls_in; // length of 5th dimension
 
     const int volume_4d_cb;
-    WilsonMatrix<real>* wm_p;
+    
+    WilsonMatrix<real>* tensor_out_p;
+    const WilsonMatrix<real>* wm_p;
     
     const bool dagger; // dagger
 
@@ -117,7 +117,7 @@ namespace quda {
 
     const bool transfer;
 
-    Transfer5dArg(ColorSpinorField& out, const ColorSpinorField& in, WilsonMatrix<real>* wm_p, bool dagger, bool transfer=true)
+    MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, const WilsonMatrix<real>* wm_p, bool dagger)
       : out(out)
         , in(in)
         , volume_4d_cb(in.VolumeCB() / in.X(4))
@@ -125,9 +125,8 @@ namespace quda {
         , Ls_out(out.X(4))
         , wm_p(wm_p)
         , dagger(dagger)
-        , transfer(transfer)
+        , transfer(true)
         , nParity(in.SiteSubset()) {
-
           if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
           if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
           if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
@@ -136,6 +135,26 @@ namespace quda {
           if (!in.isNative() || !out.isNative())
             errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
         }
+     
+     MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, WilsonMatrix<real>* wm_p)
+      : out(out)
+        , in(in)
+        , volume_4d_cb(in.VolumeCB() / in.X(4))
+        , Ls_in(in.X(4))
+        , Ls_out(out.X(4))
+        , tensor_out_p(wm_p)
+        , dagger(false)
+        , transfer(false)
+        , nParity(in.SiteSubset()) {
+          if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
+          if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
+          if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
+          if (out.Ncolor() != 3) errorQuda("nColor = %d not support", out.Ncolor());
+
+          if (!in.isNative() || !out.isNative())
+            errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        }
+
   };
   
   template<class storage_type, class Arg>
@@ -147,7 +166,7 @@ namespace quda {
       const int Ls_in = arg.Ls_in;
       const int Ls_out = arg.Ls_out;
       const int volume_4d_cb = arg.volume_4d_cb;
-      WilsonMatrix<real>* wm_p = arg.wm_p;
+      WilsonMatrix<real>* wm_p = arg.tensor_out_p;
 
       int index_4d_cb = blockIdx.x * blockDim.x + threadIdx.x;
       int s = blockIdx.y * blockDim.y + threadIdx.y;
@@ -293,7 +312,7 @@ namespace quda {
     };
 
 #endif
-  void transfer_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, const complex<float>* transfer_matrix, bool dagger) {
+  void transfer_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, const TrainingParameter<float>& tp, bool dagger) {
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
     checkLocation(out, in); // check all locations match
@@ -301,13 +320,13 @@ namespace quda {
     switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION:
         {
-          int wm_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
-          void* wm_d = device_malloc_(__func__, __FILE__, __LINE__, wm_size);
-          cudaMemcpyAsync(wm_d, transfer_matrix, wm_size, cudaMemcpyHostToDevice, streams[Nstream - 1]);
-          Transfer5dArg<short> arg(out, in, reinterpret_cast<WilsonMatrix<float>*>(wm_d), dagger);
-          Transfer5d<short, Transfer5dArg<short>> dslash(in, arg);
+          size_t m_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
+          if(tp.get_size()*sizeof(float) != m_size){
+            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(complex<float>), m_size);
+          }
+          MadwfMlArg<short> arg(out, in, (const WilsonMatrix<float>*)tp.data(), dagger);
+          Transfer5d<short, MadwfMlArg<short>> dslash(in, arg);
           dslash.apply(streams[Nstream - 1]);
-          device_free_(__func__, __FILE__, __LINE__, wm_d);
         }
         break;
       default: errorQuda("Unsupported precision %d\n", in.Precision());
@@ -317,7 +336,7 @@ namespace quda {
 #endif
   }
   
-  void tensor_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, complex<float>* tensor_matrix) {
+  void tensor_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, TrainingParameter<float>& tp) {
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
     checkLocation(out, in); // check all locations match
@@ -325,14 +344,14 @@ namespace quda {
     switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION:
         {
-          int wm_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
-          void* wm_d = device_malloc_(__func__, __FILE__, __LINE__, wm_size);
-          cudaMemsetAsync(wm_d, 0, wm_size, streams[Nstream - 1]);
-          Transfer5dArg<short> arg(out, in, reinterpret_cast<WilsonMatrix<float>*>(wm_d), false, false);
-          Transfer5d<short, Transfer5dArg<short>> dslash(in, arg);
+          size_t m_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
+          if(tp.get_size()*sizeof(float) != m_size){
+            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(complex<float>), m_size);
+          }
+          cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
+          MadwfMlArg<short> arg(out, in, (WilsonMatrix<float>*)tp.data());
+          Transfer5d<short, MadwfMlArg<short>> dslash(in, arg);
           dslash.apply(streams[Nstream - 1]);
-          cudaMemcpy(tensor_matrix, wm_d, wm_size, cudaMemcpyDeviceToHost);
-          device_free_(__func__, __FILE__, __LINE__, wm_d);
         }
         break;
       default: errorQuda("Unsupported precision %d\n", in.Precision());
@@ -342,4 +361,27 @@ namespace quda {
 #endif
   }
 
+  __global__ void axpby_kernel(complex<float>* out_p, int size, 
+      complex<float> a, const complex<float>* x_p, 
+      complex<float> b, const complex<float>* y_p){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    while(index < size){
+      out_p[index] += a * x_p[index] + b * y_p[index];
+      index += blockDim.x * gridDim.x;
+    }
+  }
+
+  void axpby(TrainingParameter<float>& out,
+      complex<float> a, const TrainingParameter<float>& x,
+      complex<float> b, const TrainingParameter<float>& y){
+    
+    int p_size = out.get_size() / 2; // complex
+    constexpr int block_size = 256;
+    int grid_size = (p_size + block_size - 1) / block_size;
+
+    axpby_kernel<<<grid_size, block_size, 0, streams[Nstream - 1]>>>((complex<float>*)out.data(), p_size, a, (complex<float>*)x.data(), b, (complex<float>*)y.data());
+
+  }
+
+}
 } // namespace quda

@@ -1080,7 +1080,7 @@ void display_test_info()
 extern void usage(char**);
 
 TEST(dslash, verify) {
-  double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
+  double deviation = pow((double)10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
   if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8) tol *= 10;

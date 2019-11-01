@@ -2,9 +2,8 @@
 #include <complex_quda.h>
 
 namespace quda {
+namespace madwf_ml {
 
-void transfer_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, const complex<float>* transfer_matrix, bool dagger);
 
-void tensor_5d_hh(ColorSpinorField& out, const ColorSpinorField& in, complex<float>* tensor_matrix);
-
+}
 }
