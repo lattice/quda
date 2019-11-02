@@ -396,6 +396,9 @@ int main(int argc, char **argv)
 
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
 
+    // if deflating preserve the deflation space between solves
+    eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
     if (multishift) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
     } else {
@@ -701,6 +704,15 @@ int main(int argc, char **argv)
   endQuda();
 
   finalizeComms();
+
+  free(spinorIn);
+  free(spinorCheck);
+  if (multishift) {
+    for (int i=0; i<inv_param.num_offset; i++) free(spinorOutMulti[i]);
+    free(spinorOutMulti);
+  } else {
+    free(spinorOut);
+  }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     if (clover) free(clover);

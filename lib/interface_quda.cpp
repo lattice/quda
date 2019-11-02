@@ -2875,8 +2875,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
     blas::copy(*in, *out);
-    solverParam.updateInvertParam(*param);
     delete solve;
+    solverParam.updateInvertParam(*param);
   }
 
   if (direct_solve) {
@@ -2924,8 +2924,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
-    solverParam.updateInvertParam(*param);
     delete solve;
+    solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
@@ -2972,8 +2972,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(*out, *in);
-    solverParam.updateInvertParam(*param);
     delete solve;
+    solverParam.updateInvertParam(*param);
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
@@ -2981,8 +2981,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
     (*solve)(tmp, *in); // y = (M M^\dag) b
     dirac.Mdag(*out, tmp);  // x = M^dag y
-    solverParam.updateInvertParam(*param);
     delete solve;
+    solverParam.updateInvertParam(*param);
   }
 
   if (getVerbosity() >= QUDA_VERBOSE){
@@ -3327,8 +3327,8 @@ for(int i=0; i < param->num_src; i++) {
       for(int i=0; i < param->num_src; i++) {
         blas::copy(in->Component(i), out->Component(i));
       }
-      solverParam.updateInvertParam(*param);
       delete solve;
+      solverParam.updateInvertParam(*param);
     }
 
     if (direct_solve) {
@@ -3336,15 +3336,15 @@ for(int i=0; i < param->num_src; i++) {
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       solve->blocksolve(*out,*in);
-      solverParam.updateInvertParam(*param);
       delete solve;
+      solverParam.updateInvertParam(*param);
     } else if (!norm_error_solve) {
       DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*param);
       Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       solve->blocksolve(*out,*in);
-      solverParam.updateInvertParam(*param);
       delete solve;
+      solverParam.updateInvertParam(*param);
     } else { // norm_error_solve
       DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       errorQuda("norm_error_solve not supported in multi source solve");
@@ -3353,8 +3353,8 @@ for(int i=0; i < param->num_src; i++) {
       //Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       //(*solve)(tmp, *in); // y = (M M^\dag) b
       //dirac.Mdag(*out, tmp);  // x = M^dag y
+      //delete solve;
       //solverParam.updateInvertParam(*param,i,i);
-      // delete solve;
     }
 
     if (getVerbosity() >= QUDA_VERBOSE){
@@ -3620,8 +3620,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
 
   SolverParam solverParam(*param);
-  MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
-  cg_m(x, *b, p, r2_old.get());
+  {
+    MultiShiftCG cg_m(*m, *mSloppy, solverParam, profileMulti);
+    cg_m(x, *b, p, r2_old.get());
+  }
   solverParam.updateInvertParam(*param);
 
   delete m;
