@@ -220,7 +220,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     const int gpuid = comm_gpuid();
     hipDeviceProp_t prop;
     hipGetDeviceProperties(&prop, gpuid);
-    if(!prop.unifiedAddressing) return;
+    errorQuda("enable_peer_to_peer is not supported in this HIP version\n");
+//    if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
 
@@ -446,11 +447,10 @@ inline bool isHost(const void *buffer)
   hipMemoryType memType;
   void *attrdata[] = {(void *)&memType};
   hipPointerAttribute_t attributes;//[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  hipError_t err = cuPointerGetAttributes(1, attributes, attrdata, (hipDeviceptr_t)buffer);
+  hipError_t err = hipPointerGetAttributes(&attributes, (hipDeviceptr_t)buffer);memType=attributes.memoryType;
   if (err != hipSuccess) {
-    const char *str;
-    str=hipGetErrorName(err);
-    errorQuda("cuPointerGetAttributes returned error %s", str);
+    memType=hipMemoryTypeHost;
+    printfQuda("hipPointerGetAttributes returned unknown address, surppose it to be a host address\n");
   }
 
   switch (memType) {

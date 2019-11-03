@@ -80,7 +80,7 @@ namespace quda {
           PROFILE(hipMemcpyDtoHAsync(dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
           break;
         case hipMemcpyHostToDevice:
-          PROFILE(hipMemcpyHtoDAsync((hipDeviceptr_t)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+          PROFILE(hipMemcpyHtoDAsync((hipDeviceptr_t)dst, const_cast<void *>(src), count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
           break;
         case hipMemcpyDeviceToDevice:
           PROFILE(hipMemcpyDtoDAsync((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
@@ -96,10 +96,10 @@ namespace quda {
 #ifdef USE_DRIVER_API
         switch(kind) {
         case hipMemcpyDeviceToHost:   hipMemcpyDtoH(dst, (hipDeviceptr_t)src, count);              break;
-        case hipMemcpyHostToDevice:   hipMemcpyHtoD((hipDeviceptr_t)dst, src, count);              break;
+        case hipMemcpyHostToDevice:   hipMemcpyHtoD((hipDeviceptr_t)dst, const_cast<void *>(src), count);              break;
         case hipMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
         case hipMemcpyDeviceToDevice: hipMemcpyDtoD((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count); break;
-        case hipMemcpyDefault:        cuMemcpy((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count);     break;
+        case hipMemcpyDefault:        hipMemcpy((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, kind);     break;
         default:
 	errorQuda("Unsupported hipMemcpy %d", kind);
         }
@@ -152,7 +152,7 @@ namespace quda {
         PROFILE(hipMemcpyDtoHAsync(dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
         break;
       case hipMemcpyHostToDevice:
-        PROFILE(hipMemcpyHtoDAsync((hipDeviceptr_t)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
+        PROFILE(hipMemcpyHtoDAsync((hipDeviceptr_t)dst, const_cast<void *>(src), count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
         break;
       case hipMemcpyDeviceToDevice:
         PROFILE(hipMemcpyDtoDAsync((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
@@ -192,7 +192,8 @@ namespace quda {
     default:
       errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
-    PROFILE(hipMemcpy2DAsync(&param, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
+    printfQuda("driver_api is not supported in hipMemcpy2DAsync\n");
+    PROFILE(hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);    
 #else
     PROFILE(hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #endif
@@ -201,7 +202,8 @@ namespace quda {
   hipError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, hipStream_t stream)
   {
     // no driver API variant here since we have C++ functions
-    PROFILE(hipError_t error = hipLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    printfQuda("this kernel can not be used in HIP\n");hipError_t error = hipErrorUnknown;
+//    PROFILE(hipError_t error = hipLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
     if (error != hipSuccess && !activeTuning()) errorQuda("(CUDA) %s", hipGetErrorString(error));
     return error;
   }

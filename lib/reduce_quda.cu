@@ -95,7 +95,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
 	if(deviceProp.canMapHostMemory) {
 	  h_reduce = (QudaSumFloat *) mapped_malloc(bytes);
-	  hipHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+	  hipHostGetDevicePointer((void **)&hd_reduce, h_reduce, 0); // set the matching device pointer
 	} else
 #endif
 	  {

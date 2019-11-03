@@ -1244,13 +1244,13 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> sqrt(const complex<ValueType>& z){
-    return polar(::sqrt(abs(z)),arg(z)/ValueType(2));
+    return polar(sqrt(abs(z)),arg(z)/ValueType(2));
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<float> sqrt(const complex<float>& z){
-    return polar(::sqrtf(abs(z)),arg(z)/float(2));
+    return polar(sqrtf(abs(z)),arg(z)/float(2));
   }
 
   template <typename ValueType>

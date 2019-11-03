@@ -339,7 +339,7 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    hipError_t err = cudaMallocManaged(&ptr, size);
+    hipError_t err = hipMallocManaged(&ptr, size);
     if (err != hipSuccess) {
       errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }

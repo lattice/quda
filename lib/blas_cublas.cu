@@ -5,6 +5,8 @@
 #endif
 #include <malloc_quda.h>
 
+#include <Eigen/LU>
+
 #define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
     ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
     : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
@@ -55,11 +57,11 @@ namespace quda {
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const int batch, QudaPrecision prec, QudaFieldLocation location)
     {
       long long flops = 0;
-#ifdef CUBLAS_LIB
       timeval start, stop;
+      size_t size = 2*n*n*prec*batch;
+/*#ifdef CUBLAS_LIB
       gettimeofday(&start, NULL);
 
-      size_t size = 2*n*n*prec*batch;
       void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
       void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
       if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, hipMemcpyHostToDevice);
@@ -131,7 +133,47 @@ namespace quda {
 
       if (getVerbosity() >= QUDA_VERBOSE)
 	printfQuda("Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
-#endif // CUBLAS_LIB
+#endif */ // CUBLAS_LIB
+
+      gettimeofday(&start, NULL);
+      void *A_h = location == QUDA_CUDA_FIELD_LOCATION ? pool_pinned_malloc(size): A;
+      void *Ainv_h = pool_pinned_malloc(size);
+      if (location == QUDA_CUDA_FIELD_LOCATION) qudaMemcpy(A_h, A, size,hipMemcpyDeviceToHost);
+
+      if (prec == QUDA_SINGLE_PRECISION) {
+
+        std::complex<float> *A_eig=(std::complex<float> *)A_h;
+        std::complex<float> *Ainv_eig=(std::complex<float> *)Ainv_h;
+
+#pragma omp parallel for
+        for(int i=0;i<batch;i++)
+        {
+                Eigen::MatrixXcd res=Eigen::MatrixXcd::Zero(n,n),inv;
+                for(int j=0;j<n;j++)
+                for(int k=0;k<n;k++)
+                        res(j,k)=A_eig[i*n*n+j*n+k];
+                inv=res.inverse();
+                for(int j=0;j<n;j++)
+                for(int k=0;k<n;k++)
+                        Ainv_eig[i*n*n+j*n+k]=inv(j,k);
+        }
+      }
+      else {
+        errorQuda("%s not implemented for precision=%d", __func__, prec);
+      }
+
+     gettimeofday(&stop, NULL);
+     long ds = stop.tv_sec - start.tv_sec;
+     long dus = stop.tv_usec - start.tv_usec;
+     double time = ds + 0.000001*dus;
+
+        printfQuda("CPU: Batched matrix inversion completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * batch*FLOPS_CGETRI(n) / time);
+
+      if (location == QUDA_CUDA_FIELD_LOCATION) {
+        qudaMemcpy(Ainv, Ainv_h, size, hipMemcpyHostToDevice);
+        pool_pinned_free(Ainv_h);
+        pool_pinned_free(A_h);
+      }
 
       return flops;
     }

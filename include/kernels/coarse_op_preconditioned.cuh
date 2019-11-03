@@ -131,7 +131,7 @@ namespace quda {
     int d = j_d / n;
 
     Float max = computeYhat<Float, n, compute_max_only>(arg, d, x_cb, parity, i, j);
-    if (compute_max_only) atomicMax(arg.max_d, max);
+    if (compute_max_only) assert(1); // atomicMax(arg.max_d, max);
   }
 
 } // namespace quda

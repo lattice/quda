@@ -8,7 +8,7 @@
 #include <float_vector.h>
 
 #if (__COMPUTE_CAPABILITY__ >= 300 || __HIP_DEVICE_COMPILE__ >= 300)
-#define WARP_SPLIT
+//#define WARP_SPLIT
 #include <generics/shfl.h>
 #endif
 

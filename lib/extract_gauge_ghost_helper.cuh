@@ -137,7 +137,7 @@ namespace quda {
     if (oddness == parity) {
 #ifdef FINE_GRAINED_ACCESS
       int i = blockIdx.y * blockDim.y + threadIdx.y;
-      if (i >= Ncolor(length)) return;
+      if (i >= gauge::Ncolor(length)) return;
       for (int j=0; j<gauge::Ncolor(length); j++) {
 	if (extract) {
 	  arg.order.Ghost(dim, (parity+arg.localParity[dim])&1, X>>1, i, j)

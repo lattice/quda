@@ -103,7 +103,7 @@ namespace quda {
     }
   }
 
-  static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
+  static const std::string quda_hash = "x64_64.quda_dev_rocm.hip2.8.19354"; // defined in lib/Makefile
   static std::string resource_path;
   static map tunecache;
   static map::iterator it;

@@ -7,7 +7,8 @@
 
 using namespace quda;
 
-#include <cub/block/block_reduce.cuh>
+#include <hipcub/hipcub.hpp>
+namespace cub=hipcub;
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>

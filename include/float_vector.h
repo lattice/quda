@@ -92,7 +92,7 @@ namespace quda {
     z.w = x.w + y.w;
     return z;
   }
-
+/*
   __host__ __device__ inline float4 operator+=(float4 &x, const float4 y) {
     x.x += y.x;
     x.y += y.y;
@@ -112,14 +112,14 @@ namespace quda {
     x.y += y.y;
     return x;
   }
-
+*/
   __host__ __device__ inline double3 operator+=(double3 &x, const double3 y) {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
     return x;
   }
-
+/*
   __host__ __device__ inline double4 operator+=(double4 &x, const double4 y) {
     x.x += y.x;
     x.y += y.y;
@@ -147,7 +147,7 @@ namespace quda {
     x.y -= y.y;
     return x;
   }
-
+*/
   __host__ __device__ inline float2 operator*=(float2 &x, const float a) {
     x.x *= a;
     x.y *= a;
@@ -325,5 +325,39 @@ namespace quda {
   template<> struct RealType<char2> { typedef char type; };
   template<> struct RealType<complex<char> > { typedef char type; };
   template<> struct RealType<char4> { typedef char type; };
+
+  // The following added by Yujiang Bi
+     template<typename T> __host__ __device__ inline T rsqrt(T a){
+               return 1/sqrt(a);
+     }
+
+  __device__ __host__
+  inline
+  void sincos(float x, float* sptr, float* cptr)
+  {
+      float tmp;
+      *sptr =
+          __ocml_sincos_f32(x, (__attribute__((address_space(5))) float*) &tmp);
+      *cptr = tmp;
+  }
+  __device__ __host__
+  inline
+  void sincos(float x, double * sptr, float* cptr)
+  {
+      float tmp;
+      *sptr =
+          __ocml_sincos_f32(x, (__attribute__((address_space(5))) float*) &tmp);
+      *cptr = tmp;
+  }
+  __device__ __host__
+  inline
+  void sincos(float x, double * sptr, double * cptr)
+  {
+      float tmp;
+      *sptr =
+          __ocml_sincos_f32(x, (__attribute__((address_space(5))) float*) &tmp);
+      *cptr = tmp;
+  }
+
 
 }

@@ -77,7 +77,6 @@
 #include <momentum.h>
 
 
-#include <hip/hip_profile.h>
 
 using namespace quda;
 
