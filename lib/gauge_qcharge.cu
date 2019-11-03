@@ -27,7 +27,7 @@ public:
 #endif
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const hipStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
         arg.result_h[0] = 0.;

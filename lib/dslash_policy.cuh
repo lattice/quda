@@ -8,12 +8,12 @@ namespace quda
 
     extern int it;
 
-    extern cudaEvent_t packEnd[2]; // double buffered
-    extern cudaEvent_t gatherStart[Nstream];
-    extern cudaEvent_t gatherEnd[Nstream];
-    extern cudaEvent_t scatterStart[Nstream];
-    extern cudaEvent_t scatterEnd[Nstream];
-    extern cudaEvent_t dslashStart[2]; // double buffered
+    extern hipEvent_t packEnd[2]; // double buffered
+    extern hipEvent_t gatherStart[Nstream];
+    extern hipEvent_t gatherEnd[Nstream];
+    extern hipEvent_t scatterStart[Nstream];
+    extern hipEvent_t scatterEnd[Nstream];
+    extern hipEvent_t dslashStart[2]; // double buffered
 
     // FIX this is a hack from hell
     // Auxiliary work that can be done while waiting on comms to finish
@@ -21,7 +21,7 @@ namespace quda
 
 #if CUDA_VERSION >= 8000
     extern cuuint32_t *commsEnd_h;
-    extern CUdeviceptr commsEnd_d[Nstream];
+    extern hipDeviceptr_t commsEnd_d[Nstream];
 #endif
 
     // these variables are used for benchmarking the dslash components in isolation
@@ -115,7 +115,7 @@ namespace quda
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
   template <typename Dslash>
-  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, cudaStream_t *stream, bool gdr)
+  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, hipStream_t *stream, bool gdr)
   {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
@@ -184,7 +184,7 @@ namespace quda
       if (!dslash.dslashParam.commDim[i]) continue;
 
       for (int dir=1; dir>=0; dir--) { // forwards gather
-        cudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
+        hipEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
 
         PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
@@ -228,7 +228,7 @@ namespace quda
      dslash, and if it is take the appropriate action:
 
      - if peer-to-peer then we now know that the peer-to-peer copy is
-       now in flight and we are safe to post the cudaStreamWaitEvent
+       now in flight and we are safe to post the hipStreamWaitEvent
        in our GPU context
 
      - if gdr or zero-copy for the receive buffer then we have nothing
@@ -254,7 +254,7 @@ namespace quda
       bool gdr_recv, bool zero_copy_recv, bool async, int scatterIndex = -1)
   {
 
-    cudaStream_t *stream = nullptr;
+    hipStream_t *stream = nullptr;
 
     PROFILE(int comms_test = dslash_comms ? in.commsQuery(dslash.Nface()/2, 2*dim+dir, dslash.Dagger(), stream, gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
@@ -400,11 +400,11 @@ namespace quda
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
 
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -496,11 +496,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -574,7 +574,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            hipEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 
@@ -656,7 +656,7 @@ namespace quda
           if (!dslashParam.commDim[i]) continue;
 
           if (!pack_event) {
-            cudaEventSynchronize(packEnd[in->bufferIndex]);
+            hipEventSynchronize(packEnd[in->bufferIndex]);
             pack_event = true;
           }
 
@@ -740,11 +740,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -822,11 +822,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -861,10 +861,10 @@ namespace quda
 #ifdef HOST_DEBUG
 #define CUDA_CALL( call )						\
   {									\
-    CUresult cudaStatus = call;						\
-    if ( CUDA_SUCCESS != cudaStatus ) {					\
+    hipError_t cudaStatus = call;						\
+    if ( hipSuccess != cudaStatus ) {					\
       const char *err_str = nullptr;					\
-      cuGetErrorString(cudaStatus, &err_str);				\
+      err_str=hipGetErrorString(call);				\
       fprintf(stderr, "ERROR: CUDA call \"%s\" in line %d of file %s failed with %s (%d).\n", #call, __LINE__, __FILE__, err_str, cudaStatus); \
     }									\
 }
@@ -914,11 +914,11 @@ namespace quda
           for (int dir = 1; dir >= 0; dir--) {
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -928,7 +928,7 @@ namespace quda
                 // schedule post comms work (scatter into the end zone)
                 if (!comm_peer2peer_enabled(1 - dir, i)) {
                   *((volatile cuuint32_t *)(commsEnd_h + 2 * i + 1 - dir)) = 0;
-                  CUDA_CALL(cuStreamWaitValue32(
+                  CUDA_CALL(hipStreamWaitValue32(
                       streams[2 * i + dir], commsEnd_d[2 * i + 1 - dir], 1, CU_STREAM_WAIT_VALUE_EQ));
                   PROFILE(if (dslash_copy)
                               in->scatter(dslash.Nface() / 2, dslash.Dagger(), 2 * i + dir, &streams[2 * i + dir]),
@@ -1033,11 +1033,11 @@ namespace quda
 
             // Query if gather has completed
             if (!pattern.gatherCompleted[2 * i + dir] && pattern.gatherCompleted[pattern.previousDir[2 * i + dir]]) {
-              cudaError_t event_test = comm_peer2peer_enabled(dir, i) ? cudaSuccess : cudaErrorNotReady;
-              if (event_test != cudaSuccess)
+              hipError_t event_test = comm_peer2peer_enabled(dir, i) ? hipSuccess : hipErrorNotReady;
+              if (event_test != hipSuccess)
                 PROFILE(event_test = qudaEventQuery(gatherEnd[2 * i + dir]), profile, QUDA_PROFILE_EVENT_QUERY);
 
-              if (cudaSuccess == event_test) {
+              if (hipSuccess == event_test) {
                 pattern.gatherCompleted[2 * i + dir] = 1;
                 pattern.completeSum++;
                 PROFILE(if (dslash_comms) in->sendStart(dslash.Nface() / 2, 2 * i + dir, dslash.Dagger(),
@@ -1047,7 +1047,7 @@ namespace quda
                 // schedule post comms work (scatter into the end zone)
                 if (!comm_peer2peer_enabled(1 - dir, i)) { // gather centric
                   *((volatile cuuint32_t *)(commsEnd_h + 2 * i + 1 - dir)) = 0;
-                  CUDA_CALL(cuStreamWaitValue32(
+                  CUDA_CALL(hipStreamWaitValue32(
                       streams[scatterIndex], commsEnd_d[2 * i + 1 - dir], 1, CU_STREAM_WAIT_VALUE_EQ));
                   PROFILE(if (dslash_copy)
                               in->scatter(dslash.Nface() / 2, dslash.Dagger(), 2 * i + dir, streams + scatterIndex),
@@ -2054,10 +2054,10 @@ public:
           // Async variants are only supported on CUDA 8.0 and up
 #if (CUDA_VERSION >= 8000) && 0
 #if (CUDA_VERSION >= 9000)
-	 CUdevice device;
-	 cuDeviceGet(&device, comm_gpuid());
+	 hipDevice_t device;
+	 hipGetDevice(&device, comm_gpuid());
 	 int can_use_stream_mem_ops;
-	 cuDeviceGetAttribute(&can_use_stream_mem_ops, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, device);
+	 hipDeviceGetAttribute(&can_use_stream_mem_ops, CU_DEVICE_ATTRIBUTE_CAN_USE_STREAM_MEM_OPS, device);
 #else
 	 int can_use_stream_mem_ops = 1;
 #endif
@@ -2193,7 +2193,7 @@ public:
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const cudaStream_t &stream) {
+   void apply(const hipStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");

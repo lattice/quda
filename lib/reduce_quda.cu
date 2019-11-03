@@ -12,7 +12,7 @@
 static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
-static cudaEvent_t reduceEnd;
+static hipEvent_t reduceEnd;
 static bool fast_reduce_enabled = false;
 
 namespace quda {
@@ -21,12 +21,12 @@ namespace quda {
 
 #include <generic_reduce.cuh>
 
-    cudaStream_t* getStream();
+    hipStream_t* getStream();
 
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
-    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    hipEvent_t* getReduceEvent() { return &reduceEnd; }
     bool getFastReduce() { return fast_reduce_enabled; }
 
     void initFastReduce(int32_t words)
@@ -56,7 +56,7 @@ namespace quda {
         }
         if (count++ % 10000 == 0) { // check error every 10000 iterations
           // if there is an error in the kernel then we need to exit the spin-wait
-          if (cudaSuccess != cudaPeekAtLastError()) break;
+          if (hipSuccess != hipPeekAtLastError()) break;
         }
       }
     }
@@ -95,7 +95,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
 	if(deviceProp.canMapHostMemory) {
 	  h_reduce = (QudaSumFloat *) mapped_malloc(bytes);
-	  cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+	  hipHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
 	} else
 #endif
 	  {
@@ -105,7 +105,7 @@ namespace quda {
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 
-      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
+      hipEventCreateWithFlags(&reduceEnd, hipEventDisableTiming);
 
       // enable fast reductions with CPU spin waiting as opposed to using CUDA events
       char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
@@ -129,14 +129,14 @@ namespace quda {
       }
       hd_reduce = 0;
 
-      cudaEventDestroy(reduceEnd);
+      hipEventDestroy(reduceEnd);
     }
 
     /**
        Generic reduction kernel launcher
     */
     template <typename doubleN, typename ReduceType, typename FloatN, int M, typename Arg>
-    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const hipStream_t &stream, Tunable &tunable)
     {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
@@ -161,12 +161,12 @@ namespace quda {
             completeFastReduce(words);
           } else {
             qudaEventRecord(reduceEnd, stream);
-            while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
+            while (hipSuccess != qudaEventQuery(reduceEnd)) { ; }
           }
         } else
 #endif
         {
-          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
+          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), hipMemcpyDeviceToHost);
         }
       }
       doubleN cpu_sum = set(((ReduceType *)h_reduce)[0]);
@@ -243,7 +243,7 @@ namespace quda {
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.r).name(), aux); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const hipStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         result = reduceLaunch<doubleN, ReduceType, FloatN, M>(arg, tp, stream, *this);

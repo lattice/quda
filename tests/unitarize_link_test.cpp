@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime.h>
 
 #include "quda.h"
 #include "gauge_field.h"
@@ -109,7 +109,7 @@ static int unitarize_link_test(int &test_rc)
 
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*cpu_prec);
+    hipHostMalloc((void**)&sitelink[i], V*gaugeSiteSize*cpu_prec);
     if(sitelink[i] == NULL){
       errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
     }
@@ -180,15 +180,15 @@ static int unitarize_link_test(int &test_rc)
 
   int *num_failures_h = (int*)mapped_malloc(sizeof(int));
   int *num_failures_d = nullptr;
-  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  hipError_t error = hipHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  if (error != hipSuccess) errorQuda("hipHostGetDevicePointer failed with error: %s", hipGetErrorString(error));
   *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {
@@ -201,7 +201,7 @@ static int unitarize_link_test(int &test_rc)
   delete cpuFatLink;
   delete cudaFatLink;
   delete cudaULink;
-  for(int dir=0; dir<4; ++dir) cudaFreeHost(sitelink[dir]);
+  for(int dir=0; dir<4; ++dir) hipHostFree(sitelink[dir]);
 
   free(fatlink);
 

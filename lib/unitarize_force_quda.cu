@@ -1,8 +1,9 @@
+#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <gauge_field.h>
 #include <tune_quda.h>
 
@@ -251,7 +252,7 @@ namespace quda {
 	    printf("Warning: Error in determinant computed by SVD : %g > %g\n", fabs(gprod-determinant), arg.max_det_error);
 	    printLink(q);
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 	    atomicAdd(arg.fails, 1);
 #else
 	    (*arg.fails)++;
@@ -400,13 +401,13 @@ namespace quda {
         checkCudaError();
       }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const hipStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	getUnitarizeForceField<<<tp.grid,tp.block>>>(arg);
       }
 
       void preTune() { ; }
-      void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
+      void postTune() { hipMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
 
       long long flops() const { return 4ll*4528*meta.Volume(); }
       long long bytes() const { return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes()); }

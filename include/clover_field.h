@@ -178,19 +178,19 @@ namespace quda {
     void compute(const cudaGaugeField &gauge);
 
 #ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t normTex;
-    cudaTextureObject_t invTex;
-    cudaTextureObject_t invNormTex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t evenNormTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t oddNormTex;
-    cudaTextureObject_t evenInvTex;
-    cudaTextureObject_t evenInvNormTex;
-    cudaTextureObject_t oddInvTex;
-    cudaTextureObject_t oddInvNormTex;
-    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm, bool full);
+    hipTextureObject_t tex;
+    hipTextureObject_t normTex;
+    hipTextureObject_t invTex;
+    hipTextureObject_t invNormTex;
+    hipTextureObject_t evenTex;
+    hipTextureObject_t evenNormTex;
+    hipTextureObject_t oddTex;
+    hipTextureObject_t oddNormTex;
+    hipTextureObject_t evenInvTex;
+    hipTextureObject_t evenInvNormTex;
+    hipTextureObject_t oddInvTex;
+    hipTextureObject_t oddInvNormTex;
+    void createTexObject(hipTextureObject_t &tex, hipTextureObject_t &texNorm, void *field, void *norm, bool full);
     void destroyTexObject();
 #endif
 
@@ -201,18 +201,18 @@ namespace quda {
     virtual ~cudaCloverField();
 
 #ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& NormTex() const { return normTex; }
-    const cudaTextureObject_t& InvTex() const { return invTex; }
-    const cudaTextureObject_t& InvNormTex() const { return invNormTex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }
-    const cudaTextureObject_t& EvenInvTex() const { return evenInvTex; }
-    const cudaTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
-    const cudaTextureObject_t& OddInvTex() const { return oddInvTex; }
-    const cudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
+    const hipTextureObject_t& Tex() const { return tex; }
+    const hipTextureObject_t& NormTex() const { return normTex; }
+    const hipTextureObject_t& InvTex() const { return invTex; }
+    const hipTextureObject_t& InvNormTex() const { return invNormTex; }
+    const hipTextureObject_t& EvenTex() const { return evenTex; }
+    const hipTextureObject_t& EvenNormTex() const { return evenNormTex; }
+    const hipTextureObject_t& OddTex() const { return oddTex; }
+    const hipTextureObject_t& OddNormTex() const { return oddNormTex; }
+    const hipTextureObject_t& EvenInvTex() const { return evenInvTex; }
+    const hipTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
+    const hipTextureObject_t& OddInvTex() const { return oddInvTex; }
+    const hipTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
 #endif
 
     /**
@@ -280,14 +280,14 @@ namespace quda {
     double rho; // rho additive factor
 
 #ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t &evenTex;
-    const cudaTextureObject_t &evenNormTex;
-    const cudaTextureObject_t &oddTex;
-    const cudaTextureObject_t &oddNormTex;
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& OddNormTex() const { return oddNormTex; }    
+    const hipTextureObject_t &evenTex;
+    const hipTextureObject_t &evenNormTex;
+    const hipTextureObject_t &oddTex;
+    const hipTextureObject_t &oddNormTex;
+    const hipTextureObject_t& EvenTex() const { return evenTex; }
+    const hipTextureObject_t& EvenNormTex() const { return evenNormTex; }
+    const hipTextureObject_t& OddTex() const { return oddTex; }
+    const hipTextureObject_t& OddNormTex() const { return oddNormTex; }    
 #endif
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :

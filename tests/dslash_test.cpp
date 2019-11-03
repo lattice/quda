@@ -412,12 +412,12 @@ DslashTime dslashCUDA(int niter) {
   DslashTime dslash_time;
   timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
+  hipEvent_t start, end;
+  hipEventCreate(&start);
+  hipEventCreate(&end);
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  hipEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
 
@@ -562,19 +562,19 @@ DslashTime dslashCUDA(int niter) {
     }
   }
     
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  hipEventRecord(end, 0);
+  hipEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  hipEventElapsedTime(&runTime, start, end);
+  hipEventDestroy(start);
+  hipEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  hipError_t stat = hipGetLastError();
+  if (stat != hipSuccess)
+    printfQuda("with ERROR: %s\n", hipGetErrorString(stat));
 
   return dslash_time;
 }

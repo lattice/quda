@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -17,43 +18,43 @@ namespace quda {
   }
 
   template<int N>
-  void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
+  void createEventArray(hipEvent_t (&event)[N], unsigned int flags=hipEventDefault)
   {
     for(int i=0; i<N; ++i)
-      cudaEventCreate(&event[i],flags);
+      hipEventCreateWithFlags(&event[i],flags);
     return;
   }
 
   template<int N>
-  void destroyEventArray(cudaEvent_t (&event)[N])
+  void destroyEventArray(hipEvent_t (&event)[N])
   {
     for(int i=0; i<N; ++i)
-      cudaEventDestroy(event[i]);
+      hipEventDestroy(event[i]);
   }
 
 
-  static cudaEvent_t packEnd;
-  static cudaEvent_t gatherEnd[4];
-  static cudaEvent_t scatterEnd[4];
-  static cudaEvent_t oprodStart;
-  static cudaEvent_t oprodEnd;
+  static hipEvent_t packEnd;
+  static hipEvent_t gatherEnd[4];
+  static hipEvent_t scatterEnd[4];
+  static hipEvent_t oprodStart;
+  static hipEvent_t oprodEnd;
 
 
   void createCloverForceEvents(){
-    cudaEventCreate(&packEnd, cudaEventDisableTiming);
-    createEventArray(gatherEnd, cudaEventDisableTiming);
-    createEventArray(scatterEnd, cudaEventDisableTiming);
-    cudaEventCreate(&oprodStart, cudaEventDisableTiming);
-    cudaEventCreate(&oprodEnd, cudaEventDisableTiming);
+    hipEventCreateWithFlags(&packEnd, hipEventDisableTiming);
+    createEventArray(gatherEnd, hipEventDisableTiming);
+    createEventArray(scatterEnd, hipEventDisableTiming);
+    hipEventCreateWithFlags(&oprodStart, hipEventDisableTiming);
+    hipEventCreateWithFlags(&oprodEnd, hipEventDisableTiming);
     return;
   }
 
   void destroyCloverForceEvents(){
     destroyEventArray(gatherEnd);
     destroyEventArray(scatterEnd);
-    cudaEventDestroy(packEnd);
-    cudaEventDestroy(oprodStart);
-    cudaEventDestroy(oprodEnd);
+    hipEventDestroy(packEnd);
+    hipEventDestroy(oprodStart);
+    hipEventDestroy(oprodEnd);
     return;
   }
 
@@ -325,7 +326,7 @@ namespace quda {
 
     virtual ~CloverForce() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const hipStream_t &stream){
       if(location == QUDA_CUDA_FIELD_LOCATION){
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());

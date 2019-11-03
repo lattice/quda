@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 #include <color_spinor_field_order.h>
@@ -122,7 +123,7 @@ namespace quda
 
       __device__ __host__ inline Float2 a(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
@@ -131,7 +132,7 @@ namespace quda
 
       __device__ __host__ inline Float2 b(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
@@ -140,7 +141,7 @@ namespace quda
 
       __device__ __host__ inline Float2 c(int i, int j) const
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
 #else
         return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];

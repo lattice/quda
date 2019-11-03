@@ -571,7 +571,7 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> operator()(int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         if (!fixed) {
           return complex<Float>( use_tex ? __ldg(v + accessor.index(parity,x_cb,s,c,n)) : v[accessor.index(parity,x_cb,s,c,n)]);
 	} else {
@@ -615,7 +615,7 @@ namespace quda {
        */
       __device__ __host__ inline const complex<Float> Ghost(int dim, int dir, int parity, int x_cb, int s, int c, int n=0) const
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         if (!ghost_fixed) {
           return complex<Float>( use_tex ? __ldg(ghost[2*dim+dir]+ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)) :
 				 ghost[2*dim+dir][ghostAccessor.index(dim,dir,parity,x_cb,s,c,n)] );
@@ -812,12 +812,12 @@ namespace quda {
       const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType, N>::type TexVector;
-      cudaTextureObject_t tex;
-      cudaTextureObject_t texNorm;
+      hipTextureObject_t tex;
+      hipTextureObject_t texNorm;
       const int tex_offset;
 #if 0 // unused at present
-        cudaTextureObject_t ghostTex;
-        cudaTextureObject_t ghostTexNorm;
+        hipTextureObject_t ghostTex;
+        hipTextureObject_t ghostTexNorm;
 #endif
 #endif
       int volumeCB;
@@ -879,7 +879,7 @@ namespace quda {
 
     norm_type nrm;
     if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
       // use textures unless we have a large alloc
       nrm = !huge_alloc ? tex1Dfetch<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
 #else
@@ -889,7 +889,7 @@ namespace quda {
 
 #pragma unroll
     for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
       if (!huge_alloc) { // use textures unless we have a huge alloc
         // first do texture load from memory
         TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
@@ -926,7 +926,7 @@ namespace quda {
       for (int i = 0; i < length / 2; i++) scale = fmaxf(max_[i], scale);
       norm[x+parity*norm_offset] = scale;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
 #else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
@@ -986,7 +986,7 @@ namespace quda {
 #pragma unroll
     for (int i = 0; i < M_ghost; i++) {                         // to do - add texture support
                                                                 // first do vectorized copy from memory into registers
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__) && 0 // buggy - need to account for dim/dir offset
       if (!huge_alloc) {                                        // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
 #pragma unroll
@@ -1021,7 +1021,7 @@ namespace quda {
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
       ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x] = scale;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
 #else
       RegType scale_inv = fixedMaxValue<Float>::value / scale;
@@ -1083,7 +1083,7 @@ namespace quda {
   void save() {
     if (backup_h) errorQuda("Already allocated host backup");
     backup_h = safe_malloc(bytes);
-    cudaMemcpy(backup_h, field, bytes, cudaMemcpyDeviceToHost);
+    hipMemcpy(backup_h, field, bytes, hipMemcpyDeviceToHost);
     checkCudaError();
   }
 
@@ -1091,7 +1091,7 @@ namespace quda {
      @brief Restore the field from the host after tuning
   */
   void load() {
-    cudaMemcpy(field, backup_h, bytes, cudaMemcpyHostToDevice);
+    hipMemcpy(field, backup_h, bytes, hipMemcpyHostToDevice);
     host_free(backup_h);
     backup_h = nullptr;
     checkCudaError();
@@ -1136,7 +1136,7 @@ namespace quda {
   virtual ~SpaceColorSpinorOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*volumeCB + x];
@@ -1159,7 +1159,7 @@ namespace quda {
   }
 
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_;
@@ -1259,7 +1259,7 @@ namespace quda {
   virtual ~SpaceSpinorColorOrder() { ; }
 
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*volumeCB + x];
@@ -1282,7 +1282,7 @@ namespace quda {
   }
 
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_;
@@ -1409,7 +1409,7 @@ namespace quda {
   __device__ __host__ inline void load(RegType v[length], int x, int parity=0) const {
     int y = getPaddedIndex(x, parity);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_ = field_[parity*exVolumeCB + y];
@@ -1434,7 +1434,7 @@ namespace quda {
   __device__ __host__ inline void save(const RegType v[length], int x, int parity=0) {
     int y = getPaddedIndex(x, parity);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
     typedef S<Float,length> structure;
     trove::coalesced_ptr<structure> field_((structure*)field);
     structure v_;

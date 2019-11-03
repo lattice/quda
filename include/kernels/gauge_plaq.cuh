@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
 #include <launch_kernel.cuh>

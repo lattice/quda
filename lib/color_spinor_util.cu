@@ -432,13 +432,13 @@ namespace quda {
     float scale = 1.0;
 
     if (isFixed<StoreType>::value) {
-      cudaMemcpy(&scale, &norm_ptr[i], sizeof(float), cudaMemcpyDeviceToHost);
+      hipMemcpy(&scale, &norm_ptr[i], sizeof(float), hipMemcpyDeviceToHost);
       scale *= fixedInvMaxValue<StoreType>::value;
     }
 
     for (int s = 0; s < Ns; s++) {
       for (int c = 0; c < Nc; c++) {
-        cudaMemcpy(indiv_num, &field_ptr[A.index(i % 2, i / 2, s, c, 0)], 2 * sizeof(StoreType), cudaMemcpyDeviceToHost);
+        hipMemcpy(indiv_num, &field_ptr[A.index(i % 2, i / 2, s, c, 0)], 2 * sizeof(StoreType), hipMemcpyDeviceToHost);
         data_cpu[2 * (c + Nc * s)] = scale * static_cast<Float>(indiv_num[0]);
         data_cpu[2 * (c + Nc * s) + 1] = scale * static_cast<Float>(indiv_num[1]);
       }

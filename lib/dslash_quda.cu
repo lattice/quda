@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -18,7 +19,7 @@ namespace quda {
 
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
-  // as opposed to multiple calls to cudaMemcpy()
+  // as opposed to multiple calls to hipMemcpy()
   static bool kernelPackT = false;
 
   void setKernelPackT(bool packT) { kernelPackT = packT; }
@@ -52,12 +53,12 @@ namespace quda {
   namespace dslash {
     int it = 0;
 
-    cudaEvent_t packEnd[2];
-    cudaEvent_t gatherStart[Nstream];
-    cudaEvent_t gatherEnd[Nstream];
-    cudaEvent_t scatterStart[Nstream];
-    cudaEvent_t scatterEnd[Nstream];
-    cudaEvent_t dslashStart[2];
+    hipEvent_t packEnd[2];
+    hipEvent_t gatherStart[Nstream];
+    hipEvent_t gatherEnd[Nstream];
+    hipEvent_t scatterStart[Nstream];
+    hipEvent_t scatterEnd[Nstream];
+    hipEvent_t dslashStart[2];
 
     // these variables are used for benchmarking the dslash components in isolation
     bool dslash_pack_compute;
@@ -88,23 +89,23 @@ namespace quda {
 
 #if CUDA_VERSION >= 8000
     cuuint32_t *commsEnd_h;
-    CUdeviceptr commsEnd_d[Nstream];
+    hipDeviceptr_t commsEnd_d[Nstream];
 #endif
   }
 
   void createDslashEvents()
   {
     using namespace dslash;
-    // add cudaEventDisableTiming for lower sync overhead
+    // add hipEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      cudaEventCreateWithFlags(&gatherStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&gatherEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterStart[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterEnd[i], cudaEventDisableTiming);
+      hipEventCreateWithFlags(&gatherStart[i], hipEventDisableTiming);
+      hipEventCreateWithFlags(&gatherEnd[i], hipEventDisableTiming);
+      hipEventCreateWithFlags(&scatterStart[i], hipEventDisableTiming);
+      hipEventCreateWithFlags(&scatterEnd[i], hipEventDisableTiming);
     }
     for (int i=0; i<2; i++) {
-      cudaEventCreateWithFlags(&packEnd[i], cudaEventDisableTiming);
-      cudaEventCreateWithFlags(&dslashStart[i], cudaEventDisableTiming);
+      hipEventCreateWithFlags(&packEnd[i], hipEventDisableTiming);
+      hipEventCreateWithFlags(&dslashStart[i], hipEventDisableTiming);
     }
 
     aux_worker = NULL;
@@ -112,7 +113,7 @@ namespace quda {
 #if CUDA_VERSION >= 8000
     commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
     for (int i=0; i<Nstream; i++) {
-      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
+      hipHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
       commsEnd_h[i] = 0;
     }
 #endif
@@ -151,15 +152,15 @@ namespace quda {
 #endif
 
     for (int i=0; i<Nstream; i++) {
-      cudaEventDestroy(gatherStart[i]);
-      cudaEventDestroy(gatherEnd[i]);
-      cudaEventDestroy(scatterStart[i]);
-      cudaEventDestroy(scatterEnd[i]);
+      hipEventDestroy(gatherStart[i]);
+      hipEventDestroy(gatherEnd[i]);
+      hipEventDestroy(scatterStart[i]);
+      hipEventDestroy(scatterEnd[i]);
     }
 
     for (int i=0; i<2; i++) {
-      cudaEventDestroy(packEnd[i]);
-      cudaEventDestroy(dslashStart[i]);
+      hipEventDestroy(packEnd[i]);
+      hipEventDestroy(dslashStart[i]);
     }
 
     checkCudaError();
@@ -269,7 +270,7 @@ namespace quda {
     }
     virtual ~Gamma() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	gammaCPU<Float,nColor>(arg);
       } else {
@@ -387,7 +388,7 @@ namespace quda {
     }
     virtual ~TwistGamma() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.doublet) twistGammaCPU<true,Float,nColor>(arg);
 	twistGammaCPU<false,Float,nColor>(arg);
@@ -584,7 +585,7 @@ namespace quda {
     }
     virtual ~Clover() { }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const hipStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -742,7 +743,7 @@ namespace quda {
     }
     virtual ~TwistClover() { }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const hipStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {

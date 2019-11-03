@@ -55,8 +55,8 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  extern cudaDeviceProp deviceProp;  
-  extern cudaStream_t *streams;
+  extern hipDeviceProp_t deviceProp;  
+  extern hipStream_t *streams;
  
 #ifdef __cplusplus
 }

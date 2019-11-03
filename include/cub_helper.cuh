@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 #include <quda_constants.h>
 #include <float_vector.h>
@@ -85,10 +86,10 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
-  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=hipcub::Sum>
   __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
-    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    typedef hipcub::BlockReduce<T, block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
 
     Reducer r;
@@ -128,7 +129,7 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
+  template <int block_size, typename T, bool do_sum = true, typename Reducer = hipcub::Sum>
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
@@ -202,7 +203,7 @@ namespace quda {
   __device__ inline void reduceRow(ReduceArg<T> arg, const T &in) {
 
     typedef vector_type<T,block_size_y> vector;
-    typedef cub::BlockReduce<vector, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    typedef hipcub::BlockReduce<vector, block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     constexpr int n_word = sizeof(T) / sizeof(int);
 
     __shared__ union {

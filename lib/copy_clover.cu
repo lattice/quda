@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <clover_field_order.h>
 #include <tune_quda.h>
 
@@ -78,7 +79,7 @@ namespace quda {
     }
     virtual ~CopyClover() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       copyCloverKernel<FloatOut, FloatIn, length, Out, In> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

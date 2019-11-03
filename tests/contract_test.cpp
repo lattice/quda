@@ -116,7 +116,7 @@ int main(int argc, char **argv)
   prec = QUDA_INVALID_PRECISION;
 
   // Clear previous error state if it exists
-  cudaGetLastError();
+  hipGetLastError();
 
   // Check for correctness
   if (verify_results) {

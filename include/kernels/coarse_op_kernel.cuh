@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <clover_field_order.h>
@@ -653,7 +654,7 @@ namespace quda {
 
     if (shared_atomic) {
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       __shared__ complex<storeType> X[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
       __shared__ complex<storeType> Y[max_color_per_block][max_color_per_block][4][coarseSpin][coarseSpin];
 

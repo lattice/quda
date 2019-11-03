@@ -142,16 +142,16 @@ namespace quda {
 
 
 #define checkCudaErrorNoSync() do {                    \
-  cudaError_t error = cudaGetLastError();              \
-  if (error != cudaSuccess)                            \
-    errorQuda("(CUDA) %s", cudaGetErrorString(error)); \
+  hipError_t error = hipGetLastError();              \
+  if (error != hipSuccess)                            \
+    errorQuda("(CUDA) %s", hipGetErrorString(error)); \
 } while (0)
 
 
 #ifdef HOST_DEBUG
 
 #define checkCudaError() do {  \
-  cudaDeviceSynchronize();     \
+  hipDeviceSynchronize();     \
   checkCudaErrorNoSync();      \
 } while (0)
 
@@ -161,7 +161,7 @@ namespace quda {
 
 #endif // HOST_DEBUG
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 // hide from device code
 #undef errorQuda
 #define errorQuda(...)

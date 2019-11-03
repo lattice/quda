@@ -32,7 +32,7 @@ public:
       qudaDeviceSynchronize();
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const hipStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY

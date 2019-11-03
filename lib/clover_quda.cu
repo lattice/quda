@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -157,7 +158,7 @@ namespace quda {
 
       virtual ~CloverCompute() {}
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const hipStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
           TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
           cloverComputeKernel<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);  

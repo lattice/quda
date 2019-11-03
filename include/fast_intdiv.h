@@ -118,8 +118,8 @@ __host__ __device__ __forceinline__
 int operator/(const int n, const int_fastdiv& divisor)
 {
   int q;
-#ifdef __CUDA_ARCH__
-  asm("mul.hi.s32 %0, %1, %2;" : "=r"(q) : "r"(divisor.M), "r"(n));
+#ifdef __HIP_DEVICE_COMPILE__
+  q = __mulhi(divisor.M,n);
 #else
   q = (((unsigned long long)((long long)divisor.M * (long long)n)) >> 32);
 #endif

@@ -189,13 +189,13 @@ namespace quda {
      Complex *evecm = static_cast<Complex*>( args.ritzVecs.data());
      double  *evalm = static_cast<double *>( args.Tmvals.data());
 
-     cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  cudaHostRegisterDefault);
+     hipHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  hipHostRegisterDefault);
      magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
      //Solve m-1 dim eigenproblem:
      DenseMatrix ritzVecsm1(args.Tm);
      Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
 
-     cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  cudaHostRegisterDefault);
+     hipHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  hipHostRegisterDefault);
      magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
      // fill 0s in mth element of old evecs:
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
@@ -216,8 +216,8 @@ namespace quda {
      Block<MatrixXcd>(args.ritzVecs.derived(), 0, 0, m, 2*k) = Q2k * es_h2k.eigenvectors();
      args.Tmvals.segment(0,2*k) = es_h2k.eigenvalues();//this is ok
 //?
-     cudaHostUnregister(evecm);
-     cudaHostUnregister(evecm1);
+     hipHostUnregister(evecm);
+     hipHostUnregister(evecm1);
 #else
      errorQuda("Magma library was not built.");
 #endif

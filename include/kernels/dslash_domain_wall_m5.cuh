@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 #include <shared_memory_cache_helper.cuh>
@@ -57,7 +58,7 @@ public:
     */
     inline __device__ __host__ const coeff_5<real> *coeff() const
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return reinterpret_cast<const coeff_5<real> *>(mobius_d);
 #else
       return arg.mobius_h;
@@ -174,7 +175,7 @@ public:
       default: errorQuda("Unknown Dslash5Type %d", type);
       }
 
-      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
+      hipMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), mobius_h, sizeof(coeff_5<real>), 0, hipMemcpyHostToDevice, streams[Nstream - 1]);
     }
 
     virtual ~Dslash5Arg() { delete mobius_h; }

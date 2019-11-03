@@ -25,7 +25,7 @@
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <cuComplex.h>
+//#include <hip/hip_complex.h>
 
 namespace quda {
   namespace gauge {
@@ -451,11 +451,11 @@ public:
   __host__ __device__ inline void imag(ValueType);
 };
 
-// TODO make cuFloatComplex and cuDoubleComplex protected
+// TODO make hipFloatComplex and hipDoubleComplex protected
 // TODO see if returning references is a perf hazard
 
 template<>
-  struct complex <float> : public float2 //cuFloatComplex
+  struct complex <float> : public float2 //hipFloatComplex
 {
 public:
   typedef float value_type;
@@ -577,7 +577,7 @@ public:
 };
 
 template<>
-  struct complex <double> : public double2 //cuDoubleComplex
+  struct complex <double> : public double2 //hipDoubleComplex
 {
 public:
   typedef double value_type;
@@ -847,14 +847,14 @@ public:
 
   // Binary arithmetic operations
   // At the moment I'm implementing the basic functions, and the
-  // corresponding cuComplex calls are commented.
+  // corresponding hipComplex calls are commented.
 
   template<typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator+(const complex<ValueType>& lhs,
 const complex<ValueType>& rhs){
     return complex<ValueType>(lhs.real()+rhs.real(),lhs.imag()+rhs.imag());
-    // return cuCaddf(lhs,rhs);
+    // return hipCaddf(lhs,rhs);
   }
 
   template<typename ValueType>
@@ -862,39 +862,39 @@ const complex<ValueType>& rhs){
     inline complex<ValueType> operator+(const volatile complex<ValueType>& lhs,
 const volatile complex<ValueType>& rhs){
     return complex<ValueType>(lhs.real()+rhs.real(),lhs.imag()+rhs.imag());
-    // return cuCaddf(lhs,rhs);
+    // return hipCaddf(lhs,rhs);
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator+(const complex<ValueType>& lhs, const ValueType & rhs){
     return complex<ValueType>(lhs.real()+rhs,lhs.imag());
-    // return cuCaddf(lhs,complex<ValueType>(rhs));
+    // return hipCaddf(lhs,complex<ValueType>(rhs));
   }
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator+(const ValueType& lhs, const complex<ValueType>& rhs){
     return complex<ValueType>(rhs.real()+lhs,rhs.imag());
-    // return cuCaddf(complex<float>(lhs),rhs);
+    // return hipCaddf(complex<float>(lhs),rhs);
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator-(const complex<ValueType>& lhs, const complex<ValueType>& rhs){
     return complex<ValueType>(lhs.real()-rhs.real(),lhs.imag()-rhs.imag());
-    // return cuCsubf(lhs,rhs);
+    // return hipCsubf(lhs,rhs);
   }
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator-(const complex<ValueType>& lhs, const ValueType & rhs){
     return complex<ValueType>(lhs.real()-rhs,lhs.imag());
-    // return cuCsubf(lhs,complex<float>(rhs));
+    // return hipCsubf(lhs,complex<float>(rhs));
   }
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator-(const ValueType& lhs, const complex<ValueType>& rhs){
     return complex<ValueType>(lhs-rhs.real(),-rhs.imag());
-    // return cuCsubf(complex<float>(lhs),rhs);
+    // return hipCsubf(complex<float>(lhs),rhs);
   }
 
   template <typename ValueType>
@@ -903,21 +903,21 @@ const volatile complex<ValueType>& rhs){
 const complex<ValueType>& rhs){
     return complex<ValueType>(lhs.real()*rhs.real()-lhs.imag()*rhs.imag(),
 lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
-    // return cuCmulf(lhs,rhs);
+    // return hipCmulf(lhs,rhs);
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator*(const complex<ValueType>& lhs, const ValueType & rhs){
     return complex<ValueType>(lhs.real()*rhs,lhs.imag()*rhs);
-    // return cuCmulf(lhs,complex<float>(rhs));
+    // return hipCmulf(lhs,complex<float>(rhs));
   }
 
   template <typename ValueType>
     __host__ __device__
     inline complex<ValueType> operator*(const ValueType& lhs, const complex<ValueType>& rhs){
     return complex<ValueType>(rhs.real()*lhs,rhs.imag()*lhs);
-    // return cuCmulf(complex<float>(lhs),rhs);
+    // return hipCmulf(complex<float>(lhs),rhs);
   }
 
 
@@ -968,7 +968,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     __host__ __device__
     inline complex<ValueType> operator/(const complex<ValueType>& lhs, const ValueType & rhs){
     return complex<ValueType>(lhs.real()/rhs,lhs.imag()/rhs);
-    // return cuCdivf(lhs,complex<float>(rhs));
+    // return hipCdivf(lhs,complex<float>(rhs));
   }
 
   template <typename ValueType>

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -145,7 +146,7 @@ namespace quda {
 
       virtual ~KSForceComplete() {}
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const hipStream_t &stream) {
         if(location == QUDA_CUDA_FIELD_LOCATION){
           // Fix this
           dim3 blockDim(128, 1, 1);
@@ -354,7 +355,7 @@ class KSLongLinkForce : Tunable {
 
   virtual ~KSLongLinkForce() {}
 
-  void apply(const cudaStream_t &stream) {
+  void apply(const hipStream_t &stream) {
     if(location == QUDA_CUDA_FIELD_LOCATION){
       // Fix this
       dim3 blockDim(128, 1, 1);

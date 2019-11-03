@@ -10,7 +10,7 @@
    avoid confusion when resolving the native atomicAdd functions.
  */
 
-#if defined(__CUDA_ARCH__) 
+#if defined(__HIP_DEVICE_COMPILE__) 
 
 #if __COMPUTE_CAPABILITY__ < 600
 /**

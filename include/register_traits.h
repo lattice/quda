@@ -152,7 +152,7 @@ namespace quda {
   template<typename T1, typename T2> __host__ __device__ inline void copy (T1 &a, const T2 &b) { a = b; }
 
   template<> __host__ __device__ inline void copy(double &a, const int2 &b) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     a = __hiloint2double(b.y, b.x);
 #else
     errorQuda("Undefined");
@@ -160,7 +160,7 @@ namespace quda {
   }
 
   template<> __host__ __device__ inline void copy(double2 &a, const int4 &b) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     a.x = __hiloint2double(b.y, b.x); a.y = __hiloint2double(b.w, b.z);
 #else
     errorQuda("Undefined");
@@ -305,7 +305,7 @@ namespace quda {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b); }
     __device__ __host__ static float Sin(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return __sinf(a); 
 #else
       return sinf(a);
@@ -313,7 +313,7 @@ namespace quda {
     }
     __device__ __host__ static float Cos(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return __cosf(a); 
 #else
       return cosf(a); 
@@ -322,7 +322,7 @@ namespace quda {
 
     __device__ __host__ static void SinCos(const float &a, float *s, float *c)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
        __sincosf(a, s, c);
 #else
        sincosf(a, s, c);
@@ -338,7 +338,7 @@ namespace quda {
     __device__ __host__ static float Atan2( const float &a, const float &b) { return atan2f(a,b)/M_PI; }
     __device__ __host__ static float Sin(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return __sinf(a * static_cast<float>(M_PI));
 #else
       return sinf(a * static_cast<float>(M_PI));
@@ -346,7 +346,7 @@ namespace quda {
     }
     __device__ __host__ static float Cos(const float &a)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return __cosf(a * static_cast<float>(M_PI));
 #else
       return cosf(a * static_cast<float>(M_PI));
@@ -355,7 +355,7 @@ namespace quda {
 
     __device__ __host__ static void SinCos(const float &a, float *s, float *c)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       __sincosf(a * static_cast<float>(M_PI), s, c);
 #else
       sincosf(a * static_cast<float>(M_PI), s, c);
@@ -411,7 +411,7 @@ namespace quda {
   template <typename VectorType>
     __device__ __host__ inline VectorType vector_load(void *ptr, int idx) {
 #define USE_LDG
-#if defined(__CUDA_ARCH__) && defined(USE_LDG)
+#if defined(__HIP_DEVICE_COMPILE__) && defined(USE_LDG)
     return __ldg(reinterpret_cast< VectorType* >(ptr) + idx);
 #else
     return reinterpret_cast< VectorType* >(ptr)[idx];
@@ -425,7 +425,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const double2 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     store_streaming_double2(reinterpret_cast<double2*>(ptr)+idx, value.x, value.y);
 #else
     reinterpret_cast<double2*>(ptr)[idx] = value;
@@ -434,7 +434,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const float4 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     store_streaming_float4(reinterpret_cast<float4*>(ptr)+idx, value.x, value.y, value.z, value.w);
 #else
     reinterpret_cast<float4*>(ptr)[idx] = value;
@@ -443,7 +443,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const float2 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     store_streaming_float2(reinterpret_cast<float2*>(ptr)+idx, value.x, value.y);
 #else
     reinterpret_cast<float2*>(ptr)[idx] = value;
@@ -452,7 +452,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const short4 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     store_streaming_short4(reinterpret_cast<short4*>(ptr)+idx, value.x, value.y, value.z, value.w);
 #else
     reinterpret_cast<short4*>(ptr)[idx] = value;
@@ -461,7 +461,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const short2 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, value.x, value.y);
 #else
     reinterpret_cast<short2*>(ptr)[idx] = value;
@@ -471,7 +471,7 @@ namespace quda {
   // A char4 is the same size as a short2
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const char4 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
 
     store_streaming_short2(reinterpret_cast<short2*>(ptr)+idx, reinterpret_cast<const short2*>(&value)->x, reinterpret_cast<const short2*>(&value)->y);
 #else
@@ -482,7 +482,7 @@ namespace quda {
 
   template <>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const char2 &value) {
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     vector_store(ptr, idx, *reinterpret_cast<const short*>(&value));
     //store_streaming_char2(reinterpret_cast<char2*>(ptr)+idx, reinterpret_cast<const char2*>(&value)->x, reinterpret_cast<const char2*>(&value)->y);
 #else

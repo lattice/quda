@@ -218,8 +218,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, gpuid);
+    hipDeviceProp_t prop;
+    hipGetDeviceProperties(&prop, gpuid);
     if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
@@ -242,8 +242,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 	  int canAccessPeer[2];
-	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	  hipDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  hipDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
 	  int accessRank[2] = { };
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
@@ -443,21 +443,21 @@ int comm_coord(int dim)
 
 inline bool isHost(const void *buffer)
 {
-  CUmemorytype memType;
+  hipMemoryType memType;
   void *attrdata[] = {(void *)&memType};
-  CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
+  hipPointerAttribute_t attributes;//[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
+  hipError_t err = cuPointerGetAttributes(1, attributes, attrdata, (hipDeviceptr_t)buffer);
+  if (err != hipSuccess) {
     const char *str;
-    cuGetErrorName(err, &str);
+    str=hipGetErrorName(err);
     errorQuda("cuPointerGetAttributes returned error %s", str);
   }
 
   switch (memType) {
-  case CU_MEMORYTYPE_DEVICE: return false;
-  case CU_MEMORYTYPE_ARRAY: errorQuda("Using array memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_UNIFIED: errorQuda("Using unified memory for communications buffer is not supported");
-  case CU_MEMORYTYPE_HOST:
+  case hipMemoryTypeDevice: return false;
+  case hipMemoryTypeArray: errorQuda("Using array memory for communications buffer is not supported");
+  case hipMemoryTypeUnified: errorQuda("Using unified memory for communications buffer is not supported");
+  case hipMemoryTypeHost:
   default: // memory not allocated by CUDA allocaters will default to being host memory
     return true;
   }
@@ -485,10 +485,10 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemcpy(tmp, buffer, nbytes, hipMemcpyDeviceToDevice);
+    if (err != hipSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
+      errorQuda("aborting with error %s", hipGetErrorString(err));
     }
     device_free(tmp);
   }
@@ -519,10 +519,10 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset(buffer, 0, nbytes);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemset(buffer, 0, nbytes);
+    if (err != hipSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
+      errorQuda("aborting with error %s", hipGetErrorString(err));
     }
   }
 #endif
@@ -557,11 +557,11 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, hipMemcpyDeviceToDevice);
+    if (err != hipSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
 		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
+      errorQuda("aborting with error %s", hipGetErrorString(err));
     }
     device_free(tmp);
   }
@@ -595,11 +595,11 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemset2D(buffer, stride, 0, blksize, nblocks);
+    if (err != hipSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
 		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
+      errorQuda("aborting with error %s", hipGetErrorString(err));
     }
   }
 #endif
@@ -681,7 +681,7 @@ bool comm_gdr_blacklist() {
       std::stringstream blacklist_list(blacklist_env);
 
       int device_count;
-      cudaGetDeviceCount(&device_count);
+      hipGetDeviceCount(&device_count);
 
       int excluded_device;
       while (blacklist_list >> excluded_device) {
@@ -720,7 +720,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   }
 
   int device_count;
-  cudaGetDeviceCount(&device_count);
+  hipGetDeviceCount(&device_count);
   if (device_count == 0) { errorQuda("No CUDA devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
@@ -753,7 +753,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
 
       int device;
       int deviceCount;
-      cudaGetDeviceCount(&deviceCount);
+      hipGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
         if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }

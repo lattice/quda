@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <clover_field_order.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>

@@ -420,7 +420,7 @@ namespace quda {
       template<typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col,
                                                  const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u[dim] + parity*cb_offset + (x_cb*nColor + row)*nColor + col);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -565,7 +565,7 @@ namespace quda {
 
       template <typename theirFloat>
       __device__ __host__ inline void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + (((parity*volumeCB+x_cb)*geometry + dim)*nColor + row)*nColor + col);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -688,7 +688,7 @@ namespace quda {
       const int offset_cb;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<Float,2>::type TexVector;
-      cudaTextureObject_t tex;
+      hipTextureObject_t tex;
 #endif
       const int volumeCB;
       const int stride;
@@ -735,7 +735,7 @@ namespace quda {
 
       __device__ __host__ inline const complex<Float> operator()(int dim, int parity, int x_cb, int row, int col) const
       {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
 	if (use_tex) {
 	  TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 	  if (fixed) {
@@ -763,7 +763,7 @@ namespace quda {
 
       template <typename theirFloat>
       __device__ __host__ void atomic_add(int dim, int parity, int x_cb, int row, int col, const complex<theirFloat> &val) const {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
 	typedef typename vector<storeFloat,2>::type vec2;
 	vec2 *u2 = reinterpret_cast<vec2*>(u + parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 	if (fixed && !match<storeFloat,theirFloat>()) {
@@ -1729,7 +1729,7 @@ namespace quda {
         const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType,N>::type TexVector;
-      cudaTextureObject_t tex;
+      hipTextureObject_t tex;
       const int tex_offset;
 #endif
       Float *ghost[4];
@@ -1800,7 +1800,7 @@ namespace quda {
 #pragma unroll
         for (int i=0; i<M; i++){
           // first do texture load from memory
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
 	  if (!huge_alloc) { // use textures unless we have a huge alloc
             TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity * tex_offset + (dir * M + i) * stride + x);
             // now insert into output array
@@ -2026,7 +2026,7 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+	hipMemcpy(backup_h, gauge, bytes, hipMemcpyDeviceToHost);
 	checkCudaError();
       }
 
@@ -2034,7 +2034,7 @@ namespace quda {
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	hipMemcpy(gauge, backup_h, bytes, hipMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = nullptr;
 	checkCudaError();
@@ -2087,7 +2087,7 @@ namespace quda {
       virtual ~LegacyOrder() { ; }
 
       __device__ __host__ inline void loadGhost(RegType v[length], int x, int dir, int parity) const {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
 	structure v_ = ghost_[parity*faceVolumeCB[dir] + x];
@@ -2098,7 +2098,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void saveGhost(const RegType v[length], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dir]);
 	structure v_;
@@ -2111,7 +2111,7 @@ namespace quda {
 
       __device__ __host__ inline void loadGhostEx(RegType v[length], int x, int dummy, int dir,
 						  int dim, int g, int parity, const int R[]) const {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
 	structure v_ = ghost_[((dir*2+parity)*R[dim]*faceVolumeCB[dim] + x)*geometry+g];
@@ -2125,7 +2125,7 @@ namespace quda {
 
       __device__ __host__ inline void saveGhostEx(const RegType v[length], int x, int dummy,
 						  int dir, int dim, int g, int parity, const int R[]) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> ghost_((structure*)ghost[dim]);
 	structure v_;
@@ -2159,7 +2159,7 @@ namespace quda {
 
       __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
 	structure v_ = gauge_[parity*volumeCB + x];
@@ -2172,7 +2172,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge[dir]);
 	structure v_;
@@ -2308,7 +2308,7 @@ namespace quda {
 
     __device__ __host__ inline void load(RegType v[length], int x, int dir, int parity, Float inphase = 1.0) const
     {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_ = gauge_[(parity*volumeCB+x)*geometry + dir];
@@ -2321,7 +2321,7 @@ namespace quda {
     }
 
     __device__ __host__ inline void save(const RegType v[length], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_;
@@ -2419,7 +2419,7 @@ namespace quda {
       // get base pointer
       const Float *gauge0 = reinterpret_cast<const Float*>(reinterpret_cast<const char*>(gauge) + (parity*volumeCB+x)*size + offset);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
       structure v_ = gauge_[dir];
@@ -2435,7 +2435,7 @@ namespace quda {
       // get base pointer
       Float *gauge0 = reinterpret_cast<Float*>(reinterpret_cast<char*>(gauge) + (parity*volumeCB+x)*size + offset);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge0);
       structure v_;
@@ -2475,7 +2475,7 @@ namespace quda {
     // we need to transpose and scale for CPS ordering
     __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
     {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_ = gauge_[((parity*volumeCB+x)*geometry + dir)];
@@ -2496,7 +2496,7 @@ namespace quda {
     }
 
     __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_;
@@ -2582,7 +2582,7 @@ namespace quda {
       // we need to transpose for BQCD ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_ = gauge_[(dir*2+parity)*exVolumeCB + x];
@@ -2602,7 +2602,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
 	structure v_;
@@ -2682,7 +2682,7 @@ namespace quda {
       // we need to transpose for TIFR ordering
       __device__ __host__ inline void load(RegType v[18], int x, int dir, int parity, Float inphase = 1.0) const
       {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
       typedef S<Float,length> structure;
       trove::coalesced_ptr<structure> gauge_((structure*)gauge);
       structure v_ = gauge_[(dir*2+parity)*volumeCB + x];
@@ -2702,7 +2702,7 @@ namespace quda {
       }
 
       __device__ __host__ inline void save(const RegType v[18], int x, int dir, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
 	structure v_;
@@ -2811,7 +2811,7 @@ namespace quda {
 
         int y = getPaddedIndex(x, parity);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
 	structure v_ = gauge_[(dir*2+parity)*exVolumeCB + y];
@@ -2834,7 +2834,7 @@ namespace quda {
 
 	int y = getPaddedIndex(x, parity);
 
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	typedef S<Float,length> structure;
 	trove::coalesced_ptr<structure> gauge_((structure*)gauge);
 	structure v_;

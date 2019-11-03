@@ -37,7 +37,7 @@
   case 960:								\
   case 992:								\
   case 1024:								\
-    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
+    tunable.jitifyError() = hipErrorInvalidValue;                   \
     break;                                                              \
 default:								\
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
@@ -205,7 +205,7 @@ default:								\
   case 448:								\
   case 480:								\
   case 512:								\
-    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
+    tunable.jitifyError() = hipErrorInvalidValue;                   \
     break;                                                              \
   default:								\
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
@@ -322,7 +322,7 @@ default:								\
   case 64:                                                                                                             \
   case 96:                                                                                                             \
   case 128:                                                                                                            \
-    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                                                                  \
+    tunable.jitifyError() = hipErrorInvalidValue;                                                                  \
     break;                                                                                                             \
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }

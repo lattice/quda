@@ -273,7 +273,7 @@ namespace quda {
     }
 
     /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    hipError_t jitify_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -291,10 +291,10 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : jitify_error(hipSuccess) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
-    virtual void apply(const cudaStream_t &stream) = 0;
+    virtual void apply(const hipStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
@@ -387,8 +387,8 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
+    hipError_t jitifyError() const { return jitify_error; }
+    hipError_t& jitifyError() { return jitify_error; }
   };
 
   

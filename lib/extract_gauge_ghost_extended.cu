@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <tune_quda.h>
 #include <gauge_field_order.h>
@@ -215,7 +216,7 @@ namespace quda {
     }
     virtual ~ExtractGhostEx() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (extract) {
 	if (location==QUDA_CPU_FIELD_LOCATION) {
 	  extractGhostEx<Float,length,nDim,dim,Order,true>(arg);

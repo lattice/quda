@@ -29,7 +29,7 @@ struct load_storage<T, U, 1> {
 }
 
 
-#if __CUDA_ARCH__ >= 350
+#if __HIP_DEVICE_COMPILE__ >= 350
 // Device has ldg
 template<typename T>
 __device__ __forceinline__ T __ldg(const T* ptr) {

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <tune_quda.h>
 
 #pragma once
@@ -198,7 +199,7 @@ namespace quda {
 
     virtual ~ExtractGhost() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (location==QUDA_CPU_FIELD_LOCATION) {
 	if (extract) extractGhost<Float,length,nDim,Order,true>(arg);
 	else extractGhost<Float,length,nDim,Order,false>(arg);

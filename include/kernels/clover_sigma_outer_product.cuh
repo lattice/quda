@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <quda_matrix.h>

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <string>
@@ -22,7 +23,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, hipStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -35,8 +36,8 @@ namespace quda {
     int gatherCompleted[2] = {0,0};
     int commsCompleted[2] = {0,0};
 
-    cudaEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) cudaEventCreate(&gatherEnd[dir], cudaEventDisableTiming);
+    hipEvent_t gatherEnd[2];
+    for(int dir=0; dir<2; dir++) hipEventCreateWithFlags(&gatherEnd[dir], hipEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;
@@ -52,7 +53,7 @@ namespace quda {
       int dir = 1;
       while(completeSum < 2){
         if(!gatherCompleted[dir]){
-          if(cudaSuccess == cudaEventQuery(gatherEnd[dir])){
+          if(hipSuccess == hipEventQuery(gatherEnd[dir])){
             spinor->commsStart(nFace, 2*dim+dir, dagger);
             completeSum++;
             gatherCompleted[dir--] = 1;
@@ -76,7 +77,7 @@ namespace quda {
       qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
-    for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
+    for(int dir=0; dir<2; dir++) hipEventDestroy(gatherEnd[dir]);
 #endif
     return;
   }
@@ -253,7 +254,7 @@ namespace quda {
       }
       virtual ~CopySpinorEx() {}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const hipStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if(location == QUDA_CPU_FIELD_LOCATION){

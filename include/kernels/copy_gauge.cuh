@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <gauge_field_order.h>
 
 namespace quda {

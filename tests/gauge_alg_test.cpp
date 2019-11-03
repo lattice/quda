@@ -116,13 +116,13 @@ class GaugeAlgTest : public ::testing::Test {
 
   void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
     unitarizeLinks(*cudaInGauge, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    hipMemcpy(&num_failures, num_failures_dev, sizeof(int), hipMemcpyDeviceToHost);
     if(num_failures>0){
-      cudaFree(num_failures_dev);
+      hipFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");
       exit(1);
     }
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    hipMemset(num_failures_dev, 0, sizeof(int));
   }
 
   virtual void SetUp() {
@@ -191,9 +191,9 @@ class GaugeAlgTest : public ::testing::Test {
     a0.Start(__func__, __FILE__, __LINE__);
     a1.Start(__func__, __FILE__, __LINE__);
 
-    cudaMalloc((void**)&num_failures_dev, sizeof(int));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
-    if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
+    hipMalloc((void**)&num_failures_dev, sizeof(int));
+    hipMemset(num_failures_dev, 0, sizeof(int));
+    if(num_failures_dev == NULL) errorQuda("hipMalloc failed for dev_pointer\n");
     if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *cudaInGauge);
      else{
        InitGaugeField( *cudaInGauge, *randstates );
@@ -224,7 +224,7 @@ class GaugeAlgTest : public ::testing::Test {
 
 
     delete cudaInGauge;
-    cudaFree(num_failures_dev);
+    hipFree(num_failures_dev);
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
 

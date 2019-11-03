@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <comm_quda.h>
 #include <gauge_fix_ovr_extra.h>
 #include <thrust_helper.cuh>
@@ -80,7 +81,7 @@ namespace quda {
     thrust::device_ptr<int> array_interiorT[2];
     for ( int i = 0; i < 2; i++ ) { //even and odd ids
       borderpoints[i] = static_cast<int*>(pool_device_malloc(nlinksfaces * sizeof(int) ));
-      cudaMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
+      hipMemset(borderpoints[i], 0, nlinksfaces * sizeof(int) );
       array_faceT[i] = thrust::device_pointer_cast(borderpoints[i]);
     }
     dim3 nthreads(128, 1, 1);

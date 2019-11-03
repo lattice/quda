@@ -121,7 +121,7 @@ class RefWrapper {
   operator RefWrapper<cls>() { return this; }
 #endif
 
-#include <cuda.h>
+//remove cuda.h
 #include <cuda_runtime_api.h>  // For dim3, cudaStream_t
 #if CUDA_VERSION >= 8000
 #define NVRTC_GET_TYPE_NAME 1
@@ -881,10 +881,10 @@ class CUDAKernel {
   std::map<std::string,std::string> _constant;
   std::vector<CUjit_option> _opts;
 
-  inline void cuda_safe_call(CUresult res) const {
-    if (res != CUDA_SUCCESS) {
+  inline void cuda_safe_call(hipError_t res) const {
+    if (res != hipSuccess) {
       const char* msg;
-      cuGetErrorName(res, &msg);
+      msg=hipGetErrorName(res);
       throw std::runtime_error(msg);
     }
   }
@@ -907,17 +907,17 @@ class CUDAKernel {
 #else
         link_file = "lib" + link_file + ".a";
 #endif
-        CUresult result = cuLinkAddFile(_link_state, CU_JIT_INPUT_LIBRARY,
+        hipError_t result = cuLinkAddFile(_link_state, CU_JIT_INPUT_LIBRARY,
                                         link_file.c_str(), 0, 0, 0);
         int path_num = 0;
-        while (result == CUDA_ERROR_FILE_NOT_FOUND &&
+        while (result == hipErrorFileNotFound &&
                path_num < (int)link_paths.size()) {
           std::string filename = path_join(link_paths[path_num++], link_file);
           result = cuLinkAddFile(_link_state, CU_JIT_INPUT_LIBRARY,
                                  filename.c_str(), 0, 0, 0);
         }
 #if JITIFY_PRINT_LOG
-        if (result == CUDA_ERROR_FILE_NOT_FOUND) {
+        if (result == hipErrorFileNotFound) {
           std::cout << "Error: Device library not found: " << link_file
                     << std::endl;
         }
@@ -996,14 +996,14 @@ class CUDAKernel {
   inline ~CUDAKernel() { this->destroy_module(); }
   inline operator CUfunction() const { return _kernel; }
 
-  inline CUresult launch(dim3 grid, dim3 block, unsigned int smem,
-                         CUstream stream, std::vector<void*> arg_ptrs) {
+  inline hipError_t launch(dim3 grid, dim3 block, unsigned int smem,
+                         hipStream_t stream, std::vector<void*> arg_ptrs) {
     return cuLaunchKernel(_kernel, grid.x, grid.y, grid.z, block.x, block.y,
                           block.z, smem, stream, arg_ptrs.data(), NULL);
   }
 
-  inline CUdeviceptr get_constant_ptr(const char *name) const {
-    CUdeviceptr const_ptr = 0;
+  inline hipDeviceptr_t get_constant_ptr(const char *name) const {
+    hipDeviceptr_t const_ptr = 0;
     auto constant = _constant.find(name);
     if (constant != _constant.end()) {
       cuda_safe_call(cuModuleGetGlobal(&const_ptr, 0, _module, constant->second.c_str()));
@@ -2104,7 +2104,7 @@ class KernelLauncher_impl {
   inline KernelLauncher_impl(KernelLauncher_impl const&) = default;
   inline KernelLauncher_impl(KernelLauncher_impl&&) = default;
 #endif
-  inline CUresult launch(
+  inline hipError_t launch(
       jitify::detail::vector<void*> arg_ptrs,
       jitify::detail::vector<std::string> arg_types = 0) const;
 };
@@ -2130,7 +2130,7 @@ class KernelLauncher {
    *    as code-strings. This parameter is optional and is only used to print
    *    out the function signature.
    */
-  inline CUresult launch(
+  inline hipError_t launch(
       std::vector<void*> arg_ptrs = std::vector<void*>(),
       jitify::detail::vector<std::string> arg_types = 0) const {
     return _impl->launch(arg_ptrs, arg_types);
@@ -2142,7 +2142,7 @@ class KernelLauncher {
    *  \see launch
    */
   template <typename... ArgTypes>
-  inline CUresult operator()(ArgTypes... args) const {
+  inline hipError_t operator()(ArgTypes... args) const {
     return this->launch(args...);
   }
   /*! Launch the kernel.
@@ -2150,7 +2150,7 @@ class KernelLauncher {
    *  \param args Function arguments for the kernel.
    */
   template <typename... ArgTypes>
-  inline CUresult launch(ArgTypes... args) const {
+  inline hipError_t launch(ArgTypes... args) const {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
@@ -2209,11 +2209,11 @@ class KernelInstantiation {
           "Kernel pointer is NULL; you may need to define JITIFY_THREAD_SAFE "
           "1");
     }
-    CUresult res = cuOccupancyMaxPotentialBlockSizeWithFlags(
+    hipError_t res = cuOccupancyMaxPotentialBlockSizeWithFlags(
         &grid, &block, func, smem_callback, smem, max_block_size, flags);
-    if (res != CUDA_SUCCESS) {
+    if (res != hipSuccess) {
       const char* msg;
-      cuGetErrorName(res, &msg);
+      msg=hipGetErrorName(res);
       throw std::runtime_error(msg);
     }
     if (smem_callback) {
@@ -2222,7 +2222,7 @@ class KernelInstantiation {
     return this->configure(grid, block, smem, stream);
   }
 
-  inline CUdeviceptr get_constant_ptr(const char *name) const { return _impl->cuda_kernel().get_constant_ptr(name); }
+  inline hipDeviceptr_t get_constant_ptr(const char *name) const { return _impl->cuda_kernel().get_constant_ptr(name); }
 };
 
 /*! An object representing a kernel made up of a Program, a name and options.
@@ -2416,7 +2416,7 @@ inline std::ostream& operator<<(std::ostream& stream, dim3 d) {
   return stream;
 }
 
-inline CUresult KernelLauncher_impl::launch(
+inline hipError_t KernelLauncher_impl::launch(
     jitify::detail::vector<void*> arg_ptrs,
     jitify::detail::vector<std::string> arg_types) const {
 #if JITIFY_PRINT_LAUNCH
@@ -2821,7 +2821,7 @@ inline Lambda<T> make_Lambda(Capture const& capture, std::string func,
  * x*x; } ); \endcode
  */
 template <typename IndexType, class Func>
-CUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
+hipError_t parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
                       Lambda<Func> const& lambda) {
   using namespace jitify;
 
@@ -2832,7 +2832,7 @@ CUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
     for (IndexType i = begin; i < end; i++) {
       lambda._func(i);
     }
-    return CUDA_SUCCESS;  // FIXME - replace with non-CUDA enum type?
+    return hipSuccess;  // FIXME - replace with non-CUDA enum type?
   }
 
   thread_local static JitCache kernel_cache(policy.cache_size);

@@ -1,8 +1,9 @@
+#include "hip/hip_runtime.h"
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
 #include <random_quda.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <quda_internal.h>
 
 #include <comm_quda.h>
@@ -10,10 +11,10 @@
 
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 #define CUDA_SAFE_CALL_NO_SYNC( call) {                                 \
-    cudaError err = call;                                               \
-    if( cudaSuccess != err) {                                           \
+    hipError_t err = call;                                               \
+    if( hipSuccess != err) {                                           \
       fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",     \
-              __FILE__, __LINE__, cudaGetErrorString( err) );           \
+              __FILE__, __LINE__, hipGetErrorString( err) );           \
       exit(EXIT_FAILURE);                                               \
     }                                                                   \
   }
@@ -60,7 +61,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-      curand_init(seed, idd, 0, &state[parity * size_cb + id]);
+      hiprand_init(seed, idd, 0, &state[parity * size_cb + id]);
     }
   }
 
@@ -90,11 +91,11 @@ namespace quda {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateMRG32k3a\n");
 #endif
   }
 
@@ -108,11 +109,11 @@ namespace quda {
     size_cb = size / param.siteSubset;
 
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using hiprandStateMRG32k3a\n");
 #endif
   }
 
@@ -130,7 +131,7 @@ namespace quda {
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
       state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(cuRNGState)));
+      CUDA_SAFE_CALL(hipMemset(state, 0, size * sizeof(cuRNGState)));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                    size * sizeof(cuRNGState) / (float)(1048576));
@@ -154,10 +155,10 @@ namespace quda {
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore() {
-    cudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemcpy(state, backup_state, size * sizeof(cuRNGState), hipMemcpyHostToDevice);
+    if (err != hipSuccess) {
       host_free(backup_state);
-      errorQuda("Failed to restore curand rng states array\n");
+      errorQuda("Failed to restore hiprand rng states array\n");
     }
     host_free(backup_state);
   }
@@ -165,10 +166,10 @@ namespace quda {
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup() {
     backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    cudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMemcpy(backup_state, state, size * sizeof(cuRNGState), hipMemcpyDeviceToHost);
+    if (err != hipSuccess) {
       host_free(backup_state);
-      errorQuda("Failed to backup curand rng states array\n");
+      errorQuda("Failed to backup hiprand rng states array\n");
     }
   }
 

@@ -53,7 +53,7 @@ namespace quda {
     } // block size is checkerboard fine length / full coarse length
     virtual ~RestrictLaunch() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	  RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>

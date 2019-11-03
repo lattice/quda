@@ -28,7 +28,7 @@ namespace quda
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const hipStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -36,11 +36,11 @@ namespace quda
 #ifdef JITIFY
       // we need to break the dslash launch abstraction here to get a handle on the constant memory pointer in the kernel module
       auto instance = Dslash::template kernel_instance<packShmem>();
-      cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
+      hipMemcpyHtoDAsync(instance.get_constant_ptr("quda::mobius_d"), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>),
                         stream);
       Tunable::jitify_error = instance.configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(mobius_d, arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, cudaMemcpyHostToDevice,
+      hipMemcpyToSymbolAsync(HIP_SYMBOL(mobius_d), arg.a_5, QUDA_MAX_DWF_LS * sizeof(complex<real>), 0, hipMemcpyHostToDevice,
                               streams[Nstream - 1]);
       Dslash::template instantiate<packShmem>(tp, stream);
 #endif

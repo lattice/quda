@@ -370,10 +370,10 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  hipEvent_t start, end;
+  hipEventCreate(&start);
+  hipEventCreate(&end);
+  hipEventRecord(start, 0);
 
   {
     switch (kernel) {
@@ -558,12 +558,12 @@ double benchmark(int kernel, const int niter) {
     }
   }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  hipEventRecord(end, 0);
+  hipEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  hipEventElapsedTime(&runTime, start, end);
+  hipEventDestroy(start);
+  hipEventDestroy(end);
   delete[] A;
   delete[] B;
   delete[] C;
@@ -1069,7 +1069,7 @@ int main(int argc, char** argv)
   setVerbosity(verbosity);
 
   // clear the error state
-  cudaGetLastError();
+  hipGetLastError();
 
   // lastly check for correctness
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();

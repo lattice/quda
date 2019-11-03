@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <tune_quda.h>
 #include <gauge_field_order.h>
 
@@ -127,7 +128,7 @@ namespace quda {
     }
     virtual ~CopyGaugeEx() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {

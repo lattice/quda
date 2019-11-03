@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 #include <color_spinor_field_order.h>
@@ -359,7 +360,7 @@ namespace quda
 
       inline __device__ __host__ void init()
       {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
         typedef decltype(a.x) real;
         double3 result = __ldg(Ar3);
         a.y = a.x * (real)(result.y) * ((real)1.0 / (real)result.z);

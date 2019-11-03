@@ -205,7 +205,7 @@ void init(int argc, char **argv)
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 
-    cudaDeviceSynchronize();
+    hipDeviceSynchronize();
     checkCudaError();
 	
     double spinor_norm2 = blas::norm2(*spinor);
@@ -253,10 +253,10 @@ void end(void)
 
 double dslashCUDA(int niter, int mu) {
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  hipEvent_t start, end;
+  hipEventCreate(&start);
+  hipEventRecord(start, 0);
+  hipEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) {
     if (transfer){
@@ -266,20 +266,20 @@ double dslashCUDA(int niter, int mu) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  hipEventCreate(&end);
+  hipEventRecord(end, 0);
+  hipEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  hipEventElapsedTime(&runTime, start, end);
+  hipEventDestroy(start);
+  hipEventDestroy(end);
 
   double secs = runTime / 1000; //stopwatchReadSeconds();
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  hipError_t stat = hipGetLastError();
+  if (stat != hipSuccess)
+    errorQuda("with ERROR: %s\n", hipGetErrorString(stat));
 
   return secs;
 }

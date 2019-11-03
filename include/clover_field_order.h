@@ -558,8 +558,8 @@ namespace quda {
       const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
 	typedef typename TexVectorType<RegType,N>::type TexVector;
-	cudaTextureObject_t tex;
-	cudaTextureObject_t normTex;
+	hipTextureObject_t tex;
+	hipTextureObject_t normTex;
 	const int tex_offset;
 #endif
 	const int volumeCB;
@@ -655,7 +655,7 @@ namespace quda {
 
           norm_type nrm;
           if (isFixed<Float>::value) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
             nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity * norm_offset + chirality * stride + x) :
                                 norm[parity * norm_offset + chirality * stride + x];
 #else
@@ -665,7 +665,7 @@ namespace quda {
 
 #pragma unroll
 	  for (int i=0; i<M; i++) {
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
+#if defined(USE_TEXTURE_OBJECTS) && defined(__HIP_DEVICE_COMPILE__)
 	    if (!huge_alloc) { // use textures unless we have a huge alloc
                                // first do texture load from memory
               TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
@@ -706,7 +706,7 @@ namespace quda {
             for (int i = 0; i < block; i++) scale = fabsf((norm_type)v[i]) > scale ? fabsf((norm_type)v[i]) : scale;
             norm[parity*norm_offset + chirality*stride + x] = scale;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
             RegType scale_inv = __fdividef(fixedMaxValue<Float>::value, scale);
 #else
             RegType scale_inv = fixedMaxValue<Float>::value / scale;
@@ -758,10 +758,10 @@ namespace quda {
 	void save() {
 	  if (backup_h) errorQuda("Already allocated host backup");
 	  backup_h = safe_malloc(bytes);
-	  cudaMemcpy(backup_h, clover, bytes, cudaMemcpyDeviceToHost);
+	  hipMemcpy(backup_h, clover, bytes, hipMemcpyDeviceToHost);
 	  if (norm_bytes) {
 	    backup_norm_h = safe_malloc(norm_bytes);
-	    cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	    hipMemcpy(backup_norm_h, norm, norm_bytes, hipMemcpyDeviceToHost);
 	  }
 	  checkCudaError();
 	}
@@ -770,11 +770,11 @@ namespace quda {
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
-	  cudaMemcpy(clover, backup_h, bytes, cudaMemcpyHostToDevice);
+	  hipMemcpy(clover, backup_h, bytes, hipMemcpyHostToDevice);
 	  host_free(backup_h);
 	  backup_h = nullptr;
 	  if (norm_bytes) {
-	    cudaMemcpy(norm, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+	    hipMemcpy(norm, backup_norm_h, norm_bytes, hipMemcpyHostToDevice);
 	    host_free(backup_norm_h);
 	    backup_norm_h = nullptr;
 	  }
@@ -821,7 +821,7 @@ namespace quda {
 
 	__device__ __host__ inline void load(RegType v[length], int x, int parity) const {
 	  // factor of 0.5 comes from basis change
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	  typedef S<Float,length> structure;
 	  trove::coalesced_ptr<structure> clover_((structure*)clover);
 	  structure v_ = clover_[parity*volumeCB + x];
@@ -832,7 +832,7 @@ namespace quda {
 	}
   
 	__device__ __host__ inline void save(const RegType v[length], int x, int parity) {
-#if defined( __CUDA_ARCH__) && !defined(DISABLE_TROVE)
+#if defined( __HIP_DEVICE_COMPILE__) && !defined(DISABLE_TROVE)
 	  typedef S<Float,length> structure;
 	  trove::coalesced_ptr<structure> clover_((structure*)clover);
 	  structure v_;

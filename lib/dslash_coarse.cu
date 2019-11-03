@@ -214,7 +214,7 @@ namespace quda {
     }
     virtual ~DslashCoarse() { }
 
-    inline void apply(const cudaStream_t &stream) {
+    inline void apply(const hipStream_t &stream) {
 
       if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -313,12 +313,12 @@ namespace quda {
 
     void preTune() {
       saveOut = new char[out.Bytes()];
-      cudaMemcpy(saveOut, out.V(), out.Bytes(), cudaMemcpyDeviceToHost);
+      hipMemcpy(saveOut, out.V(), out.Bytes(), hipMemcpyDeviceToHost);
     }
 
     void postTune()
     {
-      cudaMemcpy(out.V(), saveOut, out.Bytes(), cudaMemcpyHostToDevice);
+      hipMemcpy(out.V(), saveOut, out.Bytes(), hipMemcpyHostToDevice);
       delete[] saveOut;
     }
 
@@ -702,7 +702,7 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const cudaStream_t &stream) {
+   inline void apply(const hipStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");

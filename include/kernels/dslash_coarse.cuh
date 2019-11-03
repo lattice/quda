@@ -1,8 +1,9 @@
+#include "hip/hip_runtime.h"
 #include <gauge_field_order.h>
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <cub_helper.cuh> // for vector_type
-#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
+#if (__COMPUTE_CAPABILITY__ >= 300 || __HIP_DEVICE_COMPILE__ >= 300)
 #include <generics/shfl.h>
 #endif
 
@@ -95,7 +96,7 @@ namespace quda {
      @param parity The site parity
      @param x_cb The checkerboarded site index
    */
-  extern __shared__ float s[];
+  HIP_DYNAMIC_SHARED( float, s)
   template <typename Float, int nDim, int Ns, int Nc, int Mc, int color_stride, int dim_stride, int thread_dir, int thread_dim, bool dagger, DslashType type, typename Arg>
   __device__ __host__ inline void applyDslash(complex<Float> out[], Arg &arg, int x_cb, int src_idx, int parity, int s_row, int color_block, int color_offset) {
     const int their_spinor_parity = (arg.nParity == 2) ? 1-parity : 0;
@@ -104,7 +105,7 @@ namespace quda {
     getCoordsCB(coord, x_cb, arg.dim, arg.X0h, parity);
     coord[4] = src_idx;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     complex<Float> *shared_sum = (complex<Float>*)s;
     if (!thread_dir) {
 #endif
@@ -161,7 +162,7 @@ namespace quda {
 
       } // nDim
 
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
       if (thread_dim > 0) { // only need to write to shared memory if not master thread
 #pragma unroll
 	for (int color_local=0; color_local < Mc; color_local++) {
@@ -170,7 +171,7 @@ namespace quda {
       }
 #endif
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     } else {
 #endif
 
@@ -223,7 +224,7 @@ namespace quda {
 
       } //nDim
 
-#if defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
 
 #pragma unroll
       for (int color_local=0; color_local < Mc; color_local++) {
@@ -233,7 +234,7 @@ namespace quda {
     } // forwards / backwards thread split
 #endif
 
-#ifdef __CUDA_ARCH__ // CUDA path has to recombine the foward and backward results
+#ifdef __HIP_DEVICE_COMPILE__ // CUDA path has to recombine the foward and backward results
     __syncthreads();
 
     // (colorspin * dim_stride + dim * 2 + dir)
@@ -266,7 +267,7 @@ namespace quda {
 
     }
 
-#else // !__CUDA_ARCH__
+#else // !__HIP_DEVICE_COMPILE__
     for (int color_local=0; color_local<Mc; color_local++) out[color_local] *= -arg.kappa;
 #endif
 
@@ -320,7 +321,7 @@ namespace quda {
 
     if (dir==0 && dim==0) {
       const int my_spinor_parity = (arg.nParity == 2) ? parity : 0;
-#if __CUDA_ARCH__ >= 300 // only have warp shuffle on Kepler and above
+#if __HIP_DEVICE_COMPILE__ >= 300 // only have warp shuffle on Kepler and above
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {
@@ -332,7 +333,7 @@ namespace quda {
 	  out[color_local] += __shfl_down_sync(WARP_CONVERGED, out[color_local], offset);
       }
 
-#endif // __CUDA_ARCH__ >= 300
+#endif // __HIP_DEVICE_COMPILE__ >= 300
 
 #pragma unroll
       for (int color_local=0; color_local<Mc; color_local++) {

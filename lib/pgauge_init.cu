@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -80,10 +81,10 @@ namespace quda {
     ~InitGaugeCold () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const hipStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
-      //cudaDeviceSynchronize();
+      //hipDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {
@@ -245,7 +246,7 @@ namespace quda {
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( curand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    stheta = ( hiprand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
@@ -384,10 +385,10 @@ namespace quda {
     ~InitGaugeHot () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const hipStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
-      //cudaDeviceSynchronize();
+      //hipDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {

@@ -415,13 +415,13 @@ namespace quda {
     void zeroPad();
 
 #ifdef USE_TEXTURE_OBJECTS
-    cudaTextureObject_t tex;
-    cudaTextureObject_t evenTex;
-    cudaTextureObject_t oddTex;
-    cudaTextureObject_t phaseTex;
-    cudaTextureObject_t evenPhaseTex;
-    cudaTextureObject_t oddPhaseTex;
-    void createTexObject(cudaTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
+    hipTextureObject_t tex;
+    hipTextureObject_t evenTex;
+    hipTextureObject_t oddTex;
+    hipTextureObject_t phaseTex;
+    hipTextureObject_t evenPhaseTex;
+    hipTextureObject_t oddPhaseTex;
+    void createTexObject(hipTextureObject_t &tex, void *gauge, bool full, bool isPhase=false);
     void destroyTexObject();
 #endif
 
@@ -479,7 +479,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, hipStream_t *stream_p=nullptr);
 
     /**
        @brief Wait for communication to complete
@@ -552,11 +552,11 @@ namespace quda {
     const void *Odd_p() const { return odd; }
 
 #ifdef USE_TEXTURE_OBJECTS
-    const cudaTextureObject_t& Tex() const { return tex; }
-    const cudaTextureObject_t& EvenTex() const { return evenTex; }
-    const cudaTextureObject_t& OddTex() const { return oddTex; }
-    const cudaTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
-    const cudaTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
+    const hipTextureObject_t& Tex() const { return tex; }
+    const hipTextureObject_t& EvenTex() const { return evenTex; }
+    const hipTextureObject_t& OddTex() const { return oddTex; }
+    const hipTextureObject_t& EvenPhaseTex() const { return evenPhaseTex; }
+    const hipTextureObject_t& OddPhaseTex() const { return oddPhaseTex; }
 #endif
 
     void setGauge(void* _gauge); //only allowed when create== QUDA_REFERENCE_FIELD_CREATE

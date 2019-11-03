@@ -1,8 +1,9 @@
+#include "hip/hip_runtime.h"
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 
@@ -350,7 +351,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -358,7 +359,7 @@ namespace {
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
     void postTune() {
       if (arg.in.gauge == arg.out.gauge) arg.out.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      hipMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const {
@@ -440,7 +441,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -448,7 +449,7 @@ namespace {
     void preTune() { arg.u.save(); }
     void postTune() {
       arg.u.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      hipMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const { return 0; } // depends on number of iterations

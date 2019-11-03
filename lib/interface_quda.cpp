@@ -40,7 +40,7 @@
 #include <nvml.h>
 #endif
 
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 
 #include <ks_force_quda.h>
 
@@ -77,7 +77,7 @@
 #include <momentum.h>
 
 
-#include <cuda_profiler_api.h>
+#include <hip/hip_profile.h>
 
 using namespace quda;
 
@@ -154,8 +154,8 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
-cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+hipDeviceProp_t deviceProp;
+hipStream_t *streams;
 
 static bool initialized = false;
 
@@ -289,14 +289,14 @@ static void profilerStart(const char *f) {
   static int target_count = 0;
   static unsigned int i = 0;
   if (do_not_profile_quda){
-    cudaProfilerStop();
+    hipProfilerStop();
     printfQuda("Stopping profiling in QUDA\n");
   } else {
     if (enable) {
       if (i < target_list.size() && target_count++ == target_list[i]) {
         enable_profiler = true;
         printfQuda("Starting profiling for %s\n", f);
-        cudaProfilerStart();
+        hipProfilerStart();
       i++; // advance to next target
     }
   }
@@ -305,12 +305,12 @@ static void profilerStart(const char *f) {
 
 static void profilerStop(const char *f) {
   if(do_not_profile_quda){
-    cudaProfilerStart();
+    hipProfilerStart();
   } else {
 
     if (enable_profiler) {
       printfQuda("Stopping profiling for %s\n", f);
-      cudaProfilerStop();
+      hipProfilerStop();
       enable_profiler = false;
     }
   }
@@ -500,11 +500,11 @@ void initQudaDevice(int dev) {
   }
 
   int driver_version;
-  cudaDriverGetVersion(&driver_version);
+  hipDriverGetVersion(&driver_version);
   printfQuda("CUDA Driver version = %d\n", driver_version);
 
   int runtime_version;
-  cudaRuntimeGetVersion(&runtime_version);
+  hipRuntimeGetVersion(&runtime_version);
   printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -533,13 +533,13 @@ void initQudaDevice(int dev) {
 #endif
 
   int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
+  hipGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
     errorQuda("No CUDA devices found");
   }
 
   for(int i=0; i<deviceCount; i++) {
-    cudaGetDeviceProperties(&deviceProp, i);
+    hipGetDeviceProperties(&deviceProp, i);
     checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
@@ -557,7 +557,7 @@ void initQudaDevice(int dev) {
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
 
-  cudaGetDeviceProperties(&deviceProp, dev);
+  hipGetDeviceProperties(&deviceProp, dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
@@ -596,7 +596,7 @@ void initQudaDevice(int dev) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
 #ifndef USE_QDPJIT
-  cudaSetDevice(dev);
+  hipSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
@@ -613,9 +613,9 @@ void initQudaDevice(int dev) {
 
 
 
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  // cudaGetDeviceProperties(&deviceProp, dev);
+  hipDeviceSetCacheConfig(hipFuncCachePreferL1);
+  //hipDeviceSetSharedMemConfig(hipSharedMemBankSizeEightByte);
+  // hipGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -643,15 +643,15 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new hipStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;
-  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+  hipDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+    hipStreamCreateWithPriority(&streams[i], hipStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+  hipStreamCreateWithPriority(&streams[Nstream-1], hipStreamDefault, leastPriority);
 
   checkCudaError();
   createDslashEvents();
@@ -662,7 +662,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  hipHostGetDevicePointer((void **)&num_failures_d, num_failures_h, 0);
 
   loadTuneCache();
 
@@ -1144,10 +1144,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), hipMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), hipMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
@@ -1478,7 +1478,7 @@ void endQuda(void)
   num_failures_d = nullptr;
 
   if (streams) {
-    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
+    for (int i=0; i<Nstream; i++) hipStreamDestroy(streams[i]);
     delete []streams;
     streams = nullptr;
   }
@@ -1541,7 +1541,7 @@ void endQuda(void)
   char *device_reset_env = getenv("QUDA_DEVICE_RESET");
   if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
     // end this CUDA context
-    cudaDeviceReset();
+    hipDeviceReset();
   }
 
 }
@@ -4483,7 +4483,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  hipMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -5047,12 +5047,12 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
 void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
+  hipHostRegister(ptr, *bytes, hipHostRegisterDefault);
   checkCudaError();
 }
 
 void unregister_pinned_quda_(void *ptr) {
-  cudaHostUnregister(ptr);
+  hipHostUnregister(ptr);
   checkCudaError();
 }
 
@@ -5691,7 +5691,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_result, d_result, data_bytes, hipMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);
@@ -5769,7 +5769,7 @@ double qChargeDensityQuda(void *h_qDensity)
   profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileQCharge.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_qDensity, d_qDensity, size, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_qDensity, d_qDensity, size, hipMemcpyDeviceToHost);
   profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
 
   profileQCharge.TPSTART(QUDA_PROFILE_FREE);

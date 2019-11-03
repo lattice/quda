@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /*
   Spinor reordering and copying routines.  These are implemented to
   un on both CPU and GPU.  Here we are templating on the following:
@@ -172,7 +173,7 @@ namespace quda {
     }
     virtual ~CopyColorSpinor() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	copyColorSpinor<FloatOut, FloatIn, Ns, Nc>(arg, PreserveBasis<Ns,Nc>());
       } else {
@@ -223,7 +224,7 @@ namespace quda {
     }
     virtual ~CopyColorSpinor() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
 	if (out.GammaBasis()==in.GammaBasis()) {
 	  copyColorSpinor<FloatOut, FloatIn, Ns, Nc>(arg, PreserveBasis<Ns,Nc>());

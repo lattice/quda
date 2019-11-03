@@ -147,7 +147,7 @@ namespace quda
 
 
   /**
-   * Under CUDA 4.0, cudaHostRegister seems to require that both the
+   * Under CUDA 4.0, hipHostRegister seems to require that both the
    * beginning and end of the buffer be aligned on page boundaries.
    * This local function takes care of the alignment and gets called
    * by pinned_malloc_() and mapped_malloc_()
@@ -195,7 +195,7 @@ namespace quda
   }
 
   /**
-   * Perform a standard cudaMalloc() with error-checking.  This
+   * Perform a standard hipMalloc() with error-checking.  This
    * function should only be called via the device_malloc() macro,
    * defined in malloc_quda.h
    */
@@ -209,13 +209,13 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    cudaError_t err = cudaMalloc(&ptr, size);
-    if (err != cudaSuccess) {
+    hipError_t err = hipMalloc(&ptr, size);
+    if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
 #else
@@ -226,9 +226,9 @@ namespace quda
 
 
   /**
-   * Perform a cuMemAlloc with error-checking.  This function is to
+   * Perform a hipMalloc with error-checking.  This function is to
    * guarantee a unique memory allocation on the device, since
-   * cudaMalloc can be redirected (as is the case with QDPJIT).  This
+   * hipMalloc can be redirected (as is the case with QDPJIT).  This
    * should only be called via the device_pinned_malloc() macro,
    * defined in malloc_quda.h.
    */
@@ -241,13 +241,13 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    CUresult err = cuMemAlloc((CUdeviceptr*)&ptr, size);
-    if (err != CUDA_SUCCESS) {
+    hipError_t err = hipMalloc((hipDeviceptr_t*)&ptr, size);
+    if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -278,7 +278,7 @@ namespace quda
    * should only be called via the pinned_malloc() macro, defined in
    * malloc_quda.h
    *
-   * Note that we do not rely on cudaHostAlloc(), since buffers
+   * Note that we do not rely on hipHostMalloc(), since buffers
    * allocated in this way have been observed to cause problems when
    * shared with MPI via GPU Direct on some systems.
    */
@@ -287,8 +287,8 @@ namespace quda
     MemAlloc a(func, file, line);
     void *ptr = aligned_malloc(a, size);
     
-    cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterDefault);
-    if (err != cudaSuccess) {
+    hipError_t err = hipHostRegister(ptr, a.base_size, hipHostRegisterDefault);
+    if (err != hipSuccess) {
       errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(PINNED, a, ptr);
@@ -311,12 +311,12 @@ namespace quda
 
 #ifdef HOST_ALLOC
     void *ptr;
-    cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
-    if (err != cudaSuccess) { errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
+    hipError_t err = hipHostMalloc(&ptr, size, hipHostRegisterMapped | hipHostRegisterPortable);
+    if (err != hipSuccess) { errorQuda("hipHostMalloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
 #else
     void *ptr = aligned_malloc(a, size);
-    cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
-    if (err != cudaSuccess) {
+    hipError_t err = hipHostRegister(ptr, a.base_size, hipHostRegisterMapped);
+    if (err != hipSuccess) {
       errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
 #endif
@@ -339,13 +339,13 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    cudaError_t err = cudaMallocManaged(&ptr, size);
-    if (err != cudaSuccess) {
+    hipError_t err = cudaMallocManaged(&ptr, size);
+    if (err != hipSuccess) {
       errorQuda("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
-    cudaMemset(ptr, 0xff, size);
+    hipMemset(ptr, 0xff, size);
 #endif
     return ptr;
   }
@@ -367,8 +367,8 @@ namespace quda
     if (!alloc[DEVICE].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    cudaError_t err = cudaFree(ptr);
-    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    hipError_t err = hipFree(ptr);
+    if (err != hipSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE, ptr);
 #else
     device_pinned_free_(func, file, line, ptr);
@@ -392,8 +392,8 @@ namespace quda
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    CUresult err = cuMemFree((CUdeviceptr)ptr);
-    if (err != CUDA_SUCCESS) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    hipError_t err = hipFree((hipDeviceptr_t)ptr);
+    if (err != hipSuccess) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
 
@@ -408,8 +408,8 @@ namespace quda
     if (!alloc[MANAGED].count(ptr)) {
       errorQuda("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
     }
-    cudaError_t err = cudaFree(ptr);
-    if (err != cudaSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    hipError_t err = hipFree(ptr);
+    if (err != hipSuccess) { errorQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(MANAGED, ptr);
   }
 
@@ -425,17 +425,17 @@ namespace quda
       track_free(HOST, ptr);
       free(ptr);
     } else if (alloc[PINNED].count(ptr)) {
-      cudaError_t err = cudaHostUnregister(ptr);
-      if (err != cudaSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
+      hipError_t err = hipHostUnregister(ptr);
+      if (err != hipSuccess) { errorQuda("Failed to unregister pinned memory (%s:%d in %s())\n", file, line, func); }
       track_free(PINNED, ptr);
       free(ptr);
     } else if (alloc[MAPPED].count(ptr)) {
 #ifdef HOST_ALLOC
-      cudaError_t err = cudaFreeHost(ptr);
-      if (err != cudaSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
+      hipError_t err = hipHostFree(ptr);
+      if (err != hipSuccess) { errorQuda("Failed to free host memory (%s:%d in %s())\n", file, line, func); }
 #else
-      cudaError_t err = cudaHostUnregister(ptr);
-      if (err != cudaSuccess) {
+      hipError_t err = hipHostUnregister(ptr);
+      if (err != hipSuccess) {
         errorQuda("Failed to unregister host-mapped memory (%s:%d in %s())\n", file, line, func);
       }
       free(ptr);
@@ -476,24 +476,24 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr) {
 
-    CUpointer_attribute attribute[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
-    CUmemorytype mem_type;
+    hipPointerAttribute_t attribute;//[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
+    hipMemoryType mem_type;
     void *data[] = { &mem_type };
-    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));
-    if (error != CUDA_SUCCESS) {
+    hipError_t error = hipPointerGetAttributes(&attribute,ptr);mem_type=attribute.memoryType;
+    if (error != hipSuccess) {
       const char *string;
-      cuGetErrorString(error, &string);
+      string=hipGetErrorString(error);
       errorQuda("cuPointerGetAttributes failed with error %s", string);
     }
 
     // catch pointers that have not been created in CUDA
-    if (mem_type == 0) mem_type = CU_MEMORYTYPE_HOST;
+    if (mem_type == 0) mem_type = hipMemoryTypeHost;
 
     switch (mem_type) {
-    case CU_MEMORYTYPE_DEVICE:
-    case CU_MEMORYTYPE_UNIFIED:
+    case hipMemoryTypeDevice:
+    case hipMemoryTypeUnified:
       return QUDA_CUDA_FIELD_LOCATION;
-    case CU_MEMORYTYPE_HOST:
+    case hipMemoryTypeHost:
       return QUDA_CPU_FIELD_LOCATION;
     default:
       errorQuda("Unknown memory type %d", mem_type);

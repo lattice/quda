@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
@@ -24,7 +25,7 @@ namespace quda
 #ifdef SHARED_ACCUMULATOR
 
 #define DECLARE_LINK(U)                                                                                                \
-  extern __shared__ int s[];                                                                                           \
+  HIP_DYNAMIC_SHARED( int, s)                                                                                           \
   real *U = (real *)s;                                                                                                 \
   {                                                                                                                    \
     const int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;                               \
@@ -81,7 +82,7 @@ namespace quda
 #define DECLARE_ARRAY(d, idx)                                                                                          \
   unsigned char *d;                                                                                                    \
   {                                                                                                                    \
-    extern __shared__ int s[];                                                                                         \
+    HIP_DYNAMIC_SHARED( int, s)                                                                                         \
     int tid = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;                                     \
     int block = blockDim.x * blockDim.y * blockDim.z;                                                                  \
     int offset = 18 * block * sizeof(real) / sizeof(int) + idx * block + tid;                                          \

@@ -20,7 +20,7 @@ namespace quda
     */
     inline __device__ __host__ complex<real> a5(int s)
     {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
       return reinterpret_cast<const complex<real> *>(mobius_d)[s];
 #else
       return a_5[s];

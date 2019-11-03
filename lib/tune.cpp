@@ -719,8 +719,8 @@ namespace quda {
 	 can't guarantee that all nodes are partaking */
       if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
 	TuneParam best_param;
-	cudaError_t error = cudaSuccess;
-	cudaEvent_t start, end;
+	hipError_t error = hipSuccess;
+	hipEvent_t start, end;
 	float elapsed_time, best_time;
 	time_t now;
 
@@ -731,8 +731,8 @@ namespace quda {
 	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
 	tunable.preTune();
 
-	cudaEventCreate(&start);
-	cudaEventCreate(&end);
+	hipEventCreate(&start);
+	hipEventCreate(&end);
 
 	if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
@@ -743,8 +743,8 @@ namespace quda {
 
         tunable.initTuneParam(param);
 	while (tuning) {
-	  cudaDeviceSynchronize();
-	  cudaGetLastError(); // clear error counter
+	  hipDeviceSynchronize();
+	  hipGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
 	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
@@ -755,45 +755,45 @@ namespace quda {
 		       param.aux.x, param.aux.y, param.aux.z);
 	  }
 
-	  cudaEventRecord(start, 0);
+	  hipEventRecord(start, 0);
 	  for (int i=0; i<tunable.tuningIter(); i++) {
 	    tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	  }
-	  cudaEventRecord(end, 0);
-	  cudaEventSynchronize(end);
-	  cudaEventElapsedTime(&elapsed_time, start, end);
-	  cudaDeviceSynchronize();
-	  error = cudaGetLastError();
+	  hipEventRecord(end, 0);
+	  hipEventSynchronize(end);
+	  hipEventElapsedTime(&elapsed_time, start, end);
+	  hipDeviceSynchronize();
+	  error = hipGetLastError();
 
 	  { // check that error state is cleared
-	    cudaDeviceSynchronize();
-	    cudaError_t error = cudaGetLastError();
-	    if (error != cudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
+	    hipDeviceSynchronize();
+	    hipError_t error = hipGetLastError();
+	    if (error != hipSuccess) errorQuda("Failed to clear error state %s\n", hipGetErrorString(error));
 	  }
 
 	  elapsed_time /= (1e3 * tunable.tuningIter());
-	  if ( (elapsed_time < best_time) && (error == cudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS) ) {
+	  if ( (elapsed_time < best_time) && (error == hipSuccess) && (tunable.jitifyError() == hipSuccess) ) {
 	    best_time = elapsed_time;
 	    best_param = param;
 	  }
 	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
+	    if (error == hipSuccess && tunable.jitifyError() == hipSuccess) {
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
             } else {
-	      if (tunable.jitifyError() == CUDA_SUCCESS) {
+	      if (tunable.jitifyError() == hipSuccess) {
                 // if not jitify error must be regular error
-		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
+		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), hipGetErrorString(error));
 	      } else {
                 // else is a jitify error
 		const char *str;
-		cuGetErrorString(tunable.jitifyError(), &str);
+		str=hipGetErrorString(tunable.jitifyError());
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
 	      }
             }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
-	  tunable.jitifyError() = CUDA_SUCCESS;
+	  tunable.jitifyError() = hipSuccess;
 	}
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);
@@ -811,8 +811,8 @@ namespace quda {
 	best_param.comment += ctime(&now); // includes a newline
 	best_param.time = best_time;
 
-	cudaEventDestroy(start);
-	cudaEventDestroy(end);
+	hipEventDestroy(start);
+	hipEventDestroy(end);
 
 	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
 	tunable.postTune();

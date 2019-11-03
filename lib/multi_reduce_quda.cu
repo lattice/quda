@@ -12,14 +12,14 @@ namespace quda {
 
   namespace blas {
 
-    cudaStream_t* getStream();
-    cudaEvent_t* getReduceEvent();
+    hipStream_t* getStream();
+    hipEvent_t* getReduceEvent();
     bool getFastReduce();
     void initFastReduce(int words);
     void completeFastReduce(int32_t words);
 
     template <typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const hipStream_t &stream, Tunable &tunable)
     {
 
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
@@ -50,13 +50,13 @@ namespace quda {
             completeFastReduce(words);
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
-            while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
+            while (hipSuccess != qudaEventQuery(*getReduceEvent())) {}
           }
         } else
 #endif
         {
           qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z * sizeof(ReduceType) * NXZ * arg.NYW,
-              cudaMemcpyDeviceToHost);
+              hipMemcpyDeviceToHost);
         }
       }
 
@@ -158,7 +158,7 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const hipStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         multiReduceLaunch<doubleN, ReduceType, FloatN, M, NXZ>(result, arg, tp, stream, *this);
@@ -291,7 +291,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice,
+        hipMemcpyToSymbolAsync(HIP_SYMBOL(Amatrix_d), A, NXZ * NYW * sizeof(decltype(A[0])), 0, hipMemcpyHostToDevice,
                                 *getStream());
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
       }
@@ -303,7 +303,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice,
+        hipMemcpyToSymbolAsync(HIP_SYMBOL(Bmatrix_d), B, NXZ * NYW * sizeof(decltype(B[0])), 0, hipMemcpyHostToDevice,
                                 *getStream());
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
       }
@@ -315,7 +315,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice,
+        hipMemcpyToSymbolAsync(HIP_SYMBOL(Cmatrix_d), C, NXZ * NYW * sizeof(decltype(C[0])), 0, hipMemcpyHostToDevice,
                                 *getStream());
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
@@ -952,7 +952,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const hipStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -1106,7 +1106,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const hipStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

@@ -11,7 +11,7 @@
 
 using namespace quda;
 
-extern cudaStream_t *stream;
+extern hipStream_t *stream;
   
 /**************************************************************
  * Staple exchange routine

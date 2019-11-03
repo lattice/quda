@@ -360,7 +360,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   // printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  cudaDeviceSynchronize();
+  hipDeviceSynchronize();
   checkCudaError();
 
   tmp = new cudaColorSpinorField(csParam);
@@ -438,13 +438,13 @@ DslashTime dslashCUDA(int niter) {
   DslashTime dslash_time;
   timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  hipEvent_t start, end;
+  hipEventCreate(&start);
+  hipEventRecord(start, 0);
+  hipEventSynchronize(start);
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  hipEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
 
@@ -470,20 +470,20 @@ DslashTime dslashCUDA(int niter) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  hipEventCreate(&end);
+  hipEventRecord(end, 0);
+  hipEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  hipEventElapsedTime(&runTime, start, end);
+  hipEventDestroy(start);
+  hipEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
-    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  hipError_t stat = hipGetLastError();
+  if (stat != hipSuccess)
+    errorQuda("with ERROR: %s\n", hipGetErrorString(stat));
 
   return dslash_time;
 }

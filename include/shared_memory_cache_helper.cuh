@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #pragma once
 
 /**
@@ -27,7 +28,7 @@ namespace quda
      */
     __device__ inline real *cache()
     {
-      extern __shared__ int cache_[];
+      HIP_DYNAMIC_SHARED( int, cache_)
       return reinterpret_cast<real *>(cache_);
     }
 

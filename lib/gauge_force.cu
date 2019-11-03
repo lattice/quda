@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>
@@ -40,7 +41,7 @@ namespace quda {
       // path_coeff array
       memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int), path_coeff_h, num_paths*sizeof(double));
 
-      qudaMemcpy(buffer, path_h, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(buffer, path_h, bytes, hipMemcpyHostToDevice);
       host_free(path_h);
 
       // finally set the pointers to the correct offsets in the buffer
@@ -88,7 +89,7 @@ namespace quda {
 
   // this ensures that array elements are held in cache
   template <typename T> constexpr T cache(const T *ptr, int idx) {
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     return __ldg(ptr+idx);
 #else
     return ptr[idx];
@@ -109,8 +110,8 @@ namespace quda {
     //linkB: the loaded matrix in this round
     Link linkA, linkB, staple;
 
-#ifdef __CUDA_ARCH__
-    extern __shared__ int s[];
+#ifdef __HIP_DEVICE_COMPILE__
+    HIP_DYNAMIC_SHARED( int, s)
     int tid = (threadIdx.z*blockDim.y + threadIdx.y)*blockDim.x + threadIdx.x;
     s[tid] = 0;
     signed char *dx = (signed char*)&s[tid];
@@ -210,7 +211,7 @@ namespace quda {
       checkCudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugeForceKernel<decltype(arg)><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }

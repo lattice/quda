@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef _GAUGE_FIX_OVR_HIT_DEVF_H
 #define _GAUGE_FIX_OVR_HIT_DEVF_H
 
@@ -15,13 +16,13 @@ namespace quda {
   {
     __device__ inline operator T*()
     {
-      extern __shared__ int __smem[];
+      HIP_DYNAMIC_SHARED( int, __smem)
       return (T*)__smem;
     }
 
     __device__ inline operator const T*() const
     {
-      extern __shared__ int __smem[];
+      HIP_DYNAMIC_SHARED( int, __smem)
       return (T*)__smem;
     }
   };

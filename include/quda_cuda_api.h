@@ -1,8 +1,8 @@
 #pragma once
 
 #ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime.h>
 #include <quda_cuda_api.h>
 
 /**
@@ -15,7 +15,7 @@
 namespace quda {
 
   /**
-     @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
+     @brief Wrapper around hipMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
      @param[out] dst Destination pointer
@@ -23,7 +23,7 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, hipMemcpyKind kind,
 		   const char *func, const char *file, const char *line);
 
 }
@@ -46,7 +46,7 @@ namespace quda {
 namespace quda {
 
   /**
-     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
+     @brief Wrapper around hipMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
@@ -54,11 +54,11 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, hipMemcpyKind kind, const hipStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     @brief Wrapper around hipMemcpy2DAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
@@ -70,11 +70,11 @@ namespace quda {
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, cudaMemcpyKind kind, const cudaStream_t &stream,
+                          size_t width, size_t hieght, hipMemcpyKind kind, const hipStream_t &stream,
                           const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaLaunchKernel
+     @brief Wrapper around hipLaunchKernel
      @param[in] func Device function symbol
      @param[in] gridDim Grid dimensions
      @param[in] blockDim Block dimensions
@@ -82,46 +82,46 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream);
+  hipError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, hipStream_t stream);
 
   /**
-     @brief Wrapper around cudaEventQuery or cuEventQuery
+     @brief Wrapper around hipEventQuery or hipEventQuery
      @param[in] event Event we are querying
      @return Status of event query
    */
-  cudaError_t qudaEventQuery(cudaEvent_t &event);
+  hipError_t qudaEventQuery(hipEvent_t &event);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
+     @brief Wrapper around hipEventRecord or hipEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream=0);
+  hipError_t qudaEventRecord(hipEvent_t &event, hipStream_t stream=0);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
+     @brief Wrapper around hipEventRecord or hipEventRecord
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
-  cudaError_t qudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags);
+  hipError_t qudaStreamWaitEvent(hipStream_t stream, hipEvent_t event, unsigned int flags);
 
   /**
-     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
+     @brief Wrapper around hipStreamSynchronize or hipStreamSynchronize
      @param[in] stream Stream which we are synchronizing with respect to
    */
-  cudaError_t qudaStreamSynchronize(cudaStream_t &stream);
+  hipError_t qudaStreamSynchronize(hipStream_t &stream);
 
   /**
-     @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
+     @brief Wrapper around hipEventSynchronize or hipEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
    */
-  cudaError_t qudaEventSynchronize(cudaEvent_t &event);
+  hipError_t qudaEventSynchronize(hipEvent_t &event);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
+     @brief Wrapper around hipDeviceSynchronize or cuDeviceSynchronize
    */
-  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
+  hipError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
 #if CUDA_VERSION >= 9000
   /**
@@ -130,7 +130,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+  hipError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
 #endif
 
   /**

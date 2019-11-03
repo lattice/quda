@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <fast_intdiv.h>
@@ -50,7 +51,7 @@ namespace quda {
     Float thread_max = 0.0;
     Float site_max = active ? 0.0 : 1.0;
 
-#ifdef __CUDA_ARCH__
+#ifdef __HIP_DEVICE_COMPILE__
     // workout how big a shared-memory allocation we need
     // just statically compute the largest size needed to avoid templating on block size
     constexpr int max_block_size = 1024; // all supported GPUs have 1024 as their max block size
