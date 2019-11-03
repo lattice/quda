@@ -1,0 +1,12 @@
+*.o
+*.f90
+*.mod
+*.a
+*~
+*.pyc
+build*
+.nfs*
+.cproject
+.project
+.settings/
+.DS_Store

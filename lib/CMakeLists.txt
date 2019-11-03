@@ -113,9 +113,9 @@ endif()
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-  cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  hip_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 else()
-  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  hip_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
 # include_directories

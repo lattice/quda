@@ -299,7 +299,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -D__STRICT_ANSI__ -O3 -Wall ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -343,6 +343,12 @@ set(CMAKE_C_FLAGS_SANITIZE
 enable_language(C)
 # do all the build definitions
 #
+
+find_package(HIP)
+if(HIP_FOUND)
+    message(STATUS "Found HIP: " ${HIP_VERSION})
+endif(HIP_FOUND)
+
 
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
 
@@ -661,6 +667,8 @@ if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
 
+
+
 if(QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)
   add_definitions(-DGPU_MULTIGRID)
@@ -737,7 +745,7 @@ if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
-  list(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
+  list(APPEND QUDA_LIBS ${HIP_rocfft_LIBRARY} ${HIP_hiprand_LIBRARY} ${HIP_rocfft-device_LIBRARY} ${HIP_hipblas_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_MPI_NVTX)
@@ -852,7 +860,8 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc
-find_package(CUDAWrapper)
+#find_package(CUDAWrapper)
+find_package(AMDDeviceLibs REQUIRED CONFIG)
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -870,10 +879,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
 endif()
-file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
-string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
+#file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
+#string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+#string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+#set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
+set(HASH x64_64.quda_dev_rocm.hip2.8.19354)
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
