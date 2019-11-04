@@ -184,13 +184,13 @@ namespace quda {
       if (space && space->evecs.size() != 0) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if (param.eig_param.nConv != space->evecs.size())
+        if (param.eig_param.nConv != (int)space->evecs.size())
           errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(), param.eig_param.nConv);
 
         // move vectors from preserved space to local space
         for (auto &vec : space->evecs) evecs.push_back(vec);
 
-        if (param.eig_param.nConv != space->evals.size())
+        if (param.eig_param.nConv != (int)space->evals.size())
           errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
 
         // move vectors from preserved space to local space
