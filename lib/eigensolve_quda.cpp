@@ -872,34 +872,43 @@ namespace quda
         kSpace.push_back(ColorSpinorField::Create(csParam));
       }
     }
-
-    // Array for multi-BLAS axpy
-    double *ritz_mat_col = (double *)safe_malloc((dim - 1) * sizeof(double));
-
-    for (int i = 0; i < iter_keep; i++) {
-      int k = offset + i;
-      *r[0] = *kSpace[num_locked];
-      blas::ax(ritz_mat[dim * i], *r[0]);
-      *kSpace[k] = *r[0];
-
-      // Pointers to the relevant vectors
-      std::vector<ColorSpinorField *> vecs_ptr;
-      std::vector<ColorSpinorField *> kSpace_ptr;
-      kSpace_ptr.push_back(kSpace[k]);
-      for (int j = 1; j < dim; j++) {
-        vecs_ptr.push_back(kSpace[num_locked + j]);
-        ritz_mat_col[j - 1] = ritz_mat[i * dim + j];
-      }
-
-      // Multi-BLAS axpy
-      blas::axpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("dim = %d\n", dim);
+      printfQuda("iter_keep = %d\n", iter_keep);
+      printfQuda("kSpace = %d\n", (int)kSpace.size());    
+      printfQuda("Modifying vectors %d - %d\n", offset, offset + iter_keep-1);
+      printfQuda("Putting data into vectors %d - %d\n", num_locked + 1, num_locked + dim-1);
     }
 
-    host_free(ritz_mat_col);
+    // Pointers to the relevant vectors
+    std::vector<ColorSpinorField *> vecs_ptr;
+    std::vector<ColorSpinorField *> kSpace_ptr;
 
-    for (int i = 0; i < iter_keep; i++) *kSpace[i + num_locked] = *kSpace[offset + i];
-    *kSpace[num_locked + iter_keep] = *kSpace[nKr];
+    // Array for multiBLAS axpy
+    double *ritz_mat_keep = (double *)safe_malloc((dim*iter_keep) * sizeof(double));
+    for (int i = 0; i < iter_keep; i++) {
+      kSpace_ptr.push_back(kSpace[offset+i]);
+      blas::zero(*kSpace_ptr[i]);
+    }    
+    for (int j = 0; j < dim; j++) {
+      vecs_ptr.push_back(kSpace[num_locked + j]);
+      for (int i = 0; i < iter_keep; i++) {
+	ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j];
+      }
+    }
+    
+    // multiBLAS axpy
+    blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
+    
+    host_free(ritz_mat_keep);
+    
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Copying vectors %d - %d to %d - %d\n", offset, offset+iter_keep-1, num_locked, num_locked + iter_keep-1);
+    for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
+    
+    //Update residual vector
+    std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
 
+    //Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
   }
 } // namespace quda
