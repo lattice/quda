@@ -278,9 +278,9 @@ namespace quda
     left_vecs.reserve(n_defl);
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs.push_back(evecs[i]);
 
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    std::vector<Complex> s(n_defl * src.size());
     std::vector<ColorSpinorField *> src_ = const_cast<decltype(src)&>(src);
-    blas::cDotProduct(s, left_vecs, src_);
+    blas::cDotProduct(s.data(), left_vecs, src_);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
@@ -292,9 +292,7 @@ namespace quda
       right_vecs.push_back(evecs[i]);
       s[i] /= evals[i].real();
     }
-    blas::caxpy(s, right_vecs, sol);
-
-    host_free(s);
+    blas::caxpy(s.data(), right_vecs, sol);
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -344,18 +342,16 @@ namespace quda
     for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
+    std::vector<Complex> s(n_defl * src.size());
     std::vector<ColorSpinorField *> src_ = const_cast<decltype(src)&>(src);
-    blas::cDotProduct(s, eig_vecs, src_);
+    blas::cDotProduct(s.data(), eig_vecs, src_);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
     if (!accumulate) for (auto &x : sol) blas::zero(*x);
-    blas::caxpy(s, eig_vecs, sol);
-
-    host_free(s);
+    blas::caxpy(s.data(), eig_vecs, sol);
   }
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
