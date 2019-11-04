@@ -212,9 +212,6 @@ namespace quda {
         for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
       }
     }
-    // Construct vectors to hold deflated RHS
-    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
-    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
 
     deflate_init = true;
 
@@ -249,10 +246,6 @@ namespace quda {
       }
 
       evecs.resize(0);
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-      defl_tmp1.resize(0);
-      defl_tmp2.resize(0);
       deflate_init = false;
     }
   }

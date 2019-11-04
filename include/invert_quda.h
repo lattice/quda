@@ -466,10 +466,6 @@ namespace quda {
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField *> evecs;     /** Holds the eigenvectors. */
     std::vector<Complex> evals;                /** Holds the eigenvalues. */
-    std::vector<ColorSpinorField *> defl_tmp1; /** temp space needed for deflation. */
-    std::vector<ColorSpinorField *> defl_tmp2; /** temp space needed for deflation. */
-
-    // friend void MG::destroyCoarseSolver();
 
   public:
     Solver(SolverParam &param, TimeProfile &profile);
