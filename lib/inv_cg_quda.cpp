@@ -369,30 +369,10 @@ namespace quda {
     }
 
     if (param.deflate && param.maxiter > 1) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b.
-      blas::copy(*defl_tmp2[0], r);
-      rhs.push_back(defl_tmp2[0]);
-
-      // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
-
-      // Compute r_defl = RHS - A * LHS
-      blas::copy(x, *defl_tmp1[0]); // prec copy
-      mat(r, x);
-
-      blas::copy(x, *rhs[0]); // prec copy
-      r2 = blas::xmyNorm(x, r);
-
-      blas::copy(x, *defl_tmp1[0]); // prec copy
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        // xand y must be added to the solution at the end
-        blas::axpy(1.0, x, y);
-      } else {
-        // Just add x to y, which has been zeroed out
-        blas::copy(y, x);
-      }
+      // Deflate and accumulate to solution vector
+      eig_solve->deflate(y, r, evecs, evals, true);
+      mat(r, y, x, tmp3);
+      r2 = blas::xmyNorm(b, r);
     }
 
     blas::zero(x);
@@ -445,6 +425,7 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
     double delta = param.delta;
 
     // this parameter determines how many consective reliable update
@@ -627,6 +608,17 @@ namespace quda {
         mat(r, y, x, tmp3); //  here we can use x as tmp
         r2 = blas::xmyNorm(b, r);
 
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y, x, tmp3);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
 
@@ -758,7 +750,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
     param.gflops = gflops;
     param.iter += k;
 
@@ -781,6 +773,7 @@ namespace quda {
     blas::flops = 0;
     mat.flops();
     matSloppy.flops();
+    matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

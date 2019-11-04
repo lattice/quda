@@ -231,25 +231,12 @@ namespace quda {
     }
 
     if (param.deflate && param.maxiter > 1) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b.
-      blas::copy(*defl_tmp2[0], r);
-      rhs.push_back(defl_tmp2[0]);
-
       // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
-      eig_solve->deflateSVD(defl_tmp1, rhs, evecs, evals);
+      eig_solve->deflateSVD(x, r, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      blas::copy(tmp, *defl_tmp1[0]); // prec copy
-      mat(r, tmp);
-
-      blas::copy(tmp, *rhs[0]); // prec copy
-      r2 = blas::xmyNorm(tmp, r);
-
-      blas::copy(tmp, *defl_tmp1[0]); // prec copy
-      // defl_tmp must be added to the solution at the end
-      blas::axpy(1.0, tmp, x);
+      mat(r, x, tmp);
+      r2 = blas::xmyNorm(b, r);
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -289,6 +276,7 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     double r2_old = r2;
+    double maxr_deflate = sqrt(r2);
     bool l2_converge = false;
 
     blas::copy(*p[0], r); // no op if uni-precision
@@ -337,6 +325,18 @@ namespace quda {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp);
         r2 = blas::xmyNorm(b, r);  
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflateSVD(x, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, x, tmp);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
         // break-out check if we have reached the limit of the precision
@@ -394,7 +394,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops())*1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;
@@ -403,6 +403,8 @@ namespace quda {
       blas::flops = 0;
       mat.flops();
       matSloppy.flops();
+      matPrecon.flops();
+      matMdagM.flops();
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }

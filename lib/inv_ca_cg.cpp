@@ -501,7 +501,9 @@ namespace quda {
       constructDeflationSpace(b, matPrecon);
       if (deflate_compute) {
         // compute the deflation space.
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
         (*eig_solve)(evecs, evals);
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_PREAMBLE);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -527,25 +529,16 @@ namespace quda {
     }
 
     if (param.deflate && param.maxiter > 1) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `x` as a temp.
-      blas::copy(*defl_tmp2[0], r_);
-      rhs.push_back(defl_tmp2[0]);
+      // Deflate and add solution to accumulator
+      eig_solve->deflate(x, r_, evecs, evals, true);
 
-      // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
-
-      // Compute r_defl = RHS - A * LHS
-      blas::copy(tmp, *defl_tmp1[0]); // prec copy
-      mat(r_, tmp);
-
-      blas::copy(tmp, *rhs[0]); // prec copy
-      r2 = blas::xmyNorm(tmp, r_);
-
-      blas::copy(tmp, *defl_tmp1[0]); // prec copy
-      // defl_tmp1 must be added to the solution at the end
-      blas::axpy(1.0, tmp, x);
+      mat(r_, x, tmp, tmp2);
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r_);
+      } else {
+        blas::xpay(b, -1.0, r_);
+        r2 = b2; // dummy setting
+      }
     }
 
     // Use power iterations to approx lambda_max
@@ -622,6 +615,7 @@ namespace quda {
     double delta = param.delta; // delta for reliable updates.
     double rNorm = sqrt(r2); // The current residual norm.
     double maxrr = rNorm; // The maximum residual norm since the last reliable update.
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
 
     // Factors which map linear operator onto [-1,1]
     double m_map = 2./(lambda_max-lambda_min);
@@ -735,7 +729,6 @@ namespace quda {
 
       total_iter+=nKrylov;
 
-
       // update since nKrylov or maxiter reached, converged or reliable update required
       // note that the heavy quark residual will by definition only be checked every nKrylov steps
       // Note: this won't reliable update when the norm _increases_.
@@ -743,6 +736,18 @@ namespace quda {
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r_, x, tmp, tmp2);
         r2 = blas::xmyNorm(b, r_);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and add solution to accumulator
+          eig_solve->deflate(x, r_, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r_, x, tmp, tmp2);
+          r2 = blas::xmyNorm(b, r_);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         blas::copy(*S[0], r_);
 
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r_).z);
@@ -790,7 +795,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;
@@ -799,6 +804,7 @@ namespace quda {
       blas::flops = 0;
       mat.flops();
       matSloppy.flops();
+      matPrecon.flops();
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }

@@ -168,7 +168,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   // outer solver parameters
   inv_param.inv_type = inv_type;
   inv_param.tol = tol;
-  inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
+  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
   inv_param.use_alternative_reliable = alternative_reliable;
@@ -655,8 +655,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
+  add_eigen_option_group(app);
+  add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};

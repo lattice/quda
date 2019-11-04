@@ -105,7 +105,7 @@ int main(int argc, char **argv)
   auto app = make_app();
   // app->get_formatter()->column_width(40);
   add_eigen_option_group(app);
-  // add_deflation_option_group(app);
+  add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
-  inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
+  inv_param.tol_restart = tol_restart; //now theoretical background for this parameter... 
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
