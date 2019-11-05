@@ -1102,7 +1102,7 @@ namespace quda
       //---------------------------------------------------------------------------
       permuteVecs(kSpace, host_Q, iter_keep);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      
+
       host_free(host_P);
       host_free(host_L);
       host_free(host_U);
