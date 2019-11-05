@@ -216,14 +216,13 @@ namespace quda
 
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
-
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
     int nConv = eig_param->nConv;
     if (evecs.size() != (unsigned int)(2 * nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
 
-    double sigma_tmp[nConv];
+    std::vector<double> sigma_tmp(nConv);
 
     for (int i = 0; i < nConv; i++) {
 
@@ -244,11 +243,10 @@ namespace quda
       mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] = sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
+      sigma_tmp[i] = sqrt(blas::norm2(*evecs[nConv + i]));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*evecs[nConv + i]));
-      blas::ax(1.0 / norm, *evecs[nConv + i]);
+      blas::ax(1.0 / sigma_tmp[i], *evecs[nConv + i]);
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
@@ -267,6 +265,8 @@ namespace quda
   {
     // number of evecs
     int n_defl = eig_param->nConv;
+    if (evecs.size() != (unsigned int)(2 * n_defl))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_defl);
 
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
