@@ -426,7 +426,7 @@ extern "C" {
     int max_restarts;
     /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
     int batched_rotate;
-    
+
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
     /** For Arpack cross check, name of the Arpack logfile **/

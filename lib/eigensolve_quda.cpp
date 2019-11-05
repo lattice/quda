@@ -216,95 +216,88 @@ namespace quda
   void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
   {
     std::vector<int> pivots(size);
-    for (int i=0; i<size; i++) {
-      for (int j=0; j<size; j++) {
-	if(mat[j*size + i] == 1) {
-	  pivots[j] = i;
-	}
+    for (int i = 0; i < size; i++) {
+      for (int j = 0; j < size; j++) {
+        if (mat[j * size + i] == 1) { pivots[j] = i; }
       }
     }
-    
+
     // Identify cycles in the permutation array.
     // We shall use the sign bit as a marker. If the
     // sign is negative, the vector has already been
     // swapped into the correct place. A positive
     // value indicates the start of a new cycle.
-    
-    for (int i=0; i<size; i++) {
+
+    for (int i = 0; i < size; i++) {
       // First cycle always starts at 0, hence OR statement
-      if(pivots[i] > 0 || i==0) {
-	int k = i;
-	// Identify vector to be placed at i
-	int j = pivots[i];
-	pivots[i] = -pivots[i];
-	while (j > i) {
-	  std::swap(kSpace[k+num_locked], kSpace[j+num_locked]);
-	  pivots[j] = -pivots[j];
-	  k = j;
-	  j = -pivots[j];
-	}
+      if (pivots[i] > 0 || i == 0) {
+        int k = i;
+        // Identify vector to be placed at i
+        int j = pivots[i];
+        pivots[i] = -pivots[i];
+        while (j > i) {
+          std::swap(kSpace[k + num_locked], kSpace[j + num_locked]);
+          pivots[j] = -pivots[j];
+          k = j;
+          j = -pivots[j];
+        }
       }
     }
     // Sanity check
-    for (int i=0; i<size; i++) {
+    for (int i = 0; i < size; i++) {
       if (pivots[i] > 0) {
-	printf("Error at %d\n", i);
-	exit(0);
+        printf("Error at %d\n", i);
+        exit(0);
       }
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie, int js, int je, int type) {    
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie,
+                                int js, int je, int type)
+  {
     // is = i_start
     // ie = i_end
     // js = j_start
     // je = j_end
     int block_i_rank = ie - is;
     int block_j_rank = je - js;
-    
+
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
-    
+
     // Alias the vectors we wish to keep
-    for (int i = is; i < ie; i++) {
-      vecs_ptr.push_back(kSpace[num_locked + i]);
-    }
+    for (int i = is; i < ie; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
     // Alias the extra space vectors, zero the workspace
     for (int j = js; j < je; j++) {
       int k = nKr + 1 + j - js;
       kSpace_ptr.push_back(kSpace[k]);
     }
-    
-    Complex *batch_array = (Complex *)safe_malloc((block_i_rank*block_j_rank) * sizeof(Complex));
-    double *batch_array_r = (double *)safe_malloc((block_i_rank*block_j_rank) * sizeof(double));
+
+    Complex *batch_array = (Complex *)safe_malloc((block_i_rank * block_j_rank) * sizeof(Complex));
+    double *batch_array_r = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUM major -> ROW major)
     for (int j = js; j < je; j++) {
       for (int i = is; i < ie; i++) {
-	int j_arr = j-js;
-	int i_arr = i-is;
-	batch_array[i_arr * block_j_rank + j_arr].real(array[j*rank + i]);
-	batch_array[i_arr * block_j_rank + j_arr].imag(0.0);
-	batch_array_r[i_arr * block_j_rank + j_arr] = array[j*rank + i];
+        int j_arr = j - js;
+        int i_arr = i - is;
+        batch_array[i_arr * block_j_rank + j_arr].real(array[j * rank + i]);
+        batch_array[i_arr * block_j_rank + j_arr].imag(0.0);
+        batch_array_r[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
     switch (type) {
-    case 0:
-      blas::axpy(batch_array_r, vecs_ptr, kSpace_ptr);
-      break;
-    case 1:
-      blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr);
-      break;
-    case 2:
-      blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr);
-      break;
+    case 0: blas::axpy(batch_array_r, vecs_ptr, kSpace_ptr); break;
+    case 1: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
+    case 2: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
-    host_free(batch_array_r);    
+    host_free(batch_array_r);
   }
 
-  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je) {
+  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je)
+  {
     // copy back to correct position
     for (int j = js; j < je; j++) {
       int k = nKr + 1 + j - js;
@@ -312,7 +305,7 @@ namespace quda
       blas::zero(*kSpace[k]);
     }
   }
-  
+
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
 
@@ -968,92 +961,89 @@ namespace quda
     int dim = nKr - num_locked;
 
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    double *ritz_mat_keep = (double *)safe_malloc((dim*iter_keep) * sizeof(double));
+    double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
 
-    // If we have memory availible, do the entire rotation 
+    // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
       if ((int)kSpace.size() < offset + iter_keep) {
-	for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
-	  kSpace.push_back(ColorSpinorField::Create(csParam));
-	}
+        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+          kSpace.push_back(ColorSpinorField::Create(csParam));
+        }
       }
 
       // Pointers to the relevant vectors
       std::vector<ColorSpinorField *> vecs_ptr;
       std::vector<ColorSpinorField *> kSpace_ptr;
-            
+
       // Alias the extra space vectors, zero the workspace
       for (int i = 0; i < iter_keep; i++) {
-	kSpace_ptr.push_back(kSpace[offset+i]);
-	blas::zero(*kSpace_ptr[i]);
+        kSpace_ptr.push_back(kSpace[offset + i]);
+        blas::zero(*kSpace_ptr[i]);
       }
 
       // Alias the vectors we wish to keep, populate the Ritz matrix
       for (int j = 0; j < dim; j++) {
-	vecs_ptr.push_back(kSpace[num_locked + j]);
-	for (int i = 0; i < iter_keep; i++) {
-	  ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j];
-	}
+        vecs_ptr.push_back(kSpace[num_locked + j]);
+        for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
       }
-      
+
       // multiBLAS axpy
       blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
 
       // Copy back to the Krylov space
-      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);      
+      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
     } else {
-      
+
       // Do batched rotation to save on memory
       int batch_size = batched_rotate;
-      int full_batches = iter_keep/batch_size;
-      int batch_size_r = iter_keep%batch_size;
+      int full_batches = iter_keep / batch_size;
+      int batch_size_r = iter_keep % batch_size;
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-      
+
       if ((int)kSpace.size() < offset + batch_size) {
-	for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
-	  kSpace.push_back(ColorSpinorField::Create(csParam));
-	}
+        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+          kSpace.push_back(ColorSpinorField::Create(csParam));
+        }
       }
 
       MatrixXd mat = MatrixXd::Zero(dim, iter_keep);
       for (int j = 0; j < iter_keep; j++)
-	for (int i = 0; i < dim; i++)
-	  mat(i,j) = ritz_mat[j*dim + i];
-      
-      FullPivLU<MatrixXd> matLU(mat);
-      // RitzLU now contains the LU decomposition   
+        for (int i = 0; i < dim; i++) mat(i, j) = ritz_mat[j * dim + i];
 
-      MatrixXd matUpper = MatrixXd::Zero(dim,iter_keep);
+      FullPivLU<MatrixXd> matLU(mat);
+      // RitzLU now contains the LU decomposition
+
+      MatrixXd matUpper = MatrixXd::Zero(dim, iter_keep);
       matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
-      MatrixXd matLower = MatrixXd::Identity(dim,dim);
-      matLower.block(0,0,dim,iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      MatrixXd matLower = MatrixXd::Identity(dim, dim);
+      matLower.block(0, 0, dim, iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
 
       // Multi-BLAS friendly arrays to store the L/U matrices
-      double *host_L = (double *)safe_malloc((dim*iter_keep) * sizeof(double));
-      double *host_U = (double *)safe_malloc((iter_keep*iter_keep) * sizeof(double));
-      int *host_P = (int *)safe_malloc((dim*dim) * sizeof(int));
-      int *host_Q = (int *)safe_malloc((iter_keep*iter_keep) * sizeof(int));
+      double *host_L = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
+      double *host_U = (double *)safe_malloc((iter_keep * iter_keep) * sizeof(double));
+      int *host_P = (int *)safe_malloc((dim * dim) * sizeof(int));
+      int *host_Q = (int *)safe_malloc((iter_keep * iter_keep) * sizeof(int));
 
       // Populate host L/U arrays
-      for (int i=0; i<dim; i++) {
-	for (int j=0; j<iter_keep; j++) {
-	  if (i<iter_keep) host_U[j*iter_keep + i] = matUpper(i,j);
-	  host_L[j*dim + i] = matLower(i,j);
-	}
+      for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < iter_keep; j++) {
+          if (i < iter_keep) host_U[j * iter_keep + i] = matUpper(i, j);
+          host_L[j * dim + i] = matLower(i, j);
+        }
       }
-      
+
       // Populate host P/Q arrays
-      MatrixXi tempP = MatrixXi::Zero(dim,dim);
-      MatrixXi tempQ = MatrixXi::Zero(iter_keep,iter_keep);
+      MatrixXi tempP = MatrixXi::Zero(dim, dim);
+      MatrixXi tempQ = MatrixXi::Zero(iter_keep, iter_keep);
       tempP = matLU.permutationP().inverse();
       tempQ = matLU.permutationQ().inverse();
-      for (int i=0; i<dim; i++) {
-	for (int j=0; j<dim; j++) {
-	  if (i<iter_keep && j<iter_keep) host_Q[j*iter_keep + i] = tempQ(i,j);
-	  host_P[j*dim + i] = tempP(i,j);
-	}
+      for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+          if (i < iter_keep && j < iter_keep) host_Q[j * iter_keep + i] = tempQ(i, j);
+          host_P[j * dim + i] = tempP(i, j);
+        }
       }
 
       // Compute V * A = V * PLUQ
@@ -1067,43 +1057,44 @@ namespace quda
       // Loop over full batches
       for (int b = 0; b < full_batches; b++) {
 
-	// batch triangle
-	blockRotate(kSpace, host_L, dim, b*batch_size, (b+1)*batch_size, b*batch_size, (b+1)*batch_size, 1);
-	//batch pencil
-	blockRotate(kSpace, host_L, dim, (b+1)*batch_size, dim, b*batch_size, (b+1)*batch_size, 0);	
-	blockReset(kSpace, b*batch_size, (b+1)*batch_size);
+        // batch triangle
+        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size, 1);
+        // batch pencil
+        blockRotate(kSpace, host_L, dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, 0);
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
-
-      if(do_batch_remainder) {
-	// remainder triangle
-	blockRotate(kSpace, host_L, dim, full_batches*batch_size, iter_keep, full_batches*batch_size, iter_keep, 1);
-	//remainder pencil
-	if (iter_keep < dim) {
-	  blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches*batch_size, iter_keep, 0);
-	}
-	blockReset(kSpace, full_batches*batch_size, iter_keep);	
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep, 1);
+        // remainder pencil
+        if (iter_keep < dim) {
+          blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches * batch_size, iter_keep, 0);
+        }
+        blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
-      
+
       // Do U Multiply
       //---------------------------------------------------------------------------
-      if(do_batch_remainder) {	
-	// remainder triangle
-	blockRotate(kSpace, host_U, iter_keep, full_batches*batch_size, iter_keep, full_batches*batch_size, iter_keep, 0);	
-	//remainder pencil
-	blockRotate(kSpace, host_U, iter_keep, 0, full_batches*batch_size, full_batches*batch_size, iter_keep, 0);
-	blockReset(kSpace, full_batches*batch_size, iter_keep);
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotate(kSpace, host_U, iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
+                    iter_keep, 0);
+        // remainder pencil
+        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep, 0);
+        blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
-      
+
       // Loop over full batches
-      for (int b = full_batches-1; b >= 0; b--) {	
-	// batch triangle
-	blockRotate(kSpace, host_U, iter_keep, b*batch_size, (b+1)*batch_size, b*batch_size, (b+1)*batch_size, 0);
-	if(b>0) {
-	  //batch pencil
-	  blockRotate(kSpace, host_U, iter_keep, 0, b*batch_size, b*batch_size, (b+1)*batch_size, 0);
-	}
-	blockReset(kSpace, b*batch_size, (b+1)*batch_size);
+      for (int b = full_batches - 1; b >= 0; b--) {
+        // batch triangle
+        blockRotate(kSpace, host_U, iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
+                    (b + 1) * batch_size, 0);
+        if (b > 0) {
+          // batch pencil
+          blockRotate(kSpace, host_U, iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, 0);
+        }
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       // Do Q Permute
@@ -1114,15 +1105,14 @@ namespace quda
       host_free(host_L);
       host_free(host_U);
       host_free(host_Q);
-      
     }
-    
-    //Update residual vector
+
+    // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
 
-    //Update sub arrow matrix
+    // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
 
-    host_free(ritz_mat_keep);    
+    host_free(ritz_mat_keep);
   }
 } // namespace quda

@@ -115,7 +115,7 @@ public:
     void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
 
     /**
-       @brief Rotate part of kSpace 
+       @brief Rotate part of kSpace
        @param[in/out] kSpace The current Krylov space
        @param[in] array The rotation matrix
        @param[in] rank row rank of array
@@ -125,17 +125,17 @@ public:
        @param[in] je End of j index
        @param[in] type Type of caxpy(_U/L) to perform
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank,
-		     int is, int ie, int js, int je, int type);
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie, int js, int je,
+                     int type);
 
     /**
-       @brief Copy temp part of kSpace, zero out for next use 
+       @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space
        @param[in] js Start of j index
        @param[in] je End of j index
     */
     void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
-      
+
     /**
        @brief Deflate vector with Eigenvectors
        @param[in] vec_defl The deflated vector
