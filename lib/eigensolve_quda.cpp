@@ -730,8 +730,10 @@ namespace quda
 
       iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked - 12);
 
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
-
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
       num_locked += iter_locked;
@@ -952,8 +954,7 @@ namespace quda
   }
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
-  {
-
+  {    
     int offset = nKr + 1;
     int dim = nKr - num_locked;
 
@@ -1005,6 +1006,7 @@ namespace quda
         }
       }
 
+      profile.TPSTART(QUDA_PROFILE_EIGEN);      
       MatrixXd mat = MatrixXd::Zero(dim, iter_keep);
       for (int j = 0; j < iter_keep; j++)
         for (int i = 0; i < dim; i++) mat(i, j) = ritz_mat[j * dim + i];
@@ -1042,7 +1044,9 @@ namespace quda
           host_P[j * dim + i] = tempP(i, j);
         }
       }
+      profile.TPSTOP(QUDA_PROFILE_EIGEN);
 
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
       // Compute V * A = V * PLUQ
 
       // Do P Permute
@@ -1103,7 +1107,8 @@ namespace quda
       host_free(host_U);
       host_free(host_Q);
     }
-
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+    
     // Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
 
