@@ -30,6 +30,7 @@ protected:
     int restart_iter;
     int max_restarts;
     int check_interval;
+    int batched_rotate;
     int iter;
     int iter_converged;
     int iter_locked;
@@ -236,8 +237,18 @@ public:
     void eigensolveFromArrowMat(int nLocked, int arror_pos);
 
     /**
-       @brief Get the eigen-decomposition from the arrow matrix
-       @param[in] nKspace current Kryloc space
+       @brief Permute the vector space using the permutation matrix.
+       @param[in/out] kSpace The current Krylov space
+       @param[in] mat Eigen object storing the pivots
+       @param[in] num_locked The start of vectors to be permuted
+       @param[in] size The size of the (square) permutation matrix
+    */
+    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat,
+		     int num_locked, int size);
+    
+    /**
+       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+       @param[in] nKspace current Krylov space
     */
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 

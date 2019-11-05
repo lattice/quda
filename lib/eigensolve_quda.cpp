@@ -45,6 +45,7 @@ namespace quda
     restart_iter = 0;
     max_restarts = eig_param->max_restarts;
     check_interval = eig_param->check_interval;
+    batched_rotate = eig_param->batched_rotate;
     iter = 0;
     iter_converged = 0;
     iter_locked = 0;
@@ -860,55 +861,309 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
   }
 
+  void TRLM::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int num_locked, int size)
+  {
+    std::vector<int> pivots(size);
+    for (int i=0; i<size; i++) {
+      for (int j=0; j<size; j++) {
+	if(mat[j*size + i] == 1) {
+	  pivots[j] = i;
+	}
+      }
+    }
+    
+    // Identify cycles in the permutation array.
+    // We shall use the sign bit as a marker. If the
+    // sign is negative, the vector has already been
+    // swapped into the correct place. A positive
+    // value indicates the start of a new cycle.
+    
+    for (int i=0; i<size; i++) {
+      // First cycle always starts at 0, hence OR statement
+      if(pivots[i] > 0 || i==0) {
+	int k = i;
+	// Identify vector to be placed at i
+	int j = pivots[i];
+	pivots[i] = -pivots[i];
+	while (j > i) {
+	  std::swap(kSpace[k+num_locked], kSpace[j+num_locked]);
+	  pivots[j] = -pivots[j];
+	  k = j;
+	  j = -pivots[j];
+	}
+      }
+    }
+    // Sanity check
+    for (int i=0; i<size; i++) {
+      if (pivots[i] > 0) {
+	printf("Error at %d\n", i);
+	exit(0);
+      }
+    }
+  }
+  
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
 
     int offset = nKr + 1;
     int dim = nKr - num_locked;
 
-    if ((int)kSpace.size() < offset + iter_keep) {
-      for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
-        kSpace.push_back(ColorSpinorField::Create(csParam));
-      }
-    }
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("dim = %d\n", dim);
-      printfQuda("iter_keep = %d\n", iter_keep);
-      printfQuda("kSpace = %d\n", (int)kSpace.size());    
-      printfQuda("Modifying vectors %d - %d\n", offset, offset + iter_keep-1);
-      printfQuda("Putting data into vectors %d - %d\n", num_locked + 1, num_locked + dim-1);
-    }
-
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
     std::vector<ColorSpinorField *> kSpace_ptr;
 
-    // Array for multiBLAS axpy
+    // Multi-BLAS friendly array to store part of Ritz matrix we want
     double *ritz_mat_keep = (double *)safe_malloc((dim*iter_keep) * sizeof(double));
-    for (int i = 0; i < iter_keep; i++) {
-      kSpace_ptr.push_back(kSpace[offset+i]);
-      blas::zero(*kSpace_ptr[i]);
-    }    
-    for (int j = 0; j < dim; j++) {
-      vecs_ptr.push_back(kSpace[num_locked + j]);
-      for (int i = 0; i < iter_keep; i++) {
-	ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j];
+    
+    if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
+      if ((int)kSpace.size() < offset + iter_keep) {
+	for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+	  kSpace.push_back(ColorSpinorField::Create(csParam));
+	}
       }
+
+      // Alias the extra space vectors, zero the workspace
+      for (int i = 0; i < iter_keep; i++) {
+	kSpace_ptr.push_back(kSpace[offset+i]);
+	blas::zero(*kSpace_ptr[i]);
+      }
+
+      // Alias the vectors we wish to keep, populate the Ritz matrix
+      for (int j = 0; j < dim; j++) {
+	vecs_ptr.push_back(kSpace[num_locked + j]);
+	for (int i = 0; i < iter_keep; i++) {
+	  ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j];
+	}
+      }
+      
+      // multiBLAS axpy
+      blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
+
+      // Copy back to the Krylov space
+      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);      
+    } else {
+      // Do batched rotation
+      int batch_size = batched_rotate;
+      int full_batches = iter_keep/batch_size;
+      int batch_size_r = iter_keep%batch_size;
+      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
+      
+      if ((int)kSpace.size() < offset + batch_size) {
+	for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+	  if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+	  kSpace.push_back(ColorSpinorField::Create(csParam));
+	}
+      }
+
+      // Alias the extra space vectors, zero the workspace
+      for (int i = 0; i < iter_keep; i++) {
+	kSpace_ptr.push_back(kSpace[offset+i]);
+	blas::zero(*kSpace_ptr[i]);
+      }
+      
+      // Alias the vectors we wish to keep, populate the Ritz matrix
+      for (int j = 0; j < dim; j++) {
+	vecs_ptr.push_back(kSpace[num_locked + j]);
+	for (int i = 0; i < iter_keep; i++) {
+	  ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j];
+	}
+      }
+
+      MatrixXd mat = MatrixXd::Zero(dim, iter_keep);
+      for (int j = 0; j < iter_keep; j++)
+	for (int i = 0; i < dim; i++)
+	  mat(i,j) = ritz_mat[j*dim + i];
+      
+      FullPivLU<MatrixXd> matLU(mat);
+      // RitzLU now contains the LU decomposition   
+
+      MatrixXd matUpper = MatrixXd::Zero(dim,iter_keep);
+      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      MatrixXd matLower = MatrixXd::Identity(dim,dim);
+      matLower.block(0,0,dim,iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+
+      // Multi-BLAS friendly arrays to store the L/U matrices
+      double *host_L = (double *)safe_malloc((dim*iter_keep) * sizeof(double));
+      double *host_U = (double *)safe_malloc((iter_keep*iter_keep) * sizeof(double));
+      int *host_P = (int *)safe_malloc((dim*dim) * sizeof(int));
+      int *host_Q = (int *)safe_malloc((iter_keep*iter_keep) * sizeof(int));
+
+      // Populate host L/U arrays
+      for (int i=0; i<dim; i++) {
+	for (int j=0; j<iter_keep; j++) {
+	  if (i<iter_keep) host_U[j*iter_keep + i] = matUpper(i,j);
+	  host_L[j*dim + i] = matLower(i,j);
+	}
+      }
+      
+      // Populate host P/Q arrays
+      MatrixXi tempP = MatrixXi::Zero(dim,dim);
+      MatrixXi tempQ = MatrixXi::Zero(iter_keep,iter_keep);
+      tempP = matLU.permutationP().inverse();
+      tempQ = matLU.permutationQ().inverse();
+      for (int i=0; i<dim; i++) {
+	for (int j=0; j<dim; j++) {
+	  if (i<iter_keep && j<iter_keep) host_Q[j*iter_keep + i] = tempQ(i,j);
+	  host_P[j*dim + i] = tempP(i,j);
+	}
+      }
+      
+      permuteVecs(kSpace, host_P, num_locked, dim);
+
+      // from which we reference other indicies
+      int i_start, i_end, j_start, j_end;
+
+      // Do L Portion
+      //---------------------------------------------------------------------------
+      // Loop over full batches
+      for (int b = 0; b < full_batches; b++) {
+	
+	// batch triangle
+	i_start = b*batch_size;
+	i_end   = (b+1)*batch_size;
+	j_start = i_start;
+	j_end   = i_end;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = j; i < i_end; i++) {
+	    blas::axpy(host_L[j*dim + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	//batch pencil
+	i_start = (b+1)*batch_size;
+	i_end   = dim;
+	j_start = b*batch_size;
+	j_end   = (b+1)*batch_size;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = i_start; i < i_end; i++) {
+	    blas::axpy(host_L[j*dim + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	// copy back to correct position
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  std::swap(kSpace[j + num_locked], kSpace[k]);
+	  blas::zero(*kSpace[k]);
+	}
+      }
+      
+      if(do_batch_remainder) {
+	// remainder triangle
+	i_start = full_batches*batch_size;
+	i_end   = iter_keep;
+	j_start = i_start;
+	j_end   = i_end;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = j; i < i_end; i++) {
+	    blas::axpy(host_L[j*dim + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	//remainder pencil
+	i_start = iter_keep;
+	i_end   = dim;
+	j_start = full_batches*batch_size;
+	j_end   = iter_keep;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = i_start; i < i_end; i++) {
+	    blas::axpy(host_L[j*dim + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	// copy back to correct position
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  std::swap(kSpace[j + num_locked], kSpace[k]);
+	  blas::zero(*kSpace[k]);
+	}
+      }
+      
+      // Do U Portion
+      //---------------------------------------------------------------------------
+      if(do_batch_remainder) {	
+	// remainder triangle
+	i_start = full_batches*batch_size;
+	i_end   = iter_keep;
+	j_start = i_start;
+	j_end   = i_end;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = i_start; i < j+1; i++) {
+	    blas::axpy(host_U[j*iter_keep + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	//remainder pencil
+	i_start = 0;
+	i_end   = full_batches*batch_size;
+	j_start = full_batches*batch_size;
+	j_end   = iter_keep;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = i_start; i < i_end; i++) {
+	    blas::axpy(host_U[j*iter_keep + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	// copy back to correct position
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  std::swap(kSpace[j + num_locked], kSpace[k]);
+	  blas::zero(*kSpace[k]);
+	}
+      }
+      
+      // Loop over full batches
+      for (int b = full_batches-1; b >= 0; b--) {
+	
+	// batch triangle
+	i_start = b*batch_size;
+	i_end   = (b+1)*batch_size;
+	j_start = i_start;
+	j_end   = i_end;
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  for (int i = i_start; i < j+1; i++) {
+	    blas::axpy(host_U[j*iter_keep + i], *kSpace[num_locked + i], *kSpace[k]);
+	  }
+	}
+	
+	if(b>0) {
+	  //batch pencil
+	  i_start = 0;
+	  i_end   = b*batch_size;
+	  j_start = b*batch_size;
+	  j_end   = (b+1)*batch_size;
+	  for (int j = j_start; j < j_end; j++) {
+	    int k = offset + j - j_start;
+	    for (int i = i_start; i < i_end; i++) {
+	      blas::axpy(host_U[j*iter_keep + i], *kSpace[num_locked + i], *kSpace[k]);
+	    }
+	  }
+	}
+	// copy back to correct position
+	for (int j = j_start; j < j_end; j++) {
+	  int k = offset + j - j_start;
+	  std::swap(kSpace[j + num_locked], kSpace[k]);
+	  blas::zero(*kSpace[k]);
+	}
+      }
+      
+      permuteVecs(kSpace, host_Q, num_locked, iter_keep);
+      
+      host_free(host_L);
+      host_free(host_U);
+      host_free(host_P);
+      host_free(host_Q);
+      
     }
-    
-    // multiBLAS axpy
-    blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
-    
-    host_free(ritz_mat_keep);
-    
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Copying vectors %d - %d to %d - %d\n", offset, offset+iter_keep-1, num_locked, num_locked + iter_keep-1);
-    for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
     
     //Update residual vector
     std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
 
     //Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
+
+    host_free(ritz_mat_keep);    
   }
 } // namespace quda
