@@ -120,8 +120,10 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec = prec;
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_sloppy = prec_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
 
   gauge_param.anisotropy = 1.0;
 
@@ -197,11 +199,10 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.Nsteps = 2;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.cuda_prec_precondition = inv_param.cuda_prec_sloppy;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -221,6 +222,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec;
   inv_param.cuda_prec_sloppy = prec_sloppy;
+  inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
@@ -394,11 +396,12 @@ int invert_test()
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
   }
-  gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-  gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -406,9 +409,9 @@ int invert_test()
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
     gauge_param.reconstruct = link_recon; 
-    gauge_param.reconstruct_sloppy = link_recon_sloppy; 
-    gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-    gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 
