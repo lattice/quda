@@ -245,10 +245,7 @@ namespace quda
     }
     // Sanity check
     for (int i = 0; i < size; i++) {
-      if (pivots[i] > 0) {
-        printf("Error at %d\n", i);
-        exit(0);
-      }
+      if (pivots[i] > 0) errorQuda("Error at pivot %d", i);
     }
   }
 
