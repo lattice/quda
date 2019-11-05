@@ -107,6 +107,36 @@ public:
     Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
     /**
+       @brief Permute the vector space using the permutation matrix.
+       @param[in/out] kSpace The current Krylov space
+       @param[in] mat Eigen object storing the pivots
+       @param[in] size The size of the (square) permutation matrix
+    */
+    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
+
+    /**
+       @brief Rotate part of kSpace 
+       @param[in/out] kSpace The current Krylov space
+       @param[in] array The rotation matrix
+       @param[in] rank row rank of array
+       @param[in] is Start of i index
+       @param[in] ie End of i index
+       @param[in] js Start of j index
+       @param[in] je End of j index
+       @param[in] type Type of caxpy(_U/L) to perform
+    */
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank,
+		     int is, int ie, int js, int je, int type);
+
+    /**
+       @brief Copy temp part of kSpace, zero out for next use 
+       @param[in/out] kSpace The current Krylov space
+       @param[in] js Start of j index
+       @param[in] je End of j index
+    */
+    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
+      
+    /**
        @brief Deflate vector with Eigenvectors
        @param[in] vec_defl The deflated vector
        @param[in] vec The input vector
@@ -236,16 +266,6 @@ public:
     */
     void eigensolveFromArrowMat(int nLocked, int arror_pos);
 
-    /**
-       @brief Permute the vector space using the permutation matrix.
-       @param[in/out] kSpace The current Krylov space
-       @param[in] mat Eigen object storing the pivots
-       @param[in] num_locked The start of vectors to be permuted
-       @param[in] size The size of the (square) permutation matrix
-    */
-    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat,
-		     int num_locked, int size);
-    
     /**
        @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
        @param[in] nKspace current Krylov space
