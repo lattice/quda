@@ -1042,6 +1042,7 @@ namespace quda {
     const DiracMatrix &matPrecon;
     const DiracMdagM matMdagM; // used by the eigensolver
     bool init;
+    const bool use_source; // whether we can reuse the source vector
 
     // Basis. Currently anything except POWER_BASIS causes a warning
     // then swap to POWER_BASIS.

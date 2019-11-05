@@ -12,6 +12,10 @@ namespace quda {
     matPrecon(matPrecon),
     matMdagM(matPrecon.Expose()),
     init(false),
+    use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
+               param.precision == param.precision_sloppy &&
+               param.use_init_guess == QUDA_USE_INIT_GUESS_NO &&
+               !param.deflate),
     basis(param.ca_basis),
     alpha(nullptr),
     rp(nullptr),
@@ -25,9 +29,6 @@ namespace quda {
 
     if (init) {
       if (alpha) delete []alpha;
-      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
-                         param.precision == param.precision_sloppy &&
-                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
       if (basis == QUDA_POWER_BASIS) {
         for (int i=0; i<param.Nkrylov+1; i++) if (i>0 || !use_source) delete p[i];
       } else {
@@ -55,8 +56,6 @@ namespace quda {
       alpha = new Complex[param.Nkrylov];
 
       bool mixed = param.precision != param.precision_sloppy;
-      bool use_source = (param.preserve_source == QUDA_PRESERVE_SOURCE_NO && !mixed &&
-                         param.use_init_guess == QUDA_USE_INIT_GUESS_NO);
 
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_NULL_FIELD_CREATE;
@@ -236,7 +235,12 @@ namespace quda {
 
       // Compute r_defl = RHS - A * LHS
       mat(r, x, tmp);
-      r2 = blas::xmyNorm(b, r);
+      if (!fixed_iteration) {
+        r2 = blas::xmyNorm(b, r);
+      } else {
+        blas::xpay(b, -1.0, r);
+        r2 = b2; // dummy setting
+      }
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -247,7 +251,7 @@ namespace quda {
         param.true_res = 0.0;
         param.true_res_hq = 0.0;
         return;
-            } else {
+      } else {
         b2 = r2;
       }
     }
