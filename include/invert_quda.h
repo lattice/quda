@@ -444,7 +444,7 @@ namespace quda {
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
 
-      if (deflate) *static_cast<QudaEigParam*>(param.eig_param) = eig_param;
+      if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -1383,9 +1383,9 @@ public:
      deflated solver.
   */
   struct deflation_space : public Object {
-    bool svd;                             /** Whether this space is for an SVD deflaton */
-    std::vector<ColorSpinorField*> evecs; /** Container for the eigenvectors */
-    std::vector<Complex> evals;           /** The eigenvalues */
+    bool svd;                              /** Whether this space is for an SVD deflaton */
+    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
+    std::vector<Complex> evals;            /** The eigenvalues */
   };
 
 } // namespace quda

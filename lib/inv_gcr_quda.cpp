@@ -447,7 +447,7 @@ namespace quda {
 
         if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp);
-        r2 = blas::xmyNorm(b, r);  
+        r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
@@ -501,8 +501,8 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-  
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops())*1e-9;
+
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
     if (K) gflops += K->flops()*1e-9;
 
     if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 

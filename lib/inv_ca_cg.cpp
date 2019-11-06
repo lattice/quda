@@ -795,7 +795,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;

@@ -113,10 +113,9 @@ public:
        @param[in] evals The eigenvalues to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(std::vector<ColorSpinorField *> &sol,
-                 const std::vector<ColorSpinorField *> &src,
-                 const std::vector<ColorSpinorField *> &evecs,
-                 const std::vector<Complex> &evals, bool accumulate = false) const;
+    void deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                 const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                 bool accumulate = false) const;
 
     /**
        @brief Deflate a given source vector with a given eigenspace.
@@ -127,8 +126,7 @@ public:
        @param[in] evals The eigenvalues to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(ColorSpinorField &sol, const ColorSpinorField &src,
-                 const std::vector<ColorSpinorField *> &evecs,
+    void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
                  const std::vector<Complex> &evals, bool accumulate = false)
     {
       // FIXME add support for mixed-precison dot product to avoid this copy
@@ -136,11 +134,10 @@ public:
         ColorSpinorParam param(*evecs[0]);
         tmp1 = ColorSpinorField::Create(param);
       }
-      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ?
-        tmp1 : const_cast<ColorSpinorField*>(&src);
+      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias
-      std::vector<ColorSpinorField *> src_{src_tmp};
-      std::vector<ColorSpinorField *> sol_{&sol};
+      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> sol_ {&sol};
       deflate(sol_, src_, evecs, evals, accumulate);
     }
 
@@ -153,10 +150,9 @@ public:
        @param[in] evals The singular values to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(std::vector<ColorSpinorField *> &sol,
-                    const std::vector<ColorSpinorField *> &vec,
-                    const std::vector<ColorSpinorField *> &evecs,
-                    const std::vector<Complex> &evals, bool accumulate = false) const;
+    void deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &vec,
+                    const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                    bool accumulate = false) const;
 
     /**
        @brief Deflate a a given source vector with a given with a set of left and
@@ -167,8 +163,7 @@ public:
        @param[in] evals The singular values to use in deflation
        @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(ColorSpinorField &sol, const ColorSpinorField &src,
-                    const std::vector<ColorSpinorField *> &evecs,
+    void deflateSVD(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
                     const std::vector<Complex> &evals, bool accumulate = false)
     {
       // FIXME add support for mixed-precison dot product to avoid this copy
@@ -176,11 +171,10 @@ public:
         ColorSpinorParam param(*evecs[0]);
         tmp1 = ColorSpinorField::Create(param);
       }
-      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ?
-        tmp1 : const_cast<ColorSpinorField*>(&src);
+      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
       blas::copy(*src_tmp, src); // no-op if these alias
-      std::vector<ColorSpinorField *> src_{src_tmp};
-      std::vector<ColorSpinorField *> sol_{&sol};
+      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> sol_ {&sol};
       deflateSVD(sol_, src_, evecs, evals, accumulate);
     }
 

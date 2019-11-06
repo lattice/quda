@@ -258,10 +258,9 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol,
-                               const std::vector<ColorSpinorField *> &src,
-                               const std::vector<ColorSpinorField *> &evecs,
-                               const std::vector<Complex> &evals, bool accumulate) const
+  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                               const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                               bool accumulate) const
   {
     // number of evecs
     int n_defl = eig_param->nConv;
@@ -279,13 +278,14 @@ namespace quda
     for (int i = n_defl; i < 2 * n_defl; i++) left_vecs.push_back(evecs[i]);
 
     std::vector<Complex> s(n_defl * src.size());
-    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src)&>(src);
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
     blas::cDotProduct(s.data(), left_vecs, src_);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
     //    vec_defl = Sum_i (R_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(*x);
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
     std::vector<ColorSpinorField *> right_vecs;
     right_vecs.reserve(n_defl);
     for (int i = 0; i < n_defl; i++) {
@@ -322,10 +322,9 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(std::vector<ColorSpinorField *> &sol,
-                            const std::vector<ColorSpinorField *> &src,
-                            const std::vector<ColorSpinorField *> &evecs,
-                            const std::vector<Complex> &evals, bool accumulate) const
+  void EigenSolver::deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                            const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                            bool accumulate) const
   {
     // number of evecs
     int n_defl = eig_param->nConv;
@@ -343,14 +342,15 @@ namespace quda
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
     std::vector<Complex> s(n_defl * src.size());
-    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src)&>(src);
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
     blas::cDotProduct(s.data(), eig_vecs, src_);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    if (!accumulate) for (auto &x : sol) blas::zero(*x);
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
   }
 

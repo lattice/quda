@@ -12,10 +12,8 @@ namespace quda {
     matPrecon(matPrecon),
     matMdagM(matPrecon.Expose()),
     init(false),
-    use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO &&
-               param.precision == param.precision_sloppy &&
-               param.use_init_guess == QUDA_USE_INIT_GUESS_NO &&
-               !param.deflate),
+    use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO && param.precision == param.precision_sloppy
+               && param.use_init_guess == QUDA_USE_INIT_GUESS_NO && !param.deflate),
     basis(param.ca_basis),
     alpha(nullptr),
     rp(nullptr),
@@ -328,7 +326,7 @@ namespace quda {
 
         if ( (r2 < stop || total_iter>=param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp);
-        r2 = blas::xmyNorm(b, r);  
+        r2 = blas::xmyNorm(b, r);
 
         if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
           // Deflate and accumulate to solution vector
@@ -398,7 +396,7 @@ namespace quda {
       param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
 
       // store flops and reset counters
-      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops())*1e-9;
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
 
       param.gflops += gflops;
       param.iter += total_iter;

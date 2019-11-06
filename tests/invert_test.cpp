@@ -235,7 +235,7 @@ int main(int argc, char **argv)
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
-  inv_param.tol_restart = tol_restart; //now theoretical background for this parameter... 
+  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
@@ -708,7 +708,7 @@ int main(int argc, char **argv)
   free(spinorIn);
   free(spinorCheck);
   if (multishift) {
-    for (int i=0; i<inv_param.num_offset; i++) free(spinorOutMulti[i]);
+    for (int i = 0; i < inv_param.num_offset; i++) free(spinorOutMulti[i]);
     free(spinorOutMulti);
   } else {
     free(spinorOut);

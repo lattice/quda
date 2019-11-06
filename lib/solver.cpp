@@ -179,14 +179,15 @@ namespace quda {
       evecs.reserve(param.eig_param.nConv);
       evals.reserve(param.eig_param.nConv);
 
-      deflation_space *space = reinterpret_cast<deflation_space*>(param.eig_param.preserve_deflation_space);
+      deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
       if (space && space->evecs.size() != 0) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if ((!space->svd && param.eig_param.nConv != (int)space->evecs.size()) ||
-            (space->svd && 2*param.eig_param.nConv != (int)space->evecs.size()))
-          errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(), param.eig_param.nConv);
+        if ((!space->svd && param.eig_param.nConv != (int)space->evecs.size())
+            || (space->svd && 2 * param.eig_param.nConv != (int)space->evecs.size()))
+          errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
+                    param.eig_param.nConv);
 
         // move vectors from preserved space to local space
         for (auto &vec : space->evecs) evecs.push_back(vec);
@@ -226,9 +227,10 @@ namespace quda {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Preserving deflation space of size %lu\n", evecs.size());
 
         if (param.eig_param.preserve_deflation_space) {
-          deflation_space *space = reinterpret_cast<deflation_space*>(param.eig_param.preserve_deflation_space);
+          deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
           // first ensure that any existing space is freed
-          for (auto &vec : space->evecs) if (vec) delete vec;
+          for (auto &vec : space->evecs)
+            if (vec) delete vec;
           space->evecs.resize(0);
           delete space;
         }
@@ -246,7 +248,8 @@ namespace quda {
 
         param.eig_param.preserve_deflation_space = space;
       } else {
-        for (auto &vec : evecs) if (vec) delete vec;
+        for (auto &vec : evecs)
+          if (vec) delete vec;
       }
 
       evecs.resize(0);
