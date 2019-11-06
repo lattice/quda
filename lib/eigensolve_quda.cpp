@@ -1000,7 +1000,7 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+        for (int i = kSpace.size(); i < offset + batch_size; i++) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
           kSpace.push_back(ColorSpinorField::Create(csParam));
         }
