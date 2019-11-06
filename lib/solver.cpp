@@ -17,7 +17,7 @@ namespace quda {
     eig_solve(nullptr),
     deflate_init(false),
     deflate_compute(true),
-    recompute_evals(param.eig_param.recompute_evals)
+    recompute_evals(!param.eig_param.preserve_evals)
   {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);

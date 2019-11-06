@@ -151,7 +151,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(a_max, 0.0);
   P(preserve_deflation, QUDA_BOOLEAN_NO);
   P(preserve_deflation_space, 0);
-  P(recompute_evals, QUDA_BOOLEAN_NO);
+  P(preserve_evals, QUDA_BOOLEAN_YES);
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
@@ -175,7 +175,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(a_min, INVALID_DOUBLE);
   P(a_max, INVALID_DOUBLE);
   P(preserve_deflation, QUDA_BOOLEAN_INVALID);
-  P(recompute_evals, QUDA_BOOLEAN_INVALID);
+  P(preserve_evals, QUDA_BOOLEAN_INVALID);
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);

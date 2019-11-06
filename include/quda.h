@@ -404,11 +404,11 @@ extern "C" {
     void *preserve_deflation_space;
 
     /** If we restore the deflation space, this boolean indicates
-        whether we should recompute evalues or reuse the prior
-        computed ones.  For example if a different mass shift is being
-        used than the one used to generate the space, then this should
-        be true */
-    QudaBoolean recompute_evals;
+        whether we are also preserving the evalues or recomputing
+        them.  For example if a different mass shift is being used
+        than the one used to generate the space, then this should be
+        false, but preserve_deflation would be true */
+    QudaBoolean preserve_evals;
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
