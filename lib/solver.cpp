@@ -184,7 +184,8 @@ namespace quda {
       if (space && space->evecs.size() != 0) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-        if (param.eig_param.nConv != (int)space->evecs.size())
+        if ((!space->svd && param.eig_param.nConv != (int)space->evecs.size()) ||
+            (space->svd && 2*param.eig_param.nConv != (int)space->evecs.size()))
           errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(), param.eig_param.nConv);
 
         // move vectors from preserved space to local space
@@ -233,6 +234,9 @@ namespace quda {
         }
 
         deflation_space *space = new deflation_space;
+
+        // if evecs size = 2x evals size then we are doing an SVD deflation
+        space->svd = (evecs.size() == 2 * evals.size()) ? true : false;
 
         space->evecs.reserve(evecs.size());
         for (auto &vec : evecs) space->evecs.push_back(vec);

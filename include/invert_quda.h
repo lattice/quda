@@ -1383,6 +1383,7 @@ public:
      deflated solver.
   */
   struct deflation_space : public Object {
+    bool svd;                             /** Whether this space is for an SVD deflaton */
     std::vector<ColorSpinorField*> evecs; /** Container for the eigenvectors */
     std::vector<Complex> evals;           /** The eigenvalues */
   };
