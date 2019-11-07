@@ -268,7 +268,7 @@ namespace quda {
       preconditioner(param.preconditioner),
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
-      deflate(false),
+      deflate(param.eig_param != 0),
       use_init_guess(param.use_init_guess),
       compute_null_vector(QUDA_COMPUTE_NULL_VECTOR_NO),
       delta(param.reliable_delta),
@@ -325,6 +325,7 @@ namespace quda {
       mg_instance(false),
       extlib_type(param.extlib_type)
     {
+      if (deflate) { eig_param = *(static_cast<QudaEigParam *>(param.eig_param)); }
       for (int i=0; i<num_offset; i++) {
         offset[i] = param.offset[i];
         tol_offset[i] = param.tol_offset[i];
@@ -343,7 +344,7 @@ namespace quda {
       preconditioner(param.preconditioner),
       deflation_op(param.deflation_op),
       residual_type(param.residual_type),
-      deflate(false),
+      deflate(param.deflate),
       eig_param(param.eig_param),
       use_init_guess(param.use_init_guess),
       compute_null_vector(param.compute_null_vector),
@@ -442,6 +443,8 @@ namespace quda {
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
+
+      if (deflate) *static_cast<QudaEigParam *>(param.eig_param) = eig_param;
     }
 
     void updateRhsIndex(QudaInvertParam &param) {
@@ -463,10 +466,6 @@ namespace quda {
     bool recompute_evals;   /** If true, instruct the solver to recompute evals from an existing deflation space. */
     std::vector<ColorSpinorField *> evecs;     /** Holds the eigenvectors. */
     std::vector<Complex> evals;                /** Holds the eigenvalues. */
-    std::vector<ColorSpinorField *> defl_tmp1; /** temp space needed for deflation. */
-    std::vector<ColorSpinorField *> defl_tmp2; /** temp space needed for deflation. */
-
-    // friend void MG::destroyCoarseSolver();
 
   public:
     Solver(SolverParam &param, TimeProfile &profile);
@@ -614,13 +613,14 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
     // pointers to fields to avoid multiple creation overhead
     ColorSpinorField *yp, *rp, *rnewp, *pp, *App, *tmpp, *tmp2p, *tmp3p, *rSloppyp, *xSloppyp;
     std::vector<ColorSpinorField*> p;
     bool init;
 
   public:
-    CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CG();
     /**
      * @brief Run CG.
@@ -686,12 +686,13 @@ namespace quda {
   private:
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
+    DiracMMdag mmdagPrecon;
     ColorSpinorField *xp;
     ColorSpinorField *yp;
     bool init;
 
   public:
-    CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -702,11 +703,12 @@ namespace quda {
   private:
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
+    DiracMdagM mdagmPrecon;
     ColorSpinorField *bp;
     bool init;
 
   public:
-    CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -935,6 +937,7 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
     bool init;
 
     bool lambda_init;
@@ -985,7 +988,7 @@ namespace quda {
     int reliable(double &rNorm,  double &maxrr, int &rUpdate, const double &r2, const double &delta);
 
   public:
-    CACG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CACG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CACG();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -996,12 +999,13 @@ namespace quda {
   private:
     DiracMMdag mmdag;
     DiracMMdag mmdagSloppy;
+    DiracMMdag mmdagPrecon;
     ColorSpinorField *xp;
     ColorSpinorField *yp;
     bool init;
 
   public:
-    CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CACGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1012,11 +1016,12 @@ namespace quda {
   private:
     DiracMdagM mdagm;
     DiracMdagM mdagmSloppy;
+    DiracMdagM mdagmPrecon;
     ColorSpinorField *bp;
     bool init;
 
   public:
-    CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
+    CACGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
     virtual ~CACGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -1034,8 +1039,10 @@ namespace quda {
   private:
     const DiracMatrix &mat;
     const DiracMatrix &matSloppy;
+    const DiracMatrix &matPrecon;
     const DiracMdagM matMdagM; // used by the eigensolver
     bool init;
+    const bool use_source; // whether we can reuse the source vector
 
     // Basis. Currently anything except POWER_BASIS causes a warning
     // then swap to POWER_BASIS.
@@ -1068,10 +1075,10 @@ namespace quda {
     void solve(Complex *psi_, std::vector<ColorSpinorField*> &q, ColorSpinorField &b);
 
 public:
-    CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~CAGCR();
+  CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+  virtual ~CAGCR();
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+  void operator()(ColorSpinorField &out, ColorSpinorField &in);
   };
 
   // Steepest descent solver used as a preconditioner
@@ -1369,6 +1376,16 @@ public:
 
     void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
 
+  };
+
+  /**
+     @brief This is an object that captures the state required for a
+     deflated solver.
+  */
+  struct deflation_space : public Object {
+    bool svd;                              /** Whether this space is for an SVD deflaton */
+    std::vector<ColorSpinorField *> evecs; /** Container for the eigenvectors */
+    std::vector<Complex> evals;            /** The eigenvalues */
   };
 
 } // namespace quda

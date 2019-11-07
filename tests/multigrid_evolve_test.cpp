@@ -415,6 +415,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;

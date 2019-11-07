@@ -213,9 +213,17 @@ module quda_fortran
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
 
-     integer(8) :: preconditioner ! pointer to preconditioner instance
+     ! pointer to preconditioner instance
+     integer(8) :: preconditioner
 
-     integer(8) :: deflation_op ! pointer to deflation instance
+     ! pointer to deflation instance
+     integer(8) :: deflation_op
+
+     ! defines deflation
+     integer(8) :: eig_param
+
+     ! If true, deflate the initial guess
+     QudaBoolean :: deflate
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition

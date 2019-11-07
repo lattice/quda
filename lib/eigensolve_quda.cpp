@@ -33,6 +33,8 @@ namespace quda
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
+
     // Problem parameters
     nEv = eig_param->nEv;
     nKr = eig_param->nKr;
@@ -101,7 +103,7 @@ namespace quda
     case QUDA_EIG_IR_ARNOLDI: errorQuda("IR Arnoldi not implemented"); break;
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TR Lanczos eigensolver\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
       break;
     default: errorQuda("Invalid eig solver type");
@@ -214,14 +216,13 @@ namespace quda
 
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
-
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
     int nConv = eig_param->nConv;
     if (evecs.size() != (unsigned int)(2 * nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
 
-    double sigma_tmp[nConv];
+    std::vector<double> sigma_tmp(nConv);
 
     for (int i = 0; i < nConv; i++) {
 
@@ -242,11 +243,10 @@ namespace quda
       mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] = sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
+      sigma_tmp[i] = sqrt(blas::norm2(*evecs[nConv + i]));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*evecs[nConv + i]));
-      blas::ax(1.0 / norm, *evecs[nConv + i]);
+      blas::ax(1.0 / sigma_tmp[i], *evecs[nConv + i]);
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
@@ -258,40 +258,41 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                               std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                               const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                               bool accumulate) const
   {
     // number of evecs
     int n_defl = eig_param->nConv;
+    if (evecs.size() != (unsigned int)(2 * n_defl))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_defl);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
     // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
 
     // 1. Take block inner product: L_i^dag * vec = A_i
-    std::vector<ColorSpinorField *> left_vecs_ptr;
-    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, left_vecs_ptr, vec);
+    std::vector<ColorSpinorField *> left_vecs;
+    left_vecs.reserve(n_defl);
+    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs.push_back(evecs[i]);
+
+    std::vector<Complex> s(n_defl * src.size());
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+    blas::cDotProduct(s.data(), left_vecs, src_);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
     //    vec_defl = Sum_i (R_i)^{-1} * A_i
-    blas::zero(*vec_defl[0]);
-    std::vector<ColorSpinorField *> right_vecs_ptr;
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
+    std::vector<ColorSpinorField *> right_vecs;
+    right_vecs.reserve(n_defl);
     for (int i = 0; i < n_defl; i++) {
-      right_vecs_ptr.push_back(eig_vecs[i]);
+      right_vecs.push_back(evecs[i]);
       s[i] /= evals[i].real();
     }
-    blas::caxpy(s, right_vecs_ptr, vec_defl);
-
-    // FIXME - we can optimize the zeroing out with a "multi-caxy"
-    // function that just writes over vec_defl and doesn't sum.  When
-    // we exceed the multi-blas limit this would deompose into caxy
-    // for the kernel call and caxpy for the subsequent ones
-
-    host_free(s);
+    blas::caxpy(s.data(), right_vecs, sol);
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -321,8 +322,9 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                            std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  void EigenSolver::deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                            const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                            bool accumulate) const
   {
     // number of evecs
     int n_defl = eig_param->nConv;
@@ -334,25 +336,22 @@ namespace quda
 
     // Pointers to the required Krylov space vectors,
     // no extra memory is allocated.
-    std::vector<ColorSpinorField *> eig_vecs_ptr;
-    for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
+    std::vector<ColorSpinorField *> eig_vecs;
+    eig_vecs.reserve(n_defl);
+    for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
 
     // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, eig_vecs_ptr, vec);
+    std::vector<Complex> s(n_defl * src.size());
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+    blas::cDotProduct(s.data(), eig_vecs, src_);
 
     // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
     for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
 
     // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    blas::zero(*vec_defl[0]);
-    blas::caxpy(s, eig_vecs_ptr, vec_defl);
-    // FIXME - we can optimize the zeroing out with a "multi-caxy"
-    // function that just writes over vec_defl and doesn't sum.  When
-    // we exceed the multi-blas limit this would deompose into caxy
-    // for the kernel call and caxpy for the subsequent ones
-
-    host_free(s);
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
+    blas::caxpy(s.data(), eig_vecs, sol);
   }
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
@@ -827,6 +826,8 @@ namespace quda
       printfQuda("***** END TRLM SOLUTION *****\n");
       printfQuda("*****************************\n");
     }
+
+    mat.flops();
   }
 
   // Destructor
