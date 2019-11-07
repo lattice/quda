@@ -92,11 +92,17 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   QudaPrecision file_prec = (prec == 70) ? QUDA_SINGLE_PRECISION : QUDA_DOUBLE_PRECISION;
 
   // Various checks
-  if (in_nSpin != nSpin)
-    errorQuda("QIO_get_spins %d does not match expected number of colors %d", in_nSpin, nSpin);
+  // Note: we exclude gauge fields from this b/c QUDA originally saved gauge fields as
+  // nSpin == 1, nColor == 9, while it's supposed to be (0,3). 
+  // Further, even if the nSpin and nColor don't agree, what really matters is the 
+  // total typesize check.
+  if (len != 18) {
+    if (in_nSpin != nSpin)
+      warningQuda("QIO_get_spins %d does not match expected number of colors %d", in_nSpin, nSpin);
 
-  if (in_nColor != nColor)
-    errorQuda("QIO_get_colors %d does not match expected number of spins %d", in_nColor, nColor);
+    if (in_nColor != nColor)
+      warningQuda("QIO_get_colors %d does not match expected number of spins %d", in_nColor, nColor);
+  }
 
   if (in_count != count)
     errorQuda("QIO_get_datacount %d does not match expected number of fields %d", in_count, count);
@@ -341,7 +347,7 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
 int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
     QudaPrecision file_prec, QudaPrecision cpu_prec, const char* type)
 {
-  return write_field<18>(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9, type); 
+  return write_field<18>(outfile, count, field_out, file_prec, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 0, 3, type); 
 }
 
 void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
