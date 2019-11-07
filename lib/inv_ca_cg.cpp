@@ -48,12 +48,7 @@ namespace quda {
       if (rp) delete rp;
     }
 
-    if (deflate_init) {
-      for (auto veci : param.evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
 
     if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
@@ -260,10 +255,6 @@ namespace quda {
       for (int i=0; i<param.Nkrylov; i++) Q[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) Qtmp[i] = ColorSpinorField::Create(csParam);
       for (int i=0; i<param.Nkrylov; i++) AQ[i] = ColorSpinorField::Create(csParam);
-
-      // Once the CACG operator is called, we are able to construct an appropriate
-      // Krylov space for deflation
-      if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
 
       //sloppy temporary for mat-vec
       tmp_sloppy = mixed ? ColorSpinorField::Create(csParam) : nullptr;
@@ -478,6 +469,21 @@ namespace quda {
     double b2 = !fixed_iteration ? blas::norm2(b) : 1.0;
     double r2 = 0.0; // if zero source then we will exit immediately doing no work
 
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space.
+      constructDeflationSpace(b, mat);
+
+      if (deflate_compute) {
+        // compute the deflation space.
+        (*eig_solve)(evecs, evals);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(mat, evecs, evals);
+        recompute_evals = false;
+      }
+    }
+
     // compute intitial residual depending on whether we have an initial guess or not
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
       mat(r_, x, tmp, tmp2);
@@ -494,7 +500,7 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
+    if (param.deflate && param.maxiter > 1) {
       std::vector<ColorSpinorField *> rhs;
       // Use residual from supplied guess r, or original
       // rhs b. use `x` as a temp.
@@ -502,7 +508,7 @@ namespace quda {
       rhs.push_back(defl_tmp2[0]);
 
       // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+      eig_solve->deflate(defl_tmp1, rhs, evecs, evals);
 
       // Compute r_defl = RHS - A * LHS
       mat(r_, *defl_tmp1[0], tmp, tmp2);

@@ -137,6 +137,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
+bool deflate = false;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
@@ -178,6 +179,7 @@ quda::mgarray<bool> mg_eig_use_dagger = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 bool mg_eig_coarse_guess = false;
+bool mg_eig_preserve_deflation = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -238,8 +240,10 @@ namespace
                                                            {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
                                                            {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
-  CLI::TransformPairs<QudaPrecision>
-    precision_map({{"double", QUDA_DOUBLE_PRECISION}, {"single", QUDA_SINGLE_PRECISION}, {"half", QUDA_HALF_PRECISION}});
+  CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
+                                                    {"single", QUDA_SINGLE_PRECISION},
+                                                    {"half", QUDA_HALF_PRECISION},
+                                                    {"quarter", QUDA_QUARTER_PRECISION}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -621,8 +625,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-eig-check-interval", mg_eig_check_interval, CLI::Validator(),
     "Perform a convergence check every nth restart/iteration (only used in Implicit Restart types)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-coarse-guess", mg_eig_use_poly_acc, CLI::Validator(),
-                         "If deflating on the coarse grid, optionaly use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-coarse-guess", mg_eig_coarse_guess,
+                       "If deflating on the coarse grid, optionally use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-preserve-deflation", mg_eig_preserve_deflation,
+                       "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),

@@ -87,7 +87,8 @@ namespace quda {
 
     const int N = p.size();
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Constructing minimum residual extrapolation with basis size %d\n", N);
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Constructing minimum residual extrapolation with basis size %d\n", N);
 
     // if no guess is required, then set initial guess = 0
     if (N == 0) {

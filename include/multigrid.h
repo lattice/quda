@@ -56,9 +56,6 @@ namespace quda {
     /** The null space vectors */
     std::vector<ColorSpinorField*> &B;
 
-    /** The eigenvalue array */
-    std::vector<Complex> evals;
-
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
 
@@ -136,8 +133,8 @@ namespace quda {
       omega = param.omega[level];
     }
 
-    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
-            DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+            DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),
@@ -148,7 +145,6 @@ namespace quda {
       coarse(param.coarse),
       fine(param.fine),
       B(B),
-      evals(evals),
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
@@ -470,7 +466,6 @@ public:
     DiracM *mSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
-    std::vector<Complex> evals;
 
     MGParam *mgParam;
 
