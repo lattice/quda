@@ -96,6 +96,11 @@ namespace quda {
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
+    QudaParity suggested_parity; // used to specify whether a single parity field is even/odd
+                                 // by construction not enforced, this is more of an optional
+                                 // metadata to specify, for ex, if an eigenvector is for an
+                                 // even or odd parity.
+
     void *v; // pointer to field
     void *norm;
 
@@ -119,6 +124,7 @@ namespace quda {
         gammaBasis(QUDA_INVALID_GAMMA_BASIS),
         create(QUDA_INVALID_FIELD_CREATE),
         pc_type(QUDA_PC_INVALID),
+        suggested_parity(QUDA_INVALID_PARITY),
         is_composite(false),
         composite_dim(0),
         is_component(false),
@@ -156,9 +162,17 @@ namespace quda {
 
       if (!pc_solution) {
         siteSubset = QUDA_FULL_SITE_SUBSET;
+        suggested_parity = QUDA_INVALID_PARITY;
       } else {
         x[0] /= 2; // X defined the full lattice dimensions
         siteSubset = QUDA_PARITY_SITE_SUBSET;
+        if (inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN || inv_param.matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+          suggested_parity = QUDA_EVEN_PARITY;
+        } else if (inv_param.matpc_type == QUDA_MATPC_ODD_ODD || inv_param.matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+          suggested_parity = QUDA_ODD_PARITY;
+        } else {
+          errorQuda("Operator is preconditioned but preconditioning type is not specified");
+        }
       }
 
       if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
@@ -211,6 +225,7 @@ namespace quda {
         gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
         create(QUDA_COPY_FIELD_CREATE),
         pc_type(cpuParam.pc_type),
+        suggested_parity(cpuParam.suggested_parity),
         v(0),
         is_composite(cpuParam.is_composite),
         composite_dim(cpuParam.composite_dim),
@@ -258,6 +273,8 @@ namespace quda {
       printfQuda("fieldOrder = %d\n", fieldOrder);
       printfQuda("gammaBasis = %d\n", gammaBasis);
       printfQuda("create = %d\n", create);
+      printfQuda("pc_type = %d\n", pc_type);
+      printfQuda("suggested_parity = %d\n", suggested_parity);
       printfQuda("v = %lx\n", (unsigned long)v);
       printfQuda("norm = %lx\n", (unsigned long)norm);
       //! for deflation etc.
@@ -313,7 +330,7 @@ namespace quda {
   private:
       void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
           QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-          QudaGammaBasis gammaBasis, QudaPCType pc_type);
+          QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity);
       void destroy();
 
   protected:
@@ -337,6 +354,11 @@ namespace quda {
     QudaTwistFlavorType twistFlavor;
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
+
+    QudaParity suggested_parity; // used to specify whether a single parity field is even/odd
+                                 // by construction not enforced, this is more of an optional
+                                 // metadata to specify, for ex, if an eigenvector is for an
+                                 // even or odd parity.
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
@@ -477,6 +499,8 @@ namespace quda {
     size_t ComponentNormBytes() const { return composite_descr.norm_bytes; }
 
     QudaPCType PCType() const { return pc_type; }
+    QudaParity SuggestedParity() const { return suggested_parity; }
+    void setSuggestedParity(QudaParity suggested_parity) { this->suggested_parity = suggested_parity; }
 
     QudaSiteSubset SiteSubset() const { return siteSubset; }
     QudaSiteOrder SiteOrder() const { return siteOrder; }
