@@ -583,7 +583,8 @@ namespace quda {
       char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          hipMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+          hipMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad-1);
+          hipMemset2DAsync(dst + pitch*Npad-pad_bytes, pad_bytes, 0, pad_bytes, 1);
         }
     }
 
@@ -614,7 +615,8 @@ namespace quda {
       }
     }
 
-    checkCudaError();
+//comment out this check as the function get_pointer_location will return an error for the host pointer
+//    checkCudaError(); 
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src)

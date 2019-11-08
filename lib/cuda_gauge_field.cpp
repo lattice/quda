@@ -94,7 +94,8 @@ namespace quda {
     size_t pitch = stride*order*precision;
     if (pad_bytes) {
       hipMemset2D(static_cast<char*>(even) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
-      hipMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad);
+      hipMemset2D(static_cast<char*>(odd) + volumeCB*order*precision, pitch, 0, pad_bytes, Npad-1);
+      hipMemset2D(static_cast<char*>(odd) + Npad*pitch-pad_bytes, pad_bytes, 0, pad_bytes, 1);
     }
   }
 
