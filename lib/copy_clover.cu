@@ -80,7 +80,10 @@ namespace quda {
     virtual ~CopyClover() { ; }
   
     void apply(const hipStream_t &stream) {
+      int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+      deviceProp.maxThreadsPerBlock=256;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+      deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
       copyCloverKernel<FloatOut, FloatIn, length, Out, In> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

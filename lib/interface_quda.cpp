@@ -557,6 +557,10 @@ void initQudaDevice(int dev) {
 #endif
 
   hipGetDeviceProperties(&deviceProp, dev);
+  int max_threads=512;
+  if(deviceProp.maxThreadsPerBlock>max_threads) deviceProp.maxThreadsPerBlock=max_threads;
+  for(int i=0;i<3;i++)
+      if(deviceProp.maxThreadsDim[i]>max_threads) deviceProp.maxThreadsDim[i]=max_threads;
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
