@@ -220,7 +220,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
     const int gpuid = comm_gpuid();
     hipDeviceProp_t prop;
     hipGetDeviceProperties(&prop, gpuid);
-    errorQuda("enable_peer_to_peer is not supported in this HIP version\n");
+    errorQuda("enable_peer_to_peer is not supported in this HIP version, please set QUDA_ENABLE_P2P=0\n");
 //    if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
