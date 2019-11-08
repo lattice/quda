@@ -199,6 +199,27 @@ namespace quda {
   {
     // if src is a CPU field then create GPU field
     ColorSpinorField *src = &src_;
+
+    printfQuda("make random source on cpu\n");
+    if (src_.Location() == QUDA_CUDA_FIELD_LOCATION)
+    {
+       ColorSpinorParam param(src_);
+       QudaPrecision prec = std::max(src_.Precision(), QUDA_SINGLE_PRECISION);
+       param.setPrecision(prec, prec, true);
+       param.create = QUDA_NULL_FIELD_CREATE;
+       param.location = QUDA_CPU_FIELD_LOCATION;
+       param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+       src = ColorSpinorField::Create(param);
+       *src=src_;
+    }
+    src->Source(QUDA_RANDOM_SOURCE, 0); 
+    if (src_.Location() == QUDA_CUDA_FIELD_LOCATION)
+    {
+       src_ = *src;
+       delete src;
+    }
+    return;
+
     if (src_.Location() == QUDA_CPU_FIELD_LOCATION || src_.Precision() < QUDA_SINGLE_PRECISION) {
       ColorSpinorParam param(src_);
       QudaPrecision prec = std::max(src_.Precision(), QUDA_SINGLE_PRECISION);
