@@ -883,10 +883,9 @@ namespace quda
         if ((i == 0) || (alpha[i - 1] >= alpha[i]))
           i++;
         else {
-          double tmp = alpha[i];
-          alpha[i] = alpha[i - 1];
-          alpha[--i] = tmp;
+          std::swap(alpha[i], alpha[i - 1]);
           std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
         }
       }
     } else {
@@ -894,10 +893,9 @@ namespace quda
         if ((i == 0) || (alpha[i - 1] <= alpha[i]))
           i++;
         else {
-          double tmp = alpha[i];
-          alpha[i] = alpha[i - 1];
-          alpha[--i] = tmp;
+          std::swap(alpha[i], alpha[i - 1]);
           std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
         }
       }
     }
