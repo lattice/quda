@@ -481,9 +481,10 @@ namespace quda
     void *data[] = { &mem_type };
     hipError_t error = hipPointerGetAttributes(&attribute,ptr);mem_type=attribute.memoryType;
     if (error != hipSuccess) {
+      mem_type = hipMemoryTypeHost;
       const char *string;
       string=hipGetErrorString(error);
-      errorQuda("cuPointerGetAttributes failed with error %s", string);
+      printfQuda("cuPointerGetAttributes failed with error %s, would be on the host\n", string);
     }
 
     // catch pointers that have not been created in CUDA
