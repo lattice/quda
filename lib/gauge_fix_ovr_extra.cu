@@ -98,7 +98,7 @@ namespace quda {
     for ( int i = 0; i < 2; i++ ) {
       //sort and remove duplicated lattice indices
       thrust_allocator alloc;
-      thrust::sort(thrust::cuda::par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
+      thrust::sort(thrust_par(alloc), array_faceT[i], array_faceT[i] + nlinksfaces);
       thrust::device_ptr<int> new_end = thrust::unique(array_faceT[i], array_faceT[i] + nlinksfaces);
       size[i] = thrust::raw_pointer_cast(new_end) - thrust::raw_pointer_cast(array_faceT[i]);
     }

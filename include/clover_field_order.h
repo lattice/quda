@@ -231,7 +231,7 @@ namespace quda {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           thrust_allocator alloc;
           thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
+          result = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+offset_cb, h, result, r);
         } else {
           // just use offset_cb, since factor of two from parity is equivalent to complexity
           complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
@@ -296,7 +296,7 @@ namespace quda {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           thrust_allocator alloc;
           thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
+          result = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+offset_cb, h, result, r);
         } else {
           // just use offset_cb, since factor of two from parity is equivalent to complexity
           complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);

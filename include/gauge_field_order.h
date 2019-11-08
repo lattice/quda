@@ -455,7 +455,7 @@ namespace quda {
           thrust_allocator alloc;
           for (int d=lower; d<upper; d++) {
             thrust::device_ptr<complex<storeFloat> > ptr(u[d]);
-            result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+2*volumeCB*nColor*nColor, h, result, r);
+            result = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+2*volumeCB*nColor*nColor, h, result, r);
           }
         } else {
           for (int d=lower; d<upper; d++) {
@@ -599,10 +599,10 @@ namespace quda {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           thrust_allocator alloc;
           thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
+          result = thrust::transform_reduce(thrust_par(alloc),
                                             ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
                                             ptr+(0*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
+          result = thrust::transform_reduce(thrust_par(alloc),
                                             ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
                                             ptr+(1*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
         } else {
@@ -797,10 +797,10 @@ namespace quda {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           thrust_allocator alloc;
           thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
+          result = thrust::transform_reduce(thrust_par(alloc),
                                             ptr+0*offset_cb+lower*stride*nColor*nColor,
                                             ptr+0*offset_cb+upper*stride*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
+          result = thrust::transform_reduce(thrust_par(alloc),
                                             ptr+1*offset_cb+lower*stride*nColor*nColor,
                                             ptr+1*offset_cb+upper*stride*nColor*nColor, h, result, r);
         } else {

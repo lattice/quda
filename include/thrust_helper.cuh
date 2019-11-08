@@ -5,8 +5,17 @@
 #undef device_malloc
 #undef device_free
 
+#define __old_thrust__
+
+#ifndef __old_thrust__
+#include <thrust/system/hip/vector.h>
+#include <thrust/system/hip/execution_policy.h>
+#define thrust_par(alloc) thrust::hip::par(alloc)
+#else
 #include <thrust/system/cuda/vector.h>
 #include <thrust/system/cuda/execution_policy.h>
+#define thrust_par(alloc) thrust::cuda::par(alloc)
+#endif 
 #include <thrust/transform_reduce.h>
 #include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>

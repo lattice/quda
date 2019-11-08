@@ -748,7 +748,7 @@ namespace quda {
         if (location == QUDA_CUDA_FIELD_LOCATION) {
           thrust_allocator alloc;
           thrust::device_ptr<complex<storeFloat> > ptr(v);
-          nrm2 = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+          nrm2 = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
           square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
         } else {
           nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
@@ -769,7 +769,7 @@ namespace quda {
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust_allocator alloc;
 	  thrust::device_ptr<complex<storeFloat> > ptr(v);
-	  absmax = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
+	  absmax = thrust::transform_reduce(thrust_par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
 					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
 	} else {
 	  absmax = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
