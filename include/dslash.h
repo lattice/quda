@@ -156,8 +156,9 @@ namespace quda
       if (deviceProp.major >= 7) { // should test whether this is always optimal on Volta
         this->setMaxDynamicSharedBytesPerBlock(f);
       }
-      void *args[] = {&arg};
-      qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+//      Arg *args;hipMalloc(&args, sizeof(Arg));hipMemcpy(args,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+//      f<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*args);
+      f<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
 
     /**
