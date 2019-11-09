@@ -8,12 +8,6 @@
  *
  */
 
-// trove requires the warp shuffle instructions introduced with Kepler
-#if __COMPUTE_CAPABILITY__ >= 300
-#include <trove/ptr.h>
-#else
-#define DISABLE_TROVE
-#endif
 #ifndef __CUDACC_RTC__
 #include <assert.h>
 #endif
@@ -30,6 +24,7 @@
 #include <thrust_helper.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
+#include <trove_helper.cuh>
 
 namespace quda {
 
