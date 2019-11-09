@@ -14,7 +14,7 @@
 namespace quda {
 
 #define MAX_MATRIX_SIZE 4096
-  static __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+//  static __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
 
   // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
   static signed char B_array_h[MAX_MATRIX_SIZE];
@@ -36,6 +36,8 @@ namespace quda {
     int geoBlockSizeCB; // number of geometric elements in each checkerboarded block
     int_fastdiv swizzle; // swizzle factor for transposing blockIdx.x mapping to coarse grid coordinate
     const Vector *B;
+    signed char *B_array_d=NULL;
+
     template <typename... T>
     BlockOrthoArg(ColorSpinorField &V, const int *fine_to_coarse, const int *coarse_to_fine, int parity,
                   const int *geo_bs, const int n_block_ortho, const ColorSpinorField &meta, T... B) :
@@ -231,7 +233,7 @@ namespace quda {
 
   template <int block_size, typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin,
             int nVec, typename Arg>
-  __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
+  __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg &arg)
   {
 
     int x_coarse = blockIdx.x;
@@ -265,7 +267,7 @@ namespace quda {
 
     // cast the constant memory buffer to a Vector array
     typedef typename std::remove_reference<decltype(*arg.B)>::type Vector;
-    const Vector *B = reinterpret_cast<const Vector *>(B_array_d);
+    const Vector *B = reinterpret_cast<const Vector *>(arg.B_array_d);
 
     // loop over number of block orthos
     for (int n = 0; n < arg.nBlockOrtho; n++) {

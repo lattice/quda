@@ -18,6 +18,10 @@ namespace quda
   namespace blas
   {
 
+    __global__ void set_Amatix(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Amatrix_d[idx]=ref[idx];}
+    __global__ void set_Bmatix(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Bmatrix_d[idx]=ref[idx];}
+    __global__ void set_Cmatix(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Cmatrix_d[idx]=ref[idx];}
+
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z
@@ -79,7 +83,7 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg &arg)
     {
       // use i to loop over elements in kernel
       const int k = blockIdx.y * blockDim.y + threadIdx.y;

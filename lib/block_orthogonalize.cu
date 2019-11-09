@@ -115,6 +115,9 @@ namespace quda {
       typedef BlockOrthoArg<Rotator,Vector,nSpin,spinBlockSize,coarseSpin,nVec> Arg;
       Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
       arg.swizzle = tp.aux.x;
+      Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+      hipMalloc(&arg_d->B_array_d, sizeof(signed char)*MAX_MATRIX_SIZE);
+      
 #ifdef JITIFY
       using namespace jitify::reflection;
       auto instance = program->kernel("quda::blockOrthoGPU")
@@ -122,8 +125,11 @@ namespace quda {
       hipMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-      hipMemcpyToSymbolAsync(HIP_SYMBOL(B_array_d), B_array_h, MAX_MATRIX_SIZE, 0, hipMemcpyHostToDevice, stream);
-      LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
+      hipMemcpy(arg_d->B_array_d,B_array_h,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
+      LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,*arg_d,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
+      hipDeviceSynchronize();
+      hipFree(arg_d->B_array_d);
+      hipFree(arg_d);
 #endif
     }
 

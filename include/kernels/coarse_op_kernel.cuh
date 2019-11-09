@@ -210,7 +210,7 @@ namespace quda {
   }
 
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeUVGPU(Arg arg) {
+  __global__ void ComputeUVGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -286,7 +286,7 @@ namespace quda {
   }
 
   template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeAVGPU(Arg arg)
+  __global__ void ComputeAVGPU(Arg &arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -341,7 +341,7 @@ namespace quda {
   }
 
   template<typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeTMAVGPU(Arg arg) {
+  __global__ void ComputeTMAVGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -412,7 +412,7 @@ namespace quda {
     arg.max_h = max;
   }
 
-  template <typename Float, bool twist, typename Arg> __global__ void ComputeCloverInvMaxGPU(Arg arg)
+  template <typename Float, bool twist, typename Arg> __global__ void ComputeCloverInvMaxGPU(Arg &arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -504,7 +504,7 @@ namespace quda {
   }
 
   template <typename Float, int fineSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeTMCAVGPU(Arg arg)
+  __global__ void ComputeTMCAVGPU(Arg &arg)
   {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
@@ -777,7 +777,7 @@ namespace quda {
   }
 
   template<bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  void ComputeVUVCPU(Arg arg) {
+  void ComputeVUVCPU(Arg &arg) {
 
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
     constexpr bool shared_atomic = false; // not supported on CPU
@@ -855,7 +855,7 @@ namespace quda {
 
   template<bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
            int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeVUVGPU(Arg arg) {
+  __global__ void ComputeVUVGPU(Arg &arg) {
 
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
     int parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row;
@@ -910,7 +910,7 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void ComputeYReverseGPU(Arg arg) {
+  __global__ void ComputeYReverseGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -1000,7 +1000,7 @@ namespace quda {
   }
 
   template <bool from_coarse, typename Float, int fineSpin, int coarseSpin, int fineColor, int coarseColor, typename Arg>
-  __global__ void ComputeCoarseCloverGPU(Arg arg) {
+  __global__ void ComputeCoarseCloverGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.fineVolumeCB) return;
 
@@ -1034,7 +1034,7 @@ namespace quda {
 
   //Adds the identity matrix to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void AddCoarseDiagonalGPU(Arg arg) {
+  __global__ void AddCoarseDiagonalGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
@@ -1071,7 +1071,7 @@ namespace quda {
 
   //Adds the twisted-mass term to the coarse local term.
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void AddCoarseTmDiagonalGPU(Arg arg) {
+  __global__ void AddCoarseTmDiagonalGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int parity = blockDim.y*blockIdx.y + threadIdx.y;
@@ -1145,7 +1145,7 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void ConvertGPU(Arg arg) {
+  __global__ void ConvertGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
@@ -1193,7 +1193,7 @@ namespace quda {
   }
 
   template<typename Float, int nSpin, int nColor, typename Arg>
-  __global__ void RescaleYGPU(Arg arg) {
+  __global__ void RescaleYGPU(Arg &arg) {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
 
