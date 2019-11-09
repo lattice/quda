@@ -341,6 +341,7 @@ macro(HIP_PARSE_HIPCC_OPTIONS _option_prefix)
     endforeach()
 endmacro()
 
+
 ###############################################################################
 # MACRO: Try and include dependency file if it exists
 ###############################################################################
@@ -457,7 +458,7 @@ macro(HIP_PREPARE_TARGET_COMMANDS _target _format _generated_files _source_files
         get_source_file_property(_is_header ${file} HEADER_FILE_ONLY)
         # Allow per source file overrides of the format. Also allows compiling non .cu files.
         get_source_file_property(_hip_source_format ${file} HIP_SOURCE_PROPERTY_FORMAT)
-        if((${file} MATCHES "\\.cu_hip$" OR _hip_source_format) AND NOT _is_header)
+        if((${file} MATCHES "\\.cu$" OR _hip_source_format) AND NOT _is_header)
             set(host_flag FALSE)
         else()
             set(host_flag TRUE)
@@ -467,16 +468,15 @@ macro(HIP_PREPARE_TARGET_COMMANDS _target _format _generated_files _source_files
             # Determine output directory
             HIP_COMPUTE_BUILD_PATH("${file}" hip_build_path)
             set(hip_compile_output_dir "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_target}.dir/${hip_build_path}")
+            set(hip_compile_relative_dir "CMakeFiles/${_target}.dir/${hip_build_path}")
 
             get_filename_component(basename ${file} NAME)
             set(generated_file_path "${hip_compile_output_dir}/${CMAKE_CFG_INTDIR}")
-            set(generated_file_basename "${_target}_generated_${basename}${generated_extension}")
+            set(generated_file_basename "${basename}${generated_extension}")
 
             # Set file names
+            set(flag_file "${generated_file_path}/flags.make")
             set(generated_file "${generated_file_path}/${generated_file_basename}")
-            set(cmake_dependency_file "${hip_compile_output_dir}/${generated_file_basename}.depend")
-            set(custom_target_script_pregen "${hip_compile_output_dir}/${generated_file_basename}.cmake.pre-gen")
-            set(custom_target_script "${hip_compile_output_dir}/${generated_file_basename}.cmake")
 
             # Set properties for object files
             set_source_files_properties("${generated_file}"
@@ -492,24 +492,6 @@ macro(HIP_PREPARE_TARGET_COMMANDS _target _format _generated_files _source_files
                 set(source_file "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
             endif()
 
-            # Bring in the dependencies
-            HIP_INCLUDE_HIPCC_DEPENDENCIES(${cmake_dependency_file})
-
-            # Configure the build script
-            configure_file("${HIP_run_hipcc}" "${custom_target_script_pregen}" @ONLY)
-            file(GENERATE
-                OUTPUT "${custom_target_script}"
-                INPUT "${custom_target_script_pregen}"
-                )
-            set(main_dep DEPENDS ${source_file})
-            if(CMAKE_GENERATOR MATCHES "Makefiles")
-                set(verbose_output "$(VERBOSE)")
-            elseif(HIP_VERBOSE_BUILD)
-                set(verbose_output ON)
-            else()
-                set(verbose_output OFF)
-            endif()
-
             # Create up the comment string
             file(RELATIVE_PATH generated_file_relative_path "${CMAKE_BINARY_DIR}" "${generated_file}")
             set(hip_build_comment_string "Building HIPCC object ${generated_file_relative_path}")
@@ -517,19 +499,13 @@ macro(HIP_PREPARE_TARGET_COMMANDS _target _format _generated_files _source_files
             # Build the generated file and dependency file
             add_custom_command(
                 OUTPUT ${generated_file}
-                # These output files depend on the source_file and the contents of cmake_dependency_file
-                ${main_dep}
-                DEPENDS ${HIP_HIPCC_DEPEND}
-                DEPENDS ${custom_target_script}
+                # These output files depend on the source_file and the flags.make
+                DEPENDS ${flag_file}
+		DEPENDS ${source_file}
                 # Make sure the output directory exists before trying to write to it.
-                COMMAND ${CMAKE_COMMAND} -E make_directory "${generated_file_path}"
-                COMMAND ${CMAKE_COMMAND} ARGS
-                -D verbose:BOOL=${verbose_output}
-                -D build_configuration:STRING=${_hip_build_configuration}
-                -D "generated_file:STRING=${generated_file}"
-                -P "${custom_target_script}"
-                WORKING_DIRECTORY "${hip_compile_output_dir}"
-                COMMENT "${hip_build_comment_string}"
+		COMMAND ${HIP_HIPCC_EXECUTABLE} 
+		$(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) 
+		-o ${hip_compile_relative_dir}${generated_file_basename} -c ${source_file}
                 )
 
             # Make sure the build system knows the file is generated
