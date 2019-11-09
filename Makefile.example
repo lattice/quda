@@ -1,0 +1,52 @@
+# -*- Makefile -*-
+# change LQCD_INSTALL, BUILD_PATH and QUDA_PATH
+# compile: make cmake && make hack&& make build
+# Created By Shun Xu, 9 Mar 2019
+# Modilfed By Yi-Bo Yang, 9 Mov 2019
+
+LQCD_INSTALL=${PATH_OF_QMP/QIO}
+
+PWD_DIR=$(shell pwd)
+BUILD_PATH= build_quda
+QUDA_PATH=.
+
+EIGEN_INCLUDE_DIR=${QUDA_PATH}/include/externals/eigen-hacked
+SM_version=sm_30
+LQCD_DEF = -DQUDA_GPU_ARCH=${SM_version}
+LQCD_DEF+= -DQUDA_DIRAC_STAGGERED=ON -DQUDA_DIRAC_DOMAIN_WALL=OFF -DQUDA_DIRAC_TWISTED_MASS=OFF 
+LQCD_DEF+= -DQUDA_LINK_HISQ=OFF  -DQUDA_MULTIGRID=ON -DQUDA_MPI=OFF -DQUDA_INTERFACE_MILC=OFF 
+LQCD_DEF+= -DQUDA_QMP=ON -DQUDA_QMPHOME=$(LQCD_INSTALL)/qmp 
+LQCD_DEF+= -DQUDA_QIO=ON -DQUDA_QIOHOME=$(LQCD_INSTALL)/qio -DQUDA_LIMEHOME=$(LQCD_INSTALL)/qio
+LQCD_DEF+= -DQUDA_USE_EIGEN=ON -DQUDA_DOWNLOAD_EIGEN=OFF -DEIGEN_INCLUDE_DIR=$(EIGEN_INCLUDE_DIR) 
+LQCD_DEF+= -DQUDA_BUILD_SHAREDLIB=ON
+LQCD_DEF+= -DQUDA_BUILD_ALL_TESTS=ON -DQUDA_TEX=OFF -DCMAKE_BUILD_TYPE=DEVEL
+LQCD_DEF+= -DQUDA_LIBS="-L/opt/hpc/software/mpi/hpcx/v2.4.1/gcc-7.2.1/lib/ -lopen-pal /opt/rocm/lib/libhipblas.so"
+
+.PHONY: build
+.PHONY: cmake
+
+## compile targets
+all: cmake hack build
+
+suffix="$(date +%Y%m%d_%T)"
+
+cmake:
+	mkdir -p $(BUILD_PATH)/tmp
+	rm -rf $(BUILD_PATH)/CMakeCache.txt
+	cd $(BUILD_PATH) && MPICXX=mpicxx MPICC=mpicc CC=gcc CXX=hipcc cmake ${QUDA_PATH} $(LQCD_DEF) 
+
+hack:
+	cd $(BUILD_PATH)/lib/CMakeFiles/quda.dir/ &&\
+	cat build.make | sed -e s:") -o CMakeFiles/quda.dir/gauge_stout":")  -fno-inline -o CMakeFiles/quda.dir/gauge_stout":g >build.make.test &&\
+	mv  build.make.test  build.make &&\
+	cat build.make | sed -e s:") -o CMakeFiles/quda.dir/clover_deriv_quda":")  -fno-inline -o CMakeFiles/quda.dir/clover_deriv_quda":g >build.make.test &&\
+	mv  build.make.test  build.make &&\
+	touch -t 10270901 build.make 
+
+build:
+	cd $(BUILD_PATH) && TMPDIR=$(PWD_DIR)/$(BUILD_PATH)/tmp make -j 8 VERBOSE=1 2>&1 | tee build.log
+#	cd $(BUILD_PATH) && TMPDIR=$(PWD_DIR)/$(BUILD_PATH)/tmp make VERBOSE=1 2>&1 | tee build.log
+	
+clean:
+	rm -rf $(BUILD_PATH)/*
+
