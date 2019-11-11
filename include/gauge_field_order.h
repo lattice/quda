@@ -1379,7 +1379,7 @@ namespace quda {
         }
 
         template <typename I>
-        __device__ __host__ inline void Unpack(complex out[18], const real in[12], int idx, int dir, real phase,
+        __device__ __host__ inline void Unpack(complex out[9], const real in[12], int idx, int dir, real phase,
                                                const I *X, const int *R) const
         {
 #pragma unroll
@@ -1560,7 +1560,7 @@ namespace quda {
 
         template <typename I>
         __device__ __host__ inline void
-        Unpack(complex out[18], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
+        Unpack(complex out[9], const real in[8], int idx, int dir, real phase, const I *X, const int *R,
                const complex scale = complex(static_cast<real>(1.0), static_cast<real>(1.0))) const
         {
           complex u = dir < 3 ?
