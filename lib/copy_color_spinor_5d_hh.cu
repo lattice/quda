@@ -16,25 +16,25 @@ namespace madwf_ml {
   template<class real>
   using WilsonVector = ColorSpinor<real, 3, 4>;
 
-  template<class real>
-  class WilsonMatrix {
+  template<class real, int dim>
+  class Matrix {
    
-    static constexpr int size = wm_dim;
+    static constexpr int size = dim * dim;
     complex<real> data[size];
     
   public:
     
-    __device__ __host__ inline WilsonMatrix<real>() {
+    __device__ __host__ inline Matrix<real, dim>() {
       #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = 0; }
     }
 
-    __device__ __host__ inline WilsonMatrix<real>(const WilsonMatrix<real>& a) {
+    __device__ __host__ inline Matrix<real, dim>(const Matrix<real, dim>& a) {
       #pragma unroll
       for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
     }
 
-    __device__ __host__ inline WilsonMatrix<real>& operator=(const WilsonMatrix<real>& a) {
+    __device__ __host__ inline Matrix<real, dim>& operator=(const Matrix<real, dim>& a) {
       if (this != &a) {
         #pragma unroll
         for (int i = 0; i < size; i++) { data[i] = a.data[i]; }
@@ -52,15 +52,18 @@ namespace madwf_ml {
 
     // Wilson Matrix is row major
     __device__ __host__ inline complex<real>& operator()(int row, int column) {
-      return data[row * color_spin_dim + column];
+      return data[row * dim + column];
     }
     
     __device__ __host__ inline const complex<real>& operator()(int row, int column) const {
-      return data[row * color_spin_dim + column];
+      return data[row * dim + column];
     }
   
   };
-  
+ 
+  template<class real>
+  using WilsonMatrix = Matrix<real, color_spin_dim>;
+ 
   template<bool dagger, class real>
   __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const WilsonMatrix<real>& m, const WilsonVector<real>& v){
     WilsonVector<real> out; // out is initialized to zero
@@ -88,6 +91,46 @@ namespace madwf_ml {
       for(int column = 0; column < color_spin_dim; column++){
         m(row, column) = conj(conj(v(row)) * w(column));
         // m(row, column) = conj(v(row)) * w(column);
+      }
+    }
+    return m;
+  }
+
+  template<class real>
+  using SpinMatrix = Matrix<real, spin_dim>;
+ 
+  template<bool dagger, class real>
+  __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const SpinMatrix<real>& m, const WilsonVector<real>& v){
+    WilsonVector<real> out; // out is initialized to zero
+    #pragma unroll
+    for(int color = 0; color < color_dim; color++){
+      #pragma unroll
+      for(int column = 0; column < spin_dim; column++){
+        auto v_col = v(column, color);
+        #pragma unroll
+        for(int row = 0; row < spin_dim; row++){
+          if(dagger){
+            out(row, color) += conj(m(column, row)) * v_col;
+          }else{
+            out(row, color) += m(row, column) * v_col;
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  template<class real>
+  __device__ __host__ inline SpinMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
+    SpinMatrix<real> m;
+    #pragma unroll
+    for(int color = 0; color < color_dim; color++){
+      #pragma unroll
+      for(int row = 0; row < spin_dim; row++){
+        #pragma unroll
+        for(int column = 0; column < spin_dim; column++){
+          m(row, column) += conj(conj(v(row, color)) * w(column, color));
+        }
       }
     }
     return m;
@@ -127,6 +170,12 @@ namespace madwf_ml {
         , dagger(dagger)
         , transfer(true)
         , nParity(in.SiteSubset()) {
+
+          if (volume_4d_cb != out.VolumeCB() / Ls_out){
+            errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", 
+              volume_4d_cb, out.VolumeCB() / Ls_out);
+          }
+
           if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
           if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
           if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
@@ -146,6 +195,12 @@ namespace madwf_ml {
         , dagger(false)
         , transfer(false)
         , nParity(in.SiteSubset()) {
+          
+          if (volume_4d_cb != out.VolumeCB() / Ls_out){
+            errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", 
+              volume_4d_cb, out.VolumeCB() / Ls_out);
+          }
+          
           if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
           if (in.Ncolor() != 3) errorQuda("nColor = %d not support", in.Ncolor());
           if (out.Nspin() != 4) errorQuda("nSpin = %d not support", out.Nspin());
@@ -270,6 +325,9 @@ namespace madwf_ml {
       Transfer5d(const ColorSpinorField &meta, Arg& arg)
         : TunableVectorYZ(arg.Ls_out, arg.nParity), arg(arg), meta(meta) {
         strcpy(aux, meta.AuxString());
+        char tmp[512];
+        sprintf(tmp, ",%02d->%02d", arg.Ls_in, arg.Ls_out);
+        strcat(aux, tmp);
         strcat(aux, arg.transfer?",transfer_5d":",tensor_5d");
         if (arg.dagger) strcat(aux, ",Dagger");
       }
@@ -285,6 +343,11 @@ namespace madwf_ml {
             transfer_5d_kernel<storage_type, false><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
           }
         }else{
+          // Each block has a Wilson Matrix.
+          int num_x_blocks = tp.grid.x;
+          int alloc_size = sizeof(WilsonMatrix<real>);
+          
+
           tensor_5d_kernel<storage_type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); 
         }
       }
@@ -320,12 +383,13 @@ namespace madwf_ml {
     switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION:
         {
+          using arg_type = MadwfMlArg<short>;
           size_t m_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
           if(tp.get_size()*sizeof(float) != m_size){
             errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(complex<float>), m_size);
           }
-          MadwfMlArg<short> arg(out, in, (const WilsonMatrix<float>*)tp.data(), dagger);
-          Transfer5d<short, MadwfMlArg<short>> dslash(in, arg);
+          arg_type arg(out, in, (const WilsonMatrix<float>*)tp.data(), dagger);
+          Transfer5d<short, arg_type> dslash(in, arg);
           dslash.apply(streams[Nstream - 1]);
         }
         break;

@@ -253,6 +253,8 @@ namespace quda {
   void MSPCG::ATx(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp){
   
     int Ls_out = out.X(4);
+    
+    // printfQuda("  Ls = %d\n", Ls_out);
 
     ColorSpinorParam csParam(in);
     
@@ -260,13 +262,14 @@ namespace quda {
     csParam.create = QUDA_NULL_FIELD_CREATE;
     
     dirac_param_precondition.Ls = Ls_out;
-    //double mobius_alpha = (dirac_param_precondition.b_5[0] + dirac_param_precondition.c_5[0]).real();
-    //double new_alpha = mobius_alpha*((double)in.X(4))/((double)Ls_out) ;
-    //for(int s = 0; s < Ls_out; s++){
-    //  dirac_param_precondition.b_5[s] = (new_alpha + 1.0)/2.0;
-    //  dirac_param_precondition.c_5[s] = (new_alpha - 1.0)/2.0;
-    //}
-
+#if 0    
+    double mobius_alpha = (dirac_param_precondition.b_5[0] + dirac_param_precondition.c_5[0]).real();
+    double new_alpha = mobius_alpha*((double)in.X(4))/((double)Ls_out) ;
+    for(int s = 0; s < Ls_out; s++){
+      dirac_param_precondition.b_5[s] = (new_alpha + 1.0)/2.0;
+      dirac_param_precondition.c_5[s] = (new_alpha - 1.0)/2.0;
+    }
+#endif
     DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
     cudaColorSpinorField truncated_cs_field_in(csParam);
     cudaColorSpinorField ip(csParam);
@@ -276,7 +279,7 @@ namespace quda {
     madwf_ml::transfer_5d_hh(truncated_cs_field_in, in, tp, false);
     // A * T * phi
     // mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
-  
+    
     blas::zero(out);
     double rk2 = blas::norm2(truncated_cs_field_in);
     double Mpk2, alpha, beta, rkp12;
@@ -289,14 +292,15 @@ namespace quda {
       beta = rkp12 / rk2;
       rk2 = rkp12;
       axpyZpbx(alpha, ip, out, truncated_cs_field_in, beta);
-      // printfQuda("  r2 = %8.4e\n", rk2);
+      // printfQuda("  r2 = %8.4e, alpha = %8.4e, beta = %8.4e, Mpk2 = %8.4e\n", rk2, alpha, beta, Mpk2);
+      // if(isnan(rk2)) errorQuda("NaN detected!\n");
     }
- 
-    //for(int s = 0; s < Ls_out; s++){
-    //  dirac_param_precondition.b_5[s] = (mobius_alpha + 1.0)/2.0;
-    //  dirac_param_precondition.c_5[s] = (mobius_alpha - 1.0)/2.0;
-    //}
-
+#if 0    
+    for(int s = 0; s < Ls_out; s++){
+      dirac_param_precondition.b_5[s] = (mobius_alpha + 1.0)/2.0;
+      dirac_param_precondition.c_5[s] = (mobius_alpha - 1.0)/2.0;
+    }
+#endif    
  
   }
 
@@ -358,16 +362,17 @@ namespace quda {
     
     madwf_ml::TrainingParameter<float> P(tp.size());
 
-    double pmu = 0.0;
+    // double pmu = 0.0;
 
-    double old_chi2 = 0.0;
+    // double old_chi2 = 0.0;
     float alpha;
     float b = 0.99;
     printfQuda("beta = %f\n", b);
-    for(int iteration = 0; iteration < 3600; iteration++){
+    printfQuda("training mu   = %f\n", dirac_param_precondition.mu);
+    for(int iteration = 0; iteration < 1000; iteration++){
       
       madwf_ml::TrainingParameter<float> D(tp.size());
-      double dmu = 0.0;
+      // double dmu = 0.0;
       
       double chi2 = 0.0;
       std::vector<double> a(5, 0.0);
@@ -379,12 +384,12 @@ namespace quda {
         ATx(ATphi, *phi, T);
         inner_dslash(Mchi, chi);
         ATx(ATMchi, Mchi, T);
-
+        
         madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
         madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
- 
+
         madwf_ml::axpby(D, 2.0f, d1, 2.0f, d2);
-        dmu += 2.0 * reDotProduct(Mchi, *phi);
+        // dmu += 2.0 * reDotProduct(Mchi, *phi);
 #if 0
         double d = 0.4;
         for(int i = 0; i < 14; i++){
@@ -400,7 +405,8 @@ namespace quda {
       
       // printfQuda("D[0] = %+8.4e\n", D[0]);
       madwf_ml::axpby(P, (b-1), P, (1-b), D);
-      pmu = b * pmu + (1-b) * dmu;
+
+      // pmu = b * pmu + (1-b) * dmu;
   
       // printfQuda("P[0] = %+8.4e\n", P[0]);
 
@@ -420,7 +426,7 @@ namespace quda {
         madwf_ml::transfer_5d_hh(tmp, ADphi, T, true);
         // theta
         axpy(1.0, theta, tmp);
-        axpy(pmu, *phi, tmp);
+        // axpy(pmu, *phi, tmp);
 
         inner_dslash(theta, tmp);
 
@@ -450,10 +456,10 @@ namespace quda {
       double r[3] = {0.0, 0.0, 0.0};
       solve_deg3(4.0*a[4], 3.0*a[3], 2.0*a[2], a[1], r[0], r[1], r[2]);
 
-      for(int i = 0; i < 3; i++){
-        printfQuda("r[%d] = %+8.4e, ", i, r[i]);
-      }
-      printfQuda("\n");
+      // for(int i = 0; i < 3; i++){
+      //   printfQuda("r[%d] = %+8.4e, ", i, r[i]);
+      // }
+      // printfQuda("\n");
 
       // try the three roots
       double try_root[3];
@@ -474,11 +480,11 @@ namespace quda {
         alpha = r[2]; 
       }
       madwf_ml::axpby(T, 0.0f, T, -alpha, P);
-      mu -= alpha * pmu;
+      // mu -= alpha * pmu;
 
       // printfQuda("training_param[0] = %8.4e\n", tp[0]);
 
-      printf("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e, mu = %8.4e\n", comm_rank(), iteration, chi2, chi2/ref, alpha, mu);
+      printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e, mu = %8.4e\n", comm_rank(), iteration, chi2, chi2/ref, alpha, mu);
 
     }
    
@@ -494,9 +500,11 @@ namespace quda {
     tp = T.to_host();
 
     std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
-    save_param_path += "/training_param_" + std::to_string(comm_rank()) + ".dat";
+    char cstring[512];
+    sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
+    save_param_path += std::string(cstring);
     FILE* fp = fopen(save_param_path.c_str(), "w");
-    fwrite(tp.data(), tp.size()*sizeof(float), 1, fp);
+    fwrite(tp.data(), sizeof(float), tp.size(), fp);
     printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
     return;
   }
@@ -526,7 +534,7 @@ namespace quda {
     }
     static std::vector<float> training_param(Ls*Ls_cheap*144*2, 0.1f);
     static madwf_ml::TrainingParameter<float> device_tp(training_param);
-    static double mu = 3.1566e-01;
+    static double mu = dirac_param_precondition.mu;
     // static double mu = 1.2425e-01;
     // static double mu = 1.07361e-1;
     // static double mu = 0.3833;
@@ -538,27 +546,34 @@ namespace quda {
       device_tp.from_host(training_param);
     }
    
-    if(load_from_file){
+    if(load_from_file && !loaded_from_file){
+      printfQuda("inference mu   = %f\n", dirac_param_precondition.mu);
       std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
-      save_param_path += "/training_param_" + std::to_string(comm_rank()) + ".dat";
+      char cstring[512];
+      sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_cheap, mu);
+      save_param_path += std::string(cstring);
       // save_param_path += "/training_param_" + std::to_string(0) + ".dat";
       FILE* fp = fopen(save_param_path.c_str(), "rb");
       if(!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
-      fread(training_param.data(), training_param.size()*sizeof(float), 1, fp);
+      size_t fread_count = fread(training_param.data(), sizeof(float), training_param.size(), fp);
+      if(fread_count != training_param.size()){
+        errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count, training_param.size());
+      }
       printfQuda("Training params loaded from %s.\n", save_param_path.c_str());
       load_from_file = false;
       loaded_from_file = true;
       device_tp.from_host(training_param);
     }
     if(trained){
-      //double chi2 = calculate_chi(*ip, ib, device_tp, mu, Ls_cheap, &ix);
-      //double persistent_b2 = norm2(ib);
-      //printf("rank %03d, chi2 %% = %8.4e, ix2 = %8.4e \n", comm_rank(), chi2 / persistent_b2, norm2(ix));
+      double chi2 = calculate_chi(*ip, ib, device_tp, mu, Ls_cheap, &ix);
+      double persistent_b2 = norm2(ib);
+      printfQuda("rank %03d, chi2 %% = %8.4e, ix2 = %8.4e ", comm_rank(), chi2 / persistent_b2, norm2(ix));
     }
     // blas::zero(ix);
     // axpy(1.0, ib, ix);
     // if(!trained || loaded_from_file){
     if(!trained){
+    // copy(ix, ib);
       ColorSpinorParam csParam(ib);
       cudaColorSpinorField b(csParam);
       b = ib;
