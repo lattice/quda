@@ -369,7 +369,7 @@ namespace quda {
     float b = 0.99;
     printfQuda("beta = %f\n", b);
     printfQuda("training mu   = %f\n", dirac_param_precondition.mu);
-    for(int iteration = 0; iteration < 1000; iteration++){
+    for(int iteration = 0; iteration < 2400; iteration++){
       
       madwf_ml::TrainingParameter<float> D(tp.size());
       // double dmu = 0.0;
