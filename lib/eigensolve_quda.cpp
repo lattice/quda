@@ -962,7 +962,7 @@ namespace quda
     if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
       if ((int)kSpace.size() < offset + iter_keep) {
         for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
           kSpace.push_back(ColorSpinorField::Create(csParam));
         }
       }
@@ -998,7 +998,7 @@ namespace quda
 
       if ((int)kSpace.size() < offset + batch_size) {
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
           kSpace.push_back(ColorSpinorField::Create(csParam));
         }
       }
