@@ -78,8 +78,9 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;
-#endif
+#else
   gauge_param.ga_pad = 0;
+#endif
 }
 
 extern void usage(char **);
