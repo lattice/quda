@@ -62,6 +62,53 @@ cpuColorSpinorField *tmp;
 
 static void end();
 
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  eig_param.cuda_prec_ritz = prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
+
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
   gauge_param.X[0] = xdim;
@@ -73,8 +120,10 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec = prec;
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_sloppy = prec_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
 
   gauge_param.anisotropy = 1.0;
 
@@ -121,7 +170,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   // outer solver parameters
   inv_param.inv_type = inv_type;
   inv_param.tol = tol;
-  inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
+  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
   inv_param.use_alternative_reliable = alternative_reliable;
@@ -150,11 +199,10 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.Nsteps = 2;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.cuda_prec_precondition = inv_param.cuda_prec_sloppy;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -174,6 +222,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec;
   inv_param.cuda_prec_sloppy = prec_sloppy;
+  inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
@@ -202,6 +251,9 @@ int invert_test()
   setGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -344,21 +396,23 @@ int invert_test()
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = gauge_param.reconstruct_refinement_sloppy
+      = QUDA_RECONSTRUCT_NO;
   }
-  gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-  gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct = link_recon; 
-    gauge_param.reconstruct_sloppy = link_recon_sloppy; 
-    gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-    gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 
@@ -605,8 +659,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
+  add_eigen_option_group(app);
+  add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};
