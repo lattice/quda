@@ -871,6 +871,11 @@ set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
 
+if(${CUDA_VERSION} STREQUAL "10.2")
+  set(CMAKE_CUDA_FLAGS
+      "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
+endif()
+
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
