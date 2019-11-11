@@ -47,7 +47,7 @@ endif()
 # define tests
 
 # if we build with QDP JIT the tests cannot run anyway
-if(QUDA_INTERFACE_QDPJIT)
+if(QUDA_QDPJIT)
   set(QUDA_BUILD_ALL_TESTS OFF)
 endif()
 
@@ -501,7 +501,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
   if(QUDA_COVDEV)
     add_test(NAME covdev_-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNC} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
    endif()

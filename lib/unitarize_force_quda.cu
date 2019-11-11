@@ -488,15 +488,15 @@ namespace quda{
       Matrix<complex<Float>,3> v_tmp, result_tmp, oprod_tmp;
 
       for(int dir=0; dir<4; ++dir){
-	arg.force_old.load((Float*)(oprod_tmp.data), idx, dir, parity);
-	arg.gauge.load((Float*)(v_tmp.data), idx, dir, parity);
+	oprod_tmp = arg.force_old(dir, idx, parity);
+	v_tmp = arg.gauge(dir, idx, parity);
 	v = v_tmp;
 	oprod = oprod_tmp;
 
 	getUnitarizeForceSite<double>(result, v, oprod, arg);
 	result_tmp = result;
 
-	arg.force.save((Float*)(result_tmp.data), idx, dir, parity);
+	arg.force(dir, idx, parity) = result_tmp;
       } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
@@ -510,15 +510,15 @@ namespace quda{
       for (int parity=0; parity<2; parity++) {
 	for (int i=0; i<arg.threads/2; i++) {
 	  for (int dir=0; dir<4; dir++) {
-	    arg.force_old.load((Float*)(oprod_tmp.data), i, dir, parity);
-	    arg.gauge.load((Float*)(v_tmp.data), i, dir, parity);
+	    oprod_tmp = arg.force_old(dir, i, parity);
+	    v_tmp = arg.gauge(dir, i, parity);
 	    v = v_tmp;
 	    oprod = oprod_tmp;
 
 	    getUnitarizeForceSite<double>(result, v, oprod, arg);
 
 	    result_tmp = result;
-	    arg.force.save((Float*)(result_tmp.data), i, dir, parity);
+	    arg.force(dir, i, parity) = result_tmp;
 	  }
 	}
       }

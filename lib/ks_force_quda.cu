@@ -12,7 +12,7 @@ namespace quda {
 
   template<typename Oprod, typename Gauge, typename Mom>
     struct KSForceArg {
-      int threads; 
+      int threads;
       int X[4]; // grid dimensions
 #ifndef BUILD_TIFR_INTERFACE
 #ifdef MULTI_GPU
@@ -23,7 +23,7 @@ namespace quda {
       Gauge gauge;
       Mom mom;
 
-      KSForceArg(Oprod& oprod, Gauge &gauge, Mom& mom, int dim[4]) 
+      KSForceArg(Oprod& oprod, Gauge &gauge, Mom& mom, int dim[4])
         : oprod(oprod), gauge(gauge), mom(mom){
 
           threads = 1;
@@ -38,7 +38,6 @@ namespace quda {
         }
 
     };
-
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
     __host__ __device__ void completeKSForceCore(KSForceArg<Oprod,Gauge,Mom>& arg, int idx){
@@ -63,40 +62,21 @@ namespace quda {
 #endif
 #endif
 
-      Matrix<complex<Float>,3> O;
-      Matrix<complex<Float>,3> G;
-      Matrix<complex<Float>,3> M;
-
+      Matrix<complex<Float>,3> O, G, M;
 
       int dx[4] = {0,0,0,0};
       for(int dir=0; dir<4; ++dir){
-        arg.gauge.load((Float*)(G.data), linkIndexShift(x,dx,X), dir, parity); 
-        arg.oprod.load((Float*)(O.data), linkIndexShift(x,dx,X), dir, parity); 
+        G = arg.gauge(dir, linkIndexShift(x,dx,X), parity);
+        O = arg.oprod(dir, linkIndexShift(x,dx,X), parity);
         if(parity==0){
-          M = G*O; 
+          M = G*O;
         }else{
           M = -G*O;
         }
 
-        Float sub = getTrace(M).y/(static_cast<Float>(3));
-        Float temp[10];
+        makeAntiHerm(M);
 
-
-        temp[0] = (M.data[1].x - M.data[3].x)*0.5;
-        temp[1] = (M.data[1].y + M.data[3].y)*0.5;
-
-        temp[2] = (M.data[2].x - M.data[6].x)*0.5;
-        temp[3] = (M.data[2].y + M.data[6].y)*0.5;
-
-        temp[4] = (M.data[5].x - M.data[7].x)*0.5;
-        temp[5] = (M.data[5].y + M.data[7].y)*0.5;
-
-        temp[6] = (M.data[0].y-sub);
-        temp[7] = (M.data[4].y-sub);
-        temp[8] = (M.data[8].y-sub);
-        temp[9] = 0.0;
-
-        arg.mom.save(temp, idx, dir, parity);
+        arg.mom(dir, idx, parity) = M;
       }
     }
 
@@ -109,9 +89,6 @@ namespace quda {
       completeKSForceCore<Float,Oprod,Gauge,Mom>(arg,idx);
     }
 
-
-
-
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
     void completeKSForceCPU(KSForceArg<Oprod,Gauge,Mom>& arg)
     {
@@ -119,8 +96,6 @@ namespace quda {
         completeKSForceCore<Float,Oprod,Gauge,Mom>(arg,idx);
       }
     }
-
-
 
   template<typename Float, typename Oprod, typename Gauge, typename Mom>
     class KSForceComplete : Tunable {
@@ -158,7 +133,7 @@ namespace quda {
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-      long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; } 
+      long long flops() const { return 792*arg.X[0]*arg.X[1]*arg.X[2]*arg.X[3]; }
       long long bytes() const { return 0; } // Fix this
     };
 
@@ -168,7 +143,7 @@ namespace quda {
       KSForceArg<Oprod,Gauge,Mom> arg(oprod, gauge, mom, dim);
       KSForceComplete<Float,Oprod,Gauge,Mom> completeForce(arg,meta,location);
       completeForce.apply(0);
-      if(flops) *flops = completeForce.flops();	
+      if(flops) *flops = completeForce.flops();
       qudaDeviceSynchronize();
     }
 
@@ -215,7 +190,7 @@ namespace quda {
 
   template<typename Result, typename Oprod, typename Gauge>
     struct KSLongLinkArg {
-      int threads; 
+      int threads;
       int X[4]; // grid dimensions
 #ifdef MULTI_GPU
       int border[4];
@@ -225,7 +200,7 @@ namespace quda {
       Oprod oprod;
       Gauge gauge;
 
-      KSLongLinkArg(Result& res, Oprod& oprod, Gauge &gauge, int dim[4]) 
+      KSLongLinkArg(Result& res, Oprod& oprod, Gauge &gauge, int dim[4])
         : coeff(1.0), res(res), oprod(oprod), gauge(gauge){
 
           threads = 1;
@@ -276,10 +251,10 @@ Matrix<Cmplx,3> M;
 
 int dx[4] = {0,0,0,0};
 for(int dir=0; dir<4; ++dir){
-arg.gauge.load((Float*)(G.data), linkIndexShift(x,dx,X), dir, parity); 
-arg.oprod.load((Float*)(O.data), linkIndexShift(x,dx,X), dir, parity); 
+arg.gauge.load((Float*)(G.data), linkIndexShift(x,dx,X), dir, parity);
+arg.oprod.load((Float*)(O.data), linkIndexShift(x,dx,X), dir, parity);
 if(parity==0){
-M = G*O; 
+M = G*O;
 }else{
 M = -G*O;
 }
@@ -369,7 +344,7 @@ class KSLongLinkForce : Tunable {
 
   long long flops() const { return 0; } // Fix this
   long long bytes() const { return 0; } // Fix this
-}; 
+};
 
 
 
@@ -389,12 +364,12 @@ void computeKSLongLinkForce(GaugeField& result, const GaugeField &oprod, const G
   if(location != QUDA_CUDA_FIELD_LOCATION){
     errorQuda("Only QUDA_CUDA_FIELD_LOCATION currently supported");
   }else{
-    if((oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) || (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) || 
+    if((oprod.Reconstruct() != QUDA_RECONSTRUCT_NO) || (gauge.Reconstruct() != QUDA_RECONSTRUCT_NO) ||
         (result.Reconstruct() != QUDA_RECONSTRUCT_10)){
 
       errorQuda("Reconstruct type not supported");
     }else{
-      computeKSLongLinkForce<Float>(FloatNOrder<Float, 18, 2, 18>(result), 
+      computeKSLongLinkForce<Float>(FloatNOrder<Float, 18, 2, 18>(result),
 				    FloatNOrder<Float, 18, 2, 18>(oprod),
 				    FloatNOrder<Float, 18, 2, 18>(gauge),
 				    const_cast<int*>(result.X()),

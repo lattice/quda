@@ -90,8 +90,14 @@ using namespace gauge;
     while (x < arg.threads) {
       // loop over direction
       for (int mu=0; mu<4; mu++) {
-	Float v[10];
-	arg.mom.load(v, x, mu, parity);
+        // FIXME should understand what this does exactly and cleanup (matches MILC)
+	complex<Float> v_[5];
+	arg.mom.load(v_, x, mu, parity);
+        Float v[10];
+        for (int i=0; i<5; i++) {
+          v[2*i+0] = v_[i].real();
+          v[2*i+1] = v_[i].imag();
+        }
 
 	double local_sum = 0.0;
 	for (int j=0; j<6; j++) local_sum += v[j]*v[j];
@@ -366,12 +372,12 @@ using namespace gauge;
 
     while (x<arg.threads) {
       for (int d=0; d<4; d++) {
-	arg.force.load(reinterpret_cast<Float*>(f.data), x, d, parity);
-	arg.U.load(reinterpret_cast<Float*>(u.data), x, d, parity);
+	f = arg.force(d, x, parity);
+	u = arg.U(d, x, parity);
 
 	f = u * f;
 
-	arg.force.save(reinterpret_cast<Float*>(f.data), x, d, parity);
+	arg.force(d, x, parity) = f;
       }
 
       x += gridDim.x*blockDim.x;
