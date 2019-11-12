@@ -742,8 +742,7 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead.\n");
-        return;
+        errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       axpy_recurse<multicaxpy_>(a_, x, y, 0, 0, 1);
     }
@@ -754,19 +753,16 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead.\n");
-        return;
+        errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
       axpy_recurse<multicaxpy_>(a_, x, y, 0, 0, -1);
     }
-
 
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
 
     void caxpy_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_U(a, x.Components(), y.Components()); }
 
     void caxpy_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy_L(a, x.Components(), y.Components()); }
-
 
     void caxpyz_recurse(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z, int i, int j, int pass, int upper) {
 
@@ -952,8 +948,34 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a_, x, y, 0, 0, 0);
     }
 
+    void axpy_U(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
+      //                                         which lets us skip some tiles.
+      if (x.size() != y.size())
+      {
+        errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
+      }
+      axpy_recurse<multiaxpy_>(a_, x, y, 0, 0, 1);
+    }
+
+    void axpy_L(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+      // Enter a recursion.
+      // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
+      //                                         which lets us skip some tiles.
+      if (x.size() != y.size())
+      {
+        errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
+      }
+      axpy_recurse<multiaxpy_>(a_, x, y, 0, 0, -1);
+    }
+
     // Composite field version
     void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy(a, x.Components(), y.Components()); }
+
+    void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_U(a, x.Components(), y.Components()); }
+
+    void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y) { axpy_L(a, x.Components(), y.Components()); }
 
 
   } // namespace blas

@@ -83,6 +83,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
+  eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
