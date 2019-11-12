@@ -156,23 +156,6 @@ namespace madwf_ml {
   
   }
 
-
-  template<class real>
-  __device__ __host__ inline SpinMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
-    SpinMatrix<real> m;
-    #pragma unroll
-    for(int color = 0; color < color_dim; color++){
-      #pragma unroll
-      for(int row = 0; row < spin_dim; row++){
-        #pragma unroll
-        for(int column = 0; column < spin_dim; column++){
-          m(row, column) += conj(conj(v(row, color)) * w(column, color));
-        }
-      }
-    }
-    return m;
-  }
-
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
   template <class storage_type, class matrix_type> struct MadwfMlArg {
@@ -272,7 +255,7 @@ namespace madwf_ml {
       if (parity >= arg.nParity) return;
    
       VectorCache<real, Vector> cache;
-      
+     
       int ld = Ls_in * blockDim.x;
       int t = s;
       while(t < Ls_in){
