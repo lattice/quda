@@ -43,11 +43,21 @@ namespace quda {
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaMemset(ptr, value, count)                       \
+  ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaMemsetAsync(ptr, value, count, stream)                       \
+  ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 namespace quda {
 
   /**
      @brief Wrapper around cudaMemcpyAsync or driver API equivalent
-     Potentially add auto-profiling support.
+     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
@@ -59,7 +69,7 @@ namespace quda {
 
   /**
      @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
-     Potentially add auto-profiling support.
+     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
      @param[in] src Source pointer
@@ -72,6 +82,27 @@ namespace quda {
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
                           size_t width, size_t hieght, cudaMemcpyKind kind, const cudaStream_t &stream,
                           const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemset or driver API equivalent.
+     Adds auto-profiling support.
+     @param[out] ptr Starting address pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+   */
+  void qudaMemset_(void *ptr, int value, size_t count,
+                   const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent.
+     Adds auto-profiling support.
+     @param[out] ptr Starting address pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+     @param[in] stream  Stream to issue memset
+   */
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream,
+                        const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaLaunchKernel
