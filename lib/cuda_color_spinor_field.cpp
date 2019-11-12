@@ -31,14 +31,12 @@ namespace quda {
 
     create(param.create);
 
-    if  (param.create == QUDA_NULL_FIELD_CREATE) {
-      // do nothing
-    } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
-      zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      // do nothing
-    } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-      errorQuda("not implemented");
+    switch (param.create) {
+    case QUDA_NULL_FIELD_CREATE:
+    case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing;
+    case QUDA_ZERO_FIELD_CREATE: zero(); break;
+    case QUDA_COPY_FIELD_CREATE: errorQuda("Copy field create not implemented for this constructor");
+    default: errorQuda("Unexpected create type %d", param.create);
     }
   }
 

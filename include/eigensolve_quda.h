@@ -106,24 +106,77 @@ public:
     Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
     /**
-       @brief Deflate vector with Eigenvectors
-       @param[in] vec_defl The deflated vector
-       @param[in] vec The input vector
+       @brief Deflate a set of source vectors with a given eigenspace
+       @param[in] sol The resulting deflated vector set
+       @param[in] src The source vector set we are deflating
        @param[in] evecs The eigenvectors to use in deflation
        @param[in] evals The eigenvalues to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                 std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
+    void deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                 const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                 bool accumulate = false) const;
 
     /**
-       @brief Deflate vector with both left and Right singular vectors
-       @param[in] vec_defl The deflated vector
-       @param[in] vec The input vector
+       @brief Deflate a given source vector with a given eigenspace.
+       This is a wrapper variant for a single source vector.
+       @param[in] sol The resulting deflated vector
+       @param[in] src The source vector we are deflating
+       @param[in] evecs The eigenvectors to use in deflation
+       @param[in] evals The eigenvalues to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+    */
+    void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
+                 const std::vector<Complex> &evals, bool accumulate = false)
+    {
+      // FIXME add support for mixed-precison dot product to avoid this copy
+      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
+        ColorSpinorParam param(*evecs[0]);
+        tmp1 = ColorSpinorField::Create(param);
+      }
+      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
+      blas::copy(*src_tmp, src); // no-op if these alias
+      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> sol_ {&sol};
+      deflate(sol_, src_, evecs, evals, accumulate);
+    }
+
+    /**
+       @brief Deflate a set of source vectors with a set of left and
+       right singular vectors
+       @param[in] sol The resulting deflated vector set
+       @param[in] src The source vector set we are deflating
        @param[in] evecs The singular vectors to use in deflation
        @param[in] evals The singular values to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
     */
-    void deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                    std::vector<ColorSpinorField *> evecs, std::vector<Complex> evals);
+    void deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &vec,
+                    const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                    bool accumulate = false) const;
+
+    /**
+       @brief Deflate a a given source vector with a given with a set of left and
+       right singular vectors  This is a wrapper variant for a single source vector.
+       @param[in] sol The resulting deflated vector set
+       @param[in] src The source vector set we are deflating
+       @param[in] evecs The singular vectors to use in deflation
+       @param[in] evals The singular values to use in deflation
+       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+    */
+    void deflateSVD(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
+                    const std::vector<Complex> &evals, bool accumulate = false)
+    {
+      // FIXME add support for mixed-precison dot product to avoid this copy
+      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
+        ColorSpinorParam param(*evecs[0]);
+        tmp1 = ColorSpinorField::Create(param);
+      }
+      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
+      blas::copy(*src_tmp, src); // no-op if these alias
+      std::vector<ColorSpinorField *> src_ {src_tmp};
+      std::vector<ColorSpinorField *> sol_ {&sol};
+      deflateSVD(sol_, src_, evecs, evals, accumulate);
+    }
 
     /**
        @brief Computes Left/Right SVD from pre computed Right/Left
@@ -138,9 +191,21 @@ public:
        @param[in] mat Matrix operator
        @param[in] evecs The eigenvectors
        @param[in] evals The eigenvalues
-       @param[in] k The number to compute
+       @param[in] size The number of eigenvalues to compute
     */
-    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals, int k);
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals,
+                      int size);
+
+    /**
+       @brief Compute eigenvalues and their residiua.  This variant compute the number of converged eigenvalues.
+       @param[in] mat Matrix operator
+       @param[in] evecs The eigenvectors
+       @param[in] evals The eigenvalues
+    */
+    void computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
+    {
+      computeEvals(mat, evecs, evals, nConv);
+    }
 
     /**
        @brief Load vectors from file

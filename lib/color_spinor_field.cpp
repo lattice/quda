@@ -20,6 +20,7 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
+    if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
         param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type);
@@ -425,7 +426,7 @@ namespace quda {
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
     param.pc_type = pc_type;
-    param.create = QUDA_INVALID_FIELD_CREATE;
+    param.create = QUDA_NULL_FIELD_CREATE;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const {

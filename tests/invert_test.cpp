@@ -22,8 +22,6 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-
-
 void
 display_test_info()
 {
@@ -49,6 +47,53 @@ display_test_info()
   
 }
 
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  eig_param.cuda_prec_ritz = prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_NO;
+    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
+
 int main(int argc, char **argv)
 {
 
@@ -59,8 +104,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
+  add_eigen_option_group(app);
+  add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
@@ -108,7 +153,10 @@ int main(int argc, char **argv)
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
- 
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
+
   double kappa5;
 
   gauge_param.X[0] = xdim;
@@ -187,7 +235,7 @@ int main(int argc, char **argv)
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
   inv_param.tol = tol;
-  inv_param.tol_restart = 1e-3; //now theoretical background for this parameter... 
+  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
@@ -347,6 +395,9 @@ int main(int argc, char **argv)
   for (int i = 0; i < Nsrc; i++) {
 
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+
+    // if deflating preserve the deflation space between solves
+    eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
     if (multishift) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
@@ -653,6 +704,15 @@ int main(int argc, char **argv)
   endQuda();
 
   finalizeComms();
+
+  free(spinorIn);
+  free(spinorCheck);
+  if (multishift) {
+    for (int i = 0; i < inv_param.num_offset; i++) free(spinorOutMulti[i]);
+    free(spinorOutMulti);
+  } else {
+    free(spinorOut);
+  }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     if (clover) free(clover);

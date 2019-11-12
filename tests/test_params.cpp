@@ -54,6 +54,7 @@ quda::mgarray<int> nvec = {};
 quda::mgarray<char[256]> mg_vec_infile;
 quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
+bool inv_deflate = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
@@ -178,6 +179,7 @@ quda::mgarray<bool> mg_eig_use_dagger = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 bool mg_eig_coarse_guess = false;
+bool mg_eig_preserve_deflation = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -238,8 +240,10 @@ namespace
                                                            {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
                                                            {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
-  CLI::TransformPairs<QudaPrecision>
-    precision_map({{"double", QUDA_DOUBLE_PRECISION}, {"single", QUDA_SINGLE_PRECISION}, {"half", QUDA_HALF_PRECISION}});
+  CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
+                                                    {"single", QUDA_SINGLE_PRECISION},
+                                                    {"half", QUDA_HALF_PRECISION},
+                                                    {"quarter", QUDA_QUARTER_PRECISION}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -349,6 +353,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
+  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -621,8 +626,10 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-eig-check-interval", mg_eig_check_interval, CLI::Validator(),
     "Perform a convergence check every nth restart/iteration (only used in Implicit Restart types)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-coarse-guess", mg_eig_use_poly_acc, CLI::Validator(),
-                         "If deflating on the coarse grid, optionaly use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-coarse-guess", mg_eig_coarse_guess,
+                       "If deflating on the coarse grid, optionally use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-preserve-deflation", mg_eig_preserve_deflation,
+                       "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),

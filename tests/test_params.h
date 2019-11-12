@@ -132,6 +132,17 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 
+template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
+{
+  auto it
+    = std::find_if(map.begin(), map.end(), [&val](const decltype(map.back()) &p) -> bool { return p.second == val; });
+  return it->first;
+}
+
+// template<typename T>
+// const char* inline get_cstring(CLI::TransformPairs<T> &map, T val){
+//   return get_string(map,val).c_str();
+// }
 // parameters
 
 extern int device;
@@ -175,6 +186,7 @@ extern quda::mgarray<int> nvec;
 extern quda::mgarray<char[256]> mg_vec_infile;
 extern quda::mgarray<char[256]> mg_vec_outfile;
 extern QudaInverterType inv_type;
+extern bool inv_deflate;
 extern QudaInverterType precon_type;
 extern int multishift;
 extern bool verify_results;
@@ -298,6 +310,7 @@ extern quda::mgarray<bool> mg_eig_use_dagger;
 extern quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum;
 extern quda::mgarray<QudaEigType> mg_eig_type;
 extern bool mg_eig_coarse_guess;
+extern bool mg_eig_preserve_deflation;
 
 extern double heatbath_beta_value;
 extern int heatbath_warmup_steps;
