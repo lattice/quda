@@ -83,20 +83,6 @@ namespace madwf_ml {
   }
 
   template<class real>
-  __device__ __host__ inline WilsonMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
-    WilsonMatrix<real> m;
-    #pragma unroll
-    for(int row = 0; row < color_spin_dim; row++){
-      #pragma unroll
-      for(int column = 0; column < color_spin_dim; column++){
-        m(row, column) = conj(conj(v(row)) * w(column));
-        // m(row, column) = conj(v(row)) * w(column);
-      }
-    }
-    return m;
-  }
-
-  template<class real>
   using SpinMatrix = Matrix<real, spin_dim>;
  
   template<bool dagger, class real>
@@ -121,6 +107,57 @@ namespace madwf_ml {
   }
 
   template<class real>
+  __device__ inline void vector_tensor_matrix(WilsonMatrix<real>* mp, const WilsonVector<real>& v, const WilsonVector<real>& w){
+    
+    typedef cub::WarpReduce<complex<real>> WarpReduce;
+    __shared__ typename WarpReduce::TempStorage temp_storage;
+    
+    real* real_p = reinterpret_cast<real*>(mp);
+
+    #pragma unroll
+    for(int a = 0; a < color_spin_dim; a++){
+    #pragma unroll
+    for(int b = 0; b < color_spin_dim; b++){
+      int cs = a * color_spin_dim + b;
+      complex<real> z = conj(conj(v(a)) * w(b));
+      complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
+      if(threadIdx.x == 0) {
+        atomicAdd(&real_p[cs * 2 + 0], aggregate.real());
+        atomicAdd(&real_p[cs * 2 + 1], aggregate.imag());
+      }
+    }}
+  
+  }
+  
+  template<class real>
+  __device__ inline void vector_tensor_matrix(SpinMatrix<real>* mp, const WilsonVector<real>& v, const WilsonVector<real>& w){
+    
+    typedef cub::WarpReduce<complex<real>> WarpReduce;
+    __shared__ typename WarpReduce::TempStorage temp_storage;
+    
+    real* real_p = reinterpret_cast<real*>(mp);
+    
+    #pragma unroll
+    for(int a = 0; a < spin_dim; a++){
+    #pragma unroll
+    for(int b = 0; b < spin_dim; b++){
+      int cs = a * spin_dim + b;
+      complex<real> z = 0;
+      #pragma unroll
+      for(int color = 0; color < color_dim; color++){
+        z += conj(conj(v(a, color)) * w(b, color));
+      }
+      complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
+      if(threadIdx.x == 0) {
+        atomicAdd(&real_p[cs * 2 + 0], aggregate.real());
+        atomicAdd(&real_p[cs * 2 + 1], aggregate.imag());
+      }
+    }}
+  
+  }
+
+
+  template<class real>
   __device__ __host__ inline SpinMatrix<real> vector_tensor_matrix(const WilsonVector<real>& v, const WilsonVector<real>& w){
     SpinMatrix<real> m;
     #pragma unroll
@@ -138,7 +175,7 @@ namespace madwf_ml {
 
 #ifdef GPU_DOMAIN_WALL_DIRAC
 
-  template <typename storage_type> struct MadwfMlArg {
+  template <class storage_type, class matrix_type> struct MadwfMlArg {
 
     typedef typename colorspinor_mapper<storage_type, 4, 3>::type F;
     typedef typename mapper<storage_type>::type real;
@@ -151,16 +188,19 @@ namespace madwf_ml {
 
     const int volume_4d_cb;
     
-    WilsonMatrix<real>* tensor_out_p;
-    const WilsonMatrix<real>* wm_p;
-    
+    matrix_type* tensor_out_p;
+    const matrix_type* wm_p;
+   
+    typedef matrix_type MatrixType;
+    static constexpr int matrix_size = sizeof(matrix_type);
+
     const bool dagger; // dagger
 
     const int nParity;
 
     const bool transfer;
 
-    MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, const WilsonMatrix<real>* wm_p, bool dagger)
+    MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, const matrix_type* wm_p, bool dagger)
       : out(out)
         , in(in)
         , volume_4d_cb(in.VolumeCB() / in.X(4))
@@ -171,9 +211,9 @@ namespace madwf_ml {
         , transfer(true)
         , nParity(in.SiteSubset()) {
 
-          if (volume_4d_cb != out.VolumeCB() / Ls_out){
+          if (volume_4d_cb != (int)out.VolumeCB() / Ls_out){
             errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", 
-              volume_4d_cb, out.VolumeCB() / Ls_out);
+              volume_4d_cb, (int)out.VolumeCB() / Ls_out);
           }
 
           if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
@@ -185,7 +225,7 @@ namespace madwf_ml {
             errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
         }
      
-     MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, WilsonMatrix<real>* wm_p)
+     MadwfMlArg(ColorSpinorField& out, const ColorSpinorField& in, matrix_type* wm_p)
       : out(out)
         , in(in)
         , volume_4d_cb(in.VolumeCB() / in.X(4))
@@ -196,9 +236,9 @@ namespace madwf_ml {
         , transfer(false)
         , nParity(in.SiteSubset()) {
           
-          if (volume_4d_cb != out.VolumeCB() / Ls_out){
+          if (volume_4d_cb != (int)out.VolumeCB() / Ls_out){
             errorQuda("Input and Output fields should have the same 4d volume: %d neq %d.\n", 
-              volume_4d_cb, out.VolumeCB() / Ls_out);
+              volume_4d_cb, (int)out.VolumeCB() / Ls_out);
           }
           
           if (in.Nspin() != 4) errorQuda("nSpin = %d not support", in.Nspin());
@@ -221,7 +261,7 @@ namespace madwf_ml {
       const int Ls_in = arg.Ls_in;
       const int Ls_out = arg.Ls_out;
       const int volume_4d_cb = arg.volume_4d_cb;
-      WilsonMatrix<real>* wm_p = arg.tensor_out_p;
+      auto wm_p = arg.tensor_out_p;
 
       int index_4d_cb = blockIdx.x * blockDim.x + threadIdx.x;
       int s = blockIdx.y * blockDim.y + threadIdx.y;
@@ -242,25 +282,12 @@ namespace madwf_ml {
       }
       cache.sync();
 
-      typedef cub::WarpReduce<complex<real>> WarpReduce;
-      __shared__ typename WarpReduce::TempStorage temp_storage;
-
       // t -> s_in, s-> s_out
       const Vector v = arg.out(s * volume_4d_cb + index_4d_cb, parity); 
       for(t = 0; t < Ls_in; t++){
         const Vector w = cache.load(t * blockDim.x + threadIdx.x, ld); 
         int wm_index = s * Ls_in + t;
-        real* p = reinterpret_cast<real*>(&wm_p[wm_index]);
-        for(int a = 0; a < color_spin_dim; a++){
-        for(int b = 0; b < color_spin_dim; b++){
-          int cs = a * color_spin_dim + b;
-          auto z = conj(conj(v(a)) * w(b));
-          complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
-          if(threadIdx.x == 0) {
-            atomicAdd(&p[cs*2+0], aggregate.real());
-            atomicAdd(&p[cs*2+1], aggregate.imag());
-          }
-        }}
+        vector_tensor_matrix(&wm_p[wm_index], v, w);
       }
 
     }
@@ -270,15 +297,24 @@ namespace madwf_ml {
 
       typedef typename mapper<storage_type>::type real;
       typedef ColorSpinor<real, 3, 4> Vector;
+      typedef typename Arg::MatrixType matrix_type;
 
       const int Ls_in = arg.Ls_in;
       const int Ls_out = arg.Ls_out;
       const int volume_4d_cb = arg.volume_4d_cb;
-      const WilsonMatrix<real>* wm_p = arg.wm_p;
+      const matrix_type* wm_p = arg.wm_p;
 
       int index_4d_cb = blockIdx.x * blockDim.x + threadIdx.x;
       int s = blockIdx.y * blockDim.y + threadIdx.y;
       int parity = blockIdx.z * blockDim.z + threadIdx.z;
+
+      int tid = threadIdx.y * blockDim.x + threadIdx.x;
+      extern __shared__ real smem[];
+      while(tid < Ls_out * Ls_in * sizeof(matrix_type) / sizeof(real)){
+        smem[tid] = reinterpret_cast<const real*>(wm_p)[tid];
+        tid += blockDim.y * blockDim.x;
+      }
+      __syncthreads();
 
       if (index_4d_cb >= volume_4d_cb) return;
       if (s >= Ls_out) return;
@@ -294,7 +330,7 @@ namespace madwf_ml {
         }else{
           wm_index = s * Ls_in  + t;
         }
-        out += matrix_vector_multiply<dagger>(wm_p[wm_index], in);
+        out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_type*>(smem)[wm_index], in);
       }
       arg.out(s * volume_4d_cb + index_4d_cb, parity) = out;
     }
@@ -316,7 +352,13 @@ namespace madwf_ml {
         }
       }
       
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { 
+        if(arg.transfer){
+          return arg.Ls_in * arg.Ls_out * Arg::matrix_size; 
+        }else{
+          return 0;
+        }
+      }
       // bool advanceSharedBytes(TuneParam &param) const { return false; } // Don't tune shared mem
       bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
       unsigned int minThreads() const { return arg.volume_4d_cb; }
@@ -357,7 +399,7 @@ namespace madwf_ml {
         TunableVectorYZ::initTuneParam(param);
         param.block.y = arg.Ls_out; // Ls must be contained in the block
         param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
+        param.shared_bytes = sharedBytesPerBlock(param) + sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
       void defaultTuneParam(TuneParam &param) const
@@ -365,7 +407,7 @@ namespace madwf_ml {
         TunableVectorYZ::defaultTuneParam(param);
         param.block.y = arg.Ls_out; // Ls must be contained in the block
         param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
+        param.shared_bytes = sharedBytesPerBlock(param) + sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
@@ -383,12 +425,13 @@ namespace madwf_ml {
     switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION:
         {
-          using arg_type = MadwfMlArg<short>;
-          size_t m_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
+          using matrix_type = SpinMatrix<float>;
+          using arg_type = MadwfMlArg<short, matrix_type>;
+          size_t m_size = in.X(4)*out.X(4)*sizeof(matrix_type);
           if(tp.get_size()*sizeof(float) != m_size){
-            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(complex<float>), m_size);
+            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(float), m_size);
           }
-          arg_type arg(out, in, (const WilsonMatrix<float>*)tp.data(), dagger);
+          arg_type arg(out, in, (const matrix_type*)tp.data(), dagger);
           Transfer5d<short, arg_type> dslash(in, arg);
           dslash.apply(streams[Nstream - 1]);
         }
@@ -408,13 +451,15 @@ namespace madwf_ml {
     switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION:
         {
-          size_t m_size = in.X(4)*out.X(4)*sizeof(WilsonMatrix<float>);
+          using matrix_type = SpinMatrix<float>;
+          using arg_type = MadwfMlArg<short, matrix_type>;
+          size_t m_size = in.X(4)*out.X(4)*sizeof(matrix_type);
           if(tp.get_size()*sizeof(float) != m_size){
-            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(complex<float>), m_size);
+            errorQuda("Training Parameter size mismatch %lu neq %lu.\n", tp.get_size()*sizeof(float), m_size);
           }
           cudaMemsetAsync(tp.data(), 0, m_size, streams[Nstream - 1]);
-          MadwfMlArg<short> arg(out, in, (WilsonMatrix<float>*)tp.data());
-          Transfer5d<short, MadwfMlArg<short>> dslash(in, arg);
+          arg_type arg(out, in, (matrix_type*)tp.data());
+          Transfer5d<short, arg_type> dslash(in, arg);
           dslash.apply(streams[Nstream - 1]);
         }
         break;

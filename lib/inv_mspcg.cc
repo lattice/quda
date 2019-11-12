@@ -322,13 +322,13 @@ namespace quda {
     constexpr int color_spin_dim = 12;
 
     int Ls_in = in[0]->X(4);
-
+#if 0
     size_t param_size = Ls_in*Ls_cheap * color_spin_dim*color_spin_dim * 2;
 
     if(tp.size() != param_size){
       errorQuda("wrong param size.\n");
     }
-
+#endif
     ColorSpinorParam csParam(*in[0]);
     cudaColorSpinorField chi(csParam);
     cudaColorSpinorField tmp(csParam);
@@ -519,8 +519,8 @@ namespace quda {
 
     const size_t training_size = 16;
 
-    static bool trained = false;
-    static bool load_from_file = false;
+    static bool trained = true;
+    static bool load_from_file = trained;
     static bool loaded_from_file = false;
     static std::vector<ColorSpinorField*> vs(0);
     static int v_count = 0;
@@ -532,7 +532,7 @@ namespace quda {
       axpby(5e3/sqrt(norm2(ib)), ib, 0.0, *p);
       vs.push_back(p);
     }
-    static std::vector<float> training_param(Ls*Ls_cheap*144*2, 0.1f);
+    static std::vector<float> training_param(Ls*Ls_cheap*16*2, 0.1f);
     static madwf_ml::TrainingParameter<float> device_tp(training_param);
     static double mu = dirac_param_precondition.mu;
     // static double mu = 1.2425e-01;
