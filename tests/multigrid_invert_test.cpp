@@ -64,8 +64,8 @@ display_test_info()
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
         printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
+      printfQuda("\n");
     }
-    printfQuda("\n");
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -217,10 +217,11 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<QUDA_MAX_DIM; j++) {
+    for (int j = 0; j < 4; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
     mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
@@ -393,8 +394,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -460,7 +461,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = mg_verbosity[0];
 
 

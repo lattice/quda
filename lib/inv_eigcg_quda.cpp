@@ -43,90 +43,108 @@ namespace quda {
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
-
    enum  class libtype {eigen_lib, magma_lib, lapack_lib, mkl_lib};
 
-   class EigCGArgs{
+   class EigCGArgs
+   {
 
-     public:
-       //host Lanczos matrice, and its eigenvalue/vector arrays:
-       DenseMatrix Tm;//VH A V,
-       //eigenvectors:
-       VectorSet ritzVecs;//array of  (m)  ritz and of m length
-       //eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
-       RealVector Tmvals;//eigenvalues of T[m,  m  ] and T[m-1, m-1] (re-used)
-       //Aux matrix for computing 2k Ritz vectors:
-       DenseMatrix H2k;
+   public:
+     // host Lanczos matrice, and its eigenvalue/vector arrays:
+     DenseMatrix Tm; // VH A V,
+     // eigenvectors:
+     VectorSet ritzVecs; // array of  (m)  ritz and of m length
+     // eigenvalues of both T[m,  m  ] and T[m-1, m-1] (re-used)
+     RealVector Tmvals; // eigenvalues of T[m,  m  ] and T[m-1, m-1] (re-used)
+     // Aux matrix for computing 2k Ritz vectors:
+     DenseMatrix H2k;
 
-       int m;
-       int k;
-       int id;//cuurent search spase index
+     int m;
+     int k;
+     int id; // cuurent search spase index
 
-       int restarts;
-       double global_stop;
-  
-       bool run_residual_correction;//used in mixed precision cycles 
+     int restarts;
+     double global_stop;
 
-       ColorSpinorFieldSet *V2k; //eigCG accumulation vectors needed to update Tm (spinor matrix of size eigen_vector_length x (2*k))
+     bool run_residual_correction; // used in mixed precision cycles
 
-       EigCGArgs(int m, int k) : Tm(DenseMatrix::Zero(m,m)), ritzVecs(VectorSet::Zero(m,m)), Tmvals(m), H2k(2*k, 2*k),
-       m(m), k(k), id(0), restarts(0), global_stop(0.0), run_residual_correction(false), V2k(nullptr) { }
+     ColorSpinorFieldSet
+       *V2k; // eigCG accumulation vectors needed to update Tm (spinor matrix of size eigen_vector_length x (2*k))
 
-       ~EigCGArgs() { 
-         if(V2k) delete V2k;
+     EigCGArgs(int m, int k) :
+       Tm(DenseMatrix::Zero(m, m)),
+       ritzVecs(VectorSet::Zero(m, m)),
+       Tmvals(m),
+       H2k(2 * k, 2 * k),
+       m(m),
+       k(k),
+       id(0),
+       restarts(0),
+       global_stop(0.0),
+       run_residual_correction(false),
+       V2k(nullptr)
+     {
+     }
+
+     ~EigCGArgs()
+     {
+       if (V2k) delete V2k;
+     }
+
+     // method for constructing Lanczos matrix :
+     inline void SetLanczos(Complex diag_val, Complex offdiag_val)
+     {
+       if (run_residual_correction) return;
+
+       Tm.diagonal<0>()[id] = diag_val;
+
+       if (id < (m - 1)) { // Load Lanczos off-diagonals:
+         Tm.diagonal<+1>()[id] = offdiag_val;
+         Tm.diagonal<-1>()[id] = offdiag_val;
        }
 
-       //method for constructing Lanczos matrix :
-       inline void SetLanczos(Complex diag_val, Complex offdiag_val) { 
-         if(run_residual_correction) return;
+       id += 1;
 
-         Tm.diagonal<0>()[id] = diag_val; 
+       return;
+     }
 
-         if (id < (m-1)){ //Load Lanczos off-diagonals:
-           Tm.diagonal<+1>()[id] = offdiag_val; 
-           Tm.diagonal<-1>()[id] = offdiag_val; 
-         }
+     inline void ResetArgs()
+     {
+       id = 0;
+       Tm.setZero();
+       Tmvals.setZero();
+       ritzVecs.setZero();
 
-         id += 1;
+       if (V2k) delete V2k;
+       V2k = nullptr;
+     }
 
-         return;
-       }
+     inline void ResetSearchIdx()
+     {
+       id = 2 * k;
+       restarts += 1;
+     }
 
-       inline void ResetArgs() { 
-         id = 0;
-         Tm.setZero(); 
-         Tmvals.setZero(); 
-         ritzVecs.setZero();
+     void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
+     {
+       Tm.setZero();
 
-         if(V2k) delete V2k;
-         V2k = nullptr;
-       }
+       auto s = std::make_unique<Complex[]>(2 * k);
 
-       inline void ResetSearchIdx() {  id = 2*k;  restarts += 1; }
+       for (int i = 0; i < 2 * k; i++) Tm(i, i) = Tmvals(i); //??
 
-       void RestartLanczos(ColorSpinorField *w, ColorSpinorFieldSet *v, const double inv_sqrt_r2)
-       {
-         Tm.setZero();
+       std::vector<ColorSpinorField *> w_;
+       w_.push_back(w);
 
-         std::unique_ptr<Complex[] > s(new Complex[2*k]);
+       std::vector<ColorSpinorField *> v_(v->Components().begin(), v->Components().begin() + 2 * k);
 
-         for(int i = 0; i < 2*k; i++) Tm(i,i) = Tmvals(i);//??
+       blas::cDotProduct(s.get(), w_, v_);
 
-	 std::vector<ColorSpinorField*> w_;
-	 w_.push_back(w);
+       Map<VectorXcd, Unaligned> s_(s.get(), 2 * k);
+       s_ *= inv_sqrt_r2;
 
-	 std::vector<ColorSpinorField*> v_(v->Components().begin(), v->Components().begin()+2*k);
-
-	 blas::cDotProduct(s.get(), w_, v_);
-
-	 Map<VectorXcd, Unaligned > s_(s.get(), 2*k);
-	 s_ *= inv_sqrt_r2;
-
-	 Tm.col(2*k).segment(0, 2*k) = s_;
-	 Tm.row(2*k).segment(0, 2*k) = s_.adjoint();
-
-	 return;
-       }
+       Tm.col(2 * k).segment(0, 2 * k) = s_;
+       Tm.row(2 * k).segment(0, 2 * k) = s_.adjoint();
+     }
    };
 
    //Rayleigh Ritz procedure:
@@ -276,7 +294,7 @@ namespace quda {
     }
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = new CG(matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
       K = new MR(matPrecon, matPrecon, Kparam, profile);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
@@ -615,9 +633,9 @@ namespace quda {
       restart_idx += 1;
 
       defl(xProj, rProj);
-      x = xProj;      
+      x = xProj;
 
-      K = new CG(mat, matPrecon, Kparam, profile);
+      K = new CG(mat, matPrecon, matPrecon, Kparam, profile);
       (*K)(x, b);
       delete K;
 
@@ -709,7 +727,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
-           K = new CG(matSloppy, matPrecon, Kparam, profile);   
+           K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
          }
 
          eigcg_args->run_residual_correction = true;      

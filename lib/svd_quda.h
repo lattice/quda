@@ -613,12 +613,9 @@ void bdSVD(Matrix<Real,3>& u, Matrix<Real,3>& v, Matrix<Real,3>& b, int max_it)
   return;
 }
 
-
-
-template<class Float>
-  DEVICEHOST
-void computeSVD(const Matrix<complex<Float>,3> & m, Matrix<complex<Float>,3>&  u,
-		Matrix<complex<Float>,3>& v,  Float singular_values[3])
+template <class Float>
+DEVICEHOST void computeSVD(const Matrix<complex<Float>, 3> &m, Matrix<complex<Float>, 3> &u,
+                           Matrix<complex<Float>, 3> &v, Float singular_values[3])
 {
   getRealBidiagMatrix<Float>(m, u, v);
 
@@ -637,8 +634,6 @@ void computeSVD(const Matrix<complex<Float>,3> & m, Matrix<complex<Float>,3>&  u
 
   u = u*u_real;
   v = v*v_real;
-
-  return;
 }
 
 //} // end namespace quda

@@ -278,9 +278,10 @@ extern "C" {
     /** defines deflation */
     void *eig_param;
 
-    /**
-      Dirac Dslash used in preconditioner
-    */
+    /** If true, deflate the initial guess */
+    bool deflate;
+
+    /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
     /** Verbosity of the inner Krylov solver */
     QudaVerbosity verbosity_precondition;
@@ -392,6 +393,22 @@ extern "C" {
     /** Range used in polynomial acceleration **/
     double a_min;
     double a_max;
+
+    /** Whether to preserve the deflation space between solves.  If
+        true, the space will be stored in an instance of the
+        deflation_space struct, pointed to by preserve_deflation_space */
+    QudaBoolean preserve_deflation;
+
+    /** This is where we store the deflation space.  This will point
+        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this.  */
+    void *preserve_deflation_space;
+
+    /** If we restore the deflation space, this boolean indicates
+        whether we are also preserving the evalues or recomputing
+        them.  For example if a different mass shift is being used
+        than the one used to generate the space, then this should be
+        false, but preserve_deflation would be true */
+    QudaBoolean preserve_evals;
 
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
@@ -637,6 +654,9 @@ extern "C" {
 
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
+
+    /** Whether to preserve the deflation space during MG update */
+    QudaBoolean preserve_deflation;
 
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
