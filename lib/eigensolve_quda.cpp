@@ -200,6 +200,7 @@ namespace quda
     Complex *s = (Complex *)safe_malloc((j + 1) * sizeof(Complex));
     Complex sum(0.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
+    vecs_ptr.reserve(j+1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
     blas::cDotProduct(s, vecs_ptr, rvec);
@@ -266,8 +267,11 @@ namespace quda
     std::vector<ColorSpinorField *> kSpace_ptr;
 
     // Alias the vectors we wish to keep
+    vecs_ptr.reserve(block_i_rank);
     for (int i = is; i < ie; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
+
     // Alias the extra space vectors, zero the workspace
+    kSpace_ptr.reserve(block_j_rank);
     for (int j = js; j < je; j++) {
       int k = nKr + 1 + j - js;
       kSpace_ptr.push_back(kSpace[k]);
@@ -451,6 +455,7 @@ namespace quda
         printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
 
       std::vector<ColorSpinorField *> tmp;
+      tmp.reserve(Nvec);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         ColorSpinorParam csParam(*eig_vecs[0]);
         csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -496,6 +501,7 @@ namespace quda
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
     std::vector<ColorSpinorField *> tmp;
+    tmp.reserve(Nvec);
     if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam csParam(*eig_vecs[0]);
       csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -539,6 +545,7 @@ namespace quda
   {
     // Make an array of size nConv
     std::vector<ColorSpinorField *> vecs_ptr;
+    vecs_ptr.reserve(nConv);
     for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
     loadVectors(vecs_ptr, eig_param->vec_infile);
 
@@ -622,10 +629,12 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParam = csParamClone;
     // Increase Krylov space to nKr+1 one vector, create residual
+    kSpace.reserve(nKr + 1);
     for (int i = nConv; i < nKr + 1; i++) kSpace.push_back(ColorSpinorField::Create(csParam));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
     // Increase evals space to nEv
+    evals.reserve(nEv);
     for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
     //---------------------------------------------------------------------------
 
@@ -800,6 +809,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size nConv
       std::vector<ColorSpinorField *> vecs_ptr;
+      vecs_ptr.reserve(nConv);
       for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
       saveVectors(vecs_ptr, eig_param->vec_outfile);
     }
@@ -838,10 +848,19 @@ namespace quda
     blas::axpy(-alpha[j], *v[j], *r[0]);
 
     int start = (j > num_keep) ? j - 1 : 0;
-    for (int i = start; i < j; i++) {
 
+    if (j - start > 0) {
+      std::vector<ColorSpinorField*> r_{r[0]};
+      std::vector<double> beta_;
+      beta_.reserve(j - start);
+      std::vector<ColorSpinorField*> v_;
+      v_.reserve(j - start);
+      for (int i = start; i < j; i++) {
+        beta_.push_back(-beta[i]);
+        v_.push_back(v[i]);
+      }
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(-beta[i], *v[i], *r[0]);
+      blas::axpy(beta_.data(), v_, r_);
     }
 
     // Orthogonalise r against the Krylov space
@@ -957,8 +976,9 @@ namespace quda
     // If we have memory availible, do the entire rotation
     if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
       if ((int)kSpace.size() < offset + iter_keep) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep);
+        kSpace.reserve(offset + iter_keep);
         for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
           kSpace.push_back(ColorSpinorField::Create(csParam));
         }
       }
@@ -968,12 +988,14 @@ namespace quda
       std::vector<ColorSpinorField *> kSpace_ptr;
 
       // Alias the extra space vectors, zero the workspace
+      vecs_ptr.reserve(iter_keep);
       for (int i = 0; i < iter_keep; i++) {
         kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
 
       // Alias the vectors we wish to keep, populate the Ritz matrix
+      kSpace_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) {
         vecs_ptr.push_back(kSpace[num_locked + j]);
         for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
@@ -993,8 +1015,9 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
           kSpace.push_back(ColorSpinorField::Create(csParam));
         }
       }
@@ -1073,7 +1096,7 @@ namespace quda
       if (do_batch_remainder) {
         // remainder triangle
         blockRotate(kSpace, host_U, iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
-                    iter_keep, 0);
+                    iter_keep, 2);
         // remainder pencil
         blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep, 0);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
@@ -1083,7 +1106,7 @@ namespace quda
       for (int b = full_batches - 1; b >= 0; b--) {
         // batch triangle
         blockRotate(kSpace, host_U, iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
-                    (b + 1) * batch_size, 0);
+                    (b + 1) * batch_size, 2);
         if (b > 0) {
           // batch pencil
           blockRotate(kSpace, host_U, iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, 0);
