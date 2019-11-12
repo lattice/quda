@@ -267,7 +267,7 @@ namespace quda
 
     // Alias the vectors we wish to keep
     for (int i = is; i < ie; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
-    // Alias the extra space vectors, zero the workspace
+    // Alias the extra space vector
     for (int j = js; j < je; j++) {
       int k = nKr + 1 + j - js;
       kSpace_ptr.push_back(kSpace[k]);
@@ -297,7 +297,7 @@ namespace quda
 
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je)
   {
-    // copy back to correct position
+    // copy back to correct position, zero out the workspace
     for (int j = js; j < je; j++) {
       int k = nKr + 1 + j - js;
       std::swap(kSpace[j + num_locked], kSpace[k]);
