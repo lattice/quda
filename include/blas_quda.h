@@ -143,6 +143,58 @@ namespace quda {
     void axpy(const double *a, ColorSpinorField &x, ColorSpinorField &y);
 
     /**
+       @brief Compute the block "axpy_U" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       Where 'a' must be a square, upper triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy_U(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy_U(const double *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
+       @brief Compute the block "axpy_L" with over the set of
+       ColorSpinorFields.  E.g., it computes
+
+       y = x * a + y
+
+       Where 'a' must be a square, lower triangular matrix.
+
+       @param a[in] Matrix of coefficients
+       @param x[in] vector of input ColorSpinorFields
+       @param y[in,out] vector of input/output ColorSpinorFields
+    */
+    void axpy_L(const double *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y);
+
+    /**
+       @brief This is a wrapper for calling the block "axpy_U" with a
+       composite ColorSpinorField.  E.g., it computes
+
+       y = x * a + y
+
+       @param a[in] Matrix of coefficients
+       @param x[in] Input matrix
+       @param y[in,out] Computed output matrix
+    */
+    void axpy_L(const double *a, ColorSpinorField &x, ColorSpinorField &y);
+
+    /**
        @brief Compute the block "caxpy" with over the set of
        ColorSpinorFields.  E.g., it computes
 

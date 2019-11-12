@@ -273,26 +273,22 @@ namespace quda
       kSpace_ptr.push_back(kSpace[k]);
     }
 
-    Complex *batch_array = (Complex *)safe_malloc((block_i_rank * block_j_rank) * sizeof(Complex));
-    double *batch_array_r = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
+    double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUM major -> ROW major)
     for (int j = js; j < je; j++) {
       for (int i = is; i < ie; i++) {
         int j_arr = j - js;
         int i_arr = i - is;
-        batch_array[i_arr * block_j_rank + j_arr].real(array[j * rank + i]);
-        batch_array[i_arr * block_j_rank + j_arr].imag(0.0);
-        batch_array_r[i_arr * block_j_rank + j_arr] = array[j * rank + i];
+        batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
     switch (type) {
-    case 0: blas::axpy(batch_array_r, vecs_ptr, kSpace_ptr); break;
-    case 1: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
-    case 2: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
+    case 0: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
+    case 1: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
+    case 2: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
-    host_free(batch_array_r);
   }
 
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je)
