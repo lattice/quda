@@ -1300,8 +1300,6 @@ public:
 
     QudaMatPCType getMatPCType() const { return dirac->getMatPCType(); }
 
-    
-    
     virtual int getStencilSteps() const = 0; 
 
     std::string Type() const { return typeid(*dirac).name(); }

@@ -23,7 +23,7 @@ namespace quda {
     if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
-        param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
+           param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -34,7 +34,7 @@ namespace quda {
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
-        field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type, field.suggested_parity);
+           field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type, field.suggested_parity);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -170,8 +170,9 @@ namespace quda {
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-      QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity)
+                                QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder,
+                                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type,
+                                QudaParity suggested_parity)
   {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
@@ -307,7 +308,7 @@ namespace quda {
       }
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor, src.precision, src.pad, src.siteSubset,
-          src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type, src.suggested_parity);
+             src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type, src.suggested_parity);
     }
     return *this;
   }

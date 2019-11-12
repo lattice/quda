@@ -374,7 +374,7 @@ namespace quda
         csParam.create = QUDA_NULL_FIELD_CREATE;
         // if we're loading nColor == 3 fields, they'll always be full-field. Copy into a single parity afterwards.
         if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
-          csParam.x[0] *= 2; 
+          csParam.x[0] *= 2;
           csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
         }
         for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
@@ -383,9 +383,7 @@ namespace quda
         if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
           csParam.x[0] *= 2;
           csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-          for (int i = 0; i < Nvec; i++) {
-            tmp.push_back(ColorSpinorField::Create(csParam));
-          }
+          for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
         } else {
           for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
         }
@@ -399,8 +397,8 @@ namespace quda
         }
       }
 
-      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(), spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
-                        Nvec, 0, (char **)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -415,11 +413,11 @@ namespace quda
           // Create a temporary single-parity CPU field
           csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
           csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
-                                                                                eig_vecs[0]->Precision());
+                                                                                  eig_vecs[0]->Precision());
           csParam.location = QUDA_CPU_FIELD_LOCATION;
           csParam.create = QUDA_NULL_FIELD_CREATE;
 
-          ColorSpinorField* tmp_intermediate = ColorSpinorField::Create(csParam);
+          ColorSpinorField *tmp_intermediate = ColorSpinorField::Create(csParam);
 
           for (int i = 0; i < Nvec; i++) {
             if (spinor_parity == QUDA_EVEN_PARITY)
@@ -435,7 +433,8 @@ namespace quda
 
           delete tmp_intermediate;
         }
-      } else if (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
+      } else if (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION
+                 && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
         for (int i = 0; i < Nvec; i++) {
           if (spinor_parity == QUDA_EVEN_PARITY)
             blas::copy(*eig_vecs[i], tmp[i]->Even());
@@ -483,11 +482,11 @@ namespace quda
         csParam.create = QUDA_NULL_FIELD_CREATE;
 
         // intermediate host single-parity field
-        ColorSpinorField* tmp_intermediate = ColorSpinorField::Create(csParam);
+        ColorSpinorField *tmp_intermediate = ColorSpinorField::Create(csParam);
 
-        csParam.x[0] *= 2; // corrects for the factor of two in the X direction
+        csParam.x[0] *= 2;                          // corrects for the factor of two in the X direction
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // create a full-parity field.
-        csParam.create = QUDA_ZERO_FIELD_CREATE; // to explicitly zero the odd sites.
+        csParam.create = QUDA_ZERO_FIELD_CREATE;    // to explicitly zero the odd sites.
         for (int i = 0; i < Nvec; i++) {
           tmp.push_back(ColorSpinorField::Create(csParam));
 
@@ -502,7 +501,6 @@ namespace quda
             blas::copy(tmp[i]->Odd(), *tmp_intermediate);
           else
             errorQuda("When saving single parity vectors, the suggested parity must be set.");
-
         }
         delete tmp_intermediate;
       }
@@ -512,9 +510,7 @@ namespace quda
       if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
         csParam.x[0] *= 2;
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-        for (int i = 0; i < Nvec; i++) {
-          tmp.push_back(ColorSpinorField::Create(csParam));
-        }
+        for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
       } else {
         for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
       }
@@ -530,12 +526,13 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(), spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(),
-                       Nvec, 0, (char **)0);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(),
+                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
     host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
-    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION || (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
+    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION
+        || (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
       for (int i = 0; i < Nvec; i++) delete tmp[i];
     }
 
@@ -814,7 +811,7 @@ namespace quda
       // Make an array of size nConv
       std::vector<ColorSpinorField *> vecs_ptr;
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      for (int i = 0; i < nConv; i++) { 
+      for (int i = 0; i < nConv; i++) {
         kSpace[i]->setSuggestedParity(mat_parity);
         vecs_ptr.push_back(kSpace[i]);
       }

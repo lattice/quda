@@ -17,7 +17,7 @@ namespace quda {
   struct FullClover;
 
   // Declaration in advance
-constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType&);
+  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &);
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
@@ -116,22 +116,22 @@ constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType&);
     ColorSpinorParam(const ColorSpinorField &a);
 
     ColorSpinorParam() :
-        LatticeFieldParam(),
-        location(QUDA_INVALID_FIELD_LOCATION),
-        nColor(0),
-        nSpin(0),
-        nVec(1),
-        twistFlavor(QUDA_TWIST_INVALID),
-        siteOrder(QUDA_INVALID_SITE_ORDER),
-        fieldOrder(QUDA_INVALID_FIELD_ORDER),
-        gammaBasis(QUDA_INVALID_GAMMA_BASIS),
-        create(QUDA_INVALID_FIELD_CREATE),
-        pc_type(QUDA_PC_INVALID),
-        suggested_parity(QUDA_INVALID_PARITY),
-        is_composite(false),
-        composite_dim(0),
-        is_component(false),
-        component_id(0)
+      LatticeFieldParam(),
+      location(QUDA_INVALID_FIELD_LOCATION),
+      nColor(0),
+      nSpin(0),
+      nVec(1),
+      twistFlavor(QUDA_TWIST_INVALID),
+      siteOrder(QUDA_INVALID_SITE_ORDER),
+      fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      gammaBasis(QUDA_INVALID_GAMMA_BASIS),
+      create(QUDA_INVALID_FIELD_CREATE),
+      pc_type(QUDA_PC_INVALID),
+      suggested_parity(QUDA_INVALID_PARITY),
+      is_composite(false),
+      composite_dim(0),
+      is_component(false),
+      component_id(0)
     {
       ;
     }
@@ -209,25 +209,25 @@ constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType&);
     }
 
     // normally used to create cuda param from a cpu param
-    ColorSpinorParam(
-        ColorSpinorParam &cpuParam, QudaInvertParam &inv_param, QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
-        LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
-        location(location),
-        nColor(cpuParam.nColor),
-        nSpin(cpuParam.nSpin),
-        nVec(cpuParam.nVec),
-        twistFlavor(cpuParam.twistFlavor),
-        siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
-        fieldOrder(QUDA_INVALID_FIELD_ORDER),
-        gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
-        create(QUDA_COPY_FIELD_CREATE),
-        pc_type(cpuParam.pc_type),
-        suggested_parity(cpuParam.suggested_parity),
-        v(0),
-        is_composite(cpuParam.is_composite),
-        composite_dim(cpuParam.composite_dim),
-        is_component(false),
-        component_id(0)
+    ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
+                     QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
+      location(location),
+      nColor(cpuParam.nColor),
+      nSpin(cpuParam.nSpin),
+      nVec(cpuParam.nVec),
+      twistFlavor(cpuParam.twistFlavor),
+      siteOrder(QUDA_EVEN_ODD_SITE_ORDER),
+      fieldOrder(QUDA_INVALID_FIELD_ORDER),
+      gammaBasis(nSpin == 4 ? QUDA_UKQCD_GAMMA_BASIS : QUDA_DEGRAND_ROSSI_GAMMA_BASIS),
+      create(QUDA_COPY_FIELD_CREATE),
+      pc_type(cpuParam.pc_type),
+      suggested_parity(cpuParam.suggested_parity),
+      v(0),
+      is_composite(cpuParam.is_composite),
+      composite_dim(cpuParam.composite_dim),
+      is_component(false),
+      component_id(0)
     {
       siteSubset = cpuParam.siteSubset;
       fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
@@ -325,10 +325,10 @@ constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType&);
   class ColorSpinorField : public LatticeField {
 
   private:
-      void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-          QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-          QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity);
-      void destroy();
+    void create(int nDim, const int *x, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
+                QudaPrecision precision, int pad, QudaSiteSubset subset, QudaSiteOrder siteOrder,
+                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type, QudaParity suggested_parity);
+    void destroy();
 
   protected:
     bool init;
@@ -1069,7 +1069,8 @@ constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType&);
      @param[in] matpc_type The matrix preconditioning type
      @return Even or Odd as appropriate, invalid if the preconditioning type is invalid (implicitly non-preconditioned)
    */
-  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType& matpc_type) {
+  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &matpc_type)
+  {
     if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       return QUDA_EVEN_PARITY;
     } else if (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
