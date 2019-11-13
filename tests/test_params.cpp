@@ -64,6 +64,9 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double epsilon = 0.01;
+double m5 = -1.5;
+double b5 = 1.5;
+double c5 = 0.5;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -373,6 +376,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
+  quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
+  quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
+  quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
   quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
