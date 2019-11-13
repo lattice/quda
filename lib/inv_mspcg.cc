@@ -25,22 +25,25 @@
 #include <deque>
 #include <polynomial.h>
 
-extern quda::cudaGaugeField* gaugePrecondition;
-extern quda::cudaGaugeField* gaugePrecise;
-extern quda::cudaGaugeField* gaugeSloppy;
+extern quda::cudaGaugeField *gaugePrecondition;
+extern quda::cudaGaugeField *gaugePrecise;
+extern quda::cudaGaugeField *gaugeSloppy;
 
-namespace quda {
+namespace quda
+{
 
   using namespace blas;
 
-  static cudaGaugeField* createExtendedGauge(cudaGaugeField& in, const int* R, TimeProfile& profile,
-      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID) {
+  static cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                             bool redundant_comms = false,
+                                             QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID)
+  {
     int y[4];
     for (int dir = 0; dir < 4; ++dir) y[dir] = in.X()[dir] + 2 * R[dir];
     int pad = 0;
 
     GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
-        in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
+                             in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
     gParamEx.create = QUDA_ZERO_FIELD_CREATE;
     gParamEx.order = in.Order();
     gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -51,7 +54,7 @@ namespace quda {
 
     gParamEx.setPrecision(in.Precision(), true);
 
-    cudaGaugeField* out = new cudaGaugeField(gParamEx);
+    cudaGaugeField *out = new cudaGaugeField(gParamEx);
 
     // copy input field into the extended device gauge field
     copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
@@ -64,7 +67,8 @@ namespace quda {
     return out;
   }
 
-  static void set_mobius_dirac_param(DiracParam& diracParam, QudaInvertParam* inv_param, const bool pc) {
+  static void set_mobius_dirac_param(DiracParam &diracParam, QudaInvertParam *inv_param, const bool pc)
+  {
     double kappa = inv_param->kappa;
     if (inv_param->dirac_order == QUDA_CPS_WILSON_DIRAC_ORDER) { kappa *= gaugePrecise->Anisotropy(); }
 
@@ -88,37 +92,38 @@ namespace quda {
 
     for (int i = 0; i < 4; i++) diracParam.commDim[i] = 1; // comms are always on
   }
-  
-  MSPCG::MSPCG(QudaInvertParam* inv_param, SolverParam& param_, TimeProfile& profile)
-      : Solver(param_, profile)
-      , solver_prec(0)
-      , solver_prec_param(param_)
-      , mat(nullptr)
-      , mat_sloppy(nullptr)
-      , mat_precondition(nullptr)
-      , nrm_op(nullptr)
-      , nrm_op_sloppy(nullptr)
-      , nrm_op_precondition(nullptr)
-      , vct_dr(nullptr)
-      , vct_dp(nullptr)
-      , vct_dmmp(nullptr)
-      , vct_dtmp(nullptr)
-      , vct_dtmp2(nullptr)
-      , r(nullptr)
-      , p(nullptr)
-      , z(nullptr)
-      , mmp(nullptr)
-      , tmp(nullptr)
-      , tmp2(nullptr)
-      , fr(nullptr)
-      , fz(nullptr)
-      , immp(nullptr)
-      , ip(nullptr)
-      , ifmmp(nullptr)
-      , ifp(nullptr)
-      , iftmp(nullptr)
-      , ifset(nullptr)
-      , inner_iterations(param.maxiter_precondition) {
+
+  MSPCG::MSPCG(QudaInvertParam *inv_param, SolverParam &param_, TimeProfile &profile) :
+    Solver(param_, profile),
+    solver_prec(0),
+    solver_prec_param(param_),
+    mat(nullptr),
+    mat_sloppy(nullptr),
+    mat_precondition(nullptr),
+    nrm_op(nullptr),
+    nrm_op_sloppy(nullptr),
+    nrm_op_precondition(nullptr),
+    vct_dr(nullptr),
+    vct_dp(nullptr),
+    vct_dmmp(nullptr),
+    vct_dtmp(nullptr),
+    vct_dtmp2(nullptr),
+    r(nullptr),
+    p(nullptr),
+    z(nullptr),
+    mmp(nullptr),
+    tmp(nullptr),
+    tmp2(nullptr),
+    fr(nullptr),
+    fz(nullptr),
+    immp(nullptr),
+    ip(nullptr),
+    ifmmp(nullptr),
+    ifp(nullptr),
+    iftmp(nullptr),
+    ifset(nullptr),
+    inner_iterations(param.maxiter_precondition)
+  {
 
     printfQuda("MSPCG constructor starts.\n");
 
@@ -156,9 +161,7 @@ namespace quda {
     set_mobius_dirac_param(dirac_param_precondition, inv_param, true); // pc = true
     dirac_param_precondition.gauge = padded_gauge_field_precondition;
 
-    for (int i = 0; i < 4; i++) {
-      dirac_param_precondition.commDim[i] = 0;
-    }
+    for (int i = 0; i < 4; i++) { dirac_param_precondition.commDim[i] = 0; }
 
     mat = new DiracMobiusPC(dirac_param);
     nrm_op = new DiracMdagM(mat);
@@ -168,7 +171,7 @@ namespace quda {
 
     mat_precondition = new DiracMobiusPC(dirac_param_precondition);
     nrm_op_precondition = new DiracMdagMLocal(mat_precondition);
-    
+
     const char fname[] = "MSPCG::MSPCG(QudaInvertParam*, SolverParam&, TimeProfile&)";
     const char cname[] = __FILE__;
 
@@ -176,16 +179,15 @@ namespace quda {
     precise_timer.Reset(fname, cname, __LINE__);
     sloppy_timer.Reset(fname, cname, __LINE__);
     preconditioner_timer.Reset("woo", cname, __LINE__);
-    for (int i = 0; i < 2; i++){
-      linalg_timer[i].Reset(fname, cname, __LINE__);
-    }
-    
+    for (int i = 0; i < 2; i++) { linalg_timer[i].Reset(fname, cname, __LINE__); }
+
     printfQuda("MSPCG constructor ends.\n");
   }
 
-  MSPCG::~MSPCG() {
+  MSPCG::~MSPCG()
+  {
     profile.TPSTART(QUDA_PROFILE_FREE);
-    
+
     delete nrm_op_precondition;
     delete mat_precondition;
 
@@ -201,66 +203,67 @@ namespace quda {
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  void MSPCG::inner_dslash(ColorSpinorField& out, const ColorSpinorField& in) {
-    (*nrm_op_precondition)(out, in);
-  }
+  void MSPCG::inner_dslash(ColorSpinorField &out, const ColorSpinorField &in) { (*nrm_op_precondition)(out, in); }
 
-  double MSPCG::calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp, double mu, int Ls_hat, ColorSpinorField* x){
-    
+  double MSPCG::calculate_chi(ColorSpinorField &out, const ColorSpinorField &in, madwf_ml::TrainingParameter<float> &tp,
+                              double mu, int Ls_hat, ColorSpinorField *x)
+  {
+
     ColorSpinorParam csParam(in);
-    
+
     cudaColorSpinorField tmp(csParam);
     cudaColorSpinorField ip(csParam);
-    
+
     csParam.x[4] = Ls_hat;
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    
+
     dirac_param_precondition.Ls = Ls_hat;
-    
+
     DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
 
     cudaColorSpinorField truncated_cs_field_out(csParam);
-   
+
     // A * T * phi
     ATx(truncated_cs_field_out, in, tp);
-   
-    if(x){
-    // T^ * A * T * phi
-    madwf_ml::transfer_5d_hh(*x, truncated_cs_field_out, tp, true);
 
-    ip = in;
-    axpy(mu, ip, *x);
+    if (x) {
+      // T^ * A * T * phi
+      madwf_ml::transfer_5d_hh(*x, truncated_cs_field_out, tp, true);
 
-    // M * T^ * A * T * phi
-    inner_dslash(ip, *x);
-   
-    }else{
-    // T^ * A * T * phi
-    madwf_ml::transfer_5d_hh(tmp, truncated_cs_field_out, tp, true);
-    
-    ip = in;
-    axpy(mu, ip, tmp);
+      ip = in;
+      axpy(mu, ip, *x);
 
-    // M * T^ * A * T * phi
-    inner_dslash(ip, tmp);
+      // M * T^ * A * T * phi
+      inner_dslash(ip, *x);
+
+    } else {
+      // T^ * A * T * phi
+      madwf_ml::transfer_5d_hh(tmp, truncated_cs_field_out, tp, true);
+
+      ip = in;
+      axpy(mu, ip, tmp);
+
+      // M * T^ * A * T * phi
+      inner_dslash(ip, tmp);
     }
 
     copy(out, in);
     // M * T^ * A * T * phi - phi
     return xmyNorm(ip, out);
   }
-  
-  void MSPCG::ATx(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp){
-  
+
+  void MSPCG::ATx(ColorSpinorField &out, const ColorSpinorField &in, madwf_ml::TrainingParameter<float> &tp)
+  {
+
     int Ls_out = out.X(4);
-    
+
     // printfQuda("  Ls = %d\n", Ls_out);
 
     ColorSpinorParam csParam(in);
-    
+
     csParam.x[4] = Ls_out;
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    
+
     dirac_param_precondition.Ls = Ls_out;
 #if 0    
     double mobius_alpha = (dirac_param_precondition.b_5[0] + dirac_param_precondition.c_5[0]).real();
@@ -274,12 +277,12 @@ namespace quda {
     cudaColorSpinorField truncated_cs_field_in(csParam);
     cudaColorSpinorField ip(csParam);
     cudaColorSpinorField immp(csParam);
-   
+
     // T * phi
     madwf_ml::transfer_5d_hh(truncated_cs_field_in, in, tp, false);
     // A * T * phi
     // mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
-    
+
     blas::zero(out);
     double rk2 = blas::norm2(truncated_cs_field_in);
     double Mpk2, alpha, beta, rkp12;
@@ -300,25 +303,23 @@ namespace quda {
       dirac_param_precondition.b_5[s] = (mobius_alpha + 1.0)/2.0;
       dirac_param_precondition.c_5[s] = (mobius_alpha - 1.0)/2.0;
     }
-#endif    
- 
+#endif
   }
 
-  void fill_random(std::vector<float>& v){
+  void fill_random(std::vector<float> &v)
+  {
     static std::random_device rd;
-		// the good rng
-  	static std::mt19937 rng(23ul*comm_rank());
-		// The gaussian distribution
-  	static std::normal_distribution<double> n(0., 1.);
-   
-    for(auto& x : v){
-      x = 1e-1*n(rng);
-    }
-  
+    // the good rng
+    static std::mt19937 rng(23ul * comm_rank());
+    // The gaussian distribution
+    static std::normal_distribution<double> n(0., 1.);
+
+    for (auto &x : v) { x = 1e-1 * n(rng); }
   }
 
-  void MSPCG::train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, double& mu, int Ls_cheap) {
-  
+  void MSPCG::train_param(const std::vector<ColorSpinorField *> &in, std::vector<float> &tp, double &mu, int Ls_cheap)
+  {
+
     constexpr int color_spin_dim = 12;
 
     int Ls_in = in[0]->X(4);
@@ -334,12 +335,12 @@ namespace quda {
     cudaColorSpinorField tmp(csParam);
     cudaColorSpinorField theta(csParam);
     cudaColorSpinorField lambda(csParam);
-        
+
     cudaColorSpinorField Mchi(csParam);
-    
+
     double ref = 0.0;
     int count = 0;
-    for(const auto& phi : in){
+    for (const auto &phi : in) {
       ref += norm2(*phi);
       printfQuda("reference dslash norm %03d = %8.4e\n", count, norm2(*phi));
       count++;
@@ -348,18 +349,18 @@ namespace quda {
 
     csParam.x[4] = Ls_cheap;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
- 
+
     cudaColorSpinorField ATchi(csParam);
     cudaColorSpinorField ATphi(csParam);
     cudaColorSpinorField ADphi(csParam);
-    
+
     cudaColorSpinorField ATMchi(csParam);
-    
+
     madwf_ml::TrainingParameter<float> T(tp);
-    
+
     madwf_ml::TrainingParameter<float> d1(tp.size());
     madwf_ml::TrainingParameter<float> d2(tp.size());
-    
+
     madwf_ml::TrainingParameter<float> P(tp.size());
 
     // double pmu = 0.0;
@@ -369,22 +370,22 @@ namespace quda {
     float b = 0.99;
     printfQuda("beta = %f\n", b);
     printfQuda("training mu   = %f\n", dirac_param_precondition.mu);
-    for(int iteration = 0; iteration < 40; iteration++){
-      
+    for (int iteration = 0; iteration < 40; iteration++) {
+
       madwf_ml::TrainingParameter<float> D(tp.size());
       // double dmu = 0.0;
-      
+
       double chi2 = 0.0;
       std::vector<double> a(5, 0.0);
 
-      for(const auto& phi : in){
-        
+      for (const auto &phi : in) {
+
         chi2 += calculate_chi(chi, *phi, T, mu, Ls_cheap);
-     
+
         ATx(ATphi, *phi, T);
         inner_dslash(Mchi, chi);
         ATx(ATMchi, Mchi, T);
-        
+
         madwf_ml::tensor_5d_hh(ATphi, Mchi, d1);
         madwf_ml::tensor_5d_hh(ATMchi, *phi, d2);
 
@@ -402,26 +403,26 @@ namespace quda {
         }
 #endif
       }
-      
+
       // printfQuda("D[0] = %+8.4e\n", D[0]);
-      madwf_ml::axpby(P, (b-1), P, (1-b), D);
+      madwf_ml::axpby(P, (b - 1), P, (1 - b), D);
 
       // pmu = b * pmu + (1-b) * dmu;
-  
+
       // printfQuda("P[0] = %+8.4e\n", P[0]);
 
       chi2 = 0.0;
       // line search
-      for(const auto& phi : in){
-        
+      for (const auto &phi : in) {
+
         double ind_chi2 = calculate_chi(chi, *phi, T, mu, Ls_cheap);
         chi2 += ind_chi2;
-     
+
         ATx(ATphi, *phi, T);
         // D' * A * T * phi
         madwf_ml::transfer_5d_hh(theta, ATphi, P, true);
-        
-        ATx(ADphi, *phi, P);  
+
+        ATx(ADphi, *phi, P);
         // T' * A * D * phi
         madwf_ml::transfer_5d_hh(tmp, ADphi, T, true);
         // theta
@@ -432,20 +433,19 @@ namespace quda {
 
         // lambda = D' * A * D * phi
         madwf_ml::transfer_5d_hh(tmp, ADphi, P, true);
-       
+
         inner_dslash(lambda, tmp);
 
-        std::vector<ColorSpinorField*> lhs {&chi, &theta, &lambda};
-        std::vector<ColorSpinorField*> rhs {&chi, &theta, &lambda};
+        std::vector<ColorSpinorField *> lhs {&chi, &theta, &lambda};
+        std::vector<ColorSpinorField *> rhs {&chi, &theta, &lambda};
         Complex dot[9];
         cDotProduct(dot, lhs, rhs);
 
         a[0] += dot[0].real();
-        a[1] += -2.0*dot[1].real();
-        a[2] += dot[4].real() + 2.0*dot[2].real();
-        a[3] += -2.0*dot[5].real();
+        a[1] += -2.0 * dot[1].real();
+        a[2] += dot[4].real() + 2.0 * dot[2].real();
+        a[3] += -2.0 * dot[5].real();
         a[4] += dot[8].real();
-        
       }
 
       // for(int i = 0; i < 5; i++){
@@ -454,7 +454,7 @@ namespace quda {
       // printfQuda("\n");
 
       double r[3] = {0.0, 0.0, 0.0};
-      solve_deg3(4.0*a[4], 3.0*a[3], 2.0*a[2], a[1], r[0], r[1], r[2]);
+      solve_deg3(4.0 * a[4], 3.0 * a[3], 2.0 * a[2], a[1], r[0], r[1], r[2]);
 
       // for(int i = 0; i < 3; i++){
       //   printfQuda("r[%d] = %+8.4e, ", i, r[i]);
@@ -463,57 +463,55 @@ namespace quda {
 
       // try the three roots
       double try_root[3];
-      for(int i = 0; i < 3; i++){
-        try_root[i] = eval_deg4(a[4], a[3], a[2], a[1], a[0], r[i]);
-      }
-      
+      for (int i = 0; i < 3; i++) { try_root[i] = eval_deg4(a[4], a[3], a[2], a[1], a[0], r[i]); }
+
       // for(int i = 0; i < 3; i++){
       //   printfQuda("e[%d] = %+8.4e, ", i, try_root[i]);
       // }
       // printfQuda("\n");
 
-      if(try_root[0] < try_root[1] && try_root[0] < try_root[2]){
+      if (try_root[0] < try_root[1] && try_root[0] < try_root[2]) {
         alpha = r[0];
-      }else if(try_root[1] < try_root[2]){
+      } else if (try_root[1] < try_root[2]) {
         alpha = r[1];
-      }else{
-        alpha = r[2]; 
+      } else {
+        alpha = r[2];
       }
       madwf_ml::axpby(T, 0.0f, T, -alpha, P);
       // mu -= alpha * pmu;
 
       // printfQuda("training_param[0] = %8.4e\n", tp[0]);
 
-      printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e, mu = %8.4e\n", comm_rank(), iteration, chi2, chi2/ref, alpha, mu);
-
+      printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e, mu = %8.4e\n", comm_rank(),
+                 iteration, chi2, chi2 / ref, alpha, mu);
     }
-   
+
     printfQuda("Training finished ...\n");
     count = 0;
-    for(const auto& phi : in){
+    for (const auto &phi : in) {
       double ind_chi2 = calculate_chi(chi, *phi, T, mu, Ls_cheap);
       double phi2 = norm2(*phi);
-      printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2/phi2, phi2);
+      printfQuda("chi2 %03d %% = %8.4e, phi2 = %8.4e\n", count, ind_chi2 / phi2, phi2);
       count++;
     }
 
     tp = T.to_host();
 
-    std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
+    std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
     char cstring[512];
     sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
     save_param_path += std::string(cstring);
-    FILE* fp = fopen(save_param_path.c_str(), "w");
+    FILE *fp = fopen(save_param_path.c_str(), "w");
     fwrite(tp.data(), sizeof(float), tp.size(), fp);
     printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
     return;
   }
 
+  void MSPCG::inner_cg(ColorSpinorField &ix, ColorSpinorField &ib, bool does_training)
+  {
 
-  void MSPCG::inner_cg(ColorSpinorField& ix, ColorSpinorField& ib, bool does_training) {
-    
     commGlobalReductionSet(false);
-  
+
     const int Ls = ib.X(4);
     const int Ls_cheap = 8;
 
@@ -522,49 +520,50 @@ namespace quda {
     static bool trained = false;
     static bool load_from_file = trained;
     static bool loaded_from_file = false;
-    static std::vector<ColorSpinorField*> vs(0);
+    static std::vector<ColorSpinorField *> vs(0);
     static int v_count = 0;
     v_count++;
-    if(!trained && v_count > 400){
+    if (!trained && v_count > 400) {
       ColorSpinorParam csParam(ib);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      ColorSpinorField* p = new cudaColorSpinorField(csParam); 
-      axpby(5e3/sqrt(norm2(ib)), ib, 0.0, *p);
+      ColorSpinorField *p = new cudaColorSpinorField(csParam);
+      axpby(5e3 / sqrt(norm2(ib)), ib, 0.0, *p);
       vs.push_back(p);
     }
-    static std::vector<float> training_param(Ls*Ls_cheap*16*2, 0.1f);
+    static std::vector<float> training_param(Ls * Ls_cheap * 16 * 2, 0.1f);
     static madwf_ml::TrainingParameter<float> device_tp(training_param);
     static double mu = dirac_param_precondition.mu;
     // static double mu = 1.2425e-01;
     // static double mu = 1.07361e-1;
     // static double mu = 0.3833;
     // static double mu = 1.0;
-    if(!trained && vs.size() >= training_size){
+    if (!trained && vs.size() >= training_size) {
       fill_random(training_param);
       train_param(vs, training_param, mu, Ls_cheap);
       trained = true;
       device_tp.from_host(training_param);
     }
-   
-    if(load_from_file && !loaded_from_file){
+
+    if (load_from_file && !loaded_from_file) {
       printfQuda("inference mu   = %f\n", dirac_param_precondition.mu);
-      std::string save_param_path(getenv("QUDA_RESOURCE_PATH")); 
+      std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
       char cstring[512];
       sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_cheap, mu);
       save_param_path += std::string(cstring);
       // save_param_path += "/training_param_" + std::to_string(0) + ".dat";
-      FILE* fp = fopen(save_param_path.c_str(), "rb");
-      if(!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
+      FILE *fp = fopen(save_param_path.c_str(), "rb");
+      if (!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
       size_t fread_count = fread(training_param.data(), sizeof(float), training_param.size(), fp);
-      if(fread_count != training_param.size()){
-        errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count, training_param.size());
+      if (fread_count != training_param.size()) {
+        errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
+                  training_param.size());
       }
       printfQuda("Training params loaded from %s.\n", save_param_path.c_str());
       load_from_file = false;
       loaded_from_file = true;
       device_tp.from_host(training_param);
     }
-    if(trained){
+    if (trained) {
       double chi2 = calculate_chi(*ip, ib, device_tp, mu, Ls_cheap, &ix);
       double persistent_b2 = norm2(ib);
       printfQuda("rank %03d, chi2 %% = %8.4e, ix2 = %8.4e ", comm_rank(), chi2 / persistent_b2, norm2(ix));
@@ -572,18 +571,18 @@ namespace quda {
     // blas::zero(ix);
     // axpy(1.0, ib, ix);
     // if(!trained || loaded_from_file){
-    if(!trained){
-    // copy(ix, ib);
+    if (!trained) {
+      // copy(ix, ib);
       ColorSpinorParam csParam(ib);
       cudaColorSpinorField b(csParam);
       b = ib;
-      
+
       blas::zero(ix);
       // axpby(-1.0, *ip, 0.0, ib);
       // inner_dslash(*ip, ix);
       // double rk2 = blas::xmyNorm(ib, *ip);
       double rk2 = blas::norm2(ib);
-      if(rk2 == 0.0){
+      if (rk2 == 0.0) {
         commGlobalReductionSet(true);
         return;
       }
@@ -605,10 +604,11 @@ namespace quda {
     return;
   }
 
-  int MSPCG::outer_cg(ColorSpinorField& dx, ColorSpinorField& db, double quit) {
+  int MSPCG::outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit)
+  {
     double Mpk2, alpha, beta, rkp12;
     (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = nrm_op * x
-    double rk2 = xmyNorm(db, *vct_dr); // r = b - nrm_op * x
+    double rk2 = xmyNorm(db, *vct_dr);             // r = b - nrm_op * x
 
     printfQuda("outer_cg: before starting: r2 = %8.4e \n", rk2);
     if (rk2 < quit) {
@@ -635,8 +635,8 @@ namespace quda {
 
       xpay(*vct_dr, beta, *vct_dp);
 
-      printfQuda(
-          "outer_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n", loop_count, rk2, alpha, beta, Mpk2);
+      printfQuda("outer_cg: #%04d: r2 = %8.4e alpha = %8.4e beta = %8.4e Mpk2 = %8.4e\n", loop_count, rk2, alpha, beta,
+                 Mpk2);
     }
 
     printfQuda("outer_cg: CONVERGED after %04d iterations: r2/target_r2 = %8.4e/%8.4e.\n", loop_count + 1, rk2, quit);
@@ -644,7 +644,8 @@ namespace quda {
     return loop_count;
   }
 
-  void MSPCG::Minv(ColorSpinorField& out, const ColorSpinorField& in) {
+  void MSPCG::Minv(ColorSpinorField &out, const ColorSpinorField &in)
+  {
     preconditioner_timer.Start("woo", "hoo", 0);
     if (inner_iterations <= 0) {
       blas::copy(out, in);
@@ -660,7 +661,8 @@ namespace quda {
     preconditioner_timer.Stop("woo", "hoo", 0);
   }
 
-  void MSPCG::allocate(ColorSpinorField& db) {
+  void MSPCG::allocate(ColorSpinorField &db)
+  {
 
     // initializing the fermion vectors.
     ColorSpinorParam csParam(db);
@@ -730,7 +732,8 @@ namespace quda {
     sp_len0 = Xs0[0] * Xs0[1] * Xs0[2] * Xs0[3] / 2;
   }
 
-  void MSPCG::deallocate() {
+  void MSPCG::deallocate()
+  {
 
     delete r;
     delete x;
@@ -760,7 +763,8 @@ namespace quda {
     delete vct_dtmp2;
   }
 
-  void MSPCG::operator()(ColorSpinorField& dx, ColorSpinorField& db) {
+  void MSPCG::operator()(ColorSpinorField &dx, ColorSpinorField &db)
+  {
 
     const char fname[] = "MSPCG::operator()(ColorSpinorField&, ColorSpinorField&)";
     const char cname[] = __FILE__;
@@ -769,7 +773,7 @@ namespace quda {
     fGflops = 0.;
 
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-    
+
     // Check to see that we're not trying to invert on a zero-field source
     double b2 = norm2(db);
     if (b2 == 0.) {
@@ -807,12 +811,12 @@ namespace quda {
     // reliable update
 
     constexpr double fp16_eps = std::pow(2., -13);
-    const double u = param.precision_sloppy == 8
-        ? std::numeric_limits<double>::epsilon() / 2.
-        : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() / 2. : fp16_eps);
-    const double uhigh = param.precision == 8
-        ? std::numeric_limits<double>::epsilon() / 2.
-        : ((param.precision == 4) ? std::numeric_limits<float>::epsilon() / 2. : fp16_eps);
+    const double u = param.precision_sloppy == 8 ?
+      std::numeric_limits<double>::epsilon() / 2. :
+      ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon() / 2. : fp16_eps);
+    const double uhigh = param.precision == 8 ?
+      std::numeric_limits<double>::epsilon() / 2. :
+      ((param.precision == 4) ? std::numeric_limits<float>::epsilon() / 2. : fp16_eps);
     const double deps = sqrt(u);
     const double dfac = 1.1;
     double d_new = 0.;
@@ -859,8 +863,8 @@ namespace quda {
 #else
       // single multi-reduction that computes all the required inner products
       // ||p||^2, (r, z), ||M p||^2 (note that tmp2 contains M*p vector)
-      std::vector<ColorSpinorField*> lhs {p, tmp2, r};
-      std::vector<ColorSpinorField*> rhs {p, tmp2, z};
+      std::vector<ColorSpinorField *> lhs {p, tmp2, r};
+      std::vector<ColorSpinorField *> rhs {p, tmp2, z};
       Complex dot[9];
       cDotProduct(dot, lhs, rhs);
       double3 pAppp = make_double3(dot[4].real(), 0.0, dot[0].real());
@@ -877,7 +881,7 @@ namespace quda {
 
       blas::copy(*r_old, *r);
 
-      axpy(alpha, *p, *x); // x_k+1 = x_k + alpha * p_k
+      axpy(alpha, *p, *x);              // x_k+1 = x_k + alpha * p_k
       rr2 = axpyNorm(-alpha, *mmp, *r); // r_k+1 = r_k - alpha * Ap_k
       rNorm = sqrt(rr2);
 
@@ -889,7 +893,7 @@ namespace quda {
 
         printfQuda("Reliable update conditions: \n    d_n-1 < eps*r2_old: %8.4e < %8.4e,\n    dn    > eps*r_n: %8.4e   "
                    " > %8.4e,\n    dnew  > 1.1*dinit: %8.4e  > (1.1*)%8.4e.\n",
-            d, deps * sqrt(r2_old), d_new, deps * rNorm, d_new, dinit);
+                   d, deps * sqrt(r2_old), d_new, deps * rNorm, d_new, dinit);
 
         precise_timer.Start("woo", "hoo", 0);
 
@@ -897,7 +901,7 @@ namespace quda {
         xpy(*vct_dtmp, dx);
 
         (*nrm_op)(*vct_dr, dx, *vct_dtmp, *vct_dtmp2); // r = MdagM * x
-        r2 = xmyNorm(db, *vct_dr); // r = b - MdagM * x
+        r2 = xmyNorm(db, *vct_dr);                     // r = b - MdagM * x
 
         blas::copy(*r, *vct_dr);
         blas::zero(*x);
@@ -943,7 +947,7 @@ namespace quda {
 
       k++;
       printfQuda("MSPCG/iter.count/r2/target_r2/%%/target_%%: %05d %8.4e %8.4e %8.4e %8.4e\n", k, rr2, stop,
-          std::sqrt(rr2 / b2), param.tol);
+                 std::sqrt(rr2 / b2), param.tol);
     }
 
     // END of main loop
@@ -980,19 +984,20 @@ namespace quda {
 
     printfQuda("-------- END --------\n");
     printfQuda("MSPCG CONVERGED in %05d iterations(with %02d inner_iterations each) with %03d reliable updates.\n", k,
-        inner_iterations, num_reliable_updates);
+               inner_iterations, num_reliable_updates);
     printfQuda("True residual/target_r2: %8.4e/%8.4e.\n", true_res, stop);
     printfQuda("Performance precise:        %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n",
-        precise_tflops / precise_timer.time, precise_timer.time, int(precise_timer.time / param.secs * 100.),
-        precise_timer.count);
+               precise_tflops / precise_timer.time, precise_timer.time, int(precise_timer.time / param.secs * 100.),
+               precise_timer.count);
     printfQuda("Performance sloppy:         %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n",
-        sloppy_tflops / sloppy_timer.time, sloppy_timer.time, int(sloppy_timer.time / param.secs * 100.),
-        sloppy_timer.count);
+               sloppy_tflops / sloppy_timer.time, sloppy_timer.time, int(sloppy_timer.time / param.secs * 100.),
+               sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n",
-        preconditioner_tflops / prec_time, prec_time, int(prec_time / param.secs * 100.), preconditioner_timer.count);
+               preconditioner_tflops / prec_time, prec_time, int(prec_time / param.secs * 100.),
+               preconditioner_timer.count);
     for (int i = 0; i < 2; i++) {
       printfQuda("Performance linear algebra [%d]:             in %8.2f secs(%02d%%) with %05d calls.\n", i,
-          linalg_timer[i].time, int(linalg_timer[i].time / param.secs * 100.), linalg_timer[i].count);
+                 linalg_timer[i].time, int(linalg_timer[i].time / param.secs * 100.), linalg_timer[i].count);
     }
     printfQuda("Total time %8.2f secs.\n", param.secs);
 
