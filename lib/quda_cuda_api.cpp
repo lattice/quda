@@ -122,15 +122,11 @@ namespace quda {
         }
       } else {
 #ifdef USE_DRIVER_API
-        switch (async) {
-        case  true: cuMemsetD32Async((CUdeviceptr)dst, value, count/4, stream); break;
-        case false: cuMemsetD32((CUdeviceptr)dst, value, count/4);              break;
-        }
+        if (async) cuMemsetD32Async((CUdeviceptr)dst, value, count/4, stream);
+        else       cuMemsetD32((CUdeviceptr)dst, value, count/4);
 #else
-        switch (async) {
-        case  true: cudaMemsetAsync(dst, value, count, stream); break;
-        case false: cudaMemset(dst, value, count);              break;
-        }
+        if (async) cudaMemsetAsync(dst, value, count, stream);
+        else       cudaMemset(dst, value, count);
 #endif
       }
     }
