@@ -113,9 +113,9 @@ namespace quda {
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
-      * By construction not enforced, this is more of an optional
-      * metadata to specify, for ex, if an eigensolver is for an
-      * even or odd parity. */
+     * By construction not enforced, this is more of an optional
+     * metadata to specify, for ex, if an eigensolver is for an
+     * even or odd parity. */
     QudaParity suggested_parity;
 
     void *v; // pointer to field
@@ -367,10 +367,10 @@ namespace quda {
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
     /** Used to specify whether a single parity field is even/odd
-      * By construction not enforced, this is more of an optional
-      * metadata to specify, for ex, if an eigensolver is for an
-      * even or odd parity. */
-    QudaParity suggested_parity; 
+     * By construction not enforced, this is more of an optional
+     * metadata to specify, for ex, if an eigensolver is for an
+     * even or odd parity. */
+    QudaParity suggested_parity;
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS

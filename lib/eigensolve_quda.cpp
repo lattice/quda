@@ -510,7 +510,7 @@ namespace quda
         csParam.x[0] *= 2;
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
         csParam.create = QUDA_ZERO_FIELD_CREATE;
-        for (int i = 0; i < Nvec; i++) { 
+        for (int i = 0; i < Nvec; i++) {
           tmp.push_back(ColorSpinorField::Create(csParam));
           if (spinor_parity == QUDA_EVEN_PARITY)
             blas::copy(tmp[i]->Even(), *eig_vecs[i]);
