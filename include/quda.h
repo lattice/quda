@@ -279,7 +279,7 @@ extern "C" {
     void *eig_param;
 
     /** If true, deflate the initial guess */
-    bool deflate;
+    QudaBoolean deflate;
 
     /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
