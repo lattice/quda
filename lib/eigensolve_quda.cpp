@@ -505,12 +505,20 @@ namespace quda
         delete tmp_intermediate;
       }
     } else {
-      // FIXME: add conversion to full site subset from single parity fields.
       ColorSpinorParam csParam(*eig_vecs[0]);
       if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
         csParam.x[0] *= 2;
         csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-        for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        for (int i = 0; i < Nvec; i++) { 
+          tmp.push_back(ColorSpinorField::Create(csParam));
+          if (spinor_parity == QUDA_EVEN_PARITY)
+            blas::copy(tmp[i]->Even(), *eig_vecs[i]);
+          else if (spinor_parity == QUDA_ODD_PARITY)
+            blas::copy(tmp[i]->Odd(), *eig_vecs[i]);
+          else
+            errorQuda("When saving single parity vectors, the suggested parity must be set.");
+        }
       } else {
         for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
       }

@@ -16,8 +16,21 @@ namespace quda {
 
   struct FullClover;
 
-  // Declaration in advance
-  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &);
+  /**
+     @brief Helper function for getting the implied spinor parity from a matrix preconditioning type.
+     @param[in] matpc_type The matrix preconditioning type
+     @return Even or Odd as appropriate, invalid if the preconditioning type is invalid (implicitly non-preconditioned)
+   */
+  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &matpc_type)
+  {
+    if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+      return QUDA_EVEN_PARITY;
+    } else if (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+      return QUDA_ODD_PARITY;
+    } else {
+      return QUDA_INVALID_PARITY;
+    }
+  }
 
   /** Typedef for a set of spinors. Can be further divided into subsets ,e.g., with different precisions (not implemented currently) */
   typedef std::vector<ColorSpinorField*> CompositeColorSpinorField;
@@ -99,10 +112,11 @@ namespace quda {
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
-    QudaParity suggested_parity; // used to specify whether a single parity field is even/odd
-                                 // by construction not enforced, this is more of an optional
-                                 // metadata to specify, for ex, if an eigenvector is for an
-                                 // even or odd parity.
+    /** Used to specify whether a single parity field is even/odd
+      * By construction not enforced, this is more of an optional
+      * metadata to specify, for ex, if an eigensolver is for an
+      * even or odd parity. */
+    QudaParity suggested_parity;
 
     void *v; // pointer to field
     void *norm;
@@ -352,10 +366,11 @@ namespace quda {
 
     QudaPCType pc_type; // used to select preconditioning method in DWF
 
-    QudaParity suggested_parity; // used to specify whether a single parity field is even/odd
-                                 // by construction not enforced, this is more of an optional
-                                 // metadata to specify, for ex, if an eigenvector is for an
-                                 // even or odd parity.
+    /** Used to specify whether a single parity field is even/odd
+      * By construction not enforced, this is more of an optional
+      * metadata to specify, for ex, if an eigensolver is for an
+      * even or odd parity. */
+    QudaParity suggested_parity; 
 
     size_t real_length; // physical length only
     size_t length; // length including pads, but not ghost zone - used for BLAS
@@ -1063,22 +1078,6 @@ namespace quda {
   }
 
 #define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)
-
-  /**
-     @brief Helper function for getting the implied spinor parity from a matrix preconditioning type.
-     @param[in] matpc_type The matrix preconditioning type
-     @return Even or Odd as appropriate, invalid if the preconditioning type is invalid (implicitly non-preconditioned)
-   */
-  constexpr QudaParity impliedParityFromMatPC(const QudaMatPCType &matpc_type)
-  {
-    if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
-      return QUDA_EVEN_PARITY;
-    } else if (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
-      return QUDA_ODD_PARITY;
-    } else {
-      return QUDA_INVALID_PARITY;
-    }
-  }
 
 } // namespace quda
 
