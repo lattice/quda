@@ -369,7 +369,7 @@ namespace quda {
     float b = 0.99;
     printfQuda("beta = %f\n", b);
     printfQuda("training mu   = %f\n", dirac_param_precondition.mu);
-    for(int iteration = 0; iteration < 2400; iteration++){
+    for(int iteration = 0; iteration < 40; iteration++){
       
       madwf_ml::TrainingParameter<float> D(tp.size());
       // double dmu = 0.0;
@@ -519,7 +519,7 @@ namespace quda {
 
     const size_t training_size = 16;
 
-    static bool trained = true;
+    static bool trained = false;
     static bool load_from_file = trained;
     static bool loaded_from_file = false;
     static std::vector<ColorSpinorField*> vs(0);

@@ -106,11 +106,47 @@ namespace madwf_ml {
     return out;
   }
 
+  constexpr int warp_size = 32;
+  
+  template<class T>
+  __device__ inline void warp_reduce(T& f) {
+    #pragma unroll
+    for (int offset = 16; offset > 0; offset /= 2) {
+      T other_f = __shfl_down_sync(0xffffffffu, f, offset);
+      f += other_f;
+    }
+  }
+  
+  template<class T>
+  __device__ inline void block_reduce_x(T& f){
+  
+    int lane_id_x   = threadIdx.x % warp_size;
+    int warp_id_x   = threadIdx.x / warp_size;
+    int block_dim_x = blockDim.x  / warp_size;
+  
+    __shared__ T smem[32];
+  
+    warp_reduce(f);
+    // Now lane 0 of each warp holds the reduced value
+    
+    if(block_dim_x > 1){
+      int index = threadIdx.y * block_dim_x + warp_id_x;
+      if (lane_id_x == 0) {
+        smem[index] = f;
+      }
+      __syncthreads();
+      if (warp_id_x == 0) {
+        f = (lane_id_x < block_dim_x)
+                       ? smem[index]
+                       : 0 ;
+        warp_reduce(f);
+      }
+    }
+    // Now the first thread in the x direction holds the reduction result.
+  }
+
   template<class real>
   __device__ inline void vector_tensor_matrix(WilsonMatrix<real>* mp, const WilsonVector<real>& v, const WilsonVector<real>& w){
-    
-    typedef cub::WarpReduce<complex<real>> WarpReduce;
-    __shared__ typename WarpReduce::TempStorage temp_storage;
     
     real* real_p = reinterpret_cast<real*>(mp);
 
@@ -120,22 +156,20 @@ namespace madwf_ml {
     for(int b = 0; b < color_spin_dim; b++){
       int cs = a * color_spin_dim + b;
       complex<real> z = conj(conj(v(a)) * w(b));
-      complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
+      // Perform a block reduction across the x direction
+      block_reduce_x(z);
       if(threadIdx.x == 0) {
-        atomicAdd(&real_p[cs * 2 + 0], aggregate.real());
-        atomicAdd(&real_p[cs * 2 + 1], aggregate.imag());
+        atomicAdd(&real_p[cs * 2 + 0], z.real());
+        atomicAdd(&real_p[cs * 2 + 1], z.imag());
       }
     }}
   
   }
   
   template<class real>
-  __device__ inline void vector_tensor_matrix(SpinMatrix<real>* mp, const WilsonVector<real>& v, const WilsonVector<real>& w){
+  __device__ inline void vector_tensor_matrix(SpinMatrix<real>* mp, int m_index, const WilsonVector<real>& v, const WilsonVector<real>& w){
     
-    typedef cub::WarpReduce<complex<real>> WarpReduce;
-    __shared__ typename WarpReduce::TempStorage temp_storage;
-    
-    real* real_p = reinterpret_cast<real*>(mp);
+    complex<real>* p = reinterpret_cast<complex<real>*>(mp);
     
     #pragma unroll
     for(int a = 0; a < spin_dim; a++){
@@ -147,10 +181,10 @@ namespace madwf_ml {
       for(int color = 0; color < color_dim; color++){
         z += conj(conj(v(a, color)) * w(b, color));
       }
-      complex<real> aggregate = WarpReduce(temp_storage).Sum(z);
+      // Perform a block reduction across the x direction
+      block_reduce_x(z);
       if(threadIdx.x == 0) {
-        atomicAdd(&real_p[cs * 2 + 0], aggregate.real());
-        atomicAdd(&real_p[cs * 2 + 1], aggregate.imag());
+        p[(m_index * spin_dim*spin_dim + cs) * gridDim.x + blockIdx.x] = z;
       }
     }}
   
@@ -234,7 +268,29 @@ namespace madwf_ml {
         }
 
   };
-  
+
+
+  template<class T, int block_size>
+    __global__ void tensor_reduce_kernel(T* out, T* in, int batch_size) {
+
+      int tid = threadIdx.x;
+
+      T z = 0;
+      while(tid < batch_size){
+        z += in[blockIdx.x * batch_size + tid];
+        tid += blockDim.x;
+      }
+
+      typedef cub::BlockReduce<T, block_size> BlockReduce;
+      __shared__ typename BlockReduce::TempStorage temp_storage;
+      T aggregate = BlockReduce(temp_storage).Sum(z);
+
+      if(threadIdx.x == 0){
+        out[blockIdx.x] = aggregate;
+      }
+
+    }
+
   template<class storage_type, class Arg>
     __global__ void tensor_5d_kernel(Arg arg) {
 
@@ -270,11 +326,11 @@ namespace madwf_ml {
       for(t = 0; t < Ls_in; t++){
         const Vector w = cache.load(t * blockDim.x + threadIdx.x, ld); 
         int wm_index = s * Ls_in + t;
-        vector_tensor_matrix(&wm_p[wm_index], v, w);
+        vector_tensor_matrix(wm_p, wm_index, v, w);
       }
 
     }
-
+  
   template<class storage_type, bool dagger, class Arg>
     __global__ void transfer_5d_kernel(Arg arg) {
 
@@ -359,6 +415,12 @@ namespace madwf_ml {
 
       virtual ~Transfer5d() { ; }
 
+      template<class F>
+      inline void launch(F* f, const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+        void* args[] = {&arg};
+        qudaLaunchKernel((const void*)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+      }
+
       void apply(const cudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if(arg.transfer){
@@ -368,12 +430,25 @@ namespace madwf_ml {
             transfer_5d_kernel<storage_type, false><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
           }
         }else{
+          using Complex = complex<real>;
+          using matrix_type = typename Arg::MatrixType;
+          
           // Each block has a Wilson Matrix.
           int num_x_blocks = tp.grid.x;
-          int alloc_size = sizeof(WilsonMatrix<real>);
-          
+          int alloc_size = num_x_blocks * Arg::matrix_size * arg.Ls_in * arg.Ls_out;
 
-          tensor_5d_kernel<storage_type><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); 
+          Complex* tensor_out = reinterpret_cast<Complex*>(arg.tensor_out_p);
+          arg.tensor_out_p = (matrix_type*)device_malloc_(__func__, __FILE__, __LINE__, alloc_size);
+          Complex* tensor_in = reinterpret_cast<Complex*>(arg.tensor_out_p);
+
+          launch(tensor_5d_kernel<storage_type, Arg>, tp, arg, stream); 
+
+          constexpr int block_size = 128;
+          tensor_reduce_kernel<Complex, block_size>
+            <<<arg.Ls_in*arg.Ls_out*sizeof(matrix_type)/sizeof(Complex), block_size, 0, stream>>>(tensor_out, tensor_in, num_x_blocks);
+
+          device_free_(__func__, __FILE__, __LINE__, tensor_in);
+
         }
       }
 
