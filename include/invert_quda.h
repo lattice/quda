@@ -1148,9 +1148,6 @@ public:
 
     virtual ~PreconditionedSolver() { delete solver; }
 
-<<<<<<< HEAD
-    void operator()(ColorSpinorField &x, ColorSpinorField &b);
-=======
     void operator()(ColorSpinorField &x, ColorSpinorField &b) {
       setOutputPrefix(prefix);
 
@@ -1171,7 +1168,6 @@ public:
      *        rescaling an MG instance
      */
     Solver &ExposeSolver() const { return *solver; }
->>>>>>> develop
   };
 
   class MultiShiftSolver {
