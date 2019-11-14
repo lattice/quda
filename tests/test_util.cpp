@@ -1630,6 +1630,9 @@ int ydim = 24;
 int zdim = 24;
 int tdim = 24;
 int Lsdim = 16;
+bool use_mspcg_madwf_ml_training = false;
+bool perform_mspcg_madwf_ml_training = false;
+int Ls_cheap = 16;
 QudaDagType dagger = QUDA_DAG_NO;
 int eofa_pm = 1;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
@@ -2328,6 +2331,53 @@ int process_command_line_option(int argc, char** argv, int* idx)
       usage(argv);
     }
     Lsdim=Ls;
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--use-mspcg-madwf-ml-training") == 0){
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      use_mspcg_madwf_ml_training = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      use_mspcg_madwf_ml_training = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--perform-mspcg-madwf-ml-training") == 0){
+    if (i + 1 >= argc) { usage(argv); }
+
+    if (strcmp(argv[i+1], "true") == 0){
+      perform_mspcg_madwf_ml_training = true;
+    }else if (strcmp(argv[i+1], "false") == 0){
+      perform_mspcg_madwf_ml_training = false;
+    }else{
+      fprintf(stderr, "ERROR: invalid multishift boolean\n");
+      exit(1);
+    }
+
+    i++;
+    ret = 0;
+    goto out;
+  }
+
+  if( strcmp(argv[i], "--Ls-cheap") == 0){
+    if (i + 1 >= argc) { usage(argv); }
+    int Ls_cheap_ =  atoi(argv[i+1]);
+    if (Ls < 0 || Ls > 128){
+      printf("ERROR: invalid Ls dimension\n");
+      usage(argv);
+    }
+    Ls_cheap=Ls_cheap_;
     i++;
     ret = 0;
     goto out;

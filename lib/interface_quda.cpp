@@ -3219,8 +3219,16 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       delete solve;
 #else
       MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert);
-      
-      (*mspcg)(*out, *in);
+     
+      if(param->perform_mspcg_madwf_ml_training){
+        mspcg->mspcg_madwf_ml(*out, *in, true, true, param->Ls_cheap);
+        blas::zero(*out);
+      }
+      if(param->use_mspcg_madwf_ml_training){
+        mspcg->mspcg_madwf_ml(*out, *in, true, false, param->Ls_cheap);
+      }else{
+        mspcg->mspcg_madwf_ml(*out, *in, false, false, param->Ls_cheap);
+      }
       solverParam.updateInvertParam(*param);
       delete mspcg;
 #endif

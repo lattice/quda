@@ -108,6 +108,10 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
+    bool use_mspcg_madwf_ml_training;
+    bool perform_mspcg_madwf_ml_training;
+    int Ls_cheap;
+
     double _Complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
     double _Complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 

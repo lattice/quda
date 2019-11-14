@@ -13,6 +13,7 @@
 
 namespace quda
 {
+  using Tp = madwf_ml::TrainingParameter<float>;
 
   class MSPCG : public Solver
   { // Multisplitting Preconditioned CG
@@ -89,8 +90,10 @@ namespace quda
     
     void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     void Minv(ColorSpinorField &out, const ColorSpinorField &in);
+    
+    void m_inv_trained(ColorSpinorField &out, const ColorSpinorField &in, const Tp& tp, double mu, int Ls_cheap);
 
-    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib, bool does_training = true);
+    void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
 
   public:
@@ -111,14 +114,18 @@ namespace quda
 
     void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in);
     
-    void test_dslash(const ColorSpinorField &tb);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in){
+      this->mspcg_madwf_ml(out, in, false, false, 0);
+    }
+    void mspcg_madwf_ml(ColorSpinorField &out, ColorSpinorField &in, const bool use_training, const bool perform_training, const int Ls_cheap);
+    
+    void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, const double mu, int Ls_cheap);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+    void calculate_TdATx(ColorSpinorField& out, const ColorSpinorField& in, const Tp& tp, double mu, int Ls_cheap);
 
-    void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, double& mu, int Ls_cheap);
+    double calculate_chi(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap);
 
-    double calculate_chi(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp, double mu, int Ls_hat, ColorSpinorField* x = nullptr);
-    void ATx(ColorSpinorField& out, const ColorSpinorField& in, madwf_ml::TrainingParameter<float>& tp);
+    void ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp& tp);
 
   };
 
