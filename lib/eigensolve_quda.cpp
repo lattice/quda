@@ -200,7 +200,7 @@ namespace quda
     Complex *s = (Complex *)safe_malloc((j + 1) * sizeof(Complex));
     Complex sum(0.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(j+1);
+    vecs_ptr.reserve(j + 1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
     blas::cDotProduct(s, vecs_ptr, rvec);
@@ -849,10 +849,10 @@ namespace quda
     int start = (j > num_keep) ? j - 1 : 0;
 
     if (j - start > 0) {
-      std::vector<ColorSpinorField*> r_{r[0]};
+      std::vector<ColorSpinorField *> r_ {r[0]};
       std::vector<double> beta_;
       beta_.reserve(j - start);
-      std::vector<ColorSpinorField*> v_;
+      std::vector<ColorSpinorField *> v_;
       v_.reserve(j - start);
       for (int i = start; i < j; i++) {
         beta_.push_back(-beta[i]);

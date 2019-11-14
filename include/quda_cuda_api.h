@@ -45,12 +45,12 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemset(ptr, value, count)                       \
+#define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
-#define qudaMemsetAsync(ptr, value, count, stream)                       \
+#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 namespace quda {
@@ -90,8 +90,7 @@ namespace quda {
      @param[in] value Value to set for each byte of specified memory
      @param[in] count Size in bytes to set
    */
-  void qudaMemset_(void *ptr, int value, size_t count,
-                   const char *func, const char *file, const char *line);
+  void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaMemsetAsync or driver API equivalent.
@@ -101,8 +100,8 @@ namespace quda {
      @param[in] count Size in bytes to set
      @param[in] stream  Stream to issue memset
    */
-  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream,
-                        const char *func, const char *file, const char *line);
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream, const char *func,
+                        const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaLaunchKernel

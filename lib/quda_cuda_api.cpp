@@ -26,7 +26,8 @@ namespace quda {
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
-  class QudaMem : public Tunable {
+  class QudaMem : public Tunable
+  {
 
     void *dst;
     const void *src;
@@ -41,9 +42,15 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   public:
-    inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-                   bool async, const char *func, const char *file, const char *line)
-      : dst(dst), src(src), count(count), value(0), copy(true), kind(kind), async(async)
+    inline QudaMem(void *dst, const void *src, size_t count, cudaMemcpyKind kind, bool async, const char *func,
+                   const char *file, const char *line) :
+      dst(dst),
+      src(src),
+      count(count),
+      value(0),
+      copy(true),
+      kind(kind),
+      async(async)
     {
       if (!async) {
         switch (kind) {
@@ -71,9 +78,14 @@ namespace quda {
       strcat(aux, line);
     }
 
-    inline QudaMem(void *dst, int value, size_t count,
-                   bool async, const char *func, const char *file, const char *line)
-      : dst(dst), src(nullptr), count(count), value(value), copy(false), kind(cudaMemcpyDefault), async(async)
+    inline QudaMem(void *dst, int value, size_t count, bool async, const char *func, const char *file, const char *line) :
+      dst(dst),
+      src(nullptr),
+      count(count),
+      value(value),
+      copy(false),
+      kind(cudaMemcpyDefault),
+      async(async)
     {
       name = !async ? "cudaMemset" : "cudaMemsetAsync";
       strcpy(aux, func);
@@ -98,8 +110,7 @@ namespace quda {
           case cudaMemcpyDeviceToDevice:
             PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
             break;
-          default:
-            errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
+          default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
           }
 #else
           PROFILE(cudaMemcpyAsync(dst, src, count, kind, stream),
@@ -107,14 +118,13 @@ namespace quda {
 #endif
         } else {
 #ifdef USE_DRIVER_API
-          switch(kind) {
-          case cudaMemcpyDeviceToHost:   cuMemcpyDtoH(dst, (CUdeviceptr)src, count);              break;
-          case cudaMemcpyHostToDevice:   cuMemcpyHtoD((CUdeviceptr)dst, src, count);              break;
-          case cudaMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
+          switch (kind) {
+          case cudaMemcpyDeviceToHost: cuMemcpyDtoH(dst, (CUdeviceptr)src, count); break;
+          case cudaMemcpyHostToDevice: cuMemcpyHtoD((CUdeviceptr)dst, src, count); break;
+          case cudaMemcpyHostToHost: memcpy(dst, src, count); break;
           case cudaMemcpyDeviceToDevice: cuMemcpyDtoD((CUdeviceptr)dst, (CUdeviceptr)src, count); break;
-          case cudaMemcpyDefault:        cuMemcpy((CUdeviceptr)dst, (CUdeviceptr)src, count);     break;
-          default:
-            errorQuda("Unsupported cudaMemcpyType %d", kind);
+          case cudaMemcpyDefault: cuMemcpy((CUdeviceptr)dst, (CUdeviceptr)src, count); break;
+          default: errorQuda("Unsupported cudaMemcpyType %d", kind);
           }
 #else
           cudaMemcpy(dst, src, count, kind);
@@ -122,15 +132,15 @@ namespace quda {
         }
       } else {
 #ifdef USE_DRIVER_API
-        switch (async) {
-        case  true: cuMemsetD32Async((CUdeviceptr)dst, value, count/4, stream); break;
-        case false: cuMemsetD32((CUdeviceptr)dst, value, count/4);              break;
-        }
+        if (async)
+          cuMemsetD32Async((CUdeviceptr)dst, value, count / 4, stream);
+        else
+          cuMemsetD32((CUdeviceptr)dst, value, count / 4);
 #else
-        switch (async) {
-        case  true: cudaMemsetAsync(dst, value, count, stream); break;
-        case false: cudaMemset(dst, value, count);              break;
-        }
+        if (async)
+          cudaMemsetAsync(dst, value, count, stream);
+        else
+          cudaMemset(dst, value, count);
 #endif
       }
     }
@@ -146,7 +156,6 @@ namespace quda {
 
     long long flops() const { return 0; }
     long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2*count : count; }
-
   };
 
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
@@ -226,18 +235,17 @@ namespace quda {
     QudaMem set(ptr, value, count, false, func, file, line);
     set.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream, const char *func, const char *file, const char *line)
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream, const char *func,
+                        const char *file, const char *line)
   {
     if (count == 0) return;
     QudaMem copy(ptr, value, count, true, func, file, line);
     copy.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess)
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
