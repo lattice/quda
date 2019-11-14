@@ -25,7 +25,7 @@ namespace quda
     DiracMobiusPC *mat;
     DiracMobiusPC *mat_sloppy;
     DiracMobiusPC *mat_precondition;
-    
+
     DiracMdagM *nrm_op;
     DiracMdagM *nrm_op_sloppy;
     DiracMdagMLocal *nrm_op_precondition;
@@ -87,22 +87,21 @@ namespace quda
     int shift2[4] = {2, 2, 2, 2};
 
     bool tc;
-    
+
     void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     void Minv(ColorSpinorField &out, const ColorSpinorField &in);
-    
-    void m_inv_trained(ColorSpinorField &out, const ColorSpinorField &in, const Tp& tp, double mu, int Ls_cheap);
+
+    void m_inv_trained(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap);
 
     void inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
 
   public:
-    
     /* --------------------------------------------------------------------------*
-     * 
+     *
      * --------------------------------------------------------------------------*/
-    MSPCG(QudaInvertParam* inv_param, SolverParam& param_, TimeProfile& profile);
-    
+    MSPCG(QudaInvertParam *inv_param, SolverParam &param_, TimeProfile &profile);
+
     ~MSPCG();
 
     int inner_iterations;
@@ -113,20 +112,18 @@ namespace quda
     void deallocate();
 
     void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in);
-    
-    void operator()(ColorSpinorField &out, ColorSpinorField &in){
-      this->mspcg_madwf_ml(out, in, false, false, 0);
-    }
-    void mspcg_madwf_ml(ColorSpinorField &out, ColorSpinorField &in, const bool use_training, const bool perform_training, const int Ls_cheap);
-    
-    void train_param(const std::vector<ColorSpinorField*>& in, std::vector<float>& tp, const double mu, int Ls_cheap);
 
-    void calculate_TdATx(ColorSpinorField& out, const ColorSpinorField& in, const Tp& tp, double mu, int Ls_cheap);
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) { this->mspcg_madwf_ml(out, in, false, false, 0); }
+    void mspcg_madwf_ml(ColorSpinorField &out, ColorSpinorField &in, const bool use_training,
+                        const bool perform_training, const int Ls_cheap);
+
+    void train_param(const std::vector<ColorSpinorField *> &in, std::vector<float> &tp, const double mu, int Ls_cheap);
+
+    void calculate_TdATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap);
 
     double calculate_chi(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap);
 
-    void ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp& tp);
-
+    void ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp);
   };
 
 } // namespace quda
