@@ -54,6 +54,7 @@ namespace quda {
 
 //special types needed for compatibility with QUDA blas:
    using RowMajorRealMatrix = Matrix<double, Dynamic, Dynamic, RowMajor>;
+			using RowMajorComplexMatrix = Matrix<Complex, Dynamic, Dynamic, RowMajor>;
 
    static int max_eigcg_cycles = 4;//how many eigcg cycles do we allow?
 
@@ -465,10 +466,10 @@ namespace quda {
 
 	 printfQuda("\nOrthonormalize new eigenvectors..\n");
 
-#if 0 //communication optimized version
-	 MatrixXd R ( MatrixXd::Identity(first_idx+k, first_idx+k) );
-	 MatrixXd T ( MatrixXd::Identity(first_idx+k, first_idx+k) );
-	 RowMajorRealMatrix L (first_idx+k-1, 2);
+#if 1 //communication optimized version
+	 MatrixXcd R ( MatrixXcd::Identity(first_idx+k, first_idx+k) );
+	 MatrixXcd T ( MatrixXcd::Identity(first_idx+k, first_idx+k) );
+	 RowMajorComplexMatrix L (first_idx+k-1, 2);
 
 	 for (int j = 0; j < k; j++) {//extra step to include the last vector normalization
 
@@ -483,9 +484,9 @@ namespace quda {
 	   std::vector<ColorSpinorField*> rvj(RV.begin(), RV.begin() + i);
 	   std::vector<ColorSpinorField*> rv2(RV.begin() + (i-1), RV.begin() + (i+1));
 
-	   blas::reDotProduct(L.block(0,0,i,2).data(), rvj, rv2);
+	   blas::cDotProduct(L.block(0,0,i,2).data(), rvj, rv2);
 
-	   R(i-1,i-1) = sqrt( L(i-1, 0) );
+	   R(i-1,i-1) = sqrt( L(i-1, 0).real() );
 	   R(i-1,i  ) = L(i-1, 1) / R(i-1,i-1);
 
 	   if( i > 1 ) {
@@ -497,21 +498,21 @@ namespace quda {
 	   R.col(i).head(i) = T.block(0,0,i,i).adjoint() * R.col(i).head(i);
 
 	   //Normalization of the previous vectors:
-	   if(R(i-1, i-1) < 1e-8)  errorQuda("\nCannot orthogonalize %dth vector\n", i-1);
+	   if(R(i-1, i-1).real() < 1e-8)  errorQuda("\nCannot orthogonalize %dth vector\n", i-1);
 
-	   blas::ax(1.0 / R(i-1, i-1), *RV[i-1]);
+	   blas::ax(1.0 / R(i-1, i-1).real(), *RV[i-1]);
 
-	   VectorXd Rj( R.col(i).head(i) );
+	   VectorXcd Rj( R.col(i).head(i) );
 	   std::vector<ColorSpinorField*> rvjp1{RV[i]};
 
 	   for(int l = 0; l < i; l++) Rj[l] = -Rj[l];
 
-	   blas::axpy( Rj.data(), rvj, rvjp1);
+	   blas::caxpy( Rj.data(), rvj, rvjp1);
 	 } // end for loop over j
 
 	 //extra step to include the last vector normalization
 	 R(first_idx+k-1,first_idx+k-1) = sqrt(blas::norm2(*RV[first_idx+k-1]));
-	 blas::ax(1.0 / R(first_idx+k-1,first_idx+k-1), *RV[first_idx+k-1]);
+	 blas::ax(1.0 / R(first_idx+k-1,first_idx+k-1).real(), *RV[first_idx+k-1]);
 
 #else //old legacy version
 

@@ -2676,7 +2676,7 @@ void* newDeflationQuda(QudaInvertParam *inv_param) {
 void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
-  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);  
+  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
 
   auto *defl_p = static_cast<deflated_solver*>(df);
   Deflation &defl = *(defl_p->defl);
@@ -2894,7 +2894,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       delete dsolve;
     }
     blas::copy(*in, *out);
-    delete solve;
+    //delete solve;
     solverParam.updateInvertParam(*param);
   }
 
@@ -2950,8 +2950,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       (*dsolve)(*out, *in);
       delete dsolve;
     }
-    (*solve)(*out, *in);
-    delete solve;
+    //(*solve)(*out, *in);
+    //delete solve;
     solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -3006,8 +3006,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       (*dsolve)(*out, *in);
       delete dsolve;
     }
-    (*solve)(*out, *in);
-    delete solve;
+    //(*solve)(*out, *in);
+    //delete solve;
     solverParam.updateInvertParam(*param);
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -3023,7 +3023,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
       delete dsolve;
     }
     dirac.Mdag(*out, tmp);  // x = M^dag y
-    delete solve;
+    //delete solve;
     solverParam.updateInvertParam(*param);
   }
 
