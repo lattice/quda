@@ -5,7 +5,7 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
-// Local enum for the LU axpy block type 
+// Local enum for the LU axpy block type
 enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
 namespace quda
@@ -13,7 +13,7 @@ namespace quda
 
   class EigenSolver
   {
-    
+
 protected:
     QudaEigParam *eig_param;
     TimeProfile &profile;
@@ -130,7 +130,7 @@ public:
     */
     void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie, int js, int je,
                      blockType b_type);
-    
+
     /**
        @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space

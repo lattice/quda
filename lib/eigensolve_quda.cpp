@@ -1010,7 +1010,7 @@ namespace quda
       int full_batches = iter_keep / batch_size;
       int batch_size_r = iter_keep % batch_size;
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-      
+
       if ((int)kSpace.size() < offset + batch_size) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
@@ -1072,7 +1072,8 @@ namespace quda
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size, LOWER_TRI);
+        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size,
+                    LOWER_TRI);
         // batch pencil
         blockRotate(kSpace, host_L, dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, PENCIL);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
@@ -1080,7 +1081,8 @@ namespace quda
 
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep, LOWER_TRI);
+        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep,
+                    LOWER_TRI);
         // remainder pencil
         if (iter_keep < dim) {
           blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
@@ -1095,7 +1097,8 @@ namespace quda
         blockRotate(kSpace, host_U, iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
                     iter_keep, UPPER_TRI);
         // remainder pencil
-        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep, PENCIL);
+        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep,
+                    PENCIL);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
 
