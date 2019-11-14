@@ -15,8 +15,6 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-bool flags = true;
-
 namespace quda
 {
 
@@ -253,7 +251,7 @@ namespace quda
   }
 
   void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie,
-                                int js, int je, int type)
+                                int js, int je, blockType b_type)
   {
     // is = i_start
     // ie = i_end
@@ -285,10 +283,10 @@ namespace quda
         batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
-    switch (type) {
-    case 0: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
-    case 1: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
-    case 2: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
+    switch (b_type) {
+    case PENCIL: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
+    case LOWER_TRI: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
+    case UPPER_TRI: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
@@ -1012,7 +1010,7 @@ namespace quda
       int full_batches = iter_keep / batch_size;
       int batch_size_r = iter_keep % batch_size;
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
+      
       if ((int)kSpace.size() < offset + batch_size) {
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
@@ -1074,18 +1072,18 @@ namespace quda
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size, 1);
+        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size, LOWER_TRI);
         // batch pencil
-        blockRotate(kSpace, host_L, dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, 0);
+        blockRotate(kSpace, host_L, dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, PENCIL);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep, 1);
+        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep, LOWER_TRI);
         // remainder pencil
         if (iter_keep < dim) {
-          blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches * batch_size, iter_keep, 0);
+          blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
         }
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
@@ -1095,9 +1093,9 @@ namespace quda
       if (do_batch_remainder) {
         // remainder triangle
         blockRotate(kSpace, host_U, iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
-                    iter_keep, 2);
+                    iter_keep, UPPER_TRI);
         // remainder pencil
-        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep, 0);
+        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep, PENCIL);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
 
@@ -1105,10 +1103,10 @@ namespace quda
       for (int b = full_batches - 1; b >= 0; b--) {
         // batch triangle
         blockRotate(kSpace, host_U, iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
-                    (b + 1) * batch_size, 2);
+                    (b + 1) * batch_size, UPPER_TRI);
         if (b > 0) {
           // batch pencil
-          blockRotate(kSpace, host_U, iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, 0);
+          blockRotate(kSpace, host_U, iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, PENCIL);
         }
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
