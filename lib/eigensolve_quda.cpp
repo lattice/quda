@@ -1154,24 +1154,25 @@ namespace quda
       // Do P Permute
       //---------------------------------------------------------------------------
       permuteVecs(kSpace, tempP.data(), dim);
-      
+
       // Do L Multiply
       //---------------------------------------------------------------------------
       // Loop over full batches
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotate(kSpace, matLower.data(), dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size,
-                    LOWER_TRI);
+        blockRotate(kSpace, matLower.data(), dim, b * batch_size, (b + 1) * batch_size, b * batch_size,
+                    (b + 1) * batch_size, LOWER_TRI);
         // batch pencil
-        blockRotate(kSpace, matLower.data(), dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, PENCIL);
+        blockRotate(kSpace, matLower.data(), dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size,
+                    PENCIL);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, matLower.data(), dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep,
-                    LOWER_TRI);
+        blockRotate(kSpace, matLower.data(), dim, full_batches * batch_size, iter_keep, full_batches * batch_size,
+                    iter_keep, LOWER_TRI);
         // remainder pencil
         if (iter_keep < dim) {
           blockRotate(kSpace, matLower.data(), dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
@@ -1183,11 +1184,11 @@ namespace quda
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
         // remainder triangle
-	blockRotate(kSpace, matUpper.data(), iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
-		    iter_keep, UPPER_TRI);
+        blockRotate(kSpace, matUpper.data(), iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
+                    iter_keep, UPPER_TRI);
         // remainder pencil
-        blockRotate(kSpace, matUpper.data(), iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep,
-                    PENCIL);
+        blockRotate(kSpace, matUpper.data(), iter_keep, 0, full_batches * batch_size, full_batches * batch_size,
+                    iter_keep, PENCIL);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
 
@@ -1198,7 +1199,8 @@ namespace quda
                     (b + 1) * batch_size, UPPER_TRI);
         if (b > 0) {
           // batch pencil
-          blockRotate(kSpace, matUpper.data(), iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, PENCIL);
+          blockRotate(kSpace, matUpper.data(), iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size,
+                      PENCIL);
         }
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
