@@ -41,6 +41,17 @@ namespace quda
         if (device_data) { device_free_(__func__, __FILE__, __LINE__, device_data); }
       }
 
+      void copy(const TrainingParameter& other)
+      {
+        if(size != other.size){
+          errorQuda("Copying from a vector with different size.\n");
+        }
+        size_t m_size = size * sizeof(real);
+        if(device_data != other.device_data){
+          cudaMemcpy(device_data, other.device_data, m_size, cudaMemcpyDeviceToDevice);
+        }
+      }
+
       std::vector<real> to_host() const
       {
         std::vector<real> out(size);

@@ -384,12 +384,9 @@ namespace quda
 #endif
       }
 
-      // printfQuda("D[0] = %+8.4e\n", D[0]);
       madwf_ml::axpby(P, (b - 1), P, (1 - b), D);
 
       // pmu = b * pmu + (1-b) * dmu;
-
-      // printfQuda("P[0] = %+8.4e\n", P[0]);
 
       chi2 = 0.0;
       // line search
@@ -428,27 +425,12 @@ namespace quda
         a[4] += dot[8].real();
       }
 
-      // for(int i = 0; i < 5; i++){
-      //   printfQuda("a[%d] = %8.4e, ", i, a[i]);
-      // }
-      // printfQuda("\n");
-
       double r[3] = {0.0, 0.0, 0.0};
       solve_deg3(4.0 * a[4], 3.0 * a[3], 2.0 * a[2], a[1], r[0], r[1], r[2]);
-
-      // for(int i = 0; i < 3; i++){
-      //   printfQuda("r[%d] = %+8.4e, ", i, r[i]);
-      // }
-      // printfQuda("\n");
 
       // try the three roots
       double try_root[3];
       for (int i = 0; i < 3; i++) { try_root[i] = eval_deg4(a[4], a[3], a[2], a[1], a[0], r[i]); }
-
-      // for(int i = 0; i < 3; i++){
-      //   printfQuda("e[%d] = %+8.4e, ", i, try_root[i]);
-      // }
-      // printfQuda("\n");
 
       if (try_root[0] < try_root[1] && try_root[0] < try_root[2]) {
         alpha = r[0];
@@ -460,9 +442,7 @@ namespace quda
       madwf_ml::axpby(T, 0.0f, T, -alpha, P);
       // mu -= alpha * pmu;
 
-      // printfQuda("training_param[0] = %8.4e\n", tp[0]);
-
-      printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %8.4e, mu = %8.4e\n", comm_rank(),
+      printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                  iteration, chi2, chi2 / ref, alpha, mu);
     }
 
