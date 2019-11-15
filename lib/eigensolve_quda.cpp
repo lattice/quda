@@ -250,11 +250,11 @@ namespace quda
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int i_start,
-                                int i_end, int j_start, int j_end, blockType b_type)
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank,
+                                const range &i_range, const range &j_range, blockType b_type)
   {
-    int block_i_rank = i_end - i_start;
-    int block_j_rank = j_end - j_start;
+    int block_i_rank = i_range.second - i_range.first;
+    int block_j_rank = j_range.second - j_range.first;
 
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
@@ -262,20 +262,20 @@ namespace quda
 
     // Alias the vectors we wish to keep
     vecs_ptr.reserve(block_i_rank);
-    for (int i = i_start; i < i_end; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
+    for (int i = i_range.first; i < i_range.second; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
     // Alias the extra space vectors
     kSpace_ptr.reserve(block_j_rank);
-    for (int j = j_start; j < j_end; j++) {
-      int k = nKr + 1 + j - j_start;
+    for (int j = j_range.first; j < j_range.second; j++) {
+      int k = nKr + 1 + j - j_range.first;
       kSpace_ptr.push_back(kSpace[k]);
     }
 
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUM major -> ROW major)
-    for (int j = j_start; j < j_end; j++) {
-      for (int i = i_start; i < i_end; i++) {
-        int j_arr = j - j_start;
-        int i_arr = i - i_start;
+    for (int j = j_range.first; j < j_range.second; j++) {
+      for (int i = i_range.first; i < i_range.second; i++) {
+        int j_arr = j - j_range.first;
+        int i_arr = i - i_range.first;
         batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
@@ -1161,21 +1161,18 @@ namespace quda
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotate(kSpace, matLower.data(), dim, b * batch_size, (b + 1) * batch_size, b * batch_size,
-                    (b + 1) * batch_size, LOWER_TRI);
+        blockRotate(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},  {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
         // batch pencil
-        blockRotate(kSpace, matLower.data(), dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size,
-                    PENCIL);
+        blockRotate(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim}, {b * batch_size, (b + 1) * batch_size}, PENCIL);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, matLower.data(), dim, full_batches * batch_size, iter_keep, full_batches * batch_size,
-                    iter_keep, LOWER_TRI);
+        blockRotate(kSpace, matLower.data(), dim, {full_batches * batch_size, iter_keep}, {full_batches * batch_size, iter_keep}, LOWER_TRI);
         // remainder pencil
         if (iter_keep < dim) {
-          blockRotate(kSpace, matLower.data(), dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
+          blockRotate(kSpace, matLower.data(), dim, {iter_keep, dim}, {full_batches * batch_size, iter_keep}, PENCIL);
         }
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
@@ -1184,23 +1181,19 @@ namespace quda
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, matUpper.data(), iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
-                    iter_keep, UPPER_TRI);
+        blockRotate(kSpace, matUpper.data(), iter_keep, {full_batches * batch_size, iter_keep}, {full_batches * batch_size, iter_keep}, UPPER_TRI);
         // remainder pencil
-        blockRotate(kSpace, matUpper.data(), iter_keep, 0, full_batches * batch_size, full_batches * batch_size,
-                    iter_keep, PENCIL);
+        blockRotate(kSpace, matUpper.data(), iter_keep, {0, full_batches * batch_size}, {full_batches * batch_size, iter_keep}, PENCIL);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
 
       // Loop over full batches
       for (int b = full_batches - 1; b >= 0; b--) {
         // batch triangle
-        blockRotate(kSpace, matUpper.data(), iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
-                    (b + 1) * batch_size, UPPER_TRI);
+        blockRotate(kSpace, matUpper.data(), iter_keep, {b * batch_size, (b + 1) * batch_size}, {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
         if (b > 0) {
           // batch pencil
-          blockRotate(kSpace, matUpper.data(), iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size,
-                      PENCIL);
+          blockRotate(kSpace, matUpper.data(), iter_keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size}, PENCIL);
         }
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }

@@ -5,16 +5,18 @@
 #include <dirac_quda.h>
 #include <color_spinor_field.h>
 
-// Local enum for the LU axpy block type
-enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
-
 namespace quda
 {
+
+  // Local enum for the LU axpy block type
+  enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
   class EigenSolver
   {
 
 protected:
+    using range = std::pair<int, int>;
+
     QudaEigParam *eig_param;
     TimeProfile &profile;
 
@@ -128,8 +130,7 @@ public:
        @param[in] je End of j index
        @param[in] blockType Type of caxpy(_U/L) to perform
     */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie, int js, int je,
-                     blockType b_type);
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
 
     /**
        @brief Copy temp part of kSpace, zero out for next use
