@@ -1096,7 +1096,7 @@ namespace quda
         blas::zero(*kSpace_ptr[i]);
       }
 
-      // Alias the vectors we wish to keep, populate the Ritz matrix
+      // Alias the vectors we wish to keep, populate the Ritz matrix and transpose.
       kSpace_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) {
         vecs_ptr.push_back(kSpace[num_locked + j]);
@@ -1130,38 +1130,22 @@ namespace quda
         for (int i = 0; i < dim; i++) mat(i, j) = ritz_mat[j * dim + i];
 
       FullPivLU<MatrixXd> matLU(mat);
-      // RitzLU now contains the LU decomposition
 
-      MatrixXd matUpper = MatrixXd::Zero(dim, iter_keep);
+      // Extract the upper triagnular matrix
+      MatrixXd matUpper = MatrixXd::Zero(iter_keep, iter_keep);
       matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(iter_keep, iter_keep);
+
+      // Extract the lower triangular matrix
       MatrixXd matLower = MatrixXd::Identity(dim, dim);
       matLower.block(0, 0, dim, iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower.conservativeResize(dim, iter_keep);
 
-      // Multi-BLAS friendly arrays to store the L/U matrices
-      double *host_L = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
-      double *host_U = (double *)safe_malloc((iter_keep * iter_keep) * sizeof(double));
-      int *host_P = (int *)safe_malloc((dim * dim) * sizeof(int));
-      int *host_Q = (int *)safe_malloc((iter_keep * iter_keep) * sizeof(int));
-
-      // Populate host L/U arrays
-      for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < iter_keep; j++) {
-          if (i < iter_keep) host_U[j * iter_keep + i] = matUpper(i, j);
-          host_L[j * dim + i] = matLower(i, j);
-        }
-      }
-
-      // Populate host P/Q arrays
+      // Extract the desired permutation matrices
       MatrixXi tempP = MatrixXi::Zero(dim, dim);
       MatrixXi tempQ = MatrixXi::Zero(iter_keep, iter_keep);
       tempP = matLU.permutationP().inverse();
       tempQ = matLU.permutationQ().inverse();
-      for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) {
-          if (i < iter_keep && j < iter_keep) host_Q[j * iter_keep + i] = tempQ(i, j);
-          host_P[j * dim + i] = tempP(i, j);
-        }
-      }
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -1169,28 +1153,28 @@ namespace quda
 
       // Do P Permute
       //---------------------------------------------------------------------------
-      permuteVecs(kSpace, host_P, dim);
-
+      permuteVecs(kSpace, tempP.data(), dim);
+      
       // Do L Multiply
       //---------------------------------------------------------------------------
       // Loop over full batches
       for (int b = 0; b < full_batches; b++) {
 
         // batch triangle
-        blockRotate(kSpace, host_L, dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size,
+        blockRotate(kSpace, matLower.data(), dim, b * batch_size, (b + 1) * batch_size, b * batch_size, (b + 1) * batch_size,
                     LOWER_TRI);
         // batch pencil
-        blockRotate(kSpace, host_L, dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, PENCIL);
+        blockRotate(kSpace, matLower.data(), dim, (b + 1) * batch_size, dim, b * batch_size, (b + 1) * batch_size, PENCIL);
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, host_L, dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep,
+        blockRotate(kSpace, matLower.data(), dim, full_batches * batch_size, iter_keep, full_batches * batch_size, iter_keep,
                     LOWER_TRI);
         // remainder pencil
         if (iter_keep < dim) {
-          blockRotate(kSpace, host_L, dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
+          blockRotate(kSpace, matLower.data(), dim, iter_keep, dim, full_batches * batch_size, iter_keep, PENCIL);
         }
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
@@ -1199,10 +1183,10 @@ namespace quda
       //---------------------------------------------------------------------------
       if (do_batch_remainder) {
         // remainder triangle
-        blockRotate(kSpace, host_U, iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
-                    iter_keep, UPPER_TRI);
+	blockRotate(kSpace, matUpper.data(), iter_keep, full_batches * batch_size, iter_keep, full_batches * batch_size,
+		    iter_keep, UPPER_TRI);
         // remainder pencil
-        blockRotate(kSpace, host_U, iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep,
+        blockRotate(kSpace, matUpper.data(), iter_keep, 0, full_batches * batch_size, full_batches * batch_size, iter_keep,
                     PENCIL);
         blockReset(kSpace, full_batches * batch_size, iter_keep);
       }
@@ -1210,24 +1194,19 @@ namespace quda
       // Loop over full batches
       for (int b = full_batches - 1; b >= 0; b--) {
         // batch triangle
-        blockRotate(kSpace, host_U, iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
+        blockRotate(kSpace, matUpper.data(), iter_keep, b * batch_size, (b + 1) * batch_size, b * batch_size,
                     (b + 1) * batch_size, UPPER_TRI);
         if (b > 0) {
           // batch pencil
-          blockRotate(kSpace, host_U, iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, PENCIL);
+          blockRotate(kSpace, matUpper.data(), iter_keep, 0, b * batch_size, b * batch_size, (b + 1) * batch_size, PENCIL);
         }
         blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
       }
 
       // Do Q Permute
       //---------------------------------------------------------------------------
-      permuteVecs(kSpace, host_Q, iter_keep);
+      permuteVecs(kSpace, tempQ.data(), iter_keep);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-      host_free(host_P);
-      host_free(host_L);
-      host_free(host_U);
-      host_free(host_Q);
     }
 
     // Update residual vector
