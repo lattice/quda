@@ -33,11 +33,11 @@ namespace quda {
 				  bool allow_svd, bool svd_only,
 				  double svd_rel_error, double svd_abs_error);
 
-  void unitarizeLinksCPU(cpuGaugeField& outfield, const cpuGaugeField &infield);
+  void unitarizeLinksCPU(GaugeField &outfield, const GaugeField &infield);
 
-  void unitarizeLinks(cudaGaugeField& outfield, const cudaGaugeField &infield, int *fails);
-  void unitarizeLinks(cudaGaugeField& outfield, int *fails);
-  
+  void unitarizeLinks(GaugeField &outfield, const GaugeField &infield, int *fails);
+  void unitarizeLinks(GaugeField &outfield, int *fails);
+
   bool isUnitary(const cpuGaugeField& field, double max_error);
 
   /**
@@ -49,8 +49,8 @@ namespace quda {
    * @param tol Tolerance to which the iterative algorithm works
    * @param fails Number of link failures (device pointer)
    */
-  void projectSU3(cudaGaugeField &U, double tol, int *fails);
-  
+  void projectSU3(GaugeField &U, double tol, int *fails);
+
 } // namespace quda
 
 

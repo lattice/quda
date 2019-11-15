@@ -20,9 +20,10 @@ namespace quda {
       composite_descr(param.is_composite, param.composite_dim, param.is_component, param.component_id),
       components(0)
   {
+    if (param.create == QUDA_INVALID_FIELD_CREATE) errorQuda("Invalid create type");
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(param.nDim, param.x, param.nColor, param.nSpin, param.nVec, param.twistFlavor, param.Precision(), param.pad,
-        param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type);
+           param.siteSubset, param.siteOrder, param.fieldOrder, param.gammaBasis, param.pc_type, param.suggested_parity);
   }
 
   ColorSpinorField::ColorSpinorField(const ColorSpinorField &field)
@@ -33,7 +34,7 @@ namespace quda {
   {
     for (int i = 0; i < 2 * QUDA_MAX_DIM; i++) ghost_buf[i] = nullptr;
     create(field.nDim, field.x, field.nColor, field.nSpin, field.nVec, field.twistFlavor, field.Precision(), field.pad,
-        field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type);
+           field.siteSubset, field.siteOrder, field.fieldOrder, field.gammaBasis, field.pc_type, field.suggested_parity);
   }
 
   ColorSpinorField::~ColorSpinorField() {
@@ -169,8 +170,9 @@ namespace quda {
   } // createGhostZone
 
   void ColorSpinorField::create(int Ndim, const int *X, int Nc, int Ns, int Nvec, QudaTwistFlavorType Twistflavor,
-      QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder, QudaFieldOrder fieldOrder,
-      QudaGammaBasis gammaBasis, QudaPCType pc_type)
+                                QudaPrecision Prec, int Pad, QudaSiteSubset siteSubset, QudaSiteOrder siteOrder,
+                                QudaFieldOrder fieldOrder, QudaGammaBasis gammaBasis, QudaPCType pc_type,
+                                QudaParity suggested_parity)
   {
     this->siteSubset = siteSubset;
     this->siteOrder = siteOrder;
@@ -187,6 +189,7 @@ namespace quda {
     twistFlavor = Twistflavor;
 
     this->pc_type = pc_type;
+    this->suggested_parity = suggested_parity;
 
     precision = Prec;
     volume = 1;
@@ -305,7 +308,7 @@ namespace quda {
       }
 
       create(src.nDim, src.x, src.nColor, src.nSpin, src.nVec, src.twistFlavor, src.precision, src.pad, src.siteSubset,
-          src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type);
+             src.siteOrder, src.fieldOrder, src.gammaBasis, src.pc_type, src.suggested_parity);
     }
     return *this;
   }
@@ -319,6 +322,7 @@ namespace quda {
     if (param.twistFlavor != QUDA_TWIST_INVALID) twistFlavor = param.twistFlavor;
 
     if (param.pc_type != QUDA_PC_INVALID) pc_type = param.pc_type;
+    if (param.suggested_parity != QUDA_INVALID_PARITY) suggested_parity = param.suggested_parity;
 
     if (param.Precision() != QUDA_INVALID_PRECISION) precision = param.Precision();
     if (param.GhostPrecision() != QUDA_INVALID_PRECISION) ghost_precision = param.GhostPrecision();
@@ -421,7 +425,8 @@ namespace quda {
     param.siteOrder = siteOrder;
     param.gammaBasis = gammaBasis;
     param.pc_type = pc_type;
-    param.create = QUDA_INVALID_FIELD_CREATE;
+    param.suggested_parity = suggested_parity;
+    param.create = QUDA_NULL_FIELD_CREATE;
   }
 
   void ColorSpinorField::exchange(void **ghost, void **sendbuf, int nFace) const {
@@ -897,6 +902,8 @@ namespace quda {
     out << "nDim = " << a.nDim << std::endl;
     for (int d=0; d<a.nDim; d++) out << "x[" << d << "] = " << a.x[d] << std::endl;
     out << "volume = " << a.volume << std::endl;
+    out << "pc_type = " << a.pc_type << std::endl;
+    out << "suggested_parity = " << a.suggested_parity << std::endl;
     out << "precision = " << a.precision << std::endl;
     out << "ghost_precision = " << a.ghost_precision << std::endl;
     out << "pad = " << a.pad << std::endl;

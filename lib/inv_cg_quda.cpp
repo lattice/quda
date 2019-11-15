@@ -19,10 +19,22 @@
 
 namespace quda {
 
-  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
-    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
-    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+  CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    yp(nullptr),
+    rp(nullptr),
+    rnewp(nullptr),
+    pp(nullptr),
+    App(nullptr),
+    tmpp(nullptr),
+    tmp2p(nullptr),
+    tmp3p(nullptr),
+    rSloppyp(nullptr),
+    xSloppyp(nullptr),
+    init(false)
   {
   }
 
@@ -47,19 +59,20 @@ namespace quda {
       if (rnewp) delete rnewp;
       init = false;
 
-      if (deflate_init) {
-        for (auto veci : param.evecs)
-          if (veci) delete veci;
-        delete defl_tmp1[0];
-        delete defl_tmp2[0];
-      }
+      destroyDeflationSpace();
     }
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
-  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
-    xp(nullptr), yp(nullptr), init(false) {
+  CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
+    mmdag(mat.Expose()),
+    mmdagSloppy(matSloppy.Expose()),
+    mmdagPrecon(matPrecon.Expose()),
+    xp(nullptr),
+    yp(nullptr),
+    init(false)
+  {
   }
 
   CGNE::~CGNE() {
@@ -139,9 +152,14 @@ namespace quda {
 
   }
 
-  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
-    bp(nullptr), init(false) {
+  CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    CG(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
+    mdagm(mat.Expose()),
+    mdagmSloppy(matSloppy.Expose()),
+    mdagmPrecon(matPrecon.Expose()),
+    bp(nullptr),
+    init(false)
+  {
   }
 
   CGNR::~CGNR() {
@@ -269,9 +287,21 @@ namespace quda {
       init = true;
     }
 
-    // Once the CG operator is called, we are able to construct an appropriate
-    // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matPrecon);
+      if (deflate_compute) {
+        // compute the deflation space.
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matPrecon, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
@@ -338,27 +368,11 @@ namespace quda {
       blas::zero(y);
     }
 
-    if (param.deflate == true) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `x` as a temp.
-      blas::copy(x, r);
-      rhs.push_back(&x);
-
-      // Deflate
-      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
-
-      // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0], tmp2, tmp3);
-      r2 = blas::xmyNorm(*rhs[0], r);
-
-      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-        // defl_tmp1 and y must be added to the solution at the end
-        blas::axpy(1.0, *defl_tmp1[0], y);
-      } else {
-        // Just add defl_tmp1 to y, which has been zeroed out
-        blas::copy(y, *defl_tmp1[0]);
-      }
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate and accumulate to solution vector
+      eig_solve->deflate(y, r, evecs, evals, true);
+      mat(r, y, x, tmp3);
+      r2 = blas::xmyNorm(b, r);
     }
 
     blas::zero(x);
@@ -411,6 +425,7 @@ namespace quda {
     double r0Norm = rNorm;
     double maxrx = rNorm;
     double maxrr = rNorm;
+    double maxr_deflate = rNorm; // The maximum residual since the last deflation
     double delta = param.delta;
 
     // this parameter determines how many consective reliable update
@@ -593,6 +608,17 @@ namespace quda {
         mat(r, y, x, tmp3); //  here we can use x as tmp
         r2 = blas::xmyNorm(b, r);
 
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflate(y, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, y, x, tmp3);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
+
         blas::copy(rSloppy, r); //nop when these pointers alias
         blas::zero(xSloppy);
 
@@ -724,7 +750,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops())*1e-9;
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
     param.gflops = gflops;
     param.iter += k;
 
@@ -747,6 +773,7 @@ namespace quda {
     blas::flops = 0;
     mat.flops();
     matSloppy.flops();
+    matPrecon.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 

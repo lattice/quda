@@ -30,7 +30,10 @@ namespace quda
     tmp1(nullptr),
     tmp2(nullptr)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
     // Problem parameters
     nEv = eig_param->nEv;
@@ -87,21 +90,7 @@ namespace quda
       spectrum[0] = 'S';
     }
 
-    // Print Eigensolver params
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("spectrum %s\n", spectrum);
-      printfQuda("tol %.4e\n", tol);
-      printfQuda("nConv %d\n", nConv);
-      printfQuda("nEv %d\n", nEv);
-      printfQuda("nKr %d\n", nKr);
-      if (eig_param->use_poly_acc) {
-        printfQuda("polyDeg %d\n", eig_param->poly_deg);
-        printfQuda("a-min %f\n", eig_param->a_min);
-        printfQuda("a-max %f\n", eig_param->a_max);
-      }
-    }
-
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
@@ -114,7 +103,7 @@ namespace quda
     case QUDA_EIG_IR_ARNOLDI: errorQuda("IR Arnoldi not implemented"); break;
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Creating TR Lanczos eigensolver\n");
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
       break;
     default: errorQuda("Invalid eig solver type");
@@ -225,51 +214,15 @@ namespace quda
     return sum;
   }
 
-  // Deflate vec, place result in vec_defl
-  void EigenSolver::deflate(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                            std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
-  {
-    // number of evecs
-    int n_defl = eig_param->nConv;
-
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
-
-    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
-    // for all i computed eigenvectors and values.
-
-    // Pointers to the required Krylov space vectors,
-    // no extra memory is allocated.
-    std::vector<ColorSpinorField *> eig_vecs_ptr;
-    for (int i = 0; i < n_defl; i++) eig_vecs_ptr.push_back(eig_vecs[i]);
-
-    // 1. Take block inner product: (V_i)^dag * vec = A_i
-    Complex*s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, eig_vecs_ptr, vec);
-
-    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
-    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
-
-    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
-    blas::zero(*vec_defl[0]);
-    blas::caxpy(s, eig_vecs_ptr, vec_defl);
-    // FIXME - we can optimize the zeroing out with a "multi-caxy"
-    // function that just writes over vec_defl and doesn't sum.  When
-    // we exceed the multi-blas limit this would deompose into caxy
-    // for the kernel call and caxpy for the subsequent ones
-
-    host_free(s);
-  }
-
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
-
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
 
     int nConv = eig_param->nConv;
     if (evecs.size() != (unsigned int)(2 * nConv))
       errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * nConv);
 
-    double sigma_tmp[nConv];
+    std::vector<double> sigma_tmp(nConv);
 
     for (int i = 0; i < nConv; i++) {
 
@@ -290,11 +243,10 @@ namespace quda
       mat.Expose()->M(*evecs[nConv + i], *evecs[i]);
 
       // sigma_i = sqrt(sigma_i (Lsv_i)^dag * sigma_i * Lsv_i )
-      sigma_tmp[i] = sqrt(blas::reDotProduct(*evecs[nConv + i], *evecs[nConv + i]));
+      sigma_tmp[i] = sqrt(blas::norm2(*evecs[nConv + i]));
 
       // Normalise the Lsv: sigma_i Lsv_i -> Lsv_i
-      double norm = sqrt(blas::norm2(*evecs[nConv + i]));
-      blas::ax(1.0 / norm, *evecs[nConv + i]);
+      blas::ax(1.0 / sigma_tmp[i], *evecs[nConv + i]);
 
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Sval[%04d] = %+.16e sigma - sqrt(|lambda|) = %+.16e\n", i, sigma_tmp[i],
@@ -306,57 +258,100 @@ namespace quda
   }
 
   // Deflate vec, place result in vec_defl
-  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> vec_defl, std::vector<ColorSpinorField *> vec,
-                               std::vector<ColorSpinorField *> eig_vecs, std::vector<Complex> evals)
+  void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                               const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                               bool accumulate) const
   {
     // number of evecs
     int n_defl = eig_param->nConv;
+    if (evecs.size() != (unsigned int)(2 * n_defl))
+      errorQuda("Incorrect deflation space sized %d passed to computeSVD, expected %d", (int)(evecs.size()), 2 * n_defl);
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and %d right singular vectors\n", n_defl, n_defl);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d left and right singular vectors\n", n_defl);
 
     // Perform Sum_i R_i * (\sigma_i)^{-1} * L_i^dag * vec = vec_defl
     // for all i computed eigenvectors and values.
 
     // 1. Take block inner product: L_i^dag * vec = A_i
-    std::vector<ColorSpinorField *> left_vecs_ptr;
-    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs_ptr.push_back(eig_vecs[i]);
-    Complex *s = (Complex *)safe_malloc(n_defl * sizeof(Complex));
-    blas::cDotProduct(s, left_vecs_ptr, vec);
+    std::vector<ColorSpinorField *> left_vecs;
+    left_vecs.reserve(n_defl);
+    for (int i = n_defl; i < 2 * n_defl; i++) left_vecs.push_back(evecs[i]);
+
+    std::vector<Complex> s(n_defl * src.size());
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+    blas::cDotProduct(s.data(), left_vecs, src_);
 
     // 2. Perform block caxpy
     //    A_i -> (\sigma_i)^{-1} * A_i
     //    vec_defl = Sum_i (R_i)^{-1} * A_i
-    blas::zero(*vec_defl[0]);
-    std::vector<ColorSpinorField *> right_vecs_ptr;
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
+    std::vector<ColorSpinorField *> right_vecs;
+    right_vecs.reserve(n_defl);
     for (int i = 0; i < n_defl; i++) {
-      right_vecs_ptr.push_back(eig_vecs[i]);
+      right_vecs.push_back(evecs[i]);
       s[i] /= evals[i].real();
     }
-    blas::caxpy(s, right_vecs_ptr, vec_defl);
-
-    // FIXME - we can optimize the zeroing out with a "multi-caxy"
-    // function that just writes over vec_defl and doesn't sum.  When
-    // we exceed the multi-blas limit this would deompose into caxy
-    // for the kernel call and caxpy for the subsequent ones
-
-    host_free(s);
+    blas::caxpy(s.data(), right_vecs, sol);
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
                                  std::vector<Complex> &evals, int size)
   {
+    if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
+    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+
+    ColorSpinorParam csParam(*evecs[0]);
+    std::vector<ColorSpinorField *> temp;
+    temp.push_back(ColorSpinorField::Create(csParam));
+
     for (int i = 0; i < size; i++) {
       // r = A * v_i
-      matVec(mat, *r[0], *evecs[i]);
-
+      matVec(mat, *temp[0], *evecs[i]);
       // lambda_i = v_i^dag A v_i / (v_i^dag * v_i)
-      evals[i] = blas::cDotProduct(*evecs[i], *r[0]) / sqrt(blas::norm2(*evecs[i]));
-
+      evals[i] = blas::cDotProduct(*evecs[i], *temp[0]) / sqrt(blas::norm2(*evecs[i]));
       // Measure ||lambda_i*v_i - A*v_i||
       Complex n_unit(-1.0, 0.0);
-      blas::caxpby(evals[i], *evecs[i], n_unit, *r[0]);
-      residua[i] = sqrt(blas::norm2(*r[0]));
+      blas::caxpby(evals[i], *evecs[i], n_unit, *temp[0]);
+      residua[i] = sqrt(blas::norm2(*temp[0]));
+
+      if (getVerbosity() >= QUDA_SUMMARIZE)
+        printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
+    delete temp[0];
+  }
+
+  // Deflate vec, place result in vec_defl
+  void EigenSolver::deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+                            const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+                            bool accumulate) const
+  {
+    // number of evecs
+    int n_defl = eig_param->nConv;
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Deflating %d vectors\n", n_defl);
+
+    // Perform Sum_i V_i * (L_i)^{-1} * (V_i)^dag * vec = vec_defl
+    // for all i computed eigenvectors and values.
+
+    // Pointers to the required Krylov space vectors,
+    // no extra memory is allocated.
+    std::vector<ColorSpinorField *> eig_vecs;
+    eig_vecs.reserve(n_defl);
+    for (int i = 0; i < n_defl; i++) eig_vecs.push_back(evecs[i]);
+
+    // 1. Take block inner product: (V_i)^dag * vec = A_i
+    std::vector<Complex> s(n_defl * src.size());
+    std::vector<ColorSpinorField *> src_ = const_cast<decltype(src) &>(src);
+    blas::cDotProduct(s.data(), eig_vecs, src_);
+
+    // 2. Perform block caxpy: V_i * (L_i)^{-1} * A_i
+    for (int i = 0; i < n_defl; i++) { s[i] /= evals[i].real(); }
+
+    // 3. Accumulate sum vec_defl = Sum_i V_i * (L_i)^{-1} * A_i
+    if (!accumulate)
+      for (auto &x : sol) blas::zero(*x);
+    blas::caxpy(s.data(), eig_vecs, sol);
   }
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
@@ -364,6 +359,7 @@ namespace quda
 
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
+    auto spinor_parity = eig_vecs[0]->SuggestedParity();
     if (strcmp(vec_infile.c_str(), "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
@@ -376,9 +372,21 @@ namespace quda
                                                                                 eig_vecs[0]->Precision());
         csParam.location = QUDA_CPU_FIELD_LOCATION;
         csParam.create = QUDA_NULL_FIELD_CREATE;
+        // if we're loading nColor == 3 fields, they'll always be full-field. Copy into a single parity afterwards.
+        if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+          csParam.x[0] *= 2;
+          csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+        }
         for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
       } else {
-        for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
+        ColorSpinorParam csParam(*eig_vecs[0]);
+        if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+          csParam.x[0] *= 2;
+          csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+          for (int i = 0; i < Nvec; i++) { tmp.push_back(ColorSpinorField::Create(csParam)); }
+        } else {
+          for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
+        }
       }
 
       void **V = static_cast<void **>(safe_malloc(Nvec * sizeof(void *)));
@@ -389,13 +397,52 @@ namespace quda
         }
       }
 
-      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->Ncolor(), tmp[0]->Nspin(),
-                        Nvec, 0, (char **)0);
+      read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+
+        ColorSpinorParam csParam(*eig_vecs[0]);
+        if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || csParam.nColor != 3) { // we don't care for MG vectors
+          for (int i = 0; i < Nvec; i++) {
+            *eig_vecs[i] = *tmp[i];
+            delete tmp[i];
+          }
+        } else { // nColor == 3 field with a single parity: need to copy it out of the full-field vector.
+          // Create a temporary single-parity CPU field
+          csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+          csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
+                                                                                  eig_vecs[0]->Precision());
+          csParam.location = QUDA_CPU_FIELD_LOCATION;
+          csParam.create = QUDA_NULL_FIELD_CREATE;
+
+          ColorSpinorField *tmp_intermediate = ColorSpinorField::Create(csParam);
+
+          for (int i = 0; i < Nvec; i++) {
+            if (spinor_parity == QUDA_EVEN_PARITY)
+              blas::copy(*tmp_intermediate, tmp[i]->Even());
+            else if (spinor_parity == QUDA_ODD_PARITY)
+              blas::copy(*tmp_intermediate, tmp[i]->Odd());
+            else
+              errorQuda("When loading single parity vectors, the suggested parity must be set.");
+
+            *eig_vecs[i] = *tmp_intermediate;
+            delete tmp[i];
+          }
+
+          delete tmp_intermediate;
+        }
+      } else if (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION
+                 && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET) {
         for (int i = 0; i < Nvec; i++) {
-          *eig_vecs[i] = *tmp[i];
+          if (spinor_parity == QUDA_EVEN_PARITY)
+            blas::copy(*eig_vecs[i], tmp[i]->Even());
+          else if (spinor_parity == QUDA_ODD_PARITY)
+            blas::copy(*eig_vecs[i], tmp[i]->Odd());
+          else
+            errorQuda("When loading single parity vectors, the suggested parity must be set.");
+
           delete tmp[i];
         }
       }
@@ -415,19 +462,66 @@ namespace quda
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
     std::vector<ColorSpinorField *> tmp;
+    tmp.reserve(Nvec);
+    auto spinor_parity = eig_vecs[0]->SuggestedParity();
     if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
       ColorSpinorParam csParam(*eig_vecs[0]);
       csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       csParam.setPrecision(eig_vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
                                                                               eig_vecs[0]->Precision());
       csParam.location = QUDA_CPU_FIELD_LOCATION;
-      csParam.create = QUDA_NULL_FIELD_CREATE;
-      for (int i = 0; i < Nvec; i++) {
-        tmp.push_back(ColorSpinorField::Create(csParam));
-        *tmp[i] = *eig_vecs[i];
+
+      if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || csParam.nColor != 3) { // we don't care for MG vectors
+        // We're good, copy as is.
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+        for (int i = 0; i < Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+          *tmp[i] = *eig_vecs[i];
+        }
+      } else { // QUDA_PARITY_SITE_SUBSET
+        csParam.create = QUDA_NULL_FIELD_CREATE;
+
+        // intermediate host single-parity field
+        ColorSpinorField *tmp_intermediate = ColorSpinorField::Create(csParam);
+
+        csParam.x[0] *= 2;                          // corrects for the factor of two in the X direction
+        csParam.siteSubset = QUDA_FULL_SITE_SUBSET; // create a full-parity field.
+        csParam.create = QUDA_ZERO_FIELD_CREATE;    // to explicitly zero the odd sites.
+        for (int i = 0; i < Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+
+          // copy the single parity eigen/singular vector into an
+          // intermediate device-side vector
+          *tmp_intermediate = *eig_vecs[i];
+
+          // copy the single parity only eigen/singular vector into the even components of the full parity vector
+          if (spinor_parity == QUDA_EVEN_PARITY)
+            blas::copy(tmp[i]->Even(), *tmp_intermediate);
+          else if (spinor_parity == QUDA_ODD_PARITY)
+            blas::copy(tmp[i]->Odd(), *tmp_intermediate);
+          else
+            errorQuda("When saving single parity vectors, the suggested parity must be set.");
+        }
+        delete tmp_intermediate;
       }
     } else {
-      for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
+      ColorSpinorParam csParam(*eig_vecs[0]);
+      if (csParam.nColor == 3 && csParam.siteSubset == QUDA_PARITY_SITE_SUBSET) {
+        csParam.x[0] *= 2;
+        csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        for (int i = 0; i < Nvec; i++) {
+          tmp.push_back(ColorSpinorField::Create(csParam));
+          if (spinor_parity == QUDA_EVEN_PARITY)
+            blas::copy(tmp[i]->Even(), *eig_vecs[i]);
+          else if (spinor_parity == QUDA_ODD_PARITY)
+            blas::copy(tmp[i]->Odd(), *eig_vecs[i]);
+          else
+            errorQuda("When saving single parity vectors, the suggested parity must be set.");
+        }
+      } else {
+        for (int i = 0; i < Nvec; i++) { tmp.push_back(eig_vecs[i]); }
+      }
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start saving %d vectors to %s\n", Nvec, vec_outfile.c_str());
@@ -440,12 +534,13 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->Ncolor(), tmp[0]->Nspin(),
-                       Nvec, 0, (char **)0);
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(),
+                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
     host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
-    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
+    if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION
+        || (eig_vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && eig_vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
       for (int i = 0; i < Nvec; i++) delete tmp[i];
     }
 
@@ -457,8 +552,13 @@ namespace quda
   void EigenSolver::loadFromFile(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace,
                                  std::vector<Complex> &evals)
   {
+    // Set suggested parity of fields
+    const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
+    for (int i = 0; i < nConv; i++) { kSpace[i]->setSuggestedParity(mat_parity); }
+
     // Make an array of size nConv
     std::vector<ColorSpinorField *> vecs_ptr;
+    vecs_ptr.reserve(nConv);
     for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
     loadVectors(vecs_ptr, eig_param->vec_infile);
 
@@ -469,13 +569,7 @@ namespace quda
     r.push_back(ColorSpinorField::Create(csParam));
 
     // Error estimates (residua) given by ||A*vec - lambda*vec||
-    computeEvals(mat, kSpace, evals, nConv);
-    for (int i = 0; i < nConv; i++) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
-      }
-    }
-
+    computeEvals(mat, kSpace, evals);
     delete r[0];
   }
 
@@ -494,7 +588,8 @@ namespace quda
     EigenSolver(eig_param, profile),
     mat(mat)
   {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
@@ -511,7 +606,7 @@ namespace quda
       errorQuda("Only real spectrum type (LR or SR) can be passed to the TR Lanczos solver");
     }
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
@@ -586,6 +681,20 @@ namespace quda
       printfQuda("*****************************\n");
     }
 
+    // Print Eigensolver params
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("spectrum %s\n", spectrum);
+      printfQuda("tol %.4e\n", tol);
+      printfQuda("nConv %d\n", nConv);
+      printfQuda("nEv %d\n", nEv);
+      printfQuda("nKr %d\n", nKr);
+      if (eig_param->use_poly_acc) {
+        printfQuda("polyDeg %d\n", eig_param->poly_deg);
+        printfQuda("a-min %f\n", eig_param->a_min);
+        printfQuda("a-max %f\n", eig_param->a_max);
+      }
+    }
+
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     // Loop over restart iterations.
@@ -593,7 +702,7 @@ namespace quda
 
       for (int step = num_keep; step < nKr; step++) lanczosStep(kSpace, step);
       iter += (nKr - num_keep);
-      // if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Restart %d complete\n", restart_iter+1);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter + 1);
 
       int arrow_pos = std::max(num_keep - num_locked + 1, 2);
       // The eigenvalues are returned in the alpha array
@@ -641,18 +750,18 @@ namespace quda
       num_locked += iter_locked;
 
       if (getVerbosity() >= QUDA_VERBOSE) {
-        // printfQuda("iter Conv = %d\n", iter_converged);
-        // printfQuda("iter Keep = %d\n", iter_keep);
-        // printfQuda("iter Lock = %d\n", iter_locked);
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
-        // printfQuda("num_converged = %d\n", num_converged);
-        // printfQuda("num_keep = %d\n", num_keep);
-        // printfQuda("num_locked = %d\n", num_locked);
       }
 
-      if (getVerbosity() >= QUDA_VERBOSE) {
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("iter Conv = %d\n", iter_converged);
+        printfQuda("iter Keep = %d\n", iter_keep);
+        printfQuda("iter Lock = %d\n", iter_locked);
+        printfQuda("num_converged = %d\n", num_converged);
+        printfQuda("num_keep = %d\n", num_keep);
+        printfQuda("num_locked = %d\n", num_locked);
         for (int i = 0; i < nKr; i++) {
-          // printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
       }
 
@@ -698,13 +807,7 @@ namespace quda
       }
 
       // Compute eigenvalues
-      computeEvals(mat, kSpace, evals, nConv);
-      if (getVerbosity() >= QUDA_SUMMARIZE) {
-        for (int i = 0; i < nConv; i++) {
-          printfQuda("EigValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, evals[i].real(), evals[i].imag(),
-                     residua[i]);
-        }
-      }
+      computeEvals(mat, kSpace, evals);
     }
 
     // Local clean-up
@@ -715,7 +818,11 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size nConv
       std::vector<ColorSpinorField *> vecs_ptr;
-      for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
+      const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
+      for (int i = 0; i < nConv; i++) {
+        kSpace[i]->setSuggestedParity(mat_parity);
+        vecs_ptr.push_back(kSpace[i]);
+      }
       saveVectors(vecs_ptr, eig_param->vec_outfile);
     }
 
@@ -724,6 +831,8 @@ namespace quda
       printfQuda("***** END TRLM SOLUTION *****\n");
       printfQuda("*****************************\n");
     }
+
+    mat.flops();
   }
 
   // Destructor
@@ -779,10 +888,9 @@ namespace quda
         if ((i == 0) || (alpha[i - 1] >= alpha[i]))
           i++;
         else {
-          double tmp = alpha[i];
-          alpha[i] = alpha[i - 1];
-          alpha[--i] = tmp;
+          std::swap(alpha[i], alpha[i - 1]);
           std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
         }
       }
     } else {
@@ -790,10 +898,9 @@ namespace quda
         if ((i == 0) || (alpha[i - 1] <= alpha[i]))
           i++;
         else {
-          double tmp = alpha[i];
-          alpha[i] = alpha[i - 1];
-          alpha[--i] = tmp;
+          std::swap(alpha[i], alpha[i - 1]);
           std::swap(kSpace[i], kSpace[i - 1]);
+          i--;
         }
       }
     }

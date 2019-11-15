@@ -85,7 +85,6 @@ namespace quda
             for(int i=0; i<(int)param.B.size(); i++) {
               spinorNoise(*r, *rng, QUDA_NOISE_UNIFORM);
               *param.B[i] = *r;
-              param.evals.push_back(0.0);
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
@@ -116,7 +115,7 @@ namespace quda
   void MG::reset(bool refresh) {
     pushLevel(param.level);
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("%s level %d\n", transfer ? "Resetting" : "Creating", param.level);
 
     destroySmoother();
     destroyCoarseSolver();
@@ -203,8 +202,8 @@ namespace quda
         coarse->reset(refresh);
       } else {
         // create the next multigrid level
-        param_coarse = new MGParam(param, *B_coarse, param.evals, matCoarseResidual, matCoarseSmoother,
-                                   matCoarseSmootherSloppy, param.level + 1);
+        param_coarse = new MGParam(param, *B_coarse, matCoarseResidual, matCoarseSmoother, matCoarseSmootherSloppy,
+                                   param.level + 1);
         param_coarse->fine = this;
         param_coarse->delta = 1e-20;
         param_coarse->precision = param.mg_global.invert_param->cuda_prec_precondition;
@@ -214,15 +213,6 @@ namespace quda
       setOutputPrefix(prefix); // restore since we just popped back from coarse grid
 
       createCoarseSolver();
-
-      if (param.level == param.Nlevel - 2 && param.mg_global.use_eig_solver[param.level + 1]) {
-        // if we are deflating the coarsest grid, then run a dummy solve
-        // so that the deflation is done during the setup
-        spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
-        param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
-        (*coarse_solver)(*x_coarse, *r_coarse);
-        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
-      }
     }
 
     if (param.level == 0) {
@@ -230,7 +220,7 @@ namespace quda
       if (param.mg_global.run_verify) verify();
     }
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Setup of level %d done\n", param.level);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Setup of level %d done\n", param.level);
 
     popLevel(param.level);
   }
@@ -416,6 +406,14 @@ namespace quda
       // nothing to do
     } else if (param.cycle_type == QUDA_MG_CYCLE_RECURSIVE || param.level == param.Nlevel-2) {
       if (coarse_solver) {
+        auto &coarse_solver_inner = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
+        // int defl_size = coarse_solver_inner.evecs.size();
+        int defl_size = coarse_solver_inner.deflationSpaceSize();
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          // Deflation space exists and we are going to create a new solver. Extract deflation space.
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Extracting deflation space size %d to MG\n", defl_size);
+          coarse_solver_inner.extractDeflationSpace(evecs);
+        }
         delete coarse_solver;
         coarse_solver = nullptr;
       }
@@ -519,16 +517,46 @@ namespace quda
       param_coarse_solver->precision_sloppy = param_coarse_solver->precision;
       param_coarse_solver->precision_precondition = param_coarse_solver->precision_sloppy;
 
-      if (param.mg_global.coarse_grid_solution_type[param.level+1] == QUDA_MATPC_SOLUTION) {
-        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
+      if (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION) {
+        Solver *solver
+          = Solver::create(*param_coarse_solver, *matCoarseSmoother, *matCoarseSmoother, *matCoarseSmoother, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
-        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile, coarse_prefix);
+        coarse_solver = new PreconditionedSolver(*solver, *matCoarseSmoother->Expose(), *param_coarse_solver, profile,
+                                                 coarse_prefix);
       } else {
-        Solver *solver = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
+        Solver *solver
+          = Solver::create(*param_coarse_solver, *matCoarseResidual, *matCoarseResidual, *matCoarseResidual, profile);
         sprintf(coarse_prefix, "MG level %d (%s): ", param.level + 1,
                 param.mg_global.location[param.level + 1] == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
         coarse_solver = new PreconditionedSolver(*solver, *matCoarseResidual->Expose(), *param_coarse_solver, profile, coarse_prefix);
+      }
+
+      setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+
+      if (param.level == param.Nlevel - 2 && param.mg_global.use_eig_solver[param.level + 1]) {
+
+        // Test if a coarse grid deflation space needs to be transferred to the coarse solver to prevent recomputation
+        int defl_size = evecs.size();
+        auto &coarse_solver_inner = reinterpret_cast<PreconditionedSolver *>(coarse_solver)->ExposeSolver();
+        if (defl_size > 0 && transfer && param.mg_global.preserve_deflation) {
+          // We shall not recompute the deflation space, we shall transfer
+          // vectors stored in the parent MG instead
+          coarse_solver_inner.setDeflateCompute(false);
+          coarse_solver_inner.setRecomputeEvals(true);
+          if (getVerbosity() >= QUDA_VERBOSE)
+            printfQuda("Transferring deflation space size %d to coarse solver\n", defl_size);
+          // Create space in coarse solver to hold deflation space, destroy space in MG.
+          coarse_solver_inner.injectDeflationSpace(evecs);
+        }
+
+        // Run a dummy solve so that the deflation space is constructed and computed if needed during the MG setup,
+        // or the eigenvalues are recomputed during transfer.
+        spinorNoise(*r_coarse, *coarse->rng, QUDA_NOISE_UNIFORM);
+        param_coarse_solver->maxiter = 1; // do a single iteration on the dummy solve
+        (*coarse_solver)(*x_coarse, *r_coarse);
+        setOutputPrefix(prefix); // restore since we just popped back from coarse grid
+        param_coarse_solver->maxiter = param.mg_global.coarse_solver_maxiter[param.level + 1];
       }
 
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Assigned coarse solver to preconditioned GCR solver\n");
@@ -1059,7 +1087,8 @@ namespace quda
     if (param.level == 0 && param.is_staggered) {
       warningQuda("Cannot load near-null vectors for top level of staggered MG solve.");
     } else {
-      profile_global.TPSTOP(QUDA_PROFILE_INIT);
+      bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
+      if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
       profile_global.TPSTART(QUDA_PROFILE_IO);
       pushLevel(param.level);
       std::string vec_infile(param.mg_global.vec_infile[param.level]);
@@ -1070,7 +1099,7 @@ namespace quda
       EigenSolver::loadVectors(B, vec_infile);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
-      profile_global.TPSTART(QUDA_PROFILE_INIT);
+      if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
   }
 
@@ -1079,7 +1108,8 @@ namespace quda
     if (param.level == 0 && param.is_staggered) {
       warningQuda("Cannot save near-null vectors for top level of staggered MG solve.");
     } else {
-      profile_global.TPSTOP(QUDA_PROFILE_INIT);
+      bool is_running = profile_global.isRunning(QUDA_PROFILE_INIT);
+      if (is_running) profile_global.TPSTOP(QUDA_PROFILE_INIT);
       profile_global.TPSTART(QUDA_PROFILE_IO);
       pushLevel(param.level);
       std::string vec_outfile(param.mg_global.vec_outfile[param.level]);
@@ -1090,7 +1120,7 @@ namespace quda
       EigenSolver::saveVectors(B, vec_outfile);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
-      profile_global.TPSTART(QUDA_PROFILE_INIT);
+      if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
     }
   }
 

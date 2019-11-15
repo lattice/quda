@@ -145,12 +145,12 @@ if(QUDA_MULTIGRID)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
 
-  #if(${QUDA_GAUGE_ALG})
-  #  cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
-  #                      domain_wall_dslash_reference.cpp blas_reference.cpp)
-  #  target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
-  #  quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-  #endif()
+  if(${QUDA_GAUGE_ALG})
+    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
+                        domain_wall_dslash_reference.cpp blas_reference.cpp)
+    target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
+    quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
+  endif()
 
 endif()
 
@@ -534,7 +534,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
 
   if(QUDA_COVDEV)
     add_test(NAME covdev_-policy${pol2}
-             COMMAND ${QUDA_CTEST_LAUNC} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
    endif()

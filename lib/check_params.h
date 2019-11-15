@@ -149,6 +149,9 @@ void printQudaEigParam(QudaEigParam *param) {
   P(poly_deg, 0);
   P(a_min, 0.0);
   P(a_max, 0.0);
+  P(preserve_deflation, QUDA_BOOLEAN_NO);
+  P(preserve_deflation_space, 0);
+  P(preserve_evals, QUDA_BOOLEAN_YES);
   P(use_dagger, QUDA_BOOLEAN_NO);
   P(use_norm_op, QUDA_BOOLEAN_NO);
   P(compute_svd, QUDA_BOOLEAN_NO);
@@ -171,6 +174,8 @@ void printQudaEigParam(QudaEigParam *param) {
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
   P(a_max, INVALID_DOUBLE);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
+  P(preserve_evals, QUDA_BOOLEAN_INVALID);
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
@@ -478,6 +483,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
 #endif
 
+#if defined(INIT_PARAM)
+  P(eig_param, 0);
+#elif defined(CHECK_PARAM)
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
+    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
+  }
+#endif
+
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
@@ -782,8 +795,10 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 #ifdef INIT_PARAM
   P(coarse_guess, QUDA_BOOLEAN_NO);
+  P(preserve_deflation, QUDA_BOOLEAN_NO);
 #else
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
 #endif
 
   for (int i = 0; i < n_level - 1; i++) {
