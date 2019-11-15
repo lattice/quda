@@ -387,10 +387,10 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 256:
-    status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   case 384:
-    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, nSpin, nColor, type);
+    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);
