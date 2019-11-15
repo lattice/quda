@@ -1142,10 +1142,10 @@ namespace quda
       matLower.conservativeResize(dim, iter_keep);
 
       // Extract the desired permutation matrices
-      MatrixXi tempP = MatrixXi::Zero(dim, dim);
-      MatrixXi tempQ = MatrixXi::Zero(iter_keep, iter_keep);
-      tempP = matLU.permutationP().inverse();
-      tempQ = matLU.permutationQ().inverse();
+      MatrixXi matP = MatrixXi::Zero(dim, dim);
+      MatrixXi matQ = MatrixXi::Zero(iter_keep, iter_keep);
+      matP = matLU.permutationP().inverse();
+      matQ = matLU.permutationQ().inverse();
       profile.TPSTOP(QUDA_PROFILE_EIGEN);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -1153,7 +1153,7 @@ namespace quda
 
       // Do P Permute
       //---------------------------------------------------------------------------
-      permuteVecs(kSpace, tempP.data(), dim);
+      permuteVecs(kSpace, matP.data(), dim);
 
       // Do L Multiply
       //---------------------------------------------------------------------------
@@ -1207,7 +1207,7 @@ namespace quda
 
       // Do Q Permute
       //---------------------------------------------------------------------------
-      permuteVecs(kSpace, tempQ.data(), iter_keep);
+      permuteVecs(kSpace, matQ.data(), iter_keep);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 
