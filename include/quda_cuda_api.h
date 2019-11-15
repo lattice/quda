@@ -30,26 +30,19 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
+
 #define qudaMemcpy(dst, src, count, kind) \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemcpyAsync(dst, src, count, kind, stream) \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemset(ptr, value, count)                                                                                  \
   ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
   ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
@@ -170,8 +163,6 @@ namespace quda {
 
 } // namespace quda
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
