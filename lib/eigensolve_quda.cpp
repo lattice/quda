@@ -250,8 +250,8 @@ namespace quda
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int i_start, int i_end,
-                                int j_start, int j_end, blockType b_type)
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int i_start,
+                                int i_end, int j_start, int j_end, blockType b_type)
   {
     int block_i_rank = i_end - i_start;
     int block_j_rank = j_end - j_start;
