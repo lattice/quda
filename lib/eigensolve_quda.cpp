@@ -250,15 +250,11 @@ namespace quda
     }
   }
 
-  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int is, int ie,
-                                int js, int je, blockType b_type)
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, int i_start, int i_end,
+                                int j_start, int j_end, blockType b_type)
   {
-    // is = i_start
-    // ie = i_end
-    // js = j_start
-    // je = j_end
-    int block_i_rank = ie - is;
-    int block_j_rank = je - js;
+    int block_i_rank = i_end - i_start;
+    int block_j_rank = j_end - j_start;
 
     // Pointers to the relevant vectors
     std::vector<ColorSpinorField *> vecs_ptr;
@@ -266,20 +262,20 @@ namespace quda
 
     // Alias the vectors we wish to keep
     vecs_ptr.reserve(block_i_rank);
-    for (int i = is; i < ie; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
+    for (int i = i_start; i < i_end; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
     // Alias the extra space vectors
     kSpace_ptr.reserve(block_j_rank);
-    for (int j = js; j < je; j++) {
-      int k = nKr + 1 + j - js;
+    for (int j = j_start; j < j_end; j++) {
+      int k = nKr + 1 + j - j_start;
       kSpace_ptr.push_back(kSpace[k]);
     }
 
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
     // Populate batch array (COLUM major -> ROW major)
-    for (int j = js; j < je; j++) {
-      for (int i = is; i < ie; i++) {
-        int j_arr = j - js;
-        int i_arr = i - is;
+    for (int j = j_start; j < j_end; j++) {
+      for (int i = i_start; i < i_end; i++) {
+        int j_arr = j - j_start;
+        int i_arr = i - i_start;
         batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
       }
     }
@@ -292,11 +288,11 @@ namespace quda
     host_free(batch_array);
   }
 
-  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je)
+  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end)
   {
     // copy back to correct position, zero out the workspace
-    for (int j = js; j < je; j++) {
-      int k = nKr + 1 + j - js;
+    for (int j = j_start; j < j_end; j++) {
+      int k = nKr + 1 + j - j_start;
       std::swap(kSpace[j + num_locked], kSpace[k]);
       blas::zero(*kSpace[k]);
     }
