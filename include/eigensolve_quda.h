@@ -8,10 +8,15 @@
 namespace quda
 {
 
+  // Local enum for the LU axpy block type
+  enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
+
   class EigenSolver
   {
 
 protected:
+    using range = std::pair<int, int>;
+
     QudaEigParam *eig_param;
     TimeProfile &profile;
 
@@ -30,6 +35,7 @@ protected:
     int restart_iter;
     int max_restarts;
     int check_interval;
+    int batched_rotate;
     int iter;
     int iter_converged;
     int iter_locked;
@@ -104,6 +110,35 @@ public:
        @param[in] j Number of vectors in v to orthogonalise against
     */
     Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+
+    /**
+       @brief Permute the vector space using the permutation matrix.
+       @param[in/out] kSpace The current Krylov space
+       @param[in] mat Eigen object storing the pivots
+       @param[in] size The size of the (square) permutation matrix
+    */
+    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
+
+    /**
+       @brief Rotate part of kSpace
+       @param[in/out] kSpace The current Krylov space
+       @param[in] array The rotation matrix
+       @param[in] rank row rank of array
+       @param[in] is Start of i index
+       @param[in] ie End of i index
+       @param[in] js Start of j index
+       @param[in] je End of j index
+       @param[in] blockType Type of caxpy(_U/L) to perform
+    */
+    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+
+    /**
+       @brief Copy temp part of kSpace, zero out for next use
+       @param[in/out] kSpace The current Krylov space
+       @param[in] js Start of j index
+       @param[in] je End of j index
+    */
+    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
 
     /**
        @brief Deflate a set of source vectors with a given eigenspace
@@ -289,8 +324,8 @@ public:
     void eigensolveFromArrowMat(int nLocked, int arror_pos);
 
     /**
-       @brief Get the eigen-decomposition from the arrow matrix
-       @param[in] nKspace current Kryloc space
+       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+       @param[in] nKspace current Krylov space
     */
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 

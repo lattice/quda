@@ -64,6 +64,9 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double epsilon = 0.01;
+double m5 = -1.5;
+double b5 = 1.5;
+double c5 = 0.5;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -141,6 +144,7 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
+int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
@@ -166,6 +170,7 @@ char eig_vec_outfile[256] = "";
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_nEv = {};
 quda::mgarray<int> mg_eig_nKr = {};
+quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
@@ -371,6 +376,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
+  quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
+  quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
+  quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
   quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
@@ -526,6 +534,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested");
   opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
+  opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
+                      "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
   opgroup->add_option(
     "--eig-require-convergence",
@@ -636,6 +646,9 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
+    "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   quda_app->add_mgoption(opgroup, "--mg-eig-poly-deg", mg_eig_poly_deg, CLI::PositiveNumber,
                          "Set the degree of the Chebyshev polynomial (default 100)");
   quda_app->add_mgoption(
