@@ -75,6 +75,9 @@ namespace quda
     void axpby(TrainingParameter<float> &out, complex<float> a, const TrainingParameter<float> &x, complex<float> b,
                const TrainingParameter<float> &y);
 
+    
+    float inner_product(const TrainingParameter<float> &a, const TrainingParameter<float> &b);
+
     constexpr int spin_dim = 4;
     constexpr int color_dim = 3;
     constexpr int sm_dim = spin_dim * spin_dim;

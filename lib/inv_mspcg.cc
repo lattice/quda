@@ -342,15 +342,17 @@ namespace quda
     madwf_ml::TrainingParameter<float> d2(tp.size());
 
     madwf_ml::TrainingParameter<float> P(tp.size());
+     
+    madwf_ml::TrainingParameter<float> D_old(tp.size());
 
     // double pmu = 0.0;
 
     // double old_chi2 = 0.0;
     float alpha;
-    float b = 0.99;
+    float b = 0.8;
     printfQuda("beta = %f\n", b);
     printfQuda("training mu   = %f\n", mu);
-    for (int iteration = 0; iteration < 2000; iteration++) {
+    for (int iteration = 0; iteration < 2400; iteration++) {
 
       madwf_ml::TrainingParameter<float> D(tp.size());
       // double dmu = 0.0;
@@ -359,7 +361,6 @@ namespace quda
       std::vector<double> a(5, 0.0);
 
       for (const auto &phi : in) {
-
         chi2 += calculate_chi(chi, *phi, T, mu, Ls_cheap);
 
         ATx(ATphi, *phi, T);
@@ -371,21 +372,24 @@ namespace quda
 
         madwf_ml::axpby(D, 2.0f, d1, 2.0f, d2);
         // dmu += 2.0 * reDotProduct(Mchi, *phi);
-#if 0
-        double d = 0.4;
-        for(int i = 0; i < 14; i++){
-          tp[i] += d/2;
-          double chi2_p = calculate_chi(chi, *phi, tp, Ls_out);
-          tp[i] -= d;
-          double chi2_m = calculate_chi(chi, *phi, tp, Ls_out);
-          printfQuda("d_chi2 norm [%04d]  = %f vs. %f \n", i, (chi2_p - chi2_m)/d, (2.0f*(d1[i]+d2[i])));
-          tp[i] += d/2;
-        }
-#endif
       }
 
+#if 1
       madwf_ml::axpby(P, (b - 1), P, (1 - b), D);
+#else
+      if(iteration == 0){
+        P.copy(D);
+      }else{
+        // double den = madwf_ml::inner_product(D_old, D_old);
+        double den = madwf_ml::inner_product(P, D_old) - madwf_ml::inner_product(P, D);
+        double num = madwf_ml::inner_product(D, D) - madwf_ml::inner_product(D, D_old);
+        b = std::max(0.0, num / den);
+        madwf_ml::axpby(P, b, P, 1.0f, D);
+      }
+      D_old.copy(D);
 
+      printfQuda("beta = %8.4e ", b);
+#endif
       // pmu = b * pmu + (1-b) * dmu;
 
       chi2 = 0.0;
@@ -444,6 +448,9 @@ namespace quda
 
       printfQuda("grad min iter %03d: %04d chi2 = %8.4e, chi2 %% = %8.4e, alpha = %+8.4e, mu = %+8.4e\n", comm_rank(),
                  iteration, chi2, chi2 / ref, alpha, mu);
+    
+      // if((chi2 - old_chi2) * (chi2 - old_chi2) / (ref * ref) / (old_chi2*old_chi2 / (ref*ref)) < 1e-10){ break; }
+      // old_chi2 = chi2;
     }
 
     printfQuda("Training finished ...\n");

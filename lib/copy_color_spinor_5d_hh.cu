@@ -7,6 +7,8 @@
 #include <shared_memory_cache_helper.cuh>
 
 #include <cub/cub.cuh>
+#include <thrust/inner_product.h>
+#include <thrust/execution_policy.h>
 
 #include <madwf_ml.h>
 
@@ -360,6 +362,8 @@ namespace quda
         } else {
           wm_index = s * Ls_in + t;
         }
+        out += reinterpret_cast<const matrix_type *>(smem)[wm_index] * (in.project(4, +1)).reconstruct(4, +1);
+        out += reinterpret_cast<const matrix_type *>(smem)[(Ls_out-1-s) * Ls_in + Ls_in-1-t] * (in.project(4, -1)).reconstruct(4, -1);
         out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_type *>(smem)[wm_index], in);
       }
       arg.out(s * volume_4d_cb + index_4d_cb, parity) = out;
@@ -477,7 +481,6 @@ namespace quda
     void transfer_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, const TrainingParameter<float> &tp, bool dagger)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-
       checkLocation(out, in); // check all locations match
 
       switch (checkPrecision(out, in)) {
@@ -502,9 +505,8 @@ namespace quda
     void tensor_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, TrainingParameter<float> &tp)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-
       checkLocation(out, in); // check all locations match
-
+      
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
         using matrix_type = SpinMatrix<float>;
@@ -534,17 +536,24 @@ namespace quda
         index += blockDim.x * gridDim.x;
       }
     }
-
+    
     void axpby(TrainingParameter<float> &out, complex<float> a, const TrainingParameter<float> &x, complex<float> b,
                const TrainingParameter<float> &y)
     {
-
       int p_size = out.get_size() / 2; // complex
       constexpr int block_size = 256;
       int grid_size = (p_size + block_size - 1) / block_size;
-
       axpby_kernel<<<grid_size, block_size, 0, streams[Nstream - 1]>>>(
         (complex<float> *)out.data(), p_size, a, (complex<float> *)x.data(), b, (complex<float> *)y.data());
+    }
+    
+    float inner_product(const TrainingParameter<float> &a, const TrainingParameter<float> &b)
+    {
+      size_t p_size = a.get_size();
+      if(p_size != b.get_size()){
+        errorQuda("size mismatch between inputs.\n");
+      }
+      return thrust::inner_product(thrust::device, a.data(), a.data() + p_size, b.data(), 0.0f);
     }
 
   } // namespace madwf_ml
