@@ -279,7 +279,7 @@ extern "C" {
     void *eig_param;
 
     /** If true, deflate the initial guess */
-    bool deflate;
+    QudaBoolean deflate;
 
     /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
@@ -441,6 +441,8 @@ extern "C" {
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
+    /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
+    int batched_rotate;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;

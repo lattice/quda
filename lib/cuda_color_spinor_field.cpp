@@ -564,8 +564,14 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    cudaMemsetAsync(v, 0, bytes, *blas::getStream());
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, *blas::getStream());
+
+//    cudaMemsetAsync(v, 0, bytes, *blas::getStream());
+//    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemsetAsync(norm, 0, norm_bytes, *blas::getStream());
+
+    qudaMemsetAsync(v, 0, bytes, 0);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+      qudaMemsetAsync(norm, 0, norm_bytes, 0);
+
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -591,7 +597,7 @@ namespace quda {
       size_t pad_bytes = (stride - volumeCB) * sizeof(float);
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          cudaMemsetAsync((char*)norm + volumeCB*sizeof(float), 0, (stride-volumeCB)*sizeof(float));
+          qudaMemsetAsync((char *)norm + volumeCB * sizeof(float), 0, (stride - volumeCB) * sizeof(float), 0);
         }
     }
 
@@ -600,8 +606,8 @@ namespace quda {
       size_t subset_bytes = bytes/siteSubset;
       size_t subset_length = length/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
-        cudaMemsetAsync((char*)v + subset_length*precision + subset_bytes*subset, 0,
-                        subset_bytes-subset_length*precision);
+        qudaMemsetAsync((char *)v + subset_length * precision + subset_bytes * subset, 0,
+                        subset_bytes - subset_length * precision, 0);
       }
     }
 
@@ -609,8 +615,8 @@ namespace quda {
     if (norm_bytes && norm_bytes != siteSubset*stride*sizeof(float)) {
       size_t subset_bytes = norm_bytes/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
-        cudaMemsetAsync((char*)norm + (size_t)stride*sizeof(float) + subset_bytes*subset, 0,
-                        subset_bytes-(size_t)stride*sizeof(float));
+        qudaMemsetAsync((char *)norm + (size_t)stride * sizeof(float) + subset_bytes * subset, 0,
+                        subset_bytes - (size_t)stride * sizeof(float), 0);
       }
     }
 
@@ -673,7 +679,7 @@ namespace quda {
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
-        cudaMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
+        qudaMemsetAsync(v, 0, bytes, 0); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
         if (zeroCopy) pool_pinned_free(buffer);
