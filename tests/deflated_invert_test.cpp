@@ -245,7 +245,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   df_param_p->eig_type = QUDA_EIG_INVALID;
   df_param_p->check_interval = eig_check_interval;
   df_param_p->max_restarts   =  eigcg_max_restarts;// eig_max_restarts;// eigcg_max_restarts;
-  df_param_p->tol   = eigenval_tol; //eig_tol;//foemer eigenval_tol  
+  df_param_p->tol   = eigenval_tol; //eig_tol;//foemer eigenval_tol
 
   // set file i/o parameters
   strcpy(df_param_p->vec_infile, eig_vec_infile);
@@ -294,10 +294,9 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
-  //set eigenspace parameters first:
-  QudaEigParam  df_param = newQudaEigParam();
-
   QudaInvertParam inv_param = newQudaInvertParam();
+
+  QudaEigParam  df_param = newQudaEigParam();
 
   inv_param.eig_param  = static_cast<void*>(&df_param);
 

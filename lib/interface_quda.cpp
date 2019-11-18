@@ -2610,33 +2610,21 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
 }
 
 deflated_solver::deflated_solver(QudaInvertParam &param, TimeProfile &profile)
-  : d(nullptr), m(nullptr), RV(0), deflParam(nullptr), defl(nullptr),  profile(profile) {
+  : RV(0), deflParam(nullptr), defl(nullptr),  profile(profile) {
 
   QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
-  QudaEigParam& eig_param = *eig_param_p;
 
   if (param.inv_type != QUDA_EIGCG_INVERTER && param.inv_type != QUDA_INC_EIGCG_INVERTER) return;
 
   profile.TPSTART(QUDA_PROFILE_INIT);
 
   cudaGaugeField *cudaGauge = checkGauge(&param);
-  eig_param.secs   = 0;
-  eig_param.gflops = 0;
-
-  DiracParam diracParam;
-  if(eig_param.cuda_prec_ritz == param.cuda_prec)
-  {
-    setDiracParam(diracParam, &param, (param.solve_type == QUDA_DIRECT_PC_SOLVE) || (param.solve_type == QUDA_NORMOP_PC_SOLVE));
-  } else {
-    setDiracSloppyParam(diracParam, &param, (param.solve_type == QUDA_DIRECT_PC_SOLVE) || (param.solve_type == QUDA_NORMOP_PC_SOLVE));
-  }
+  eig_param_p->secs   = 0;
+  eig_param_p->gflops = 0;
 
   const bool pc_solve = (param.solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  d = Dirac::create(diracParam);
-  m = pc_solve ? static_cast<DiracMatrix*>( new DiracMdagM(*d) ) : static_cast<DiracMatrix*>( new DiracM(*d));
-
-  ColorSpinorParam ritzParam(nullptr, param, cudaGauge->X(), pc_solve, eig_param.location);
+  ColorSpinorParam ritzParam(nullptr, param, cudaGauge->X(), pc_solve, eig_param_p->location);
 
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
   ritzParam.setPrecision(param.cuda_prec_ritz);
@@ -2647,14 +2635,14 @@ deflated_solver::deflated_solver(QudaInvertParam &param, TimeProfile &profile)
 
     //select memory location here, by default ritz vectors will be allocated on the device
     //but if not sufficient device memory, then the user may choose mapped type of memory
-    ritzParam.mem_type = eig_param.mem_type_ritz;
+    ritzParam.mem_type = eig_param_p->mem_type_ritz;
   } else { //host location
     ritzParam.mem_type = QUDA_MEMORY_PINNED;
   }
 
   for (int i = 0; i < (param.nev*param.deflation_grid); i++) { RV.push_back(ColorSpinorField::Create(ritzParam)); }
 
-  deflParam = new DeflationParam(eig_param, RV, *m);
+  deflParam = new DeflationParam(*eig_param_p, RV);
 
   defl = new Deflation(*deflParam, profile);
 

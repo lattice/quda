@@ -451,7 +451,7 @@ namespace quda {
       if(param.eig_param) {
         QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
         eig_param_p->nConv = eig_param.nConv;
-      }      
+      }
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
@@ -1289,6 +1289,8 @@ public:
 
   using ColorSpinorFieldSet = ColorSpinorField;
 
+  class EigCGArgs;
+
   //forward declaration
   class IncEigCG : public Solver {
 
@@ -1311,11 +1313,15 @@ public:
     std::shared_ptr<ColorSpinorField> r_pre;    // residual passed to preconditioner
     std::shared_ptr<ColorSpinorField> p_pre;    // preconditioner result
 
+    std::shared_ptr<EigCGArgs> local_eigcg_args;
+
     TimeProfile &profile; // time profile for initCG solver
 
     bool init;
 
   public:
+    static std::shared_ptr<EigCGArgs> persistant_eigcg_args;
+
     IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
@@ -1331,6 +1337,14 @@ public:
     int CAEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    void Increment( );
+
+    void Deflate( ColorSpinorField &out, ColorSpinorField &in );
+
+    void Reduce(double tol, int max_nev);
+
+    void Verify( );
   };
 
 //forward declaration

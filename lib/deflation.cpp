@@ -50,6 +50,7 @@ namespace quda {
    */
 
   void Deflation::verify() {
+#if 0	  
     const int nevs_to_print = param.cur_dim;
     if(nevs_to_print == 0) errorQuda("\nIncorrect size of current deflation space. \n");
 
@@ -103,12 +104,12 @@ namespace quda {
 
        printfQuda("Eigenvalue %d: %1.12e Residual: %1.12e\n", i+1, eval, relerr);
     }
-
+#endif
     return;
   }
 
   void Deflation::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-
+#if 0
     if(param.cur_dim == 0) return;//nothing to do
 
     std::unique_ptr<double[] > vec(new double[param.ld]);
@@ -141,7 +142,7 @@ namespace quda {
 
     check_nrm2 = norm2(x);
     printfQuda("\nDeflated guess spinor norm (gpu): %1.15e\n", sqrt(check_nrm2));
-
+#endif
     return;
   }
 }

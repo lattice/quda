@@ -25,7 +25,7 @@ namespace quda {
     double *invRitzVals;
 
      /** The Dirac operator to use for spinor deflation operation */
-    DiracMatrix &matDeflation;
+    //DiracMatrix &matDeflation;
 
     /** Host  projection matrix (e.g. eigCG VH A V) */
     double *matProj;
@@ -48,7 +48,7 @@ namespace quda {
     /** Filename for where to load/store the deflation space */
     char filename[100];
 
-    DeflationParam(QudaEigParam &param, std::vector<ColorSpinorField*> &RV,  DiracMatrix &matDeflation, int cur_dim = 0) : eig_global(param), RV(RV), matDeflation(matDeflation),
+    DeflationParam(QudaEigParam &param, std::vector<ColorSpinorField*> &RV,  int cur_dim = 0) : eig_global(param), RV(RV),
              cur_dim(cur_dim), use_inv_ritz(false), location(param.location) {
 
         if(param.nk == 0 || param.np == 0 || (param.np % param.nk != 0)) errorQuda("\nIncorrect deflation space parameters...\n");
@@ -149,9 +149,6 @@ namespace quda {
    */
   struct deflated_solver {
 
-    Dirac  *d;
-    DiracMatrix *m;
-
     std::vector<ColorSpinorField*> RV;//Ritz vectors
 
     DeflationParam *deflParam;
@@ -169,9 +166,6 @@ namespace quda {
       if (deflParam) delete deflParam;
 
       for(auto v : RV) delete v;
-
-      if (m) delete m;
-      if (d) delete d;
 
       profile.TPSTOP(QUDA_PROFILE_FREE);
     }
