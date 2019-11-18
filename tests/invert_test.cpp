@@ -68,6 +68,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
+  eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
   inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
-  double kappa5;
+  double kappa5 = 0;
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
@@ -200,15 +201,15 @@ int main(int argc, char **argv)
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
              dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
 	     dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.m5 = -1.8;
+    inv_param.m5 = m5;
     kappa5 = 0.5/(5 + inv_param.m5);  
     inv_param.Ls = Lsdim;
     for(int k = 0; k < Lsdim; k++) // for mobius only
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.452;
-      inv_param.c_5[k] = 0.452;
+      inv_param.b_5[k] = b5;
+      inv_param.c_5[k] = c5;
     }
   }
 
