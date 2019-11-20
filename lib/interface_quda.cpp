@@ -648,7 +648,14 @@ void initQudaMemory()
   profileInit.TPSTART(QUDA_PROFILE_INIT);
 
   if (!comms_initialized) init_default_comms();
-
+  #if defined(NVSHMEM_COMMS)
+    // MPI_Init(&argc, &argv);
+    MPI_Comm tmp = MPI_COMM_WORLD;
+    printfQuda("Init NVSHMEM ...\n\n");
+    nvshmemx_init_attr_t attr;
+    attr.mpi_comm = &tmp;
+    nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+  #endif
   streams = new cudaStream_t[Nstream];
 
   int greatestPriority;
@@ -688,17 +695,19 @@ void initQuda(int dev)
   // initialize communications topology, if not already done explicitly via initCommsGridQuda()
   if (!comms_initialized) init_default_comms();
 
- #if defined(NVSHMEM_COMMS)
-  // MPI_Init(&argc, &argv);
-  MPI_Comm tmp = MPI_COMM_WORLD;
 
-  nvshmemx_init_attr_t attr;
-  attr.mpi_comm = &tmp;
-  nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
-#endif 
 
   // set the device that QUDA uses
   initQudaDevice(dev);
+
+// #if defined(NVSHMEM_COMMS)
+//   // MPI_Init(&argc, &argv);
+//   MPI_Comm tmp = MPI_COMM_WORLD;
+//   printfQuda("Init NVSHMEM ...\n\n");
+//   nvshmemx_init_attr_t attr;
+//   attr.mpi_comm = &tmp;
+//   nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+// #endif
 
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
