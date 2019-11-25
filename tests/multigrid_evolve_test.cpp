@@ -907,7 +907,7 @@ int main(int argc, char **argv)
         inv_param2.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
       }
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-	// Multiply by -1.0 to emulate twist switch
+        // Multiply by -1.0 to emulate twist switch
         inv_param.mu = -1.0 * mu + 0.01 * step;
         inv_param2.mu = -1.0 * mu + 0.01 * step;
         mg_param.invert_param->mu = inv_param.mu;
