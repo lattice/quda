@@ -65,7 +65,7 @@ namespace quda {
         if (compute_max_only) {
           if (!activeTuning())
           {
-            cudaMemsetAsync(arg.max_d, 0, sizeof(Float), stream);
+            qudaMemsetAsync(arg.max_d, 0, sizeof(Float), stream);
           }
         }
 #ifdef JITIFY

@@ -15,8 +15,6 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-bool flags = true;
-
 namespace quda
 {
 
@@ -47,6 +45,7 @@ namespace quda
     restart_iter = 0;
     max_restarts = eig_param->max_restarts;
     check_interval = eig_param->check_interval;
+    batched_rotate = eig_param->batched_rotate;
     iter = 0;
     iter_converged = 0;
     iter_locked = 0;
@@ -199,6 +198,7 @@ namespace quda
     Complex *s = (Complex *)safe_malloc((j + 1) * sizeof(Complex));
     Complex sum(0.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
+    vecs_ptr.reserve(j + 1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
     blas::cDotProduct(s, vecs_ptr, rvec);
@@ -212,6 +212,90 @@ namespace quda
 
     host_free(s);
     return sum;
+  }
+
+  void EigenSolver::permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size)
+  {
+    std::vector<int> pivots(size);
+    for (int i = 0; i < size; i++) {
+      for (int j = 0; j < size; j++) {
+        if (mat[j * size + i] == 1) { pivots[j] = i; }
+      }
+    }
+
+    // Identify cycles in the permutation array.
+    // We shall use the sign bit as a marker. If the
+    // sign is negative, the vector has already been
+    // swapped into the correct place. A positive
+    // value indicates the start of a new cycle.
+
+    for (int i = 0; i < size; i++) {
+      // First cycle always starts at 0, hence OR statement
+      if (pivots[i] > 0 || i == 0) {
+        int k = i;
+        // Identify vector to be placed at i
+        int j = pivots[i];
+        pivots[i] = -pivots[i];
+        while (j > i) {
+          std::swap(kSpace[k + num_locked], kSpace[j + num_locked]);
+          pivots[j] = -pivots[j];
+          k = j;
+          j = -pivots[j];
+        }
+      }
+    }
+    // Sanity check
+    for (int i = 0; i < size; i++) {
+      if (pivots[i] > 0) errorQuda("Error at pivot %d", i);
+    }
+  }
+
+  void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i_range,
+                                const range &j_range, blockType b_type)
+  {
+    int block_i_rank = i_range.second - i_range.first;
+    int block_j_rank = j_range.second - j_range.first;
+
+    // Pointers to the relevant vectors
+    std::vector<ColorSpinorField *> vecs_ptr;
+    std::vector<ColorSpinorField *> kSpace_ptr;
+
+    // Alias the vectors we wish to keep
+    vecs_ptr.reserve(block_i_rank);
+    for (int i = i_range.first; i < i_range.second; i++) { vecs_ptr.push_back(kSpace[num_locked + i]); }
+    // Alias the extra space vectors
+    kSpace_ptr.reserve(block_j_rank);
+    for (int j = j_range.first; j < j_range.second; j++) {
+      int k = nKr + 1 + j - j_range.first;
+      kSpace_ptr.push_back(kSpace[k]);
+    }
+
+    double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
+    // Populate batch array (COLUM major -> ROW major)
+    for (int j = j_range.first; j < j_range.second; j++) {
+      for (int i = i_range.first; i < i_range.second; i++) {
+        int j_arr = j - j_range.first;
+        int i_arr = i - i_range.first;
+        batch_array[i_arr * block_j_rank + j_arr] = array[j * rank + i];
+      }
+    }
+    switch (b_type) {
+    case PENCIL: blas::axpy(batch_array, vecs_ptr, kSpace_ptr); break;
+    case LOWER_TRI: blas::axpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
+    case UPPER_TRI: blas::axpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
+    default: errorQuda("Undefined MultiBLAS type in blockRotate");
+    }
+    host_free(batch_array);
+  }
+
+  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end)
+  {
+    // copy back to correct position, zero out the workspace
+    for (int j = j_start; j < j_end; j++) {
+      int k = nKr + 1 + j - j_start;
+      std::swap(kSpace[j + num_locked], kSpace[k]);
+      blas::zero(*kSpace[k]);
+    }
   }
 
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
@@ -365,6 +449,7 @@ namespace quda
         printfQuda("Start loading %04d vectors from %s\n", Nvec, vec_infile.c_str());
 
       std::vector<ColorSpinorField *> tmp;
+      tmp.reserve(Nvec);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
         ColorSpinorParam csParam(*eig_vecs[0]);
         csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -642,10 +727,12 @@ namespace quda
     ColorSpinorParam csParamClone(*kSpace[0]);
     csParam = csParamClone;
     // Increase Krylov space to nKr+1 one vector, create residual
+    kSpace.reserve(nKr + 1);
     for (int i = nConv; i < nKr + 1; i++) kSpace.push_back(ColorSpinorField::Create(csParam));
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
     // Increase evals space to nEv
+    evals.reserve(nEv);
     for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
     //---------------------------------------------------------------------------
 
@@ -743,7 +830,9 @@ namespace quda
 
       iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked - 12);
 
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
       num_converged = num_locked + iter_converged;
       num_keep = num_locked + iter_keep;
@@ -818,6 +907,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
       // Make an array of size nConv
       std::vector<ColorSpinorField *> vecs_ptr;
+      vecs_ptr.reserve(nConv);
       const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
       for (int i = 0; i < nConv; i++) {
         kSpace[i]->setSuggestedParity(mat_parity);
@@ -860,10 +950,19 @@ namespace quda
     blas::axpy(-alpha[j], *v[j], *r[0]);
 
     int start = (j > num_keep) ? j - 1 : 0;
-    for (int i = start; i < j; i++) {
 
+    if (j - start > 0) {
+      std::vector<ColorSpinorField *> r_ {r[0]};
+      std::vector<double> beta_;
+      beta_.reserve(j - start);
+      std::vector<ColorSpinorField *> v_;
+      v_.reserve(j - start);
+      for (int i = start; i < j; i++) {
+        beta_.push_back(-beta[i]);
+        v_.push_back(v[i]);
+      }
       // r = r - b_{j-1} * v_{j-1}
-      blas::axpy(-beta[i], *v[i], *r[0]);
+      blas::axpy(beta_.data(), v_, r_);
     }
 
     // Orthogonalise r against the Krylov space
@@ -970,44 +1069,154 @@ namespace quda
 
   void TRLM::computeKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
-
     int offset = nKr + 1;
     int dim = nKr - num_locked;
 
-    if ((int)kSpace.size() < offset + iter_keep) {
-      for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-        if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding %d vector to kSpace\n", i);
-        kSpace.push_back(ColorSpinorField::Create(csParam));
+    // Multi-BLAS friendly array to store part of Ritz matrix we want
+    double *ritz_mat_keep = (double *)safe_malloc((dim * iter_keep) * sizeof(double));
+
+    // If we have memory availible, do the entire rotation
+    if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
+      if ((int)kSpace.size() < offset + iter_keep) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep);
+        kSpace.reserve(offset + iter_keep);
+        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParam));
+        }
       }
-    }
-
-    // Array for multi-BLAS axpy
-    double *ritz_mat_col = (double *)safe_malloc((dim - 1) * sizeof(double));
-
-    for (int i = 0; i < iter_keep; i++) {
-      int k = offset + i;
-      *r[0] = *kSpace[num_locked];
-      blas::ax(ritz_mat[dim * i], *r[0]);
-      *kSpace[k] = *r[0];
 
       // Pointers to the relevant vectors
       std::vector<ColorSpinorField *> vecs_ptr;
       std::vector<ColorSpinorField *> kSpace_ptr;
-      kSpace_ptr.push_back(kSpace[k]);
-      for (int j = 1; j < dim; j++) {
-        vecs_ptr.push_back(kSpace[num_locked + j]);
-        ritz_mat_col[j - 1] = ritz_mat[i * dim + j];
+
+      // Alias the extra space vectors, zero the workspace
+      vecs_ptr.reserve(iter_keep);
+      for (int i = 0; i < iter_keep; i++) {
+        kSpace_ptr.push_back(kSpace[offset + i]);
+        blas::zero(*kSpace_ptr[i]);
       }
 
-      // Multi-BLAS axpy
-      blas::axpy(ritz_mat_col, vecs_ptr, kSpace_ptr);
+      // Alias the vectors we wish to keep, populate the Ritz matrix and transpose.
+      kSpace_ptr.reserve(dim);
+      for (int j = 0; j < dim; j++) {
+        vecs_ptr.push_back(kSpace[num_locked + j]);
+        for (int i = 0; i < iter_keep; i++) { ritz_mat_keep[j * iter_keep + i] = ritz_mat[i * dim + j]; }
+      }
+
+      // multiBLAS axpy
+      blas::axpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
+
+      // Copy back to the Krylov space
+      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
+    } else {
+
+      // Do batched rotation to save on memory
+      int batch_size = batched_rotate;
+      int full_batches = iter_keep / batch_size;
+      int batch_size_r = iter_keep % batch_size;
+      bool do_batch_remainder = (batch_size_r != 0 ? true : false);
+
+      if ((int)kSpace.size() < offset + batch_size) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
+        kSpace.reserve(offset + batch_size);
+        for (int i = kSpace.size(); i < offset + batch_size; i++) {
+          kSpace.push_back(ColorSpinorField::Create(csParam));
+        }
+      }
+
+      profile.TPSTART(QUDA_PROFILE_EIGEN);
+      MatrixXd mat = MatrixXd::Zero(dim, iter_keep);
+      for (int j = 0; j < iter_keep; j++)
+        for (int i = 0; i < dim; i++) mat(i, j) = ritz_mat[j * dim + i];
+
+      FullPivLU<MatrixXd> matLU(mat);
+
+      // Extract the upper triagnular matrix
+      MatrixXd matUpper = MatrixXd::Zero(iter_keep, iter_keep);
+      matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
+      matUpper.conservativeResize(iter_keep, iter_keep);
+
+      // Extract the lower triangular matrix
+      MatrixXd matLower = MatrixXd::Identity(dim, dim);
+      matLower.block(0, 0, dim, iter_keep).triangularView<Eigen::StrictlyLower>() = matLU.matrixLU();
+      matLower.conservativeResize(dim, iter_keep);
+
+      // Extract the desired permutation matrices
+      MatrixXi matP = MatrixXi::Zero(dim, dim);
+      MatrixXi matQ = MatrixXi::Zero(iter_keep, iter_keep);
+      matP = matLU.permutationP().inverse();
+      matQ = matLU.permutationQ().inverse();
+      profile.TPSTOP(QUDA_PROFILE_EIGEN);
+
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      // Compute V * A = V * PLUQ
+
+      // Do P Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matP.data(), dim);
+
+      // Do L Multiply
+      //---------------------------------------------------------------------------
+      // Loop over full batches
+      for (int b = 0; b < full_batches; b++) {
+
+        // batch triangle
+        blockRotate(kSpace, matLower.data(), dim, {b * batch_size, (b + 1) * batch_size},
+                    {b * batch_size, (b + 1) * batch_size}, LOWER_TRI);
+        // batch pencil
+        blockRotate(kSpace, matLower.data(), dim, {(b + 1) * batch_size, dim}, {b * batch_size, (b + 1) * batch_size},
+                    PENCIL);
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
+      }
+
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotate(kSpace, matLower.data(), dim, {full_batches * batch_size, iter_keep},
+                    {full_batches * batch_size, iter_keep}, LOWER_TRI);
+        // remainder pencil
+        if (iter_keep < dim) {
+          blockRotate(kSpace, matLower.data(), dim, {iter_keep, dim}, {full_batches * batch_size, iter_keep}, PENCIL);
+        }
+        blockReset(kSpace, full_batches * batch_size, iter_keep);
+      }
+
+      // Do U Multiply
+      //---------------------------------------------------------------------------
+      if (do_batch_remainder) {
+        // remainder triangle
+        blockRotate(kSpace, matUpper.data(), iter_keep, {full_batches * batch_size, iter_keep},
+                    {full_batches * batch_size, iter_keep}, UPPER_TRI);
+        // remainder pencil
+        blockRotate(kSpace, matUpper.data(), iter_keep, {0, full_batches * batch_size},
+                    {full_batches * batch_size, iter_keep}, PENCIL);
+        blockReset(kSpace, full_batches * batch_size, iter_keep);
+      }
+
+      // Loop over full batches
+      for (int b = full_batches - 1; b >= 0; b--) {
+        // batch triangle
+        blockRotate(kSpace, matUpper.data(), iter_keep, {b * batch_size, (b + 1) * batch_size},
+                    {b * batch_size, (b + 1) * batch_size}, UPPER_TRI);
+        if (b > 0) {
+          // batch pencil
+          blockRotate(kSpace, matUpper.data(), iter_keep, {0, b * batch_size}, {b * batch_size, (b + 1) * batch_size},
+                      PENCIL);
+        }
+        blockReset(kSpace, b * batch_size, (b + 1) * batch_size);
+      }
+
+      // Do Q Permute
+      //---------------------------------------------------------------------------
+      permuteVecs(kSpace, matQ.data(), iter_keep);
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
     }
 
-    host_free(ritz_mat_col);
+    // Update residual vector
+    std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
 
-    for (int i = 0; i < iter_keep; i++) *kSpace[i + num_locked] = *kSpace[offset + i];
-    *kSpace[num_locked + iter_keep] = *kSpace[nKr];
-
+    // Update sub arrow matrix
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
+
+    host_free(ritz_mat_keep);
   }
 } // namespace quda
