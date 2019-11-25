@@ -265,7 +265,6 @@ namespace quda {
     // Create space for the eigenvectors, destroy defl_space
     for (auto &e : defl_space) { evecs.push_back(e); }
     defl_space.resize(0);
-
   }
 
   void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
