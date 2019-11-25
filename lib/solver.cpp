@@ -260,21 +260,22 @@ namespace quda {
   void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
   {
     if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
-    int size = defl_space.size();
+    // Create space for the eigenvalues
+    evals.resize(defl_space.size());
+    // Create space for the eigenvectors, destroy defl_space
     for (auto &e : defl_space) { evecs.push_back(e); }
     defl_space.resize(0);
-    // Create space for the eigenvalues
-    evals.reserve(size);
-    for (int i = 0; i < size; i++) evals.push_back(0.0);
+
   }
 
   void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
   {
     if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
-    for (auto &e : evecs ) { defl_space.push_back(e); }
-    evecs.resize(0);
     // We do not care about the eigenvalues, they will be recomputed.
     evals.resize(0);
+    // Create space for the eigenvectors, destroy evecs
+    for (auto &e : evecs ) { defl_space.push_back(e); }
+    evecs.resize(0);
   }
 
   void Solver::extendSVDDeflationSpace()
