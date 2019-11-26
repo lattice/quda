@@ -15,7 +15,7 @@ namespace quda
     template <class real> class TrainingParameter
     {
 
-      real *device_data;
+      real *device_data = nullptr;
 
       size_t size;
 
@@ -23,17 +23,21 @@ namespace quda
       TrainingParameter(std::vector<real> &host_vector) : size(host_vector.size())
       {
         size_t m_size = size * sizeof(real);
-        device_data = (real *)device_malloc_(__func__, __FILE__, __LINE__, m_size);
-        if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
-        cudaMemcpy(device_data, host_vector.data(), m_size, cudaMemcpyHostToDevice);
+        if(m_size > 0){
+          device_data = (real *)device_malloc_(__func__, __FILE__, __LINE__, m_size);
+          if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
+          cudaMemcpy(device_data, host_vector.data(), m_size, cudaMemcpyHostToDevice);
+        }
       }
 
       TrainingParameter(size_t size_) : size(size_)
       {
         size_t m_size = size * sizeof(real);
-        device_data = (real *)device_malloc_(__func__, __FILE__, __LINE__, m_size);
-        if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
-        cudaMemset(device_data, 0, m_size);
+        if(m_size > 0){
+          device_data = (real *)device_malloc_(__func__, __FILE__, __LINE__, m_size);
+          if (!device_data) { errorQuda("Unable to allocate a device buffer of %lu bytes.\n", m_size); }
+          cudaMemset(device_data, 0, m_size);
+        }
       }
 
       ~TrainingParameter()

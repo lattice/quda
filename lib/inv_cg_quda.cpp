@@ -300,7 +300,7 @@ namespace quda {
     const double u = param.precision_sloppy == 8 ?
       std::numeric_limits<double>::epsilon() / 2. :
       param.precision_sloppy == 4 ? std::numeric_limits<float>::epsilon() / 2. :
-                                    param.precision == 2 ? pow(2., -13) : pow(2., -6);
+                                    param.precision_sloppy == 2 ? pow(2., -13) : pow(2., -6);
     const double uhigh = param.precision == 8 ? std::numeric_limits<double>::epsilon() / 2. :
                                                 param.precision == 4 ? std::numeric_limits<float>::epsilon() / 2. :
                                                                        param.precision == 2 ? pow(2., -13) : pow(2., -6);
