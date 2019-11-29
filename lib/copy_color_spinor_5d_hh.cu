@@ -106,7 +106,16 @@ namespace quda
       }
       return out;
     }
-
+    
+    template <class real> using ChiralProjector = complex<real>[2];
+    
+    template <bool dagger, class real>
+    __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const ChiralProjector<real> &m,
+                                                                         const WilsonVector<real> &v)
+    {
+      return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
+    }
+    
     constexpr int warp_size = 32;
 
     template <class T> __device__ inline void warp_reduce(T &f)
@@ -184,6 +193,30 @@ namespace quda
           block_reduce_x(z);
           if (threadIdx.x == 0) { p[(m_index * spin_dim * spin_dim + cs) * gridDim.x + blockIdx.x] = z; }
         }
+      }
+    }
+
+    template <class real>
+    __device__ inline void vector_tensor_matrix(ChiralProjector<real> *mp, int m_index, const WilsonVector<real> &v,
+                                                const WilsonVector<real> &w)
+    {
+      
+      complex<real> *p = reinterpret_cast<complex<real> *>(mp);
+
+#pragma unroll
+      for (int pm = 0; pm < 1; pm++){
+        complex<real> z = 0;
+        WilsonVector<real> projected_w = w.project(4, pm ? -1 : +1).reconstruct(4, pm ? -1 : +1);
+#pragma unroll
+        for (int spin = 0; spin < spin_dim; spin++) {
+#pragma unroll
+          for (int color = 0; color < color_dim; color++) { 
+            z += conj(conj(v(spin, color)) * projected_w(spin, color)); 
+          }
+        }
+        // Perform a block reduction across the x direction
+        block_reduce_x(z);
+        if (threadIdx.x == 0) { p[(m_index * 2 + pm) * gridDim.x + blockIdx.x] = z; }
       }
     }
 
@@ -362,8 +395,6 @@ namespace quda
         } else {
           wm_index = s * Ls_in + t;
         }
-        out += reinterpret_cast<const matrix_type *>(smem)[wm_index] * (in.project(4, +1)).reconstruct(4, +1);
-        out += reinterpret_cast<const matrix_type *>(smem)[(Ls_out-1-s) * Ls_in + Ls_in-1-t] * (in.project(4, -1)).reconstruct(4, -1);
         out += matrix_vector_multiply<dagger>(reinterpret_cast<const matrix_type *>(smem)[wm_index], in);
       }
       arg.out(s * volume_4d_cb + index_4d_cb, parity) = out;
@@ -478,6 +509,9 @@ namespace quda
     };
 
 #endif
+    
+    using matrix_type = ChiralProjector<float>;
+    
     void transfer_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, const TrainingParameter<float> &tp, bool dagger)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC
@@ -485,7 +519,6 @@ namespace quda
 
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-        using matrix_type = SpinMatrix<float>;
         using arg_type = MadwfMlArg<short, matrix_type>;
         size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
         if (tp.get_size() * sizeof(float) != m_size) {
@@ -509,7 +542,6 @@ namespace quda
       
       switch (checkPrecision(out, in)) {
       case QUDA_HALF_PRECISION: {
-        using matrix_type = SpinMatrix<float>;
         using arg_type = MadwfMlArg<short, matrix_type>;
         size_t m_size = in.X(4) * out.X(4) * sizeof(matrix_type);
         if (tp.get_size() * sizeof(float) != m_size) {
