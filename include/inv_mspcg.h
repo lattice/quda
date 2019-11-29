@@ -25,10 +25,12 @@ namespace quda
     DiracMobiusPC *mat;
     DiracMobiusPC *mat_sloppy;
     DiracMobiusPC *mat_precondition;
+    DiracMobiusPC *mat_precondition_truncated;
 
     DiracMdagM *nrm_op;
     DiracMdagM *nrm_op_sloppy;
     DiracMdagMLocal *nrm_op_precondition;
+    DiracMdagMLocal *nrm_op_precondition_truncated;
 
     DiracParam dirac_param;
     DiracParam dirac_param_sloppy;
@@ -113,7 +115,7 @@ namespace quda
 
     void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in);
 
-    void operator()(ColorSpinorField &out, ColorSpinorField &in) { this->mspcg_madwf_ml(out, in, false, false, 0); }
+    void operator()(ColorSpinorField &out, ColorSpinorField &in) { this->mspcg_madwf_ml(out, in, false, false, 4); }
     void mspcg_madwf_ml(ColorSpinorField &out, ColorSpinorField &in, const bool use_training,
                         const bool perform_training, const int Ls_cheap);
 

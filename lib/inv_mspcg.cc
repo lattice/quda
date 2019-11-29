@@ -100,9 +100,11 @@ namespace quda
     mat(nullptr),
     mat_sloppy(nullptr),
     mat_precondition(nullptr),
+    mat_precondition_truncated(nullptr),
     nrm_op(nullptr),
     nrm_op_sloppy(nullptr),
     nrm_op_precondition(nullptr),
+    nrm_op_precondition_truncated(nullptr),
     vct_dr(nullptr),
     vct_dp(nullptr),
     vct_dmmp(nullptr),
@@ -225,6 +227,9 @@ namespace quda
 
   double MSPCG::calculate_chi(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp, double mu, int Ls_cheap)
   {
+    bool global_reduce = commGlobalReduction();
+    if(global_reduce){ commGlobalReductionSet(false); }
+    
     ColorSpinorParam csParam(in);
     cudaColorSpinorField tmp1(csParam);
     cudaColorSpinorField tmp2(csParam);
@@ -237,41 +242,34 @@ namespace quda
     copy(out, in);
     // M * T^ * A * T * phi - phi
     return xmyNorm(tmp2, out);
+  
+    if(global_reduce){ commGlobalReductionSet(true); }
   }
 
   void MSPCG::ATx(ColorSpinorField &out, const ColorSpinorField &in, const Tp &tp)
   {
+    bool global_reduce = commGlobalReduction();
+    if(global_reduce){ commGlobalReductionSet(false); }
 
     int Ls_cheap = out.X(4);
     ColorSpinorParam csParam(in);
     csParam.x[4] = Ls_cheap;
     csParam.create = QUDA_NULL_FIELD_CREATE;
 
-    dirac_param_precondition.Ls = Ls_cheap;
-#if 0    
-    double mobius_alpha = (dirac_param_precondition.b_5[0] + dirac_param_precondition.c_5[0]).real();
-    double new_alpha = mobius_alpha*((double)in.X(4))/((double)Ls_out) ;
-    for(int s = 0; s < Ls_out; s++){
-      dirac_param_precondition.b_5[s] = (new_alpha + 1.0)/2.0;
-      dirac_param_precondition.c_5[s] = (new_alpha - 1.0)/2.0;
-    }
-#endif
-    DiracMobiusPC mat_precondition_truncated(dirac_param_precondition);
     cudaColorSpinorField truncated_cs_field_in(csParam);
     cudaColorSpinorField ip(csParam);
     cudaColorSpinorField immp(csParam);
 
     // T * phi
     madwf_ml::transfer_5d_hh(truncated_cs_field_in, in, tp, false);
+    
     // A * T * phi
-    // mat_precondition_truncated.MdagMLocal(out, truncated_cs_field_in);
-
     blas::zero(out);
     double rk2 = blas::norm2(truncated_cs_field_in);
     double Mpk2, alpha, beta, rkp12;
     blas::copy(ip, truncated_cs_field_in);
     for (int local_loop_count = 0; local_loop_count < inner_iterations; local_loop_count++) {
-      mat_precondition_truncated.MdagMLocal(immp, ip);
+      (*nrm_op_precondition_truncated)(immp, ip);
       Mpk2 = reDotProduct(ip, immp);
       alpha = rk2 / Mpk2;
       rkp12 = axpyNorm(-alpha, immp, truncated_cs_field_in);
@@ -279,12 +277,8 @@ namespace quda
       rk2 = rkp12;
       axpyZpbx(alpha, ip, out, truncated_cs_field_in, beta);
     }
-#if 0    
-    for(int s = 0; s < Ls_out; s++){
-      dirac_param_precondition.b_5[s] = (mobius_alpha + 1.0)/2.0;
-      dirac_param_precondition.c_5[s] = (mobius_alpha - 1.0)/2.0;
-    }
-#endif
+    
+    if(global_reduce){ commGlobalReductionSet(true); }
   }
 
   void fill_random(std::vector<float> &v)
@@ -300,6 +294,7 @@ namespace quda
 
   void MSPCG::train_param(const std::vector<ColorSpinorField *> &in, std::vector<float> &tp, const double mu, int Ls_cheap)
   {
+    commGlobalReductionSet(false);
 
     constexpr int color_spin_dim = 12;
 
@@ -352,7 +347,7 @@ namespace quda
     float b = 0.8;
     printfQuda("beta = %f\n", b);
     printfQuda("training mu   = %f\n", mu);
-    for (int iteration = 0; iteration < 2400; iteration++) {
+    for (int iteration = 0; iteration < 1600; iteration++) {
 
       madwf_ml::TrainingParameter<float> D(tp.size());
       // double dmu = 0.0;
@@ -466,11 +461,23 @@ namespace quda
 
     std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
     char cstring[512];
-    sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
+    // sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls_in, Ls_cheap, mu);
+    sprintf(cstring, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", comm_rank(), Ls_in, Ls_cheap, mu, inner_iterations);
     save_param_path += std::string(cstring);
     FILE *fp = fopen(save_param_path.c_str(), "w");
-    fwrite(tp.data(), sizeof(float), tp.size(), fp);
+    size_t fwrite_count = fwrite(tp.data(), sizeof(float), tp.size(), fp);
+    fclose(fp);
+    if (fwrite_count != tp.size()) {
+      errorQuda("Unable to write training params to %s (%lu neq %lu).\n", save_param_path.c_str(), fwrite_count,
+                tp.size());
+    }
     printfQuda("Training params saved to %s ...\n", save_param_path.c_str());
+    
+    commGlobalReductionSet(true);
+    
+    double dummy_for_sync = 0.0;
+    reduceDouble(dummy_for_sync);
+    
     return;
   }
 
@@ -698,19 +705,28 @@ namespace quda
     constexpr int complex_matrix_size = 16; // spin by spin
     const int Ls = db.X(4);
     int training_param_size = Ls * Ls_cheap * complex_matrix_size * 2;
+    printfQuda("training parameter size = %d %d \n", Ls, Ls_cheap);
     std::vector<float> host_training_param(training_param_size);
     Tp training_param(training_param_size);
+
+    if (use_training || perform_training) {
+      dirac_param_precondition.Ls = Ls_cheap;
+      mat_precondition_truncated = new DiracMobiusPC(dirac_param_precondition);
+      nrm_op_precondition_truncated = new DiracMdagMLocal(mat_precondition_truncated);
+    }
 
     // If we want to use training without performing it we need to load the params from file.
     if (use_training && !perform_training) {
       printfQuda("inference mu   = %f\n", dirac_param_precondition.mu);
       std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
       char cstring[512];
-      sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_cheap, mu);
+      // sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_cheap, mu);
+      sprintf(cstring, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", 0, Ls, Ls_cheap, mu, inner_iterations);
       save_param_path += std::string(cstring);
       FILE *fp = fopen(save_param_path.c_str(), "rb");
       if (!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
       size_t fread_count = fread(host_training_param.data(), sizeof(float), host_training_param.size(), fp);
+      fclose(fp);
       if (fread_count != host_training_param.size()) {
         errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
                   host_training_param.size());
@@ -938,13 +954,15 @@ namespace quda
     double precise_tflops = nrm_op->flops() * 1e-12;
     double sloppy_tflops = nrm_op_sloppy->flops() * 1e-12;
     double preconditioner_tflops = nrm_op_precondition->flops() * 1e-12;
+    double preconditioner_truncated_tflops = nrm_op_precondition_truncated ? nrm_op_precondition_truncated->flops() * 1e-12 : 0 ;
     double linalg_tflops = blas::flops * 1e-12;
 
-    param.gflops = (preconditioner_tflops + sloppy_tflops + precise_tflops + linalg_tflops) * 1e3;
+    param.gflops = (preconditioner_tflops + preconditioner_truncated_tflops + sloppy_tflops + precise_tflops + linalg_tflops) * 1e3;
 
     reduceDouble(precise_tflops);
     reduceDouble(sloppy_tflops);
     reduceDouble(preconditioner_tflops);
+    reduceDouble(preconditioner_truncated_tflops);
     reduceDouble(linalg_tflops);
 
     double prec_time = preconditioner_timer.time;
@@ -969,7 +987,7 @@ namespace quda
                sloppy_tflops / sloppy_timer.time, sloppy_timer.time, int(sloppy_timer.time / param.secs * 100.),
                sloppy_timer.count);
     printfQuda("Performance preconditioner: %8.2f TFLOPS in %8.2f secs(%02d%%) with %05d calls.\n",
-               preconditioner_tflops / prec_time, prec_time, int(prec_time / param.secs * 100.),
+               (preconditioner_tflops + preconditioner_truncated_tflops)/ prec_time, prec_time, int(prec_time / param.secs * 100.),
                preconditioner_timer.count);
     for (int i = 0; i < 2; i++) {
       printfQuda("Performance linear algebra [%d]:             in %8.2f secs(%02d%%) with %05d calls.\n", i,
@@ -987,6 +1005,11 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_FREE);
 
     for (auto p : training_sample) { delete p; }
+
+    if(mat_precondition_truncated){
+      delete mat_precondition_truncated;
+      delete nrm_op_precondition_truncated;
+    }
 
     return;
   }
