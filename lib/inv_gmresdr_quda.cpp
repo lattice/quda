@@ -49,6 +49,13 @@ namespace quda {
       static bool SelectSmall (SortedEvals v1, SortedEvals v2) { return (v1._val < v2._val);}
     };
 
+    //helper for a smart pointer creation
+
+    std::shared_ptr<ColorSpinorField> MakeSharedPtr2(const ColorSpinorParam &param)
+    {
+      if (param.location == QUDA_CPU_FIELD_LOCATION )  return std::move(std::make_shared<cpuColorSpinorField>(param) );
+      else					      return std::move(std::make_shared<cudaColorSpinorField>(param));
+    }
 
     class GMResDRArgs{
 
@@ -67,11 +74,20 @@ namespace quda {
 
        Complex      *c;
 
-       ColorSpinorFieldSet *Vkp1;//high-precision accumulation array
+       std::shared_ptr<ColorSpinorFieldSet> Vkp1;//high-precision accumulation array
 
-       GMResDRArgs(int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)),
+       GMResDRArgs(ColorSpinorField &meta, int m, int nev) : ritzVecs(VectorSet::Zero(m+1,nev+1)), H(DenseMatrix::Zero(m+1,m)),
        eta(Vector::Zero(m)), givensH(MatrixXcd::Zero(m+1, m)), cn( VectorXcd::Zero(m) ), sn( VectorXd::Zero(m) ),
-       m(m), k(nev), restarts(0), Vkp1(nullptr) { c = static_cast<Complex*> (ritzVecs.col(k).data()); }
+       m(m), k(nev), restarts(0), Vkp1(nullptr) {
+         c = static_cast<Complex*> (ritzVecs.col(k).data());
+
+         ColorSpinorParam csParam(meta);
+
+         csParam.composite_dim = (k+1);
+         csParam.setPrecision(QUDA_DOUBLE_PRECISION);
+
+         Vkp1 = MakeSharedPtr2(csParam);
+       }
 
        inline void ResetArgs() {
          ritzVecs.setZero();
@@ -82,9 +98,7 @@ namespace quda {
          sn.setZero();
        }
 
-       ~GMResDRArgs(){
-          if(Vkp1) delete Vkp1;
-       }
+       ~GMResDRArgs(){ }
 
        void Givens(const int j) {
          Complex h0 = H(0, j-1);
@@ -216,64 +230,49 @@ namespace quda {
 
 
  GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), init(false)
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    K(nullptr),
+    Kparam(param),
+    Vm(nullptr),
+    Zm(nullptr),
+    profile(profile),
+    init(false)
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
-     if (param.inv_type_precondition == QUDA_CG_INVERTER)
+     if(param.inv_type_precondition == QUDA_CG_INVERTER){
        K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) 
-       K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_MR_INVERTER)
+     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
        K = new MR(matPrecon, matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_SD_INVERTER)
+     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
        K = new SD(matPrecon, Kparam, profile);
-     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER)
-       K = nullptr;
-     else
-       errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
-
+     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
+       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
+     }
 
      return;
  }
 
- GMResDR::GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), init(false) { }
+ GMResDR::GMResDR(DiracMatrix &mat, Solver &K_, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(param, profile),
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
+    K(&K_),
+    Kparam(param),
+    Vm(nullptr),
+    Zm(nullptr),
+    profile(profile),
+    init(false) { }
 
 
- GMResDR::~GMResDR() {
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if(init)
-    {
-      delete Vm;
-      Vm = nullptr;
-
-      delete r_sloppy;
-
-      if(K && (param.precision_precondition != param.precision_sloppy))
-      {
-        delete r_pre;
-        delete p_pre;
-      }
-
-      if(K) {
-        delete Zm;
-        delete K;
-      }
-
-      delete tmpp;
-      delete yp;
-      delete rp;
-    }
-
-   profile.TPSTOP(QUDA_PROFILE_FREE);
- }
+ GMResDR::~GMResDR() { if(K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;}
 
 
- void GMResDR::UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels)
+ void GMResDR::UpdateSolution(ColorSpinorField &x, ColorSpinorField &r, bool do_gels)
  {
    GMResDRArgs &args = *gmresdr_args;
 
@@ -283,7 +282,7 @@ namespace quda {
    std::vector<ColorSpinorField*> vm((*Vm)());
 
    std::vector<ColorSpinorField*> x_, r_;
-   x_.push_back(x), r_.push_back(r);
+   x_.push_back(&x), r_.push_back(&r);
 
    blas::caxpy( static_cast<Complex*> ( args.eta.data()), zm, x_);
 
@@ -472,46 +471,45 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     const double tol_threshold     = 1.2;
     const double det_max_deviation = 0.4;
 
-    ColorSpinorField *ep = nullptr;
+    std::shared_ptr<ColorSpinorField> ep = nullptr;
 
     if (!init) {
 
-      gmresdr_args = std::make_unique< GMResDRArgs> (param.m, param.nev);
-
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
-      rp = ColorSpinorField::Create(csParam);
-      yp = ColorSpinorField::Create(csParam);
-      ep = ColorSpinorField::Create(csParam);
+      rp = MakeSharedPtr2(csParam);
+      yp = MakeSharedPtr2(csParam);
+      ep = MakeSharedPtr2(csParam);
 
       csParam.setPrecision(param.precision_sloppy);
 
-      tmpp     = ColorSpinorField::Create(csParam);
-      r_sloppy = ColorSpinorField::Create(csParam);
+      tmpp     = MakeSharedPtr2(csParam);
+      r_sloppy = MakeSharedPtr2(csParam);
 
       if ( K && (param.precision_precondition != param.precision_sloppy) ) {
 
         csParam.setPrecision(param.precision_precondition);
-        p_pre = ColorSpinorField::Create(csParam);
-        r_pre = ColorSpinorField::Create(csParam);
+        p_pre = MakeSharedPtr2(csParam);
+        r_pre = MakeSharedPtr2(csParam);
 
       }
 
       csParam.setPrecision(param.precision_sloppy);
       csParam.is_composite  = true;
-      csParam.composite_dim = param.m+1;
+      csParam.composite_dim = param.eig_param.nKr+1;
 
-      Vm   = ColorSpinorFieldSet::Create(csParam);
+      Vm   = MakeSharedPtr2(csParam);
 
-      csParam.composite_dim = param.m;
+      csParam.composite_dim = param.eig_param.nKr;
 
-      Zm = K ? ColorSpinorFieldSet::Create(csParam) : Vm;
+      Zm = K ? MakeSharedPtr2(csParam) : Vm;
 
 
-      csParam.composite_dim = (param.nev+1);
+      csParam.composite_dim = (param.eig_param.nEv+1);
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-      gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
+      gmresdr_args = std::make_unique< GMResDRArgs> (*Vm, param.eig_param.nKr, param.eig_param.nEv);
+      //gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
       init = true;
     }
@@ -562,12 +560,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     int restart_idx = 0, j = 0, check_interval = 4;
 
-    DenseMatrix Gm = DenseMatrix::Zero(args.k+1, args.k+1);
+    DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.nEv+1, param.eig_param.nEv+1);
 
-    while(restart_idx < param.deflation_grid && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
+    while(restart_idx < param.eig_param.max_restarts && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
     {
       tot_iters += FlexArnoldiProcedure(j, (j == 0));
-      UpdateSolution(&e, r_sloppy, !(j == 0));
+      UpdateSolution(e, rSloppy, !(j == 0));
 
       r2 = norm2(rSloppy);
 
@@ -579,11 +577,11 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
         ext_r2 = xmyNorm(r, y);
 
 	// can this be done as a single 2-d reduction?
-        for(int l = 0; l < args.k+1; l++) {
+        for(int l = 0; l < param.eig_param.nEv+1; l++) {
 
           Complex *col = Gm.col(l).data();
 
-	  std::vector<ColorSpinorField*> v1_(Vm->Components().begin(), Vm->Components().begin()+args.k+1);
+	  std::vector<ColorSpinorField*> v1_(Vm->Components().begin(), Vm->Components().begin()+param.eig_param.nEv+1);
 	  std::vector<ColorSpinorField*> v2_;
 	  v2_.push_back(static_cast<ColorSpinorField*>(&Vm->Component(l)));
 
@@ -601,7 +599,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 	do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
       }
 
-      if( ((restart_idx != param.deflation_grid-1) && !do_clean_restart) ) {
+      if( ((restart_idx != param.eig_param.max_restarts-1) && !do_clean_restart) ) {
 
 	RestartVZH();
 	j = args.k;
@@ -651,10 +649,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
    param.rhs_idx += 1;
 
-   //to avoid a (misleading) postrun report about non-deallocated resources 
+   //to avoid a (misleading) postrun report about non-deallocated resources
    gmresdr_args.reset(nullptr);
 
-   if(ep) delete ep;
    return;
  }
 

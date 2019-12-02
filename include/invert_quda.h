@@ -1361,15 +1361,15 @@ public:
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
 
-    ColorSpinorFieldSet *Vm;//arnoldi basis vectors, size (m+1)
-    ColorSpinorFieldSet *Zm;//arnoldi basis vectors, size (m+1)
+    std::shared_ptr<ColorSpinorFieldSet> Vm;//arnoldi basis vectors, size (m+1)
+    std::shared_ptr<ColorSpinorFieldSet> Zm;//arnoldi basis vectors, size (m+1)
 
-    ColorSpinorField *rp;       //! residual vector
-    ColorSpinorField *yp;       //! high precision accumulator
-    ColorSpinorField *tmpp;     //! temporary for mat-vec
-    ColorSpinorField *r_sloppy; //! sloppy residual vector
-    ColorSpinorField *r_pre;    //! residual passed to preconditioner
-    ColorSpinorField *p_pre;    //! preconditioner result
+    std::shared_ptr<ColorSpinorField> rp;       //! residual vector
+    std::shared_ptr<ColorSpinorField> yp;       //! high precision accumulator
+    std::shared_ptr<ColorSpinorField> tmpp;     //! temporary for mat-vec
+    std::shared_ptr<ColorSpinorField> r_sloppy; //! sloppy residual vector
+    std::shared_ptr<ColorSpinorField> r_pre;    //! residual passed to preconditioner
+    std::shared_ptr<ColorSpinorField> p_pre;    //! preconditioner result
 
     TimeProfile &profile;    //time profile for initCG solver
 
@@ -1392,7 +1392,7 @@ public:
 
     void RestartVZH();
 
-    void UpdateSolution(ColorSpinorField *x, ColorSpinorField *r, bool do_gels);
+    void UpdateSolution(ColorSpinorField &x, ColorSpinorField &r, bool do_gels);
 
   };
 

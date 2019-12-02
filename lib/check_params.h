@@ -165,8 +165,6 @@ void printQudaEigParam(QudaEigParam *param) {
   P(check_interval, 0);
   P(max_restarts, 0);
   P(arpack_check, QUDA_BOOLEAN_NO);
-  P(nk, 0);
-  P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
   P(extlib_type, QUDA_EIGEN_EXTLIB);
   P(mem_type_ritz, QUDA_MEMORY_DEVICE);
@@ -190,8 +188,6 @@ void printQudaEigParam(QudaEigParam *param) {
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(arpack_check, QUDA_BOOLEAN_INVALID);
-  P(nk, INVALID_INT);
-  P(np, INVALID_INT);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
@@ -491,7 +487,7 @@ void printQudaInvertParam(QudaInvertParam *param) {
 #if defined(INIT_PARAM)
   P(eig_param, 0);
 #elif defined(CHECK_PARAM)
-  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER && param->inv_type != QUDA_GMRESDR_INVERTER) {
     errorQuda("At present cannot combine deflation with Schwarz preconditioner");
   }
 #endif

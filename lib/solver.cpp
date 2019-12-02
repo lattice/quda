@@ -1,7 +1,6 @@
 #include <quda_internal.h>
 #include <invert_quda.h>
 #include <multigrid.h>
-#include <deflation.h>
 #include <eigensolve_quda.h>
 #include <cmath>
 

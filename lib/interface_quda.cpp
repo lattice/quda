@@ -30,8 +30,6 @@
 
 #include <multigrid.h>
 
-#include <deflation.h>
-
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
@@ -2609,28 +2607,24 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profilerStop(__func__);
 }
 
-deflated_solver::deflated_solver(QudaInvertParam &param, TimeProfile &profile)
-  : RV(0), deflParam(nullptr), defl(nullptr),  profile(profile) {
+void* newDeflationQuda(QudaInvertParam *inv_param) {
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
 
-  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
+  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
 
-  if (param.inv_type != QUDA_EIGCG_INVERTER && param.inv_type != QUDA_INC_EIGCG_INVERTER) return;
+  auto *defl= new deflation_space();
 
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  const bool pc_solve = (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
-  cudaGaugeField *cudaGauge = checkGauge(&param);
-  eig_param_p->secs   = 0;
-  eig_param_p->gflops = 0;
+  cudaGaugeField *cudaGauge = checkGauge(inv_param);
 
-  const bool pc_solve = (param.solve_type == QUDA_NORMOP_PC_SOLVE);
-
-  ColorSpinorParam ritzParam(nullptr, param, cudaGauge->X(), pc_solve, eig_param_p->location);
+  ColorSpinorParam ritzParam(nullptr, *inv_param, cudaGauge->X(), pc_solve, eig_param_p->location);
 
   ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
-  ritzParam.setPrecision(param.cuda_prec_ritz);
+  ritzParam.setPrecision(inv_param->cuda_prec_ritz);
 
   if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
-    ritzParam.setPrecision(param.cuda_prec_ritz, param.cuda_prec_ritz, true); // set native field order
+    ritzParam.setPrecision(inv_param->cuda_prec_ritz, inv_param->cuda_prec_ritz, true); // set native field order
     if (ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
 
     //select memory location here, by default ritz vectors will be allocated on the device
@@ -2640,19 +2634,7 @@ deflated_solver::deflated_solver(QudaInvertParam &param, TimeProfile &profile)
     ritzParam.mem_type = QUDA_MEMORY_PINNED;
   }
 
-  for (int i = 0; i < (param.nev*param.deflation_grid); i++) { RV.push_back(ColorSpinorField::Create(ritzParam)); }
-
-  deflParam = new DeflationParam(*eig_param_p, RV);
-
-  defl = new Deflation(*deflParam, profile);
-
-  profile.TPSTOP(QUDA_PROFILE_INIT);
-}
-
-void* newDeflationQuda(QudaInvertParam *inv_param) {
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
-  auto *defl = new deflated_solver(*inv_param, profileInvert);
+  for (int i = 0; i < (inv_param->nev*inv_param->deflation_grid); i++) { defl->evecs.push_back(ColorSpinorField::Create(ritzParam)); }
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -2666,10 +2648,11 @@ void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
 
   QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
 
-  auto *defl_p = static_cast<deflated_solver*>(df);
-  Deflation &defl = *(defl_p->defl);
+  //auto *defl_p = static_cast<deflated_solver*>(df);
+  //Deflation &defl = *(defl_p->defl);
 
-  eig_param_p->is_complete = defl.is_complete() ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  //eig_param_p->is_complete = defl.is_complete() ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param_p->is_complete = QUDA_BOOLEAN_NO;
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -2679,8 +2662,12 @@ void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
   return;
 }
 
-void destroyDeflationQuda(void *df) {
-  delete static_cast<deflated_solver*>(df);
+void destroyDeflationQuda(void *ds) {
+
+  auto ds_p = static_cast<deflation_space*>(ds);
+  for (auto p : ds_p->evecs) {delete p; }
+
+  delete ds_p;
 }
 
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)

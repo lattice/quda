@@ -456,9 +456,6 @@ extern "C" {
 
     // EIG-CG PARAMS
     //-------------------------------------------------
-    int nk;
-    int np;
-
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;
 
