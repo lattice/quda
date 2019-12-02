@@ -257,9 +257,14 @@ extern "C" {
   bool comm_gdr_enabled();
 
   /**
-     @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+     @brief Query if NVSHMEM communication is enabled (global setting)
   */
-  bool comm_gdr_blacklist();
+  bool comm_nvshmem_enabled();
+
+   /**
+       @brief Query if GPU Direct RDMA communication is blacklisted for this GPU
+   */
+   bool comm_gdr_blacklist();
 
   /**
      Create a persistent message handler for a relative send

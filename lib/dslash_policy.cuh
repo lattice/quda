@@ -385,6 +385,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -571,6 +572,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -659,6 +661,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
@@ -741,6 +744,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
@@ -816,6 +820,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -898,6 +903,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -990,6 +996,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -1107,6 +1114,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // Record the start of the dslash if doing communication in T and not kernel packing
       if (dslashParam.commDim[3] && !getKernelPackT()) {
@@ -1215,6 +1223,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1316,6 +1325,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1410,6 +1420,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1500,6 +1511,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1584,6 +1596,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1674,6 +1687,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1760,6 +1774,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1853,6 +1868,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -1935,6 +1951,7 @@ namespace quda
       auto &dslashParam = dslash.dslashParam;
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
+      dslashParam.shmem = 0;
 
       PROFILE(if (dslash_interior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
 
@@ -2136,6 +2153,17 @@ public:
               errorQuda("Cannot select a GDR policy %d unless QUDA_ENABLE_GDR is set", static_cast<int>(dslash_policy));
             }
 
+#ifndef NVSHMEM_COMMS
+            // check valid policy for nvshmem
+            if (dslash_policy == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM
+                 || dslash_policy == QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM_STREAM
+                 || dslash_policy == QudaDslashPolicy::QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM
+                 || dslash_policy == QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM ) {
+              errorQuda("Cannot select a NVSHMEM policy %d when QUDA is not build with QUDA_NVSHMEM enabled.", static_cast<int>(dslash_policy));
+            }
+
+#endif
+
             enable_policy(static_cast<QudaDslashPolicy>(policy_));
             first_active_policy = policy_ < first_active_policy ? policy_ : first_active_policy;
             if (policy_list.peek() == ',') policy_list.ignore();
@@ -2185,8 +2213,14 @@ public:
 	   enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_ASYNC);
 	 }
 #endif
-        }
 
+          if (comm_nvshmem_enabled()) {
+            enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM);
+            enable_policy(QudaDslashPolicy::QUDA_FUSED_DSLASH_SHMEM_STREAM);
+            enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_P2PPACK_FUSED_HALO_SHMEM);
+            enable_policy(QudaDslashPolicy::QUDA_DSLASH_FUSED_PACK_FUSED_HALO_SHMEM);
+          }
+        }
         // construct string specifying which policies have been enabled
         for (int i = 0; i < (int)QudaDslashPolicy::QUDA_DSLASH_POLICY_DISABLED; i++) {
           strcat(policy_string, (int)policies[i] == i ? "1" : "0");

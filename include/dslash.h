@@ -41,6 +41,7 @@ namespace quda
     char aux_base[TuneKey::aux_n];
     char aux[8][TuneKey::aux_n];
     char aux_pack[TuneKey::aux_n];
+    char aux_barrier[TuneKey::aux_n];
 
     // pointers to ghost buffers we are packing to
     void *packBuffer[4 * QUDA_MAX_DIM];
@@ -141,7 +142,7 @@ namespace quda
       if (arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL) {
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += arg.commDim[d];
-        arg.blocks_per_dir == static_cast<int>(tp.grid.x / (2 * nDimComms));
+        // arg.blocks_per_dir == static_cast<int>(tp.grid.x / (2 * nDimComms));
         arg.counter = (activeTuning() && !policyTuning()) ? -1 : dslash::synccounter;
       }
     }
@@ -352,6 +353,9 @@ namespace quda
 #endif // MULTI_GPU
       fillAux(KERNEL_POLICY, "policy");
 
+      strcpy(aux_barrier, aux[EXTERIOR_KERNEL_ALL]);
+      strcat(aux_barrier, ",shmem");
+
       // extract the filename from the template template class (do
       // this regardless of jitify to ensure a build error if filename
       // helper isn't defined)
@@ -420,7 +424,8 @@ namespace quda
 
     virtual TuneKey tuneKey() const
     {
-      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack : aux[arg.kernel_type];
+      auto aux_ = (arg.pack_blocks > 0 && arg.kernel_type == INTERIOR_KERNEL) ? aux_pack :
+        ((arg.shmem > 0 && arg.kernel_type == EXTERIOR_KERNEL_ALL)  ? aux_barrier : aux[arg.kernel_type]);
       return TuneKey(in.VolString(), typeid(*this).name(), aux_);
     }
 

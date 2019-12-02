@@ -343,7 +343,7 @@ namespace quda
       int local_tid = local_block_idx * blockDim.x + threadIdx.x;
 
       // for shmem
-      const int shmem = arg.shmem;
+      // const int shmem = arg.shmem;
       const int shmemidx = 2 * dim + dir;
       const bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
       // constexpr int shmem = shmem_;
@@ -410,7 +410,7 @@ namespace quda
             // send data over IB if necessary
             if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
             // shmem barrier part I
-            if (shmem & 8) {
+            if (arg.shmem & 8) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
                 nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                getNeighborRank(2 * dim + dir, arg));
@@ -428,7 +428,7 @@ namespace quda
 
         if (threadIdx.x == 0) {
           if (amLast) {
-            if (shmem & 8) {
+            if (arg.shmem & 8) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
                 nvshmem_long_p((long *)arg.sync_arr + 2 * dim + (1 - dir), arg.counter,
                                getNeighborRank(2 * dim + dir, arg));
@@ -580,6 +580,7 @@ namespace quda
     }
 
 #ifdef NVSHMEM_COMMS
+if(arg.shmem){
       // MWTO -> clean up and merge with non-staggered version
       bool amLast = false;
       if (!intranode && pack_internode) {
@@ -626,6 +627,7 @@ namespace quda
           }
         }
       }
+}
 #endif
     }
   };
