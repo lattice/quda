@@ -458,7 +458,7 @@ macro(HIP_PREPARE_TARGET_COMMANDS _target _format _generated_files _source_files
         get_source_file_property(_is_header ${file} HEADER_FILE_ONLY)
         # Allow per source file overrides of the format. Also allows compiling non .cu files.
         get_source_file_property(_hip_source_format ${file} HIP_SOURCE_PROPERTY_FORMAT)
-        if((${file} MATCHES "\\.cu$" OR _hip_source_format) AND NOT _is_header)
+        if((${file} MATCHES "\\.cu_ignore$" OR _hip_source_format) AND NOT _is_header)
             set(host_flag FALSE)
         else()
             set(host_flag TRUE)
