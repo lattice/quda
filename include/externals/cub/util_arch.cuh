@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -43,8 +43,8 @@ namespace cub {
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS    // Do not document
 
-#if (__CUDACC_VER_MAJOR__ >= 9)
-#define CUB_USE_COOPERATIVE_GROUPS
+#if (__CUDACC_VER_MAJOR__ >= 9) && !defined(CUB_USE_COOPERATIVE_GROUPS)
+    #define CUB_USE_COOPERATIVE_GROUPS
 #endif
 
 /// CUB_PTX_ARCH reflects the PTX version targeted by the active compiler pass (or zero during the host pass).
@@ -116,26 +116,33 @@ namespace cub {
 #endif
 
 
-/// Scale down the number of warps to keep same amount of "tile" storage as the nominal configuration for 4B data.  Minimum of two warps.
-#define CUB_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH)                        \
-    (CUB_MIN(                                                                           \
-        NOMINAL_4B_BLOCK_THREADS * 2,                                                   \
-    	CUB_WARP_THREADS(PTX_ARCH) * CUB_MAX(                                           \
-    		(NOMINAL_4B_BLOCK_THREADS / CUB_WARP_THREADS(PTX_ARCH)) * 3 / 4,            \
-            (NOMINAL_4B_BLOCK_THREADS / CUB_WARP_THREADS(PTX_ARCH)) * 4 / sizeof(T))))
+/// Scale down the number of threads to keep same amount of scratch storage as the nominal configuration for 4B data.  Minimum of two warps.
+#ifndef CUB_SCALED_BLOCK_THREADS
+    #define CUB_SCALED_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH)                   \
+        (CUB_MIN(                                                                           \
+            NOMINAL_4B_BLOCK_THREADS,                                                       \
+            CUB_WARP_THREADS(PTX_ARCH) * CUB_MAX(                                           \
+                2,                                                                          \
+                (NOMINAL_4B_BLOCK_THREADS / CUB_WARP_THREADS(PTX_ARCH)) * 4 / sizeof(T))))
+#endif
 
-/// Scale up/down number of items per thread to keep the same amount of "tile" storage as the nominal configuration for 4B data.  Minimum 1 item per thread
-#define CUB_ITEMS_PER_THREAD(NOMINAL_4B_ITEMS_PER_THREAD, NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH)    \
-	(CUB_MIN(                                                                           \
-        NOMINAL_4B_ITEMS_PER_THREAD * 2,                                                \
-		CUB_MAX(                                                                        \
-		    1,                                                                          \
-            (NOMINAL_4B_ITEMS_PER_THREAD * NOMINAL_4B_BLOCK_THREADS * 4 / sizeof(T)) / CUB_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH))))
+/// Scale down number of items per thread to keep the same amount of register storage as the nominal configuration for 4B data.  Minimum 1 item per thread
+#ifndef CUB_SCALED_ITEMS_PER_THREAD
+    #define CUB_SCALED_ITEMS_PER_THREAD(NOMINAL_4B_ITEMS_PER_THREAD, NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH)     \
+        CUB_MAX(                                                                                                \
+            1,                                                                                                  \
+            (sizeof(T) < 4) ?                                                                                   \
+                ((NOMINAL_4B_ITEMS_PER_THREAD * NOMINAL_4B_BLOCK_THREADS * 4) / CUB_MAX(4, sizeof(T))) / CUB_SCALED_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH) / 2 :  \
+                ((NOMINAL_4B_ITEMS_PER_THREAD * NOMINAL_4B_BLOCK_THREADS * 4) / CUB_MAX(4, sizeof(T))) / CUB_SCALED_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, PTX_ARCH))
+#endif
 
+/// Define both nominal threads-per-block and items-per-thread
+#ifndef CUB_SCALED_GRANULARITIES
+    #define CUB_SCALED_GRANULARITIES(NOMINAL_4B_BLOCK_THREADS, NOMINAL_4B_ITEMS_PER_THREAD, T)      \
+        CUB_SCALED_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, 200),                                   \
+        CUB_SCALED_ITEMS_PER_THREAD(NOMINAL_4B_ITEMS_PER_THREAD, NOMINAL_4B_BLOCK_THREADS, T, 200)
+#endif
 
-#define CUB_NOMINAL_CONFIG(NOMINAL_4B_BLOCK_THREADS, NOMINAL_4B_ITEMS_PER_THREAD, T)            \
-		CUB_BLOCK_THREADS(NOMINAL_4B_BLOCK_THREADS, T, 200),                            \
-		CUB_ITEMS_PER_THREAD(NOMINAL_4B_ITEMS_PER_THREAD, NOMINAL_4B_BLOCK_THREADS, T, 200)
 
 
 #endif  // Do not document
