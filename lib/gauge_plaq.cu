@@ -30,7 +30,10 @@ namespace quda {
     void apply(const hipStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION){
 	for (int i=0; i<2; i++) ((double*)arg.result_h)[i] = 0.0;
-	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        int maxThreadsPerBlock_tmp=deviceProp.maxThreadsPerBlock;
+        deviceProp.maxThreadsPerBlock=128;
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        deviceProp.maxThreadsPerBlock=maxThreadsPerBlock_tmp;
 #ifdef JITIFY
         using namespace jitify::reflection;
         jitify_error = program->kernel("quda::computePlaq")
