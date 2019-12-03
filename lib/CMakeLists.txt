@@ -132,7 +132,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
                                 $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
-# some clang warnings shouds be warning even when turning warnings into errors
+# some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp
                          PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
