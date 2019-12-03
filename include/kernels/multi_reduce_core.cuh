@@ -14,6 +14,10 @@ namespace quda
   namespace blas
   {
 
+    __global__ void set_AmatixR(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Amatrix_d[idx]=ref[idx];}
+    __global__ void set_BmatixR(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Bmatrix_d[idx]=ref[idx];}
+    __global__ void set_CmatixR(signed char *ref) {int idx = blockIdx.x * blockDim.x + threadIdx.x;if(idx>=MAX_MATRIX_SIZE)return;Cmatrix_d[idx]=ref[idx];}
+
     /**
        @brief Parameter struct for generic multi-blas kernel.
        @tparam NXZ is dimension of input vectors: X,Z,V

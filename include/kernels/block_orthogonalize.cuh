@@ -233,7 +233,7 @@ namespace quda {
 
   template <int block_size, typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin,
             int nVec, typename Arg>
-  __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg &arg)
+  __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
   {
 
     int x_coarse = blockIdx.x;

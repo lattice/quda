@@ -171,16 +171,18 @@ namespace quda {
 
         tp.block.x *= tp.aux.x; // include warp-split factor
 
-	typedef MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> Arg;
-	Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+//        typedef MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> Arg;
+//        Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+
 
         switch (tp.aux.x) {
-        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
-        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
-	hipDeviceSynchronize();hipFree(arg_d);
+
+//        hipDeviceSynchronize();hipFree(arg_d);
 
         tp.block.x /= tp.aux.x; // restore block size
 #endif
