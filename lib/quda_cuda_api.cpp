@@ -192,7 +192,7 @@ namespace quda {
     default:
       errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
-    printfQuda("driver_api is not supported in hipMemcpy2DAsync\n");
+//    printfQuda("driver_api is not supported in hipMemcpy2DAsync\n");
     PROFILE(hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);    
 #else
     PROFILE(hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
