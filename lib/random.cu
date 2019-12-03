@@ -79,8 +79,7 @@ namespace quda {
     dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
     rngArg arg(X);
     nblocks.y = n_parity;
-    printfQuda("kernel_random is skipped as hiprand_init will crash\n");
-//    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
+    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
     qudaDeviceSynchronize();
   }
 
