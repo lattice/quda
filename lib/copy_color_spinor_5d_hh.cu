@@ -113,7 +113,11 @@ namespace quda
     __device__ __host__ inline WilsonVector<real> matrix_vector_multiply(const ChiralProjector<real> &m,
                                                                          const WilsonVector<real> &v)
     {
-      return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
+      if(dagger){
+        return conj(m[0]) * v.project(4, +1).reconstruct(4, +1) + conj(m[1]) * v.project(4, -1).reconstruct(4, -1);
+      }else{
+        return m[0] * v.project(4, +1).reconstruct(4, +1) + m[1] * v.project(4, -1).reconstruct(4, -1);
+      }
     }
     
     constexpr int warp_size = 32;
@@ -204,9 +208,9 @@ namespace quda
       complex<real> *p = reinterpret_cast<complex<real> *>(mp);
 
 #pragma unroll
-      for (int pm = 0; pm < 1; pm++){
+      for (int pm = 0; pm < 2; pm++){
         complex<real> z = 0;
-        WilsonVector<real> projected_w = w.project(4, pm ? -1 : +1).reconstruct(4, pm ? -1 : +1);
+        WilsonVector<real> projected_w = w.project(4, 1-2*pm).reconstruct(4, 1-2*pm);
 #pragma unroll
         for (int spin = 0; spin < spin_dim; spin++) {
 #pragma unroll
@@ -509,9 +513,14 @@ namespace quda
     };
 
 #endif
-    
+
+// The following macro choose the structure of the transfer matrix.
+#if 1
+    using matrix_type = SpinMatrix<float>;
+#else    
     using matrix_type = ChiralProjector<float>;
-    
+#endif
+
     void transfer_5d_hh(ColorSpinorField &out, const ColorSpinorField &in, const TrainingParameter<float> &tp, bool dagger)
     {
 #ifdef GPU_DOMAIN_WALL_DIRAC

@@ -24,6 +24,7 @@
 #include <random>
 #include <deque>
 #include <polynomial.h>
+#include <unordered_map>
 
 extern quda::cudaGaugeField *gaugePrecondition;
 extern quda::cudaGaugeField *gaugePrecise;
@@ -299,11 +300,7 @@ namespace quda
     constexpr int color_spin_dim = 12;
 
     int Ls_in = in[0]->X(4);
-#if 1
-    size_t param_size = Ls_in * Ls_cheap * 16 * 2;
-
-    if (tp.size() != param_size) { errorQuda("wrong param size.\n"); }
-#endif
+    
     ColorSpinorParam csParam(*in[0]);
     cudaColorSpinorField chi(csParam);
     cudaColorSpinorField tmp(csParam);
@@ -345,8 +342,8 @@ namespace quda
     // double old_chi2 = 0.0;
     float alpha;
     float b = 0.8;
-    printfQuda("beta = %f\n", b);
-    printfQuda("training mu   = %f\n", mu);
+    printfQuda("beta          = %.3f\n", b);
+    printfQuda("training mu   = %.3f\n", mu);
     for (int iteration = 0; iteration < 1600; iteration++) {
 
       madwf_ml::TrainingParameter<float> D(tp.size());
@@ -687,6 +684,8 @@ namespace quda
                              const bool perform_training, const int Ls_cheap)
   {
 
+    static std::unordered_map<std::string, std::vector<float>> host_training_param_cache; // empty map
+    
     const char fname[] = "MSPCG::operator()(ColorSpinorField&, ColorSpinorField&)";
     const char cname[] = __FILE__;
 
@@ -702,10 +701,14 @@ namespace quda
     bool trained = false;
     std::vector<ColorSpinorField *> training_sample(0);
 
+#if 1
     constexpr int complex_matrix_size = 16; // spin by spin
+#else
+    constexpr int complex_matrix_size = 2; // chiral
+#endif    
+
     const int Ls = db.X(4);
     int training_param_size = Ls * Ls_cheap * complex_matrix_size * 2;
-    printfQuda("training parameter size = %d %d \n", Ls, Ls_cheap);
     std::vector<float> host_training_param(training_param_size);
     Tp training_param(training_param_size);
 
@@ -717,21 +720,30 @@ namespace quda
 
     // If we want to use training without performing it we need to load the params from file.
     if (use_training && !perform_training) {
-      printfQuda("inference mu   = %f\n", dirac_param_precondition.mu);
-      std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
-      char cstring[512];
+      printfQuda("inference mu   = %.3f\n", dirac_param_precondition.mu);
+      char param_file_name[512];
       // sprintf(cstring, "/training_param_rank_%03d_ls_%02d_%02d_mu_%.3f.dat", comm_rank(), Ls, Ls_cheap, mu);
-      sprintf(cstring, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", 0, Ls, Ls_cheap, mu, inner_iterations);
-      save_param_path += std::string(cstring);
-      FILE *fp = fopen(save_param_path.c_str(), "rb");
-      if (!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
-      size_t fread_count = fread(host_training_param.data(), sizeof(float), host_training_param.size(), fp);
-      fclose(fp);
-      if (fread_count != host_training_param.size()) {
-        errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
-                  host_training_param.size());
+      sprintf(param_file_name, "/training_param_rank_%05d_ls_%02d_%02d_mu_%.3f_it_%02d.dat", 0, Ls, Ls_cheap, mu, inner_iterations);
+      std::string param_file_name_str(param_file_name);
+      auto search_cache = host_training_param_cache.find(param_file_name_str);
+      if(search_cache != host_training_param_cache.end()){
+        printfQuda("Training params loaded from CACHE.\n");
+        host_training_param = search_cache->second;
+      }else{
+        // the parameter is not in cache: load from file system.
+        std::string save_param_path(getenv("QUDA_RESOURCE_PATH"));
+        save_param_path += param_file_name_str;
+        FILE *fp = fopen(save_param_path.c_str(), "rb");
+        if (!fp) errorQuda("Unable to open file %s\n", save_param_path.c_str());
+        size_t fread_count = fread(host_training_param.data(), sizeof(float), host_training_param.size(), fp);
+        fclose(fp);
+        if (fread_count != host_training_param.size()) {
+          errorQuda("Unable to load training params from %s (%lu neq %lu).\n", save_param_path.c_str(), fread_count,
+                    host_training_param.size());
+        }
+        host_training_param_cache.insert({param_file_name_str, host_training_param});
+        printfQuda("Training params loaded from FILE %s.\n", save_param_path.c_str());
       }
-      printfQuda("Training params loaded from %s.\n", save_param_path.c_str());
       training_param.from_host(host_training_param);
       trained = true;
     }
