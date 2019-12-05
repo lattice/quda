@@ -222,15 +222,10 @@ namespace quda {
     /**< The precision of the Ritz vectors */
     QudaPrecision precision_ritz;//also search space precision
 
-    int nev;//number of eigenvectors produced by EigCG
-    int m;//Dimension of the search space
-    int deflation_grid;
     int rhs_idx;
 
-    int     eigcg_max_restarts;
     int     max_restart_num;
     double  inc_tol;
-    double  eigenval_tol;
 
     QudaVerbosity verbosity_precondition; //! verbosity to use for preconditioner
 
@@ -313,14 +308,9 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.cuda_prec_ritz),
-      nev(param.nev),
-      m(param.max_search_dim),
-      deflation_grid(param.deflation_grid),
       rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts),
       max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol),
-      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(false),
       global_reduction(true),
@@ -392,14 +382,9 @@ namespace quda {
       secs(param.secs),
       gflops(param.gflops),
       precision_ritz(param.precision_ritz),
-      nev(param.nev),
-      m(param.m),
-      deflation_grid(param.deflation_grid),
       rhs_idx(0),
-      eigcg_max_restarts(param.eigcg_max_restarts),
       max_restart_num(param.max_restart_num),
       inc_tol(param.inc_tol),
-      eigenval_tol(param.eigenval_tol),
       verbosity_precondition(param.verbosity_precondition),
       is_preconditioner(param.is_preconditioner),
       global_reduction(param.global_reduction),
@@ -412,10 +397,6 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if((param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_EIGCG_INVERTER) && m % 16){//current hack for the magma library
-        m = (m / 16) * 16 + 16;
-        warningQuda("\nSwitched eigenvector search dimension to %d\n", m);
-      }
       if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
@@ -1360,6 +1341,11 @@ public:
 
     Solver *K;
     SolverParam Kparam; // parameters for preconditioner solve
+
+    /**
+       The size of the Krylov space that (F)GMRES(DR) uses.
+     */
+    int nKrylov;    
 
     std::shared_ptr<ColorSpinorFieldSet> Vm;//arnoldi basis vectors, size (m+1)
     std::shared_ptr<ColorSpinorFieldSet> Zm;//arnoldi basis vectors, size (m+1)

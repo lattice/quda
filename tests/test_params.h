@@ -256,15 +256,10 @@ extern quda::mgarray<QudaSchwarzType> schwarz_type;
 extern quda::mgarray<int> schwarz_cycle;
 
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
-extern int nev;
-extern int max_search_dim;
-extern int deflation_grid;
-extern double tol_restart;
 
-extern int eigcg_max_restarts;
 extern int max_restart_num;
 extern double inc_tol;
-extern double eigenval_tol;
+extern double tol_restart;
 
 extern QudaExtLibType solver_ext_lib;
 extern QudaExtLibType deflation_ext_lib;

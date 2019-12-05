@@ -323,22 +323,9 @@ extern "C" {
     /**Parameters for deflated solvers*/
     /** The precision of the Ritz vectors */
     QudaPrecision cuda_prec_ritz;
-    /** How many vectors to compute after one solve
-     *  for eigCG recommended values 8 or 16
-    */
-    int nev;
-    /** EeigCG  : Search space dimension
-     *  gmresdr : Krylov subspace dimension
-    */
-    int max_search_dim;
     /** For systems with many RHS: current RHS index */
     int rhs_idx;
     /** Specifies deflation space volume: total number of eigenvectors is nev*deflation_grid */
-    int deflation_grid;
-    /** eigCG: selection criterion for the reduced eigenvector set */
-    double eigenval_tol;
-    /** mixed precision eigCG tuning parameter:  minimum search vector space restarts */
-    int eigcg_max_restarts;
     /** initCG tuning parameter:  maximum restarts */
     int max_restart_num;
     /** initCG tuning parameter:  tolerance for cg refinement corrections in the deflation stage */
@@ -452,9 +439,6 @@ extern "C" {
     /** Name of the QUDA logfile (residua, upper Hessenberg/tridiag matrix updates) **/
     char QUDA_logfile[512];
 
-    //-------------------------------------------------
-
-    // EIG-CG PARAMS
     //-------------------------------------------------
     /** Whether to load eigenvectors */
     QudaBoolean import_vectors;

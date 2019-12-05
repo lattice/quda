@@ -175,15 +175,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.rhs_idx  = 0;
 
-  inv_param.nev = nev;
-  inv_param.max_search_dim = max_search_dim;
-  inv_param.deflation_grid = deflation_grid;
   inv_param.tol_restart = tol_restart;
-  inv_param.eigcg_max_restarts = eigcg_max_restarts;
   inv_param.max_restart_num = max_restart_num;
   inv_param.inc_tol = inc_tol;
-  inv_param.eigenval_tol = eigenval_tol;
-
 
   if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
@@ -197,8 +191,9 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.verbosity_precondition = verbosity;
 
   inv_param.inv_type_precondition = precon_type;
-  inv_param.gcrNkrylov = 6;
+  inv_param.precondition_cycle    = 1; //gcrNkrylov for the inner solver 
 
+  inv_param.gcrNkrylov = gcrNkrylov;
   inv_param.pipeline = pipeline;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -229,23 +224,21 @@ void setInvertParam(QudaInvertParam &inv_param) {
   df_param_p->import_vectors = QUDA_BOOLEAN_NO;
   df_param_p->run_verify     = QUDA_BOOLEAN_NO;
 
-  //df_param_p->nk             = inv_param.nev;
-  //df_param_p->np             = inv_param.nev*inv_param.deflation_grid;
   df_param_p->extlib_type    = deflation_ext_lib;
 
   df_param_p->cuda_prec_ritz = prec_ritz;
   df_param_p->location       = location_ritz;
   df_param_p->mem_type_ritz  = mem_type_ritz;
 
-  df_param_p->nEv = inv_param.inv_type == QUDA_GMRESDR_INVERTER ? inv_param.nev : inv_param.nev*inv_param.deflation_grid;//redef to nEv
-  df_param_p->nKr = inv_param.max_search_dim;//redef to nEv
-  df_param_p->nLockedMax = inv_param.nev;//redef to nLockedMax
+  df_param_p->nEv = eig_nEv;//inv_param.inv_type == QUDA_GMRESDR_INVERTER ? inv_param.nev : inv_param.nev*inv_param.deflation_grid;
+  df_param_p->nKr = inv_param.inv_type != QUDA_GMRESDR_INVERTER ? eig_nKr : 0;//max_search_dim for eigCG
+  df_param_p->nLockedMax = eig_nConv;//inv_param.nev;
   df_param_p->nConv = 0;
 
   df_param_p->eig_type = QUDA_EIG_INVALID;
   df_param_p->check_interval = eig_check_interval;
-  df_param_p->max_restarts   = inv_param.inv_type == QUDA_GMRESDR_INVERTER ? inv_param.deflation_grid : eigcg_max_restarts;// eig_max_restarts;// eigcg_max_restarts;
-  df_param_p->tol   = eigenval_tol; //eig_tol;//foemer eigenval_tol
+  df_param_p->max_restarts   = eig_max_restarts;//eigCG only
+  df_param_p->tol   =  eig_tol;//foemer eigenval_tol
 
   // set file i/o parameters
   strcpy(df_param_p->vec_infile, eig_vec_infile);

@@ -125,15 +125,10 @@ quda::mgarray<int> schwarz_cycle = {};
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
-int nev = 8;
-int max_search_dim = 64;
-int deflation_grid = 16;
-double tol_restart = 5e+3 * tol;
 
-int eigcg_max_restarts = 3;
 int max_restart_num = 3;
 double inc_tol = 1e-2;
-double eigenval_tol = 1e-1;
+double tol_restart = 5e+3 * tol;
 
 QudaExtLibType solver_ext_lib = QUDA_EIGEN_EXTLIB;
 QudaExtLibType deflation_ext_lib = QUDA_EIGEN_EXTLIB;
@@ -564,27 +559,14 @@ void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("Deflation", "Options controlling deflation");
 
-  opgroup
-    ->add_option("--df-deflation-grid", deflation_grid,
-                 "Set maximum number of cycles needed to compute eigenvectors(default 1)")
-    ->check(CLI::PositiveNumber);
-  opgroup
-    ->add_option(
-      "--df-eigcg-max-restarts",
-      eigcg_max_restarts, "Set how many iterative refinement cycles will be solved with eigCG within a single physical right hand site solve (default 4)")
-    ->check(CLI::PositiveNumber);
-  ;
   opgroup->add_option("--df-ext-lib-type", deflation_ext_lib,
                       "Set external library for the deflation methods  (default Eigen library)");
   opgroup->add_option("--df-location-ritz", location_ritz,
                       "Set memory location for the ritz vectors  (default cuda memory location)");
   opgroup->add_option("--df-max-restart-num", max_restart_num,
                       "Set maximum number of the initCG restarts in the deflation stage (default 3)");
-  opgroup->add_option("--df-max-search-dim", max_search_dim, "Set the size of eigenvector search space (default 64)");
   opgroup->add_option("--df-mem-type-ritz", mem_type_ritz,
                       "Set memory type for the ritz vectors  (default device memory type)");
-  opgroup->add_option("--df-nev", nev, "Set number of eigenvectors computed within a single solve cycle (default 8)");
-  opgroup->add_option("--df-tol-eigenval", eigenval_tol, "Set maximum eigenvalue residual norm (default 1e-1)");
   opgroup->add_option("--df-tol-inc", inc_tol,
                       "Set tolerance for the subsequent restarts in the initCG solver  (default 1e-2)");
   opgroup->add_option("--df-tol-restart", tol_restart,

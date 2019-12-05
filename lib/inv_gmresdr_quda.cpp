@@ -205,29 +205,43 @@ namespace quda {
 
    static std::unique_ptr<GMResDRArgs> gmresdr_args = nullptr;
 
-    void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
-      inner.tol = outer.tol_precondition;
-      inner.maxiter = outer.maxiter_precondition;
-      inner.delta = 1e-20;
-      inner.inv_type = outer.inv_type_precondition;
+   // set the required parameters for the inner solver
+   void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
+     inner.tol = outer.tol_precondition;
+     inner.delta = 1e-20; // no reliable updates within the inner solver
 
-      inner.precision = outer.precision_precondition;
-      inner.precision_sloppy = outer.precision_precondition;
+     inner.precision = outer.precision_precondition;//precision_sloppy
+     inner.precision_sloppy = outer.precision_precondition;
 
-      inner.iter = 0;
-      inner.gflops = 0;
-      inner.secs = 0;
+     // this sets a fixed iteration count if we're using the MR solver
+     inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
 
-      inner.inv_type_precondition = QUDA_INVALID_INVERTER;
-      inner.is_preconditioner = true;
-      inner.global_reduction  = false;
-      if(inner.global_reduction) warningQuda("Set global reduction flag for preconditioner to true.\n");
+     inner.iter = 0;
+     inner.gflops = 0;
+     inner.secs = 0;
 
-      if (outer.precision_sloppy != outer.precision_precondition)
-        inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-      else inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
-    }
+     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
+     inner.is_preconditioner = true; // tell inner solver it is a preconditioner
 
+     inner.schwarz_type = outer.schwarz_type;
+     inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
+
+     inner.use_init_guess = QUDA_USE_INIT_GUESS_NO;
+
+     inner.maxiter = outer.maxiter_precondition;
+     if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+       inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+     } else {
+       inner.Nsteps = outer.precondition_cycle;
+     }
+
+     inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+
+     inner.verbosity_precondition = outer.verbosity_precondition;
+
+     inner.compute_true_res = false;
+     inner.sloppy_converge = true;
+   }
 
  GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
     Solver(param, profile),
@@ -236,6 +250,7 @@ namespace quda {
     matPrecon(matPrecon),
     K(nullptr),
     Kparam(param),
+    nKrylov(param.Nkrylov),	
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
@@ -263,6 +278,7 @@ namespace quda {
     matPrecon(matPrecon),
     K(&K_),
     Kparam(param),
+    nKrylov(param.Nkrylov),	
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
@@ -496,11 +512,11 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
       csParam.setPrecision(param.precision_sloppy);
       csParam.is_composite  = true;
-      csParam.composite_dim = param.eig_param.nKr+1;
+      csParam.composite_dim = nKrylov+1;
 
       Vm   = MakeSharedPtr2(csParam);
 
-      csParam.composite_dim = param.eig_param.nKr;
+      csParam.composite_dim = nKrylov;
 
       Zm = K ? MakeSharedPtr2(csParam) : Vm;
 
@@ -508,7 +524,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.composite_dim = (param.eig_param.nEv+1);
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-      gmresdr_args = std::make_unique< GMResDRArgs> (*Vm, param.eig_param.nKr, param.eig_param.nEv);
+      gmresdr_args = std::make_unique< GMResDRArgs> (*Vm, nKrylov, param.eig_param.nEv);
       //gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
       init = true;
@@ -562,7 +578,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.nEv+1, param.eig_param.nEv+1);
 
-    while(restart_idx < param.eig_param.max_restarts && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
+    while(restart_idx < param.max_restart_num && !(convergence(r2, heavy_quark_res, stop, param.tol_hq) || !(r2 > stop)))
     {
       tot_iters += FlexArnoldiProcedure(j, (j == 0));
       UpdateSolution(e, rSloppy, !(j == 0));
@@ -599,7 +615,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 	do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
       }
 
-      if( ((restart_idx != param.eig_param.max_restarts-1) && !do_clean_restart) ) {
+      if( ((restart_idx != param.max_restart_num-1) && !do_clean_restart) ) {
 
 	RestartVZH();
 	j = args.k;

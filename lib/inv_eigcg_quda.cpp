@@ -1453,7 +1453,7 @@ namespace quda {
      }
 
      if(param.eig_param.nConv == param.eig_param.nEv) {
-       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eigenval_tol);
+       printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
      }
 

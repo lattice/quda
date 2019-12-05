@@ -2634,7 +2634,7 @@ void* newDeflationQuda(QudaInvertParam *inv_param) {
     ritzParam.mem_type = QUDA_MEMORY_PINNED;
   }
 
-  for (int i = 0; i < (inv_param->nev*inv_param->deflation_grid); i++) { defl->evecs.push_back(ColorSpinorField::Create(ritzParam)); }
+  for (int i = 0; i < eig_param_p->nEv; i++) { defl->evecs.push_back(ColorSpinorField::Create(ritzParam)); }
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
