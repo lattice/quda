@@ -482,7 +482,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
  void GMResDR::operator()(ColorSpinorField &x, ColorSpinorField &b)
  {
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    if(!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
     const double tol_threshold     = 1.2;
     const double det_max_deviation = 0.4;
@@ -538,8 +538,10 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 
     ColorSpinorField &rSloppy = *r_sloppy;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if(!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    }
 
     int tot_iters = 0;
 
@@ -564,9 +566,11 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       blas::axpy(1.0 / args.c[0].real(), r, Vm->Component(0));
     }
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    if(!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      blas::flops = 0;
+    }
 
     const bool use_heavy_quark_res = (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
 
@@ -644,13 +648,15 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    //final solution:
    xpy(e, x);
 
-   profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-   profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+   if(!param.is_preconditioner) {  
+     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-   param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-   double gflops = (blas::flops + mat.flops())*1e-9;
-   param.gflops = gflops;
-   param.iter += tot_iters;
+     param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+     double gflops = (blas::flops + mat.flops())*1e-9;
+     param.gflops = gflops;
+     param.iter += tot_iters;
+   }
 
    mat(r, x);
 
