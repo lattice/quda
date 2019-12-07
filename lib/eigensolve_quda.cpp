@@ -209,9 +209,11 @@ namespace quda
     
     // Power iteration
     double norm = 0.0;
-    for (int i=0; i<25; i++) {      
-      norm = sqrt(blas::norm2(*in_ptr));
-      blas::ax(1.0 / norm, *in_ptr);
+    for (int i=0; i<100; i++) {      
+      if((i+1)%10 == 0) {
+	norm = sqrt(blas::norm2(*in_ptr));
+	blas::ax(1.0 / norm, *in_ptr);
+      }
       matVec(mat, *out_ptr, *in_ptr);
       std::swap(out_ptr, in_ptr);
     }
