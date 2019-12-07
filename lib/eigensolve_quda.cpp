@@ -193,7 +193,7 @@ namespace quda
 
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
   {
-    
+
     if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
       in.Source(QUDA_RANDOM_SOURCE);
     } else {
@@ -204,29 +204,29 @@ namespace quda
       delete rng;
     }
 
-    ColorSpinorField* in_ptr = &in;
-    ColorSpinorField* out_ptr = &out;
-    
+    ColorSpinorField *in_ptr = &in;
+    ColorSpinorField *out_ptr = &out;
+
     // Power iteration
     double norm = 0.0;
-    for (int i=0; i<100; i++) {      
-      if((i+1)%10 == 0) {
-	norm = sqrt(blas::norm2(*in_ptr));
-	blas::ax(1.0 / norm, *in_ptr);
+    for (int i = 0; i < 100; i++) {
+      if ((i + 1) % 10 == 0) {
+        norm = sqrt(blas::norm2(*in_ptr));
+        blas::ax(1.0 / norm, *in_ptr);
       }
       matVec(mat, *out_ptr, *in_ptr);
       std::swap(out_ptr, in_ptr);
     }
-    
+
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
     // Zero out workspace
     blas::zero(out);
     blas::zero(in);
     // Increase final result by 10% for safety
-    return result*1.10;
+    return result * 1.10;
   }
-  
+
   // Orthogonalise r against V_[j]
   Complex EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
                                           int j)
@@ -740,11 +740,11 @@ namespace quda
     }
 
     // Check for Chebyshev maximum estimation
-    if(eig_param->use_poly_acc && eig_param->a_max == 0.0) {      
+    if (eig_param->use_poly_acc && eig_param->a_max == 0.0) {
       eig_param->a_max = estimateChebyOpMax(mat, *kSpace[1], *kSpace[0]);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
     }
-    
+
     // Test for an initial guess
     double norm = sqrt(blas::norm2(*kSpace[0]));
     if (norm == 0) {
@@ -763,7 +763,7 @@ namespace quda
     // Normalise initial guess
     norm = sqrt(blas::norm2(*kSpace[0]));
     blas::ax(1.0 / norm, *kSpace[0]);
-    
+
     // Create a device side residual vector by cloning
     // the kSpace passed to the function.
     ColorSpinorParam csParamClone(*kSpace[0]);
