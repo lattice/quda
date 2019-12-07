@@ -221,7 +221,7 @@ namespace quda
     // Zero out workspace
     blas::zero(out);
     blas::zero(in);
-    // Increase final result by 10% for saftey
+    // Increase final result by 10% for safety
     return result*1.10;
   }
   

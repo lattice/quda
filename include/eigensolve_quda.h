@@ -102,7 +102,7 @@ public:
     void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
-       @brief Estimates the spectral raduius of the operator for the max value of the 
+       @brief Estimate the spectral radius of the operator for the max value of the 
        Chebyshev polynomial
        @param[in] mat Matrix operator
        @param[in] out Output spinor
