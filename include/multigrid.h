@@ -100,7 +100,7 @@ namespace quda {
     char filename[100];
 
     /** Whether or not this is a staggered solve or not */
-    QudaBoolean is_staggered;
+    bool is_staggered;
 
     /**
        This is top level instantiation done when we start creating the multigrid operator.
@@ -128,7 +128,7 @@ namespace quda {
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
       setup_location(param.setup_location[level]),
-      is_staggered(param.is_staggered)
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -162,7 +162,7 @@ namespace quda {
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
       setup_location(param.mg_global.setup_location[level]),
-      is_staggered(param.is_staggered)
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];

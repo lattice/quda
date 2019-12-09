@@ -242,7 +242,7 @@ namespace quda {
   inline void genericPackGhost(void **ghost, const ColorSpinorField &a, QudaParity parity,
 			       int nFace, int dagger, MemoryLocation *destination) {
 
-#ifndef GPU_STAGGERED_DIRAC
+#ifndef NSPIN1
     if (a.Ncolor() != 3 && a.Nspin() == 1)
       errorQuda("Ncolor = %d not supported for Nspin = %d fields", a.Ncolor(), a.Nspin());
 #endif

@@ -142,8 +142,8 @@ namespace quda {
       param.create = QUDA_REFERENCE_FIELD_CREATE;
 
       // These never get accessed, `nullptr` on its own leads to an error in texture binding
-      param.v = (void*)std::numeric_limits<long long unsigned int>::max();
-      param.norm = (void*)std::numeric_limits<long long unsigned int>::max();
+      param.v = (void*)std::numeric_limits<uint64_t>::max();
+      param.norm = (void*)std::numeric_limits<uint64_t>::max();
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {

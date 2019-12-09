@@ -229,8 +229,8 @@ namespace quda {
         // need this hackery for the moment (need to locate the odd pointers half way into the full field)
         // check for special metadata wrapper (look at reference comments in
         // createTexObject() below)
-        if (!((long long unsigned int)v == (long long unsigned int)(void*)std::numeric_limits<long long unsigned int>::max() ||
-          (long long unsigned int)norm == (long long unsigned int)(void*)std::numeric_limits<long long unsigned int>::max())) {
+        if (!((uint64_t)v == (uint64_t)(void*)std::numeric_limits<uint64_t>::max() ||
+          (uint64_t)norm == (uint64_t)(void*)std::numeric_limits<uint64_t>::max())) {
 
           (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
           if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) 
@@ -305,8 +305,8 @@ namespace quda {
     // in some cases to simply carry around a ColorSpinorField as a metadata
     // container without actually allocating memory for it.
     // Check for that and exit out if so.
-    if ((long long unsigned int)v == (long long unsigned int)(void*)std::numeric_limits<long long unsigned int>::max() &&
-          (long long unsigned int)norm == (long long unsigned int)(void*)std::numeric_limits<long long unsigned int>::max()) {
+    if ((uint64_t)v == (uint64_t)(void*)std::numeric_limits<uint64_t>::max() &&
+          (uint64_t)norm == (uint64_t)(void*)std::numeric_limits<uint64_t>::max()) {
       return;
     }
 

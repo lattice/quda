@@ -56,6 +56,7 @@ namespace quda {
   void DiracCoarse::createY(bool gpu, bool mapped) const
   {
     int ndim = transfer->Vectors().Ndim();
+    // FIXME MRHS NDIM hack
     if (ndim == 5 && transfer->Vectors().Nspin() != 4)
       ndim = 4; // forced case for staggered, coarsened staggered
     int x[QUDA_MAX_DIM];
