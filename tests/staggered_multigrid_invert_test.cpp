@@ -64,12 +64,11 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
@@ -91,6 +90,7 @@ display_test_info()
       printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
       printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
       printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+      printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
       printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
                  mg_eig_use_normop[i] ? "true" : "false");
       if (mg_eig_use_poly_acc[i]) {
@@ -98,16 +98,12 @@ display_test_info()
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
         printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
+      printfQuda("\n");
     }
-    printfQuda("\n");
   }
-
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3)); 
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
   return ;
 }
 
@@ -182,6 +178,8 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
+  mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
@@ -207,8 +205,6 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
 
 void setMultigridParam(QudaMultigridParam &mg_param) {
   QudaInvertParam &inv_param = *mg_param.invert_param;//this will be used to setup SolverParam parent in MGParam class
-
-  for (int i=0; i<mg_levels-1; i++) printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
 
   inv_param.Ls = 1;
 
@@ -412,6 +408,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
   }
 
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
   inv_param.inv_type = QUDA_GCR_INVERTER;
@@ -420,10 +418,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   inv_param.reliable_delta = reliable_delta;
   inv_param.gcrNkrylov = 10;
 
-  //inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity = QUDA_VERBOSE;
-  //inv_param.verbosity_precondition = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -523,19 +519,10 @@ int main(int argc, char **argv)
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
 
-    setup_ca_basis[i] = QUDA_POWER_BASIS;
-    setup_ca_basis_size[i] = 4;
-    setup_ca_lambda_min[i] = 0.0;
-    setup_ca_lambda_max[i] = -1.0; // use power iterations
-
-    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-    coarse_solver_ca_basis_size[i] = 4;
-    coarse_solver_ca_lambda_min[i] = 0.0;
-    coarse_solver_ca_lambda_max[i] = -1.0;
-
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_YES;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
@@ -546,6 +533,16 @@ int main(int argc, char **argv)
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = 5.0;
+
+    setup_ca_basis[i] = QUDA_POWER_BASIS;
+    setup_ca_basis_size[i] = 4;
+    setup_ca_lambda_min[i] = 0.0;
+    setup_ca_lambda_max[i] = -1.0; // use power iterations
+
+    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
+    coarse_solver_ca_basis_size[i] = 4;
+    coarse_solver_ca_lambda_min[i] = 0.0;
+    coarse_solver_ca_lambda_max[i] = -1.0;
 
     strcpy(mg_vec_infile[i], "");
     strcpy(mg_vec_outfile[i], "");
