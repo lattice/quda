@@ -109,7 +109,9 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
     errorQuda("QIO_get_typesize %d does not match expected datasize %d", in_typesize, file_prec * len);
 
   // Print the XML string.
-  if (QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
+  // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
+  // Tracked on github via #936 
+  if (len != 18 && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
 
   // Get total size. Could probably check the filesize better, but tbd.
   size_t rec_size = file_prec * count * len;
