@@ -87,6 +87,8 @@ namespace quda {
          csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
          Vkp1 = MakeSharedPtr2(csParam);
+
+	 printfQuda("GMResDR parameters nKrylov = %d, nDefl = %d\n", m, k);
        }
 
        inline void ResetArgs() {
@@ -267,6 +269,8 @@ namespace quda {
      }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
      }
+
+     if(!K) warningQuda("Running without preconditioning...\n");
 
      return;
  }

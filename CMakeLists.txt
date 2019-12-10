@@ -420,6 +420,7 @@ if(QUDA_QMP)
   mark_as_advanced(QMP_FOUND)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+    include(ExternalProject)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
                         GIT_TAG qmp2-5-1
@@ -485,6 +486,7 @@ if(QUDA_QIO)
   mark_as_advanced(QIO_FOUND)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    include(ExternalProject)
     ExternalProject_Add(QIO
                         GIT_REPOSITORY https://github.com/usqcd-software/qio.git
                         GIT_TAG qio2-5-0
@@ -578,7 +580,7 @@ if(QUDA_ARPACK)
 
   if(QUDA_DOWNLOAD_ARPACK)
     include(GNUInstallDirs)
-
+    include(ExternalProject)
     ExternalProject_Add(ARPACK-NG
                         GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
                         GIT_TAG 3.7.0

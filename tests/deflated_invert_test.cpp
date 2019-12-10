@@ -42,16 +42,21 @@ display_test_info()
              get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim, get_dslash_str(dslash_type),
              get_mass_normalization_str(normalization));
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-
   printfQuda("Deflation space info: location   mem_type\n");
   printfQuda("                     %5s     %8s\n", get_ritz_location_str(location_ritz),
              get_memory_type_str(mem_type_ritz));
 
-  return ;
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+  return;
 }
+
 
 QudaPrecision &cpu_prec = prec;
 QudaPrecision &cuda_prec = prec;
@@ -193,7 +198,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
   inv_param.inv_type_precondition = precon_type;
   inv_param.precondition_cycle    = 1; //gcrNkrylov for the inner solver 
 
-  inv_param.gcrNkrylov = gcrNkrylov;
+  inv_param.gcrNkrylov = eig_nKr;//gcrNkrylov;
   inv_param.pipeline = pipeline;
 
   // require both L2 relative and heavy quark residual to determine convergence
@@ -250,7 +255,7 @@ int main(int argc, char **argv)
 
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
+  add_eigen_option_group(app);
   add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   try {
