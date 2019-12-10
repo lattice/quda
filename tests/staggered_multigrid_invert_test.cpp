@@ -117,12 +117,14 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  gauge_param.cpu_prec = cpu_prec;    
+  gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;  
-  gauge_param.cuda_prec_sloppy = prec_sloppy;
+  gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+  gauge_param.cuda_prec_sloppy = prec_sloppy;
+  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
 
   if (dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH)
     dslash_type = QUDA_ASQTAD_DSLASH;
@@ -656,6 +658,9 @@ int main(int argc, char **argv)
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4*V*gaugeSiteSize*gSize);
 
+  // for load, etc
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+
   // load a field WITHOUT PHASES
   if (strcmp(latfile,"")) {
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -757,25 +762,29 @@ int main(int argc, char **argv)
 #endif
   
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
   gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct= gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = gauge_param.reconstruct_refinement_sloppy
+      = QUDA_RECONSTRUCT_NO;
   }
-  gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-  gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
-    gauge_param.reconstruct= link_recon;
+    gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+    gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
-    gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-    gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 
