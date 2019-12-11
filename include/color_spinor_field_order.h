@@ -1030,7 +1030,8 @@ namespace quda {
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++)
-        max_[i] = fmaxf((norm_type)fabsf(v[i]), (norm_type)fabsf(v[i + length_ghost / 2]));
+        max_[i] = fmaxf( (norm_type)fabsf( (norm_type)v[i] ),
+                         (norm_type)fabsf( (norm_type)v[i + length_ghost / 2] ) );
       norm_type scale = 0.0;
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);
