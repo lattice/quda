@@ -221,7 +221,7 @@ namespace quda {
         @brief accessor for Kappa (mass parameter)
     */
     double Kappa() const { return kappa; }
-    
+
     /**
         @brief accessor for Mass (in case of a factor of 2 for staggered)
     */
@@ -306,14 +306,14 @@ namespace quda {
 
     /**
      * @brief Create the coarse Wilson operator.
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
      *          and returns color matrices Y[0..2*dim-1] corresponding
      *          to the coarse grid hopping terms and X corresponding to
      *          the coarse grid "clover" term.
-     * 
+     *
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
@@ -376,7 +376,7 @@ namespace quda {
 
     /**
      * @brief Create the coarse clover operator
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
@@ -739,9 +739,9 @@ public:
 
     double Mu() const { return mu; }
 
-   /**
+    /**
      * @brief Create the coarse twisted-mass operator
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
@@ -753,7 +753,8 @@ public:
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
@@ -834,9 +835,9 @@ public:
 
     double Mu() const { return mu; }
 
-   /**
+    /**
      * @brief Create the coarse twisted-clover operator
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
@@ -848,7 +849,8 @@ public:
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
@@ -928,7 +930,7 @@ public:
 
     /**
      * @brief Create the coarse staggered operator.
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
@@ -937,7 +939,7 @@ public:
      *          the coarse grid "clover" term. Unike the Wilson operator,
      *          we assume a mass normalization, not a kappa normalization.
      *          Ultimately this routine just performs the Kahler-Dirac rotation.
-     * 
+     *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
@@ -1001,7 +1003,7 @@ public:
 
     /**
      * @brief Create the coarse staggered operator.
-     * 
+     *
      * @details Takes the multigrid transfer class, which knows
      *          about the coarse grid blocking, as well as
      *          having prolongate and restrict member functions,
@@ -1020,8 +1022,8 @@ public:
      * @param mu Mu parameter for the coarse operator (ignored for staggered)
      * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      */
-    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-      double kappa, double mass, double mu=0., double mu_factor=0.) const;
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0.) const;
   };
 
   // Even-odd preconditioned staggered

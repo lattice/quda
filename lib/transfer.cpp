@@ -67,12 +67,11 @@ namespace quda {
       if (geo_bs[d] == 0) errorQuda("Unable to block dimension %d", d);
     }
 
-    if (ndim > 4)
-    {
-      if (geo_bs[4] != 1)
-      {
+    if (ndim > 4) {
+      if (geo_bs[4] != 1) {
         geo_bs[4] = 1;
-        warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions.\n");
+        warningQuda(
+          "5th dimension block size is being set to 1. This is a benign side effect of staggered fermions.\n");
       }
     }
 
@@ -136,14 +135,14 @@ namespace quda {
     param.fieldOrder = location == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.setPrecision(location == QUDA_CUDA_FIELD_LOCATION ? null_precision : B[0]->Precision());
 
-    if (is_staggered) { 
+    if (is_staggered) {
       // Need to create V_d and V_h as metadata containers, but we don't
       // actually need to allocate the memory.
       param.create = QUDA_REFERENCE_FIELD_CREATE;
 
       // These never get accessed, `nullptr` on its own leads to an error in texture binding
-      param.v = (void*)std::numeric_limits<uint64_t>::max();
-      param.norm = (void*)std::numeric_limits<uint64_t>::max();
+      param.v = (void *)std::numeric_limits<uint64_t>::max();
+      param.norm = (void *)std::numeric_limits<uint64_t>::max();
     }
 
     if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -350,7 +349,7 @@ namespace quda {
 
       if (use_gpu) {
         if (in.Location() == QUDA_CPU_FIELD_LOCATION) input = coarse_tmp_d;
-        if (out.Location() == QUDA_CPU_FIELD_LOCATION ||  out.GammaBasis() != V->GammaBasis())
+        if (out.Location() == QUDA_CPU_FIELD_LOCATION || out.GammaBasis() != V->GammaBasis())
           output = (out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ? fine_tmp_d : &fine_tmp_d->Even();
         if (!enable_gpu) errorQuda("not created with enable_gpu set, so cannot run on GPU");
       } else {
@@ -359,19 +358,18 @@ namespace quda {
       }
 
       *input = in; // copy result to input field (aliasing handled automatically)
-      
+
       if (V->SiteSubset() == QUDA_PARITY_SITE_SUBSET && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
         errorQuda("Cannot prolongate to a full field since only have single parity null-space components");
 
-      if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))){
+      if ((V->Nspin() != 1) && ((output->GammaBasis() != V->GammaBasis()) || (input->GammaBasis() != V->GammaBasis()))) {
         errorQuda("Cannot apply prolongator using fields in a different basis from the null space (%d,%d) != %d",
-          output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
+                  output->GammaBasis(), in.GammaBasis(), V->GammaBasis());
       }
 
       Prolongate(*output, *input, *V, Nvec, fine_to_coarse, spin_map, parity);
 
-      flops_ += 8*in.Ncolor()*out.Ncolor()*out.VolumeCB()*out.SiteSubset();
-
+      flops_ += 8 * in.Ncolor() * out.Ncolor() * out.VolumeCB() * out.SiteSubset();
     }
 
     out = *output; // copy result to out field (aliasing handled automatically)
@@ -396,7 +394,7 @@ namespace quda {
     } else {
 
       initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-      const ColorSpinorField *V = use_gpu ? V_d : V_h;  
+      const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
       if (use_gpu) {
         if (out.Location() == QUDA_CPU_FIELD_LOCATION) output = coarse_tmp_d;
@@ -415,25 +413,23 @@ namespace quda {
 
       // Check for KD preconditioned staggered op
       if (input->Nspin() == 1) {
-        
+
       } else { // (wilson or coarse)->coarse}
-        if ( V->Nspin() != 1 && ( output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis() ) )
-        errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
-          out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
+        if (V->Nspin() != 1 && (output->GammaBasis() != V->GammaBasis() || input->GammaBasis() != V->GammaBasis()))
+          errorQuda("Cannot apply restrictor using fields in a different basis from the null space (%d,%d) != %d",
+                    out.GammaBasis(), input->GammaBasis(), V->GammaBasis());
 
         Restrict(*output, *input, *V, Nvec, fine_to_coarse, coarse_to_fine, spin_map, parity);
 
-        flops_ += 8*out.Ncolor()*in.Ncolor()*in.VolumeCB()*in.SiteSubset();
-
+        flops_ += 8 * out.Ncolor() * in.Ncolor() * in.VolumeCB() * in.SiteSubset();
       }
-    } 
-    
+    }
+
     out = *output; // copy result to out field (aliasing handled automatically)
 
     // only need to synchronize if we're transferring from GPU to CPU
     if (out.Location() == QUDA_CPU_FIELD_LOCATION && in.Location() == QUDA_CUDA_FIELD_LOCATION)
       qudaDeviceSynchronize();
-    
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
   }

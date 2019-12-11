@@ -434,12 +434,11 @@ public:
      @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
      @param mass[in] Mass parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
-     operator we are constructing the coarse grid operator from. 
+     operator we are constructing the coarse grid operator from.
      For staggered, should always be QUDA_MATPC_INVALID.
    */
-  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-    const cudaGaugeField &gauge,
-    double mass, QudaDiracType dirac, QudaMatPCType matpc);
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
+                         QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
