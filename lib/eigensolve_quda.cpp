@@ -220,9 +220,7 @@ namespace quda
 
     // Compute spectral radius estimate
     double result = blas::reDotProduct(*out_ptr, *in_ptr);
-    // Zero out workspace
-    blas::zero(out);
-    blas::zero(in);
+
     // Increase final result by 10% for safety
     return result * 1.10;
   }
@@ -739,12 +737,6 @@ namespace quda
       return;
     }
 
-    // Check for Chebyshev maximum estimation
-    if (eig_param->use_poly_acc && eig_param->a_max == 0.0) {
-      eig_param->a_max = estimateChebyOpMax(mat, *kSpace[1], *kSpace[0]);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
-    }
-
     // Test for an initial guess
     double norm = sqrt(blas::norm2(*kSpace[0]));
     if (norm == 0) {
@@ -764,6 +756,12 @@ namespace quda
     norm = sqrt(blas::norm2(*kSpace[0]));
     blas::ax(1.0 / norm, *kSpace[0]);
 
+    // Check for Chebyshev maximum estimation
+    if (eig_param->use_poly_acc && eig_param->a_max == 0.0) {
+      eig_param->a_max = estimateChebyOpMax(mat, *kSpace[2], *kSpace[1]);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
+    }
+    
     // Create a device side residual vector by cloning
     // the kSpace passed to the function.
     ColorSpinorParam csParamClone(*kSpace[0]);
