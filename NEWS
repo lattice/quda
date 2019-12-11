@@ -1,3 +1,70 @@
+Version 1.0.0 - xx December 2019
+
+- Add support for CUDA 10.2: QUDA 1.0.0 is supported on CUDA 7.5-10.2
+  using either GCC or clang compilers.  CUDA 10.x and either GCC >=
+  6.x or clang >= 6.x are highly recommended.
+
+- Completely rewritten all dslash kernels using the accessor
+  framework.  This dramatically reduces code complexity and improve
+  performance.
+
+- New physics functionalithy added: gauge Laplace kernel, Gaussian
+  quark smearing, topological charge density.
+
+- QUDA can now be built to either utilize texture-memory reads or to
+  use direct memory accessing (cmake option QUDA_USE_TEX).  The
+  default is to enable On Volta and Turing, since better performance
+  is obtained with direct memory reads, and disable on Pascal and
+  earlier.
+
+- QUDA is no longer supported on the Fermi generation of GPUs (sm_20
+  and sm_21).  Compilation and running should still be possible but
+  will require compilation with texture objects disabled.
+
+- Added supported for quarter precision (QUDA_QUARTER_PRECISION) for
+  the linear operator and associated solvers.
+
+- Implemented both CA-CG and CA-GCR communucation avoid solvers, for
+  use either as stand-alone solvers or as a means to accelerate
+  multigrid.
+
+- Continued evolution and optimization of the multigrid framework.
+  Regardless, we advise users to use the latest develop branch when
+  using multigrid, since it continues to be a fast-moving target with
+  continual focus on optimization and improvement.
+
+- An implementation of the Thick Restarted Lanczos Method (TRLM) for
+  eigenvector solving of the normal operator.
+
+- Lanczos-accelerated multigrid through the use of coarse-grid
+  deflation and / or using singular vectors to define the prolongator.
+
+- Removal of the legacy contraction and covariant derivative
+  algorithms, and replacement with accessor-based rewrites.
+
+- Improved heavy-quark residual convergence which ensure correct
+  convergence for MILC heavy quark observables.
+
+- Experimental support for Just-In-Time (JIT) compilation using Jitify.
+
+- Signficantly improved unit testing framework using ctest.
+
+- QUDA can now be built to target Google's address sanitizer
+  (CMAKE_BUILD_TYPE option is SANITIZE) for improved debugging.
+
+- QUDA can now download and install the USQCD libraries QMP and QIO
+  automatically as part of the compilation process.  To enable this,
+  the option QUDA_DOWNLOAD_USQCD=ON should be set.  Similarly to Eigen
+  installation this requires access to the outside internet.
+
+- QUDA can now doanload and install the ARPACK library automatically
+  if the QUDA_DOWNLOAD_ARPACK option is enabled.
+
+- Updated to CUB 1.8.
+
+- Multiple bug fixes and clean up to the library. Many of these are
+  listed here: https://github.com/lattice/quda/milestone/21?closed=1
+
 Version 0.9.0 - 24 July 2018
 
 - Add support for CUDA 9.x: QUDA 0.9.0 is supported on CUDA 7.0-9.2.
