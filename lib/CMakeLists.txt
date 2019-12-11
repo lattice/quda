@@ -181,7 +181,7 @@ if(QUDA_JITIFY)
 endif()
 
 if(QUDA_BACKWARDS)
-  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR} ${BACKWARD_INCLUDE_DIRS})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
