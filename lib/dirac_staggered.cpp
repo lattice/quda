@@ -127,18 +127,6 @@ namespace quda {
     // do nothing
   }
 
-  /* Creates the coarse grid dirac operator
-  Takes: multigrid transfer class, which knows
-  about the coarse grid blocking, as well as
-  having prolongate and restrict member functions
-  
-  Returns: Color matrices Y[0..2*dim] corresponding
-  to the coarse grid operator.  The first 2*dim
-  matrices correspond to the forward/backward
-  hopping terms on the coarse grid.  Y[2*dim] is
-  the color matrix that is diagonal on the coarse
-  grid
-  */
   void DiracStaggered::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
            double kappa, double mass, double mu, double mu_factor) const {
     StaggeredCoarseOp(Y, X, T, *gauge, mass, QUDA_STAGGERED_DIRAC, QUDA_MATPC_INVALID);

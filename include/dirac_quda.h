@@ -305,8 +305,15 @@ namespace quda {
 			     const QudaSolutionType) const;
 
     /**
-     * @brief Create the coarse Wilson operator
-     *
+     * @brief Create the coarse Wilson operator.
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
+     * 
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param T[in] Transfer operator defining the coarse grid
@@ -369,6 +376,13 @@ namespace quda {
 
     /**
      * @brief Create the coarse clover operator
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
@@ -727,6 +741,13 @@ public:
 
    /**
      * @brief Create the coarse twisted-mass operator
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
@@ -815,6 +836,13 @@ public:
 
    /**
      * @brief Create the coarse twisted-clover operator
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
@@ -899,10 +927,17 @@ public:
 			     const QudaSolutionType) const;
 
     /**
-     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
-     *        we assume a mass normalization, not a kappa normalization. Thus kappa
-     *        gets ignored. 
-     *
+     * @brief Create the coarse staggered operator.
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
+     * 
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
@@ -965,9 +1000,17 @@ public:
 			     const QudaSolutionType) const;
 
     /**
-     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
-     *        we assume a mass normalization, not a kappa normalization. Thus kappa
-     *        gets ignored. 
+     * @brief Create the coarse staggered operator.
+     * 
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation,
+     *          dropping the long links.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
