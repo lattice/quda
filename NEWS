@@ -4,6 +4,9 @@ Version 1.0.0 - xx December 2019
   using either GCC or clang compilers.  CUDA 10.x and either GCC >=
   6.x or clang >= 6.x are highly recommended.
 
+- Signficant improvements to the CMake build system and removal of the
+  legacy configure build.
+
 - Completely rewritten all dslash kernels using the accessor
   framework.  This dramatically reduces code complexity and improve
   performance.
@@ -12,10 +15,9 @@ Version 1.0.0 - xx December 2019
   quark smearing, topological charge density.
 
 - QUDA can now be built to either utilize texture-memory reads or to
-  use direct memory accessing (cmake option QUDA_USE_TEX).  The
-  default is to enable On Volta and Turing, since better performance
-  is obtained with direct memory reads, and disable on Pascal and
-  earlier.
+  use direct memory accessing (cmake option QUDA_TEX).  The default is
+  to enable On Volta and Turing, since better performance is obtained
+  with direct memory reads, and disable on Pascal and earlier.
 
 - QUDA is no longer supported on the Fermi generation of GPUs (sm_20
   and sm_21).  Compilation and running should still be possible but

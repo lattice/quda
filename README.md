@@ -1,4 +1,4 @@
-# QUDA 0.9.0                        
+# QUDA 1.0.0
 
 ## Overview
 
@@ -18,29 +18,32 @@ fermion actions:
 
 Implementations of CG, multi-shift CG, BiCGStab, BiCGStab(l), and
 DD-preconditioned GCR are provided, including robust mixed-precision
-variants supporting combinations of double, single, and half (16-bit
-"block floating point") precision.  The library also includes
-auxilliary routines necessary for Hybrid Monte Carlo, such as HISQ
-link fattening, force terms and clover- field construction.  Use of
-many GPUs in parallel is supported throughout, with communication
-handled by QMP or MPI.  Support for eigen-vector deflation solvers is
-also included (https://github.com/lattice/quda/wiki/Deflated-Solvers).
+variants supporting combinations of double, single, half and quarter
+precisions (where the latter two are 16-bit and 8-bit "block floating
+point", respectively).  The library also includes auxilliary routines
+necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
+terms and clover- field construction.  Use of many GPUs in parallel is
+supported throughout, with communication handled by QMP or MPI.
 
-We note that while this release of QUDA includes an initial
-implementation of adaptive multigrid, this is considered experimental
-and is undergoing continued evolution and improvement.  We highly
-recommend that those users interested in using adaptive multigrid use
-the present multigrid development branch "feature/multigrid".  More
-details can be found at https://github.com/lattice/quda/wiki/Multigrid-Solver.
+QUDA includes an implementations of adaptive multigrid for the Wilson,
+clover-improved, twisted-mass and twisted-clover fermion actions.  We
+note however that this is undergoing continued evolution and
+improvement and we highly recommend using adaptive multigrid use the
+latest develop branch.  More details can be found at
+https://github.com/lattice/quda/wiki/Multigrid-Solver.
+
+Support for eigen-vector deflation solvers is also included through
+the Thick Restarted Lanczos Method (TRLM).  For more details we refer
+the user to the wiki
+(https://github.com/lattice/quda/wiki/Deflated-Solvers).
 
 ## Software Compatibility:
 
-The library has been tested under Linux (CentOS 6 and Ubuntu 16.04)
-using releases 7.5, 8.0 and 9.0, 9.1 and 9.2 of the CUDA toolkit.
-CUDA 7.0 is not supported, though they may continue to work fine.
-Eariler versions of the CUDA toolkit will not work.  QUDA has been
-tested in conjuction with both x86-64 and IBM POWER8/POWER9 CPUs.  The
-library also works on 64-bit Intel-based Macs.
+The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
+using releases 7.5 through 10.2 of the CUDA toolkit.  Eariler versions
+of the CUDA toolkit will not work, and we highly recommend the use of
+10.x.  QUDA has been tested in conjuction with x86-64, IBM
+POWER8/POWER9 and ARM CPUs.  CMake 3.11 or greater to required to build QUDA.
 
 See also Known Issues below.
 
@@ -56,7 +59,11 @@ capability" of your card, either from NVIDIA's documentation or by
 running the deviceQuery example in the CUDA SDK, and pass the
 appropriate value to the `QUDA_GPU_ARCH` variable in cmake.
 
-QUDA 0.9.0, supports devices of compute capability 2.0 or greater.
+QUDA 1.0.0, supports devices of compute capability 3.0 or greater.
+While QUDA is no longer supported on the older Fermi architecture, it
+may continue to work (assuming the user disables the use of textures
+(QUDA_TEX=OFF).
+
 See also "Known Issues" below.
 
 
@@ -66,7 +73,7 @@ The recommended method for compiling QUDA is to use cmake, and build
 QUDA in a separate directory from the source directory.  For
 instructions on how to build QUDA using cmake see this page
 https://github.com/lattice/quda/wiki/Building-QUDA-with-cmake. Note that
-this requires cmake version 3.1 or later. You can obtain cmake from
+this requires cmake version 3.11 or later. You can obtain cmake from
 https://cmake.org/download/. On Linux the binary tar.gz archives unpack
 into a cmake directory and usually run fine from that directory.
 
@@ -106,19 +113,24 @@ details).  MAGMA is available from
 http://icl.cs.utk.edu/magma/index.html.  MAGMA is enabled using the
 cmake option `QUDA_MAGMA=ON`.
 
-Version 0.9.x of QUDA includes interface for the external (P)ARPACK
+Version 1.0.0 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
 CMake option `QUDA_ARPACK=ON`. Note that with a multi-gpu option, the
 build system will automatically use PARPACK library.
 
+Automatic download and installation of Eigen, (P)ARPACK, QMP and QIO
+is supported in QUDA through the CMake options QUDA_DOWNLOAD_EIGEN,
+QUDA_DOWNLOAD_ARPACK, and QUDA_DOWNLOAD_USQCD.
+
 ### Application Interfaces
 
 By default only the QDP and MILC interfaces are enabled.  For
-interfacing support with QDPJIT, BQCD or CPS; this should be enabled at
-by setting the corresponding `QUDA_INTERFACE_<application>` variable e.g., `QUDA_INTERFACE_BQCD=ON`.
-To keep compilation time to a minimum it is recommended to only enable
-those interfaces that are used by a given application.  
+interfacing support with QDPJIT, BQCD or CPS; this should be enabled
+at by setting the corresponding `QUDA_INTERFACE_<application>`
+variable e.g., `QUDA_INTERFACE_BQCD=ON`.  To keep compilation time to
+a minimum it is recommended to only enable those interfaces that are
+used by a given application.
 
 ## Tuning
 
@@ -164,13 +176,6 @@ include/enum_quda.h.
 
 
 ## Known Issues:
-
-* For compatibility with CUDA, on 32-bit platforms the library is
-compiled with the GCC option -malign-double.  This differs from the
-GCC default and may affect the alignment of various structures,
-notably those of type QudaGaugeParam and QudaInvertParam, defined in
-quda.h.  Therefore, any code to be linked against QUDA should also be
-compiled with this option.
 
 * When the auto-tuner is active in a multi-GPU run it may cause issues
 with binary reproducibility of this run if domain-decomposition
@@ -241,13 +246,16 @@ http://lattice.github.com/quda .
 *  Balint Joo (Jefferson Laboratory)
 *  Hyung-Jin Kim (Samsung Advanced Institute of Technology)
 *  Bartek Kostrzewa (Bonn)
+*  Eloy Romero (William and Mary)
 *  Claudio Rebbi (Boston University) 
 *  Guochun Shi (NCSA)
 *  Hauke Sandmeyer (Bielefeld)
 *  Mario Schröck (INFN)
 *  Alexei Strelchenko (Fermi National Accelerator Laboratory)
+*  Jiqun Tu (Columbia)
 *  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
+*  Andre Walker-Loud
 *  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jlab)
 
