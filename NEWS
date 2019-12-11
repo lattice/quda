@@ -7,6 +7,16 @@ Version 1.0.0 - xx December 2019
 - Signficant improvements to the CMake build system and removal of the
   legacy configure build.
 
+- Added more targeted compilation options to constrain which
+  precisions and reconstruct types are compiled.  QUDA_PRECISION is a
+  cmake parameter that is a 4-bit number corresponding to which
+  precisions are enabled, with 1 = quarter, 2 = half, 4 = single and 8
+  = double, the default is 14 which enables double, single and half
+  precision.  QUDA_RECONSTRUCT is a 3-bit number corresponding to
+  which reconstruct types are enabled, with 1 = reconstruct-8/9, 2 =
+  reconstruct-12/13 and 4 = reconstruct-18, the default is 7 which
+  enables all reconstruct types.
+
 - Completely rewritten all dslash kernels using the accessor
   framework.  This dramatically reduces code complexity and improve
   performance.
