@@ -110,7 +110,7 @@ template<typename T>
 __device__ typename detail::dismember_type<T>::type*
 compute_address(T* src, int div, int mod) {
     typedef typename detail::dismember_type<T>::type U;
-#if (__CUDACC_VER_MAJOR__ >= 9)
+#if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
 // we have already asserted that we have warp convergence here so just use full warp mask
     T* base_ptr = __shfl_sync(WARP_CONVERGED, src, div);
 #else
@@ -201,7 +201,6 @@ bool is_contiguous(int warp_id, const T* ptr) {
     bool result = __all(neighbor_contiguous);
     return result;
 }
-
 
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type

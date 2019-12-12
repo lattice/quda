@@ -2,7 +2,7 @@
 #include <generics/detail/alias.h>
 #include <thrust/detail/static_assert.h>
 
-#if (__CUDACC_VER_MAJOR__ >= 9)
+#if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
 
 namespace detail {
 
