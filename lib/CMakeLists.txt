@@ -115,12 +115,28 @@ if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
 endif()
 
+# nvshmem enabled parts need CUDA_SEPARABLE_COMPILATION ...
+if(QUDA_NVSHMEM)
+  add_library(quda_pack OBJECT ${QUDA_DSLASH_OBJS})
+  target_include_directories(quda_pack PRIVATE dslash_core)
+  target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
+  target_include_directories(quda_pack PRIVATE .)
+  set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  target_include_directories(quda_pack PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+endif()
+
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-  cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  set_target_properties(quda_pack PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+  cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> $<TARGET_OBJECTS:quda_pack> ${QUDA_CU_OBJS})
 else()
-  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> $<TARGET_OBJECTS:quda_pack> ${QUDA_CU_OBJS})
+endif()
+
+if(QUDA_NVSHMEM)
+  set_property(TARGET quda PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif()
 
 # include_directories
@@ -130,20 +146,7 @@ target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp PRIVATE .)
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
-# nvshmem enabled parts need CUDA_SEPARABLE_COMPILATION ...
-if(QUDA_NVSHMEM)
-  cuda_add_library(quda_pack STATIC ${QUDA_DSLASH_OBJS})
-  target_include_directories(quda_pack PRIVATE dslash_core)
-  target_include_directories(quda_pack SYSTEM PRIVATE ../include/externals)
-  target_include_directories(quda_pack PRIVATE .)
-  target_link_libraries(quda PUBLIC quda_pack)
-  set_target_properties(quda_pack PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-  set_property(TARGET quda_pack PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-  # set_source_files_properties(dslash_wilson.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
-  # set_source_files_properties(dslash_pack2.cu  PROPERTIES COMPILE_OPTIONS --ptxas-options=-v)
-  target_include_directories(quda_pack PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-endif()
+
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -216,7 +219,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_NVSHMEM)
-    target_link_libraries(quda_pack PUBLIC -L${QUDA_NVSHMEM_HOME}/lib -lnvshmem  ${MPI_CXX_LIBRARIES})
+    target_link_libraries(quda PUBLIC -L${QUDA_NVSHMEM_HOME}/lib -lnvshmem  ${MPI_CXX_LIBRARIES})
 endif()
 
 
