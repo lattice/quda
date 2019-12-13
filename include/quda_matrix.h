@@ -205,6 +205,39 @@ namespace quda {
           for (int i=1; i<length; i++) checksum_ ^= base_[i];
           return checksum_;
         }
+
+        __device__ __host__ inline bool isUnitary(double max_error) const
+        {
+          const auto identity = conj(*this) * *this;
+
+#pragma unroll
+          for (int i=0; i<N; ++i){
+            if( fabs(identity(i,i).real() - 1.0) > max_error ||
+                fabs(identity(i,i).imag()) > max_error) return false;
+
+#pragma unroll
+            for (int j=i+1; j<N; ++j){
+              if( fabs(identity(i,j).real()) > max_error ||
+                  fabs(identity(i,j).imag()) > max_error ||
+                  fabs(identity(j,i).real()) > max_error ||
+                  fabs(identity(j,i).imag()) > max_error ){
+                return false;
+              }
+            }
+          }
+
+#pragma unroll
+          for (int i=0; i<N; i++) {
+#pragma unroll
+            for (int j=0; j<N; j++) {
+              if (std::isnan((*this)(i,j).real()) ||
+                  std::isnan((*this)(i,j).imag())) return false;
+            }
+          }
+
+          return true;
+        }
+
     };
 
   /**
@@ -1125,35 +1158,6 @@ namespace quda {
       printf("(%lf, %lf)\n", link(2,2).x, link(2,2).y);
       printf("\n");
     }
-
-  template<class Cmplx>
-  __device__ __host__
-    bool isUnitary(const Matrix<Cmplx,3>& matrix, double max_error)
-  {
-    const Matrix<Cmplx,3> identity = conj(matrix)*matrix;
-
-#pragma unroll
-    for (int i=0; i<3; ++i){
-      if( fabs(identity(i,i).x - 1.0) > max_error || fabs(identity(i,i).y) > max_error) return false;
-#pragma unroll
-      for (int j=i+1; j<3; ++j){
-	if( fabs(identity(i,j).x) > max_error || fabs(identity(i,j).y) > max_error
-	    ||  fabs(identity(j,i).x) > max_error || fabs(identity(j,i).y) > max_error ){
-	  return false;
-	}
-      }
-    }
-
-#pragma unroll
-    for (int i=0; i<3; i++) {
-#pragma unroll
-      for (int j=0; j<3; j++) {
-	if (isnan(matrix(i,j).x) || isnan(matrix(i,j).y)) return false;
-      }
-    }
-
-    return true;
-  }
 
   template<class Cmplx>
   __device__ __host__

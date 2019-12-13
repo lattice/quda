@@ -262,7 +262,7 @@ namespace{
 
     *result = u*conj(v);
 
-    if (isUnitary(*result,max_error)==false)
+    if (result->isUnitary(max_error)==false)
       {
 	printf("ERROR: Link unitarity test failed\n");
 	printf("TOLERANCE: %g\n", max_error);
@@ -335,12 +335,12 @@ namespace{
       for(int dir=0; dir<4; ++dir){
 	if(field.Precision() == QUDA_SINGLE_PRECISION){
 	  copyArrayToLink(&link, ((float*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
-	}else if(field.Precision() == QUDA_DOUBLE_PRECISION){     
+	}else if(field.Precision() == QUDA_DOUBLE_PRECISION){
 	  copyArrayToLink(&link, ((double*)(field.Gauge_p()) + (i*4 + dir)*18)); // order of arguments?
 	}else{
 	  errorQuda("Unsupported precision\n");
 	}
-	if(isUnitary(link,max_error) == false){ 
+	if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %d,\t direction = %d\n", i, dir);
 	  printLink(link);
@@ -375,7 +375,7 @@ namespace{
     v = tmp;
     unitarizeLinkMILC(v, &result, arg);
     if (arg.check_unitarization) {
-      if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
+      if (result.isUnitary(arg.max_error) == false) atomicAdd(arg.fails, 1);
     }
     tmp = result;
 
@@ -542,7 +542,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
     polarSu3<Float>(u, arg.tol);
 
     // count number of failures
-    if (isUnitary(u, arg.tol) == false) {
+    if (u.isUnitary(arg.tol) == false) {
       atomicAdd(arg.fails, 1);
     }
 
@@ -566,7 +566,7 @@ void unitarizeLinks(cudaGaugeField& output, const cudaGaugeField &input, int* fa
       : TunableVectorYZ(2, 4), arg(arg), meta(meta) { }
     
     void apply(const cudaStream_t &stream){
-      TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE); //getVerbosity());
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ProjectSU3kernel<Float,G><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
     void preTune() { arg.u.save(); }
