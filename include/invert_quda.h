@@ -432,6 +432,11 @@ namespace quda {
       if(param.eig_param) {
         QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
         eig_param_p->nConv = eig_param.nConv;
+
+	if( eig_param_p->nEv != eig_param.nEv ){
+	  warningQuda("Resized previous deflation space from %d to %d./n", eig_param_p->nEv,  eig_param.nEv );
+	  eig_param_p->nEv = eig_param.nEv;
+	}
       }
 
       param.ca_lambda_min = ca_lambda_min;

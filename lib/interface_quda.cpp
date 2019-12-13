@@ -2648,11 +2648,7 @@ void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
 
   QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
 
-  //auto *defl_p = static_cast<deflated_solver*>(df);
-  //Deflation &defl = *(defl_p->defl);
-
-  //eig_param_p->is_complete = defl.is_complete() ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param_p->is_complete = QUDA_BOOLEAN_NO;
+  eig_param_p->is_complete = eig_param_p->nEv == eig_param_p->nConv ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 

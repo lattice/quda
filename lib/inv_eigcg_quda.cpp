@@ -1398,6 +1398,7 @@ namespace quda {
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
+           Kparam.deflate     = false;
            K.reset( new CG(matSloppy, matPrecon, matPrecon, Kparam, profile) );
          }
 
@@ -1432,16 +1433,16 @@ namespace quda {
        param.true_res_hq = sqrt(HeavyQuarkResidualNorm(out,r).z);
        PrintSummary( !dcg_cycle ? "EigCG:" : "DCG (correction cycle):", iters, r2, b2, stop, param.tol_hq);
 
-       if( getVerbosity() >= QUDA_VERBOSE ) {
+       if( /*getVerbosity() >= QUDA_VERBOSE*/ false ) {//disable intermediate checks
          if( !dcg_cycle &&  (local_eigcg_args->restarts >= 1) && (param.eig_param.nConv < param.eig_param.nEv) ) Verify();
        }
 
      } while ((r2 > stop) && mixed_prec);
 
-     if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
-       printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
+     //if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
+       //printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
        //max_eigcg_cycles = logical_rhs_id;//adjust maximum allowed cycles based on the actual information
-     }
+     //}
 
      // we need to update rhs index and number of computed eigenvectors
      param.rhs_idx += logical_rhs_id;

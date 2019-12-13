@@ -371,6 +371,7 @@ int main(int argc, char **argv)
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
 
   void *spinorOut = NULL;
   spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
@@ -387,22 +388,18 @@ int main(int argc, char **argv)
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
+  double *time = new double[Nsrc];
+  double *gflops = new double[Nsrc];
+
   void *df_preconditioner  = newDeflationQuda(&inv_param);
   inv_param.deflation_op   = df_preconditioner;
 
-  for (int i=0; i<Nsrc; i++) {
-    // create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  rng->Init();
 
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      //((float*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
-    } else {
-      //((double*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
-    }
+  for (int i=0; i<Nsrc; i++) {
+
+    construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
 
     if(df_param.is_complete == QUDA_BOOLEAN_YES) {
       printfQuda("Deflation space is complete. Running deflated CG solver.\n");
@@ -416,7 +413,15 @@ int main(int argc, char **argv)
     if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ) updateDeflationQuda(df_preconditioner, &inv_param);
     //
     printfQuda("\nDone for %d rhs.\n", inv_param.rhs_idx);
+
+    time[i] = inv_param.secs;
+    gflops[i] = inv_param.gflops / inv_param.secs;
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+               inv_param.gflops / inv_param.secs);
   }
+
+  rng->Release();
+  delete rng;
 
   destroyDeflationQuda(df_preconditioner);
 
@@ -428,6 +433,29 @@ int main(int argc, char **argv)
   // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
              inv_param.gflops / inv_param.secs, 0.0);
+
+  auto mean_time = 0.0;
+  auto mean_time2 = 0.0;
+  auto mean_gflops = 0.0;
+  auto mean_gflops2 = 0.0;
+  for (int i = 0; i < Nsrc; i++) {
+    mean_time += time[i];
+    mean_time2 += time[i] * time[i];
+    mean_gflops += gflops[i];
+    mean_gflops2 += gflops[i] * gflops[i];
+  }
+
+  mean_time /= Nsrc;
+  mean_time2 /= Nsrc;
+  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+  mean_gflops /= Nsrc;
+  mean_gflops2 /= Nsrc;
+  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
+
+  delete[] time;
+  delete[] gflops;
 
   if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
 

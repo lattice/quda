@@ -469,10 +469,12 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    R(args.m, args.m)  = sqrt( blas::norm2(vm[args.m]) );
 
    //rescale zm vectors
-   std::vector<ColorSpinorField*> zmj(zm(1, args.m));//we don't need to rescale the first vector zm[0]
-   VectorXd invRii(args.m-1);
-   for(int i = 0; i < args.m-1; i++) invRii[i] = 1.0 / R(i+1, i+1).real();
-   blas::ax(invRii.data(), zmj);
+   if(K) { //works only if we have a preconditioner
+     std::vector<ColorSpinorField*> zmj(zm(1, args.m));//we don't need to rescale the first vector zm[0]
+     VectorXd invRii(args.m-1);
+     for(int i = 0; i < args.m-1; i++) invRii[i] = 1.0 / R(i+1, i+1).real();
+     blas::ax(invRii.data(), zmj);
+   }
 
    //normalize the last vector
    blas::ax(1.0 / R(args.m, args.m).real(), vm[args.m]);
