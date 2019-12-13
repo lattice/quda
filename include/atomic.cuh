@@ -39,6 +39,8 @@ static inline __device__ double atomicAdd(double* address, double val)
 }
 #endif
 
+#endif
+
 /**
    @brief Implementation of double2 atomic addition using two
    double-precision additions.
@@ -143,5 +145,3 @@ static inline __device__ float atomicMax(float *addr, float val){
 
   return __uint_as_float(old);
 }
-
-#endif
