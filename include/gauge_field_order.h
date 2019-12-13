@@ -393,8 +393,8 @@ namespace quda {
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
@@ -497,8 +497,8 @@ namespace quda {
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
@@ -540,8 +540,8 @@ namespace quda {
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
@@ -648,8 +648,8 @@ namespace quda {
 
       void resetScale(Float max) {
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
@@ -724,8 +724,8 @@ namespace quda {
       void resetScale(Float max_) {
 	if (fixed) {
 	  max = max_;
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
@@ -848,8 +848,8 @@ namespace quda {
       void resetScale(Float max) {
 	accessor.resetScale(max);
 	if (fixed) {
-	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max() / max);
-	  scale_inv = static_cast<Float>(max / std::numeric_limits<storeFloat>::max());
+	  scale = static_cast<Float>(std::numeric_limits<storeFloat>::max()) / max;
+	  scale_inv = max / static_cast<Float>(std::numeric_limits<storeFloat>::max());
 	}
       }
 
