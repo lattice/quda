@@ -14,6 +14,7 @@
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <trove_helper.cuh>
+#include <texture_helper.cuh>
 
 namespace quda {
 
@@ -651,7 +652,7 @@ namespace quda {
           norm_type nrm;
           if (isFixed<Float>::value) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
-            nrm = !huge_alloc ? tex1Dfetch<float>(normTex, parity * norm_offset + chirality * stride + x) :
+            nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
                                 norm[parity * norm_offset + chirality * stride + x];
 #else
             nrm = norm[parity * norm_offset + chirality * stride + x];
@@ -663,7 +664,7 @@ namespace quda {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    if (!huge_alloc) { // use textures unless we have a huge alloc
                                // first do texture load from memory
-              TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
+              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
               // now insert into output array
 #pragma unroll
               for (int j = 0; j < N; j++) {

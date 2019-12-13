@@ -25,6 +25,7 @@
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <trove_helper.cuh>
+#include <texture_helper.cuh>
 
 namespace quda {
 
@@ -733,7 +734,7 @@ namespace quda {
       {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	if (use_tex) {
-	  TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
+	  TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*offset_cb + dim*stride*nColor*nColor + (row*nColor+col)*stride + x_cb);
 	  if (fixed) {
 	    return max*complex<Float>(vecTmp.x, vecTmp.y);
 	  } else {
@@ -1775,7 +1776,7 @@ namespace quda {
           // first do texture load from memory
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	  if (!huge_alloc) { // use textures unless we have a huge alloc
-            TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity * tex_offset + (dir * M + i) * stride + x);
+            TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * tex_offset + (dir * M + i) * stride + x);
             // now insert into output array
 #pragma unroll
             for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
