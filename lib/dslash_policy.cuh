@@ -491,6 +491,7 @@ namespace quda
       dslashParam.kernel_type = INTERIOR_KERNEL;
       dslashParam.threads = volume;
       dslashParam.shmem = shmem;
+      DslashCommsPattern pattern(dslashParam.commDim);
 
       // record start of the dslash
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
@@ -534,8 +535,10 @@ namespace quda
         }
       }
 
-      setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
-      PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+      if (pattern.commDimTotal) {
+        setFusedParam(dslashParam, dslash, faceVolumeCB); // setup for exterior kernel
+        PROFILE(if (dslash_exterior_compute) dslash.apply(streams[Nstream - 1]), profile, QUDA_PROFILE_DSLASH_KERNEL);
+      }
 
       dslash::synccounter++;
       in->bufferIndex = (1 - in->bufferIndex);
