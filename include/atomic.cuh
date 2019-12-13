@@ -50,7 +50,7 @@ static inline __device__ double atomicAdd(double* address, double val)
 */
 static inline __device__ double2 atomicAdd(double2 *addr, double2 val){
   double2 old = *addr;
-#ifdef __CUDA_ARCH__ && CUDA_VERSION < 8000
+#if defined(__CUDA_ARCH__) || CUDA_VERSION >= 8000
   old.x = atomicAdd((double*)addr, val.x);
   old.y = atomicAdd((double*)addr + 1, val.y);
 #endif
