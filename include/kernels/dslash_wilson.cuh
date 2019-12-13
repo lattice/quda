@@ -70,7 +70,7 @@ namespace quda
     // parity for gauge field - include residual parity from 5-d => 4-d checkerboarding
     const int gauge_parity = (nDim == 5 ? (x_cb / arg.dc.volume_4d_cb + parity) % 2 : parity);
 
-#pragma unroll
+#pragma unroll 4
     for (int d = 0; d < 4; d++) { // loop over dimension
       {                           // Forward gather - compute fwd offset for vector fetch
         const int fwd_idx = getNeighborIndexCB<nDim>(coord, d, +1, arg.dc);
