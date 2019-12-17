@@ -126,8 +126,8 @@ QUDA_DOWNLOAD_ARPACK, and QUDA_DOWNLOAD_USQCD.
 ### Application Interfaces
 
 By default only the QDP and MILC interfaces are enabled.  For
-interfacing support with QDPJIT, BQCD or CPS; this should be enabled
-at by setting the corresponding `QUDA_INTERFACE_<application>`
+interfacing support with QDPJIT, BQCD, CPS or TIFR; this should be
+enabled at by setting the corresponding `QUDA_INTERFACE_<application>`
 variable e.g., `QUDA_INTERFACE_BQCD=ON`.  To keep compilation time to
 a minimum it is recommended to only enable those interfaces that are
 used by a given application.
@@ -255,7 +255,7 @@ http://lattice.github.com/quda .
 *  Jiqun Tu (Columbia)
 *  Alejandro Vaquero (Utah University)
 *  Mathias Wagner (NVIDIA)
-*  Andre Walker-Loud
+*  Andre Walker-Loud (Lawrence Berkley Laboratory)
 *  Evan Weinberg (NVIDIA)
 *  Frank Winter (Jlab)
 
