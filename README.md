@@ -14,13 +14,13 @@ fermion actions:
 * Staggered fermions
 * Improved staggered (asqtad or HISQ) 
 * Domain wall (4-d or 5-d preconditioned)
-* Mobius fermion
+* Möbius fermion
 
 Implementations of CG, multi-shift CG, BiCGStab, BiCGStab(l), and
 DD-preconditioned GCR are provided, including robust mixed-precision
 variants supporting combinations of double, single, half and quarter
 precisions (where the latter two are 16-bit and 8-bit "block floating
-point", respectively).  The library also includes auxilliary routines
+point", respectively).  The library also includes auxiliary routines
 necessary for Hybrid Monte Carlo, such as HISQ link fattening, force
 terms and clover- field construction.  Use of many GPUs in parallel is
 supported throughout, with communication handled by QMP or MPI.
@@ -40,9 +40,9 @@ the user to the wiki
 ## Software Compatibility:
 
 The library has been tested under Linux (CentOS 7 and Ubuntu 18.04)
-using releases 7.5 through 10.2 of the CUDA toolkit.  Eariler versions
+using releases 7.5 through 10.2 of the CUDA toolkit.  Earlier versions
 of the CUDA toolkit will not work, and we highly recommend the use of
-10.x.  QUDA has been tested in conjuction with x86-64, IBM
+10.x.  QUDA has been tested in conjunction with x86-64, IBM
 POWER8/POWER9 and ARM CPUs.  CMake 3.11 or greater to required to build QUDA.
 
 See also Known Issues below.
@@ -116,7 +116,7 @@ cmake option `QUDA_MAGMA=ON`.
 Version 1.0.0 of QUDA includes interface for the external (P)ARPACK
 library for eigenvector computing. (P)ARPACK is available, e.g., from
 https://github.com/opencollab/arpack-ng.  (P)ARPACK is enabled using
-CMake option `QUDA_ARPACK=ON`. Note that with a multi-gpu option, the
+CMake option `QUDA_ARPACK=ON`. Note that with a multi-GPU option, the
 build system will automatically use PARPACK library.
 
 Automatic download and installation of Eigen, (P)ARPACK, QMP and QIO
@@ -158,10 +158,10 @@ directory.  Optionally, the output filename can be specified using the
 previously generated profile outputs.  In addition to the kernel
 profile, a policy profile, e.g., collections of kernels and/or other
 algorithms that are auto-tuned, is also output to the file
-"profile_async_async.tsv".  The policy profile for example includes
+"profile_async.tsv".  The policy profile for example includes
 the entire multi-GPU dslash, whose style and order of communication is
 autotuned.  Hence while the dslash kernel entries appearing the kernel
-profile do include communucation time, the entries in the policy
+profile do include communication time, the entries in the policy
 profile include all constituent parts (halo packing, interior update,
 communication and exterior update).
 

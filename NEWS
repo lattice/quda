@@ -4,7 +4,7 @@ Version 1.0.0 - xx December 2019
   using either GCC or clang compilers.  CUDA 10.x and either GCC >=
   6.x or clang >= 6.x are highly recommended.
 
-- Signficant improvements to the CMake build system and removal of the
+- Significant improvements to the CMake build system and removal of the
   legacy configure build.
 
 - Added more targeted compilation options to constrain which
@@ -36,7 +36,7 @@ Version 1.0.0 - xx December 2019
 - Added supported for quarter precision (QUDA_QUARTER_PRECISION) for
   the linear operator and associated solvers.
 
-- Implemented both CA-CG and CA-GCR communucation avoid solvers, for
+- Implemented both CA-CG and CA-GCR communication avoid solvers, for
   use either as stand-alone solvers or as a means to accelerate
   multigrid.
 
@@ -51,7 +51,7 @@ Version 1.0.0 - xx December 2019
 - Lanczos-accelerated multigrid through the use of coarse-grid
   deflation and / or using singular vectors to define the prolongator.
 
-- Removal of the legacy contraction and covariant derivative
+- Removal of the legacy contraction and co-variant derivative
   algorithms, and replacement with accessor-based rewrites.
 
 - Improved heavy-quark residual convergence which ensure correct
@@ -59,7 +59,7 @@ Version 1.0.0 - xx December 2019
 
 - Experimental support for Just-In-Time (JIT) compilation using Jitify.
 
-- Signficantly improved unit testing framework using ctest.
+- Significantly improved unit testing framework using ctest.
 
 - QUDA can now be built to target Google's address sanitizer
   (CMAKE_BUILD_TYPE option is SANITIZE) for improved debugging.
@@ -69,7 +69,7 @@ Version 1.0.0 - xx December 2019
   the option QUDA_DOWNLOAD_USQCD=ON should be set.  Similarly to Eigen
   installation this requires access to the outside internet.
 
-- QUDA can now doanload and install the ARPACK library automatically
+- QUDA can now download and install the ARPACK library automatically
   if the QUDA_DOWNLOAD_ARPACK option is enabled.
 
 - Updated to CUB 1.8.
@@ -88,7 +88,7 @@ Version 0.9.0 - 24 July 2018
 
 - On systems that support it, QUDA now uses direct peer-to-peer
   communication between GPUs with in the same node.  The Dslash policy
-  autotuner will ascertain the optimal commuication route to take,
+  autotuner will ascertain the optimal communication route to take,
   whether it be to route through CPU memory, use DMA copy engines or
   directly write the halo buffer to neighboring GPUs. 
 
@@ -102,7 +102,7 @@ Version 0.9.0 - 24 July 2018
   of truncation when converting to/from float).
 
 - Add support for symmetric preconditioning for 4-d preconditioned
-  Shamir and Mobius Dirac operators.
+  Shamir and Möbius Dirac operators.
 
 - Added initial support for multi-right-hand-side staggered Dirac
   operator (treat the rhs index as a fifth dimension).
@@ -196,7 +196,7 @@ Version 0.8.0 - 1st February 2016
 - Added support for gauge-field reconstruction to naive staggered
   fermions.
 
-- Added hypercubic random number generator with multi-GPU support.
+- Added hyper-cubic random number generator with multi-GPU support.
 
 - Added topological charge computation.
 
@@ -504,7 +504,7 @@ Version 0.6.0 - 23rd January 2014
 - Fixed double precision definition of *= vector operator, which caused a
   truncation to single precision for certain solver types.
 
-- Fixed memory overallocation when doing clover fermions in half precision.
+- Fixed memory over allocation when doing clover fermions in half precision.
 
 - Memory leak fix to clover fermions.
 
@@ -659,10 +659,10 @@ Version 0.4.0 - 4 April 2012
   run at a given set of parameters (action, precision, lattice volume,
   etc.).
 
-- Added NUMA affinity support.  Given a sufficiently recent linux
+- Added NUMA affinity support.  Given a sufficiently recent Linux
   kernel and a system with dual I/O hubs (IOHs), QUDA will attempt to
   associate each GPU with the "closest" socket.  This feature is
-  disabled by default under OS X and may be disabled under linux via
+  disabled by default under OS X and may be disabled under Linux via
   the "--disable-numa-affinity" configure flag.
 
 - Improved stability on Fermi-based GeForce cards by disabling double
@@ -691,7 +691,7 @@ Version 0.4.0 - 4 April 2012
 
 Version 0.3.2 - 18 January 2011
 
-- Fixed a regression in 0.3.1 that prevented the BiCGstab solver from
+- Fixed a regression in 0.3.1 that prevented the BiCGStab solver from
   working correctly with half precision on Fermi.
 
 
@@ -785,7 +785,7 @@ Version 0.3.0 - 1 October 2010
   generally be set to 'QUDA_NORMEQ_PC_SOLVE', which will solve the
   even/odd-preconditioned normal equations via CGNR.  (The full
   solution will be reconstructed if necessary based on solution_type.)
-  For BiCGstab, 'QUDA_DIRECT_PC_SOLVE' is generally best.  These choices
+  For BiCGStab, 'QUDA_DIRECT_PC_SOLVE' is generally best.  These choices
   correspond to what was done by default in earlier versions of QUDA.
 
 - Added 'dagger' option to QudaInvertParam.  If 'dagger' is set to
@@ -837,7 +837,7 @@ Version 0.2.4 - 22 June 2010
 
 - Added initial support for CUDA 3.x and Fermi (not yet optimized).
 
-- Incorporated look-ahead strategy to increase stability of the BiCGstab
+- Incorporated look-ahead strategy to increase stability of the BiCGStab
   inverter.
 
 - Added definition of QUDA_VERSION to quda.h.  This is an integer with
