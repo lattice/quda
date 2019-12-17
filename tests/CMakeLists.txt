@@ -172,13 +172,11 @@ if(QUDA_CONTRACT)
   QUDA_CHECKBUILDTEST(contract_test QUDA_BUILD_ALL_TESTS)
 endif()
 
-if(QUDA_LINK_ASQTAD OR QUDA_LINK_HISQ)
+if(QUDA_DIRAC_STAGGERED)
   cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
   quda_checkbuildtest(llfat_test QUDA_BUILD_ALL_TESTS)
-endif()
 
-if(QUDA_LINK_HISQ)
   cuda_add_executable(unitarize_link_test unitarize_link_test.cpp)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   quda_checkbuildtest(unitarize_link_test QUDA_BUILD_ALL_TESTS)
@@ -481,21 +479,19 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_naive_staggered-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
-    if(QUDA_LINK_HISQ)
-      add_test(NAME dslash_improved_staggered_build-policy${pol2}
-               COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
-                       --dslash-type asqtad
-                       --test 1
-                       --dim 6 8 10 12
-                       --compute-fat-long true
-                       --epsilon-naik
-                       -0.01
-                       --tadpole-coeff 0.9
-                       --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
-      if(polenv)
-        set_tests_properties(dslash_improved_staggered_build-policy${pol2}
-                             PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
-      endif()
+
+    add_test(NAME dslash_improved_staggered_build-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type asqtad
+                     --test 1
+                     --dim 6 8 10 12
+                     --compute-fat-long true
+                     --epsilon-naik -0.01
+                     --tadpole-coeff 0.9
+                     --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+    if(polenv)
+      set_tests_properties(dslash_improved_staggered_build-policy${pol2}
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
   endif()
 
