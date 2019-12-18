@@ -237,7 +237,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i = 0; i < mg_param.n_level; i++) {
-    for (int j = 0; j < QUDA_MAX_DIM; j++) {
+    for (int j = 0; j < 4; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
