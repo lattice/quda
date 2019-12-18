@@ -102,6 +102,15 @@ public:
     void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
     /**
+       @brief Estimate the spectral radius of the operator for the max value of the
+       Chebyshev polynomial
+       @param[in] mat Matrix operator
+       @param[in] out Output spinor
+       @param[in] in Input spinor
+    */
+    double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
+
+    /**
        @brief Orthogonalise input vector r against
        vector space v using block-BLAS
        @param[out] Sum of inner products
