@@ -51,7 +51,12 @@ namespace quda {
     case 48: norm_ = norm<real,48>(u, d, type); break;
     case 56: norm_ = norm<real,56>(u, d, type); break;
     case 64: norm_ = norm<real,64>(u, d, type); break;
-#endif
+#ifdef NSPIN1
+    case 96: norm_ = norm<real,96>(u, d, type); break;
+    case 128: norm_ = norm<real,128>(u, d, type); break;
+    case 192: norm_ = norm<real,192>(u, d, type); break;
+#endif // NSPIN1
+#endif // GPU_MULTIGRID
     default: errorQuda("Unsupported color %d", u.Ncolor());
     }
     return norm_;

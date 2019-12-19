@@ -669,6 +669,9 @@ extern "C" {
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
 
+    /** Boolean for if this is a staggered solve or not */
+    QudaBoolean is_staggered;
+
   } QudaMultigridParam;
 
 

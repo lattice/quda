@@ -99,6 +99,9 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether or not this is a staggered solve or not */
+    bool is_staggered;
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -124,7 +127,8 @@ namespace quda {
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
-      setup_location(param.setup_location[level])
+      setup_location(param.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -157,7 +161,8 @@ namespace quda {
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
-      setup_location(param.mg_global.setup_location[level])
+      setup_location(param.mg_global.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -420,6 +425,20 @@ public:
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+
+  /**
+     @brief Coarse operator construction from a fine-grid operator (Staggered)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param mass[in] Mass parameter
+     @param matpc[in] The type of even-odd preconditioned fine-grid
+     operator we are constructing the coarse grid operator from.
+     For staggered, should always be QUDA_MATPC_INVALID.
+   */
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
+                         QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)

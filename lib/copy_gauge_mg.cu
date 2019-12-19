@@ -137,6 +137,11 @@ namespace quda {
     case 48: copyGaugeMG<FloatOut,FloatIn,48>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 56: copyGaugeMG<FloatOut,FloatIn,56>(out, in, location, Out, In, outGhost, inGhost, type); break;
     case 64: copyGaugeMG<FloatOut,FloatIn,64>(out, in, location, Out, In, outGhost, inGhost, type); break;
+#ifdef GPU_STAGGERED_DIRAC
+    case 96: copyGaugeMG<FloatOut,FloatIn,96>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 128: copyGaugeMG<FloatOut,FloatIn,128>(out, in, location, Out, In, outGhost, inGhost, type); break;
+    case 192: copyGaugeMG<FloatOut,FloatIn,192>(out, in, location, Out, In, outGhost, inGhost, type); break;
+#endif
 #endif // GPU_MULTIGRID
     default: errorQuda("Unsupported number of colors; out.Nc=%d, in.Nc=%d", out.Ncolor(), in.Ncolor());
     }

@@ -59,8 +59,16 @@ void genericBlas(
     genericBlas<Float, yFloat, nSpin, 20, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
   } else if (x.Ncolor() == 24) {
     genericBlas<Float, yFloat, nSpin, 24, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#ifdef NSPIN4
   } else if (x.Ncolor() == 32) {
     genericBlas<Float, yFloat, nSpin, 32, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif // NSPIN4
+#ifdef NSPIN1
+  } else if (x.Ncolor() == 64) {
+    genericBlas<Float, yFloat, nSpin, 64, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+  } else if (x.Ncolor() == 96) {
+    genericBlas<Float, yFloat, nSpin, 96, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif // NSPIN1
 #endif
   } else {
     errorQuda("nColor = %d not implemented", x.Ncolor());

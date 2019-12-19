@@ -822,6 +822,12 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(is_staggered, QUDA_BOOLEAN_NO);
+#else
+  P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 

@@ -348,7 +348,7 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
         reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
-    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
+    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference<volatile VolatileWord*,VolatileWord>(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
 }

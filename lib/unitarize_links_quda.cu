@@ -292,7 +292,7 @@ namespace {
 	}
 	if (isUnitary(link,max_error) == false) {
 	  printf("Unitarity failure\n");
-	  printf("site index = %d,\t direction = %d\n", i, dir);
+	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
 	  identity = conj(link)*link;
 	  printLink(identity);

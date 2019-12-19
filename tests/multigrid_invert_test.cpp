@@ -377,6 +377,9 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
+  // Is NOT a staggered solve
+  mg_param.is_staggered = QUDA_BOOLEAN_NO;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
