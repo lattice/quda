@@ -6,6 +6,11 @@
 
 using namespace quda;
 
+// ensures we use shfl_sync and not shfl when compiling with clang
+#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
+#define CUB_USE_COOPERATIVE_GROUPS
+#endif
+
 #include <cub/block/block_reduce.cuh>
 
 #if __COMPUTE_CAPABILITY__ >= 300

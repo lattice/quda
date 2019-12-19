@@ -17,19 +17,19 @@ namespace quda {
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<0, 32,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 512:                \
       kernel<0, 64,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 768:                \
       kernel<0, 96,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 1024:               \
       kernel<0, 128,__VA_ARGS__>            \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     default:                \
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
@@ -39,19 +39,19 @@ namespace quda {
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<1, 32,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 512:                \
       kernel<1, 64,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 768:                \
       kernel<1, 96,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 1024:               \
       kernel<1, 128,__VA_ARGS__>            \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     default:                \
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
@@ -264,10 +264,10 @@ namespace quda {
       comm_start(mh_recv_fwd[d]);
 
       //extract top face
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[0] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
       //extract bottom
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[1] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
@@ -287,7 +287,7 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[0] >> >
+      Kernel_UnPack<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[0] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
 
     #ifndef GPU_COMMS
@@ -298,7 +298,7 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[1] >> >
+      Kernel_UnPack<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[1] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
 
       comm_wait(mh_send_back[d]);

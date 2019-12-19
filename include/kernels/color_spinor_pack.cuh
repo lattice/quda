@@ -173,7 +173,7 @@ namespace quda {
     parity_dim_dir %= arg.nParity2dim_threads;
 
     const int dim_dir = parity_dim_dir % (2*dim_threads);
-    const int dim0 = dim_dir / 2;
+    const int dim0 = dim_dir / 2; // this is the dim offset for each thread =0 for dim_threads=1)
     const int dir = dim_dir % 2;
     const int parity = (arg.nParity == 2) ? (parity_dim_dir / (2*dim_threads) ) : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -181,10 +181,10 @@ namespace quda {
     const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
 
 #pragma unroll
-    for (int dim=dim0; dim<4; dim+=dim_threads) {
+    for (int dim=0; dim<4; dim+=dim_threads) {
       switch(dir) {
       case 0:
-	switch(dim) {
+	switch(dim+dim0) {
 	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
@@ -192,7 +192,7 @@ namespace quda {
 	}
 	break;
       case 1:
-	switch(dim) {
+	switch(dim+dim0) {
 	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;

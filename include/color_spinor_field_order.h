@@ -20,6 +20,7 @@
 #include <thrust_helper.cuh>
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
+#include <texture_helper.cuh>
 
 namespace quda {
 
@@ -881,7 +882,7 @@ namespace quda {
     if (isFixed<Float>::value) {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       // use textures unless we have a large alloc
-      nrm = !huge_alloc ? tex1Dfetch<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
+      nrm = !huge_alloc ? tex1Dfetch_<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
 #else
       nrm = norm[x + parity * norm_offset];
 #endif
@@ -892,7 +893,7 @@ namespace quda {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       if (!huge_alloc) { // use textures unless we have a huge alloc
         // first do texture load from memory
-        TexVector vecTmp = tex1Dfetch<TexVector>(tex, parity*tex_offset + stride*i + x);
+        TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*i + x);
         // now insert into output array
 #pragma unroll
         for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
@@ -994,7 +995,7 @@ namespace quda {
                                                                 // first do vectorized copy from memory into registers
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
       if (!huge_alloc) {                                        // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
+        TexVector vecTmp = tex1Dfetch_<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
 #pragma unroll
         for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
         if (isFixed<Float>::value) {
@@ -1030,7 +1031,8 @@ namespace quda {
       // two-pass to increase ILP (assumes length divisible by two, e.g. complex-valued)
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++)
-        max_[i] = fmaxf((norm_type)fabsf(v[i]), (norm_type)fabsf(v[i + length_ghost / 2]));
+        max_[i] = fmaxf( (norm_type)fabsf( (norm_type)v[i] ),
+                         (norm_type)fabsf( (norm_type)v[i + length_ghost / 2] ) );
       norm_type scale = 0.0;
 #pragma unroll
       for (int i = 0; i < length_ghost / 2; i++) scale = fmaxf(max_[i], scale);

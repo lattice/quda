@@ -35,9 +35,6 @@ namespace quda {
     }
   };
 
-
-
-
   template<typename Float, typename Gauge, int NCOLORS>
   __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -81,7 +78,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //cudaDeviceSynchronize();
     }
 
@@ -385,7 +382,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //cudaDeviceSynchronize();
     }
 
