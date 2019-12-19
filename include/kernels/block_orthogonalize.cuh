@@ -190,7 +190,6 @@ namespace quda {
               else
                 for (int s = 0; s < nSpin; s++)
                   for (int c = 0; c < nColor; c++) v[s][c] = arg.V(parity, x_cb, s, c, j);
-
               for (int s = 0; s < nSpin; s++) { colorNorm<nColor>(nrm[arg.spin_map(s, parity)], v[s]); }
             }
           }

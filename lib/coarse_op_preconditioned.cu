@@ -26,6 +26,8 @@ namespace quda {
 
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
+    unsigned int maxBlockSize(const TuneParam &param) const { return std::min(TunableVectorYZ::maxBlockSize(param), 128u); }
+
   public:
       CalculateYhat(Arg &arg, const LatticeField &meta) :
         TunableVectorYZ(2 * n, 4 * n),
@@ -225,16 +227,15 @@ namespace quda {
   template <typename storeFloat, typename Float>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     switch (Y.Ncolor()) {
-    case  2: calculateYhat<storeFloat,Float, 2>(Yhat, Xinv, Y, X); break;
-    case  4: calculateYhat<storeFloat,Float, 4>(Yhat, Xinv, Y, X); break;
-    case  8: calculateYhat<storeFloat,Float, 8>(Yhat, Xinv, Y, X); break;
     case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
-    case 16: calculateYhat<storeFloat,Float,16>(Yhat, Xinv, Y, X); break;
-    case 20: calculateYhat<storeFloat,Float,20>(Yhat, Xinv, Y, X); break;
-    case 24: calculateYhat<storeFloat,Float,24>(Yhat, Xinv, Y, X); break;
-    case 32: calculateYhat<storeFloat,Float,32>(Yhat, Xinv, Y, X); break;
     case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
+#ifdef NSPIN4
     case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X); break;
+#endif // NSPIN4
+#ifdef NSPIN1
+    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
+#endif // NSPIN1
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
   }
