@@ -27,7 +27,7 @@ namespace quda {
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
-  
+#ifdef DEVELOP_ONEAPI  
   class EigValueSet;
   class cudaEigValueSet;
   class cpuEigValueSet;
@@ -43,7 +43,7 @@ namespace quda {
   class CloverField;
   class cudaCloverField;
   class cpuCloverField;
-
+#endif
   struct LatticeFieldParam {
 
   protected:

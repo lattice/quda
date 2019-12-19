@@ -382,7 +382,7 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::copy(*yD, *hD);
       break;
 
-    case 1:
+    case 1:      
       for (int i=0; i < niter; ++i) blas::copy(*yD, *mD);
       break;
 
@@ -518,11 +518,15 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 34:
+#ifdef DEVELOP_ONEAPI      
       for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
+#endif //DEVELOP_ONEAPI     
       break;
 
     case 35:
+#ifdef DEVELOP_ONEAPI      
       for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
+#endif //DEVELOP_ONEAPI      
       break;
 
     case 36:
@@ -533,24 +537,34 @@ double benchmark(int kernel, const int niter) {
       for (int i=0; i < niter; ++i) blas::caxpyBzpx(a2, *xD, *yD, b2, *zD);
       break;
 
-    case 38:
+    case 38:      
+#ifdef DEVELOP_ONEAPI     
       for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
+ #endif //DEVELOP_ONEAPI     
       break;
 
     case 39:
+#ifdef DEVELOP_ONEAPI      
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
+ #endif //DEVELOP_ONEAPI    
       break;
 
     case 40:
+#ifdef DEVELOP_ONEAPI      
       for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
+ #endif //DEVELOP_ONEAPI    
       break;
 
     case 41:
+#ifdef DEVELOP_ONEAPI      
       for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
+ #endif //DEVELOP_ONEAPI    
       break;
 
     case 42:
+#ifdef DEVELOP_ONEAPI      
       for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
+ #endif //DEVELOP_ONEAPI    
       break;
 
     default:
@@ -890,6 +904,7 @@ double test(int kernel) {
     break;
 
   case 34:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
@@ -904,9 +919,11 @@ double test(int kernel) {
       error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error/= Msrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 35:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) {
       xmD->Component(i) = *(xmH[i]);
       zmD->Component(i) = *(zmH[i]);
@@ -924,7 +941,8 @@ double test(int kernel) {
       error+= fabs(blas::norm2((xmD->Component(i))) - blas::norm2(*(xmH[i]))) / blas::norm2(*(xmH[i]));
       //error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
     }
-    error/= Nsrc;
+    error/= Nsrc;   
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 36:
@@ -946,6 +964,7 @@ double test(int kernel) {
     break;
 
   case 38:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     blas::cDotProduct(A2, xmD->Components(), xmD->Components());
     error = 0.0;
@@ -956,9 +975,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Nsrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 39:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
     blas::cDotProduct(A, xmD->Components(), ymD->Components());
@@ -970,9 +991,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Msrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 40:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
     error = 0.0;
@@ -983,9 +1006,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Nsrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 41:
+#ifdef DEVELOP_ONEAPI    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
     blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
@@ -997,9 +1022,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Msrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   case 42:
+#ifdef DEVELOP_ONEAPI    
     for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
@@ -1013,6 +1040,7 @@ double test(int kernel) {
       error += fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error /= Msrc;
+#endif //DEVELOP_ONEAPI    
     break;
 
   default:
@@ -1074,7 +1102,11 @@ int main(int argc, char** argv)
   // lastly check for correctness
   ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
   if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+#if 1  
   result = RUN_ALL_TESTS();
+#else
+  initFields(3, 0);//int prec, int order 
+#endif  
 
   endQuda();
 

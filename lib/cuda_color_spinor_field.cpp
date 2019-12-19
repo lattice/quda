@@ -7,7 +7,9 @@
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
+#ifdef DEVELOP_ONEAPI
 #include <dslash_quda.h>
+#endif
 
 static bool zeroCopy = false;
 
@@ -773,6 +775,7 @@ namespace quda {
                                        const int dagger, cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
                                        MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
+#ifdef DEVELOP_ONEAPI	  
 #ifdef MULTI_GPU
     void *packBuffer[2 * QUDA_MAX_DIM] = {};
 
@@ -798,13 +801,14 @@ namespace quda {
 #else
     errorQuda("packGhost not built on single-GPU build");
 #endif
+#endif //ONEAPI    
   }
  
   // send the ghost zone to the host
   void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, 
 				       const QudaDirection dir, const int dagger, 
 				       cudaStream_t *stream) {
-
+#ifdef DEVELOP_ONEAPI
 #ifdef MULTI_GPU
     if (precision != ghost_precision) { pushKernelPackT(true); }
     
@@ -869,6 +873,7 @@ namespace quda {
     errorQuda("sendGhost not built on single-GPU build");
 #endif
 
+#endif //ONEAPI
   }
 
 
@@ -1020,7 +1025,7 @@ namespace quda {
 
 
   void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr, bool remote_write) {
-
+#ifdef DEVELOP_ONEAPI
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
 
@@ -1120,6 +1125,7 @@ namespace quda {
 	comm_start(mh_send_p2p_fwd[bufferIndex][dim]);
       }
     }
+#endif //ONEAPI    
   }
 
   void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr_send, bool gdr_recv) {
@@ -1299,7 +1305,7 @@ namespace quda {
   void cudaColorSpinorField::exchangeGhost(QudaParity parity, int nFace, int dagger, const MemoryLocation *pack_destination_,
 					   const MemoryLocation *halo_location_, bool gdr_send, bool gdr_recv,
 					   QudaPrecision ghost_precision_)  const {
-
+#ifdef DEVELOP_ONEAPI
     // we are overriding the ghost precision, and it doesn't match what has already been allocated
     if (ghost_precision_ != QUDA_INVALID_PRECISION && ghost_precision != ghost_precision_) {
       ghost_precision_reset = true;
@@ -1439,6 +1445,7 @@ namespace quda {
     }
 
     popKernelPackT(); // restore kernel packing
+#endif // ONEAPI    
   }
 
   std::ostream& operator<<(std::ostream &out, const cudaColorSpinorField &a) {

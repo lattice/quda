@@ -13,7 +13,11 @@
 #include <test_util.h>
 #include <test_params.h>
 
+#ifdef DEVELOP_ONEAPI
 #include <dslash_quda.h>
+#else
+#include <color_spinor_field.h>
+#endif
 #include "misc.h"
 
 using namespace std;

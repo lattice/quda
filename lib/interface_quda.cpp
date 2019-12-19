@@ -12,25 +12,33 @@
 #include <comm_quda.h>
 #include <tune_quda.h>
 #include <blas_quda.h>
+#ifdef DEVELOP_ONEAPI
 #include <gauge_field.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <eigensolve_quda.h>
+#endif //ONEAPI
 #include <color_spinor_field.h>
+#ifdef DEVELOP_ONEAPI
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
+#endif // ONEAPI
 #include <algorithm>
+#ifdef DEVELOP_ONEAPI
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
+#endif // ONEAPI
 #include <random_quda.h>
 #include <mpi_comm_handle.h>
 
+#ifdef DEVELOP_ONEAPI
 #include <multigrid.h>
 
 #include <deflation.h>
+#endif // ONEAPI
 
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
@@ -42,12 +50,15 @@
 
 #include <cuda.h>
 
+#ifdef DEVELOP_ONEAPI
 #include <ks_force_quda.h>
 
 #ifdef GPU_GAUGE_FORCE
 #include <gauge_force_quda.h>
 #endif
 #include <gauge_update_quda.h>
+
+#endif // ONEAPI
 
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
@@ -71,11 +82,14 @@
 #include "check_params.h"
 #undef PRINT_PARAM
 
+#ifdef DEVELOP_ONEAPI
+
 #include <gauge_tools.h>
 #include <contract_quda.h>
 
 #include <momentum.h>
 
+#endif // ONEAPI
 
 #include <cuda_profiler_api.h>
 
@@ -84,6 +98,8 @@ using namespace quda;
 static int R[4] = {0, 0, 0, 0};
 // setting this to false prevents redundant halo exchange but isn't yet compatible with HISQ / ASQTAD kernels
 static bool redundant_comms = false;
+
+#ifdef DEVELOP_ONEAPI
 
 #include <blas_cublas.h>
 
@@ -115,6 +131,7 @@ void closeMagma(){
   return;
 }
 
+
 cudaGaugeField *gaugePrecise = nullptr;
 cudaGaugeField *gaugeSloppy = nullptr;
 cudaGaugeField *gaugePrecondition = nullptr;
@@ -142,6 +159,8 @@ cudaCloverField *cloverRefinement = nullptr;
 
 cudaGaugeField *momResident = nullptr;
 cudaGaugeField *extendedGaugeResident = nullptr;
+
+#endif // ONEAPI
 
 std::vector<cudaColorSpinorField*> solutionResident;
 
@@ -654,9 +673,13 @@ void initQudaMemory()
   cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
 
   checkCudaError();
+#ifdef DEVELOP_ONEAPI  
   createDslashEvents();
+#endif //ONEAPI  
   blas::init();
+#ifdef DEVELOP_ONEAPI  
   cublas::init();
+#endif // ONEAPI
 
   // initalize the memory pool allocators
   pool::init();
@@ -688,6 +711,8 @@ void initQuda(int dev)
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
 }
+
+#ifdef DEVELOP_ONEAPI
 
 // helper for creating extended gauge fields
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
@@ -1468,26 +1493,29 @@ void flushChronoQuda(int i)
   basis.clear();
 }
 
+#endif // ONEAPI
+
 void endQuda(void)
 {
   profileEnd.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!initialized) return;
-
+#ifdef DEVELOP_ONEAPI
   freeGaugeQuda();
   freeCloverQuda();
 
   for (int i=0; i<QUDA_MAX_CHRONO; i++) flushChronoQuda(i);
-
+#endif //ONEAPI
   for (auto v : solutionResident) if (v) delete v;
   solutionResident.clear();
-
+#ifdef DEVELOP_ONEAPI
   if(momResident) delete momResident;
 
   LatticeField::freeGhostBuffer();
   cpuColorSpinorField::freeGhostBuffer();
 
   cublas::destroy();
+#endif //ONEAPI
   blas::end();
 
   pool::flush_pinned();
@@ -1502,14 +1530,17 @@ void endQuda(void)
     delete []streams;
     streams = nullptr;
   }
+#ifdef DEVELOP_ONEAPI
   destroyDslashEvents();
+#endif // ONEAPI
 
   saveTuneCache();
   saveProfile();
 
   // flush any outstanding force monitoring (if enabled)
+#ifdef DEVELOP_ONEAPI
   flushForceMonitor();
-
+#endif // ONEAPI
   initialized = false;
 
   comm_finalize();
@@ -1521,6 +1552,7 @@ void endQuda(void)
   // print out the profile information of the lifetime of the library
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     profileInit.Print();
+#ifdef DEVELOP_ONEAPI
     profileGauge.Print();
     profileClover.Print();
     profileDslash.Print();
@@ -1543,6 +1575,7 @@ void endQuda(void)
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
+#endif //ONEAPI
     profileEnd.Print();
 
     profileInit2End.Print();
@@ -1566,6 +1599,7 @@ void endQuda(void)
 
 }
 
+#ifdef DEVELOP_ONEAPI
 
 namespace quda {
 
@@ -5812,3 +5846,5 @@ double qChargeDensityQuda(void *h_qDensity)
 
   return charge;
 }
+
+#endif //ONEAPI

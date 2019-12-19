@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include "quda.h"
 #include <string.h>
+#ifdef DEVELOP_ONEAPI
 #include "invert_quda.h"
+#endif //ONEAPI
 #include "misc.h"
- #include <assert.h>
+#include <assert.h>
 #include "util_quda.h"
 #include <test_util.h>
 

@@ -298,7 +298,9 @@ namespace quda {
 
   void cpuColorSpinorField::packGhost(void **ghost, const QudaParity parity, const int nFace, const int dagger) const
   {
+#ifdef ENABLE_STUFF	  
     genericPackGhost(ghost, *this, parity, nFace, dagger);
+#endif    
     return;
   }
 

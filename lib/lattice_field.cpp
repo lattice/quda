@@ -2,8 +2,10 @@
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <color_spinor_field.h>
+#ifdef DEVELOP_ONEAPI
 #include <gauge_field.h>
 #include <clover_field.h>
+#endif //ONEAPI
 
 namespace quda {
 
@@ -660,13 +662,19 @@ namespace quda {
 
   QudaFieldLocation LatticeField::Location() const { 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
-    if (typeid(*this)==typeid(cudaCloverField) || 
-	typeid(*this)==typeid(cudaColorSpinorField) ||
-	typeid(*this)==typeid(cudaGaugeField)) {
+    if (
+#ifdef DEVELOP_ONEAPI		    
+	typeid(*this)==typeid(cudaCloverField) || 
+	typeid(*this)==typeid(cudaGaugeField) ||
+#endif //ONEAPI	
+	typeid(*this)==typeid(cudaColorSpinorField )) {
       location = QUDA_CUDA_FIELD_LOCATION; 
-    } else if (typeid(*this)==typeid(cpuCloverField) || 
-	       typeid(*this)==typeid(cpuColorSpinorField) ||
-	       typeid(*this)==typeid(cpuGaugeField)) {
+    } else if (
+#ifdef DEVELOP_ONEAPI		    
+	       typeid(*this)==typeid(cpuCloverField) || 
+	       typeid(*this)==typeid(cpuGaugeField) ||
+#endif //ONEAPI	       
+	       typeid(*this)==typeid(cpuColorSpinorField )) {
       location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
@@ -687,6 +695,7 @@ namespace quda {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());
+#ifdef DEVELOP_ONEAPI      
     } else if (typeid(*this) == typeid(const cudaGaugeField)) {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
@@ -695,6 +704,7 @@ namespace quda {
       const CloverField &cField = static_cast<const CloverField&>(*this);
       if (cField.Order() == 2 || cField.Order() == 4)
 	return static_cast<int>(cField.Order());
+#endif //ONEAPI      
     }
 
     errorQuda("Unsupported field type");

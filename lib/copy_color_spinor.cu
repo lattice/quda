@@ -100,6 +100,7 @@ namespace quda {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
     } else {
+#ifdef ENABLE_STUFF	    
       if (dst.Precision() == QUDA_DOUBLE_PRECISION) {
         if (src.Precision() == QUDA_DOUBLE_PRECISION) {
           copyGenericColorSpinorMGDD(dst, src, location, Dst, Src);
@@ -143,6 +144,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported Destination Precision %d", dst.Precision());
       }
+#endif //ENABLE_STUFF      
     }
   }  
 
