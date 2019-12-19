@@ -18,8 +18,8 @@ namespace quda {
 
     QudaFieldLocation location = Y.Location();
 
-    QudaBoolean need_bidirectional = QUDA_BOOLEAN_NO;
-    if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_YES; }
+    bool need_bidirectional = false;
+    if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_TRUE; }
 
     if (location == QUDA_CPU_FIELD_LOCATION) {
 
