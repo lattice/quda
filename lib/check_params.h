@@ -776,12 +776,14 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
-  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
+  P(run_low_mode_check, QUDA_BOOLEAN_NO);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_NO);
   P(coarse_guess, QUDA_BOOLEAN_NO);
 #else
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
 #endif
 
