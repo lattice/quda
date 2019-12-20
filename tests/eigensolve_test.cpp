@@ -64,7 +64,7 @@ void display_test_info()
   if (eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax < 0)
+    if (eig_amax <= 0)
       printfQuda(" - Chebyshev polynomial maximum will be computed\n");
     else
       printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
