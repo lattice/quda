@@ -34,7 +34,7 @@ display_test_info()
 	     get_recon_str(link_recon_sloppy),  
 	     xdim, ydim, zdim, tdim, Lsdim, 
 	     get_dslash_str(dslash_type), 
-	     get_mass_normalization_str(normalization));     
+	     get_mass_normalization_str(normalization));
 
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
@@ -57,10 +57,12 @@ display_test_info()
   if (eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if(eig_amax < 0) printfQuda(" - Chebyshev polynomial maximum will be computed\n");
-    else printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+    if (eig_amax < 0)
+      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+    else
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
-  
+
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
