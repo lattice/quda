@@ -39,7 +39,7 @@ namespace quda {
     mu_factor(param.mu_factor),
     transfer(nullptr),
     dirac(nullptr),
-    need_bidirectional(QUDA_BOOLEAN_NO),
+    need_bidirectional(false),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
@@ -527,11 +527,11 @@ namespace quda {
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
-                     matpcType, QUDA_BOOLEAN_YES);
+                     matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
-                     matpcType, QUDA_BOOLEAN_YES);
+                     matpcType, true);
     }
   }
 

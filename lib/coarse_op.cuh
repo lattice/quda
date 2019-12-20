@@ -872,7 +872,7 @@ namespace quda {
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
                   ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
 		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
-		  QudaBoolean need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine) {
+		  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine) {
 
     // sanity checks
     if (matpc == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC || matpc == QUDA_MATPC_ODD_ODD_ASYMMETRIC)
@@ -904,7 +904,7 @@ namespace quda {
     // If doing a preconditioned operator with a clover term then we
     // have bi-directional links, though we can do the bidirectional setup for all operators for debugging
     bool bidirectional_links = (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_COARSEPC_DIRAC || bidirectional_debug ||
-				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || need_bidirectional == QUDA_BOOLEAN_YES);
+				dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC || need_bidirectional);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
       if (bidirectional_links) printfQuda("Doing bi-directional link coarsening\n");
