@@ -94,7 +94,7 @@ void display_test_info()
       if (mg_eig_use_poly_acc[i]) {
         printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-        if (mg_eig_amax[i] < 0)
+        if (mg_eig_amax[i] <= 0)
           printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
         else
           printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
