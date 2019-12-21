@@ -1250,9 +1250,10 @@ extern "C" {
    * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
+   * @param meas_Q_interval Measure the topological charge every Nth smearing step
    */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon);
-
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_Q_interval);
+  
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
