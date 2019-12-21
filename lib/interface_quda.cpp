@@ -5529,7 +5529,7 @@ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performWFlownStep(unsigned int nSteps, double rho)
+void performWFlownStep(unsigned int nSteps, double step_size)
 {
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5549,7 +5549,7 @@ void performWFlownStep(unsigned int nSteps, double rho)
   for (unsigned int i=0; i<nSteps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
-    WFlowStep(*gaugeSmeared, *cudaGaugeTemp, rho);
+    WFlowStep(*gaugeSmeared, *cudaGaugeTemp, step_size);
   }
 
   delete cudaGaugeTemp;

@@ -1255,6 +1255,13 @@ extern "C" {
   void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
 
   /**
+   * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
+   * @param nSteps Number of steps to apply.
+   * @param step_size Size of Wilson Flow step 
+   */
+  void performWFlownStep(unsigned int nSteps, double step_size);
+  
+  /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeQuda();

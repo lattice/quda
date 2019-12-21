@@ -196,6 +196,20 @@ int main(int argc, char **argv)
   qCharge = qChargeQuda();
   printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
 
+  // Wilson Flow
+  double traj_length = 1.0;
+  nSteps = 100;
+  double step_size = traj_length/nSteps;
+  // start the timer
+  time0 = -((double)clock());
+  performWFlownStep(nSteps, step_size);  
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Total time for Wilson Flow = %g secs\n", time0);
+  qCharge = qChargeQuda();
+  printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
+  
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif
