@@ -9,7 +9,7 @@ namespace quda
 #define  DOUBLE_TOL	1e-15
 #define  SINGLE_TOL	2e-6
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int wflowDim_> struct GaugeWFLOWArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int wflowDim_> struct GaugeWFlowArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -27,7 +27,7 @@ namespace quda
     const Float epsilon;
     const Float tolerance;
 
-    GaugeWFLOWArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon=0) :
+    GaugeWFlowArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon=0) :
       out(out),
       in(in),
       threads(1),
@@ -104,7 +104,7 @@ namespace quda
     }
   }
 
-  template <typename Arg> __global__ void computeWFLOWStep(Arg arg)
+  template <typename Arg> __global__ void computeWFlowStep(Arg arg)
   {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;

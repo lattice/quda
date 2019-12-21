@@ -8,10 +8,10 @@
 
 namespace quda {
 
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFLOW : TunableVectorYZ
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlow : TunableVectorYZ
   {
     static constexpr int wflowDim = 3; // apply wflowing in space only
-    GaugeWFLOWArg<Float, nColor, recon, wflowDim> arg;
+    GaugeWFlowArg<Float, nColor, recon, wflowDim> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -19,7 +19,7 @@ namespace quda {
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFLOW(GaugeField &out, const GaugeField &in, double rho) :
+    GaugeWFlow(GaugeField &out, const GaugeField &in, double rho) :
       TunableVectorYZ(2, wflowDim),
       arg(out, in, rho),
       meta(in)
@@ -38,10 +38,10 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeWFLOWStep").instantiate(Type<decltype(arg)>())
+      jitify_error = program->kernel("quda::computeWFlowStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      computeWFLOWStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      computeWFlowStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
     }
 
@@ -53,9 +53,9 @@ public:
     //DMH: FIXME Re-evaluate these
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
-  }; // GaugeWFLOW
+  }; // GaugeWFlow
 
-  void WFLOWStep(GaugeField &out, const GaugeField &in, double rho)
+  void WFlowStep(GaugeField &out, const GaugeField &in, double rho)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -64,7 +64,7 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
-    instantiate<GaugeWFLOW>(out, in, rho);
+    instantiate<GaugeWFlow>(out, in, rho);
 #else
     errorQuda("Gauge tools are not built");
 #endif

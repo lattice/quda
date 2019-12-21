@@ -210,7 +210,7 @@ static TimeProfile profileWuppertal("wuppertalQuda");
 //!<Profiler for gaussQuda
 static TimeProfile profileGauss("gaussQuda");
 
-//!<Profiler for plaqQuda
+//!<Profiler for qChargeQuda
 static TimeProfile profileQCharge("qChargeQuda");
 
 //!< Profiler for APEQuda
@@ -221,6 +221,9 @@ static TimeProfile profileSTOUT("STOUTQuda");
 
 //!< Profiler for OvrImpSTOUTQuda
 static TimeProfile profileOvrImpSTOUT("OvrImpSTOUTQuda");
+
+//!< Profiler for wFlowQuda
+static TimeProfile profileWFlow("wFlowQuda");
 
 //!< Profiler for projectSU3Quda
 static TimeProfile profileProject("projectSU3Quda");
@@ -1540,6 +1543,8 @@ void endQuda(void)
     profileQCharge.Print();
     profileAPE.Print();
     profileSTOUT.Print();
+    profileOvrImpSTOUT.Print();
+    profileWFlow.Print();
     profileProject.Print();
     profilePhase.Print();
     profileMomAction.Print();
@@ -5522,6 +5527,41 @@ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
   }
 
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void performWFlownStep(unsigned int nSteps, double rho)
+{
+  profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
+
+  if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+  if (gaugeSmeared != nullptr) delete gaugeSmeared;
+  gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
+
+  GaugeFieldParam gParam(*gaugeSmeared);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
+
+  double3 plaq = plaquette(*gaugeSmeared);
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    printfQuda("Plaquette after 0 WFlow steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
+  }
+
+  for (unsigned int i=0; i<nSteps; i++) {
+    cudaGaugeTemp->copy(*gaugeSmeared);
+    cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
+    WFlowStep(*gaugeSmeared, *cudaGaugeTemp, rho);
+  }
+
+  delete cudaGaugeTemp;
+
+  gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
+
+  plaq = plaquette(*gaugeSmeared);
+  if (getVerbosity() >= QUDA_SUMMARIZE) {
+    printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
+  }
+
+  profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 
