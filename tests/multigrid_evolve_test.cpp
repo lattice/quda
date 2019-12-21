@@ -146,18 +146,18 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
   mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
-  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
   mg_eig_param.cuda_prec_ritz = cuda_prec;
 
-  mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
-  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
   mg_eig_param.a_max = mg_eig_amax[level];
@@ -240,7 +240,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
-    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.spin_block_size[i] = 1;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
@@ -377,7 +377,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_NO;
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
@@ -406,8 +406,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
-  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.preserve_deflation = QUDA_BOOLEAN_NO;
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.preserve_deflation = QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -574,14 +574,14 @@ int main(int argc, char **argv)
     mg_eig_tol[i] = 1e-3;
     mg_eig_nEv[i] = nvec[i];
     mg_eig_nKr[i] = 3 * nvec[i];
-    mg_eig_require_convergence[i] = QUDA_BOOLEAN_YES;
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
     mg_eig_amax[i] = -1.0; // use power iterations
@@ -875,7 +875,7 @@ int main(int argc, char **argv)
 
     invertQuda(spinorOut, spinorIn, &inv_param2);
 
-    mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     for (int i = 0; i < mg_param.n_level; i++) mg_param.setup_maxiter_refresh[i] = 0;
 
     mg_preconditioner = newMultigridQuda(&mg_param);
