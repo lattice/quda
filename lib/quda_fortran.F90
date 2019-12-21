@@ -219,13 +219,11 @@ module quda_fortran
      ! pointer to deflation instance
      integer(8) :: deflation_op
 
-     ! defines deflation
+     ! pointer to QudaEigParam that defines any deflation
      integer(8) :: eig_param
 
      ! If true, deflate the initial guess
      QudaBoolean :: deflate
-
-     integer(8) :: eig_param ! pointer to eig parameter instance
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition

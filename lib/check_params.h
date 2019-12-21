@@ -155,7 +155,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_dagger, QUDA_BOOLEAN_FALSE);
   P(use_norm_op, QUDA_BOOLEAN_FALSE);
   P(compute_svd, QUDA_BOOLEAN_FALSE);
-  P(require_convergence, QUDA_BOOLEAN_TURE);
+  P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);

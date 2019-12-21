@@ -1519,7 +1519,7 @@ namespace quda {
       int nParity;
       QDPJITDiracOrder(const ColorSpinorField &a, int nFace=1, Float *field_=0)
       : field(field_ ? field_ : (Float*)a.V()), volumeCB(a.VolumeCB()), stride(a.Stride()), nParity(a.SiteSubset())
-  { if (volumeCB != a.Stride()) errorQuda("Stride must equal volume for this field order"); }
+  { if (volumeCB != stride) errorQuda("Stride must equal volume for this field order"); }
 
   __device__ __host__ inline void load(complex v[Ns * Nc], int x, int parity = 0) const
   {
