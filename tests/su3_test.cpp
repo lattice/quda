@@ -156,53 +156,54 @@ int main(int argc, char **argv)
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1). 
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int nSteps = 50;
+  unsigned int n_steps = 50;
   double coeff_APE = 0.6;
   double coeff_STOUT = coeff_APE/(2*(4-1));
   
   //STOUT
   // start the timer
   time0 = -((double)clock());
-  performSTOUTnStep(nSteps, coeff_STOUT);
+  performSTOUTnStep(n_steps, coeff_STOUT);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for STOUT = %g secs\n", time0);
   qCharge = qChargeQuda();
-  printf("Computed topological charge after is %.16e \n", qCharge);
+  printf("Computed topological charge after STOUT smearin is %.16e \n", qCharge);
 
   //APE
   // start the timer
   time0 = -((double)clock());
-  performAPEnStep(nSteps, coeff_APE);  
+  performAPEnStep(n_steps, coeff_APE);  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for APE = %g secs\n", time0);
   qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
+  printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
 
   //Over Improved STOUT
   double epsilon = -0.25;
   coeff_STOUT = 0.06;
-  nSteps = 200;
+  n_steps = 200;
   // start the timer
   time0 = -((double)clock());
-  performOvrImpSTOUTnStep(nSteps, coeff_STOUT, epsilon);  
+  performOvrImpSTOUTnStep(n_steps, coeff_STOUT, epsilon);  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
   qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
+  printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
 
   // Wilson Flow
+  n_steps = 100;
+  int measQinterval = 5; // Measure the topological charge Nth Wilson Flow step
   double traj_length = 1.0;
-  nSteps = 100;
-  double step_size = traj_length/nSteps;
+  double step_size = traj_length/n_steps;
   // start the timer
   time0 = -((double)clock());
-  performWFlownStep(nSteps, step_size);  
+  performWFlownStep(n_steps, step_size, measQinterval);  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;

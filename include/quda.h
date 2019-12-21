@@ -1,5 +1,4 @@
-#ifndef _QUDA_H
-#define _QUDA_H
+#pragma once
 
 /**
  * @file  quda.h
@@ -1227,39 +1226,40 @@ extern "C" {
    * @param h_in   Input spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
    */
-  void performAPEnStep(unsigned int nSteps, double alpha);
+  void performAPEnStep(unsigned int n_steps, double alpha);
 
   /**
    * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    */
-  void performSTOUTnStep(unsigned int nSteps, double rho);
+  void performSTOUTnStep(unsigned int n_steps, double rho);
 
   /**
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
    */
-  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon);
 
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param step_size Size of Wilson Flow step 
+   * @param meas_Q_interval Measure the topological charge every Nth Wilson Flow step
    */
-  void performWFlownStep(unsigned int nSteps, double step_size);
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interval);
   
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
@@ -1370,4 +1370,3 @@ extern "C" {
 
 /* #include <quda_new_interface.h> */
 
-#endif /* _QUDA_H */

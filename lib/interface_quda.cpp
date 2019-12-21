@@ -5349,7 +5349,7 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   return;
 }
 
-void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)
+void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int n_steps, double alpha)
 {
   profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5393,7 +5393,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   double a = alpha/(1.+6.*alpha);
   double b = 1./(1.+6.*alpha);
 
-  for (unsigned int i=0; i<nSteps; i++) {
+  for (unsigned int i=0; i<n_steps; i++) {
     if (i) in = out;
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -5424,7 +5424,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   profileWuppertal.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performAPEnStep(unsigned int nSteps, double alpha)
+void performAPEnStep(unsigned int n_steps, double alpha)
 {
   profileAPE.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5441,7 +5441,7 @@ void performAPEnStep(unsigned int nSteps, double alpha)
     printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<nSteps; i++) {
+  for (unsigned int i=0; i<n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileAPE,redundant_comms);
     APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
@@ -5453,13 +5453,13 @@ void performAPEnStep(unsigned int nSteps, double alpha)
 
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d APE steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaquette after %d APE steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
 
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performSTOUTnStep(unsigned int nSteps, double rho)
+void performSTOUTnStep(unsigned int n_steps, double rho)
 {
   profileSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5476,7 +5476,7 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
     printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<nSteps; i++) {
+  for (unsigned int i=0; i<n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
@@ -5488,13 +5488,13 @@ void performSTOUTnStep(unsigned int nSteps, double rho)
 
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
 
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
+void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon)
 {
   profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5511,7 +5511,7 @@ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
     printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<nSteps; i++) {
+  for (unsigned int i=0; i<n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
     OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
@@ -5523,13 +5523,13 @@ void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon)
 
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
 
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performWFlownStep(unsigned int nSteps, double step_size)
+void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interval)
 {
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
@@ -5546,19 +5546,22 @@ void performWFlownStep(unsigned int nSteps, double step_size)
     printfQuda("Plaquette after 0 WFlow steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<nSteps; i++) {
+  for (unsigned int i=0; i<n_steps; i++) {    
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     WFlowStep(*gaugeSmeared, *cudaGaugeTemp, step_size);
+    if( (i+1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("Q charge at step %03d = %.16e\n", i+1, qChargeQuda());
+    }
   }
 
   delete cudaGaugeTemp;
-
+  
   gaugeSmeared->exchangeExtendedGhost(R,redundant_comms);
 
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", nSteps, plaq.x, plaq.y, plaq.z);
+    printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
 
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);

@@ -76,6 +76,15 @@ namespace quda
   void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho, double epsilon);
 
   /**
+     @brief Apply Wilson Flow to the gauge field
+
+     @param[out] dataDs Output smeared field
+     @param[in] dataOr Input gauge field
+     @param[in] step_size Step size
+  */
+  void WFlowStep(GaugeField &dataDs, const GaugeField &dataOr, double step_size);
+  
+  /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field
    * @param[in] gauge_dir, 3 for Coulomb gauge fixing, other for Landau gauge fixing
