@@ -106,8 +106,6 @@ set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
 set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
 set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
-set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
-set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
@@ -311,10 +309,10 @@ set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
@@ -332,9 +330,9 @@ set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING "Flags used by the C compi
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING "Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall -DDEVICE_DEBUG" CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline -DHOST_DEBUG"
+    "-Wall -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
     "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
@@ -713,13 +711,9 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_LINK_ASQTAD)
-  add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_ASQTAD)
-
-if(QUDA_LINK_HISQ)
-  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_HISQ)
+if(QUDA_DIRAC_STAGGERED)
+  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE)
+endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
@@ -842,10 +836,10 @@ set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "${QUDA_NVCC_FLAGS} -G"
+    "${QUDA_NVCC_FLAGS} -G -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G"
+    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -DDEVICE_DEBUG -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined"
@@ -894,6 +888,11 @@ endif()
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
+
+if(${CUDA_VERSION} STREQUAL "10.2")
+  set(CMAKE_CUDA_FLAGS
+      "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
+endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )

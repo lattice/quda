@@ -1,4 +1,3 @@
-#include <cub_helper.cuh>
 #include <multigrid_helper.cuh>
 #include <fast_intdiv.h>
 
@@ -6,6 +5,7 @@
 #define DISABLE_GHOST true // do not rename this (it is both a template parameter and a macro)
 
 #include <color_spinor_field_order.h>
+#include <cub_helper.cuh>
 
 // enabling CTA swizzling improves spatial locality of MG blocks reducing cache line wastage
 //#define SWIZZLE

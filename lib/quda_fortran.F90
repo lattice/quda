@@ -225,6 +225,8 @@ module quda_fortran
      ! If true, deflate the initial guess
      QudaBoolean :: deflate
 
+     integer(8) :: eig_param ! pointer to eig parameter instance
+
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
 

@@ -453,10 +453,14 @@ extern "C" {
   } QudaSetupType;
 
   typedef enum QudaBoolean_s {
-    QUDA_BOOLEAN_NO = 0,
-    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_FALSE = 0,
+    QUDA_BOOLEAN_TRUE = 1,
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
+
+  // define these for backwards compatibility
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,

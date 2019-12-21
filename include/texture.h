@@ -2,6 +2,8 @@
 
 #ifdef USE_TEXTURE_OBJECTS
 
+#include <texture_helper.cuh>
+
 template <typename OutputType, typename InputType> class Texture
 {
   typedef typename quda::mapper<InputType>::type RegType;
@@ -24,7 +26,7 @@ template <typename OutputType, typename InputType> class Texture
   __device__ inline OutputType fetch(unsigned int idx) const
   {
     OutputType rtn;
-    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    copyFloatN(rtn, tex1Dfetch_<RegType>(spinor, idx));
     return rtn;
   }
 
@@ -38,10 +40,10 @@ __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
 template <> __device__ inline double2 Texture<double2, double2>::fetch(unsigned int idx) const
-{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned int idx) const
-{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 #else // !USE_TEXTURE_OBJECTS - use direct reads
 

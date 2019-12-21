@@ -96,8 +96,14 @@ namespace quda {
     while (x < arg.threads) {
       // loop over direction
       for (int mu=0; mu<4; mu++) {
-	typename Arg::Float v[10];
-	arg.mom.load(v, x, mu, parity);
+        // FIXME should understand what this does exactly and cleanup (matches MILC)
+	complex<Float> v_[5];
+	arg.mom.load(v_, x, mu, parity);
+        Float v[10];
+        for (int i=0; i<5; i++) {
+          v[2*i+0] = v_[i].real();
+          v[2*i+1] = v_[i].imag();
+        }
 
 	double local_sum = 0.0;
 	for (int j=0; j<6; j++) local_sum += v[j]*v[j];
