@@ -1185,13 +1185,13 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      typedef decltype(Q(0,0).x) undMatType;
+      typedef decltype(Q(0,0).x) matType;
 
-      undMatType inv3 = 1.0/3.0;
-      undMatType c0, c1, c0_max, Tr_re;
-      undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-      undMatType theta;
-      undMatType u_p, w_p;  //u, w parameters.
+      matType inv3 = 1.0/3.0;
+      matType c0, c1, c0_max, Tr_re;
+      matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      matType theta;
+      matType u_p, w_p;  //u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -1220,17 +1220,17 @@ namespace quda {
       w_p = sqrt(c1)*sin(theta*inv3);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      undMatType u_sq = u_p*u_p;
-      undMatType w_sq = w_p*w_p;
-      undMatType denom_inv = 1.0/(9*u_sq - w_sq);
-      undMatType exp_iu_re = cos(u_p);
-      undMatType exp_iu_im = sin(u_p);
-      undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      undMatType cos_w = cos(w_p);
-      undMatType sinc_w;
-      undMatType hj_re = 0.0;
-      undMatType hj_im = 0.0;
+      matType u_sq = u_p*u_p;
+      matType w_sq = w_p*w_p;
+      matType denom_inv = 1.0/(9*u_sq - w_sq);
+      matType exp_iu_re = cos(u_p);
+      matType exp_iu_im = sin(u_p);
+      matType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
+      matType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      matType cos_w = cos(w_p);
+      matType sinc_w;
+      matType hj_re = 0.0;
+      matType hj_im = 0.0;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
@@ -1388,4 +1388,31 @@ namespace quda {
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
 
+  template<class T>
+    __device__  __host__ inline
+    void anti_herm_part(const Matrix<T,3>& Q, Matrix<T,3>* AHQ)
+    {
+      // Compute \AHQ = i/2[Q^dag - Q - 1/3 * I * Tr(Q^dag - Q)]
+      
+      //Declarations
+      typedef decltype(Q(0,0).x) dataType;
+
+      Matrix<T,3> Qdiff;
+      Matrix<T,3> QDT;
+      
+      Qdiff = conj(Q) - Q;
+      
+      *AHQ = Qdiff;
+      T QdiffTr = getTrace(Qdiff);
+      complex<dataType> i_2(0, 0.5);
+      QdiffTr = (1.0 / 3.0) * QdiffTr;
+      
+      // Matrix proportional to QdiffTr
+      setIdentity(&QDT);
+      
+      *AHQ = *AHQ - QdiffTr * QDT;
+      *AHQ = i_2 * (*AHQ);
+      // anti hermitian part of Q is now defined.
+    }
+    
 } // end namespace quda

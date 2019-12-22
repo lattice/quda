@@ -79,10 +79,11 @@ namespace quda
      @brief Apply Wilson Flow to the gauge field
 
      @param[out] dataDs Output smeared field
+     @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
      @param[in] step_size Step size
   */
-  void WFlowStep(GaugeField &dataDs, const GaugeField &dataOr, double step_size);
+  void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
   
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

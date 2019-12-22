@@ -4,6 +4,14 @@
 
 namespace quda
 {
+  // This function gets stap = S_{mu,nu} i.e., the staple of length 3.
+  //
+  // |- > -|                /- > -/                /- > -
+  // ^     v               ^     v                ^
+  // |     |              /     /                /- < -
+  //         + |     |  +         +  /     /  +         +  - > -/
+  //           v     ^              v     ^                    v
+  //           |- > -|             /- > -/                - < -/  
   template <typename Arg, typename Link>
   __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple)
   {

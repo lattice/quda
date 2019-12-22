@@ -1,7 +1,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
-#include <kernels/gauge_staples.cuh>
+#include <kernels/gauge_utils.cuh>
 
 namespace quda
 {
@@ -69,41 +69,21 @@ namespace quda
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, idx, parity, dir, Stap);
-      //
-      // |- > -|                /- > -/                /- > -
-      // ^     v               ^     v                ^
-      // |     |              /     /                /- < -
-      //         + |     |  +         +  /     /  +         +  - > -/
-      //           v     ^              v     ^                    v
-      //           |- > -|             /- > -/                - < -/
-
+      
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
-
+      
       // Get U^{\dagger}
-      UDag = inverse(U);
+      UDag = conj(U);
 
       // Compute \Omega = \rho * S * U^{\dagger}
       Omega = (arg.rho * Stap) * UDag;
 
-      // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
-      //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
-
-      OmegaDiff = conj(Omega) - Omega;
-
-      Q = OmegaDiff;
-      OmegaDiffTr = getTrace(OmegaDiff);
-      OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
-
-      // Matrix proportional to OmegaDiffTr
-      setIdentity(&ODT);
-
-      Q = Q - OmegaDiffTr * ODT;
-      Q = i_2 * Q;
-      // Q is now defined.
-
+      // Compute anti-hermitian part
+      anti_herm_part(Omega, &Q);
+      
 #if 0
       //Test for Tracless:
       //reuse OmegaDiffTr
@@ -166,8 +146,8 @@ namespace quda
       X[dr] += 2 * arg.border[dr];
     }
 
-    double staple_coeff = (5.0 - 2.0 * arg.epsilon) / 3.0;
-    double rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
+    real staple_coeff = (5.0 - 2.0 * arg.epsilon) / 3.0;
+    real rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
 
     int dx[4] = {0, 0, 0, 0};
     // All dimensions are smeared
@@ -188,7 +168,7 @@ namespace quda
       //-------------------------------------------------------------------
 
       // Get U^{\dagger}
-      UDag = inverse(U);
+      UDag = conj(U);
 
       // Compute \rho * staple_coeff * S
       Omega = (arg.rho * staple_coeff) * (Stap);
@@ -197,57 +177,11 @@ namespace quda
       Omega = Omega - (arg.rho * rectangle_coeff) * (Rect);
       Omega = Omega * UDag;
 
-      // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
-      //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
-
-      OmegaDiff = conj(Omega) - Omega;
-
-      Q = OmegaDiff;
-      OmegaDiffTr = getTrace(OmegaDiff);
-      OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
-
-      // Matrix proportional to OmegaDiffTr
-      setIdentity(&ODT);
-
-      Q = Q - OmegaDiffTr * ODT;
-      Q = i_2 * Q;
-      // Q is now defined.
-
-#if 0
-      //Test for Tracless:
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q);
-      double error;
-      error = OmegaDiffTr.real();
-      printf("Trace test %d %d %.15e\n", idx, dir, error);
-
-      //Test for hemiticity:
-      Link Q_diff = conj(Q);
-      Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
-      Q_diff *= Q_diff;
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q_diff);
-      error = OmegaDiffTr.real();
-      printf("Herm test %d %d %.15e\n", idx, dir, error);
-#endif
-
+      // Compute anti-hermitian part, exponentiate, update U
+      anti_herm_part(Omega, &Q);
       exponentiate_iQ(Q, &exp_iQ);
-
-#if 0
-      //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
-      printf("expiQ test %d %d %.15e\n", idx, dir, error);
-#endif
-
       U = exp_iQ * U;
-#if 0
-      //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
-      printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
-#endif
-
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
-
 } // namespace quda

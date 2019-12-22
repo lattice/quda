@@ -5538,6 +5538,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
 
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
+  auto *cudaGaugeAux = new cudaGaugeField(gParam);
 
   double3 plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -5547,7 +5548,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
   for (unsigned int i=0; i<n_steps; i++) {    
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    WFlowStep(*gaugeSmeared, *cudaGaugeTemp, step_size);
+    WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
     if( (i+1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i+1, qCharge);
@@ -5555,6 +5556,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
   }
 
   delete cudaGaugeTemp;
+  delete cudaGaugeAux;
   
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
