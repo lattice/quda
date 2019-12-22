@@ -64,10 +64,8 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // Only spatial dimensions are flowed
     {
-      Link U, UDag, Stap, Omega, OmegaDiff, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
-
+      Link U, Stap, temp1, temp2, Q, exp_iQ;
+ 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, idx, parity, dir, Stap);
 
@@ -77,14 +75,11 @@ namespace quda
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
-      // Get U^{\dagger}
-      UDag = inverse(U);
-
-      // Compute \Omega = \rho * S * U^{\dagger}
-      Omega = (arg.epsilon / 4.0) * Stap * UDag;
+      // Compute Q = c * S * U^{\dagger}
+      temp1 = (arg.epsilon / 4.0) * Stap * conj(U);
 
       // Compute anti-hermitian part, exponentiate, update U
-      anti_herm_part(Omega, &Q);      
+      anti_herm_part(temp1, &Q);      
       exponentiate_iQ(Q, &exp_iQ);
       U = exp_iQ * U;
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
@@ -116,9 +111,7 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // Only spatial dimensions are flowed
     {
-      Link U, UDag, Stap, temp1, temp2, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+      Link U, Stap, temp1, temp2, Q, exp_iQ;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, idx, parity, dir, Stap);
@@ -126,11 +119,8 @@ namespace quda
       // Get updated U stored in arg.out
       U = arg.out(dir, linkIndexShift(x, dx, X), parity);
 
-      // Get U^{\dagger}
-      UDag = inverse(U);
-
       // Compute \Omega = c * S * U^{\dagger}
-      temp1 = Stap * UDag;
+      temp1 = Stap * conj(U);
       temp2 = (8.0 / 9.0) * temp1;
 
       // Use staple computed from W1 step
@@ -174,9 +164,7 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // Only spatial dimensions are flowed
     {
-      Link U, UDag, Stap, temp1, temp2, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+      Link U, Stap, temp1, temp2, Q, exp_iQ;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       computeStaple(arg, idx, parity, dir, Stap);
@@ -184,11 +172,8 @@ namespace quda
       // Get updated U stored in arg.out
       U = arg.out(dir, linkIndexShift(x, dx, X), parity);
 
-      // Get U^{\dagger}
-      UDag = inverse(U);
-
       // Compute \Omega = c * S * U^{\dagger}
-      temp1 = Stap * UDag;
+      temp1 = Stap * conj(U);
       temp2 = (3.0 / 4.0) * temp1;
 
       // Use staple computed from W1 step
