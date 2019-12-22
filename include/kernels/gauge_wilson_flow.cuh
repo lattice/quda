@@ -116,7 +116,6 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // Only spatial dimensions are flowed
     {
-      /*
       Link U, UDag, Stap, temp1, temp2, ODT, Q, exp_iQ;
       Complex OmegaDiffTr;
       Complex i_2(0, 0.5);
@@ -141,17 +140,12 @@ namespace quda
       // Save for Vt step
       arg.temp(dir, linkIndexShift(x, dx, X), parity) = temp1 + temp2;
 
-      // Get traceless anti-Hermitian part of temp1 + temp2;
-      
-      
-      //exponentiate_iQ((temp1 + temp2), &exp_iQ);
-
-      //temp1 = exp_iQ * arg.epsilon;
-
-
-      
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = temp1;
-      */
+      // Get traceless anti-Hermitian part of temp1 + temp2, exponentiate, update U
+      anti_herm_part(temp1 + temp2, &Q);
+      Q *= arg.epsilon;      
+      exponentiate_iQ(Q, &exp_iQ);
+      U = exp_iQ * U;
+      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;      
     }
   }
 
@@ -180,6 +174,33 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // Only spatial dimensions are flowed
     {
+      Link U, UDag, Stap, temp1, temp2, ODT, Q, exp_iQ;
+      Complex OmegaDiffTr;
+      Complex i_2(0, 0.5);
+
+      // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
+      computeStaple(arg, idx, parity, dir, Stap);
+
+      // Get updated U stored in arg.out
+      U = arg.out(dir, linkIndexShift(x, dx, X), parity);
+
+      // Get U^{\dagger}
+      UDag = inverse(U);
+
+      // Compute \Omega = c * S * U^{\dagger}
+      temp1 = Stap * UDag;
+      temp2 = (3.0 / 4.0) * temp1;
+
+      // Use staple computed from W1 step
+      temp1 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
+      temp1 *= -1.0;
+      
+      // Get traceless anti-Hermitian part of temp1 + temp2, exponentiate, update U
+      anti_herm_part(temp1 + temp2, &Q);
+      Q *= arg.epsilon;      
+      exponentiate_iQ(Q, &exp_iQ);
+      U = exp_iQ * U;
+      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;      
     }
   }  
 } // namespace quda
