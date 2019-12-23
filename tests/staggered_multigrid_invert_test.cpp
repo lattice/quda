@@ -40,9 +40,7 @@
 
 static int n_naiks = 1;
 
-#ifdef MULTI_GPU
 void **ghost_fatlink, **ghost_longlink;
-#endif
 
 cpuColorSpinorField *in;
 cpuColorSpinorField *out;
@@ -935,6 +933,7 @@ int main(int argc, char **argv)
     milc_longlink = nullptr;
   }
 
+#ifdef MULTI_GPU
   if (cpuFat != nullptr) {
     delete cpuFat;
     cpuFat = nullptr;
@@ -943,6 +942,7 @@ int main(int argc, char **argv)
     delete cpuLong;
     cpuLong = nullptr;
   }
+#endif
 
   delete in;
   delete out;

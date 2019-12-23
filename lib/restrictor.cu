@@ -10,7 +10,6 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 
-
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
             int coarse_colors_per_thread>
   class RestrictLaunch : public Tunable {
