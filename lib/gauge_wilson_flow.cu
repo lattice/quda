@@ -10,8 +10,7 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW1 : TunableVectorYZ
   {
-    static constexpr int wflowDim = 3; // apply wflowing in space only
-    GaugeWFlowArg<Float, nColor, recon, wflowDim> arg;
+    GaugeWFlowArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -20,7 +19,7 @@ namespace quda {
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
     GaugeWFlowW1(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
-      TunableVectorYZ(2, wflowDim),
+      TunableVectorYZ(2, 3),
       arg(out, temp, in, epsilon),
       meta(in)
     {
@@ -55,13 +54,10 @@ public:
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlowW1
 
-
-
   
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW2 : TunableVectorYZ
   {
-    static constexpr int wflowDim = 3; // apply wflowing in space only
-    GaugeWFlowArg<Float, nColor, recon, wflowDim> arg;
+    GaugeWFlowArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -69,9 +65,9 @@ public:
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFlowW2(GaugeField &in, GaugeField &temp, GaugeField &out, Float epsilon) :
-      TunableVectorYZ(2, wflowDim),
-      arg(in, temp, out, epsilon),
+    GaugeWFlowW2(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
+      TunableVectorYZ(2, 3),
+      arg(out, temp, in, epsilon),
       meta(in)
     {
       strcpy(aux, meta.AuxString());
@@ -107,8 +103,7 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowVt : TunableVectorYZ
   {
-    static constexpr int wflowDim = 3; // apply wflowing in space only
-    GaugeWFlowArg<Float, nColor, recon, wflowDim> arg;
+    GaugeWFlowArg<Float, nColor, recon> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -117,7 +112,7 @@ public:
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
     GaugeWFlowVt(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
-      TunableVectorYZ(2, wflowDim),
+      TunableVectorYZ(2, 3),
       arg(out, temp, in, epsilon),
       meta(in)
     {
@@ -160,9 +155,9 @@ public:
 
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
-
-    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);
-    instantiate<GaugeWFlowW2>(out, temp, in, epsilon);
+    
+    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);    
+    instantiate<GaugeWFlowW2>(in, temp, out, epsilon);
     instantiate<GaugeWFlowVt>(out, temp, in, epsilon);
 #else
     errorQuda("Gauge tools are not built");

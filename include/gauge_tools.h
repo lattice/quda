@@ -143,6 +143,13 @@ namespace quda
   double computeQCharge(const GaugeField &Fmunu);
 
   /**
+     @brief Compute the field energy
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
+     @return double The total field energy
+  */
+  double computeEnergy(const GaugeField &Fmunu);
+
+  /**
      @brief Compute the topological charge density per lattice site
      @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
      @param[out] qDensity The topological charge at each lattice site

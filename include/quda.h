@@ -1268,6 +1268,11 @@ extern "C" {
   double qChargeQuda();
 
   /**
+   * Calculates the field energy from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
+   */
+  double energyQuda();
+  
+  /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data
    * @param[in] y pointer to host data

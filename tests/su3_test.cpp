@@ -194,7 +194,7 @@ int main(int argc, char **argv)
   double coeff_OvrImpSTOUT = 0.06;
   double epsilon = -0.25;
   int meas_Q_interval = 5; // Measure the topological charge Nth Wilson Flow step
-  double traj_length = 1.0;
+  double traj_length = 0.5;
   double step_size = traj_length/n_steps;
   
   //Over Improved STOUT

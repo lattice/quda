@@ -213,6 +213,9 @@ static TimeProfile profileGauss("gaussQuda");
 //!<Profiler for qChargeQuda
 static TimeProfile profileQCharge("qChargeQuda");
 
+//!<Profiler for energyQuda
+static TimeProfile profileEnergy("energyQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
@@ -1541,6 +1544,7 @@ void endQuda(void)
     profileCovDev.Print();
     profilePlaq.Print();
     profileQCharge.Print();
+    profileEnergy.Print();
     profileAPE.Print();
     profileSTOUT.Print();
     profileOvrImpSTOUT.Print();
@@ -5533,9 +5537,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
 
-  if (gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
-
+  
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
@@ -5552,9 +5555,11 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
     if( (i+1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i+1, qCharge);
+      double energy = energyQuda();
+      printfQuda("Energy Density at step %03d = %le\n", i+1, 2 * step_size*(i+1) * step_size*(i+1) * energy * 6.0 * 4 * 3 * 0.5);
     }
   }
-
+  
   delete cudaGaugeTemp;
   delete cudaGaugeAux;
   
@@ -5811,6 +5816,40 @@ double qChargeQuda()
   profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
 
   return charge;
+}
+
+
+double energyQuda()
+{
+  profileEnergy.TPSTART(QUDA_PROFILE_TOTAL);
+
+  cudaGaugeField *gauge = nullptr;
+  if (!gaugeSmeared) {
+    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileQCharge);
+    gauge = extendedGaugeResident;
+  } else {
+    gauge = gaugeSmeared;
+  }
+
+  profileEnergy.TPSTART(QUDA_PROFILE_INIT);
+  // create the Fmunu field
+
+  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  cudaGaugeField Fmunu(tensorParam);
+
+  profileEnergy.TPSTOP(QUDA_PROFILE_INIT);
+  profileEnergy.TPSTART(QUDA_PROFILE_COMPUTE);
+
+  computeFmunu(Fmunu, *gauge);
+  double energy = quda::computeEnergy(Fmunu);
+
+  profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  return energy/(Fmunu.Volume() * 16);
 }
 
 double qChargeDensityQuda(void *h_qDensity)
