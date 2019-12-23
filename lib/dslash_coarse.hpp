@@ -103,7 +103,7 @@ namespace quda {
 	// check this grid size is valid before returning
 	if (param.grid.x < (unsigned int)deviceProp.maxGridSize[0]) return true;
       }
-#endif
+#endif // DOT_PRODUCT_SPLIT
 
       // reset color column stride if too large or not divisible
       param.aux.x = 1;
@@ -185,7 +185,7 @@ namespace quda {
       if (out.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
         create_jitify_program("kernels/dslash_coarse.cuh");
-#endif
+#endif // JITIFY
       }
       strcat(aux, compile_type_str(out));
       strcat(aux, out.AuxString());
@@ -238,7 +238,7 @@ namespace quda {
         jitify_error = program->kernel("quda::coarseDslashKernel")
           .instantiate(Type<Float>(),nDim,Ns,Nc,Mc,(int)tp.aux.x,(int)tp.aux.y,dslash,clover,dagger,type,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
+#else // !JITIFY
         switch (tp.aux.y) { // dimension gather parallelisation
         case 1:
           switch (tp.aux.x) { // this is color_col_stride
@@ -303,7 +303,7 @@ namespace quda {
         default:
           errorQuda("Invalid dimension thread splitting %d", tp.aux.y);
         }
-#endif
+#endif // !JITIFY
       }
     }
 
@@ -511,11 +511,11 @@ namespace quda {
             errorQuda("Halo precision %d not supported with field precision %d and link precision %d", halo_precision, precision, Y.Precision());
           }
         } else if (Y.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
           if (halo_precision == QUDA_SINGLE_PRECISION) {
             ApplyCoarse<float,short,float,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_HALF_PRECISION) {
-#if QUDA_PRECISION & 2
             ApplyCoarse<float,short,short,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
