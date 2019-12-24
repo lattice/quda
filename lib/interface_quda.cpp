@@ -210,10 +210,10 @@ static TimeProfile profileWuppertal("wuppertalQuda");
 //!<Profiler for gaussQuda
 static TimeProfile profileGauss("gaussQuda");
 
-//!<Profiler for qChargeQuda
+//!< Profiler for qChargeQuda
 static TimeProfile profileQCharge("qChargeQuda");
 
-//!<Profiler for energyQuda
+//!< Profiler for energyQuda
 static TimeProfile profileEnergy("energyQuda");
 
 //!< Profiler for APEQuda
@@ -5397,7 +5397,7 @@ void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, 
   double a = alpha/(1.+6.*alpha);
   double b = 1./(1.+6.*alpha);
 
-  for (unsigned int i=0; i<n_steps; i++) {
+  for (unsigned int i = 0; i < n_steps; i++) {
     if (i) in = out;
     ApplyLaplace(out, in, *precise, 3, a, b, in, parity, false, nullptr, profileWuppertal);
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
@@ -5445,10 +5445,14 @@ void performAPEnStep(unsigned int n_steps, double alpha)
     printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<n_steps; i++) {
+  for (unsigned int i = 0; i < n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileAPE,redundant_comms);
     APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
+    if ((i + 1) % 5 == 0 && getVerbosity() >= QUDA_VERBOSE) {
+      double qCharge = qChargeQuda();
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
+    }
   }
 
   delete cudaGaugeTemp;
@@ -5478,10 +5482,15 @@ void performSTOUTnStep(unsigned int n_steps, double rho)
     printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<n_steps; i++) {
+  for (unsigned int i = 0; i < n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
+    if ((i + 1) % 5 == 0 && getVerbosity() >= QUDA_VERBOSE) {
+      double qCharge = qChargeQuda();
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
+    }
+
   }
 
   delete cudaGaugeTemp;
@@ -5511,13 +5520,13 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
     printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<n_steps; i++) {
+  for (unsigned int i = 0; i < n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
     OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
-    if( (i+1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
+    if ((i + 1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       double qCharge = qChargeQuda();
-      printfQuda("Q charge at step %03d = %+.16e\n", i+1, qCharge);
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
     }
   }
 
@@ -5531,14 +5540,15 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interval)
+void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval)
 {
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
 
-  gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
-  
+  if (gaugeSmeared != nullptr) delete gaugeSmeared;
+  gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileOvrImpSTOUT);
+
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
@@ -5548,21 +5558,34 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
     printfQuda("Plaquette after 0 WFlow steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
   }
 
-  for (unsigned int i=0; i<n_steps; i++) {    
+  for (unsigned int i = 0; i < n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
     WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
-    if( (i+1) % meas_Q_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
+    if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {      
       double qCharge = qChargeQuda();
-      printfQuda("Q charge at step %03d = %+.16e\n", i+1, qCharge);
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
       double energy = energyQuda();
-      printfQuda("Energy Density at step %03d = %le\n", i+1, 2 * step_size*(i+1) * step_size*(i+1) * energy * 6.0 * 4 * 3 * 0.5);
+      plaq = plaquette(*gaugeSmeared);
+      double twotsq = 2 * step_size * (i + 1) * step_size * (i + 1);
+
+      // Data looks good (quadratic -> shoulder -> linear) but wrong formula.
+      // The energy definition for both clover and plaquette decays as 1/t^0.5
+      // The fact that these two independent measurements of the energy decay in
+      // the same incorrect fashion suggests that the Wilson Flow code (or some
+      // component thereof) is in error.
+      printfQuda("Wrong Def Energy Density clover at step %03d = %le %le\n", i + 1, twotsq * energy * energy, energy);
+      printfQuda("Wrong Def Energy Density plaq   at step %03d = %le %le \n", i + 1, twotsq * (1.0 - plaq.x) * (1.0 - plaq.x), plaq.x);
+
+      // Data looks bad (always quadratic) but correct formula
+      printfQuda("Correct Def Energy Density clover at step %03d = %le %le\n", i + 1, twotsq * energy, energy);
+      printfQuda("Correct Def Energy Density plaq   at step %03d = %le %le\n", i + 1, twotsq * (1.0 - plaq.x), plaq.x);
     }
   }
   
   delete cudaGaugeTemp;
   delete cudaGaugeAux;
-  
+
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
@@ -5570,7 +5593,6 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interv
 
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
 }
-
 
 int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const unsigned int Nsteps, \
   const unsigned int verbose_interval, const double relax_boost, const double tolerance, const unsigned int reunit_interval, \
@@ -5818,7 +5840,6 @@ double qChargeQuda()
   return charge;
 }
 
-
 double energyQuda()
 {
   profileEnergy.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5849,7 +5870,7 @@ double energyQuda()
   profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  return energy/(Fmunu.Volume() * 16);
+  return energy / (-1.0 * Fmunu.Volume() * 16.0);
 }
 
 double qChargeDensityQuda(void *h_qDensity)

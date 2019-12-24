@@ -65,24 +65,20 @@ namespace quda
     {
       Link U, UDag, Stap, Omega, OmegaDiff, ODT, Q, exp_iQ;
       Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap);
+      computeStaple(arg, idx, parity, dir, Stap, Arg::stoutDim);
       
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       
-      // Get U^{\dagger}
-      UDag = conj(U);
-
       // Compute \Omega = \rho * S * U^{\dagger}
-      Omega = (arg.rho * Stap) * UDag;
+      Omega = (arg.rho * Stap) * conj(U);
 
-      // Compute anti-hermitian part
-      anti_herm_part(Omega, &Q);
+      // Compute hermitian projection
+      herm_proj(Omega, &Q);
       
 #if 0
       //Test for Tracless:
@@ -152,9 +148,7 @@ namespace quda
     int dx[4] = {0, 0, 0, 0};
     // All dimensions are smeared
     {
-      Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+      Link U, Stap, Rect, Omega, Q, exp_iQ;
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
@@ -167,18 +161,15 @@ namespace quda
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
 
-      // Get U^{\dagger}
-      UDag = conj(U);
-
       // Compute \rho * staple_coeff * S
       Omega = (arg.rho * staple_coeff) * (Stap);
 
       // Compute \rho * rectangle_coeff * R
       Omega = Omega - (arg.rho * rectangle_coeff) * (Rect);
-      Omega = Omega * UDag;
+      Omega = Omega * conj(U);
 
-      // Compute anti-hermitian part, exponentiate, update U
-      anti_herm_part(Omega, &Q);
+      // Compute hermitian proj, exponentiate, update U
+      herm_proj(Omega, &Q);
       exponentiate_iQ(Q, &exp_iQ);
       U = exp_iQ * U;
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;

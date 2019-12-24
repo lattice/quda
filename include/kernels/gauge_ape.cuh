@@ -68,7 +68,7 @@ namespace quda
     {
       Link U, S, TestU, I;
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, S);
+      computeStaple(arg, idx, parity, dir, S, 3);
       //
       // |- > -|                /- > -/                /- > -
       // ^     v               ^     v                ^

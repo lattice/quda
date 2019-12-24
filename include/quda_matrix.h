@@ -1185,13 +1185,13 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      typedef decltype(Q(0,0).x) matType;
+      typedef decltype(Q(0, 0).x) matType;
 
-      matType inv3 = 1.0/3.0;
+      matType inv3 = 1.0 / 3.0;
       matType c0, c1, c0_max, Tr_re;
       matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
       matType theta;
-      matType u_p, w_p;  //u, w parameters.
+      matType u_p, w_p; // u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -1220,13 +1220,13 @@ namespace quda {
       w_p = sqrt(c1)*sin(theta*inv3);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      matType u_sq = u_p*u_p;
-      matType w_sq = w_p*w_p;
-      matType denom_inv = 1.0/(9*u_sq - w_sq);
+      matType u_sq = u_p * u_p;
+      matType w_sq = w_p * w_p;
+      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
       matType exp_iu_re = cos(u_p);
       matType exp_iu_im = sin(u_p);
-      matType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      matType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
+      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
       matType cos_w = cos(w_p);
       matType sinc_w;
       matType hj_re = 0.0;
@@ -1388,31 +1388,46 @@ namespace quda {
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
 
-  template<class T>
-    __device__  __host__ inline
-    void anti_herm_part(const Matrix<T,3>& Q, Matrix<T,3>* AHQ)
+    template <class T> __device__ __host__ inline void herm_proj(const Matrix<T, 3> &Q, Matrix<T, 3> *HPQ)
     {
-      // Compute \AHQ = i/2[Q^dag - Q - 1/3 * I * Tr(Q^dag - Q)]
+      // Compute HPQ = i/2[(Q^dag - Q) - 1/3 * Tr(Q^dag - Q)]
+      // Equation (2) https://arxiv.org/abs/hep-lat/0311018v1
       
-      //Declarations
-      typedef decltype(Q(0,0).x) dataType;
-
-      Matrix<T,3> Qdiff;
-      Matrix<T,3> QDT;
-      
-      Qdiff = conj(Q) - Q;
-      
-      *AHQ = Qdiff;
-      T QdiffTr = getTrace(Qdiff);
+      typedef decltype(Q(0, 0).x) dataType;
+      Matrix<T, 3> QDT;
       complex<dataType> i_2(0, 0.5);
-      QdiffTr = (1.0 / 3.0) * QdiffTr;
+      
+      *HPQ = conj(Q) - Q;
+      T QdiffTr = (1.0 / 3.0) * getTrace(*HPQ);
+      // Zero out real part to reduce error
+      QdiffTr.x = 0.0;
       
       // Matrix proportional to QdiffTr
       setIdentity(&QDT);
+      *HPQ -= QdiffTr * QDT;
+      *HPQ *= i_2;
+      // Hermitian projection of Q is now defined.
+    }
+
+    template <class T> __device__ __host__ inline void anti_herm_proj(const Matrix<T, 3> &Q, Matrix<T, 3> *AHPQ, bool from_field_strength = false)
+    {
+      // Compute AHPQ = 1/2[(Q - Q^dag)] - i/3 * Im Tr(Q)
+      //              = 1/2[(Q - Q^dag) - 1/3 * Tr(Q - Q^dag)]
       
-      *AHQ = *AHQ - QdiffTr * QDT;
-      *AHQ = i_2 * (*AHQ);
-      // anti hermitian part of Q is now defined.
+      typedef decltype(Q(0, 0).x) dataType;
+      Matrix<T, 3> QDT;
+      
+      if(!from_field_strength) *AHPQ = Q - conj(Q);
+      else *AHPQ = 8.0 * Q;
+      T QdiffTr =  (1.0/3.0) * getTrace(*AHPQ);
+      // Zero out real part to reduce error
+      QdiffTr.x = 0.0;
+      
+      // Matrix proportional to QdiffTr
+      setIdentity(&QDT);
+      *AHPQ -= QdiffTr * QDT;
+      *AHPQ *= 0.5;
+      // anti hermitian projection of Q is now defined.
     }
     
 } // end namespace quda

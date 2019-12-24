@@ -1253,15 +1253,15 @@ extern "C" {
    * @param meas_Q_interval Measure the topological charge every Nth smearing step
    */
   void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_Q_interval);
-  
+
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
-   * @param step_size Size of Wilson Flow step 
+   * @param step_size Size of Wilson Flow step
    * @param meas_Q_interval Measure the topological charge every Nth Wilson Flow step
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interval);
-  
+
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
@@ -1271,7 +1271,7 @@ extern "C" {
    * Calculates the field energy from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double energyQuda();
-  
+
   /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data

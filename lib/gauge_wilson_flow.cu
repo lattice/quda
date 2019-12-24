@@ -54,7 +54,6 @@ public:
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlowW1
 
-  
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW2 : TunableVectorYZ
   {
     GaugeWFlowArg<Float, nColor, recon> arg;
@@ -156,7 +155,7 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
     
-    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);    
+    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);
     instantiate<GaugeWFlowW2>(in, temp, out, epsilon);
     instantiate<GaugeWFlowVt>(out, temp, in, epsilon);
 #else

@@ -151,10 +151,10 @@ int main(int argc, char **argv)
   } else {
     for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
   }
-  
+
   // Q charge Reduction
   comm_allreduce(&qChargeCheck);
-  
+
   printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
              qCharge - qChargeCheck);
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
   // Gauge Smearing Routines
   //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
-  // on D dimensional lattices for rho = alpha/2*(D-1). 
+  // on D dimensional lattices for rho = alpha/2*(D-1).
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
   unsigned int n_steps = 200;
   double coeff_APE = 0.6;
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
   //APE
   // start the timer
   time0 = -((double)clock());
-  performAPEnStep(n_steps, coeff_APE);  
+  performAPEnStep(n_steps, coeff_APE);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
@@ -193,14 +193,14 @@ int main(int argc, char **argv)
   //---------------------------------------------------------------------------
   double coeff_OvrImpSTOUT = 0.06;
   double epsilon = -0.25;
-  int meas_Q_interval = 5; // Measure the topological charge Nth Wilson Flow step
-  double traj_length = 0.5;
-  double step_size = traj_length/n_steps;
-  
-  //Over Improved STOUT
+  int meas_interval = 5; // Measure the topological charge Nth Wilson Flow step
+  double traj_length = 1.0;
+  double step_size = traj_length / (double)n_steps;
+
+  // Over Improved STOUT
   // start the timer
   time0 = -((double)clock());
-  performOvrImpSTOUTnStep(n_steps, coeff_OvrImpSTOUT, epsilon, meas_Q_interval);  
+  performOvrImpSTOUTnStep(n_steps, coeff_OvrImpSTOUT, epsilon, meas_interval);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
@@ -209,16 +209,16 @@ int main(int argc, char **argv)
   printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
 
   // Wilson Flow
-  // start the timer
+  // Start the timer
   time0 = -((double)clock());
-  performWFlownStep(n_steps, step_size, meas_Q_interval);  
+  performWFlownStep(n_steps, step_size, meas_interval);
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
   printfQuda("Total time for Wilson Flow = %g secs\n", time0);
   qCharge = qChargeQuda();
   printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
-  
+
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
 #endif

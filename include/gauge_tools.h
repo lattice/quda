@@ -84,7 +84,7 @@ namespace quda
      @param[in] step_size Step size
   */
   void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
-  
+
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field

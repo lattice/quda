@@ -13,7 +13,7 @@ namespace quda
   //           v     ^              v     ^                    v
   //           |- > -|             /- > -/                - < -/  
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple)
+  __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple, int dir_ignore = -1)
   {
     // compute spacetime dimensions and parity
     int X[4];
@@ -28,12 +28,13 @@ namespace quda
 
     setZero(&staple);
 
-    // I believe most users won't want to include time staples in smearing
-    for (int mu = 0; mu < 3; mu++) {
+    for (int mu = 0; mu < 4 ; mu++) {
 
-      // identify directions orthogonal to the link.
-      if (mu != dir) {
-
+      // Identify directions orthogonal to the link and 
+      // ignore the dir_ignore direction (usually the temporal dim
+      // when used with STOUT or APE for measurement smearing)
+      if (mu != dir && mu != dir_ignore) {
+	
         int nu = dir;
         {
           int dx[4] = {0, 0, 0, 0};
@@ -73,7 +74,7 @@ namespace quda
   }
   
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle)
+  __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle, int dir_ignore = -1)
   {
     // compute spacetime dimensions and parity
     int X[4];
@@ -89,12 +90,11 @@ namespace quda
     setZero(&staple);
     setZero(&rectangle);
 
-    // Over-Improved stout is usually done for topological
-    // measuremnts, so we include the temporal direction.
-    for (int mu = 0; mu < 4; mu++) {
-
-      // identify directions orthogonal to the link.
-      if (mu != dir) {
+    for (int mu = 0; mu < 4; mu++) {      
+      // Identify directions orthogonal to the link.
+      // Over-Improved stout is usually done for topological
+      // measuremnts which will include the temporal direction.
+      if (mu != dir && mu != dir_ignore) {
         int nu = dir;
 
         // RECTANGLE calculation

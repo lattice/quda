@@ -38,20 +38,20 @@ namespace quda
     
     double E = 0.0;
     
-    Link temp;
-    
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
       Matrix<complex<typename Arg::Float>, Arg::nColor> F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
                                                                arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
 
+      Link temp1, temp2;
       for(int i=0; i<6; i++) {
-	anti_herm_part(F[i], &temp);
-	temp *= temp;
-	E += getTrace(temp).real();
+	anti_herm_proj(F[i], &temp1, true);
+	temp2 = temp1*conj(temp1);
+	E += getTrace(temp2).real();
       }
       x_cb += blockDim.x * gridDim.x;
-    }    
+    }
+    
     reduce2d<blockSize, 2>(arg, E);
   }  
 } // namespace quda
