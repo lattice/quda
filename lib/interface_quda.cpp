@@ -5870,7 +5870,7 @@ double energyQuda()
   profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  return energy / (-1.0 * Fmunu.Volume() * 16.0);
+  return energy / (Fmunu.Volume() * 16.0);
 }
 
 double qChargeDensityQuda(void *h_qDensity)
