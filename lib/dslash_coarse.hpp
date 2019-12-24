@@ -512,10 +512,7 @@ namespace quda {
           }
         } else if (Y.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-          if (halo_precision == QUDA_SINGLE_PRECISION) {
-            ApplyCoarse<float,short,float,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
-                                                  comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
-          } else if (halo_precision == QUDA_HALF_PRECISION) {
+          if (halo_precision == QUDA_HALF_PRECISION) {
             ApplyCoarse<float,short,short,dagger>(out, inA, inB, Y, X, kappa, parity, dslash, clover,
                                                   comms ? DSLASH_FULL : DSLASH_INTERIOR, halo_location);
           } else if (halo_precision == QUDA_QUARTER_PRECISION) {
