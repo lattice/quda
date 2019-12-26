@@ -92,15 +92,19 @@ namespace quda {
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
-			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional) {
+			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2) 
       errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
+#ifdef NSPIN4
     if (coarseColor == 6) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
-    } else if (coarseColor == 24) {
+    } else
+#endif
+    if (coarseColor == 24) {
       calculateYcoarse<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
 #ifdef NSPIN4
     } else if (coarseColor == 32) {
@@ -121,7 +125,8 @@ namespace quda {
   template <typename Float, typename vFloat, int fineColor>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
-			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional) {
+			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  {
     if (T.Vectors().Nspin() == 2) {
       calculateYcoarse<Float,vFloat,fineColor,2>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
     } else {
@@ -133,21 +138,25 @@ namespace quda {
   template <typename Float, typename vFloat>
   void calculateYcoarse(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
 			ColorSpinorField &uv, const Transfer &T, const GaugeField &g, const GaugeField &clover,
-			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional) {
+			const GaugeField &cloverInv, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional)
+  {
+#ifdef NSPIN4
     if (g.Ncolor()/T.Vectors().Nspin() == 6) { // free field Wilson
       calculateYcoarse<Float,vFloat,6>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
-    } else if (g.Ncolor()/T.Vectors().Nspin() == 24) {
+    } else
+#endif
+    if (g.Ncolor()/T.Vectors().Nspin() == 24) {
       calculateYcoarse<Float,vFloat,24>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
-#ifdef GPU_WILSON_DIRAC
+#ifdef NSPIN4
     } else if (g.Ncolor()/T.Vectors().Nspin() == 32) {
       calculateYcoarse<Float,vFloat,32>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
-#endif // GPU_WILSON_DIRAC
-#ifdef GPU_STAGGERED_DIRAC
+#endif // NSPIN4
+#ifdef NSPIN1
     } else if (g.Ncolor()/T.Vectors().Nspin() == 64) {
       calculateYcoarse<Float,vFloat,64>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
     } else if (g.Ncolor()/T.Vectors().Nspin() == 96) {
       calculateYcoarse<Float,vFloat,96>(Y, X, Yatomic, Xatomic, uv, T, g, clover, cloverInv, kappa, mu, mu_factor, dirac, matpc, need_bidirectional);
-#endif // GPU_WILSON_DIRAC
+#endif // NSPIN1
     } else {
       errorQuda("Unsupported number of colors %d\n", g.Ncolor());
     }

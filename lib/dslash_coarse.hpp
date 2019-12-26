@@ -378,13 +378,12 @@ namespace quda {
     if (inA.Nspin() != 2)
       errorQuda("Unsupported number of coarse spins %d\n", inA.Nspin());
 
-    if (inA.Ncolor() == 4) {
-      ApplyCoarse<Float,yFloat,ghostFloat,dagger,4,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
 #ifdef NSPIN4
-    } else if (inA.Ncolor() == 6) { // free field Wilson
+    if (inA.Ncolor() == 6) { // free field Wilson
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,6,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
+    } else
 #endif // NSPIN4
-    } else if (inA.Ncolor() == 24) {
+    if (inA.Ncolor() == 24) {
       ApplyCoarse<Float,yFloat,ghostFloat,dagger,24,2>(out, inA, inB, Y, X, kappa, parity, dslash, clover, type, halo_location);
 #ifdef NSPIN4
     } else if (inA.Ncolor() == 32) {

@@ -233,11 +233,12 @@ namespace quda {
 
     if (out.Ncolor() == 3) {
       const int fineColor = 3;
-      if (nVec == 4) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 6) { // Free field Wilson
+#ifdef NSPIN4
+      if (nVec == 6) { // Free field Wilson
         Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 24) {
+      } else
+#endif // NSPIN4
+      if (nVec == 24) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
 #ifdef NSPIN4
       } else if (nVec == 32) {
