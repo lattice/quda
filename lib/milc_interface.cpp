@@ -760,7 +760,7 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz, QudaMemoryType mem_type_ritz,
                        QudaExtLibType deflation_ext_lib, char vec_infile[], char vec_outfile[], QudaEigParam *df_param)
 {
-
+#if 0
   df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
   df_param->cuda_prec_ritz = ritz_prec;
@@ -776,6 +776,7 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
   // set file i/o parameters
   strcpy(df_param->vec_infile, vec_infile);
   strcpy(df_param->vec_outfile, vec_outfile);
+#endif  
 }
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])
@@ -1066,6 +1067,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
                      const int last_rhs_flag, // is this the last rhs to solve
                      double *const final_residual, double *const final_fermilab_residual, int *num_iters)
 {
+#if 0	
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
@@ -1150,6 +1152,7 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   if (!create_quda_gauge && last_rhs_flag) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
+#endif  
 } // qudaEigCGInvert
 
 
@@ -1447,6 +1450,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
                            const int last_rhs_flag, // is this the last rhs to solve?
                            double *const final_residual, double *const final_fermilab_residual, int *num_iters)
 {
+#if 0	
   qudamilc_called<true>(__func__);
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaCloverInvert: requesting zero residual\n");
 
@@ -1512,6 +1516,7 @@ void qudaEigCGCloverInvert(int external_precision, int quda_precision, double ka
   if ( (clover || cloverInverse) && last_rhs_flag) qudaFreeCloverField();
   if (link && last_rhs_flag) qudaFreeGaugeField();
   qudamilc_called<false>(__func__);
+#endif  
 } // qudaEigCGCloverInvert
 
 
