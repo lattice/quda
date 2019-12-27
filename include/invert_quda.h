@@ -35,11 +35,6 @@ namespace quda {
     void *preconditioner;
 
     /**
-     * Deflation operator
-     */
-    void *deflation_op;
-
-    /**
      * Whether to use the L2 relative residual, L2 absolute residual
      * or Fermilab heavy-quark residual, or combinations therein to
      * determine convergence.  To require that multiple stopping
@@ -263,7 +258,6 @@ namespace quda {
       inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition),
       preconditioner(param.preconditioner),
-      deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.eig_param != 0),
       use_init_guess(param.use_init_guess),
@@ -335,7 +329,6 @@ namespace quda {
       inv_type(param.inv_type),
       inv_type_precondition(param.inv_type_precondition),
       preconditioner(param.preconditioner),
-      deflation_op(param.deflation_op),
       residual_type(param.residual_type),
       deflate(param.deflate),
       eig_param(param.eig_param),

@@ -1390,7 +1390,7 @@ namespace quda {
        //
        eSloppy = e, rSloppy = r;
 
-       if( dcg_cycle ) { //run DCG instead
+       if( dcg_cycle ) { //run CG instead
          if(!K) {
            Kparam.precision   = param.precision_sloppy;
            Kparam.tol         = 5*param.inc_tol;//former cg_iterref_tol param
@@ -1399,7 +1399,7 @@ namespace quda {
          }
 
          local_eigcg_args->run_residual_correction = true;
-         printfQuda("Running DCG correction cycle.\n");
+         printfQuda("Running CG correction cycle.\n");
        }
 
        int iters = param.pipeline == 0 ? EigCGsolve(eSloppy, rSloppy) : CAEigCGsolve(eSloppy, rSloppy);
@@ -1441,17 +1441,17 @@ namespace quda {
      //}
 
      // we need to update rhs index and number of computed eigenvectors
-     param.rhs_idx += logical_rhs_id;
+     param.rhs_idx += 1;
 
      if(logical_rhs_id == 0) {
        warningQuda("Cannot expand the deflation space.\n");
        param.eig_param.nEv = param.eig_param.nConv;
-       param.rhs_idx += 1; //we still solved the system
      }
 
      if(param.eig_param.nConv == param.eig_param.nEv) {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
+       param.eig_param.is_complete = QUDA_BOOLEAN_YES;
      }
 
      return;

@@ -64,7 +64,7 @@ cpuColorSpinorField *tmp;
 static void end();
 
 // Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
+void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
@@ -81,6 +81,12 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  if(inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER){
+    if ( eig_nConv < 0 ) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);
+      eig_param.nLockedMax = eig_nConv;
+      eig_param.nConv      = 0;
+  }
+
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
@@ -88,7 +94,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = prec;
+  eig_param.cuda_prec_ritz = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
@@ -529,6 +535,9 @@ int invert_test()
 
     for (int k = 0; k < Nsrc; k++) {
       construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+
+      if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_YES) inv_type  = QUDA_CG_INVERTER;      
+
       invertQuda(out->V(), in->V(), &inv_param);
 
       time[k] = inv_param.secs;

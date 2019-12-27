@@ -272,9 +272,6 @@ extern "C" {
     /** Preconditioner instance, e.g., multigrid */
     void *preconditioner;
 
-    /** Deflation instance */
-    void *deflation_op;
-
     /** defines deflation */
     void *eig_param;
 

@@ -441,6 +441,8 @@ int main(int argc, char **argv)
     // if deflating preserve the deflation space between solves
     eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
 
+    if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_YES) inv_type  = QUDA_CG_INVERTER;
+
     if (multishift) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
     } else {
