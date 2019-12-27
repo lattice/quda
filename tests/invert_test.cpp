@@ -72,7 +72,7 @@ display_test_info()
 }
 
 // Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
+void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
@@ -89,6 +89,13 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  if(inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER){
+    if ( eig_nConv < 0 ) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);	  
+      eig_param.nLockedMax = eig_nConv;
+      eig_param.nConv      = 0;
+  }
+
+
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
@@ -96,7 +103,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = prec;
+  eig_param.cuda_prec_ritz = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : prec;
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
@@ -179,7 +186,7 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaEigParam eig_param = newQudaEigParam();
-  setEigParam(eig_param);
+  setEigParam(eig_param, inv_type);
   inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
   double kappa5 = 0;
@@ -247,6 +254,12 @@ int main(int argc, char **argv)
   inv_param.solve_type = solve_type;
   inv_param.matpc_type = matpc_type;
 
+  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  } 
+
   inv_param.dagger = QUDA_DAG_NO;
   inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
@@ -259,8 +272,12 @@ int main(int argc, char **argv)
   inv_param.ca_basis = ca_basis;
   inv_param.ca_lambda_min = ca_lambda_min;
   inv_param.ca_lambda_max = ca_lambda_max;
+
+  inv_param.max_restart_num = max_restart_num;
+  inv_param.inc_tol = inc_tol;  
+
   inv_param.tol = tol;
-  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
+  inv_param.tol_restart = tol_restart; 
   if(tol_hq == 0 && tol == 0){
     errorQuda("qudaInvert: requesting zero residual\n");
     exit(1);
