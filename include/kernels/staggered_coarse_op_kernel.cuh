@@ -57,7 +57,6 @@ namespace quda {
         fineVolumeCB(U.VolumeCB()), coarseVolumeCB(X.VolumeCB()),
         fine_to_coarse(fine_to_coarse), coarse_to_fine(coarse_to_fine)
     {
-
       for (int i=0; i<QUDA_MAX_DIM; i++) {
         x_size[i] = x_size_[i];
         xc_size[i] = xc_size_[i];
@@ -66,23 +65,11 @@ namespace quda {
       }
     }
 
-    ~CalculateStaggeredYArg() { }
   };
 
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
-  }
-
-
-  template<typename Float, int dim, QudaDirection dir,
-           int fineColor, int coarseSpin, typename Arg>
-  __device__ __host__ void ComputeStaggeredVUV(Arg &arg, int parity, int x_cb, int ic_f, int jc_f) {
-
+  template <typename Float, int dim, QudaDirection dir, int fineColor, int coarseSpin, typename Arg>
+  __device__ __host__ void ComputeStaggeredVUV(Arg &arg, int parity, int x_cb, int ic_f, int jc_f)
+  {
     constexpr int nDim = 4;
     int coord[QUDA_MAX_DIM];
     int coord_coarse[QUDA_MAX_DIM];
@@ -107,7 +94,6 @@ namespace quda {
     const int s_c_row = arg.spin_map(s,parity); // Coarse spin row index
     const int s_c_col = arg.spin_map(s,1-parity); // Coarse spin col index
 
-
     //Check to see if we are on the edge of a block.  If adjacent site
     //is in same block, M = X, else M = Y
     const bool isDiagonal = ((coord[dim]+1)%arg.x_size[dim])/arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
@@ -119,7 +105,6 @@ namespace quda {
     coord_coarse[0] /= 2;
 
     int coarse_x_cb = ((coord_coarse[3]*arg.xc_size[2]+coord_coarse[2])*arg.xc_size[1]+coord_coarse[1])*(arg.xc_size[0]/2) + coord_coarse[0];
-
 
     complex<Float> vuv;
 

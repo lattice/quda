@@ -71,15 +71,12 @@ namespace quda {
 
   // template on the number of coarse degrees of freedom
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
-  void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+  void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic, const Transfer &T,
+                           const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
-#if 0
-    if (coarseColor == 4) {
-      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, Yatomic, Xatomic, T, g, c, mass dirac, matpc);
-#endif
     if (coarseColor == 24) { // free field staggered
       calculateStaggeredY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, T, g, mass, dirac, matpc);
     } else {
@@ -111,11 +108,12 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateStaggeredY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc) {
+      const Transfer &T, const GaugeField &g, double mass, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     checkPrecision(Xatomic, Yatomic, g);
     checkPrecision(T.Vectors(X.Location()), X, Y);
 
-    printfQuda("Computing Y field......\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Y field......\n");
 
     if (Y.Precision() == QUDA_DOUBLE_PRECISION) {
 #ifdef GPU_MULTIGRID_DOUBLE
