@@ -164,7 +164,7 @@ int main(int argc, char **argv)
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1).
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int n_steps = 200;
+  unsigned int n_steps = 50;
   double coeff_APE = 0.6;
   double coeff_STOUT = coeff_APE/(2*(4-1));
   //STOUT
@@ -193,6 +193,7 @@ int main(int argc, char **argv)
   //---------------------------------------------------------------------------
   double coeff_OvrImpSTOUT = 0.06;
   double epsilon = -0.25;
+  n_steps = 200;
   int meas_interval = 5; // Measure the topological charge Nth Wilson Flow step
   double traj_length = 1.0;
   double step_size = traj_length / (double)n_steps;

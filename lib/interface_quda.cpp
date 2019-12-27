@@ -5574,12 +5574,14 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
       // The fact that these two independent measurements of the energy decay in
       // the same incorrect fashion suggests that the Wilson Flow code (or some
       // component thereof) is in error.
-      printfQuda("Wrong Def Energy Density clover at step %03d = %le %le\n", i + 1, twotsq * energy * energy, energy);
-      printfQuda("Wrong Def Energy Density plaq   at step %03d = %le %le \n", i + 1, twotsq * (1.0 - plaq.x) * (1.0 - plaq.x), plaq.x);
+      printfQuda("Wrong Def Energy Density clover at step %le = %le %le\n", step_size*(i + 1), twotsq * energy * energy, energy);
+      printfQuda("Wrong Def Energy Density plaq   at step %le = %le %le \n", step_size*(i + 1), twotsq * (1.0 - plaq.x) * (1.0 - plaq.x), plaq.x);
 
       // Data looks bad (always quadratic) but correct formula
-      printfQuda("Correct Def Energy Density clover at step %03d = %le %le\n", i + 1, twotsq * energy, energy);
-      printfQuda("Correct Def Energy Density plaq   at step %03d = %le %le\n", i + 1, twotsq * (1.0 - plaq.x), plaq.x);
+      printfQuda("Correct Def Energy Density clover at step %le = %le %le\n", step_size*(i + 1), twotsq * energy, energy);
+      printfQuda("Correct Def Energy Density plaqx  at step %le = %le %le\n", step_size*(i + 1), twotsq * (1.0 - plaq.x), plaq.x);
+      printfQuda("Correct Def Energy Density plaqy  at step %le = %le %le\n", step_size*(i + 1), twotsq * (1.0 - plaq.y), plaq.y);
+      printfQuda("Correct Def Energy Density plaqz  at step %le = %le %le\n", step_size*(i + 1), twotsq * (1.0 - plaq.z), plaq.z);
     }
   }
   

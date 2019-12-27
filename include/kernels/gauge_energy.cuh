@@ -46,6 +46,8 @@ namespace quda
       Link temp1, temp2;
       for(int i=0; i<6; i++) {
 	anti_herm_proj(F[i], &temp1, true);
+	// Already anti-hermitian.
+	// Scale out factor of 1/8.
 	temp2 = temp1*conj(temp1);
 	E += getTrace(temp2).real();
       }

@@ -1399,8 +1399,6 @@ namespace quda {
       
       *HPQ = conj(Q) - Q;
       T QdiffTr = (1.0 / 3.0) * getTrace(*HPQ);
-      // Zero out real part to reduce error
-      QdiffTr.x = 0.0;
       
       // Matrix proportional to QdiffTr
       setIdentity(&QDT);
@@ -1419,15 +1417,13 @@ namespace quda {
       
       if(!from_field_strength) *AHPQ = Q - conj(Q);
       else *AHPQ = 8.0 * Q;
-      T QdiffTr =  (1.0/3.0) * getTrace(*AHPQ);
-      // Zero out real part to reduce error
-      QdiffTr.x = 0.0;
+      T QdiffTr =  (1.0 / 3.0) * getTrace(*AHPQ);
       
       // Matrix proportional to QdiffTr
       setIdentity(&QDT);
       *AHPQ -= QdiffTr * QDT;
       *AHPQ *= 0.5;
-      // anti hermitian projection of Q is now defined.
+      // Anti hermitian projection of Q is now defined.
     }
     
 } // end namespace quda
