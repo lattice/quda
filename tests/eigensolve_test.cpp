@@ -64,7 +64,10 @@ void display_test_info()
   if (eig_use_poly_acc) {
     printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
     printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+    if (eig_amax <= 0)
+      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+    else
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
