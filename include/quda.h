@@ -963,14 +963,6 @@ extern "C" {
   void dumpMultigridQuda(void *mg_instance, QudaMultigridParam *param);
 
   /**
-   * @brief Updates the deflation space information
-   * @param[in] mg_instance Pointer to the instance of deflated solver
-   * @param param Contains all metadata regarding host and device
-   * storage etc.
-   */
-  void updateDeflationQuda(void *df_instance, QudaInvertParam *param);
-
-  /**
    * Apply the Dslash operator (D_{eo} or D_{oe}).
    * @param h_out  Result spinor field
    * @param h_in   Input spinor field
@@ -1330,18 +1322,6 @@ extern "C" {
   void openMagma();
 
   void closeMagma();
-
-  /**
-  * Create deflation solver resources.
-  *
-  **/
-
-  void* newDeflationQuda(QudaInvertParam *param);
-
-  /**
-   * Free resources allocated by the deflated solver
-   */
-  void destroyDeflationQuda(void *df_instance);
 
   void setMPICommHandleQuda(void *mycomm);
 

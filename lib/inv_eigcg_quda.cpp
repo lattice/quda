@@ -508,6 +508,7 @@ namespace quda {
     matDefl(param.precision_ritz == param.precision ? mat : ( param.precision_ritz == param.precision_sloppy ? matSloppy : matPrecon ) ),
     K(nullptr),
     Kparam(param),
+    m(param.eig_param.nKr),    
     ep(nullptr),
     ep_sloppy(nullptr),
     rp(nullptr),
@@ -552,14 +553,7 @@ namespace quda {
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
 
-
-    deflation_space *defl_space = static_cast<deflation_space*>(param.deflation_op);
-    injectDeflationSpace(defl_space->evecs);
-
-    const bool host_computing = param.pipeline == 0 ? false : host_flag;
-
-    if(!IncEigCG::persistant_eigcg_args) local_eigcg_args = std::make_shared <EigCGArgs>(*evecs[0], param, host_computing);
-    else local_eigcg_args.swap(IncEigCG::persistant_eigcg_args);
+    if( param.rhs_idx > 0 ) injectDeflationSpace(reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space)->evecs, false);
 
     return;
   }
@@ -581,8 +575,6 @@ namespace quda {
      //whether we want preconditiond (id = 5) or unpreconditioned (id = 2) residual:
      const int r_idx = K ? 5 : 2;
      ColorSpinorField &z  = (*work_space)[r_idx];
-
-     const int m = param.eig_param.nKr;
 
      args.UpdateLanczosMatrix(lanczos_diag, lanczos_offdiag);
      args.CacheInvRNorm(rnorm);
@@ -606,7 +598,6 @@ namespace quda {
   void IncEigCG::PipelinedSearchSpaceUpdate(const double &lanczos_diag, const double &lanczos_offdiag, const double &beta, const double &normr)
   {
     constexpr bool is_pipelined	= true;
-    const int m = param.eig_param.nKr;
 
     EigCGArgs &args = *local_eigcg_args;
 
@@ -1338,8 +1329,6 @@ namespace quda {
      if (!init) {
        ColorSpinorParam csParam(in);
 
-       const bool host_computing = param.pipeline == 0 ? false : host_flag;
-
        csParam.create = QUDA_ZERO_FIELD_CREATE;
 
        ep = MakeSharedPtr(csParam);//full precision accumulator
@@ -1364,6 +1353,13 @@ namespace quda {
 	 p_pre = MakeSharedPtr(csParam);
 	 r_pre = MakeSharedPtr(csParam);
        }
+
+       const bool host_computing = param.pipeline == 0 ? false : host_flag;
+
+       constructDeflationSpace(in, param.eig_param.nEv);
+
+       if(!IncEigCG::persistant_eigcg_args) local_eigcg_args = std::make_shared <EigCGArgs>(in, param, host_computing);
+       else local_eigcg_args.swap(IncEigCG::persistant_eigcg_args);       
 
        local_eigcg_args->global_stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -1457,9 +1453,6 @@ namespace quda {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
      }
-
-     deflation_space *defl_space = static_cast<deflation_space*>(param.deflation_op);
-     extractDeflationSpace(defl_space->evecs);
 
      return;
   }

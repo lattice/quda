@@ -329,10 +329,6 @@ namespace quda {
         rhs_idx = param.rhs_idx;
       }
 
-      if(param.eig_param) {
-        QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
-        eig_param = *eig_param_p;
-      }
     }
 
     SolverParam(const SolverParam &param) :
@@ -428,16 +424,6 @@ namespace quda {
       }
       //for mrhs solvers:
       param.rhs_idx = rhs_idx;
-
-      if(param.eig_param) {
-        QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(param.eig_param);
-        eig_param_p->nConv = eig_param.nConv;
-
-	if( eig_param_p->nEv != eig_param.nEv ){
-	  warningQuda("Resized previous deflation space from %d to %d./n", eig_param_p->nEv,  eig_param.nEv );
-	  eig_param_p->nEv = eig_param.nEv;
-	}
-      }
 
       param.ca_lambda_min = ca_lambda_min;
       param.ca_lambda_max = ca_lambda_max;
@@ -550,6 +536,11 @@ namespace quda {
     void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
+       @brief Constructs the deflation space for some subset of deflated solvers (e.g., eigCG)
+    */
+    void constructDeflationSpace(const ColorSpinorField &meta, const int size);
+
+    /**
        @brief Destroy the allocated deflation space
     */
     void destroyDeflationSpace();
@@ -566,8 +557,9 @@ namespace quda {
        space transferred to the solver.
        @param[in,out] defl_space the deflation space we wish to
        transfer to the solver.
+       @param[in] Whether to destroy the defl_space containers (defaulted to true)
     */
-    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space);
+    void injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space, const bool destroy_defl_space = true);
 
     /**
        @brief Extracts the deflation space from the solver to the
@@ -1289,6 +1281,11 @@ public:
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
 
+    /**
+       The size of the search space that EigCG uses.
+     */
+    int m;    
+	
     std::shared_ptr<ColorSpinorField> ep;//full precision accumulator
     std::shared_ptr<ColorSpinorField> ep_sloppy;
     std::shared_ptr<ColorSpinorField> rp;//full precision residual

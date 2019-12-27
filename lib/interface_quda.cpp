@@ -2617,65 +2617,6 @@ void dumpMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profilerStop(__func__);
 }
 
-void* newDeflationQuda(QudaInvertParam *inv_param) {
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
-  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
-
-  auto *defl= new deflation_space();
-
-  const bool pc_solve = (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE);
-
-  cudaGaugeField *cudaGauge = checkGauge(inv_param);
-
-  ColorSpinorParam ritzParam(nullptr, *inv_param, cudaGauge->X(), pc_solve, eig_param_p->location);
-
-  ritzParam.create        = QUDA_ZERO_FIELD_CREATE;
-  ritzParam.setPrecision(inv_param->cuda_prec_ritz);
-
-  if (ritzParam.location==QUDA_CUDA_FIELD_LOCATION) {
-    ritzParam.setPrecision(inv_param->cuda_prec_ritz, inv_param->cuda_prec_ritz, true); // set native field order
-    if (ritzParam.nSpin != 1) ritzParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-
-    //select memory location here, by default ritz vectors will be allocated on the device
-    //but if not sufficient device memory, then the user may choose mapped type of memory
-    ritzParam.mem_type = eig_param_p->mem_type_ritz;
-  } else { //host location
-    ritzParam.mem_type = QUDA_MEMORY_PINNED;
-  }
-
-  for (int i = 0; i < eig_param_p->nEv; i++) { defl->evecs.push_back(ColorSpinorField::Create(ritzParam)); }
-
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  saveProfile(__func__);
-  flushProfile();
-  return static_cast<void*>(defl);
-}
-
-void updateDeflationQuda(void *df, QudaInvertParam *inv_param) {
-  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
-
-  QudaEigParam *eig_param_p = reinterpret_cast<QudaEigParam *>(inv_param->eig_param);
-
-  eig_param_p->is_complete = eig_param_p->nEv == eig_param_p->nConv ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-
-  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  saveProfile(__func__);
-  flushProfile();
-
-  return;
-}
-
-void destroyDeflationQuda(void *ds) {
-
-  auto ds_p = static_cast<deflation_space*>(ds);
-  for (auto p : ds_p->evecs) {delete p; }
-
-  delete ds_p;
-}
-
 void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
 {
   profilerStart(__func__);
@@ -2706,7 +2647,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     (param->solve_type == QUDA_DIRECT_PC_SOLVE);
   bool norm_error_solve = (param->solve_type == QUDA_NORMERR_SOLVE) ||
     (param->solve_type == QUDA_NORMERR_PC_SOLVE);
-  bool deflated_solve = param->deflation_op != nullptr && (param->inv_type != QUDA_EIGCG_INVERTER && param->inv_type != QUDA_INC_EIGCG_INVERTER && param->inv_type != QUDA_GMRESDR_INVERTER) ? true : false;
 
   param->secs = 0;
   param->gflops = 0;
@@ -2866,16 +2806,9 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     DiracMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    if(!deflated_solve) {
-      (*solve)(*out, *in);
-      delete solve;
-    } else {
-      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
-      (*dsolve)(*out, *in);
-      delete dsolve;
-    }
+    (*solve)(*out, *in);
     blas::copy(*in, *out);
-    //delete solve;
+    delete solve;
     solverParam.updateInvertParam(*param);
   }
 
@@ -2923,16 +2856,8 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    if(!deflated_solve) {
-      (*solve)(*out, *in);
-      delete solve;
-    } else {
-      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
-      (*dsolve)(*out, *in);
-      delete dsolve;
-    }
-    //(*solve)(*out, *in);
-    //delete solve;
+    (*solve)(*out, *in);
+    delete solve;
     solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
@@ -2979,32 +2904,17 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     }
 
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    if(!deflated_solve) {
-      (*solve)(*out, *in);
-      delete solve;
-    } else {
-      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
-      (*dsolve)(*out, *in);
-      delete dsolve;
-    }
-    //(*solve)(*out, *in);
-    //delete solve;
+    (*solve)(*out, *in);
+    delete solve;
     solverParam.updateInvertParam(*param);
   } else { // norm_error_solve
     DiracMMdag m(dirac), mSloppy(diracSloppy), mPre(diracPre);
     cudaColorSpinorField tmp(*out);
     SolverParam solverParam(*param);
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
-    if(!deflated_solve) {
-      (*solve)(*out, *in); // y = (M M^\dag) b
-      delete solve;
-    } else {
-      Solver *dsolve = new PreconditionedSolver(*solve, dirac, solverParam, profileInvert, "", deflated_solve);
-      (*dsolve)(*out, *in);
-      delete dsolve;
-    }
+    (*solve)(tmp, *in); // y = (M M^\dag) b
     dirac.Mdag(*out, tmp);  // x = M^dag y
-    //delete solve;
+    delete solve;
     solverParam.updateInvertParam(*param);
   }
 
