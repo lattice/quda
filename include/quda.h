@@ -1212,7 +1212,7 @@ extern "C" {
    */
   void plaqQuda(double plaq[3]);
 
-  /*
+  /**
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externalGaugeResident cudaGaugeField
    * @param Location of gauge field
@@ -1235,33 +1235,35 @@ extern "C" {
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performAPEnStep(unsigned int n_steps, double alpha);
+  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
 
   /**
    * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performSTOUTnStep(unsigned int n_steps, double rho);
+  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
 
   /**
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
-   * @param meas_Q_interval Measure the topological charge every Nth smearing step
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_Q_interval);
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
 
   /**
    * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
    * @param n_steps Number of steps to apply.
    * @param step_size Size of Wilson Flow step
-   * @param meas_Q_interval Measure the topological charge every Nth Wilson Flow step
+   * @param meas_interval Measure the Q charge and field energy every Nth step
    */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_Q_interval);
-
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval);
+  
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */

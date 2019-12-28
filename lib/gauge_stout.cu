@@ -71,7 +71,7 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeOvrImpSTOUT : TunableVectorYZ
   {
-    static constexpr int stoutDim = 4; // apply stouting in space only
+    static constexpr int stoutDim = 4; // apply stouting in all dims
     GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
     const GaugeField &meta;
 

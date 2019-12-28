@@ -3,6 +3,9 @@
 #include <cub_helper.cuh>
 #include <quda_matrix.h>
 
+#ifndef oneOnThree
+#define oneOnThree 0.333333333333333333333333333333
+#endif
 
 namespace quda
 {
@@ -37,7 +40,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     
     double E = 0.0;
-    
+    complex<real> trace;
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
       Matrix<complex<typename Arg::Float>, Arg::nColor> F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
@@ -45,15 +48,15 @@ namespace quda
 
       Link temp1, temp2;
       for(int i=0; i<6; i++) {
-	anti_herm_proj(F[i], &temp1, true);
-	// Already anti-hermitian.
-	// Scale out factor of 1/8.
-	temp2 = temp1*conj(temp1);
-	E += getTrace(temp2).real();
+	// Rescale from 1/8
+	F[i] *= 8;
+	trace = getTrace(F[i]);
+	setIdentity(&temp2); 
+	temp1 = 0.5 * (F[i] - oneOnThree * temp2);
+	E += getTrace(temp1 * conj(temp1)).real();
       }
       x_cb += blockDim.x * gridDim.x;
     }
-    
     reduce2d<blockSize, 2>(arg, E);
   }  
 } // namespace quda

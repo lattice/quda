@@ -6,11 +6,12 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_> struct GaugeWFlowArg {
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int wFlowDim_> struct GaugeWFlowArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
+    static constexpr int wFlowDim = wFlowDim_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
     Gauge out;
@@ -45,6 +46,7 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
+    if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -61,27 +63,27 @@ namespace quda
 
     int dx[4] = {0, 0, 0, 0};
     {
-      Link U, Stap, temp1, Q, exp_iQ;
+      Link U, Stap, Z0, exp_Z0;
       Complex im(0.0,-1.0);
             
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap);
+      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
       
       // Compute Z0, store in temp
-      temp1 = Stap * conj(U);
-      arg.temp(dir, linkIndexShift(x, dx, X), parity) = temp1;
-      temp1 *= (1.0 / 4.0) * arg.epsilon;
+      Z0 = Stap * conj(U);
+      arg.temp(dir, linkIndexShift(x, dx, X), parity) = Z0;
+      Z0 *= (1.0 / 4.0) * arg.epsilon;
       
-      // Compute hermitian projection of temp1, exponentiate, update U
-      anti_herm_proj(temp1, &Q, false);
-      //Q *= im;
-      exp_iQ = Q;
-      //exponentiate_iQ(Q, &exp_iQ);
-      expsu3(exp_iQ);
-      U = exp_iQ * U;
+      // Compute anti-hermitian projection of Z0, exponentiate, update U
+      makeAntiHerm(Z0);
+      //exponentiate_iQ assumes hermitian Q, rescale Z by -i
+      Z0 = im * Z0; 
+      exponentiate_iQ(Z0, &exp_Z0);
+      
+      U = exp_Z0 * U;
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
@@ -93,6 +95,7 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
+    if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -109,31 +112,31 @@ namespace quda
 
     int dx[4] = {0, 0, 0, 0};
     {
-      Link U, Stap, temp1, temp2, Q, exp_iQ;
+      Link U, Stap, Z1, Z0, exp_Z1;
       Complex im(0.0,-1.0);
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap);
+      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
 
       // Get updated U 
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Z1.
-      temp1 = (8.0 / 9.0) * Stap * conj(U);
+      Z1 = (8.0 / 9.0) * Stap * conj(U);
       // Retrieve Z0, (8/9 Z1 - 17/36 Z0) stored in temp
-      temp2 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
-      temp2 *= (17.0 / 36.0);
-      temp1 -= temp2;
-      arg.temp(dir, linkIndexShift(x, dx, X), parity) = temp1;
-      temp1 *= arg.epsilon;
+      Z0 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
+      Z0 *= (17.0 / 36.0);
+      Z1 = Z1 - Z0;
+      arg.temp(dir, linkIndexShift(x, dx, X), parity) = Z1;
+      Z1 *= arg.epsilon;
       
-      // Compute hermitian projection of temp1, exponentiate, update U
-      anti_herm_proj(temp1, &Q, false);
-      //Q *= im;
-      exp_iQ = Q;
-      //exponentiate_iQ(Q, &exp_iQ);
-      expsu3(exp_iQ);
-      U = exp_iQ * U;
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;      
+      // Compute anti-hermitian projection of Z1, exponentiate, update U
+      makeAntiHerm(Z1);
+      //exponentiate_iQ assumes hermitian Q, rescale Z by -i
+      Z1 = im * Z1; 
+      exponentiate_iQ(Z1, &exp_Z1);
+      
+      U = exp_Z1 * U;
+      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
 
@@ -144,6 +147,7 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
+    if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -160,28 +164,28 @@ namespace quda
 
     int dx[4] = {0, 0, 0, 0};
      {
-      Link U, Stap, temp1, temp2, Q, exp_iQ;
+      Link U, Stap, Z2, Z1, exp_Z2;
       Complex im(0.0,-1.0);
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap);
+      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
 
       // Get updated U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Z2, construct (3/4 Z2 - 8/9 Z1 + 17/36 Z0)
-      temp1 = (3.0 / 4.0) * Stap * conj(U);
+      Z2 = (3.0 / 4.0) * Stap * conj(U);
       // Use (8/9 Z1 - 17/36 Z0) computed from W2 step
-      temp2 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
-      temp1 -= temp2;
-      temp1 *= arg.epsilon;
+      Z1 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
+      Z2 = Z2 - Z1;
+      Z2 *= arg.epsilon;
+
+      // Compute anti-hermitian projection of Z2, exponentiate, update U
+      makeAntiHerm(Z2);
+      //exponentiate_iQ assumes hermitian Q, rescale Z by -i
+      Z2 = im * Z2; 
+      exponentiate_iQ(Z2, &exp_Z2);
       
-      // Compute hermitian proj of temp1, exponentiate, update U
-      anti_herm_proj(temp1, &Q, false);
-      //Q *= im;
-      exp_iQ = Q;
-      //exponentiate_iQ(Q, &exp_iQ);
-      expsu3(exp_iQ);
-      U = exp_iQ * U;
+      U = exp_Z2 * U;
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;      
     }
   }  

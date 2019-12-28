@@ -10,7 +10,8 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeAPE : TunableVectorYZ
   {
-    GaugeAPEArg<Float,nColor,recon> arg;
+    static constexpr int apeDim = 3; // apply APE in space only
+    GaugeAPEArg<Float,nColor,recon, apeDim> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -19,7 +20,7 @@ namespace quda {
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
     GaugeAPE(GaugeField &out, const GaugeField &in, double alpha) :
-      TunableVectorYZ(2, 3),
+      TunableVectorYZ(2, apeDim),
       arg(out, in, alpha),
       meta(in)
     {

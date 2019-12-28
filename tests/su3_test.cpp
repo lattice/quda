@@ -25,6 +25,50 @@
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim);
+  switch(test_type) {
+  case 0 : 
+    printfQuda("\nAPE smearing\n");
+    printfQuda(" - rho %f\n", ape_smear_rho);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 1 :
+    printfQuda("\nStout smearing\n");
+    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 2 :
+    printfQuda("\nOver-Improved Stout smearing\n");
+    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - epsilon %f\n", stout_smear_epsilon);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 3 :
+    printfQuda("\nWilson Flow\n");
+    printfQuda(" - epsilon %f\n", wflow_epsilon);
+    printfQuda(" - Wilson flow steps %d\n", wflow_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);    
+    break;
+  default :
+    errorQuda("Undefined test type %d given", test_type);
+  }
+    
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+  return;
+}
+
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
@@ -69,9 +113,10 @@ int main(int argc, char **argv)
 {
 
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
+  add_su3_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -106,7 +151,7 @@ int main(int argc, char **argv)
   initRand();
 
   // load in the command line supplied gauge field
-  if (strcmp(latfile,"")) {  
+  if (strcmp(latfile, "")) {
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate an SU(3) field
@@ -127,6 +172,9 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette gauge precise is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
+
+  // All user inputs now defined
+  display_test_info();
 
   // Topological charge
   double qCharge = 0.0, qChargeCheck = 0.0;
@@ -164,61 +212,61 @@ int main(int argc, char **argv)
   // Stout smearing should be equivalent to APE smearing
   // on D dimensional lattices for rho = alpha/2*(D-1).
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int n_steps = 50;
-  double coeff_APE = 0.6;
-  double coeff_STOUT = coeff_APE/(2*(4-1));
-  //STOUT
-  // start the timer
-  time0 = -((double)clock());
-  performSTOUTnStep(n_steps, coeff_STOUT);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for STOUT = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after STOUT smearing is %.16e \n", qCharge);
-
-  //APE
-  // start the timer
-  time0 = -((double)clock());
-  performAPEnStep(n_steps, coeff_APE);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for APE = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
-
-  // Topological charge routines
-  //---------------------------------------------------------------------------
-  double coeff_OvrImpSTOUT = 0.06;
-  double epsilon = -0.25;
-  n_steps = 200;
-  int meas_interval = 5; // Measure the topological charge Nth Wilson Flow step
-  double traj_length = 1.0;
-  double step_size = traj_length / (double)n_steps;
-
-  // Over Improved STOUT
-  // start the timer
-  time0 = -((double)clock());
-  performOvrImpSTOUTnStep(n_steps, coeff_OvrImpSTOUT, epsilon, meas_interval);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
-
-  // Wilson Flow
-  // Start the timer
-  time0 = -((double)clock());
-  performWFlownStep(n_steps, step_size, meas_interval);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for Wilson Flow = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
+  switch (test_type) {
+  case 0:
+    // APE
+    // start the timer
+    time0 = -((double)clock());
+    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for APE = %g secs\n", time0);
+    qCharge = qChargeQuda();
+    printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
+    break;
+  case 1 :
+    //STOUT
+    // start the timer
+    time0 = -((double)clock());
+    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for STOUT = %g secs\n", time0);
+    qCharge = qChargeQuda();
+    printfQuda("Computed topological charge after STOUT smearing is %.16e \n", qCharge);
+    break;
+    
+    // Topological charge routines
+    //---------------------------------------------------------------------------
+  case 2 :
+    // Over Improved STOUT
+    // start the timer
+    time0 = -((double)clock());
+    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
+    qCharge = qChargeQuda();
+    printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
+    break;
+  case 3 :
+    // Wilson Flow
+    // Start the timer
+    time0 = -((double)clock());
+    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Wilson Flow = %g secs\n", time0);
+    qCharge = qChargeQuda();
+    printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
+    break;
+  default :
+    errorQuda("Undefined test type %d given", test_type);
+  }
 
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");

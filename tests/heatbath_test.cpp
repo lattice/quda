@@ -180,7 +180,7 @@ int main(int argc, char **argv)
   initQuda(device);
 
   setVerbosity(verbosity);
-  
+
   {
     using namespace quda;
     GaugeFieldParam gParam(0, gauge_param);
@@ -298,73 +298,11 @@ int main(int argc, char **argv)
       charge = qChargeQuda();
       printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
 
-  // Gauge Smearing Routines
-  //---------------------------------------------------------------------------
-  // Stout smearing should be equivalent to APE smearing
-  // on D dimensional lattices for rho = alpha/2*(D-1).
-  // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int n_steps = 200;
-  double coeff_APE = 0.6;
-  double coeff_STOUT = coeff_APE/(2*(4-1));
-  //STOUT
-  // start the timer
-  time0 = -((double)clock());
-  performSTOUTnStep(n_steps, coeff_STOUT);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for STOUT = %g secs\n", time0);
-  double qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after STOUT smearing is %.16e \n", qCharge);
-
-  //APE
-  // start the timer
-  time0 = -((double)clock());
-  performAPEnStep(n_steps, coeff_APE);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for APE = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
-
-  // Topological charge routines
-  //---------------------------------------------------------------------------
-  double coeff_OvrImpSTOUT = 0.06;
-  double epsilon = -0.5;
-  int meas_interval = 5; // Measure the topological charge Nth Wilson Flow step
-  double traj_length = 1.0;
-  double step_size = traj_length / (double)n_steps;
-
-  // Over Improved STOUT
-  // start the timer
-  time0 = -((double)clock());
-  performOvrImpSTOUTnStep(n_steps, coeff_OvrImpSTOUT, epsilon, meas_interval);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
-
-  // Wilson Flow
-  // Start the timer
-  time0 = -((double)clock());
-  performWFlownStep(n_steps, step_size, meas_interval);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for Wilson Flow = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
-
-
-      
       freeGaugeQuda();
     }
 
     // Save if output string is specified
-    if (strcmp(gauge_outfile,"")) {
+    if (strcmp(gauge_outfile, "")) {
 
       printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
 
@@ -373,28 +311,25 @@ int main(int argc, char **argv)
 
       size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) {
-        cpu_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
-      }
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
+      saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
 
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
+      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
 
-
-      for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
+      for (int dir = 0; dir < 4; dir++) free(cpu_gauge[dir]);
     } else {
       printfQuda("No output file specified.\n");
     }
 
     delete gauge;
     delete gaugeEx;
-    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
- 
+
     randstates->Release();
     delete randstates;
   }
@@ -402,21 +337,20 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone, total time = %g secs\n", 
-	 time0);
+
+  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
+  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printfQuda("\nDone, total time = %g secs\n", time0);
 
   freeGaugeQuda();
-  
+
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
 
-  for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
+  for (int dir = 0; dir < 4; dir++) free(load_gauge[dir]);
 
   return 0;
 }

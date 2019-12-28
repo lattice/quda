@@ -1392,38 +1392,18 @@ namespace quda {
     {
       // Compute HPQ = i/2[(Q^dag - Q) - 1/3 * Tr(Q^dag - Q)]
       // Equation (2) https://arxiv.org/abs/hep-lat/0311018v1
-      
+
       typedef decltype(Q(0, 0).x) dataType;
       Matrix<T, 3> QDT;
       complex<dataType> i_2(0, 0.5);
-      
+
       *HPQ = conj(Q) - Q;
       T QdiffTr = (1.0 / 3.0) * getTrace(*HPQ);
-      
+
       // Matrix proportional to QdiffTr
       setIdentity(&QDT);
       *HPQ -= QdiffTr * QDT;
       *HPQ *= i_2;
       // Hermitian projection of Q is now defined.
     }
-
-    template <class T> __device__ __host__ inline void anti_herm_proj(const Matrix<T, 3> &Q, Matrix<T, 3> *AHPQ, bool from_field_strength = false)
-    {
-      // Compute AHPQ = 1/2[(Q - Q^dag)] - i/3 * Im Tr(Q)
-      //              = 1/2[(Q - Q^dag) - 1/3 * Tr(Q - Q^dag)]
-      
-      typedef decltype(Q(0, 0).x) dataType;
-      Matrix<T, 3> QDT;
-      
-      if(!from_field_strength) *AHPQ = Q - conj(Q);
-      else *AHPQ = 8.0 * Q;
-      T QdiffTr =  (1.0 / 3.0) * getTrace(*AHPQ);
-      
-      // Matrix proportional to QdiffTr
-      setIdentity(&QDT);
-      *AHPQ -= QdiffTr * QDT;
-      *AHPQ *= 0.5;
-      // Anti hermitian projection of Q is now defined.
-    }
-    
 } // end namespace quda

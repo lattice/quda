@@ -10,7 +10,8 @@ namespace quda {
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW1 : TunableVectorYZ
   {
-    GaugeWFlowArg<Float, nColor, recon> arg;
+    static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
+    GaugeWFlowArg<Float, nColor, recon, wFlowDim> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -18,8 +19,8 @@ namespace quda {
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFlowW1(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
-      TunableVectorYZ(2, 3),
+    GaugeWFlowW1(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+      TunableVectorYZ(2, wFlowDim),
       arg(out, temp, in, epsilon),
       meta(in)
     {
@@ -56,7 +57,8 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW2 : TunableVectorYZ
   {
-    GaugeWFlowArg<Float, nColor, recon> arg;
+    static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
+    GaugeWFlowArg<Float, nColor, recon, wFlowDim> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -64,8 +66,8 @@ public:
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFlowW2(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
-      TunableVectorYZ(2, 3),
+    GaugeWFlowW2(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+      TunableVectorYZ(2, wFlowDim),
       arg(out, temp, in, epsilon),
       meta(in)
     {
@@ -102,7 +104,8 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowVt : TunableVectorYZ
   {
-    GaugeWFlowArg<Float, nColor, recon> arg;
+    static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
+    GaugeWFlowArg<Float, nColor, recon, wFlowDim> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -110,8 +113,8 @@ public:
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFlowVt(GaugeField &out, GaugeField &temp, GaugeField &in, Float epsilon) :
-      TunableVectorYZ(2, 3),
+    GaugeWFlowVt(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+      TunableVectorYZ(2, wFlowDim),
       arg(out, temp, in, epsilon),
       meta(in)
     {

@@ -13,7 +13,7 @@ namespace quda
   //           v     ^              v     ^                    v
   //           |- > -|             /- > -/                - < -/  
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple, int dir_ignore = -1)
+  __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple, int dir_ignore)
   {
     // compute spacetime dimensions and parity
     int X[4];
@@ -74,7 +74,7 @@ namespace quda
   }
   
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle, int dir_ignore = -1)
+  __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle, int dir_ignore)
   {
     // compute spacetime dimensions and parity
     int X[4];
