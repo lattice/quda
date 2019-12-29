@@ -11,7 +11,14 @@ namespace quda
   // |     |              /     /                /- < -
   //         + |     |  +         +  /     /  +         +  - > -/
   //           v     ^              v     ^                    v
-  //           |- > -|             /- > -/                - < -/  
+  //           |- > -|             /- > -/                - < -/
+
+  // Each dimension requires 2 matrix additions, 4 matrix-matrix multiplications
+  // matrix*matrix = 9*3*6 + 9*2*2 = 198 floating-point ops
+  // matrix+matrix = 18 floating-point ops
+  // => Total number of floating point ops per function call
+  // dims * (2*18 + 4*198) = dims*828
+
   template <typename Arg, typename Link>
   __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple, int dir_ignore)
   {
@@ -72,7 +79,12 @@ namespace quda
       }
     }
   }
-  
+
+  // Each dimension requires 8 matrix additions and 28 matrix-matrix multiplications
+  // matrix*matrix = 9*3*6 + 9*2*2 = 198 floating-point ops
+  // matrix+matrix = 18 floating-point ops
+  // => Total number of floating point ops per function call
+  // dims * (8*18 + 28*198) = dims*5688
   template <typename Arg, typename Link>
   __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle, int dir_ignore)
   {

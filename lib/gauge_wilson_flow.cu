@@ -149,7 +149,7 @@ public:
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlow
 
-  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
+  void WFlowStepW1(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -159,7 +159,37 @@ public:
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
     
     instantiate<GaugeWFlowW1>(out, temp, in, epsilon);
-    instantiate<GaugeWFlowW2>(in, temp, out, epsilon);
+#else
+    errorQuda("Gauge tools are not built");
+#endif
+  }  
+
+
+  void WFlowStepW2(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
+  {
+#ifdef GPU_GAUGE_TOOLS
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
+
+    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
+    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+    
+    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);
+#else
+    errorQuda("Gauge tools are not built");
+#endif
+  }  
+
+
+  void WFlowStepVt(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
+  {
+#ifdef GPU_GAUGE_TOOLS
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
+
+    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
+    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+    
     instantiate<GaugeWFlowVt>(out, temp, in, epsilon);
 #else
     errorQuda("Gauge tools are not built");
