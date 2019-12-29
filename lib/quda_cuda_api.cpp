@@ -291,7 +291,7 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    PROFILE(qudaError_t error = qudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     return error;
 #endif
   }
@@ -348,7 +348,7 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = cudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
     return error;
 #endif
   }
@@ -367,7 +367,7 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(qudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    PROFILE(qudaError_t error = qudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     if (error != qudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;

@@ -95,7 +95,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
 	if(deviceProp.canMapHostMemory) {
 	  h_reduce = (QudaSumFloat *) mapped_malloc(bytes);
-	  cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
+	  qudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
 	} else
 #endif
 	  {
@@ -105,7 +105,7 @@ namespace quda {
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 
-      cudaEventCreateWithFlags(&reduceEnd, qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&reduceEnd, qudaEventDisableTiming);
 
       // enable fast reductions with CPU spin waiting as opposed to using CUDA events
       char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
@@ -129,7 +129,7 @@ namespace quda {
       }
       hd_reduce = 0;
 
-      cudaEventDestroy(reduceEnd);
+      qudaEventDestroy(reduceEnd);
     }
 
     /**

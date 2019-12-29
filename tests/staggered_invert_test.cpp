@@ -605,7 +605,7 @@ int invert_test()
 
         invertMultiShiftQuda(outArray, in->V(), &inv_param);
 
-        cudaDeviceSynchronize();
+        qudaDeviceSynchronize();
 
         printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                    inv_param.gflops / inv_param.secs);

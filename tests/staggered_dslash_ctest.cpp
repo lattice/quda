@@ -360,7 +360,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   // printfQuda("Sending spinor field to GPU\n");
   *cudaSpinor = *spinor;
 
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   checkCudaError();
 
   tmp = new cudaColorSpinorField(csParam);
@@ -439,12 +439,12 @@ DslashTime dslashCUDA(int niter) {
   timeval tstart, tstop;
 
   qudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  qudaEventCreate(&start);
+  qudaEventRecord(start, 0);
+  qudaEventSynchronize(start);
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  qudaEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
 
@@ -470,13 +470,13 @@ DslashTime dslashCUDA(int niter) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventCreate(&end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 

@@ -36,7 +36,7 @@ namespace quda {
     int commsCompleted[2] = {0,0};
 
     qudaEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) cudaEventCreate(&gatherEnd[dir], qudaEventDisableTiming);
+    for(int dir=0; dir<2; dir++) qudaEventCreate(&gatherEnd[dir], qudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;
@@ -76,7 +76,7 @@ namespace quda {
       qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
-    for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
+    for(int dir=0; dir<2; dir++) qudaEventDestroy(gatherEnd[dir]);
 #endif
     return;
   }

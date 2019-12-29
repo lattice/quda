@@ -570,8 +570,8 @@ inline bool load_source(
     source += line + "\n";
   }
   // HACK TESTING (WAR for cub)
-  // source = "#define cudaDeviceSynchronize() qudaSuccess\n" + source;
-  ////source = "qudaError_t cudaDeviceSynchronize() { return qudaSuccess; }\n" +
+  // source = "#define qudaDeviceSynchronize() qudaSuccess\n" + source;
+  ////source = "qudaError_t qudaDeviceSynchronize() { return qudaSuccess; }\n" +
   /// source;
 
   // WAR for #pragma once causing problems when there are multiple inclusions
@@ -2872,7 +2872,7 @@ QUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
   size_t n = end - begin;
   dim3 block(policy.block_size);
   dim3 grid(std::min((n - 1) / block.x + 1, size_t(65535)));
-  cudaSetDevice(policy.device);
+  qudaSetDevice(policy.device);
   return program.kernel("parallel_for_kernel")
       .instantiate<IndexType>()
       .configure(grid, block, 0, policy.stream)

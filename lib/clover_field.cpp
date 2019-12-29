@@ -206,7 +206,7 @@ namespace quda {
       else
         texDesc.readMode = qudaReadModeElementType;
 
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
       
       // create the texture for the norm components
@@ -232,7 +232,7 @@ namespace quda {
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
       }
     }
@@ -241,19 +241,19 @@ namespace quda {
 
   void cudaCloverField::destroyTexObject() {
     if (isNative()) {
-      cudaDestroyTextureObject(tex);
-      cudaDestroyTextureObject(invTex);
-      cudaDestroyTextureObject(evenTex);
-      cudaDestroyTextureObject(oddTex);
-      cudaDestroyTextureObject(evenInvTex);
-      cudaDestroyTextureObject(oddInvTex);
+      qudaDestroyTextureObject(tex);
+      qudaDestroyTextureObject(invTex);
+      qudaDestroyTextureObject(evenTex);
+      qudaDestroyTextureObject(oddTex);
+      qudaDestroyTextureObject(evenInvTex);
+      qudaDestroyTextureObject(oddInvTex);
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaDestroyTextureObject(normTex);
-	cudaDestroyTextureObject(invNormTex);
-	cudaDestroyTextureObject(evenNormTex);
-	cudaDestroyTextureObject(oddNormTex);
-	cudaDestroyTextureObject(evenInvNormTex);
-	cudaDestroyTextureObject(oddInvNormTex);
+        qudaDestroyTextureObject(normTex);
+	qudaDestroyTextureObject(invNormTex);
+	qudaDestroyTextureObject(evenNormTex);
+	qudaDestroyTextureObject(oddNormTex);
+	qudaDestroyTextureObject(evenInvNormTex);
+	qudaDestroyTextureObject(oddInvNormTex);
       }
       checkCudaError();
     }

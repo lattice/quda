@@ -203,7 +203,7 @@ static qudaError_t SyncStream(qudaStream_t stream)
 #else
     (void)stream;
     // Device can't yet sync on a specific stream
-    return cudaDeviceSynchronize();
+    return qudaDeviceSynchronize();
 #endif
 }
 

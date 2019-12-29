@@ -500,11 +500,11 @@ void initQudaDevice(int dev) {
   }
 
   int driver_version;
-  cudaDriverGetVersion(&driver_version);
+  qudaDriverGetVersion(&driver_version);
   printfQuda("CUDA Driver version = %d\n", driver_version);
 
   int runtime_version;
-  cudaRuntimeGetVersion(&runtime_version);
+  qudaRuntimeGetVersion(&runtime_version);
   printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -533,13 +533,13 @@ void initQudaDevice(int dev) {
 #endif
 
   int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
+  qudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
     errorQuda("No CUDA devices found");
   }
 
   for(int i=0; i<deviceCount; i++) {
-    cudaGetDeviceProperties(&deviceProp, i);
+    qudaGetDeviceProperties(&deviceProp, i);
     checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
@@ -557,7 +557,7 @@ void initQudaDevice(int dev) {
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
 
-  cudaGetDeviceProperties(&deviceProp, dev);
+  qudaGetDeviceProperties(&deviceProp, dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
@@ -596,7 +596,7 @@ void initQudaDevice(int dev) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
 #ifndef USE_QDPJIT
-  cudaSetDevice(dev);
+  qudaSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
@@ -613,9 +613,9 @@ void initQudaDevice(int dev) {
 
 
 
-  cudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
+  qudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  // cudaGetDeviceProperties(&deviceProp, dev);
+  // qudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -647,7 +647,7 @@ void initQudaMemory()
 
   int greatestPriority;
   int leastPriority;
-  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+  qudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
   }
@@ -662,7 +662,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  qudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache();
 
@@ -1561,7 +1561,7 @@ void endQuda(void)
   char *device_reset_env = getenv("QUDA_DEVICE_RESET");
   if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
     // end this CUDA context
-    cudaDeviceReset();
+    qudaDeviceReset();
   }
 
 }

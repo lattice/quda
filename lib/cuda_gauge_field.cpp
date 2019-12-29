@@ -46,7 +46,7 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
         gauge_h = mapped_malloc(bytes);
-	cudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
+	qudaHostGetDevicePointer(&gauge, gauge_h, 0); // set the matching device pointer
 	break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
@@ -161,20 +161,20 @@ namespace quda {
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
       else texDesc.readMode = qudaReadModeElementType;
 
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
     }
   }
 
   void cudaGaugeField::destroyTexObject() {
     if ( isNative() && geometry != QUDA_COARSE_GEOMETRY ) {
-      cudaDestroyTextureObject(tex);
-      cudaDestroyTextureObject(evenTex);
-      cudaDestroyTextureObject(oddTex);
+      qudaDestroyTextureObject(tex);
+      qudaDestroyTextureObject(evenTex);
+      qudaDestroyTextureObject(oddTex);
       if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
-        cudaDestroyTextureObject(phaseTex);
-        cudaDestroyTextureObject(evenPhaseTex);
-        cudaDestroyTextureObject(oddPhaseTex);
+        qudaDestroyTextureObject(phaseTex);
+        qudaDestroyTextureObject(evenPhaseTex);
+        qudaDestroyTextureObject(oddPhaseTex);
       }
       checkCudaError();
     }
@@ -679,7 +679,7 @@ namespace quda {
             src.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	  // special case where we use zero-copy memory to read/write directly from application's array
 	  void *src_d;
-	  qudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
+	  qudaError_t error = qudaHostGetDevicePointer(&src_d, const_cast<void*>(src.Gauge_p()), 0);
 	  if (error != qudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
 
 	  if (src.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
@@ -757,7 +757,7 @@ namespace quda {
           cpu.Order() == QUDA_TIFR_PADDED_GAUGE_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *cpu_d;
-	qudaError_t error = cudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
+	qudaError_t error = qudaHostGetDevicePointer(&cpu_d, const_cast<void*>(cpu.Gauge_p()), 0);
 	if (error != qudaSuccess) errorQuda("Failed to get device pointer for MILC site / BQCD array");
 	if (cpu.GhostExchange() == QUDA_GHOST_EXCHANGE_NO) {
 	  copyGenericGauge(cpu, *this, QUDA_CUDA_FIELD_LOCATION, cpu_d, gauge);

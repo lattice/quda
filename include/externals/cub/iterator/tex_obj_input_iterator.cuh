@@ -177,13 +177,13 @@ public:
         res_desc.res.linear.desc        = channel_desc;
         res_desc.res.linear.sizeInBytes = bytes;
         tex_desc.readMode               = qudaReadModeElementType;
-        return cudaCreateTextureObject(&tex_obj, &res_desc, &tex_desc, NULL);
+        return qudaCreateTextureObject(&tex_obj, &res_desc, &tex_desc, NULL);
     }
 
     /// Unbind this iterator from its texture reference
     qudaError_t UnbindTexture()
     {
-        return cudaDestroyTextureObject(tex_obj);
+        return qudaDestroyTextureObject(tex_obj);
     }
 
     /// Postfix increment

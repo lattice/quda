@@ -442,11 +442,11 @@ void end() {
     timeval tstart, tstop;
 
     qudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventCreate(&end);
+    qudaEventCreate(&start);
+    qudaEventCreate(&end);
 
     comm_barrier();
-    cudaEventRecord(start, 0);
+    qudaEventRecord(start, 0);
 
     for (int i = 0; i < niter; i++) {
 
@@ -594,12 +594,12 @@ void end() {
     }
     }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 
