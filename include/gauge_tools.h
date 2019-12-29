@@ -84,22 +84,22 @@ namespace quda
   */
   void WFlowStepW1(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
 
-    /**
-     @brief Apply Wilson Flow step W2 to the gauge field
-     @param[out] dataDs Output smeared field
-     @param[in] dataTemp Temp space
-     @param[in] dataOr Input gauge field
-     @param[in] step_size Step size
-  */
+  /**
+   @brief Apply Wilson Flow step W2 to the gauge field
+   @param[out] dataDs Output smeared field
+   @param[in] dataTemp Temp space
+   @param[in] dataOr Input gauge field
+   @param[in] step_size Step size
+*/
   void WFlowStepW2(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
 
-    /**
-     @brief Apply Wilson Flow step Vt to the gauge field
-     @param[out] dataDs Output smeared field
-     @param[in] dataTemp Temp space
-     @param[in] dataOr Input gauge field
-     @param[in] step_size Step size
-  */
+  /**
+   @brief Apply Wilson Flow step Vt to the gauge field
+   @param[out] dataDs Output smeared field
+   @param[in] dataTemp Temp space
+   @param[in] dataOr Input gauge field
+   @param[in] step_size Step size
+*/
   void WFlowStepVt(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
 
   /**

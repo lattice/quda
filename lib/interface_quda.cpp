@@ -5557,19 +5557,19 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   for (unsigned int i = 0; i < n_steps; i++) {
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    
+
     WFlowStepW1(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
     gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    
+
     WFlowStepW2(*cudaGaugeTemp, *cudaGaugeAux, *gaugeSmeared, step_size);
     gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    
+
     WFlowStepVt(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
     gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    
+
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
