@@ -67,7 +67,8 @@ public:
       
       checkCudaError();
       comm_allreduce((double *)arg.result_h);
-      energy = arg.result_h[0];
+      //Volume normalisation done here
+      energy = arg.result_h[0] / (arg.threads*comm_size());
     }
   };
   

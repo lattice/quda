@@ -5854,7 +5854,8 @@ double energyQuda()
   profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
   profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  return energy / (Fmunu.Volume() * 16.0);
+  // Volume normalised in kernel reduction
+  return energy / 16.0;
 }
 
 double qChargeDensityQuda(void *h_qDensity)
