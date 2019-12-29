@@ -1,12 +1,12 @@
 #pragma once
 
 #ifndef __CUDACC_RTC__
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <quda_cuda_api.h>
+#include <quda_backend.h>
+#include <quda_backend.h>
+#include <quda_backend_api.h>
 
 /**
-   @file quda_cuda_api.h
+   @file quda_backend_api.h
 
    Wrappers around CUDA API function calls allowing us to easily
    profile and switch between using the CUDA runtime and driver APIs.

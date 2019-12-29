@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
+#include <quda_backend.h>
 #include <quda_internal.h>
 
 namespace quda {

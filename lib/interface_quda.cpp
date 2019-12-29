@@ -40,7 +40,7 @@
 #include <nvml.h>
 #endif
 
-#include <cuda.h>
+#include <quda_backend.h>
 
 #include <ks_force_quda.h>
 
@@ -77,7 +77,7 @@
 #include <momentum.h>
 
 
-#include <cuda_profiler_api.h>
+#include <quda_profiler_api.h>
 
 using namespace quda;
 

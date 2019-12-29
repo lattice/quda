@@ -121,7 +121,7 @@ class RefWrapper {
   operator RefWrapper<cls>() { return this; }
 #endif
 
-#include <cuda.h>
+#include <quda_backend.h>
 #include <cuda_runtime_api.h>  // For dim3, qudaStream_t
 #if CUDA_VERSION >= 8000
 #define NVRTC_GET_TYPE_NAME 1

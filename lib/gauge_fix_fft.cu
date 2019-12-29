@@ -9,7 +9,7 @@
 #include <cub_helper.cuh>
 #include <index_helper.cuh>
 
-#include <cufft.h>
+#include <quda_fft.h>
 
 #ifdef GPU_GAUGE_ALG
 #include <CUFFT_Plans.h>
