@@ -771,8 +771,7 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   // Option group for SU(3) related options
   auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
-  opgroup->add_option("--su3-ape-rho", ape_smear_rho,
-                      "rho coefficient for APE smearing (default 0.6)");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
 
   opgroup->add_option("--su3-stout-rho", stout_smear_rho,
                       "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
@@ -780,15 +779,13 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
                       "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
 
-  opgroup->add_option("--su3-smear-steps", smear_steps,
-                      "The number of smearing steps to perform (default 50)");
+  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
 
-  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon,
-                      "The step size in the Runge-Kutta integrator (default 0.01)");
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
 
   opgroup->add_option("--su3-wflow-steps", wflow_steps,
-		      "The number of steps in the Runge-Kutta integrator (default 100)");
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
-		      "Measure the field energy and topological charge every Nth step (default 5) ");
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }

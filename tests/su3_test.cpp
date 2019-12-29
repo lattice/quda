@@ -33,36 +33,35 @@ void display_test_info()
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
              tdim);
-  switch(test_type) {
-  case 0 : 
+  switch (test_type) {
+  case 0:
     printfQuda("\nAPE smearing\n");
     printfQuda(" - rho %f\n", ape_smear_rho);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
-  case 1 :
+  case 1:
     printfQuda("\nStout smearing\n");
     printfQuda(" - rho %f\n", stout_smear_rho);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
-  case 2 :
+  case 2:
     printfQuda("\nOver-Improved Stout smearing\n");
     printfQuda(" - rho %f\n", stout_smear_rho);
     printfQuda(" - epsilon %f\n", stout_smear_epsilon);
     printfQuda(" - smearing steps %d\n", smear_steps);
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
-  case 3 :
+  case 3:
     printfQuda("\nWilson Flow\n");
     printfQuda(" - epsilon %f\n", wflow_epsilon);
     printfQuda(" - Wilson flow steps %d\n", wflow_steps);
-    printfQuda(" - Measurement interval %d\n", measurement_interval);    
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
-  default :
-    errorQuda("Undefined test type %d given", test_type);
+  default: errorQuda("Undefined test type %d given", test_type);
   }
-    
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -116,7 +115,7 @@ int main(int argc, char **argv)
   add_su3_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -224,8 +223,8 @@ int main(int argc, char **argv)
     qCharge = qChargeQuda();
     printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
     break;
-  case 1 :
-    //STOUT
+  case 1:
+    // STOUT
     // start the timer
     time0 = -((double)clock());
     performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval);
@@ -236,10 +235,10 @@ int main(int argc, char **argv)
     qCharge = qChargeQuda();
     printfQuda("Computed topological charge after STOUT smearing is %.16e \n", qCharge);
     break;
-    
+
     // Topological charge routines
     //---------------------------------------------------------------------------
-  case 2 :
+  case 2:
     // Over-Improved STOUT
     // start the timer
     time0 = -((double)clock());
@@ -251,7 +250,7 @@ int main(int argc, char **argv)
     qCharge = qChargeQuda();
     printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
     break;
-  case 3 :
+  case 3:
     // Wilson Flow
     // Start the timer
     time0 = -((double)clock());
@@ -263,8 +262,7 @@ int main(int argc, char **argv)
     qCharge = qChargeQuda();
     printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
     break;
-  default :
-    errorQuda("Undefined test type %d given", test_type);
+  default: errorQuda("Undefined test type %d given", test_type);
   }
 
 #else

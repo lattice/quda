@@ -1263,7 +1263,7 @@ extern "C" {
    * @param meas_interval Measure the Q charge and field energy every Nth step
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval);
-  
+
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */

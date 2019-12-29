@@ -5485,7 +5485,7 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
-    gaugeSmeared->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
+    gaugeSmeared->exchangeExtendedGhost(R, profileSTOUT, redundant_comms);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
@@ -5521,7 +5521,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
     OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
-    gaugeSmeared->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
+    gaugeSmeared->exchangeExtendedGhost(R, profileOvrImpSTOUT, redundant_comms);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
