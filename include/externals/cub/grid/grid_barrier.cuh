@@ -153,9 +153,9 @@ public:
     /**
      * DeviceFrees and resets the progress counters
      */
-    cudaError_t HostReset()
+    qudaError_t HostReset()
     {
-        cudaError_t retval = cudaSuccess;
+        qudaError_t retval = qudaSuccess;
         if (d_sync)
         {
             CubDebug(retval = cudaFree(d_sync));
@@ -179,9 +179,9 @@ public:
      * Sets up the progress counters for the next kernel launch (lazily
      * allocating and initializing them if necessary)
      */
-    cudaError_t Setup(int sweep_grid_size)
+    qudaError_t Setup(int sweep_grid_size)
     {
-        cudaError_t retval = cudaSuccess;
+        qudaError_t retval = qudaSuccess;
         do {
             size_t new_sync_bytes = sweep_grid_size * sizeof(SyncFlag);
             if (new_sync_bytes > sync_bytes)

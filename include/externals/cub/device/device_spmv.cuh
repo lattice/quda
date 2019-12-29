@@ -129,7 +129,7 @@ struct DeviceSpmv
     template <
         typename            ValueT>
     CUB_RUNTIME_FUNCTION
-    static cudaError_t CsrMV(
+    static qudaError_t CsrMV(
         void*               d_temp_storage,                     ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,                 ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         ValueT*             d_values,                           ///< [in] Pointer to the array of \p num_nonzeros values of the corresponding nonzero elements of matrix <b>A</b>.
@@ -140,7 +140,7 @@ struct DeviceSpmv
         int                 num_rows,                           ///< [in] number of rows of matrix <b>A</b>.
         int                 num_cols,                           ///< [in] number of columns of matrix <b>A</b>.
         int                 num_nonzeros,                       ///< [in] number of nonzero elements of matrix <b>A</b>.
-        cudaStream_t        stream                  = 0,        ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t        stream                  = 0,        ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous       = false)    ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
         SpmvParams<ValueT, int> spmv_params;

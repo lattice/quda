@@ -174,7 +174,7 @@ public:
       default: errorQuda("Unknown Dslash5Type %d", type);
       }
 
-      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, cudaMemcpyHostToDevice, streams[Nstream - 1]);
+      cudaMemcpyToSymbolAsync(mobius_d, mobius_h, sizeof(coeff_5<real>), 0, qudaMemcpyHostToDevice, streams[Nstream - 1]);
     }
 
     virtual ~Dslash5Arg() { delete mobius_h; }

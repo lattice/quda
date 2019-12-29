@@ -218,7 +218,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
-    cudaDeviceProp prop;
+    qudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, gpuid);
     if(!prop.unifiedAddressing) return;
 
@@ -446,8 +446,8 @@ inline bool isHost(const void *buffer)
   CUmemorytype memType;
   void *attrdata[] = {(void *)&memType};
   CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
-  if (err != CUDA_SUCCESS) {
+  QUresult err = cuPointerGetAttributes(1, attributes, attrdata, (QUdeviceptr)buffer);
+  if (err != QUDA_SUCCESS) {
     const char *str;
     cuGetErrorName(err, &str);
     errorQuda("cuPointerGetAttributes returned error %s", str);
@@ -485,8 +485,8 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
+    qudaError_t err = cudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
+    if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
@@ -519,8 +519,8 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset(buffer, 0, nbytes);
-    if (err != cudaSuccess) {
+    qudaError_t err = cudaMemset(buffer, 0, nbytes);
+    if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
     }
@@ -557,8 +557,8 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    if (err != cudaSuccess) {
+    qudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
+    if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
 		 file, line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
@@ -595,8 +595,8 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
-    if (err != cudaSuccess) {
+    qudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
+    if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
 		 file, line, func, dim, dir, blksize, nblocks, stride);
       errorQuda("aborting with error %s", cudaGetErrorString(err));

@@ -164,15 +164,15 @@ namespace quda {
   }
 
 #ifdef USE_TEXTURE_OBJECTS
-  void cudaCloverField::createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm,
+  void cudaCloverField::createTexObject(qudaTextureObject_t &tex, qudaTextureObject_t &texNorm,
 					void *field, void *norm, bool full) {
     if (isNative()) {
       // create the texture for the field components
       
-      cudaChannelFormatDesc desc;
-      memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-      if (precision == QUDA_SINGLE_PRECISION) desc.f = cudaChannelFormatKindFloat;
-      else desc.f = cudaChannelFormatKindSigned; // half is short, double is int2
+      qudaChannelFormatDesc desc;
+      memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+      if (precision == QUDA_SINGLE_PRECISION) desc.f = qudaChannelFormatKindFloat;
+      else desc.f = qudaChannelFormatKindSigned; // half is short, double is int2
       
       // always four components regardless of precision
       desc.x = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
@@ -181,9 +181,9 @@ namespace quda {
       desc.w = (precision == QUDA_DOUBLE_PRECISION) ? 8*sizeof(int) : 8*precision;
       int texel_size = 4 * (precision == QUDA_DOUBLE_PRECISION ? sizeof(int) : precision);
 
-      cudaResourceDesc resDesc;
+      qudaResourceDesc resDesc;
       memset(&resDesc, 0, sizeof(resDesc));
-      resDesc.resType = cudaResourceTypeLinear;
+      resDesc.resType = qudaResourceTypeLinear;
       resDesc.res.linear.devPtr = field;
       resDesc.res.linear.desc = desc;
       resDesc.res.linear.sizeInBytes = bytes/(!full ? 2 : 1);
@@ -199,26 +199,26 @@ namespace quda {
 	errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
-      cudaTextureDesc texDesc;
+      qudaTextureDesc texDesc;
       memset(&texDesc, 0, sizeof(texDesc));
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-        texDesc.readMode = cudaReadModeNormalizedFloat;
+        texDesc.readMode = qudaReadModeNormalizedFloat;
       else
-        texDesc.readMode = cudaReadModeElementType;
+        texDesc.readMode = qudaReadModeElementType;
 
       cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
       checkCudaError();
       
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-        cudaChannelFormatDesc desc;
-	memset(&desc, 0, sizeof(cudaChannelFormatDesc));
-	desc.f = cudaChannelFormatKindFloat;
+        qudaChannelFormatDesc desc;
+	memset(&desc, 0, sizeof(qudaChannelFormatDesc));
+	desc.f = qudaChannelFormatKindFloat;
 	desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
 	
-	cudaResourceDesc resDesc;
+	qudaResourceDesc resDesc;
 	memset(&resDesc, 0, sizeof(resDesc));
-	resDesc.resType = cudaResourceTypeLinear;
+	resDesc.resType = qudaResourceTypeLinear;
 	resDesc.res.linear.devPtr = norm;
 	resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
@@ -228,9 +228,9 @@ namespace quda {
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
 
-        cudaTextureDesc texDesc;
+        qudaTextureDesc texDesc;
         memset(&texDesc, 0, sizeof(texDesc));
-        texDesc.readMode = cudaReadModeElementType;
+        texDesc.readMode = qudaReadModeElementType;
 
         cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 	checkCudaError();
@@ -293,16 +293,16 @@ namespace quda {
 
       if (src.V(false)) {
 	copyGenericClover(*this, src, false, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	qudaMemcpy(clover, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(clover, packClover, bytes, qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(norm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(norm, packCloverNorm, norm_bytes, qudaMemcpyHostToDevice);
       }
       
       if (src.V(true) && inverse) {
 	copyGenericClover(*this, src, true, QUDA_CPU_FIELD_LOCATION, packClover, 0, packCloverNorm, 0);
-	qudaMemcpy(cloverInv, packClover, bytes, cudaMemcpyHostToDevice);
+	qudaMemcpy(cloverInv, packClover, bytes, qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(invNorm, packCloverNorm, norm_bytes, cudaMemcpyHostToDevice);
+          qudaMemcpy(invNorm, packCloverNorm, norm_bytes, qudaMemcpyHostToDevice);
       }
 
       pool_pinned_free(packClover);
@@ -313,17 +313,17 @@ namespace quda {
           0;
 
       if (src.V(false)) {
-	qudaMemcpy(packClover, src.V(false), src.Bytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(false), src.Bytes(), qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(packCloverNorm, src.Norm(false), src.NormBytes(), qudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, false, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
 
       if (src.V(true) && inverse) {
-	qudaMemcpy(packClover, src.V(true), src.Bytes(), cudaMemcpyHostToDevice);
+	qudaMemcpy(packClover, src.V(true), src.Bytes(), qudaMemcpyHostToDevice);
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-          qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), cudaMemcpyHostToDevice);
+          qudaMemcpy(packCloverNorm, src.Norm(true), src.NormBytes(), qudaMemcpyHostToDevice);
 
 	copyGenericClover(*this, src, true, QUDA_CUDA_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
       }
@@ -349,9 +349,9 @@ namespace quda {
 
     // first copy over the direct part (if it exists)
     if (V(false) && cpu.V(false)) {
-      qudaMemcpy(packClover, clover, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, clover, bytes, qudaMemcpyDeviceToHost);
       if (precision == QUDA_HALF_PRECISION)
-	qudaMemcpy(packCloverNorm, norm, norm_bytes, cudaMemcpyDeviceToHost);
+	qudaMemcpy(packCloverNorm, norm, norm_bytes, qudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, false, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if((V(false) && !cpu.V(false)) || (!V(false) && cpu.V(false))) {
       errorQuda("Mismatch between Clover field GPU V(false) and CPU.V(false)");
@@ -359,9 +359,9 @@ namespace quda {
 
     // now copy the inverse part (if it exists)
     if (V(true) && cpu.V(true)) {
-      qudaMemcpy(packClover, cloverInv, bytes, cudaMemcpyDeviceToHost);
+      qudaMemcpy(packClover, cloverInv, bytes, qudaMemcpyDeviceToHost);
 	if (precision == QUDA_HALF_PRECISION)
-	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, cudaMemcpyDeviceToHost);
+	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");

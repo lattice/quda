@@ -130,7 +130,7 @@ namespace quda {
       action = arg.result_h[0];
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       arg.result_h[0] = 0.0;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -241,7 +241,7 @@ namespace quda {
       if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -323,7 +323,7 @@ namespace quda {
       apply(0);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);

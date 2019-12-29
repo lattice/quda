@@ -116,7 +116,7 @@ class GaugeAlgTest : public ::testing::Test {
 
   void CallUnitarizeLinks(cudaGaugeField *cudaInGauge){
     unitarizeLinks(*cudaInGauge, num_failures_dev);
-    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
     if(num_failures>0){
       cudaFree(num_failures_dev);
       errorQuda("Error in the unitarization\n");

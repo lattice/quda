@@ -688,7 +688,7 @@ namespace quda {
       const int offset_cb;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<Float,2>::type TexVector;
-      cudaTextureObject_t tex;
+      qudaTextureObject_t tex;
 #endif
       const int volumeCB;
       const int stride;
@@ -1729,7 +1729,7 @@ namespace quda {
         const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<RegType,N>::type TexVector;
-      cudaTextureObject_t tex;
+      qudaTextureObject_t tex;
       const int tex_offset;
 #endif
       Float *ghost[4];
@@ -2026,7 +2026,7 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
 	checkCudaError();
       }
 
@@ -2034,7 +2034,7 @@ namespace quda {
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
 	host_free(backup_h);
 	backup_h = nullptr;
 	checkCudaError();

@@ -91,20 +91,20 @@ struct IteratorTexRef
         static TexRef ref;
 
         /// Bind texture
-        static cudaError_t BindTexture(void *d_in, size_t &offset)
+        static qudaError_t BindTexture(void *d_in, size_t &offset)
         {
             if (d_in)
             {
-                cudaChannelFormatDesc tex_desc = cudaCreateChannelDesc<TextureWord>();
+                qudaChannelFormatDesc tex_desc = cudaCreateChannelDesc<TextureWord>();
                 ref.channelDesc = tex_desc;
                 return (CubDebug(cudaBindTexture(&offset, ref, d_in)));
             }
 
-            return cudaSuccess;
+            return qudaSuccess;
         }
 
         /// Unbind texture
-        static cudaError_t UnbindTexture()
+        static qudaError_t UnbindTexture()
         {
             return CubDebug(cudaUnbindTexture(ref));
         }
@@ -243,20 +243,20 @@ public:
 */
     /// Use this iterator to bind \p ptr with a texture reference
     template <typename QualifiedT>
-    cudaError_t BindTexture(
-        QualifiedT      *ptr,                   ///< Native pointer to wrap that is aligned to cudaDeviceProp::textureAlignment
+    qudaError_t BindTexture(
+        QualifiedT      *ptr,                   ///< Native pointer to wrap that is aligned to qudaDeviceProp::textureAlignment
         size_t          bytes = size_t(-1),     ///< Number of bytes in the range
         size_t          tex_offset = 0)         ///< OffsetT (in items) from \p ptr denoting the position of the iterator
     {
         this->ptr = const_cast<typename RemoveQualifiers<QualifiedT>::Type *>(ptr);
         size_t offset;
-        cudaError_t retval = TexId::BindTexture(this->ptr + tex_offset, offset);
+        qudaError_t retval = TexId::BindTexture(this->ptr + tex_offset, offset);
         this->tex_offset = (difference_type) (offset / sizeof(QualifiedT));
         return retval;
     }
 
     /// Unbind this iterator from its texture reference
-    cudaError_t UnbindTexture()
+    qudaError_t UnbindTexture()
     {
         return TexId::UnbindTexture();
     }

@@ -23,7 +23,7 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
 		   const char *func, const char *file, const char *line);
 
 }
@@ -57,7 +57,7 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
   /**
@@ -73,7 +73,7 @@ namespace quda {
      @param[in] stream Stream to issue copy
   */
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, cudaMemcpyKind kind, const cudaStream_t &stream,
+                          size_t width, size_t hieght, qudaMemcpyKind kind, const qudaStream_t &stream,
                           const char *func, const char *file, const char *line);
 
   /**
@@ -93,7 +93,7 @@ namespace quda {
      @param[in] count Size in bytes to set
      @param[in] stream  Stream to issue memset
    */
-  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream, const char *func,
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line);
 
   /**
@@ -105,21 +105,21 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream);
+  qudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream);
 
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery
      @param[in] event Event we are querying
      @return Status of event query
    */
-  cudaError_t qudaEventQuery(cudaEvent_t &event);
+  qudaError_t qudaEventQuery(qudaEvent_t &event);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream=0);
+  qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream=0);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
@@ -127,24 +127,24 @@ namespace quda {
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
-  cudaError_t qudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags);
+  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags);
 
   /**
      @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
      @param[in] stream Stream which we are synchronizing with respect to
    */
-  cudaError_t qudaStreamSynchronize(cudaStream_t &stream);
+  qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
 
   /**
      @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
    */
-  cudaError_t qudaEventSynchronize(cudaEvent_t &event);
+  qudaError_t qudaEventSynchronize(qudaEvent_t &event);
 
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */
-  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
+  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
 #if CUDA_VERSION >= 9000
   /**
@@ -153,7 +153,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+  qudaError_t qudaFuncSetAttribute(const void* func, qudaFuncAttribute attr, int value);
 #endif
 
   /**

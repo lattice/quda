@@ -395,7 +395,7 @@ struct DispatchReduce :
     OffsetT             num_items;                      ///< [in] Total number of input items (i.e., length of \p d_in)
     ReductionOpT        reduction_op;                   ///< [in] Binary reduction functor 
     OutputT             init;                           ///< [in] The initial value of the reduction
-    cudaStream_t        stream;                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+    qudaStream_t        stream;                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
     bool                debug_synchronous;              ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     int                 ptx_version;                    ///< [in] PTX version
 
@@ -413,7 +413,7 @@ struct DispatchReduce :
         OffsetT                 num_items,
         ReductionOpT            reduction_op,
         OutputT                 init,
-        cudaStream_t            stream,
+        qudaStream_t            stream,
         bool                    debug_synchronous,
         int                     ptx_version)
     :
@@ -439,7 +439,7 @@ struct DispatchReduce :
         typename                ActivePolicyT,          ///< Umbrella policy active for the target device
         typename                SingleTileKernelT>      ///< Function type of cub::DeviceReduceSingleTileKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokeSingleTile(
+    qudaError_t InvokeSingleTile(
         SingleTileKernelT       single_tile_kernel)     ///< [in] Kernel function pointer to parameterization of cub::DeviceReduceSingleTileKernel
     {
 #ifndef CUB_RUNTIME_ENABLED
@@ -448,7 +448,7 @@ struct DispatchReduce :
         // Kernel launch not supported from this device
         return CubDebug(cudaErrorNotSupported );
 #else
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Return if the caller is simply requesting the size of the storage allocation
@@ -497,7 +497,7 @@ struct DispatchReduce :
         typename                SingleTileKernelT,          ///< Function type of cub::DeviceReduceSingleTileKernel
         typename                FillAndResetDrainKernelT>   ///< Function type of cub::FillAndResetDrainKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePasses(
+    qudaError_t InvokePasses(
         ReduceKernelT               reduce_kernel,          ///< [in] Kernel function pointer to parameterization of cub::DeviceReduceKernel
         SingleTileKernelT           single_tile_kernel,     ///< [in] Kernel function pointer to parameterization of cub::DeviceReduceSingleTileKernel
         FillAndResetDrainKernelT    prepare_drain_kernel)   ///< [in] Kernel function pointer to parameterization of cub::FillAndResetDrainKernel
@@ -511,7 +511,7 @@ struct DispatchReduce :
         return CubDebug(cudaErrorNotSupported );
 #else
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get device ordinal
@@ -544,7 +544,7 @@ struct DispatchReduce :
             if (d_temp_storage == NULL)
             {
                 // Return if the caller is simply requesting the size of the storage allocation
-                return cudaSuccess;
+                return qudaSuccess;
             }
 
             // Alias the allocation for the privatized per-block reductions
@@ -644,7 +644,7 @@ struct DispatchReduce :
     /// Invocation
     template <typename ActivePolicyT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t Invoke()
+    qudaError_t Invoke()
     {
         typedef typename ActivePolicyT::SingleTilePolicy    SingleTilePolicyT;
         typedef typename DispatchReduce::MaxPolicy          MaxPolicyT;
@@ -675,7 +675,7 @@ struct DispatchReduce :
      * Internal dispatch routine for computing a device-wide reduction
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void            *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t          &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                               ///< [in] Pointer to the input sequence of data items
@@ -683,12 +683,12 @@ struct DispatchReduce :
         OffsetT         num_items,                          ///< [in] Total number of input items (i.e., length of \p d_in)
         ReductionOpT    reduction_op,                       ///< [in] Binary reduction functor 
         OutputT         init,                               ///< [in] The initial value of the reduction
-        cudaStream_t    stream,                             ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t    stream,                             ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool            debug_synchronous)                  ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
         typedef typename DispatchReduce::MaxPolicy MaxPolicyT;
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get PTX version
@@ -753,7 +753,7 @@ struct DispatchSegmentedReduce :
     OffsetT             *d_end_offsets;         ///< [in] %Device-accessible pointer to the sequence of ending offsets of length \p num_segments, such that <tt>d_end_offsets[i]-1</tt> is the last element of the <em>i</em><sup>th</sup> data segment in <tt>d_keys_*</tt> and <tt>d_values_*</tt>.  If <tt>d_end_offsets[i]-1</tt> <= <tt>d_begin_offsets[i]</tt>, the <em>i</em><sup>th</sup> is considered empty.
     ReductionOpT        reduction_op;           ///< [in] Binary reduction functor 
     OutputT             init;                   ///< [in] The initial value of the reduction
-    cudaStream_t        stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+    qudaStream_t        stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
     bool                debug_synchronous;      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     int                 ptx_version;            ///< [in] PTX version
 
@@ -773,7 +773,7 @@ struct DispatchSegmentedReduce :
         OffsetT                 *d_end_offsets,
         ReductionOpT            reduction_op,
         OutputT                 init,
-        cudaStream_t            stream,
+        qudaStream_t            stream,
         bool                    debug_synchronous,
         int                     ptx_version)
     :
@@ -802,7 +802,7 @@ struct DispatchSegmentedReduce :
         typename                        ActivePolicyT,                  ///< Umbrella policy active for the target device
         typename                        DeviceSegmentedReduceKernelT>   ///< Function type of cub::DeviceSegmentedReduceKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePasses(
+    qudaError_t InvokePasses(
         DeviceSegmentedReduceKernelT    segmented_reduce_kernel)        ///< [in] Kernel function pointer to parameterization of cub::DeviceSegmentedReduceKernel
     {
 #ifndef CUB_RUNTIME_ENABLED
@@ -810,14 +810,14 @@ struct DispatchSegmentedReduce :
         // Kernel launch not supported from this device
         return CubDebug(cudaErrorNotSupported );
 #else
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Return if the caller is simply requesting the size of the storage allocation
             if (d_temp_storage == NULL)
             {
                 temp_storage_bytes = 1;
-                return cudaSuccess;
+                return qudaSuccess;
             }
 
             // Init kernel configuration
@@ -860,7 +860,7 @@ struct DispatchSegmentedReduce :
     /// Invocation
     template <typename ActivePolicyT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t Invoke()
+    qudaError_t Invoke()
     {
         typedef typename DispatchSegmentedReduce::MaxPolicy MaxPolicyT;
 
@@ -878,7 +878,7 @@ struct DispatchSegmentedReduce :
      * Internal dispatch routine for computing a device-wide reduction
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void            *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t          &temp_storage_bytes,                ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                               ///< [in] Pointer to the input sequence of data items
@@ -888,15 +888,15 @@ struct DispatchSegmentedReduce :
         int             *d_end_offsets,                     ///< [in] %Device-accessible pointer to the sequence of ending offsets of length \p num_segments, such that <tt>d_end_offsets[i]-1</tt> is the last element of the <em>i</em><sup>th</sup> data segment in <tt>d_keys_*</tt> and <tt>d_values_*</tt>.  If <tt>d_end_offsets[i]-1</tt> <= <tt>d_begin_offsets[i]</tt>, the <em>i</em><sup>th</sup> is considered empty.
         ReductionOpT    reduction_op,                       ///< [in] Binary reduction functor 
         OutputT         init,                               ///< [in] The initial value of the reduction
-        cudaStream_t    stream,                             ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t    stream,                             ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool            debug_synchronous)                  ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
         typedef typename DispatchSegmentedReduce::MaxPolicy MaxPolicyT;
 
         if (num_segments <= 0)
-            return cudaSuccess;
+            return qudaSuccess;
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get PTX version

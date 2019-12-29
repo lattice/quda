@@ -346,11 +346,11 @@ struct DispatchSpmv
     template <
         typename                SpmvKernelT>                        ///< Function type of cub::AgentSpmvKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                   d_temp_storage,                     ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                 temp_storage_bytes,                 ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SpmvParamsT&            spmv_params,                        ///< SpMV input parameter bundle
-        cudaStream_t            stream,                             ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t            stream,                             ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                    debug_synchronous,                  ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
         SpmvKernelT             spmv_kernel,                        ///< [in] Kernel function pointer to parameterization of AgentSpmvKernel
         KernelConfig            spmv_config)                        ///< [in] Dispatch parameters that match the policy that \p spmv_kernel was compiled for
@@ -361,7 +361,7 @@ struct DispatchSpmv
         return CubDebug(cudaErrorNotSupported );
 
 #else
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get device ordinal
@@ -399,7 +399,7 @@ struct DispatchSpmv
             if (d_temp_storage == NULL)
             {
                 // Return if the caller is simply requesting the size of the storage allocation
-                return cudaSuccess;
+                return qudaSuccess;
             }
             KeyValuePairT* d_tile_carry_pairs = (KeyValuePairT*) allocations[0];  // Agent carry-out pairs
 
@@ -432,14 +432,14 @@ struct DispatchSpmv
      * Internal dispatch routine for computing a device-wide reduction
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                   d_temp_storage,                     ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                 temp_storage_bytes,                 ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SpmvParamsT&            spmv_params,                        ///< SpMV input parameter bundle
-        cudaStream_t            stream                  = 0,        ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t            stream                  = 0,        ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                    debug_synchronous       = false)    ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get PTX version

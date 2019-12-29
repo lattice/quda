@@ -122,7 +122,7 @@ class RefWrapper {
 #endif
 
 #include <cuda.h>
-#include <cuda_runtime_api.h>  // For dim3, cudaStream_t
+#include <cuda_runtime_api.h>  // For dim3, qudaStream_t
 #if CUDA_VERSION >= 8000
 #define NVRTC_GET_TYPE_NAME 1
 #endif
@@ -570,8 +570,8 @@ inline bool load_source(
     source += line + "\n";
   }
   // HACK TESTING (WAR for cub)
-  // source = "#define cudaDeviceSynchronize() cudaSuccess\n" + source;
-  ////source = "cudaError_t cudaDeviceSynchronize() { return cudaSuccess; }\n" +
+  // source = "#define cudaDeviceSynchronize() qudaSuccess\n" + source;
+  ////source = "qudaError_t cudaDeviceSynchronize() { return qudaSuccess; }\n" +
   /// source;
 
   // WAR for #pragma once causing problems when there are multiple inclusions
@@ -881,8 +881,8 @@ class CUDAKernel {
   std::map<std::string,std::string> _constant;
   std::vector<CUjit_option> _opts;
 
-  inline void cuda_safe_call(CUresult res) const {
-    if (res != CUDA_SUCCESS) {
+  inline void cuda_safe_call(QUresult res) const {
+    if (res != QUDA_SUCCESS) {
       const char* msg;
       cuGetErrorName(res, &msg);
       throw std::runtime_error(msg);
@@ -907,7 +907,7 @@ class CUDAKernel {
 #else
         link_file = "lib" + link_file + ".a";
 #endif
-        CUresult result = cuLinkAddFile(_link_state, CU_JIT_INPUT_LIBRARY,
+        QUresult result = cuLinkAddFile(_link_state, CU_JIT_INPUT_LIBRARY,
                                         link_file.c_str(), 0, 0, 0);
         int path_num = 0;
         while (result == CUDA_ERROR_FILE_NOT_FOUND &&
@@ -996,14 +996,14 @@ class CUDAKernel {
   inline ~CUDAKernel() { this->destroy_module(); }
   inline operator CUfunction() const { return _kernel; }
 
-  inline CUresult launch(dim3 grid, dim3 block, unsigned int smem,
+  inline QUresult launch(dim3 grid, dim3 block, unsigned int smem,
                          CUstream stream, std::vector<void*> arg_ptrs) {
     return cuLaunchKernel(_kernel, grid.x, grid.y, grid.z, block.x, block.y,
                           block.z, smem, stream, arg_ptrs.data(), NULL);
   }
 
-  inline CUdeviceptr get_constant_ptr(const char *name) const {
-    CUdeviceptr const_ptr = 0;
+  inline QUdeviceptr get_constant_ptr(const char *name) const {
+    QUdeviceptr const_ptr = 0;
     auto constant = _constant.find(name);
     if (constant != _constant.end()) {
       cuda_safe_call(cuModuleGetGlobal(&const_ptr, 0, _module, constant->second.c_str()));
@@ -2089,12 +2089,12 @@ class KernelLauncher_impl {
   dim3 _grid;
   dim3 _block;
   size_t _smem;
-  cudaStream_t _stream;
+  qudaStream_t _stream;
 
  public:
   inline KernelLauncher_impl(KernelInstantiation_impl const& kernel_inst,
                              dim3 grid, dim3 block, size_t smem = 0,
-                             cudaStream_t stream = 0)
+                             qudaStream_t stream = 0)
       : _kernel_inst(kernel_inst),
         _grid(grid),
         _block(block),
@@ -2104,7 +2104,7 @@ class KernelLauncher_impl {
   inline KernelLauncher_impl(KernelLauncher_impl const&) = default;
   inline KernelLauncher_impl(KernelLauncher_impl&&) = default;
 #endif
-  inline CUresult launch(
+  inline QUresult launch(
       jitify::detail::vector<void*> arg_ptrs,
       jitify::detail::vector<std::string> arg_types = 0) const;
 };
@@ -2117,7 +2117,7 @@ class KernelLauncher {
 
  public:
   inline KernelLauncher(KernelInstantiation const& kernel_inst, dim3 grid,
-                        dim3 block, size_t smem = 0, cudaStream_t stream = 0);
+                        dim3 block, size_t smem = 0, qudaStream_t stream = 0);
   JITIFY_DEFINE_AUTO_PTR_COPY_WAR(KernelLauncher)
   // Note: It's important that there is no implicit conversion required
   //         for arg_ptrs, because otherwise the parameter pack version
@@ -2130,7 +2130,7 @@ class KernelLauncher {
    *    as code-strings. This parameter is optional and is only used to print
    *    out the function signature.
    */
-  inline CUresult launch(
+  inline QUresult launch(
       std::vector<void*> arg_ptrs = std::vector<void*>(),
       jitify::detail::vector<std::string> arg_types = 0) const {
     return _impl->launch(arg_ptrs, arg_types);
@@ -2142,7 +2142,7 @@ class KernelLauncher {
    *  \see launch
    */
   template <typename... ArgTypes>
-  inline CUresult operator()(ArgTypes... args) const {
+  inline QUresult operator()(ArgTypes... args) const {
     return this->launch(args...);
   }
   /*! Launch the kernel.
@@ -2150,7 +2150,7 @@ class KernelLauncher {
    *  \param args Function arguments for the kernel.
    */
   template <typename... ArgTypes>
-  inline CUresult launch(ArgTypes... args) const {
+  inline QUresult launch(ArgTypes... args) const {
     return this->launch(std::vector<void*>({(void*)&args...}),
                         {reflection::reflect<ArgTypes>()...});
   }
@@ -2173,7 +2173,7 @@ class KernelInstantiation {
    *  \see configure
    */
   inline KernelLauncher operator()(dim3 grid, dim3 block, size_t smem = 0,
-                                   cudaStream_t stream = 0) const {
+                                   qudaStream_t stream = 0) const {
     return this->configure(grid, block, smem, stream);
   }
   /*! Configure the kernel launch.
@@ -2184,7 +2184,7 @@ class KernelInstantiation {
    * bytes. \param stream The CUDA stream to launch the kernel in.
    */
   inline KernelLauncher configure(dim3 grid, dim3 block, size_t smem = 0,
-                                  cudaStream_t stream = 0) const {
+                                  qudaStream_t stream = 0) const {
     return KernelLauncher(*this, grid, block, smem, stream);
   }
   /*! Configure the kernel launch with a 1-dimensional block and grid chosen
@@ -2199,7 +2199,7 @@ class KernelInstantiation {
    */
   inline KernelLauncher configure_1d_max_occupancy(
       int max_block_size = 0, size_t smem = 0,
-      CUoccupancyB2DSize smem_callback = 0, cudaStream_t stream = 0,
+      CUoccupancyB2DSize smem_callback = 0, qudaStream_t stream = 0,
       unsigned int flags = 0) const {
     int grid;
     int block;
@@ -2209,9 +2209,9 @@ class KernelInstantiation {
           "Kernel pointer is NULL; you may need to define JITIFY_THREAD_SAFE "
           "1");
     }
-    CUresult res = cuOccupancyMaxPotentialBlockSizeWithFlags(
+    QUresult res = cuOccupancyMaxPotentialBlockSizeWithFlags(
         &grid, &block, func, smem_callback, smem, max_block_size, flags);
-    if (res != CUDA_SUCCESS) {
+    if (res != QUDA_SUCCESS) {
       const char* msg;
       cuGetErrorName(res, &msg);
       throw std::runtime_error(msg);
@@ -2222,7 +2222,7 @@ class KernelInstantiation {
     return this->configure(grid, block, smem, stream);
   }
 
-  inline CUdeviceptr get_constant_ptr(const char *name) const { return _impl->cuda_kernel().get_constant_ptr(name); }
+  inline QUdeviceptr get_constant_ptr(const char *name) const { return _impl->cuda_kernel().get_constant_ptr(name); }
 };
 
 /*! An object representing a kernel made up of a Program, a name and options.
@@ -2403,7 +2403,7 @@ inline KernelInstantiation::KernelInstantiation(
 
 inline KernelLauncher::KernelLauncher(KernelInstantiation const& kernel_inst,
                                       dim3 grid, dim3 block, size_t smem,
-                                      cudaStream_t stream)
+                                      qudaStream_t stream)
     : _impl(new KernelLauncher_impl(*kernel_inst._impl, grid, block, smem,
                                     stream)) {}
 
@@ -2416,7 +2416,7 @@ inline std::ostream& operator<<(std::ostream& stream, dim3 d) {
   return stream;
 }
 
-inline CUresult KernelLauncher_impl::launch(
+inline QUresult KernelLauncher_impl::launch(
     jitify::detail::vector<void*> arg_ptrs,
     jitify::detail::vector<std::string> arg_types) const {
 #if JITIFY_PRINT_LAUNCH
@@ -2701,7 +2701,7 @@ struct ExecutionPolicy {
   /*! Optional callback for loading source files.*/
   file_callback_type file_callback;
   /*! CUDA stream on which to execute.*/
-  cudaStream_t stream;
+  qudaStream_t stream;
   /*! CUDA device on which to execute.*/
   int device;
   /*! CUDA block size with which to execute.*/
@@ -2713,7 +2713,7 @@ struct ExecutionPolicy {
                   jitify::detail::vector<std::string> headers_ = 0,
                   jitify::detail::vector<std::string> options_ = 0,
                   file_callback_type file_callback_ = 0,
-                  cudaStream_t stream_ = 0, int device_ = 0,
+                  qudaStream_t stream_ = 0, int device_ = 0,
                   int block_size_ = 256,
                   size_t cache_size_ = JitCache::DEFAULT_CACHE_SIZE)
       : location(location_),
@@ -2821,7 +2821,7 @@ inline Lambda<T> make_Lambda(Capture const& capture, std::string func,
  * x*x; } ); \endcode
  */
 template <typename IndexType, class Func>
-CUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
+QUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
                       Lambda<Func> const& lambda) {
   using namespace jitify;
 
@@ -2832,7 +2832,7 @@ CUresult parallel_for(ExecutionPolicy policy, IndexType begin, IndexType end,
     for (IndexType i = begin; i < end; i++) {
       lambda._func(i);
     }
-    return CUDA_SUCCESS;  // FIXME - replace with non-CUDA enum type?
+    return QUDA_SUCCESS;  // FIXME - replace with non-CUDA enum type?
   }
 
   thread_local static JitCache kernel_cache(policy.cache_size);

@@ -400,7 +400,7 @@ namespace quda {
         checkCudaError();
       }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	getUnitarizeForceField<<<tp.grid,tp.block>>>(arg);
       }

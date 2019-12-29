@@ -26,7 +26,7 @@ namespace quda
       TunableVectorYZ::resizeVector(2, arg.nParity);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);

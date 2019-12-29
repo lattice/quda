@@ -350,7 +350,7 @@ struct DispatchReduceByKey
         typename                    ScanInitKernelT,         ///< Function type of cub::DeviceScanInitKernel
         typename                    ReduceByKeyKernelT>      ///< Function type of cub::DeviceReduceByKeyKernelT
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                       d_temp_storage,             ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                     temp_storage_bytes,         ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         KeysInputIteratorT          d_keys_in,                  ///< [in] Pointer to the input sequence of keys
@@ -361,7 +361,7 @@ struct DispatchReduceByKey
         EqualityOpT                 equality_op,                ///< [in] KeyT equality operator
         ReductionOpT                reduction_op,               ///< [in] ValueT reduction operator
         OffsetT                     num_items,                  ///< [in] Total number of items to select from
-        cudaStream_t                stream,                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t                stream,                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous,          ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
         int                         /*ptx_version*/,            ///< [in] PTX version of dispatch kernels
         ScanInitKernelT            	init_kernel,                ///< [in] Kernel function pointer to parameterization of cub::DeviceScanInitKernel
@@ -391,7 +391,7 @@ struct DispatchReduceByKey
 
 #else
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get device ordinal
@@ -494,7 +494,7 @@ struct DispatchReduceByKey
      * Internal dispatch routine
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                       d_temp_storage,                 ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                     temp_storage_bytes,             ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         KeysInputIteratorT          d_keys_in,                      ///< [in] Pointer to the input sequence of keys
@@ -505,10 +505,10 @@ struct DispatchReduceByKey
         EqualityOpT                 equality_op,                    ///< [in] KeyT equality operator
         ReductionOpT                reduction_op,                   ///< [in] ValueT reduction operator
         OffsetT                     num_items,                      ///< [in] Total number of items to select from
-        cudaStream_t                stream,                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t                stream,                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous)              ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get PTX version

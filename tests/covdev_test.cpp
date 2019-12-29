@@ -253,7 +253,7 @@ void end(void)
 
 double dslashCUDA(int niter, int mu) {
 
-  cudaEvent_t start, end;
+  qudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventRecord(start, 0);
   cudaEventSynchronize(start);
@@ -277,8 +277,8 @@ double dslashCUDA(int niter, int mu) {
   double secs = runTime / 1000; //stopwatchReadSeconds();
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
+  qudaError_t stat = cudaGetLastError();
+  if (stat != qudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return secs;

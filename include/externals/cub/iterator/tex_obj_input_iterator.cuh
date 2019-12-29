@@ -145,7 +145,7 @@ private:
 
     T*                  ptr;
     difference_type     tex_offset;
-    cudaTextureObject_t tex_obj;
+    qudaTextureObject_t tex_obj;
 
 public:
 
@@ -159,29 +159,29 @@ public:
 
     /// Use this iterator to bind \p ptr with a texture reference
     template <typename QualifiedT>
-    cudaError_t BindTexture(
-        QualifiedT      *ptr,               ///< Native pointer to wrap that is aligned to cudaDeviceProp::textureAlignment
+    qudaError_t BindTexture(
+        QualifiedT      *ptr,               ///< Native pointer to wrap that is aligned to qudaDeviceProp::textureAlignment
         size_t          bytes = size_t(-1),         ///< Number of bytes in the range
         size_t          tex_offset = 0)     ///< OffsetT (in items) from \p ptr denoting the position of the iterator
     {
         this->ptr = const_cast<typename RemoveQualifiers<QualifiedT>::Type *>(ptr);
         this->tex_offset = tex_offset;
 
-        cudaChannelFormatDesc   channel_desc = cudaCreateChannelDesc<TextureWord>();
-        cudaResourceDesc        res_desc;
-        cudaTextureDesc         tex_desc;
-        memset(&res_desc, 0, sizeof(cudaResourceDesc));
-        memset(&tex_desc, 0, sizeof(cudaTextureDesc));
-        res_desc.resType                = cudaResourceTypeLinear;
+        qudaChannelFormatDesc   channel_desc = cudaCreateChannelDesc<TextureWord>();
+        qudaResourceDesc        res_desc;
+        qudaTextureDesc         tex_desc;
+        memset(&res_desc, 0, sizeof(qudaResourceDesc));
+        memset(&tex_desc, 0, sizeof(qudaTextureDesc));
+        res_desc.resType                = qudaResourceTypeLinear;
         res_desc.res.linear.devPtr      = this->ptr;
         res_desc.res.linear.desc        = channel_desc;
         res_desc.res.linear.sizeInBytes = bytes;
-        tex_desc.readMode               = cudaReadModeElementType;
+        tex_desc.readMode               = qudaReadModeElementType;
         return cudaCreateTextureObject(&tex_obj, &res_desc, &tex_desc, NULL);
     }
 
     /// Unbind this iterator from its texture reference
-    cudaError_t UnbindTexture()
+    qudaError_t UnbindTexture()
     {
         return cudaDestroyTextureObject(tex_obj);
     }

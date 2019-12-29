@@ -378,7 +378,7 @@ struct DispatchScan
         typename            ScanInitKernelPtrT,     ///< Function type of cub::DeviceScanInitKernel
         typename            ScanSweepKernelPtrT>    ///< Function type of cub::DeviceScanKernelPtrT
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*               d_temp_storage,         ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,     ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT      d_in,                   ///< [in] Pointer to the input sequence of data items
@@ -386,7 +386,7 @@ struct DispatchScan
         ScanOpT             scan_op,                ///< [in] Binary scan functor 
         InitValueT          init_value,             ///< [in] Initial value to seed the exclusive scan
         OffsetT             num_items,              ///< [in] Total number of input items (i.e., the length of \p d_in)
-        cudaStream_t        stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t        stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous,      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
         int                 /*ptx_version*/,        ///< [in] PTX version of dispatch kernels
         ScanInitKernelPtrT  init_kernel,            ///< [in] Kernel function pointer to parameterization of cub::DeviceScanInitKernel
@@ -412,7 +412,7 @@ struct DispatchScan
         return CubDebug(cudaErrorNotSupported);
 
 #else
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get device ordinal
@@ -511,7 +511,7 @@ struct DispatchScan
      * Internal dispatch routine
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*           d_temp_storage,         ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&         temp_storage_bytes,     ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT  d_in,                   ///< [in] Pointer to the input sequence of data items
@@ -519,10 +519,10 @@ struct DispatchScan
         ScanOpT         scan_op,                ///< [in] Binary scan functor 
         InitValueT      init_value,             ///< [in] Initial value to seed the exclusive scan
         OffsetT         num_items,              ///< [in] Total number of input items (i.e., the length of \p d_in)
-        cudaStream_t    stream,                 ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t    stream,                 ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool            debug_synchronous)      ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get PTX version

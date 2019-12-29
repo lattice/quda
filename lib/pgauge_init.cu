@@ -80,7 +80,7 @@ namespace quda {
     ~InitGaugeCold () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
       //cudaDeviceSynchronize();
@@ -384,7 +384,7 @@ namespace quda {
     ~InitGaugeHot () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
       //cudaDeviceSynchronize();

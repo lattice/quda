@@ -94,7 +94,7 @@ namespace quda {
       arg(arg),
       meta(meta) {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       updateGaugeFieldKernel<conj_mom,exact><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     } // apply
