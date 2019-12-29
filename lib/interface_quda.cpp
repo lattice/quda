@@ -662,7 +662,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  qudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  qudaHostGetDevicePointer((void**)num_failures_d, num_failures_h, 0);
 
   loadTuneCache();
 
