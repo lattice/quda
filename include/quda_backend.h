@@ -118,7 +118,6 @@
 #define qudaDeviceProp cudaDeviceProp
 #define qudaWarpSize warpSize
 
-//?
 #define qudaFuncAttributeMaxDynamicSharedMemorySize cudaFuncAttributeMaxDynamicSharedMemorySize 
 #define qudaFuncAttributePreferredSharedMemoryCarveout cudaFuncAttributePreferredSharedMemoryCarveout
 #define qudaSharedmemCarveoutMaxShared cudaSharedmemCarveoutMaxShared
@@ -127,66 +126,5 @@
 #endif
 
 #ifdef HIP_BACKEND
-#include <hip/hip_runtime.h>
-#include <hip/hip_profiler_api.h
-
-#define QUDA_SUCCESS hipSuccess
-#define QUDA_MEMORYTYPE_ARRAY hipMemoryTypeArray
-#define QUDA_MEMORYTYPE_DEVICE hipMemoryTypeDevice
-#define QUDA_MEMORYTYPE_UNIFIED hipMemoryTypeUnified
-#define QUDA_MEMORYTYPE_HOST hipMemoryTypeHost
-#define QUDAFFT_C2C HIPFFT_C2C
-
-#define QUdeviceptr hipDeviceptr_t
-#define QUmemorytype hipMemoryType
-#define QUresult  hipError_t
-
-#define qudaChannelFormatDesc hipChannelFormatDesc
-#define qudaChannelFormatKindFloat hipChannelFormatKindFloat
-#define qudaChannelFormatKindSigned hipChannelFormatKindSigned
-
-#define qudaEventDisableTiming hipEventDisableTiming
-#define qudaEventInterprocess hipEventInterprocess
-
-#define qudaFuncCache hipFuncCache
-#define qudaFuncCachePreferL1 hipFuncCachePreferL1
-#define qudafftComplex hipfftComplex
-#define qudafftDoubleComplex hipfftDoubleComplex
-#define qudafftHandle hipfftHandle
-#define qudafftResult hipfftResult
-
-#define qudaIpcEventHandle_t hipIpcEventHandle_t
-#define qudaIpcMemHandle_t hipIpcMemHandle_t
-#define qudaIpcMemLazyEnablePeerAccess hipIpcMemLazyEnablePeerAccess
-
-#define qudaHostRegisterDefault hipHostRegisterDefault
-#define qudaHostRegisterMapped hipHostRegisterMapped
-#define qudaHostRegisterPortable hipHostRegisterPortable
-
-#define qudaReadModeElementType hipReadModeElementType
-#define qudaReadModeNormalizedFloat hipReadModeNormalizedFloat
-
-#define qudaResourceDesc hipResourceDesc
-#define qudaResourceTypeLinear hipResourceTypeLinear
-#define qudaResourceViewDesc hipResourceViewDesc
-
-#define qudaStreamDefault hipStreamDefault
-
-#define qudaStream_t hipStream_t
-#define qudaSuccess hipSuccess
-#define qudaEvent_t hipEvent_t
-#define qudaError_t hipError_t
-#define qudaTextureObject_t hipTextureObject_t
-
-#define qudaMemcpyKind hipMemcpyKind
-#define qudaMemcpyDeviceToHost hipMemcpyDeviceToHost
-#define qudaMemcpyHostToDevice hipMemcpyHostToDevice
-#define qudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
-
-#define qudaFuncAttribute hipFuncAttribute
-#define qudaDeviceProp hipDeviceProp
-#define qudaTextureDesc hipTextureDesc
-#define qudaWarpSize hipWarpSize
-
 
 #endif
