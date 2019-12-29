@@ -30,7 +30,7 @@ public:
     void apply(const cudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        arg.result_h[0] = 0.;
+        ((double*)arg.result_h)[0] = 0.0;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
         using namespace jitify::reflection;

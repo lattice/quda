@@ -189,7 +189,6 @@ int main(int argc, char **argv)
   // Size of floating point data
   size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * sSize;
-  // Void array passed to the GPU. QUDA will allocate GPU memory and pass back a populated host array.
   void *qDensity = malloc(array_size);
   qCharge = qChargeDensityQuda(qDensity);
 
@@ -241,7 +240,7 @@ int main(int argc, char **argv)
     // Topological charge routines
     //---------------------------------------------------------------------------
   case 2 :
-    // Over Improved STOUT
+    // Over-Improved STOUT
     // start the timer
     time0 = -((double)clock());
     performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);

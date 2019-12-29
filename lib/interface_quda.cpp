@@ -5830,7 +5830,7 @@ double energyQuda()
 
   cudaGaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
-    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileQCharge);
+    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileEnergy);
     gauge = extendedGaugeResident;
   } else {
     gauge = gaugeSmeared;

@@ -51,7 +51,8 @@ namespace quda
 	// Rescale from 1/8
 	F[i] *= 8;
 	trace = getTrace(F[i]);
-	setIdentity(&temp2); 
+	setIdentity(&temp2);
+	temp2 = trace * temp2;
 	temp1 = 0.5 * (F[i] - oneOnThree * temp2);
 	E += getTrace(temp1 * conj(temp1)).real();
       }
