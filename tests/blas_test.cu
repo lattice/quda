@@ -264,7 +264,7 @@ void initFields(int prec, int order)
   if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
   if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
-  checkCudaError();
+  checkQudaError();
 
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -299,7 +299,7 @@ void initFields(int prec, int order)
   lD = new cudaColorSpinorField(param);
 
   // check for successful allocation
-  checkCudaError();
+  checkQudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 &&

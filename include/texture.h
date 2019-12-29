@@ -159,7 +159,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
       *norm_h = new char[norm_bytes];
       cudaMemcpy(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
-    checkCudaError();
+    checkQudaError();
   }
 
   // restore the field from the host
@@ -170,7 +170,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
       delete[] * norm_h;
       *norm_h = 0;
     }
-    checkCudaError();
+    checkQudaError();
   }
 
   float *Norm() { return norm; }
@@ -459,7 +459,7 @@ public:
       *spinor_h = new char[bytes];
       cudaMemcpy(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
       SN::backup(norm_h, norm_bytes);
-      checkCudaError();
+      checkQudaError();
     }
   }
 
@@ -474,7 +474,7 @@ public:
       SN::restore(norm_h, norm_bytes);
       delete[] * spinor_h;
       *spinor_h = 0;
-      checkCudaError();
+      checkQudaError();
     }
   }
 

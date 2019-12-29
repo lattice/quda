@@ -131,7 +131,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   func.apply(0);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
-  checkCudaError();
+  checkQudaError();
   qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);

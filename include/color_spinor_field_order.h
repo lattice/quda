@@ -1084,7 +1084,7 @@ namespace quda {
     if (backup_h) errorQuda("Already allocated host backup");
     backup_h = safe_malloc(bytes);
     cudaMemcpy(backup_h, field, bytes, qudaMemcpyDeviceToHost);
-    checkCudaError();
+    checkQudaError();
   }
 
   /**
@@ -1094,7 +1094,7 @@ namespace quda {
     cudaMemcpy(field, backup_h, bytes, qudaMemcpyHostToDevice);
     host_free(backup_h);
     backup_h = nullptr;
-    checkCudaError();
+    checkQudaError();
   }
 
   size_t Bytes() const

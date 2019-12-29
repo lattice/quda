@@ -232,7 +232,7 @@ namespace quda {
     staggered_prolong_restrict(out, in, fine_to_coarse, parity);
     staggered_prolong_restrict.apply(0);
     
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
   template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaStaggeredTransferType transferType>

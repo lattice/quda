@@ -763,7 +763,7 @@ namespace quda {
 	    backup_norm_h = safe_malloc(norm_bytes);
 	    cudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
 	  }
-	  checkCudaError();
+	  checkQudaError();
 	}
 
 	/**
@@ -778,7 +778,7 @@ namespace quda {
 	    host_free(backup_norm_h);
 	    backup_norm_h = nullptr;
 	  }
-	  checkCudaError();
+	  checkQudaError();
 	}
 
 	size_t Bytes() const {

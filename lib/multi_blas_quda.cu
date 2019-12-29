@@ -288,7 +288,7 @@ namespace quda {
       blas::bytes += blas.bytes();
       blas::flops += blas.flops();
 
-      checkCudaError();
+      checkQudaError();
     }
 
     /**

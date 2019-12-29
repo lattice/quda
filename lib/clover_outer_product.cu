@@ -533,7 +533,7 @@ namespace quda {
    errorQuda("Clover Dirac operator has not been built!");
 #endif
 
-   checkCudaError();
+   checkQudaError();
    return;
   } // computeCloverForce
 

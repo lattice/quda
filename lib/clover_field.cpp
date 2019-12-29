@@ -207,7 +207,7 @@ namespace quda {
         texDesc.readMode = qudaReadModeElementType;
 
       qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-      checkCudaError();
+      checkQudaError();
       
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
@@ -233,7 +233,7 @@ namespace quda {
         texDesc.readMode = qudaReadModeElementType;
 
         qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
-	checkCudaError();
+	checkQudaError();
       }
     }
 
@@ -255,7 +255,7 @@ namespace quda {
 	qudaDestroyTextureObject(evenInvNormTex);
 	qudaDestroyTextureObject(oddInvNormTex);
       }
-      checkCudaError();
+      checkQudaError();
     }
   }
 #endif
@@ -275,7 +275,7 @@ namespace quda {
       if (invNorm) pool_device_free(invNorm);
     }
     
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaCloverField::copy(const CloverField &src, bool inverse) {
@@ -334,7 +334,7 @@ namespace quda {
     }
 
     qudaDeviceSynchronize();
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaCloverField::loadCPUField(const cpuCloverField &cpu) { copy(cpu); }
@@ -370,7 +370,7 @@ namespace quda {
     pool_pinned_free(packClover);
 
     qudaDeviceSynchronize();
-    checkCudaError();
+    checkQudaError();
   }
 
   /**

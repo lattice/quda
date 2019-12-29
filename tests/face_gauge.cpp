@@ -1022,7 +1022,7 @@ void exchange_llfat_cleanup(void)
     }
 
   }
-  checkCudaError();
+  checkQudaError();
 }
 
 #undef gaugeSiteSize

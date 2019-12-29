@@ -353,7 +353,7 @@ namespace quda {
      }
    }
 
-   checkCudaError();
+   checkQudaError();
 
    for(int j = 0; j < args.k; j++)
    {

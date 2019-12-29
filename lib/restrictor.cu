@@ -181,7 +181,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
   template <typename Float, int fineSpin>

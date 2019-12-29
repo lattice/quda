@@ -321,7 +321,7 @@ namespace quda {
       errorQuda("Invalid dim=%d", dim);
     }
 
-    checkCudaError();
+    checkQudaError();
   }
 
   /** This is the template driver for extractGhost */

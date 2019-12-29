@@ -66,7 +66,7 @@ public:
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
 
-        checkCudaError();
+        checkQudaError();
         comm_allreduce((double *)arg.result_h);
         charge = arg.result_h[0];
       } else {
@@ -75,7 +75,7 @@ public:
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
 
-        checkCudaError();
+        checkQudaError();
         comm_allreduce((double *)arg.result_h);
         charge = arg.result_h[0];
       }

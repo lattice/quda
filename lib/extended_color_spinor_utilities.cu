@@ -287,7 +287,7 @@ namespace quda {
         CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, meta, location);
         copier.apply(0);
       }
-      if(location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+      if(location == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
     }
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>

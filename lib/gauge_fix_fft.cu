@@ -1103,7 +1103,7 @@ namespace quda {
     arg.free();
     CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
     CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
-    checkCudaError();
+    checkQudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 

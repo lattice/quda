@@ -348,7 +348,7 @@ void init()
   tmp = new cudaColorSpinorField(csParam);
 
   qudaDeviceSynchronize();
-  checkCudaError();
+  checkQudaError();
 
   bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
                               // because both call the same "Dslash" directly.

@@ -162,7 +162,7 @@ namespace quda {
       else texDesc.readMode = qudaReadModeElementType;
 
       qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
-      checkCudaError();
+      checkQudaError();
     }
   }
 
@@ -176,7 +176,7 @@ namespace quda {
         qudaDestroyTextureObject(evenPhaseTex);
         qudaDestroyTextureObject(oddPhaseTex);
       }
-      checkCudaError();
+      checkQudaError();
     }
   }
 #endif
@@ -731,13 +731,13 @@ namespace quda {
     staggeredPhaseType = src.StaggeredPhase();
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu) {
     copy(cpu);
     qudaDeviceSynchronize();
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaGaugeField::loadCPUField(const cpuGaugeField &cpu, TimeProfile &profile) {
@@ -814,7 +814,7 @@ namespace quda {
     cpu.staggeredPhaseType = staggeredPhaseType;
 
     qudaDeviceSynchronize();
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaGaugeField::saveCPUField(cpuGaugeField &cpu, TimeProfile &profile) const {
@@ -827,7 +827,7 @@ namespace quda {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
     cudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
-    checkCudaError();
+    checkQudaError();
     backed_up = true;
   }
 
@@ -836,7 +836,7 @@ namespace quda {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
     cudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
     delete []backup_h;
-    checkCudaError();
+    checkQudaError();
     backed_up = false;
   }
 

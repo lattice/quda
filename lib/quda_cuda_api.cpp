@@ -193,7 +193,12 @@ namespace quda {
     PROFILE(cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #endif
   }
-
+  
+  qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line) {
+    qudaError_t error = cudaGetLastError();
+    return error;
+  }
+  
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line) {
     if (count == 0) return;
     cudaMemset(dst, val, count);

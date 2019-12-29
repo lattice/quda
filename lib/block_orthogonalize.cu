@@ -224,7 +224,7 @@ namespace quda {
     BlockOrtho<double, vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
     ortho.apply(0);
-    checkCudaError();
+    checkQudaError();
   }
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize>

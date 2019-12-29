@@ -114,7 +114,7 @@ namespace quda {
         fast_reduce_enabled = true;
       }
 
-      checkCudaError();
+      checkQudaError();
     }
 
     void endReduce(void)
@@ -323,7 +323,7 @@ namespace quda {
       blas::bytes += reduce.bytes();
       blas::flops += reduce.flops();
 
-      checkCudaError();
+      checkQudaError();
       return value;
     }
 

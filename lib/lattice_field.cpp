@@ -373,7 +373,7 @@ namespace quda {
     } // loop over dimension
 
     initComms = true;
-    checkCudaError();
+    checkQudaError();
   }
 
   void LatticeField::destroyComms()
@@ -404,7 +404,7 @@ namespace quda {
       comm_barrier();
 
       initComms = false;
-      checkCudaError();
+      checkQudaError();
     }
 
   }
@@ -452,7 +452,7 @@ namespace quda {
 	}
       }
 
-      checkCudaError();
+      checkQudaError();
 
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
@@ -469,7 +469,7 @@ namespace quda {
       }
     } // buffer index
 
-    checkCudaError();
+    checkQudaError();
 
     // handles for obtained events
     qudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
@@ -514,7 +514,7 @@ namespace quda {
       }
     }
 
-    checkCudaError();
+    checkQudaError();
 
     for (int dim=0; dim<4; ++dim) {
       if (comm_dim(dim)==1) continue;
@@ -547,7 +547,7 @@ namespace quda {
 	}
       }
     }
-    checkCudaError();
+    checkQudaError();
 
     initIPCComms = true;
     ghost_field_reset = false;
@@ -556,7 +556,7 @@ namespace quda {
   void LatticeField::destroyIPCComms() {
 
     if (!initIPCComms) return;
-    checkCudaError();
+    checkQudaError();
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state
@@ -590,7 +590,7 @@ namespace quda {
       } // buffer
     } // iterate over dim
 
-    checkCudaError();
+    checkQudaError();
 
     // local take down complete - now synchronize to ensure globally complete
     qudaDeviceSynchronize();

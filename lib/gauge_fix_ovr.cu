@@ -1554,7 +1554,7 @@ public:
       cudaStreamDestroy(GFStream[8]);
     }
   #endif
-    checkCudaError();
+    checkQudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
     if (getVerbosity() > QUDA_SUMMARIZE){

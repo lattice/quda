@@ -361,7 +361,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   *cudaSpinor = *spinor;
 
   qudaDeviceSynchronize();
-  checkCudaError();
+  checkQudaError();
 
   tmp = new cudaColorSpinorField(csParam);
 

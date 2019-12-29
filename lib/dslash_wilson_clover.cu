@@ -76,7 +76,7 @@ namespace quda
           in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 
@@ -95,7 +95,7 @@ namespace quda
         in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 

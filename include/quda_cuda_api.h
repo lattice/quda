@@ -14,6 +14,11 @@
 namespace quda {
 
   /**
+     @brief Wrapper around qudaGetLastError
+  */
+  qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
+  
+  /**
      @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
@@ -264,11 +269,12 @@ namespace quda {
 
 //START Memcpy
 //-------------------------------------------------------------------------------------
-
 #define qudaMemcpy(dst, src, count, kind)				\
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaMemcpyAsync(dst, src, count, kind, stream)			\
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Memcpy
@@ -278,14 +284,19 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaEventCreate(event)						\
   ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaEventCreateWithFlags(event, flags)				\
   ::quda::qudaEventCreateWithFlags_(event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaEventDestroy(event)						\
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaEventQuery(event)						\
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaEventRecord(event, stream)					\
   ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaEventElapsedTime(ms, start, end)				\
   ::quda::qudaEventElapsedTime_(ms, start, end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //-------------------------------------------------------------------------------------
@@ -294,10 +305,13 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaMemset(dst, val, count)					\
   ::quda::qudaMemset_(dst, val, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaMemsetAsync(dst, val, count, stream)			\
   ::quda::qudaMemsetAsync_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaMemset2D(dst, val, pitch, width, height)			\
   ::quda::qudaMemset2D_(dst, val, pitch, width, height, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaMemset2DAsync(dst, val, pitch, width, height, stream)	\
   ::quda::qudaMemset2DAsync_(dst, val, pitch, width, height, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Memset
@@ -307,10 +321,13 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc) \
   ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDestroyTextureObject(pTexObject)				\
   ::quda::qudaDestroyTextureObject_(pTexObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaGetTextureObjectResourceDesc(pResDesc, texObject)		\
   ::quda::qudaGetTextureObjectResourceDesc_(pResDesc, texObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 //END texture
 //-------------------------------------------------------------------------------------
 
@@ -318,26 +335,37 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice)	\
   ::quda::qudaDeviceCanAccessPeer_(canAccessPeer, device, peerDevice, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority) \
   ::quda::qudaDeviceGetStreamPriorityRange_(leastPriority, greatestPriority, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDeviceReset()						\
   ::quda::qudaDeviceReset_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDeviceSetCacheConfig(cacheConfig)				\
   ::quda::qudaDeviceSetCacheConfig_(cacheConfig, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDeviceSynchronize()						\
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDeviceSynchronize()						\
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaGetDeviceCount(count)					\
   ::quda::qudaGetDeviceCount_(count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaSetDevice(dev)						\
   ::quda::qudaSetDevice_(dev, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaGetDeviceProperties(prop, device)				\
   ::quda::qudaGetDeviceProperties_(prop, device, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaHostGetDevicePointer(pDevice, pHost, flags)			\
     ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaDriverGetVersion(driverVersion)				\
   ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaRuntimeGetVersion(runtimeVersion)				\
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Device
@@ -350,10 +378,10 @@ namespace quda {
 //END Host
 //-------------------------------------------------------------------------------------
 
-//START ErrorString
+//START Misc
 //-------------------------------------------------------------------------------------
-#define qudaRuntimeGetVersion(runtimeVersion)				\
-  ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END ErrorString
+#define qudaGetLastError()						\
+  ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END Misc
 //-------------------------------------------------------------------------------------
 #endif

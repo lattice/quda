@@ -87,7 +87,7 @@ void initFields(QudaPrecision prec)
   yD = new cudaColorSpinorField(param);
 
   // check for successful allocation
-  checkCudaError();
+  checkQudaError();
 
   //*xD = *xH;
   //*yD = *yH;

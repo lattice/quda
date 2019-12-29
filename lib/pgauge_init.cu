@@ -111,7 +111,7 @@ namespace quda {
     InitGaugeColdArg<Gauge> initarg(dataOr, data);
     InitGaugeCold<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkCudaError();
+    checkQudaError();
   }
 
 
@@ -418,7 +418,7 @@ namespace quda {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkCudaError();
+    checkQudaError();
     qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);

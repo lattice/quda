@@ -63,7 +63,7 @@ namespace quda
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 

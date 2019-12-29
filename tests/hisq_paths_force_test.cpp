@@ -374,7 +374,7 @@ static int hisq_force_test(void)
   qudaDeviceSynchronize();
   gettimeofday(&t3, NULL);
 
-  checkCudaError();
+  checkQudaError();
 
   cudaMom->saveCPUField(*cpuMom);
 

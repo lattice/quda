@@ -281,7 +281,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_present = comm_peer2peer_enabled_global();
 
-  checkCudaErrorNoSync();
+  checkQudaErrorNoSync();
   return;
 }
 
@@ -470,7 +470,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
+  checkQudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
@@ -507,7 +507,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
+  checkQudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
@@ -540,7 +540,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
+  checkQudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
@@ -581,7 +581,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
-  checkCudaError(); // check and clear error state first
+  checkQudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it

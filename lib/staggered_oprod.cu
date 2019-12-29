@@ -398,7 +398,7 @@ namespace quda {
       }
     } // i=3,..,0
 
-    checkCudaError();
+    checkQudaError();
     } // computeStaggeredOprodCuda
 
 #endif // GPU_STAGGERED_DIRAC

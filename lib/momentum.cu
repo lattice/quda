@@ -266,7 +266,7 @@ namespace quda {
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
-    checkCudaError();
+    checkQudaError();
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS
@@ -342,7 +342,7 @@ namespace quda {
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<ApplyU, ReconstructNo12>(U, force);
-    checkCudaError();
+    checkQudaError();
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS

@@ -361,7 +361,7 @@ namespace quda {
 
       qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
-      checkCudaError();
+      checkQudaError();
 
       // create the texture for the norm components
       if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
@@ -389,12 +389,12 @@ namespace quda {
 
         qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 
-        checkCudaError();
+        checkQudaError();
       }
       
       texInit = true;
 
-      checkCudaError();
+      checkQudaError();
     }
   }
 
@@ -488,7 +488,7 @@ namespace quda {
       ghostTexInit = true;
       ghost_precision_tex = ghost_precision;
 
-      checkCudaError();
+      checkQudaError();
     }
 
   }
@@ -558,7 +558,7 @@ namespace quda {
       backup_norm_h = new char[norm_bytes];
       cudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
-    checkCudaError();
+    checkQudaError();
     backed_up = true;
   }
 
@@ -571,7 +571,7 @@ namespace quda {
       cudaMemcpy(v, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
       delete []backup_norm_h;
     }
-    checkCudaError();
+    checkQudaError();
     backed_up = false;
   }
 
@@ -629,7 +629,7 @@ namespace quda {
       }
     }
 
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaColorSpinorField::copy(const cudaColorSpinorField &src)
@@ -697,7 +697,7 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // include sync here for accurate host-device profiling
-    checkCudaError();
+    checkQudaError();
   }
 
 
@@ -750,7 +750,7 @@ namespace quda {
     }
 
     qudaDeviceSynchronize(); // need to sync before data can be used on CPU
-    checkCudaError();
+    checkQudaError();
   }
 
   void cudaColorSpinorField::allocateGhostBuffer(int nFace, bool spin_project) const {

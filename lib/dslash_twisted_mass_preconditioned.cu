@@ -92,7 +92,7 @@ namespace quda
         policy.apply(0);
       }
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 

@@ -206,7 +206,7 @@ void init(int argc, char **argv)
     *cudaSpinor = *spinor;
 
     qudaDeviceSynchronize();
-    checkCudaError();
+    checkQudaError();
 	
     double spinor_norm2 = blas::norm2(*spinor);
     double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
