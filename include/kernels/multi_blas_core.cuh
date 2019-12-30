@@ -83,7 +83,7 @@ namespace quda
        @param[in,out] arg Argument struct with required meta data
        (input/output fields, functor, etc.)
     */
-    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg arg)
+    template <typename FloatN, int M, int NXZ, int warp_split, typename Arg> __global__ void multiBlasKernel(Arg & arg)
     {
       // use i to loop over elements in kernel
       const int k = blockIdx.y * blockDim.y + threadIdx.y;

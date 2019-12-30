@@ -275,7 +275,7 @@ namespace quda {
       if (invNorm) pool_device_free(invNorm);
     }
     
-    checkCudaError();
+//    checkCudaError();
   }
 
   void cudaCloverField::copy(const CloverField &src, bool inverse) {

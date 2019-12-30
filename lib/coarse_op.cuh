@@ -195,6 +195,14 @@ namespace quda {
 
     void apply(const hipStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+         
+      float eventMs = 1.0f;
+      hipEvent_t start, stop;
+      hipEventCreate(&start);
+      hipEventCreate(&stop);
+      hipEventRecord(start, stream);
+
+
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -473,20 +481,21 @@ namespace quda {
             .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
             .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
+	Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);	  
           if (arg.shared_atomic) {
             if (arg.parity_flip != true) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
             constexpr bool parity_flip = true;
 
             if (dir == QUDA_BACKWARDS) {
-              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
             } else if (dir == QUDA_FORWARDS) {
-              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
             } else {
               errorQuda("Undefined direction %d", dir);
             }
@@ -495,19 +504,20 @@ namespace quda {
             constexpr bool parity_flip = false;
 
             if (dir == QUDA_BACKWARDS) {
-              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
             } else if (dir == QUDA_FORWARDS) {
-              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
+              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(*arg_d);
             } else {
               errorQuda("Undefined direction %d", dir);
             }
           }
+	hipDeviceSynchronize();hipFree(arg_d);
 #endif
           tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
 
@@ -592,6 +602,14 @@ namespace quda {
           errorQuda("Undefined compute type %d", type);
         }
       }
+
+      hipEventRecord(stop, stream);
+      hipEventSynchronize(stop);
+      hipEventElapsedTime(&eventMs, start, stop);
+      printfQuda("ComputexxxGPU time taken  = %6.3fms\n", eventMs);
+
+
+
     }
 
     /**

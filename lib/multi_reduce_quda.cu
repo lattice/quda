@@ -3,6 +3,8 @@
 #include <float_vector.h>
 #include <color_spinor_field_order.h>
 #include <uint_to_char.h>
+#include <stdio.h>
+
 
 #include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
@@ -39,7 +41,11 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
+
+      Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
+      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, *arg_d, ReduceType, FloatN, M, NXZ, Arg);
+      hipDeviceSynchronize();hipFree(arg_d);
+
 #endif
 #endif
 
@@ -291,11 +297,13 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
+
 	signed char *A_d;hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
 	set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
 	hipDeviceSynchronize();hipFree(A_d);
 //        hipMemcpyToSymbolAsync(HIP_SYMBOL(Amatrix_d), A, NXZ * NYW * sizeof(decltype(A[0])), 0, hipMemcpyHostToDevice,
 //                                *getStream());
+
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
       }
 
@@ -307,10 +315,11 @@ namespace quda {
           for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
 	signed char *B_d;hipMalloc(&B_d, MAX_MATRIX_SIZE);hipMemcpy(B_d,B,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-	set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(B_d);
+	set_BmatixR<<<256,MAX_MATRIX_SIZE/256>>>(B_d);
 	hipDeviceSynchronize();hipFree(B_d);
 //        hipMemcpyToSymbolAsync(HIP_SYMBOL(Bmatrix_d), B, NXZ * NYW * sizeof(decltype(B[0])), 0, hipMemcpyHostToDevice,
 //                                *getStream());
+
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
       }
 
@@ -321,11 +330,13 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
+
 	signed char *C_d;hipMalloc(&C_d, MAX_MATRIX_SIZE);hipMemcpy(C_d,C,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
-	set_AmatixR<<<256,MAX_MATRIX_SIZE/256>>>(C_d);
+	set_CmatixR<<<256,MAX_MATRIX_SIZE/256>>>(C_d);
 	hipDeviceSynchronize();hipFree(C_d);
 //        hipMemcpyToSymbolAsync(HIP_SYMBOL(Cmatrix_d), C, NXZ * NYW * sizeof(decltype(C[0])), 0, hipMemcpyHostToDevice,
 //                                *getStream());
+
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
 

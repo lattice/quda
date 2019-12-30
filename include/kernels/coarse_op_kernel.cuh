@@ -855,7 +855,7 @@ namespace quda {
 
   template<bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
            int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
-  __global__ void ComputeVUVGPU(Arg arg) {
+  __global__ void ComputeVUVGPU(Arg &arg) {
 
     Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
     int parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row;

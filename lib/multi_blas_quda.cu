@@ -146,15 +146,18 @@ namespace quda {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+
 	  signed char *A_d;hipMalloc(&A_d, MAX_MATRIX_SIZE);hipMemcpy(A_d,A,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Amatix<<<256,MAX_MATRIX_SIZE/256>>>(A_d);
           hipDeviceSynchronize();hipFree(A_d);
+
         }
 
         if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+
           signed char *B_d;hipMalloc(&B_d, MAX_MATRIX_SIZE);hipMemcpy(B_d,B,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Bmatix<<<256,MAX_MATRIX_SIZE/256>>>(B_d);
           hipDeviceSynchronize();hipFree(B_d);
@@ -164,25 +167,26 @@ namespace quda {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+
           signed char *C_d;hipMalloc(&C_d, MAX_MATRIX_SIZE);hipMemcpy(C_d,C,MAX_MATRIX_SIZE,hipMemcpyHostToDevice);
           set_Cmatix<<<256,MAX_MATRIX_SIZE/256>>>(C_d);
           hipDeviceSynchronize();hipFree(C_d);
+          
         }
 
         tp.block.x *= tp.aux.x; // include warp-split factor
 
-//        typedef MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> Arg;
-//        Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
-
+        typedef MultiBlasArg<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor> Arg;
+        Arg *arg_d;hipMalloc(&arg_d, sizeof(Arg));hipMemcpy(arg_d,&arg,sizeof(Arg),hipMemcpyHostToDevice);
 
         switch (tp.aux.x) {
-        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
-        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+        case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+        case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
+        case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(*arg_d); break;
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 
-//        hipDeviceSynchronize();hipFree(arg_d);
+        hipDeviceSynchronize();hipFree(arg_d);
 
         tp.block.x /= tp.aux.x; // restore block size
 #endif
