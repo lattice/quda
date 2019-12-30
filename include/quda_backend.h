@@ -2,10 +2,10 @@
 
 // TBD: API calls
 
-// curand_normal
-// curand_normal_double
-// curand_uniform
-// curand_uniform_double
+// qurand_normal
+// qurand_normal_double
+// qurand_uniform
+// qurand_uniform_double
 
 // cufftExecC2C
 // cufftExecZ2Z
@@ -40,10 +40,8 @@
 // * cudaEventSynchronize
  
 // * cudaGetTextureObjectResourceDesc
-// cudaGetErrorString
-// cudaGetLastError
-
-
+// * cudaGetErrorString
+// * cudaGetLastError
 
 // cudaHostAlloc
 // cudaHostRegister

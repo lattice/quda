@@ -42,7 +42,7 @@ namespace quda {
     }
   };
 
-  template <typename real, typename Link> __device__ __host__ Link gauss_su3(cuRNGState &localState)
+  template <typename real, typename Link> __device__ __host__ Link gauss_su3(quRNGState &localState)
   {
     Link ret;
     real rand1[4], rand2[4], phi[4], radius[4], temp1[4], temp2[4];
@@ -93,7 +93,7 @@ namespace quda {
       for (int mu = 0; mu < 4; mu++) arg.U(mu, linkIndex(x, arg.E), parity) = I;
     } else {
       for (int mu = 0; mu < 4; mu++) {
-        cuRNGState localState = arg.rngstate.State()[parity * arg.threads + x_cb];
+        quRNGState localState = arg.rngstate.State()[parity * arg.threads + x_cb];
 
         // generate Gaussian distributed su(n) fiueld
         Link u = gauss_su3<real, Link>(localState);

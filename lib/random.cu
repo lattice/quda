@@ -48,7 +48,7 @@ namespace quda {
      @param size size of the CURAND RNG state array
      @param arg Metadata needed for computing multi-gpu offsets
   */
-  __global__ void kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, rngArg arg)
+  __global__ void kernel_random(quRNGState *state, unsigned long long seed, int size_cb, rngArg arg)
   {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
@@ -60,7 +60,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-      curand_init(seed, idd, 0, &state[parity * size_cb + id]);
+      qurand_init(seed, idd, 0, &state[parity * size_cb + id]);
     }
   }
 
@@ -72,7 +72,7 @@ namespace quda {
      @param n_parity Number of parities (1 or 2)
      @param X array of lattice dimensions
   */
-  void launch_kernel_random(cuRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
+  void launch_kernel_random(quRNGState *state, unsigned long long seed, int size_cb, int n_parity, int X[4])
   {
     dim3 nthreads(128,1,1);
     dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
@@ -90,11 +90,11 @@ namespace quda {
     state = nullptr;
     for (int i = 0; i < 4; i++) X[i] = meta.X()[i];
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateMRG32k3a\n");
 #endif
   }
 
@@ -108,11 +108,11 @@ namespace quda {
     size_cb = size / param.siteSubset;
 
 #if defined(XORWOW)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateXORWOW\n");
 #elif defined(RG32k3a)
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateMRG32k3a\n");
 #else
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using qurandStateMRG32k3a\n");
 #endif
   }
 
@@ -129,11 +129,11 @@ namespace quda {
   */
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
-      state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(cuRNGState)));
+      state = (quRNGState *)device_malloc(size * sizeof(quRNGState));
+      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(quRNGState)));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
-                   size * sizeof(cuRNGState) / (float)(1048576));
+                   size * sizeof(quRNGState) / (float)(1048576));
     } else {
       errorQuda("Array of random numbers not allocated, array size: %d !\nExiting...\n", size);
     }
@@ -146,7 +146,7 @@ namespace quda {
     if (size > 0 && state != nullptr) {
       device_free(state);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(cuRNGState) / (float)(1048576));
+        printfQuda("Free array of random numbers with size: %.2f MB\n", size * sizeof(quRNGState) / (float)(1048576));
       size = 0;
       state = NULL;
     }
@@ -154,21 +154,21 @@ namespace quda {
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore() {
-    qudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
+    qudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(quRNGState), qudaMemcpyHostToDevice);
     if (err != qudaSuccess) {
       host_free(backup_state);
-      errorQuda("Failed to restore curand rng states array\n");
+      errorQuda("Failed to restore qurand rng states array\n");
     }
     host_free(backup_state);
   }
 
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup() {
-    backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    qudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
+    backup_state = (quRNGState *)safe_malloc(size * sizeof(quRNGState));
+    qudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(quRNGState), qudaMemcpyDeviceToHost);
     if (err != qudaSuccess) {
       host_free(backup_state);
-      errorQuda("Failed to backup curand rng states array\n");
+      errorQuda("Failed to backup qurand rng states array\n");
     }
   }
 
