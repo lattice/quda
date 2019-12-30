@@ -693,7 +693,7 @@ namespace quda {
     }
     void apply(const hipStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, tp.shared_bytes, stream >> > (arg, mu, parity);
+      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><<< tp.grid,tp.block, tp.shared_bytes, stream >>> (arg, mu, parity);
     }
 
     TuneKey tuneKey() const {

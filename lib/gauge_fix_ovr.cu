@@ -1299,8 +1299,8 @@ public:
       #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
-        block[d] = make_uint3(128, 1, 1);
-        grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
+        block[d] = dim3(128, 1, 1);
+        grid[d] = dim3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
       }
       hipStreamCreate(&GFStream[8]);
       for ( int d = 0; d < 4; d++ ) {
@@ -1378,9 +1378,9 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, true><<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, true><<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1427,14 +1427,14 @@ public:
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            Kernel_UnPackGhost<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, false><<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
           #ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, false><<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;

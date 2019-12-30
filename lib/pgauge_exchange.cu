@@ -228,8 +228,8 @@ namespace quda {
       #ifndef GPU_COMMS
         hostbuffer_h[d] = (void*)pinned_malloc(4 * bytes[d]);
       #endif
-        block[d] = make_uint3(128, 1, 1);
-        grid[d] = make_uint3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
+        block[d] = dim3(128, 1, 1);
+        grid[d] = dim3((faceVolumeCB[d] + block[d].x - 1) / block[d].x, 1, 1);
       }
 
       for ( int d = 0; d < 4; d++ ) {
@@ -262,10 +262,10 @@ namespace quda {
       comm_start(mh_recv_fwd[d]);
 
       //extract top face
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true><<< grid[d], block[d], 0, GFStream[0] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
       //extract bottom
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true><<< grid[d], block[d], 0, GFStream[1] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
