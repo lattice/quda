@@ -2,7 +2,6 @@
 
 #ifdef CUDA_BACKEND
 
-
 #include <curand_kernel.h>
   
 #define qurandStateXORWOW curandStateXORWOW
@@ -15,7 +14,11 @@
 #else
   typedef struct qurandStateMRG32k3a quRNGState;
 #endif
-  
+
+inline __device__ void qurand_init(unsigned long long seed, unsigned long long subsequence, unsigned long long offset, quRNGState state) {
+  curand_init(seed, subsequence, offset, &state);
+}
+
 inline  __device__ float qurand_uniform(quRNGState state) {
   return curand_uniform(&state);
 }

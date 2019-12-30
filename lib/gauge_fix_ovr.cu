@@ -1384,9 +1384,9 @@ public:
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronizeDriver(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronizeDriver(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
         #else
@@ -1405,9 +1405,9 @@ public:
         #ifndef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            qudaStreamSynchronize(GFStream[d]);
+            qudaStreamSynchronizeDriver(GFStream[d]);
             comm_start(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronizeDriver(GFStream[4 + d]);
             comm_start(mh_send_back[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
@@ -1439,10 +1439,10 @@ public:
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_send_back[d]);
             comm_wait(mh_send_fwd[d]);
-            qudaStreamSynchronize(GFStream[d]);
-            qudaStreamSynchronize(GFStream[4 + d]);
+            qudaStreamSynchronizeDriver(GFStream[d]);
+            qudaStreamSynchronizeDriver(GFStream[4 + d]);
           }
-          qudaStreamSynchronize(GFStream[8]);
+          qudaStreamSynchronizeDriver(GFStream[8]);
         }
       #endif
         /*gaugeFix.setParity(p);

@@ -360,8 +360,8 @@ namespace quda {
     // now copy the inverse part (if it exists)
     if (V(true) && cpu.V(true)) {
       qudaMemcpy(packClover, cloverInv, bytes, qudaMemcpyDeviceToHost);
-	if (precision == QUDA_HALF_PRECISION)
-	  qudaMemcpy(packCloverNorm, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
+      if (precision == QUDA_HALF_PRECISION)
+	qudaMemcpy(packCloverNorm, invNorm, norm_bytes, qudaMemcpyDeviceToHost);
       copyGenericClover(cpu, *this, true, QUDA_CPU_FIELD_LOCATION, 0, packClover, 0, packCloverNorm);
     } else if ((V(true) && !cpu.V(true)) || (!V(true) && cpu.V(true))) {
       errorQuda("Mismatch between Clover field GPU V(true) and CPU.V(true)");

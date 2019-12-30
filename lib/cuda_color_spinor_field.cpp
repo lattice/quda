@@ -1411,7 +1411,7 @@ namespace quda {
 	    comms_complete[2*dim+dir] = const_cast<cudaColorSpinorField*>(this)->commsQuery(nFace, 2*dim+dir, dagger, 0, gdr_send, gdr_recv);
 	    if (comms_complete[2*dim+dir]) {
 	      comms_done++;
-	      if (comm_peer2peer_enabled(1-dir,dim)) qudaStreamWaitEvent(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
+	      if (comm_peer2peer_enabled(1-dir,dim)) qudaStreamWaitEventDriver(0, ipcRemoteCopyEvent[bufferIndex][1-dir][dim], 0);
 	    }
 	  }
 	}

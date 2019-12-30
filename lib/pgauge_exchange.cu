@@ -271,10 +271,10 @@ namespace quda {
       cudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
       cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
     #endif
-      qudaStreamSynchronize(GFStream[0]);
+      qudaStreamSynchronizeDriver(GFStream[0]);
       comm_start(mh_send_fwd[d]);
 
-      qudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronizeDriver(GFStream[1]);
       comm_start(mh_send_back[d]);
 
     #ifndef GPU_COMMS
@@ -300,8 +300,8 @@ namespace quda {
 
       comm_wait(mh_send_back[d]);
       comm_wait(mh_send_fwd[d]);
-      qudaStreamSynchronize(GFStream[0]);
-      qudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronizeDriver(GFStream[0]);
+      qudaStreamSynchronizeDriver(GFStream[1]);
     }
     checkQudaError();
     qudaDeviceSynchronize();

@@ -259,7 +259,7 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(streams[2*dim+dir]);
+	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronizeDriver(streams[2*dim+dir]);
 	sendStart(dim, dir, &streams[2*dim+dir]); // start sending
       }
 
@@ -348,7 +348,7 @@ namespace quda {
       // if the sending direction is not peer-to-peer then we need to synchronize before we start sending
       for (int dim=0; dim<nDim; dim++) {
 	if (!comm_dim_partitioned(dim)) continue;
-	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronize(streams[2*dim+dir]);
+	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) qudaStreamSynchronizeDriver(streams[2*dim+dir]);
 	sendStart(dim, dir, &streams[2*dim+dir]); // start sending
       }
 
@@ -471,7 +471,7 @@ namespace quda {
     if (dir==0) {
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+	qudaEventSynchronizeDriver(ipcRemoteCopyEvent[bufferIndex][1][dim]);
       } else if (comm_gdr_enabled()) {
 	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
@@ -480,7 +480,7 @@ namespace quda {
 
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+	qudaEventSynchronizeDriver(ipcCopyEvent[bufferIndex][0][dim]);
       } else if (comm_gdr_enabled()) {
 	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
       } else {
@@ -489,7 +489,7 @@ namespace quda {
     } else {
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+	qudaEventSynchronizeDriver(ipcRemoteCopyEvent[bufferIndex][0][dim]);
       } else if (comm_gdr_enabled()) {
 	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
@@ -498,7 +498,7 @@ namespace quda {
 
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-	qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+	qudaEventSynchronizeDriver(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (comm_gdr_enabled()) {
 	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {

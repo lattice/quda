@@ -245,7 +245,7 @@ namespace quda {
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( qurand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    stheta = ( Random<T>(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;

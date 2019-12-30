@@ -107,7 +107,7 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream);
+  qudaError_t qudaLaunchKernel_(const void* func_arg, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaEventCreate
@@ -150,35 +150,54 @@ namespace quda {
      @param[in,out] start Start event we are recording
      @param[in,out] end End event we are recording
   */
-  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t &start, qudaEvent_t &end, const char *func, const char *file, const char *line);
-  
+  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around qudaEventSynchronize 
      @param[in] event Event which we are synchronizing with respect to
   */
-  qudaError_t qudaEventSynchronize(qudaEvent_t &event);
+  qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
-
+  /**
+     @brief Wrapper around qudaEventSynchronize, specialised to use the driver API
+     @param[in] event Event which we are synchronizing with respect to
+  */
+  qudaError_t qudaEventSynchronizeDriver_(qudaEvent_t &event, const char *func, const char *file, const char *line);
+    
   /**
      @brief Wrapper around qudaStreamWaitEvent
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
   */
-  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags);
+  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaStreamSynchronize or quStreamSynchronize
+     @brief Wrapper around qudaStreamWaitEvent, Driver enabled variant
+     @param[in,out] stream Stream which we are instructing to waitç∂
+     @param[in] event Event we are waiting on
+     @param[in] flags Flags to pass to function
+  */
+  qudaError_t qudaStreamWaitEventDriver_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line);
+
+  
+  /**
+     @brief Wrapper around qudaStreamSynchronize or 
      @param[in] stream Stream which we are synchronizing with respect to
   */
-  qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
+  qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
 
-  //QUDA texture objects
+  /**
+     @brief Wrapper around qudaStreamSynchronize Driver variant 
+     @param[in] stream Stream which we are synchronizing with respect to
+  */
+  qudaError_t qudaStreamSynchronizeDriver_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around cudaCreateTextureObject
   */
-  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t* pTexObject, const qudaResourceDesc* pResDesc, const qudaTextureDesc* pTexDesc, const qudaResourceViewDesc* pResViewDesc, const char *func, const char *file, const char *line);
-
+  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t *pTexObject, const qudaResourceDesc *pResDesc, const qudaTextureDesc *pTexDesc, const qudaResourceViewDesc *pResViewDesc, const char *func, const char *file, const char *line);
+  
   /**
      @brief Wrapper around cudaDestroyTextureObject
   */
@@ -231,10 +250,10 @@ namespace quda {
   qudaError_t qudaGetDeviceProperties_(qudaDeviceProp* prop, int  device, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize
+     @brief Wrapper around cudaHostGetDevicePointer
   */
   qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int flags, const char *func, const char *file, const char *line);
-  
+
   /**
      @brief Call API wrapper
   */
@@ -280,6 +299,23 @@ namespace quda {
 //END Memcpy
 //-------------------------------------------------------------------------------------
 
+#define qudaStreamSynchronize(stream)					\
+  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaStreamSynchronizeDriver(stream)					\
+  ::quda::qudaStreamSynchronizeDriver_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+
+
+
+
+
+
+
+
+
+
+
 //START Event
 //-------------------------------------------------------------------------------------
 #define qudaEventCreate(event)						\
@@ -299,7 +335,22 @@ namespace quda {
 
 #define qudaEventElapsedTime(ms, start, end)				\
   ::quda::qudaEventElapsedTime_(ms, start, end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaEventSynchronize(event)					\
+  ::quda::qudaEventSynchronize_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaEventSynchronizeDriver(event)				\
+  ::quda::qudaEventSynchronizeDriver_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaStreamWaitEvent(stream, event, flags)			\
+  ::quda::qudaStreamWaitEvent_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaStreamWaitEventDriver(stream, event, flags)			\
+  ::quda::qudaStreamWaitEventDriver_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END Event
 //-------------------------------------------------------------------------------------
+
+
 
 //START Memset
 //-------------------------------------------------------------------------------------
@@ -317,7 +368,7 @@ namespace quda {
 //END Memset
 //-------------------------------------------------------------------------------------
 
-//START texture
+//START Texture
 //-------------------------------------------------------------------------------------
 #define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc) \
   ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
@@ -327,8 +378,7 @@ namespace quda {
 
 #define qudaGetTextureObjectResourceDesc(pResDesc, texObject)		\
   ::quda::qudaGetTextureObjectResourceDesc_(pResDesc, texObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-//END texture
+//END Texture
 //-------------------------------------------------------------------------------------
 
 //START Device
@@ -361,7 +411,7 @@ namespace quda {
   ::quda::qudaGetDeviceProperties_(prop, device, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaHostGetDevicePointer(pDevice, pHost, flags)			\
-    ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+  ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaDriverGetVersion(driverVersion)				\
   ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
@@ -382,6 +432,8 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaGetLastError()						\
   ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream) \
+  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Misc
 //-------------------------------------------------------------------------------------
 #endif

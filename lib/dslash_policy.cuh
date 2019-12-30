@@ -186,7 +186,7 @@ namespace quda
       for (int dir=1; dir>=0; dir--) { // forwards gather
         qudaEvent_t &event = (i!=3 || getKernelPackT()) ? packEnd[in.bufferIndex] : dslashStart[in.bufferIndex];
 
-        PROFILE(qudaStreamWaitEvent(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+        PROFILE(qudaStreamWaitEventDriver(streams[2*i+dir], event, 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 
         // Initialize host transfer from source spinor
         PROFILE(if (dslash_copy) in.gather(dslash.Nface()/2, dslash.Dagger(), 2*i+dir), profile, QUDA_PROFILE_GATHER);
@@ -263,7 +263,7 @@ namespace quda
 
       // if peer-2-peer in a given direction then we need to insert a wait on that copy event
       if (comm_peer2peer_enabled(dir2,dim)) {
-	PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	PROFILE(qudaStreamWaitEventDriver(streams[Nstream-1], in.getIPCRemoteCopyEvent(dir2,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
       } else {
 
 	if (!gdr_recv && !zero_copy_recv) { // Issue CPU->GPU copy if not GDR
@@ -308,7 +308,7 @@ namespace quda
       if (!dslashParam.commDim[dim]) continue;
       for (int dir=0; dir<2; dir++) {
 	if (comm_peer2peer_enabled(dir,dim)) {
-	  PROFILE(qudaStreamWaitEvent(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+	  PROFILE(qudaStreamWaitEventDriver(streams[Nstream-1], in.getIPCCopyEvent(dir,dim), 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
 	}
       }
     }
@@ -433,7 +433,7 @@ namespace quda
                 PROFILE(
                     qudaEventRecord(scatterEnd[2 * i + dir], streams[2 * i + dir]), profile, QUDA_PROFILE_EVENT_RECORD);
                 // wait for scattering to finish and then launch dslash
-                PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
+                PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
                     QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
             }
@@ -526,7 +526,7 @@ namespace quda
                 || !comm_peer2peer_enabled(
                     1, i))) { // if not peer-to-peer we post an event in the scatter stream and wait on that
           PROFILE(qudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-          PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+          PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
           break;
         }
       }
@@ -957,7 +957,7 @@ namespace quda
                 PROFILE(
                     qudaEventRecord(scatterEnd[2 * i + dir], streams[2 * i + dir]), profile, QUDA_PROFILE_EVENT_RECORD);
                 // wait for scattering to finish and then launch dslash
-                PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
+                PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
                     QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
             }
@@ -1072,7 +1072,7 @@ namespace quda
         if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i))) {
           // if not peer-to-peer we post an event in the scatter stream and wait on that
           PROFILE(qudaEventRecord(scatterEnd[0], streams[scatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-          PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+          PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
           break;
         }
       }
@@ -1120,7 +1120,7 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1132,7 +1132,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1177,7 +1177,7 @@ namespace quda
                 PROFILE(
                     qudaEventRecord(scatterEnd[2 * i + dir], streams[2 * i + dir]), profile, QUDA_PROFILE_EVENT_RECORD);
                 // wait for scattering to finish and then launch dslash
-                PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
+                PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[2 * i + dir], 0), profile,
                     QUDA_PROFILE_STREAM_WAIT_EVENT);
               }
             }
@@ -1219,7 +1219,7 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
       const int packScatterIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packScatterIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1233,7 +1233,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packScatterIndex]);
+          qudaStreamSynchronizeDriver(streams[packScatterIndex]);
           break;
         }
       }
@@ -1277,7 +1277,7 @@ namespace quda
         if (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i))) {
           // if not peer-to-peer we post an event in the scatter stream and wait on that
           PROFILE(qudaEventRecord(scatterEnd[0], streams[packScatterIndex]), profile, QUDA_PROFILE_EVENT_RECORD);
-          PROFILE(qudaStreamWaitEvent(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
+          PROFILE(qudaStreamWaitEventDriver(streams[Nstream - 1], scatterEnd[0], 0), profile, QUDA_PROFILE_STREAM_WAIT_EVENT);
           break;
         }
       }
@@ -1315,7 +1315,7 @@ namespace quda
       issueRecv(*in, dslash, 0, true); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1327,7 +1327,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1403,7 +1403,7 @@ namespace quda
       PROFILE(qudaEventRecord(dslashStart[in->bufferIndex], streams[Nstream - 1]), profile, QUDA_PROFILE_EVENT_RECORD);
 
       const int packIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1417,7 +1417,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1489,7 +1489,7 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1501,7 +1501,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1579,7 +1579,7 @@ namespace quda
       issueRecv(*in, dslash, 0, false); // Prepost receives
 
       const int packIndex = getStreamIndex(dslashParam);
-      PROFILE(qudaStreamWaitEvent(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
+      PROFILE(qudaStreamWaitEventDriver(streams[packIndex], dslashStart[in->bufferIndex], 0), profile,
           QUDA_PROFILE_STREAM_WAIT_EVENT);
       const int parity_src = (in->SiteSubset() == QUDA_PARITY_SITE_SUBSET ? 1 - dslashParam.parity : 0);
       issuePack(*in, dslash, parity_src, static_cast<MemoryLocation>(Host | (Remote * dslashParam.remote_write)),
@@ -1591,7 +1591,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1676,7 +1676,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
@@ -1769,7 +1769,7 @@ namespace quda
       for (int i = 3; i >= 0; i--) { // only synchronize if we need to
         if (!dslashParam.remote_write
             || (dslashParam.commDim[i] && (!comm_peer2peer_enabled(0, i) || !comm_peer2peer_enabled(1, i)))) {
-          qudaStreamSynchronize(streams[packIndex]);
+          qudaStreamSynchronizeDriver(streams[packIndex]);
           break;
         }
       }
