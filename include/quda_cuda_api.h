@@ -41,6 +41,19 @@ namespace quda {
   */
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, 
 			const qudaStream_t &stream, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around qudaMemcpyToSymbolAsync or driver API equivalent
+     Potentially add auto-profiling support.
+     @param[in] symbol Device symbol address
+     @param[in] src Source pointer
+     @param[in] count Size of transfer
+     @param[in] offset Offset from start of symbol in bytes
+     @param[in] kind Type of memory copy
+     @param[in] stream Stream to issue copy
+  */
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset, qudaMemcpyKind kind, 
+				const qudaStream_t &stream, const char *func, const char *file, const char *line);
   
   /**
      @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
@@ -296,6 +309,9 @@ namespace quda {
 
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream) \
+  ::quda::qudaMemcpyToSymbolAsync_(symbol, src, count, offset, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Memcpy
 //-------------------------------------------------------------------------------------
 

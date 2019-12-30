@@ -7,9 +7,9 @@
 // * curand_uniform
 // * curand_uniform_double
 
-// cufftExecC2C
-// cufftExecZ2Z
-// cufftPlanMany
+// * cufftExecC2C
+// * cufftExecZ2Z
+// * cufftPlanMany
 
 // cuMemAlloc
 // cuMemFree

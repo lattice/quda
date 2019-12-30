@@ -123,7 +123,7 @@ namespace quda {
 
   };
 
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
     if (count == 0) return;
     QudaMemCopy copy(dst, src, count, kind, false, func, file, line);
@@ -133,7 +133,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
@@ -163,8 +163,16 @@ namespace quda {
     }
   }
 
+  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset, qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+    qudaError_t error = cudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t height, cudaMemcpyKind kind, const qudaStream_t &stream,
+                          size_t width, size_t height, qudaMemcpyKind kind, const qudaStream_t &stream,
                           const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -201,8 +209,7 @@ namespace quda {
   
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line) {
     if (count == 0) return;
-    cudaMemset(dst, val, count);
-    qudaError_t error = cudaGetLastError();
+    qudaError_t error = cudaMemset(dst, val, count);
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
