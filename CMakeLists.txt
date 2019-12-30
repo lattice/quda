@@ -71,7 +71,7 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 1.0.0 LANGUAGES)
+project("QUDA" VERSION 0.9.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
