@@ -233,8 +233,7 @@ namespace quda {
 
   void qudaMemset2D_(void *dst, size_t pitch, int val, size_t width, size_t height, const char *func, const char *file, const char *line) {
     if (pitch == 0) return;
-    cudaMemset2D(dst, val, pitch, width, height);
-    qudaError_t error = cudaGetLastError();
+    qudaError_t error = cudaMemset2D(dst, val, pitch, width, height);
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }

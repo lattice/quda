@@ -744,7 +744,7 @@ namespace quda {
         tunable.initTuneParam(param);
 	while (tuning) {
 	  qudaDeviceSynchronize();
-	  cudaGetLastError(); // clear error counter
+	  qudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
 	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
@@ -765,7 +765,7 @@ namespace quda {
 	  qudaEventElapsedTime(&elapsed_time, start, end);
 	  //cudaEventElapsedTime(&elapsed_time, start, end);
 	  qudaDeviceSynchronize();
-	  error = cudaGetLastError();
+	  error = qudaGetLastError();
 
 	  { // check that error state is cleared
 	    qudaDeviceSynchronize();
