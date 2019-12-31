@@ -10,18 +10,6 @@
 
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
 
-/*
-#define QUDA_SAFE_CALL_NO_SYNC( call) {                                 \
-    qudaError_t err = call;						\
-    if( qudaSuccess != err) {                                           \
-      fprintf(stderr, "Quda error in file '%s' in line %i : %s.\n",     \
-              __FILE__, __LINE__, qudaGetErrorString( err) );           \
-      exit(EXIT_FAILURE);                                               \
-    }                                                                   \
-  }
-#define QUDA_SAFE_CALL( call) QUDA_SAFE_CALL_NO_SYNC(call);
-*/
-
 namespace quda {
 
   dim3 GetBlockDim(size_t threads, size_t size) {
@@ -132,7 +120,6 @@ namespace quda {
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
       state = (quRNGState *)device_malloc(size * sizeof(quRNGState));
-      //QUDA_SAFE_CALL(qudaError_t error = qudaMemset(state, 0, size * sizeof(quRNGState)));
       qudaMemset(state, 0, size * sizeof(quRNGState));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
