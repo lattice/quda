@@ -219,9 +219,9 @@ namespace quda {
                      const char *line)
   {
     if (pitch == 0) return;
-    cudaMemset2D(dst, val, pitch, width, height);
-    qudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    qudaError_t error = cudaMemset2D(dst, val, pitch, width, height);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream,
