@@ -268,8 +268,8 @@ namespace quda {
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
-      cudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
-      cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
+      qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
+      qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
     #endif
       qudaStreamSynchronizeDriver(GFStream[0]);
       comm_start(mh_send_fwd[d]);
@@ -279,7 +279,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_back[d]);
-      cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
+      qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
     #endif
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
@@ -289,7 +289,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
-      cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
+      qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
     #endif
 
       #ifdef GPU_COMMS

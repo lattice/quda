@@ -132,7 +132,7 @@ public:
         OffsetT counters[2];
         counters[FILL] = fill_size;
         counters[DRAIN] = 0;
-        return CubDebug(cudaMemcpyAsync(d_counters, counters, sizeof(OffsetT) * 2, qudaMemcpyHostToDevice, stream));
+        return CubDebug(qudaMemcpyAsync(d_counters, counters, sizeof(OffsetT) * 2, qudaMemcpyHostToDevice, stream));
 #endif
     }
 
@@ -145,7 +145,7 @@ public:
         d_counters[DRAIN] = 0;
         return qudaSuccess;
 #else
-        return CubDebug(cudaMemsetAsync(d_counters + DRAIN, 0, sizeof(OffsetT), stream));
+        return CubDebug(qudaMemsetAsync(d_counters + DRAIN, 0, sizeof(OffsetT), stream));
 #endif
     }
 
@@ -158,7 +158,7 @@ public:
         d_counters[FILL] = 0;
         return qudaSuccess;
 #else
-        return CubDebug(cudaMemsetAsync(d_counters + FILL, 0, sizeof(OffsetT), stream));
+        return CubDebug(qudaMemsetAsync(d_counters + FILL, 0, sizeof(OffsetT), stream));
 #endif
     }
 
@@ -173,7 +173,7 @@ public:
         fill_size = d_counters[FILL];
         return qudaSuccess;
 #else
-        return CubDebug(cudaMemcpyAsync(&fill_size, d_counters + FILL, sizeof(OffsetT), qudaMemcpyDeviceToHost, stream));
+        return CubDebug(qudaMemcpyAsync(&fill_size, d_counters + FILL, sizeof(OffsetT), qudaMemcpyDeviceToHost, stream));
 #endif
     }
 

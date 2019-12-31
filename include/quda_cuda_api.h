@@ -14,6 +14,11 @@
 namespace quda {
 
   /**
+     @brief Wrapper around qudaGetErrorString
+  */
+  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
+  
+  /**
      @brief Wrapper around qudaGetLastError
   */
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
@@ -27,9 +32,9 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
-		   const char *func, const char *file, const char *line);
-
+  qudaError_t qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
+			  const char *func, const char *file, const char *line);
+  
   /**
      @brief Wrapper around qudaMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
@@ -448,6 +453,10 @@ namespace quda {
 //-------------------------------------------------------------------------------------
 #define qudaGetLastError()						\
   ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaGetErrorString(error)					\
+  ::quda::qudaGetErrorString_(error,__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream) \
   ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //END Misc

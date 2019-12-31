@@ -457,7 +457,7 @@ namespace quda {
 
     // If this is set to false, then we are assuming that the send and
     // ghost buffers are in a single contiguous memory space.  Setting
-    // to false means we aggregate all cudaMemcpys which reduces
+    // to false means we aggregate all qudaMemcpys which reduces
     // latency.
     bool fine_grained_memcpy = false;
 

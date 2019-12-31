@@ -18,7 +18,7 @@ namespace quda {
 
   // these should not be namespaced!!
   // determines whether the temporal ghost zones are packed with a gather kernel,
-  // as opposed to multiple calls to cudaMemcpy()
+  // as opposed to multiple calls to qudaMemcpy()
   static bool kernelPackT = false;
 
   void setKernelPackT(bool packT) { kernelPackT = packT; }

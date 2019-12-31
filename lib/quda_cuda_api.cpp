@@ -122,22 +122,26 @@ namespace quda {
     long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2*count : count; }
 
   };
-
-  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
-                   const char *func, const char *file, const char *line) {
-    if (count == 0) return;
+  
+  qudaError_t qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
+			  const char *func, const char *file, const char *line) {
+    
+    if (count == 0) {
+      qudaError_t error = cudaSuccess;
+      return error;
+    }
     QudaMemCopy copy(dst, src, count, kind, false, func, file, line);
     copy.apply(0);
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-
     if (kind == cudaMemcpyDeviceToDevice) {
       QudaMemCopy copy(dst, src, count, kind, true, func, file, line);
       copy.apply(stream);
@@ -205,6 +209,10 @@ namespace quda {
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line) {
     qudaError_t error = cudaGetLastError();
     return error;
+  }
+
+  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line) {
+    return cudaGetErrorString(error);
   }
   
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line) {
