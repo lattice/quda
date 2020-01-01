@@ -205,8 +205,6 @@ namespace quda {
        return;
     }
 
-   static std::unique_ptr<GMResDRArgs> gmresdr_args = nullptr;
-
    // set the required parameters for the inner solver
    void fillFGMResDRInnerSolveParam(SolverParam &inner, const SolverParam &outer) {
      inner.tol = outer.tol_precondition;
@@ -235,6 +233,9 @@ namespace quda {
        inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
      } else {
        inner.Nsteps = outer.precondition_cycle;
+       if (outer.inv_type_precondition == QUDA_GMRESDR_INVERTER) {
+         inner.max_restart_num = outer.precondition_cycle;
+       }
      }
 
      inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
@@ -253,6 +254,7 @@ namespace quda {
     K(nullptr),
     Kparam(param),
     nKrylov(param.Nkrylov),	
+    gmresdr_args(nullptr),
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
@@ -266,6 +268,8 @@ namespace quda {
        K = new MR(matPrecon, matPrecon, Kparam, profile);
      }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
        K = new SD(matPrecon, Kparam, profile);
+     }else if(param.inv_type_precondition == QUDA_GMRESDR_INVERTER){
+       K = new GMResDR(matPrecon, matPrecon, matPrecon, Kparam, profile);
      }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
        errorQuda("Unknown inner solver %d", param.inv_type_precondition);
      }
@@ -283,6 +287,7 @@ namespace quda {
     K(&K_),
     Kparam(param),
     nKrylov(param.Nkrylov),	
+    gmresdr_args(nullptr),
     Vm(nullptr),
     Zm(nullptr),
     profile(profile),
@@ -530,7 +535,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       csParam.composite_dim = (param.eig_param.nEv+1);
       csParam.setPrecision(QUDA_DOUBLE_PRECISION);
 
-      gmresdr_args = std::make_unique< GMResDRArgs> (*Vm, nKrylov, param.eig_param.nEv);
+      gmresdr_args = std::make_shared< GMResDRArgs> (*Vm, nKrylov, param.eig_param.nEv);
       //gmresdr_args->Vkp1 = ColorSpinorFieldSet::Create(csParam);
 
       init = true;
@@ -625,7 +630,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
 	do_clean_restart = ((sqrt(ext_r2) / sqrt(r2)) > tol_threshold) || fabs(1.0 - (norm(detGm)) > det_max_deviation);
       }
 
-      if( ((restart_idx != param.max_restart_num-1) && !do_clean_restart) ) {
+      if( (param.max_restart_num != 1) && ((restart_idx != param.max_restart_num-1) && !do_clean_restart) ) {
 
 	RestartVZH();
 	j = args.k;
@@ -673,12 +678,9 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    blas::flops = 0;
    mat.flops();
 
-   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    if(!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
 
    param.rhs_idx += 1;
-
-   //to avoid a (misleading) postrun report about non-deallocated resources
-   gmresdr_args.reset(nullptr);
 
    return;
  }

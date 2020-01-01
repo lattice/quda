@@ -1342,6 +1342,8 @@ public:
      */
     int nKrylov;    
 
+    std::shared_ptr<GMResDRArgs> gmresdr_args;
+
     std::shared_ptr<ColorSpinorFieldSet> Vm;//arnoldi basis vectors, size (m+1)
     std::shared_ptr<ColorSpinorFieldSet> Zm;//arnoldi basis vectors, size (m+1)
 
