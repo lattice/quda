@@ -32,19 +32,9 @@ namespace quda {
     }
   };
 
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
-  }
-
   template <typename Float, int n, bool compute_max_only, typename Arg>
   inline __device__ __host__ Float computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j)
   {
-
     constexpr int nDim = 4;
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -58,8 +48,8 @@ namespace quda {
 
       complex<Float> yHat = 0.0;
 #pragma unroll
-      for(int k = 0; k<n; k++) {
-        caxpy(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
+      for (int k = 0; k<n; k++) {
+        yHat = cmac(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
       if (compute_max_only) {
         yHatMax = fmax(fabs(yHat.x), fabs(yHat.y));
@@ -73,7 +63,7 @@ namespace quda {
       complex<Float> yHat = 0.0;
 #pragma unroll
       for (int k = 0; k<n; k++) {
-        caxpy(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
+        yHat = cmac(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
       if (compute_max_only) {
         yHatMax = fmax(fabs(yHat.x), fabs(yHat.y));
@@ -86,7 +76,7 @@ namespace quda {
     complex<Float> yHat = 0.0;
 #pragma unroll
     for (int k = 0; k<n; k++) {
-      caxpy(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
+      yHat = cmac(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
     }
     if (compute_max_only) {
       yHatMax = fmax(yHatMax, fmax(fabs(yHat.x), fabs(yHat.y)));

@@ -419,7 +419,7 @@ template<typename T, int m>
 struct warp_shuffle<array<T, m>, array<int, m> > {
     __device__ static void impl(array<T, m>& d,
                                 const array<int, m>& i) {
-#if (__CUDACC_VER_MAJOR__ >= 9)
+#if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
         d.head = __shfl_sync(WARP_CONVERGED, d.head, i.head);
 #else
         d.head = __shfl(d.head, i.head);
@@ -433,7 +433,7 @@ template<typename T>
 struct warp_shuffle<array<T, 1>, array<int, 1> > {
     __device__ static void impl(array<T, 1>& d,
                                 const array<int, 1>& i) {
-#if (__CUDACC_VER_MAJOR__ >= 9)
+#if (__CUDACC_VER_MAJOR__ >= 9 || CUDA_VERSION >= 9000)
         d.head = __shfl_sync(WARP_CONVERGED, d.head, i.head);
 #else
         d.head = __shfl(d.head, i.head);

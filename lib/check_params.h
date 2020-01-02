@@ -145,17 +145,17 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(use_poly_acc, QUDA_BOOLEAN_NO);
+  P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
   P(a_max, 0.0);
-  P(preserve_deflation, QUDA_BOOLEAN_NO);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
   P(preserve_deflation_space, 0);
-  P(preserve_evals, QUDA_BOOLEAN_YES);
-  P(use_dagger, QUDA_BOOLEAN_NO);
-  P(use_norm_op, QUDA_BOOLEAN_NO);
-  P(compute_svd, QUDA_BOOLEAN_NO);
-  P(require_convergence, QUDA_BOOLEAN_YES);
+  P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_dagger, QUDA_BOOLEAN_FALSE);
+  P(use_norm_op, QUDA_BOOLEAN_FALSE);
+  P(compute_svd, QUDA_BOOLEAN_FALSE);
+  P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
@@ -164,7 +164,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
-  P(arpack_check, QUDA_BOOLEAN_NO);
+  P(arpack_check, QUDA_BOOLEAN_FALSE);
   P(nk, 0);
   P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
@@ -638,13 +638,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+  P(pre_orthonormalize, QUDA_BOOLEAN_FALSE);
 #else
   P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
-  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+  P(post_orthonormalize, QUDA_BOOLEAN_TRUE);
 #else
   P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
@@ -666,7 +666,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
-    P(use_eig_solver[i], QUDA_BOOLEAN_NO);
+    P(use_eig_solver[i], QUDA_BOOLEAN_FALSE);
 #else
     P(use_eig_solver[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -756,7 +756,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
-    P(global_reduction[i], QUDA_BOOLEAN_YES);
+    P(global_reduction[i], QUDA_BOOLEAN_TRUE);
 #else
     P(global_reduction[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -772,7 +772,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   }
 
 #ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
 #else
   P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
 #endif
@@ -783,7 +783,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #ifdef CHECK_PARAM
   // if only doing top-level null-space generation, check that n_vec
   // is equal on all levels
-  if (param->generate_all_levels == QUDA_BOOLEAN_NO && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+  if (param->generate_all_levels == QUDA_BOOLEAN_FALSE && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
     for (int i=1; i<n_level-1; i++)
       if (param->n_vec[0] != param->n_vec[i])
 	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
@@ -792,13 +792,15 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
-  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
-  P(coarse_guess, QUDA_BOOLEAN_NO);
-  P(preserve_deflation, QUDA_BOOLEAN_NO);
+  P(run_low_mode_check, QUDA_BOOLEAN_FALSE);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_FALSE);
+  P(coarse_guess, QUDA_BOOLEAN_FALSE);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
 #else
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
   P(preserve_deflation, QUDA_BOOLEAN_INVALID);
 #endif
@@ -808,8 +810,8 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(vec_load[i], QUDA_BOOLEAN_INVALID);
     P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #else
-    P(vec_load[i], QUDA_BOOLEAN_NO);
-    P(vec_store[i], QUDA_BOOLEAN_NO);
+    P(vec_load[i], QUDA_BOOLEAN_FALSE);
+    P(vec_store[i], QUDA_BOOLEAN_FALSE);
 #endif
   }
 

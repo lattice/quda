@@ -79,7 +79,7 @@ namespace quda
     if (param.level != 0 || !param.is_staggered) {
       if (param.level < param.Nlevel - 1) {
         if (param.mg_global.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
-          if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES || param.level == 0) {
+          if (param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE || param.level == 0) {
 
             // Initializing to random vectors
             for (int i = 0; i < (int)param.B.size(); i++) {
@@ -100,7 +100,7 @@ namespace quda
         } else if (strcmp(param.mg_global.vec_infile[param.level], "")
                    != 0) { // only load if infile is defined and not computing
           if (param.mg_global.num_setup_iter[param.level] > 0) generateNullVectors(param.B);
-        } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_YES) { // only conditional load of null vectors
+        } else if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE) { // only conditional load of null vectors
           loadVectors(param.B);
         } else { // generate free field vectors
           buildFreeVectors(param.B);
@@ -175,7 +175,7 @@ namespace quda
           (*B_coarse)[i] = param.B[0]->CreateCoarse(param.geoBlockSize, param.spinBlockSize, param.Nvec, B_coarse_precision, param.mg_global.setup_location[param.level+1]);
 
         // if we're not generating on all levels then we need to propagate the vectors down
-        if ((param.level != 0 || param.Nlevel - 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_NO) {
+        if ((param.level != 0 || param.Nlevel - 1) && param.mg_global.generate_all_levels == QUDA_BOOLEAN_FALSE) {
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
           for (int i=0; i<param.Nvec; i++) {
             zero(*(*B_coarse)[i]);
@@ -347,19 +347,27 @@ namespace quda
     diracParam.mu = diracParam.dirac->Mu();
     diracParam.mu_factor = param.mg_global.mu_factor[param.level+1]-param.mg_global.mu_factor[param.level];
 
+    // Need to figure out if we need to force bi-directional build. If any previous level (incl this one) was
+    // preconditioned, we have to force bi-directional builds.
+    diracParam.need_bidirectional = QUDA_BOOLEAN_FALSE;
+    for (int i = 0; i <= param.level; i++) {
+      if (param.mg_global.coarse_grid_solution_type[i] == QUDA_MATPC_SOLUTION
+          && param.mg_global.smoother_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+        diracParam.need_bidirectional = QUDA_BOOLEAN_TRUE;
+      }
+    }
+
     diracParam.dagger = QUDA_DAG_NO;
     diracParam.matpcType = matpc_type;
     diracParam.type = QUDA_COARSE_DIRAC;
     diracParam.tmp1 = tmp_coarse;
     diracParam.tmp2 = tmp2_coarse;
     diracParam.halo_precision = param.mg_global.precision_null[param.level];
-    constexpr int MAX_BLOCK_FLOAT_NC=32; // FIXME this is the maximum number of colors for which we support block-float format
-    if (param.Nvec > MAX_BLOCK_FLOAT_NC) diracParam.halo_precision = QUDA_SINGLE_PRECISION;
 
     // use even-odd preconditioning for the coarse grid solver
     if (diracCoarseResidual) delete diracCoarseResidual;
     diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
-                                          param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_YES ? true : false);
+                                          param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
 
     // create smoothing operators
     diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
@@ -455,10 +463,10 @@ namespace quda
       // on the coarsest level, and we are on the next to coarsest level.
       if (param.mg_global.use_eig_solver[param.Nlevel - 1] && (param.level == param.Nlevel - 2)) {
         param_coarse_solver->eig_param = *param.mg_global.eig_param[param.Nlevel - 1];
-        param_coarse_solver->deflate = QUDA_BOOLEAN_YES;
+        param_coarse_solver->deflate = QUDA_BOOLEAN_TRUE;
         // Due to coherence between these levels, an initial guess
         // might be beneficial.
-        if (param.mg_global.coarse_guess == QUDA_BOOLEAN_YES) {
+        if (param.mg_global.coarse_guess == QUDA_BOOLEAN_TRUE) {
           param_coarse_solver->use_init_guess = QUDA_USE_INIT_GUESS_YES;
         }
 
@@ -471,7 +479,7 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_infile, "") == 0 && // check that input file not already set
-            param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_YES
+            param.mg_global.vec_load[param.level + 1] == QUDA_BOOLEAN_TRUE
             && (strcmp(param.mg_global.vec_infile[param.level + 1], "") != 0)) {
           std::string vec_infile(param.mg_global.vec_infile[param.level + 1]);
           vec_infile += "_level_";
@@ -482,7 +490,7 @@ namespace quda
         }
 
         if (strcmp(param_coarse_solver->eig_param.vec_outfile, "") == 0 && // check that output file not already set
-            param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_YES
+            param.mg_global.vec_store[param.level + 1] == QUDA_BOOLEAN_TRUE
             && (strcmp(param.mg_global.vec_outfile[param.level + 1], "") != 0)) {
           std::string vec_outfile(param.mg_global.vec_outfile[param.level + 1]);
           vec_outfile += "_level_";
@@ -828,8 +836,10 @@ namespace quda
       if (deviation > tol) errorQuda("failed, deviation = %e (tol=%e)", deviation, tol);
     }
 
-    // check the preconditioned operator construction if applicable
-    if (param.coarse_grid_solution_type == QUDA_MATPC_SOLUTION && param.smoother_solve_type == QUDA_DIRECT_PC_SOLVE) {
+    // check the preconditioned operator construction on the lower level if applicable
+    bool coarse_was_preconditioned = (param.mg_global.coarse_grid_solution_type[param.level + 1] == QUDA_MATPC_SOLUTION
+                                      && param.mg_global.smoother_solve_type[param.level + 1] == QUDA_DIRECT_PC_SOLVE);
+    if (coarse_was_preconditioned) {
       // check eo
       if (getVerbosity() >= QUDA_SUMMARIZE)
         printfQuda("Checking Deo of preconditioned operator 0 = \\hat{D}_c - A^{-1} D_c\n");
@@ -953,9 +963,7 @@ namespace quda
   }
 
   void MG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
-    char prefix_bkup[100];
-    strncpy(prefix_bkup, prefix, 100);
-    setOutputPrefix(prefix);
+    pushOutputPrefix(prefix);
 
     if (param.level < param.Nlevel - 1) { // set parity for the solver in the transfer operator
       QudaSiteSubset site_subset
@@ -1037,7 +1045,6 @@ namespace quda
 
         // recurse to the next lower level
         (*coarse_solver)(*x_coarse, *r_coarse);
-        setOutputPrefix(prefix); // restore prefix after return from coarse grid
         if (debug) printfQuda("after coarse solve x_coarse2 = %e r_coarse2 = %e\n", norm2(*x_coarse), norm2(*r_coarse));
 
         // prolongate back to this grid
@@ -1087,7 +1094,7 @@ namespace quda
       printfQuda("leaving V-cycle with x2=%e, r2=%e\n", norm2(x), r2);
     }
 
-    setOutputPrefix(param.level == 0 ? "" : prefix_bkup);
+    popOutputPrefix();
   }
 
   // supports separate reading or single file read
@@ -1288,7 +1295,7 @@ namespace quda
           resetTransfer = true;
           reset();
           if ( param.level < param.Nlevel-2 ) {
-            if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_YES ) {
+            if ( param.mg_global.generate_all_levels == QUDA_BOOLEAN_TRUE ) {
               coarse->generateNullVectors(*B_coarse, refresh);
             } else {
               if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restricting null space vectors\n");
@@ -1324,7 +1331,7 @@ namespace quda
       diracSmootherSloppy->setCommDim(commDim);
     }
 
-    if (param.mg_global.vec_store[param.level] == QUDA_BOOLEAN_YES) { // conditional store of null vectors
+    if (param.mg_global.vec_store[param.level] == QUDA_BOOLEAN_TRUE) { // conditional store of null vectors
       saveVectors(B);
     }
 

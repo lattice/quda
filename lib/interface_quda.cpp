@@ -112,7 +112,6 @@ void closeMagma(){
     printfQuda("\nMAGMA library was not initialized..\n");
   }
 
-  return;
 }
 
 cudaGaugeField *gaugePrecise = nullptr;
@@ -698,10 +697,13 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParamEx.pad = 0;
   gParamEx.nFace = 1;
+  gParamEx.tadpole = in.Tadpole();
+  gParamEx.anisotropy = in.Anisotropy();
   for (int d = 0; d < 4; d++) {
     gParamEx.x[d] += 2 * R[d];
     gParamEx.r[d] = R[d];
   }
+
   auto *out = new cudaGaugeField(gParamEx);
 
   // copy input field into the extended device gauge field
@@ -2477,10 +2479,10 @@ multigrid_solver::multigrid_solver(QudaMultigridParam &mg_param, TimeProfile &pr
   Bprec = (mg_param.setup_location[0] == QUDA_CPU_FIELD_LOCATION && Bprec < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : Bprec);
   csParam.setPrecision(Bprec);
   csParam.fieldOrder = mg_param.setup_location[0] == QUDA_CUDA_FIELD_LOCATION ? QUDA_FLOAT2_FIELD_ORDER : QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_YES ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
+  csParam.mem_type = mg_param.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
   B.resize(mg_param.n_vec[0]);
 
-  if (mg_param.is_staggered == QUDA_BOOLEAN_YES) {
+  if (mg_param.is_staggered == QUDA_BOOLEAN_TRUE) {
     // Create the ColorSpinorField as a "container" for metadata.
     csParam.create = QUDA_REFERENCE_FIELD_CREATE;
 
@@ -4105,8 +4107,6 @@ void createCloverQuda(QudaInvertParam* invertParam)
 
   // FIXME always preserve the extended gauge
   extendedGaugeResident = gauge;
-
-  return;
 }
 
 void* createGaugeFieldQuda(void* gauge, int geometry, QudaGaugeParam* param)
@@ -4311,7 +4311,6 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
   checkCudaError();
-  return;
 }
 
 void computeHISQForceQuda(void* const milc_momentum,
@@ -4560,7 +4559,6 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   profileHISQForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  return;
 #else
   errorQuda("HISQ force has not been built");
 #endif
@@ -4747,7 +4745,6 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
 
   checkCudaError();
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 
@@ -4852,7 +4849,6 @@ void updateGaugeFieldQuda(void* gauge,
   checkCudaError();
 
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
  void projectSU3Quda(void *gauge_h, double tol, QudaGaugeParam *param) {
@@ -5305,7 +5301,6 @@ void plaq_quda_(double plaq[3]) {
 
 void plaqQuda(double plaq[3])
 {
-
   profilePlaq.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (!gaugePrecise) errorQuda("Cannot compute plaquette as there is no resident gauge field");
@@ -5321,7 +5316,6 @@ void plaqQuda(double plaq[3])
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 /*
@@ -5341,7 +5335,6 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   copyExtendedGauge(*io_gauge, *extendedGaugeResident, loc);
 
   //profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
-  return;
 }
 
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)

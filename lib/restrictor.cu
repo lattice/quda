@@ -10,7 +10,6 @@ namespace quda {
 
 #ifdef GPU_MULTIGRID
 
-
   template <typename Float, typename vFloat, int fineSpin, int fineColor, int coarseSpin, int coarseColor,
             int coarse_colors_per_thread>
   class RestrictLaunch : public Tunable {
@@ -186,8 +185,8 @@ namespace quda {
 
   template <typename Float, int fineSpin>
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v,
-                int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity) {
-
+                int nVec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const * spin_map, int parity)
+  {
     if (out.Nspin() != 2) errorQuda("Unsupported nSpin %d", out.Nspin());
     const int coarseSpin = 2;
 
@@ -197,17 +196,15 @@ namespace quda {
       for (int p=0; p<2; p++)
         if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
       const int fineColor = 3;
-      if (nVec == 4) {
-        Restrict<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 #ifdef NSPIN4
-      } else if (nVec == 6) { // free field Wilson
+      if (nVec == 6) { // free field Wilson
         Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
+      } else
 #endif // NSPIN4
-      } else if (nVec == 24) {
+      if (nVec == 24) {
         Restrict<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
 #ifdef NSPIN4
       } else if (nVec == 32) {
@@ -216,6 +213,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#ifdef NSPIN4
     } else if (in.Ncolor() == 6) { // Coarsen coarsened Wilson free field
       const int fineColor = 6;
       if (nVec == 6) { 
@@ -223,6 +221,7 @@ namespace quda {
       } else {
         errorQuda("Unsupported nVec %d", nVec);
       }
+#endif // NSPIN4
     } else if (in.Ncolor() == 24) { // to keep compilation under control coarse grids have same or more colors
       const int fineColor = 24;
       if (nVec == 24) {

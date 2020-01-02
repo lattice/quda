@@ -221,8 +221,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
 void setDeflationParam(QudaEigParam &df_param) {
 
-  df_param.import_vectors = QUDA_BOOLEAN_NO;
-  df_param.run_verify     = QUDA_BOOLEAN_NO;
+  df_param.import_vectors = QUDA_BOOLEAN_FALSE;
+  df_param.run_verify     = QUDA_BOOLEAN_FALSE;
 
   df_param.nk             = df_param.invert_param->nev;
   df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;

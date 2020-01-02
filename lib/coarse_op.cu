@@ -18,6 +18,9 @@ namespace quda {
 
     QudaFieldLocation location = Y.Location();
 
+    bool need_bidirectional = false;
+    if (dirac == QUDA_CLOVERPC_DIRAC || dirac == QUDA_TWISTED_MASSPC_DIRAC || dirac == QUDA_TWISTED_CLOVERPC_DIRAC) { need_bidirectional = QUDA_BOOLEAN_TRUE; }
+
     if (location == QUDA_CPU_FIELD_LOCATION) {
 
       constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
@@ -49,9 +52,10 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
+
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -87,7 +91,7 @@ namespace quda {
 
       calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc,
+         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
          T.fineToCoarse(location), T.coarseToFine(location));
 
     }
@@ -104,35 +108,16 @@ namespace quda {
     const int coarseSpin = 2;
     const int coarseColor = Y.Ncolor() / coarseSpin;
 
-#if 0
-    } else if (coarseCoor == 4) {
-      calculateY<Float,vFloat,fineColor,fineSpin,4,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#endif
+#ifdef NSPIN4
     if (coarseColor == 6) { // free field Wilson
       calculateY<Float,vFloat,fineColor,fineSpin,6,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#if 0
-    } else if (coarseColor == 8) {
-      calculateY<Float,vFloat,fineColor,fineSpin,8,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 12) {
-      calculateY<Float,vFloat,fineColor,fineSpin,12,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 16) {
-      calculateY<Float,vFloat,fineColor,fineSpin,16,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 20) {
-      calculateY<Float,vFloat,fineColor,fineSpin,20,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#endif
     } else if (coarseColor == 24) {
       calculateY<Float,vFloat,fineColor,fineSpin,24,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
     } else if (coarseColor == 32) {
       calculateY<Float,vFloat,fineColor,fineSpin,32,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-#if 0 // only needed for Laplace MG. Not necessary for staggered MG Lanczos
-#ifdef NSPIN1
-    } else if (coarseColor == 64) {
-      calculateY<Float,vFloat,fineColor,fineSpin,64,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
-    } else if (coarseColor == 96) {
-      calculateY<Float,vFloat,fineColor,fineSpin,96,coarseSpin>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
+    } else
 #endif
-#endif
-    } else {
+    {
       errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor());
     }
   }

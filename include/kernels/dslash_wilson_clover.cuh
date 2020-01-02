@@ -13,7 +13,7 @@ namespace quda
     static constexpr int length = (nSpin / (nSpin / 2)) * 2 * nColor * nColor * (nSpin / 2) * (nSpin / 2) / 2;
     static constexpr bool twist = twist_;
 
-    typedef typename clover_mapper<Float, length>::type C;
+    typedef typename clover_mapper<Float, length, true>::type C;
     typedef typename mapper<Float>::type real;
 
     const C A;    /** the clover field */

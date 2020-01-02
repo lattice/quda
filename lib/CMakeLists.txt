@@ -2,7 +2,8 @@
 # cmake-format: off
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
+  dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
+  coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
@@ -137,7 +138,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
                                 $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
-# some clang warnings shouds be warning even when turning warnings into errors
+# some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp
                          PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)

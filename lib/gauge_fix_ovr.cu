@@ -138,8 +138,7 @@ namespace quda {
       setZero(&delta);
       //load upward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float *)(U.data), linkIndex(x, X), mu, parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndex(x, X), parity);
         delta -= U;
       }
       //18*gauge_dir
@@ -147,8 +146,7 @@ namespace quda {
       //2
       //load downward links
       for ( int mu = 0; mu < gauge_dir; mu++ ) {
-        Matrix<Cmplx,3> U;
-        argQ.dataOr.load((Float*)(U.data),linkIndexM1(x,X,mu), mu, 1 - parity);
+        Matrix<Cmplx,3> U = argQ.dataOr(mu, linkIndexM1(x,X,mu), 1 - parity);
         delta += U;
       }
       //18*gauge_dir
@@ -244,7 +242,7 @@ namespace quda {
 
 
   /**
-   * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU  
+   * @brief Kernel to perform gauge fixing with overrelaxation for single-GPU
    */
   template<int ImplementationType, int blockSize, typename Float, typename Gauge, int gauge_dir>
   __global__ void computeFix(GaugeFixArg<Float, Gauge> arg, int parity){
@@ -278,17 +276,16 @@ namespace quda {
         oddbit = 1 - parity;
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
-      arg.dataOr.load((Float*)(link.data),idx, mu, oddbit);
+      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, oddbit);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd 
+      // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr.save((Float*)(link.data),idx, mu, oddbit);
+      arg.dataOr(mu, idx, oddbit) = link;
     }
     // 4 threads per lattice site
     else{
@@ -307,28 +304,25 @@ namespace quda {
   #endif
       int mu = (threadIdx.x / blockSize);
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
       //load upward link
-      arg.dataOr.load((Float*)(link.data),idx, mu, parity);
-
+      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
 
       x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link1;
       //load downward link
-      arg.dataOr.load((Float*)(link1.data),idx1, mu, 1 - parity);
+      Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd 
+      // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
-      arg.dataOr.save((Float*)(link.data),idx, mu, parity);
-      arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
+      arg.dataOr(mu, idx, parity) = link;
+      arg.dataOr(mu, idx1, 1 - parity) = link1;
 
     }
   }
@@ -563,42 +557,38 @@ public:
         parity = 1 - parity;
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link;
-      arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+      Matrix<Complex,3> link = arg.dataOr(mu, idx, parity);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd 
+      // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+      arg.dataOr(mu, idx, parity) = link;
     }
     // 4 threads per lattice site
     else{
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link;
-      arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+      Matrix<Complex,3> link = arg.dataOr(mu, idx, parity);
 
 
       x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Complex,3> link1;
-      arg.dataOr.load((Float*)(link1.data),idx1, mu, 1 - parity);
+      Matrix<Complex,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd 
+      // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
-      arg.dataOr.save((Float*)(link.data),idx, mu, parity);
-      arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
-
+      arg.dataOr(mu, idx, parity) = link;
+      arg.dataOr(mu, idx1, 1 - parity) = link1;
     }
   }
 
@@ -822,41 +812,38 @@ public:
         parity = 1 - parity;
       }
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
-      arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
       // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 8x more shared memory than the implementation using atomicadd 
+      // this implementation needs 8x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 0 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
       // 8 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 1 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 8 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 2 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, arg.relax_boost, tid);
-      arg.dataOr.save((Float*)(link.data),idx, mu, parity);
+      arg.dataOr(mu, idx, parity) = link;
     }
     // 4 threads per lattice site
     else{
       idx = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link;
-      arg.dataOr.load((Float*)(link.data),idx, mu, parity);
+      Matrix<Cmplx,3> link = arg.dataOr(mu, idx, parity);
 
 
       x[mu] = (x[mu] - 1 + X[mu]) % X[mu];
       int idx1 = (((x[3] * X[2] + x[2]) * X[1] + x[1]) * X[0] + x[0]) >> 1;
-      Matrix<Cmplx,3> link1;
-      arg.dataOr.load((Float*)(link1.data),idx1, mu, 1 - parity);
+      Matrix<Cmplx,3> link1 = arg.dataOr(mu, idx1, 1 - parity);
 
       // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
-      // this implementation needs 4x more shared memory than the implementation using atomicadd 
+      // this implementation needs 4x more shared memory than the implementation using atomicadd
       if ( ImplementationType == 3 ) GaugeFixHit_NoAtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
       // 4 treads per lattice site, the reduction is performed by shared memory using atomicadd
       if ( ImplementationType == 4 ) GaugeFixHit_AtomicAdd<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
-      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd. 
-      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization 
+      // 4 treads per lattice site, the reduction is performed by shared memory without using atomicadd.
+      // uses the same amount of shared memory as the atomicadd implementation with more thread block synchronization
       if ( ImplementationType == 5 ) GaugeFixHit_NoAtomicAdd_LessSM<blockSize, Float, gauge_dir, 3>(link, link1, arg.relax_boost, tid);
 
-      arg.dataOr.save((Float*)(link.data),idx, mu, parity);
-      arg.dataOr.save((Float*)(link1.data),idx1, mu, 1 - parity);
+      arg.dataOr(mu, idx, parity) = link;
+      arg.dataOr(mu, idx1, 1 - parity) = link1;
     }
   }
 
@@ -1107,20 +1094,22 @@ public:
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
-    RegType data[18];
+    Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Cmplx*)tmp)[i];
-    }
-    else{
-      for ( int i = 0; i < NElems / 2; ++i ) ((Cmplx*)tmp)[i] = array[idx + size * i];
+      for ( int i = 0; i < NElems / 2; ++i ) {
+        array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
+      }
+    } else {
+      for ( int i = 0; i < NElems / 2; ++i ) {
+        tmp[2*i+0] = array[idx + size * i].real();
+        tmp[2*i+1] = array[idx + size * i].imag();
+      }
       arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }
-
-
 
 
   template<int NElems, typename Float, typename Gauge, bool pack>
@@ -1174,35 +1163,22 @@ public:
     typedef complex<Float> Cmplx;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
-    RegType data[18];
+    Cmplx data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Cmplx*)tmp)[i];
+      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Cmplx(tmp[2*i+0], tmp[2*i+1]);
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) ((Cmplx*)tmp)[i] = array[idx + size * i];
+      for ( int i = 0; i < NElems / 2; ++i ) {
+        tmp[2*i+0] = array[idx + size * i].real();
+        tmp[2*i+1] = array[idx + size * i].imag();
+      }
       arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
   }
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   template<typename Float, typename Gauge, int NElems, int gauge_dir>
@@ -1377,9 +1353,9 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             //extract top face
-            Kernel_UnPackTop<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), p, d, d);
             //extract bottom ghost
-            Kernel_UnPackGhost<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), 1 - p, d, d);
           }
         #ifdef GPU_COMMS
           for ( int d = 0; d < 4; d++ ) {
@@ -1426,14 +1402,14 @@ public:
           #ifdef GPU_COMMS
             comm_wait(mh_recv_back[d]);
           #endif
-            Kernel_UnPackGhost<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
+            Kernel_UnPackGhost<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
           #ifdef GPU_COMMS
             comm_wait(mh_recv_fwd[d]);
           #endif
-            Kernel_UnPackTop<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[4 + d] >> > (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
+            Kernel_UnPackTop<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[4 + d] >>> (faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), 1 - p, d, d);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
