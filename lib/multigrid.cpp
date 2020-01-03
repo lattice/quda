@@ -368,7 +368,7 @@ namespace quda
     if (diracCoarseResidual) delete diracCoarseResidual;
     diracCoarseResidual = new DiracCoarse(diracParam, param.setup_location == QUDA_CUDA_FIELD_LOCATION ? true : false,
                                           param.mg_global.setup_minimize_memory == QUDA_BOOLEAN_TRUE ? true : false);
-  
+
     // create smoothing operators
     diracParam.dirac = const_cast<Dirac*>(param.matSmooth->Expose());
     diracParam.halo_precision = param.mg_global.smoother_halo_precision[param.level+1];
