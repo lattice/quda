@@ -1451,7 +1451,7 @@ namespace quda {
      if(param.eig_param.nConv == param.eig_param.nEv) {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
-       param.eig_param.is_complete = QUDA_BOOLEAN_YES;
+       param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
      }
 
      return;

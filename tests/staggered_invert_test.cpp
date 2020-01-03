@@ -452,6 +452,12 @@ int invert_test()
 
     for (int k = 0; k < Nsrc; k++) {
       construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+
+      if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
+        printfQuda("Switched to deflated CG solver.. \n");
+        inv_param.inv_type = QUDA_CG_INVERTER;
+      }
+
       invertQuda(out->V(), in->V(), &inv_param);
 
       time[k] = inv_param.secs;
@@ -536,7 +542,9 @@ int invert_test()
     for (int k = 0; k < Nsrc; k++) {
       construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
 
-      if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_YES) inv_type  = QUDA_CG_INVERTER;      
+      if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
+        inv_param.inv_type  = QUDA_CG_INVERTER;
+      }	
 
       invertQuda(out->V(), in->V(), &inv_param);
 
