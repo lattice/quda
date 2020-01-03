@@ -51,7 +51,7 @@ namespace quda {
     }
 
     // FIXME do this in pipelined fashion to reduce memory overhead.
-    long long BatchInvertMatrix(void *Ainv, void* A, const int n, const int batch, QudaPrecision prec, QudaFieldLocation location)
+    long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
       long long flops = 0;
 #ifdef CUBLAS_LIB
