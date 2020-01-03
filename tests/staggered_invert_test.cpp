@@ -180,6 +180,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.tol = tol;
   inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
+  inv_param.max_restart_num = max_restart_num;//for the gmres-like solvers
   inv_param.reliable_delta = reliable_delta;
   inv_param.use_alternative_reliable = alternative_reliable;
   inv_param.use_sloppy_partial_accumulator = false;
