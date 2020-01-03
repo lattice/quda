@@ -41,19 +41,14 @@ namespace quda {
     switch(u.Ncolor()) {
     case  3: norm_ = norm<reg_type, real, 3>(u, d, type); break;
 #ifdef GPU_MULTIGRID
-    case  8: norm_ = norm<reg_type, real, 8>(u, d, type); break;
-    case 12: norm_ = norm<reg_type, real,12>(u, d, type); break;
-    case 16: norm_ = norm<reg_type, real,16>(u, d, type); break;
-    case 24: norm_ = norm<reg_type, real,24>(u, d, type); break;
-    case 32: norm_ = norm<reg_type, real,32>(u, d, type); break;
-    case 40: norm_ = norm<reg_type, real,40>(u, d, type); break;
-    case 48: norm_ = norm<reg_type, real,48>(u, d, type); break;
-    case 56: norm_ = norm<reg_type, real,56>(u, d, type); break;
-    case 64: norm_ = norm<reg_type, real,64>(u, d, type); break;
+#ifdef NSPIN4
+    case 12: norm_ = norm<reg_type, real, 12>(u, d, type); break;
+    case 48: norm_ = norm<reg_type, real, 48>(u, d, type); break;
+    case 64: norm_ = norm<reg_type, real, 64>(u, d, type); break;
+#endif // NSPIN4
 #ifdef NSPIN1
-    case 96: norm_ = norm<reg_type, real,96>(u, d, type); break;
-    case 128: norm_ = norm<reg_type, real,128>(u, d, type); break;
-    case 192: norm_ = norm<reg_type, real,192>(u, d, type); break;
+    case 128: norm_ = norm<reg_type, real, 128>(u, d, type); break;
+    case 192: norm_ = norm<reg_type, real, 192>(u, d, type); break;
 #endif // NSPIN1
 #endif // GPU_MULTIGRID
     default: errorQuda("Unsupported color %d", u.Ncolor());
@@ -99,7 +94,7 @@ namespace quda {
 
   double GaugeField::norm2(int d, bool fixed) const {
     if (reconstruct != QUDA_RECONSTRUCT_NO) errorQuda("Unsupported reconstruct=%d", reconstruct);
-    return norm(*this, d, fixed, NORM1);
+    return norm(*this, d, fixed, NORM2);
   }
 
   double GaugeField::abs_max(int d, bool fixed) const {
