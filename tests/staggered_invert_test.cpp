@@ -427,12 +427,6 @@ int invert_test()
   // Pre-initialize some variables
   double *time = nullptr;
   double *gflops = nullptr;
-  auto mean_time = 0.0;
-  auto mean_time2 = 0.0;
-  auto mean_gflops = 0.0;
-  auto mean_gflops2 = 0.0;
-  auto stddev_time = 0.0;
-  auto stddev_gflops = 0.0;
   double hqr = 0.0;
   double l2r = 0.0;
 
@@ -501,24 +495,30 @@ int invert_test()
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
     // Compute timings
-    for (int i = 0; i < Nsrc; i++) {
-      mean_time += time[i];
-      mean_time2 += time[i] * time[i];
-      mean_gflops += gflops[i];
-      mean_gflops2 += gflops[i] * gflops[i];
+    if (Nsrc > 1) {
+      auto mean_time = 0.0;
+      auto mean_time2 = 0.0;
+      auto mean_gflops = 0.0;
+      auto mean_gflops2 = 0.0;
+      // skip first solve due to allocations, potential UVM swapping overhead
+      for (int i = 1; i < Nsrc; i++) {
+        mean_time += time[i];
+        mean_time2 += time[i] * time[i];
+        mean_gflops += gflops[i];
+        mean_gflops2 += gflops[i] * gflops[i];
+      }
+
+      auto NsrcM1 = Nsrc-1;
+
+      mean_time /= NsrcM1;
+      mean_time2 /= NsrcM1;
+      auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+      mean_gflops /= NsrcM1;
+      mean_gflops2 /= NsrcM1;
+      auto stddev_gflops = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+      printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
     }
-
-    mean_time /= Nsrc;
-    mean_time2 /= Nsrc;
-    stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) :
-                             std::numeric_limits<double>::infinity();
-    mean_gflops /= Nsrc;
-    mean_gflops2 /= Nsrc;
-    stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
-                               std::numeric_limits<double>::infinity();
-    printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
-               stddev_time, mean_gflops, stddev_gflops);
-
     break;
 
   case 3: // even
@@ -557,23 +557,30 @@ int invert_test()
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
 
     // Compute timings
-    for (int i = 0; i < Nsrc; i++) {
-      mean_time += time[i];
-      mean_time2 += time[i] * time[i];
-      mean_gflops += gflops[i];
-      mean_gflops2 += gflops[i] * gflops[i];
-    }
+    if (Nsrc > 1) {
+      auto mean_time = 0.0;
+      auto mean_time2 = 0.0;
+      auto mean_gflops = 0.0;
+      auto mean_gflops2 = 0.0;
+      // skip first solve due to allocations, potential UVM swapping overhead
+      for (int i = 1; i < Nsrc; i++) {
+        mean_time += time[i];
+        mean_time2 += time[i] * time[i];
+        mean_gflops += gflops[i];
+        mean_gflops2 += gflops[i] * gflops[i];
+      }
 
-    mean_time /= Nsrc;
-    mean_time2 /= Nsrc;
-    stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) :
-                             std::numeric_limits<double>::infinity();
-    mean_gflops /= Nsrc;
-    mean_gflops2 /= Nsrc;
-    stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
-                               std::numeric_limits<double>::infinity();
-    printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
-               stddev_time, mean_gflops, stddev_gflops);
+      auto NsrcM1 = Nsrc-1;
+
+      mean_time /= NsrcM1;
+      mean_time2 /= NsrcM1;
+      auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
+      mean_gflops /= NsrcM1;
+      mean_gflops2 /= NsrcM1;
+      auto stddev_gflops = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
+      printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc, mean_time,
+             stddev_time, mean_gflops, stddev_gflops);
+    }
 
     break;
 
