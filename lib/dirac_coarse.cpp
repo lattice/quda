@@ -11,6 +11,7 @@ namespace quda {
     mu_factor(param.mu_factor),
     transfer(param.transfer),
     dirac(param.dirac),
+    need_bidirectional(param.need_bidirectional),
     Y_h(nullptr),
     X_h(nullptr),
     Xinv_h(nullptr),
@@ -40,6 +41,7 @@ namespace quda {
     mu_factor(param.mu_factor),
     transfer(nullptr),
     dirac(nullptr),
+    need_bidirectional(false),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
@@ -65,6 +67,7 @@ namespace quda {
     mu_factor(param.mu_factor),
     transfer(param.transfer),
     dirac(param.dirac),
+    need_bidirectional(param.need_bidirectional),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
     Xinv_h(dirac.Xinv_h),
@@ -355,10 +358,12 @@ namespace quda {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional);
     }
   }
 
@@ -565,10 +570,12 @@ namespace quda {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+                     matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+                     matpcType, true);
     }
   }
 

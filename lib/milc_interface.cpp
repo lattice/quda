@@ -761,14 +761,14 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
                        QudaExtLibType deflation_ext_lib, char vec_infile[], char vec_outfile[], QudaEigParam *df_param)
 {
 #if 0
-  df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   df_param->cuda_prec_ritz = ritz_prec;
   df_param->location       = location_ritz;
   df_param->mem_type_ritz  = mem_type_ritz;
 
 
-  df_param->run_verify     = QUDA_BOOLEAN_NO;
+  df_param->run_verify     = QUDA_BOOLEAN_FALSE;
 
   df_param->nk       = df_param->invert_param->nev;
   df_param->np       = df_param->invert_param->nev*df_param->invert_param->deflation_grid;

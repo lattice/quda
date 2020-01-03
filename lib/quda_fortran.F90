@@ -216,7 +216,7 @@ module quda_fortran
      ! pointer to preconditioner instance
      integer(8) :: preconditioner
 
-     ! defines deflation
+     ! pointer to QudaEigParam that defines any deflation
      integer(8) :: eig_param
 
      ! If true, deflate the initial guess

@@ -109,17 +109,7 @@ namespace quda {
       }
     }
 
-    ~CalculateYArg() { }
   };
-
-  // complex multiply-add with optimal use of fma
-  template<typename Float>
-  inline __device__ __host__ void caxpy(const complex<Float> &a, const complex<Float> &x, complex<Float> &y) {
-    y.x += a.x*x.x;
-    y.x -= a.y*x.y;
-    y.y += a.y*x.x;
-    y.y += a.x*x.y;
-  }
 
   /**
      Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
@@ -150,12 +140,12 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
-	      caxpy(arg.U(dim, parity, x_cb, ic, jc), W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c), UV[s][ic]);
+	      UV[s][ic] = cmac(arg.U(dim, parity, x_cb, ic, jc), W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s, jc, ic_c), UV[s][ic]);
 	    } else {
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-		caxpy(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
-                      W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
+		UV[s_col*fineSpin+s][ic] = cmac(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
+                                                W.Ghost(dim, 1, (parity+1)&1, ghost_idx, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
 	      } // which chiral block
 	    }
 	  }  //Fine color columns
@@ -169,12 +159,12 @@ namespace quda {
 	for(int ic = 0; ic < fineColor; ic++) { //Fine Color rows of gauge field
 	  for(int jc = 0; jc < fineColor; jc++) {  //Fine Color columns of gauge field
 	    if (!from_coarse) {
-	      caxpy(arg.U(dim, parity, x_cb, ic, jc), W((parity+1)&1, y_cb, s, jc, ic_c), UV[s][ic]);
+	      UV[s][ic] = cmac(arg.U(dim, parity, x_cb, ic, jc), W((parity+1)&1, y_cb, s, jc, ic_c), UV[s][ic]);
 	    } else {
 	      for (int s_col=0; s_col<fineSpin; s_col++) {
 		// on the coarse lattice if forwards then use the forwards links
-                caxpy(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
-                      W((parity+1)&1, y_cb, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
+                UV[s_col*fineSpin+s][ic] = cmac(arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, ic, jc),
+                                                W((parity+1)&1, y_cb, s_col, jc, ic_c), UV[s_col*fineSpin+s][ic]);
 	      } // which chiral block
 	    }
 	  }  //Fine color columns
@@ -565,18 +555,18 @@ namespace quda {
 
             // here UV is really UAV
 	    //Diagonal Spin
-	    caxpy(conj(V), arg.UV(parity, x_cb, s, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_row]);
+            vuv[s_c_row*coarseSpin+s_c_row] = cmac(conj(V), arg.UV(parity, x_cb, s, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_row]);
 
 	    //Off-diagonal Spin (backward link / positive projector applied)
-            caxpy( gamma.apply(s, conj(V)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
+            vuv[s_c_row*coarseSpin+s_c_col] = cmac( gamma.apply(s, conj(V)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
 	  } else {
             complex<Float> AV = arg.AV(parity, x_cb, s, ic, ic_c);
 
             //Diagonal Spin
-	    caxpy(conj(AV), arg.UV(parity, x_cb, s, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_row]);
+	    vuv[s_c_row*coarseSpin+s_c_row] = cmac(conj(AV), arg.UV(parity, x_cb, s, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_row]);
 
 	    //Off-diagonal Spin (forward link / negative projector applied)
-	    caxpy( -gamma.apply(s, conj(AV)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
+	    vuv[s_c_row*coarseSpin+s_c_col] = cmac( -gamma.apply(s, conj(AV)), arg.UV(parity, x_cb, s_col, ic, jc_c), vuv[s_c_row*coarseSpin+s_c_col]);
 	  }
 	} //Fine color
       }
@@ -591,7 +581,7 @@ namespace quda {
 #pragma unroll
           for (int s_col=0; s_col<fineSpin; s_col++) { // which chiral block
             complex<Float> UV = arg.UV(parity, x_cb, s_col*fineSpin+s, ic, jc_c);
-            caxpy(conj(AV), UV, vuv[s*coarseSpin+s_col]);
+            vuv[s*coarseSpin+s_col] = cmac(conj(AV), UV, vuv[s*coarseSpin+s_col]);
           } //Fine color
         } //Fine spin
       }

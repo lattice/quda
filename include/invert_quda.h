@@ -1120,7 +1120,7 @@ public:
     virtual ~PreconditionedSolver() { delete solver; }
 
     void operator()(ColorSpinorField &x, ColorSpinorField &b) {
-      setOutputPrefix(prefix);
+      pushOutputPrefix(prefix);
 
       QudaSolutionType solution_type = b.SiteSubset() == QUDA_FULL_SITE_SUBSET ? QUDA_MAT_SOLUTION : QUDA_MATPC_SOLUTION;
 
@@ -1131,7 +1131,7 @@ public:
       (*solver)(*out, *in);
       dirac.reconstruct(x, b, solution_type);
 
-      setOutputPrefix("");
+      popOutputPrefix();
     }
 
     /**

@@ -231,23 +231,22 @@ namespace quda {
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, const int n_block_ortho)
   {
-
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == 3) {
 
       constexpr int nColor = 3;
+#ifdef NSPIN4
       if (Nvec == 6) { // for Wilson free field
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
                                                                             geo_bs, n_block_ortho);
-      } else if (Nvec == 24) {
+      } else
+#endif
+      if (Nvec == 24) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
 #ifdef NSPIN4
       } else if (Nvec == 32) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-      } else if (Nvec == 48) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 48>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
 #endif // NSPIN4
       } else {

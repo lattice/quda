@@ -115,7 +115,7 @@ namespace quda {
     /**
        @return Clover coefficient (usually includes kappa)
     */
-    bool Csw() const { return csw; }
+    double Csw() const { return csw; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
