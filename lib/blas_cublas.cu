@@ -81,11 +81,11 @@ namespace quda {
 	  errorQuda("\nError in LU decomposition (cublasCgetrfBatched), error code = %d\n", error);
 
 	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), cudaMemcpyDeviceToHost);
-	for (int i=0; i<batch; i++) {
+	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
-	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
+	    errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%lu factorization completed but the factor U is exactly singular", i);
 	  }
 	}
     
@@ -97,11 +97,11 @@ namespace quda {
 
 	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), cudaMemcpyDeviceToHost);
 
-	for (int i=0; i<batch; i++) {
+	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
-	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
+	    errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%lu factorization completed but the factor U is exactly singular", i);
 	  }
 	}
 
