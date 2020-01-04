@@ -7,7 +7,7 @@
 
 namespace quda {
 
-  static CloverField* dummyClover()
+  inline CloverField* dummyClover()
   {
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
