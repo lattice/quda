@@ -82,7 +82,9 @@ namespace quda {
     Float max_h; // scalar that stores the maximum element of the dynamic clover inverse
     Float *max_d; // array that stores the maximum element per lattice site of the dynamic clover inverse
 
-    int dim_index; // which direction / dimension we are working on
+    int dim;           // which dimension are we working on
+    QudaDirection dir; // which direction are working on
+    int dim_index;     // which direction / dimension we are working on
 
     CalculateYArg(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,

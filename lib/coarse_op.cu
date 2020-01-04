@@ -2,20 +2,15 @@
 #include <color_spinor_field.h>
 #include <gauge_field.h>
 #include <clover_field.h>
-
-#ifdef GPU_MULTIGRID
 #include <coarse_op.cuh>
-#endif
 
 namespace quda {
-
-#ifdef GPU_MULTIGRID
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
                   ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-
+		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     QudaFieldLocation location = Y.Location();
 
     bool need_bidirectional = false;
@@ -52,10 +47,10 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-
-      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<QUDA_CPU_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
+	 avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, g, c,
+         kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(location), T.coarseToFine(location));
 
     } else {
@@ -89,11 +84,11 @@ namespace quda {
       cFine cAccessor(const_cast<CloverField&>(c), false);
       cFine cInvAccessor(const_cast<CloverField&>(c), true);
 
-      calculateY<false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
+      calculateY<QUDA_CUDA_FIELD_LOCATION, false,Float,fineSpin,fineColor,coarseSpin,coarseColor>
         (yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor,
-         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
+         avAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor, Y, X, Yatomic, Xatomic, uv, av, v, g, c,
+         kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
          T.fineToCoarse(location), T.coarseToFine(location));
-
     }
 
   }
@@ -101,8 +96,9 @@ namespace quda {
   // template on the number of coarse degrees of freedom
   template <typename Float, typename vFloat, int fineColor, int fineSpin>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
+                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c,
+                  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     if (T.Vectors().Nspin()/T.Spin_bs() != 2)
       errorQuda("Unsupported number of coarse spins %d\n",T.Vectors().Nspin()/T.Spin_bs());
     const int coarseSpin = 2;
@@ -125,8 +121,9 @@ namespace quda {
   // template on fine spin
   template <typename Float, typename vFloat, int fineColor>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
+                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c,
+                  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     if (uv.Nspin() == 4) {
       calculateY<Float,vFloat,fineColor,4>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
     } else {
@@ -137,8 +134,9 @@ namespace quda {
   // template on fine colors
   template <typename Float, typename vFloat>
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
+                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g, const CloverField &c,
+                  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     if (g.Ncolor() == 3) {
       calculateY<Float,vFloat,3>(Y, X, Yatomic, Xatomic, uv, av, T, g, c, kappa, mu, mu_factor, dirac, matpc);
     } else {
@@ -148,8 +146,10 @@ namespace quda {
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateY(GaugeField &Y, GaugeField &X, GaugeField &Yatomic, GaugeField &Xatomic,
-                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T,
-		  const GaugeField &g, const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
+                  ColorSpinorField &uv, ColorSpinorField &av, const Transfer &T, const GaugeField &g,
+                  const CloverField &c, double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
+#ifdef GPU_MULTIGRID
     checkPrecision(Xatomic, Yatomic, g);
     checkPrecision(uv, av, T.Vectors(X.Location()), X, Y);
 
@@ -181,17 +181,17 @@ namespace quda {
       errorQuda("Unsupported precision %d\n", Y.Precision());
     }
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("....done computing Y field\n");
-  }
-
+#else
+    errorQuda("Multigrid has not been built");
 #endif // GPU_MULTIGRID
+  }
 
   //Calculates the coarse color matrix and puts the result in Y.
   //N.B. Assumes Y, X have been allocated.
   void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
-		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc) {
-
-#ifdef GPU_MULTIGRID
+		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc)
+  {
     QudaPrecision precision = Y.Precision();
     QudaFieldLocation location = checkLocation(Y, X);
 
@@ -293,9 +293,6 @@ namespace quda {
 
     if (C != clover) delete C;
     if (U != &gauge) delete U;
-#else
-    errorQuda("Multigrid has not been built");
-#endif // GPU_MULTIGRID
   }
 
 } //namespace quda
