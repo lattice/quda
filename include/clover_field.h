@@ -162,7 +162,6 @@ namespace quda {
        @return Absolute minimum value
      */
     double abs_min(bool inverse = false) const;
-
   };
 
   class cudaCloverField : public CloverField {
