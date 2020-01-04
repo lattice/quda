@@ -190,6 +190,7 @@ namespace quda {
     // Template over fine color
     if (in.Ncolor() == 3) { // standard QCD
       if (in.Nspin() != 4) errorQuda("Unexpected nSpin = %d", in.Nspin());
+#ifdef NSPIN4
       constexpr int fineSpin = 4;
       constexpr int fineColor = 3;
 
@@ -199,7 +200,6 @@ namespace quda {
         for (int p=0; p<2; p++)
           if (mapper(s,p) != spin_map[s][p]) errorQuda("Spin map does not match spin_mapper");
 
-#ifdef NSPIN4
       if (nVec == 6) { // free field Wilson
         Restrict<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, coarse_to_fine, parity);
       } else if (nVec == 24) {
