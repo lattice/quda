@@ -15,7 +15,7 @@ namespace quda {
   */
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, bool compute_max_only, TuneParam &tp, const cudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const cudaStream_t &stream)
     {
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
@@ -29,7 +29,7 @@ namespace quda {
   */
   template <typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
-    Launch(Arg &arg, bool compute_max_only, TuneParam &tp, const cudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const cudaStream_t &stream)
     {
       if (compute_max_only) {
         if (!activeTuning()) {
@@ -38,7 +38,7 @@ namespace quda {
       }
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::CalculateYhatGPU")
+      error = program->kernel("quda::CalculateYhatGPU")
         .instantiate(compute_max_only, Type<Arg>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream)
         .launch(arg);
@@ -104,7 +104,7 @@ namespace quda {
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Launch<location, Arg>(arg, compute_max_only, tp, stream);
+      Launch<location, Arg>(arg, jitify_error, compute_max_only, tp, stream);
     }
 
     /**
