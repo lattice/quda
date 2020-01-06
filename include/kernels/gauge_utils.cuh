@@ -20,23 +20,10 @@ namespace quda
   // dims * (2*18 + 4*198) = dims*828
 
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple, int dir_ignore)
-  {
-    // compute spacetime dimensions and parity
-    int X[4];
-    for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
-    int x[4];
-    getCoords(x, idx, X, parity);
-    for (int dr = 0; dr < 4; ++dr) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-
+  __host__ __device__ void computeStaple(Arg &arg, const int *x, const int *X, const int parity, const int dir, Link &staple, const int dir_ignore)
+  {    
     setZero(&staple);
-
     for (int mu = 0; mu < 4 ; mu++) {
-
       // Identify directions orthogonal to the link and 
       // ignore the dir_ignore direction (usually the temporal dim
       // when used with STOUT or APE for measurement smearing)
@@ -86,22 +73,10 @@ namespace quda
   // => Total number of floating point ops per function call
   // dims * (8*18 + 28*198) = dims*5688
   template <typename Arg, typename Link>
-  __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle, int dir_ignore)
+  __host__ __device__ void computeStapleRectangle(Arg &arg, const int *x, const int *X, const int parity, const int dir, Link &staple, Link &rectangle, const int dir_ignore)
   {
-    // compute spacetime dimensions and parity
-    int X[4];
-    for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
-    int x[4];
-    getCoords(x, idx, X, parity);
-    for (int dr = 0; dr < 4; ++dr) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-
     setZero(&staple);
     setZero(&rectangle);
-
     for (int mu = 0; mu < 4; mu++) {      
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological

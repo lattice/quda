@@ -5538,6 +5538,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
 
 void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval)
 {
+  /*
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
@@ -5586,6 +5587,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
+  */
 }
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,

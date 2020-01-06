@@ -51,9 +51,9 @@ namespace quda
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
 
+    // Compute spacetime and local coords
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
     int x[4];
     getCoords(x, idx, X, parity);
     for (int dr = 0; dr < 4; ++dr) {
@@ -62,77 +62,76 @@ namespace quda
     }
 
     int dx[4] = {0, 0, 0, 0};
-    {
-      Link U, UDag, Stap, Omega, OmegaDiff, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+    Link U, UDag, Stap, Omega, OmegaDiff, ODT, Q, exp_iQ;
+    Complex OmegaDiffTr;
+    Complex i_2(0, 0.5);
 
-      // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap, Arg::stoutDim);
-
-      // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
-
-      // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
-
-      // Get U^{\dagger}
-      UDag = inverse(U);
-
-      // Compute \Omega = \rho * S * U^{\dagger}
-      Omega = (arg.rho * Stap) * UDag;
-
-      // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
-      //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
-
-      OmegaDiff = conj(Omega) - Omega;
-
-      Q = OmegaDiff;
-      OmegaDiffTr = getTrace(OmegaDiff);
-      OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
-
-      // Matrix proportional to OmegaDiffTr
-      setIdentity(&ODT);
-
-      Q = Q - OmegaDiffTr * ODT;
-      Q = i_2 * Q;
-      // Q is now defined.
-
+    // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
+    computeStaple(arg, x, X, parity, dir, Stap, Arg::stoutDim);
+    
+    // Get link U
+    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    
+    // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
+    
+    // Get U^{\dagger}
+    UDag = inverse(U);
+    
+    // Compute \Omega = \rho * S * U^{\dagger}
+    Omega = (arg.rho * Stap) * UDag;
+    
+    // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
+    //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
+    
+    OmegaDiff = conj(Omega) - Omega;
+    
+    Q = OmegaDiff;
+    OmegaDiffTr = getTrace(OmegaDiff);
+    OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
+    
+    // Matrix proportional to OmegaDiffTr
+    setIdentity(&ODT);
+    
+    Q = Q - OmegaDiffTr * ODT;
+    Q = i_2 * Q;
+    // Q is now defined.
+    
 #if 0
-      //Test for Tracless:
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q);
-      double error;
-      error = OmegaDiffTr.real();
-      printf("Trace test %d %d %.15e\n", idx, dir, error);
-
-      //Test for hemiticity:
-      Link Q_diff = conj(Q);
-      Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
-      Q_diff *= Q_diff;
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q_diff);
-      error = OmegaDiffTr.real();
-      printf("Herm test %d %d %.15e\n", idx, dir, error);
+    //Test for Tracless:
+    //reuse OmegaDiffTr
+    OmegaDiffTr = getTrace(Q);
+    double error;
+    error = OmegaDiffTr.real();
+    printf("Trace test %d %d %.15e\n", idx, dir, error);
+    
+    //Test for hemiticity:
+    Link Q_diff = conj(Q);
+    Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
+    Q_diff *= Q_diff;
+    //reuse OmegaDiffTr
+    OmegaDiffTr = getTrace(Q_diff);
+    error = OmegaDiffTr.real();
+    printf("Herm test %d %d %.15e\n", idx, dir, error);
 #endif
-
-      exponentiate_iQ(Q, &exp_iQ);
-
+      
+    exponentiate_iQ(Q, &exp_iQ);
+    
 #if 0
-      //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
-      printf("expiQ test %d %d %.15e\n", idx, dir, error);
+    //Test for expiQ unitarity:
+    error = ErrorSU3(exp_iQ);
+    printf("expiQ test %d %d %.15e\n", idx, dir, error);
 #endif
-
-      U = exp_iQ * U;
+    
+    U = exp_iQ * U;
 #if 0
-      //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
-      printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
+    //Test for expiQ*U unitarity:
+    error = ErrorSU3(U);
+    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
 #endif
-
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
-    }
+    
+    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
+  
   
   //------------------------//
   // Over-Improved routines //
@@ -149,9 +148,9 @@ namespace quda
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
 
+    // Compute spacetime and local coords
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
     int x[4];
     getCoords(x, idx, X, parity);
     for (int dr = 0; dr < 4; ++dr) {
@@ -163,83 +162,80 @@ namespace quda
     double rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
 
     int dx[4] = {0, 0, 0, 0};
-    {
-      Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q, exp_iQ;
-      Complex OmegaDiffTr;
-      Complex i_2(0, 0.5);
+    Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q, exp_iQ;
+    Complex OmegaDiffTr;
+    Complex i_2(0, 0.5);
+    
+    // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
+    // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
+    // https://arxiv.org/abs/0801.1165
+    computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::stoutDim);
+    
+    // Get link U
+    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    
+    // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
+    //-------------------------------------------------------------------
 
-      // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
-      // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, idx, parity, dir, Stap, Rect, Arg::stoutDim);
+    // Get U^{\dagger}
+    UDag = inverse(U);
 
-      // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    // Compute \rho * staple_coeff * S
+    Omega = (arg.rho * staple_coeff) * (Stap);
 
-      // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
-      //-------------------------------------------------------------------
+    // Compute \rho * rectangle_coeff * R
+    Omega = Omega - (arg.rho * rectangle_coeff) * (Rect);
+    Omega = Omega * UDag;
 
-      // Get U^{\dagger}
-      UDag = inverse(U);
+    // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
+    //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
 
-      // Compute \rho * staple_coeff * S
-      Omega = (arg.rho * staple_coeff) * (Stap);
+    OmegaDiff = conj(Omega) - Omega;
 
-      // Compute \rho * rectangle_coeff * R
-      Omega = Omega - (arg.rho * rectangle_coeff) * (Rect);
-      Omega = Omega * UDag;
+    Q = OmegaDiff;
+    OmegaDiffTr = getTrace(OmegaDiff);
+    OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
 
-      // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
-      //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
+    // Matrix proportional to OmegaDiffTr
+    setIdentity(&ODT);
 
-      OmegaDiff = conj(Omega) - Omega;
-
-      Q = OmegaDiff;
-      OmegaDiffTr = getTrace(OmegaDiff);
-      OmegaDiffTr = (1.0 / 3.0) * OmegaDiffTr;
-
-      // Matrix proportional to OmegaDiffTr
-      setIdentity(&ODT);
-
-      Q = Q - OmegaDiffTr * ODT;
-      Q = i_2 * Q;
-      // Q is now defined.
-
-#if 0
-      //Test for Tracless:
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q);
-      double error;
-      error = OmegaDiffTr.real();
-      printf("Trace test %d %d %.15e\n", idx, dir, error);
-
-      //Test for hemiticity:
-      Link Q_diff = conj(Q);
-      Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
-      Q_diff *= Q_diff;
-      //reuse OmegaDiffTr
-      OmegaDiffTr = getTrace(Q_diff);
-      error = OmegaDiffTr.real();
-      printf("Herm test %d %d %.15e\n", idx, dir, error);
-#endif
-
-      exponentiate_iQ(Q, &exp_iQ);
+    Q = Q - OmegaDiffTr * ODT;
+    Q = i_2 * Q;
+    // Q is now defined.
 
 #if 0
-      //Test for expiQ unitarity:
-      error = ErrorSU3(exp_iQ);
-      printf("expiQ test %d %d %.15e\n", idx, dir, error);
+    //Test for Tracless:
+    //reuse OmegaDiffTr
+    OmegaDiffTr = getTrace(Q);
+    double error;
+    error = OmegaDiffTr.real();
+    printf("Trace test %d %d %.15e\n", idx, dir, error);
+
+    //Test for hemiticity:
+    Link Q_diff = conj(Q);
+    Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
+    Q_diff *= Q_diff;
+    //reuse OmegaDiffTr
+    OmegaDiffTr = getTrace(Q_diff);
+    error = OmegaDiffTr.real();
+    printf("Herm test %d %d %.15e\n", idx, dir, error);
 #endif
 
-      U = exp_iQ * U;
+    exponentiate_iQ(Q, &exp_iQ);
+
 #if 0
-      //Test for expiQ*U unitarity:
-      error = ErrorSU3(U);
-      printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
+    //Test for expiQ unitarity:
+    error = ErrorSU3(exp_iQ);
+    printf("expiQ test %d %d %.15e\n", idx, dir, error);
 #endif
 
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
-    }
+    U = exp_iQ * U;
+#if 0
+    //Test for expiQ*U unitarity:
+    error = ErrorSU3(U);
+    printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
+#endif
+
+    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
-
 } // namespace quda

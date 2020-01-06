@@ -6,12 +6,14 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_, int wFlowDim_> struct GaugeWFlowArg {
+  /*
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int FlowDim_, FlowStepType stepType_> struct GaugeWFlowArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    static constexpr int wFlowDim = wFlowDim_;
+    //static constexpr int wFlowDim = wFlowDim_;
+    static constexpr FlowStepType stepType = stepType_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
     Gauge out;
@@ -40,13 +42,13 @@ namespace quda
   };
 
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3 
-  template <typename Arg> __global__ void computeWFlowStepW1(Arg arg)
+  template <typename Arg> __global__ void computeWFlowStep(Arg arg)
   {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
-    if (dir >= Arg::wFlowDim) return;
+    //if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -62,12 +64,18 @@ namespace quda
     }
 
     int dx[4] = {0, 0, 0, 0};
-    {
-      Link U, Stap, Z0, exp_Z0;
-      Complex im(0.0,-1.0);
-            
+    switch(Arg::stepType) {
+    case W1: computeW1(arg, idx, parity, dir);
+    case W2: computeW2(arg, idx, parity, dir);
+    case Vt: computeVt(arg, idx, parity, dir);
+    }
+
+      //Link U, Stap, Z0, exp_Z0;
+      //Complex im(0.0,-1.0);
+      
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
+      //computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
+      computeStaple(arg, idx, parity, dir, Stap, 4);
 
       // Get link U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
@@ -88,6 +96,7 @@ namespace quda
     }
   }
 
+  /*
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3 
   template <typename Arg> __global__ void computeWFlowStepW2(Arg arg)
   {
@@ -95,7 +104,7 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
-    if (dir >= Arg::wFlowDim) return;
+    //if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -115,7 +124,8 @@ namespace quda
       Link U, Stap, Z1, Z0, exp_Z1;
       Complex im(0.0,-1.0);
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
+      //computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
+      computeStaple(arg, idx, parity, dir, Stap, 4);
 
       // Get updated U 
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
@@ -147,7 +157,7 @@ namespace quda
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
-    if (dir >= Arg::wFlowDim) return;
+    //if (dir >= Arg::wFlowDim) return;
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
@@ -167,7 +177,7 @@ namespace quda
       Link U, Stap, Z2, Z1, exp_Z2;
       Complex im(0.0,-1.0);
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap, Arg::wFlowDim);
+      computeStaple(arg, idx, parity, dir, Stap, 4);
 
       // Get updated U
       U = arg.in(dir, linkIndexShift(x, dx, X), parity);
@@ -188,5 +198,6 @@ namespace quda
       U = exp_Z2 * U;
       arg.out(dir, linkIndexShift(x, dx, X), parity) = U;      
     }
-  }  
+  } 
+  */ 
 } // namespace quda

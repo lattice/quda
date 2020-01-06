@@ -54,9 +54,9 @@ namespace quda
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
 
+    // compute spacetime and local coords
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-
     int x[4];
     getCoords(x, idx, X, parity);
     for (int dr = 0; dr < 4; ++dr) {
@@ -65,22 +65,20 @@ namespace quda
     }
 
     int dx[4] = {0, 0, 0, 0};
-    {
-      Link U, Stap, TestU, I;
-      // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, idx, parity, dir, Stap, Arg::apeDim);
+    Link U, Stap, TestU, I;
+    // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
+    computeStaple(arg, x, X, parity, dir, Stap, Arg::apeDim);
 
-      // Get link U
-      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    // Get link U
+    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    
+    Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.))));
+    setIdentity(&I);
 
-      Stap = Stap * (arg.alpha / ((real)(2. * (3. - 1.))));
-      setIdentity(&I);
-
-      TestU = I * (1. - arg.alpha) + Stap * conj(U);
-      polarSu3<real>(TestU, arg.tolerance);
-      U = TestU * U;
-
-      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
-    }
+    TestU = I * (1. - arg.alpha) + Stap * conj(U);
+    polarSu3<real>(TestU, arg.tolerance);
+    U = TestU * U;
+    
+    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
 } // namespace quda

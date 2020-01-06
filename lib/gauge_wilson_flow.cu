@@ -7,11 +7,12 @@
 #include <instantiate.h>
 
 namespace quda {
-
-  template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW1 : TunableVectorYZ
+  /*
+  template <typename Float, int nColor, QudaReconstructType recon, QudaWFlowStepType, stepType>
+  class GaugeWFlow : TunableVectorYZ
   {
-    static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
-    GaugeWFlowArg<Float, nColor, recon, wFlowDim> arg;
+    //static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
+    GaugeWFlowArg<Float, nColor, recon, wFlowDim, stepType> arg;
     const GaugeField &meta;
 
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
@@ -19,7 +20,7 @@ namespace quda {
 
 public:
     // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
-    GaugeWFlowW1(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+    GaugeWFlow(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
       TunableVectorYZ(2, wFlowDim),
       arg(out, temp, in, epsilon),
       meta(in)
@@ -33,6 +34,37 @@ public:
       qudaDeviceSynchronize();
     }
 
+    
+    // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
+    GaugeWFlowW2(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+      TunableVectorYZ(2, wFlowDim),
+      arg(out, temp, in, epsilon),
+      meta(in)
+    {
+      strcpy(aux, meta.AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+#ifdef JITIFY
+      create_jitify_program("kernels/gauge_wilson_flow.cuh");
+#endif
+      apply(0);
+      qudaDeviceSynchronize();
+    }
+    
+    // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
+    GaugeWFlowVt(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon) :
+      TunableVectorYZ(2, wFlowDim),
+      arg(out, temp, in, epsilon),
+      meta(in)
+    {
+      strcpy(aux, meta.AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+#ifdef JITIFY
+      create_jitify_program("kernels/gauge_wilson_flow.cuh");
+#endif
+      apply(0);
+      qudaDeviceSynchronize();
+    }
+    
     void apply(const cudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -55,6 +87,7 @@ public:
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlowW1
 
+  /*
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeWFlowW2 : TunableVectorYZ
   {
     static constexpr int wFlowDim = 4; // apply Wilson Flow in all dims
@@ -148,7 +181,8 @@ public:
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
     long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlow
-
+  */
+  
   void WFlowStepW1(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
@@ -157,14 +191,19 @@ public:
 
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
-    
-    instantiate<GaugeWFlowW1>(out, temp, in, epsilon);
+
+    /*
+    switch (flow_step) {
+    case W1 : instantiate<GaugeWFlow,W1>(out, temp, in, epsilon);
+    case W2 : instantiate<GaugeWFlow,W2>(out, temp, in, epsilon);
+    case Vt : instantiate<GaugeWFlow,Vt>(out, temp, in, epsilon);
+    */
 #else
     errorQuda("Gauge tools are not built");
 #endif
   }  
 
-
+  /*
   void WFlowStepW2(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
@@ -180,7 +219,6 @@ public:
 #endif
   }  
 
-
   void WFlowStepVt(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
@@ -195,4 +233,6 @@ public:
     errorQuda("Gauge tools are not built");
 #endif
   }  
+  */
+  
 }
