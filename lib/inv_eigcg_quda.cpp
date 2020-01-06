@@ -811,9 +811,15 @@ namespace quda {
 
     projm_ = es.eigenvectors(),  evals_ = es.eigenvalues();
 
+
+    deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+
+    reserved_space->evals.resize( param.eig_param.nConv );
+    reserved_space->evecs.resize( 0 );
+
     for(int i = 0; i < param.eig_param.nConv; i++){
-      //if(fabs(evals[i]) > 1e-16)     deflparam.invRitzVals[i] = 1.0 / evals[i];
-      //else 	                  errorQuda("\nCannot invert Ritz value.\n");
+      if(fabs(devals[i]) > 1e-16) reserved_space->evals[i] = Complex(devals[i]);  
+      else                        errorQuda("\n .. zero Ritz value..\n");
     }
 
     ColorSpinorParam csParam(*evecs[0]);
@@ -865,7 +871,17 @@ namespace quda {
     printfQuda("\nReserved eigenvectors: %d\n", idx);
     //copy all the stuff to cudaRitzVectors set:
 
-    for(int i = 0; i < idx; i++) blas::copy(*evecs[i], buff->Component(i));
+    for (auto &vec : evecs) if (vec) delete vec;
+
+    evecs.resize(idx);
+
+    for(int i = 0; i < idx; i++) {
+      evecs.push_back(ColorSpinorField::Create(csParam));
+
+      blas::copy(*evecs[i], buff->Component(i));
+    }
+
+    extractDeflationSpace(reserved_space->evecs);
 
     //reset current dimension:
     param.eig_param.nConv = idx;
