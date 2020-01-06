@@ -7,7 +7,7 @@
 #include <instantiate.h>
 
 namespace quda {
-  /*
+
   template <typename Float, int nColor, QudaReconstructType recon, QudaWFlowStepType, stepType>
   class GaugeWFlow : TunableVectorYZ
   {
