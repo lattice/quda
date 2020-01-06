@@ -811,17 +811,6 @@ namespace quda {
 
     projm_ = es.eigenvectors(),  devals_ = es.eigenvalues();
 
-
-    deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
-
-    reserved_space->evals.resize( param.eig_param.nConv );
-    reserved_space->evecs.resize( 0 );
-
-    for(int i = 0; i < param.eig_param.nConv; i++){
-      if(fabs(devals[i]) > 1e-16) reserved_space->evals[i] = Complex(devals[i]);  
-      else                        errorQuda("\n .. zero Ritz value..\n");
-    }
-
     ColorSpinorParam csParam(*evecs[0]);
 
     csParam.create   = QUDA_ZERO_FIELD_CREATE;
@@ -844,6 +833,9 @@ namespace quda {
 
     while ((relerr < tol) && (idx < max_nev))
     {
+
+       if(fabs(devals[i]) < 1e-16) errorQuda("\n .. zero Ritz value..\n");
+	    
        std::vector<ColorSpinorField*> rv_(evecs.begin(), evecs.begin() + param.eig_param.nConv);
        std::vector<ColorSpinorField*> res{r.get()};
 
@@ -858,33 +850,35 @@ namespace quda {
   	  matDefl(vk[0], *r_sloppy);
 
 	  double3 dotnorm = cDotProductNormA(*r_sloppy, vk[0]);
-	  double eval = dotnorm.x / dotnorm.z;
+	  double curr_eval = dotnorm.x / dotnorm.z;
 
-	  blas::xpay(vk[0], -eval, *r_sloppy);
+	  blas::xpay(vk[0], -curr_eval, *r_sloppy);
 	  relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
-	  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", eval, relerr);
+	  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", curr_eval, relerr);
        }
 
        idx += 1;
     }
 
-    printfQuda("\nReserved eigenvectors: %d\n", idx);
-    //copy all the stuff to cudaRitzVectors set:
+    //reset current dimension:
+    param.eig_param.nConv = idx;
 
-    for (auto &vec : evecs) if (vec) delete vec;
+    printfQuda("\nReserved eigenvectors: %d\n", param.eig_param.nConv);
 
-    evecs.resize(idx);
+    deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
-    for(int i = 0; i < idx; i++) {
-      evecs.push_back(ColorSpinorField::Create(csParam));
+    reserved_space->evals.resize( param.eig_param.nConv );
+    reserved_space->evecs.resize( 0 );
 
+    evecs.resize(param.eig_param.nConv);
+
+    for(int i = 0; i < param.eig_param.nConv; i++) {
+      reserved_space->evals[i] = Complex(devals[i]);
+      evals[i]                 = Complex(devals[i]);
       blas::copy(*evecs[i], buff->Component(i));
     }
 
     extractDeflationSpace(reserved_space->evecs);
-
-    //reset current dimension:
-    param.eig_param.nConv = idx;
 
     args.V2k.reset();
 
