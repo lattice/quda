@@ -797,7 +797,7 @@ namespace quda {
       max_nev = param.eig_param.nConv;
     }
 
-    std::unique_ptr<double[] > evals(new double[param.eig_param.nConv]);
+    std::unique_ptr<double[] > devals(new double[param.eig_param.nConv]);
     std::unique_ptr<Complex[] > projm(new Complex[param.eig_param.nEv*param.eig_param.nConv]);
 
     ColorSpinorFieldSet &vk = *args.V2k;//!
@@ -805,11 +805,11 @@ namespace quda {
     memcpy(projm.get(), args.projMat, param.eig_param.nEv*param.eig_param.nConv * sizeof(Complex));//!
 
     Map<MatrixXcd, Unaligned, DynamicStride> projm_(projm.get(), param.eig_param.nConv, param.eig_param.nConv, DynamicStride(param.eig_param.nEv, 1));
-    Map<VectorXd, Unaligned> evals_(evals.get(), param.eig_param.nConv);
+    Map<VectorXd, Unaligned> devals_(devals.get(), param.eig_param.nConv);
 
     SelfAdjointEigenSolver<MatrixXcd> es(projm_);
 
-    projm_ = es.eigenvectors(),  evals_ = es.eigenvalues();
+    projm_ = es.eigenvectors(),  devals_ = es.eigenvalues();
 
 
     deflation_space *reserved_space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
