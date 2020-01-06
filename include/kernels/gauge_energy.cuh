@@ -49,11 +49,11 @@ namespace quda
       Link temp1, temp2;
       for(int i=0; i<6; i++) {
 	// Rescale from 1/8
-	F[i] *= 8;
-	trace = getTrace(F[i]);
+	temp1 = 8 * F[i];
+	trace = oneOnThree * getTrace(temp1);
 	setIdentity(&temp2);
 	temp2 = trace * temp2;
-	temp1 = 0.5 * (F[i] - oneOnThree * temp2);
+	temp1 = 0.5 * (temp1 - temp2);
 	E += getTrace(temp1 * conj(temp1)).real();
       }
       x_cb += blockDim.x * gridDim.x;
