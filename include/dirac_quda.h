@@ -51,6 +51,7 @@ namespace quda {
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
+    bool need_bidirectional; // whether or not we need to force a bi-directional build
 
     // Default constructor
     DiracParam() :
@@ -66,7 +67,8 @@ namespace quda {
       epsilon(0.0),
       tmp1(0),
       tmp2(0),
-      halo_precision(QUDA_INVALID_PRECISION)
+      halo_precision(QUDA_INVALID_PRECISION),
+      need_bidirectional(false)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -223,6 +225,11 @@ namespace quda {
     double Kappa() const { return kappa; }
 
     /**
+        @brief accessor for Mass (in case of a factor of 2 for staggered)
+    */
+    virtual double Mass() const { return mass; } // in case of factor of 2 convention for staggered
+
+    /**
         @brief accessor for twist parameter -- overrride can return better value
     */
     virtual double Mu() const { return 0.; }
@@ -300,7 +307,14 @@ namespace quda {
 			     const QudaSolutionType) const;
 
     /**
-     * @brief Create the coarse Wilson operator
+     * @brief Create the coarse Wilson operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
@@ -364,6 +378,13 @@ namespace quda {
 
     /**
      * @brief Create the coarse clover operator
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
@@ -720,14 +741,22 @@ public:
 
     double Mu() const { return mu; }
 
-   /**
+    /**
      * @brief Create the coarse twisted-mass operator
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
@@ -808,14 +837,22 @@ public:
 
     double Mu() const { return mu; }
 
-   /**
+    /**
      * @brief Create the coarse twisted-clover operator
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator
-     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for non-staggered ops)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover, hard coded to zero for
+     * non-staggered ops)
      * @param mu TM mu parameter for the coarse operator
      * @param mu_factor multiplicative factor for the mu parameter
      */
@@ -894,15 +931,24 @@ public:
 			     const QudaSolutionType) const;
 
     /**
-     * @brief Create the coarse staggered operator.  Unlike the Wilson operator,
-     *        we assume a mass normalization, not a kappa normalization. Thus kappa
-     *        gets ignored. 
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation.
      *
      * @param T[in] Transfer operator defining the coarse grid
      * @param Y[out] Coarse link field
      * @param X[out] Coarse clover field
      * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
      * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
       double kappa, double mass, double mu=0., double mu_factor=0.) const;
@@ -956,6 +1002,30 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    /**
+     * @brief Create the coarse staggered operator.
+     *
+     * @details Takes the multigrid transfer class, which knows
+     *          about the coarse grid blocking, as well as
+     *          having prolongate and restrict member functions,
+     *          and returns color matrices Y[0..2*dim-1] corresponding
+     *          to the coarse grid hopping terms and X corresponding to
+     *          the coarse grid "clover" term. Unike the Wilson operator,
+     *          we assume a mass normalization, not a kappa normalization.
+     *          Ultimately this routine just performs the Kahler-Dirac rotation,
+     *          dropping the long links.
+     *
+     * @param T[in] Transfer operator defining the coarse grid
+     * @param Y[out] Coarse link field
+     * @param X[out] Coarse clover field
+     * @param kappa Kappa parameter for the coarse operator (ignored, set to 1.0)
+     * @param mass Mass parameter for the coarse operator (gets explicitly built into clover)
+     * @param mu Mu parameter for the coarse operator (ignored for staggered)
+     * @param mu_factor Mu scaling factor for the coarse operator (ignored for staggered)
+     */
+    void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
+                        double mu_factor = 0.) const;
   };
 
   // Even-odd preconditioned staggered
@@ -986,10 +1056,12 @@ public:
   class DiracCoarse : public Dirac {
 
   protected:
+    double mass;
     double mu;
     double mu_factor;
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
+    const bool need_bidirectional; /** Whether or not to force a bi-directional build */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
     mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
@@ -1035,6 +1107,7 @@ public:
     void createYhat(bool gpu = true) const;
 
   public:
+    double Mass() const { return mass; }
     double Mu() const { return mu; }
     double MuFactor() const { return mu_factor; }
 

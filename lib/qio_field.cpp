@@ -22,8 +22,10 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
 
   /* Open the file for reading */
   QIO_Reader *infile = QIO_open_read(xml_file_in, filename, &layout, NULL, &iflag);
+
   if (infile == NULL) {
     printfQuda("%s(%d): QIO_open_read returns NULL.\n", __func__, this_node);
+    QIO_string_destroy(xml_file_in);
     return NULL;
   }
 
@@ -55,8 +57,11 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
 
   /* Open the file for reading */
   QIO_Writer *outfile = QIO_open_write(xml_file_out, filename, volfmt, &layout, &filesys, &oflag);
+
+  QIO_string_destroy(oflag.ildgLFN);
   if (outfile == NULL) {
     printfQuda("%s(%d): QIO_open_write returns NULL.\n", __func__, this_node);
+    QIO_string_destroy(xml_file_out);
     return NULL;
   }
 
@@ -71,7 +76,6 @@ template <int len>
 int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cpu_prec, QudaSiteSubset subset,
                QudaParity parity, int nSpin, int nColor)
 {
-
   // Get the QIO record and string
   char dummy[100] = "";
   QIO_RecordInfo *rec_info = QIO_create_record_info(0, NULL, NULL, 0, dummy, dummy, 0, 0, 0, 0);
@@ -109,7 +113,9 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
     errorQuda("QIO_get_typesize %d does not match expected datasize %d", in_typesize, file_prec * len);
 
   // Print the XML string.
-  if (QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
+  // The len != 18 is a WAR for this line segfaulting on some Chroma configs.
+  // Tracked on github via #936 
+  if (len != 18 && QIO_string_length(xml_record_in) > 0) printfQuda("QIO string: %s\n", QIO_string_ptr(xml_record_in));
 
   // Get total size. Could probably check the filesize better, but tbd.
   size_t rec_size = file_prec * count * len;
@@ -385,6 +391,12 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
     break;
   case 128:
     status = write_field<128>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
+  case 256:
+    status = write_field<256>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
+    break;
+  case 384:
+    status = write_field<384>(outfile, count, field_out, file_prec, cpu_prec, subset, parity, nSpin, nColor, type);
     break;
   default:
     errorQuda("Undefined %d", Ninternal);
