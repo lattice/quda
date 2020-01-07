@@ -5538,7 +5538,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
 
 void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval)
 {
-  /*
+  
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
@@ -5559,18 +5559,10 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     cudaGaugeTemp->copy(*gaugeSmeared);
     cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
 
-    WFlowStepW1(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
-    gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-
-    WFlowStepW2(*cudaGaugeTemp, *cudaGaugeAux, *gaugeSmeared, step_size);
-    gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-
-    WFlowStepVt(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
-    gaugeSmeared->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-    cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-
+    // Perform W1, W2, and Vt Wilson Flow steps as defined in
+    // https://arxiv.org/abs/1006.4518v3 
+    WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size);
+    
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
       double qCharge = qChargeQuda();
       printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
@@ -5587,7 +5579,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
-  */
+  
 }
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,

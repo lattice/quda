@@ -76,32 +76,14 @@ namespace quda
   void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho, double epsilon);
 
   /**
-     @brief Apply Wilson Flow step W1 to the gauge field
+     @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field
      @param[out] dataDs Output smeared field
      @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
-     @param[in] step_size Step size
+     @param[in] epsilon Step size
   */
-  void WFlowStepW1(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
-
-  /**
-   @brief Apply Wilson Flow step W2 to the gauge field
-   @param[out] dataDs Output smeared field
-   @param[in] dataTemp Temp space
-   @param[in] dataOr Input gauge field
-   @param[in] step_size Step size
-*/
-  void WFlowStepW2(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
-
-  /**
-   @brief Apply Wilson Flow step Vt to the gauge field
-   @param[out] dataDs Output smeared field
-   @param[in] dataTemp Temp space
-   @param[in] dataOr Input gauge field
-   @param[in] step_size Step size
-*/
-  void WFlowStepVt(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double step_size);
-
+  void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double epsilon);
+  
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
    * @param[in,out] data, quda gauge field

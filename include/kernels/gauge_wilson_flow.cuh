@@ -5,12 +5,19 @@
 
 namespace quda
 {
-  template <typename Float_, int nColor_, QudaReconstructType recon_, FlowStepType stepType_> struct GaugeWFlowArg {
+
+  enum WFlowStepType {
+    WFLOW_STEP_W1,
+    WFLOW_STEP_W2,
+    WFLOW_STEP_VT,
+  };
+  
+  template <typename Float_, int nColor_, QudaReconstructType recon_>
+  struct GaugeWFlowArg {
     using Float = Float_;
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
-    static constexpr FlowStepType stepType = stepType_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
 
     Gauge out;
@@ -21,13 +28,15 @@ namespace quda
     int X[4];    // grid dimensions
     int border[4];
     const Float epsilon;    
+    const WFlowStepType stepType;
     
-    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, Float epsilon) :
+    GaugeWFlowArg(GaugeField &out, GaugeField &temp, const GaugeField &in, const Float epsilon, const WFlowStepType stepType) :
       out(out),
       in(in),
       temp(temp),
       threads(1),
-      epsilon(epsilon)
+      epsilon(epsilon),
+      stepType(stepType)
     {
       for (int dir = 0; dir < 4; ++dir) {
         border[dir] = in.R()[dir];
@@ -56,15 +65,14 @@ namespace quda
       X[dr] += 2 * arg.border[dr];
     }
 
-    int dx[4] = {0, 0, 0, 0};
-    switch(Arg::stepType) {
-    case W1: computeW1(arg, x, X, parity, dir);
-    case W2: computeW2(arg, x, X, parity, dir);
-    case Vt: computeVt(arg, x, X, parity, dir);
+    switch(arg.stepType) {
+    case WFLOW_STEP_W1: computeW1Step(arg, x, X, parity, dir);
+    case WFLOW_STEP_W2: computeW2Step(arg, x, X, parity, dir);
+    case WFLOW_STEP_VT: computeVtStep(arg, x, X, parity, dir);
     }
   }
   
-  template <typename Arg, typename Link>
+  template <typename Arg>
   __host__ __device__ void computeW1Step(Arg &arg, const int *x, const int *X, const int parity, const int dir)
   {
     using real = typename Arg::Float;
@@ -94,7 +102,7 @@ namespace quda
     arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
 
-  template <typename Arg, typename Link>
+  template <typename Arg>
   __host__ __device__ void computeW2Step(Arg &arg, const int *x, const int *X, const int parity, const int dir)
   {
     using real = typename Arg::Float;
@@ -128,7 +136,7 @@ namespace quda
     arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
   }
   
-  template <typename Arg, typename Link>
+  template <typename Arg>
   __host__ __device__ void computeVtStep(Arg &arg, const int *x, const int *X, const int parity, const int dir)
   {
     using real = typename Arg::Float;
@@ -138,7 +146,7 @@ namespace quda
     Complex im(0.0,-1.0);
     int dx[4] = {0, 0, 0, 0};
     // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-    computeStaple(arg, idx, parity, dir, Stap, 4);    
+    computeStaple(arg, x, X, parity, dir, Stap, 4);    
     // Get updated U
     U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
