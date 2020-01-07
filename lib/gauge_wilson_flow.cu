@@ -26,6 +26,9 @@ public:
     {
       strcpy(aux, meta.AuxString());
       strcat(aux, comm_dim_partitioned_string());
+      if      (stepType == WFLOW_STEP_W1) strcat(aux,",computeWFlowStepW1");
+      else if (stepType == WFLOW_STEP_W2) strcat(aux,",computeWFlowStepW2");
+      else if (stepType == WFLOW_STEP_VT) strcat(aux,",computeWFlowStepVT");
 #ifdef JITIFY
       create_jitify_program("kernels/gauge_wilson_flow.cuh");
 #endif
@@ -44,7 +47,7 @@ public:
       computeWFlowStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
     }
-
+    
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
     void preTune() { arg.out.save(); } // defensive measure in case they alias
