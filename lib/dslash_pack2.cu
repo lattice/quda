@@ -2,12 +2,16 @@
 
 // STRIPED - spread the blocks throughout the workload to ensure we
 // work on all directions/dimensions simultanesouly to maximize NVLink saturation
-#define STRIPED
 // if not STRIPED then this means we assign one thread block per direction / dimension
+
 #ifdef NVSHMEM_COMMS
 #include <nvshmem.h>
 #include <nvshmemx.h>
+#else
+// MWTODO: how to handle striped ...
+#define STRIPED 1
 #endif
+
 
 #include <dslash_quda.h>
 #include <kernels/dslash_pack.cuh>
@@ -80,9 +84,8 @@ protected:
 #else
         // if zero-copy policy then assign exactly up to four thread blocks
         // per direction per dimension (effectively no grid-size tuning)
-        int max = ((shmem & 64) || (location & Host)) ? 4 : -1;
+        int max = ((shmem & 32) || (location & Host)) ? 4 : -1;
 #endif
-        max = ((shmem & 64) || (location & Host)) ? 4 : -1;
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
         return max > 0 ? max * nDimComms : TunableVectorYZ::maxGridSize();
@@ -103,7 +106,6 @@ protected:
         // per direction per dimension (effectively no grid-size tuning)
         int min = 2;
 #endif
-        min = ((shmem & 64) || (location & Host)) ? 4 : -1;
         int nDimComms = 0;
         for (int d = 0; d < in.Ndim(); d++) nDimComms += commDim[d];
         return min > 0 ? min * nDimComms : TunableVectorYZ::minGridSize();
@@ -151,10 +153,6 @@ protected:
       twist = ((b != 0.0) ? (c != 0.0 ? 2 : 1) : 0);
       if (twist && a == 0.0) errorQuda("Twisted packing requires non-zero scale factor a");
       if (twist) strcat(aux, twist == 2 ? ",twist-doublet" : ",twist-singlet");
-
-#ifndef STRIPED
-      if (location & Host || location & Shmem) strcat(aux, ",shmem");
-#endif
 
       // label the locations we are packing to
       // location label is nonp2p-p2p
