@@ -451,6 +451,7 @@ int invert_test()
       if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
         printfQuda("Switched to deflated CG solver.. \n");
         inv_param.inv_type = QUDA_CG_INVERTER;
+	eig_param.nKr = 2*eig_param.nEv;
       }
 
       invertQuda(out->V(), in->V(), &inv_param);

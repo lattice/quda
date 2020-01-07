@@ -490,6 +490,8 @@ namespace quda {
     inner.tol              = outer.tol;
     inner.tol_restart      = outer.tol_restart;
     inner.maxiter          = outer.maxiter;
+    inner.deflate          = false;
+    
     inner.delta            = outer.delta;
     inner.precision        = outer.precision; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
@@ -834,7 +836,7 @@ namespace quda {
     while ((relerr < tol) && (idx < max_nev))
     {
 
-       if(fabs(devals[i]) < 1e-16) errorQuda("\n .. zero Ritz value..\n");
+       if(fabs(devals[idx]) < 1e-16) errorQuda("\n .. zero Ritz value..\n");
 	    
        std::vector<ColorSpinorField*> rv_(evecs.begin(), evecs.begin() + param.eig_param.nConv);
        std::vector<ColorSpinorField*> res{r.get()};
@@ -1213,10 +1215,14 @@ namespace quda {
 
     int k = 0;
 
-    const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  b2*1e-11;
+    const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  (x.Precision() == QUDA_SINGLE_PRECISION ?  b2*1e-12 : b2*1e-8);
+    const double local_rel_stop = 1e-10;
+
+    double rel_r2 = nu / b2;
+
     bool converged = convergence(gamma, heavy_quark_res, args.global_stop, param.tol_hq);
 
-    constexpr int prediction_correction_interval = 8;
+    constexpr int prediction_correction_interval = 4;
     int correction_count;
 
     printfQuda("\nRunning CA eigCG with %d correction interval\n", prediction_correction_interval);
@@ -1274,9 +1280,11 @@ namespace quda {
         memcpy(reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4*sizeof(double));
       }
 
+      rel_r2 = sqrt(nu / b2);
+
       k++;
 
-      converged = convergence(nu, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(nu, heavy_quark_res, local_stop, param.tol_hq);
+      converged = (convergence(nu, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(nu, heavy_quark_res, local_stop, param.tol_hq)) or convergence(rel_r2, heavy_quark_res, local_rel_stop, param.tol_hq);
     }
 
     cudaProfilerStop();
@@ -1327,7 +1335,86 @@ namespace quda {
     return k;
   }
 
-  //constexpr bool host_flag = false;
+  int IncEigCG::initCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
+    int k = 0;
+    //Start init CG iterations:
+    fillInitCGSolverParam2(Kparam, param);
+
+    const double full_tol    = Kparam.tol;
+    const double tol_restart_= 5e-3;
+    const double inc_tol_    = 1e-2;
+    Kparam.tol         = tol_restart_;//Kparam.tol_restart;
+
+    ColorSpinorParam csParam(x);
+
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    ColorSpinorField *tmpp2 = ColorSpinorField::Create(csParam);//full precision accumulator
+    ColorSpinorField &tmp2  = *tmpp2;
+    ColorSpinorField *rp2 = ColorSpinorField::Create(csParam);//full precision residual
+    ColorSpinorField &r = *rp2;
+    ColorSpinorField *xp_2 = ColorSpinorField::Create(csParam);
+    ColorSpinorField &x2 = *xp_2;    
+
+    csParam.setPrecision(param.precision_ritz);
+
+    ColorSpinorField *xp_proj = ColorSpinorField::Create(csParam);
+    ColorSpinorField &xProj = *xp_proj;
+
+    ColorSpinorField *rp_proj2 =  ColorSpinorField::Create(csParam);
+    ColorSpinorField &rProj = *rp_proj2;
+
+    int restart_idx  = 0;
+
+    //xProj = x;
+    rProj = b;
+    //launch initCG:
+    const int max_restart_num = 3;
+
+    while((Kparam.tol >= full_tol) && (restart_idx < max_restart_num)) {
+      restart_idx += 1;
+
+      Deflate(xProj, rProj);
+      x2 = xProj;
+    
+      if(!K)
+	K = std::make_shared<CG>(mat, matPrecon, matPrecon, Kparam, profile);      
+      else	      
+        K.reset( new CG(mat, matPrecon, matPrecon,  Kparam, profile));
+      (*K)(x2, b);
+
+      mat(r, x2, tmp2);
+      blas::xpay(b, -1.0, r);
+
+      xProj = x2;
+      rProj = r;
+
+      if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
+
+      Kparam.tol *= inc_tol_; //param.inc_tol;
+
+      if(restart_idx == (max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
+
+      param.secs   += Kparam.secs;
+    }
+
+    if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
+    //
+    param.secs   += Kparam.secs;
+    param.gflops += Kparam.gflops;
+
+    k   += Kparam.iter;
+
+    delete rp2;
+    delete tmpp2;
+
+    {
+      delete xp_proj;
+      delete rp_proj2;
+      delete xp_2;
+    }
+    return k;
+  }
 
   void IncEigCG::operator()(ColorSpinorField &out, ColorSpinorField &in)
   {
@@ -1443,7 +1530,7 @@ namespace quda {
          if( !dcg_cycle &&  (local_eigcg_args->restarts >= 1) && (param.eig_param.nConv < param.eig_param.nEv) ) Verify();
        }
 
-     } while ((r2 > stop) && mixed_prec);
+     } while ((r2 > stop && logical_rhs_id < 2) && mixed_prec);
 
      //if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
        //printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
@@ -1462,6 +1549,7 @@ namespace quda {
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
        param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
+       initCGsolve(out, in);       
      }
 
      return;

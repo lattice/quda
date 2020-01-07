@@ -1311,6 +1311,8 @@ public:
     int EigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //communation optimized version
     int CAEigCGsolve(ColorSpinorField &out, ColorSpinorField &in);
+    //init cg check
+    int initCGsolve(ColorSpinorField &out, ColorSpinorField &in);
     //Incremental eigCG solver
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
