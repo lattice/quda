@@ -7,7 +7,12 @@
 
 namespace quda {
 
-  inline CloverField* dummyClover()
+  /**
+     @brief dummyClover is a helper function to allow us to create an
+     empty clover object - this allows us to use the the externally
+     linked reduction kernels when we do have a clover field.
+   */
+  inline std::unique_ptr<cudaCloverField> dummyClover()
   {
     CloverFieldParam cf_param;
     cf_param.nDim = 4;
@@ -27,7 +32,7 @@ namespace quda {
 
     // create a dummy cudaCloverField if one is not defined
     cf_param.order = QUDA_INVALID_CLOVER_ORDER;
-    return new cudaCloverField(cf_param);
+    return std::make_unique<cudaCloverField>(cf_param);
   }
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
@@ -64,16 +69,12 @@ namespace quda {
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
-      auto *dummy = dummyClover();
-
       calculateY<QUDA_CPU_FIELD_LOCATION, true,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic,
 	 uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, g, *dummy,
+	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, g, *dummyClover(),
          kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
-
-      delete dummy;
     } else {
 
       constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -102,16 +103,13 @@ namespace quda {
       gCoarseAtomic yAccessorAtomic(const_cast<GaugeField&>(Yatomic));
       gCoarseAtomic xAccessorAtomic(const_cast<GaugeField&>(Xatomic));
 
-      auto *dummy = dummyClover();
-
+      // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
       calculateY<QUDA_CUDA_FIELD_LOCATION, true,Float,fineSpin,fineColor,coarseSpin,coarseColor>
 	(yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic,
 	 uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor, cInvAccessor,
-	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, g, *dummy,
+	 Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField&>(v), v, g, *dummyClover(),
          kappa, mu, mu_factor, dirac, matpc, need_bidirectional,
 	 T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
-
-      delete dummy;
     }
   }
 
