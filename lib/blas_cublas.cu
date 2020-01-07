@@ -66,6 +66,7 @@ namespace quda {
       int *dipiv = static_cast<int*>(pool_device_malloc(batch*n*sizeof(int)));
       int *dinfo_array = static_cast<int*>(pool_device_malloc(batch*sizeof(int)));
       int *info_array = static_cast<int*>(pool_pinned_malloc(batch*sizeof(int)));
+      memset(info_array, '0', batch*sizeof(int)); // silence memcheck warnings
 
       if (prec == QUDA_SINGLE_PRECISION) {
 	typedef cuFloatComplex C;
