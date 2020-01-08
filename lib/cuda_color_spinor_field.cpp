@@ -230,8 +230,7 @@ namespace quda {
         // check for special metadata wrapper (look at reference comments in
         // createTexObject() below)
         if (!((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
-              || (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max())) {
-
+              || (precision == QUDA_HALF_PRECISION && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()) )) {
           (dynamic_cast<cudaColorSpinorField *>(odd))->v = (void *)((char *)v + bytes / 2);
           if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
             (dynamic_cast<cudaColorSpinorField *>(odd))->norm = (void *)((char *)norm + norm_bytes / 2);

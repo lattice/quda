@@ -215,19 +215,7 @@ namespace quda {
 #ifdef GPU_STAGGERED_DIRAC
 #define INSTANTIATE_COLOR           \
   switch(src.Ncolor()) {            \
-  case 1: CopyGenericColorSpinor<1>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 2: CopyGenericColorSpinor<2>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 4: CopyGenericColorSpinor<4>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
   case 6: CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 9: CopyGenericColorSpinor<9>(dst, src, location, dst_ptr, src_ptr);  \
-    break;                \
-  case 12: CopyGenericColorSpinor<12>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 16: CopyGenericColorSpinor<16>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
   case 18: CopyGenericColorSpinor<18>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
@@ -237,19 +225,11 @@ namespace quda {
     break;                \
   case 36: CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
-  case 48: CopyGenericColorSpinor<48>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
   case 64: CopyGenericColorSpinor<64>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
   case 72: CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr); \
     break;                \
   case 96: CopyGenericColorSpinor<96>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 128: CopyGenericColorSpinor<128>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 192: CopyGenericColorSpinor<192>(dst, src, location, dst_ptr, src_ptr); \
-    break;                \
-  case 256: CopyGenericColorSpinor<256>(dst, src, location, dst_ptr, src_ptr);  \
     break;                \
   case 576: CopyGenericColorSpinor<576>(dst, src, location, dst_ptr, src_ptr);  \
     break;                \
@@ -274,21 +254,13 @@ namespace quda {
 
 #define INSTANTIATE_COLOR                                                                                              \
   switch (src.Ncolor()) {                                                                                              \
-  case 1: CopyGenericColorSpinor<1>(dst, src, location, dst_ptr, src_ptr); break;                                      \
-  case 2: CopyGenericColorSpinor<2>(dst, src, location, dst_ptr, src_ptr); break;                                      \
-  case 4: CopyGenericColorSpinor<4>(dst, src, location, dst_ptr, src_ptr); break;                                      \
   case 6: CopyGenericColorSpinor<6>(dst, src, location, dst_ptr, src_ptr); break;                                      \
-  case 9: CopyGenericColorSpinor<9>(dst, src, location, dst_ptr, src_ptr); break;                                      \
-  case 12: CopyGenericColorSpinor<12>(dst, src, location, dst_ptr, src_ptr); break;                                    \
-  case 16: CopyGenericColorSpinor<16>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 18: CopyGenericColorSpinor<18>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 24: CopyGenericColorSpinor<24>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 32: CopyGenericColorSpinor<32>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 36: CopyGenericColorSpinor<36>(dst, src, location, dst_ptr, src_ptr); break;                                    \
-  case 48: CopyGenericColorSpinor<48>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 72: CopyGenericColorSpinor<72>(dst, src, location, dst_ptr, src_ptr); break;                                    \
   case 96: CopyGenericColorSpinor<96>(dst, src, location, dst_ptr, src_ptr); break;                                    \
-  case 256: CopyGenericColorSpinor<256>(dst, src, location, dst_ptr, src_ptr); break;                                  \
   case 576: CopyGenericColorSpinor<576>(dst, src, location, dst_ptr, src_ptr); break;                                  \
   case 768: CopyGenericColorSpinor<768>(dst, src, location, dst_ptr, src_ptr); break;                                  \
   case 1024: CopyGenericColorSpinor<1024>(dst, src, location, dst_ptr, src_ptr); break;                                \

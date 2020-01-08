@@ -46,6 +46,8 @@ namespace quda
     const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
 
+    const real dagger_scale;
+
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
@@ -58,7 +60,8 @@ namespace quda
       a(a),
       tboundary(U.TBoundary()),
       is_first_time_slice(comm_coord(3) == 0 ? true : false),
-      is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false)
+      is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
+      dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -75,7 +78,7 @@ namespace quda
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
+  template <int nParity, KernelType kernel_type, typename Arg, typename Vector>
   __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
                                                  int idx, int thread_dim, bool &active)
   {
@@ -83,7 +86,7 @@ namespace quda
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
 
-#pragma unroll 4
+#pragma unroll
     for (int d = 0; d < 4; d++) { // loop over dimension
 
       // standard - forward direction
@@ -163,7 +166,7 @@ namespace quda
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
     Arg &arg;
@@ -186,9 +189,9 @@ namespace quda
 
       Vector out;
 
-      applyStaggered<nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyStaggered<nParity, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
 
-      if (dagger) { out = -out; }
+      out *= arg.dagger_scale;
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(x_cb, my_spinor_parity);

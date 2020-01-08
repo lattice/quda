@@ -27,6 +27,7 @@ namespace quda
     param_postsmooth(nullptr),
     param_coarse_solver(nullptr),
     r(nullptr),
+    b_tilde(nullptr),
     r_coarse(nullptr),
     x_coarse(nullptr),
     tmp_coarse(nullptr),
