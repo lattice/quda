@@ -173,7 +173,7 @@ namespace quda {
     if (link_direction != QUDA_LINK_BACKWARDS)
       errorQuda("link_direction = %d not supported", link_direction);
 
-    void *recv[QUDA_MAX_DIM];
+    void *recv[2*QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // communicate between nodes
