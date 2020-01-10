@@ -67,18 +67,20 @@ namespace quda {
 
     bool compute_max_only;
 
-    long long flops() const { return 2l * arg.coarseVolumeCB * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
-    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + 8*arg.Yhat.Bytes()) * n; }
+    long long flops() const { return 2l * arg.Y.VolumeCB() * 8 * n * n * (8*n-2); } // 8 from dir, 8 from complexity,
+    long long bytes() const { return 2l * (arg.Xinv.Bytes() + 8*arg.Y.Bytes() + !compute_max_only * 8*arg.Yhat.Bytes()) * n; }
 
-    unsigned int minThreads() const { return arg.coarseVolumeCB; }
-
+    unsigned int minThreads() const { return arg.Y.VolumeCB(); }
     bool tuneGridDim() const { return false; } // don't tune the grid dimension
 
-    unsigned int maxBlockSize(const TuneParam &param) const { return std::min(TunableVectorYZ::maxBlockSize(param), 128u); }
+    // all the tuning done is only in matrix tile size (Y/Z block.grid)
+    int blockMin() const { return 8; }
+    int blockStep() const { return 8; }
+    unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
 
   public:
       CalculateYhat(Arg &arg, const LatticeField &meta) :
-        TunableVectorYZ(2 * n, 4 * n),
+        TunableVectorYZ(2 * Arg::M_tiles, 4 * Arg::N_tiles),
         arg(arg),
         meta(meta),
         compute_max_only(false)
@@ -112,7 +114,6 @@ namespace quda {
     */
     void setComputeMaxOnly(bool compute_max_only_) { compute_max_only = compute_max_only_; }
 
-    // no locality in this kernel so no point in shared-memory tuning
     bool advanceSharedBytes(TuneParam &param) const { return false; }
 
     bool advanceTuneParam(TuneParam &param) const {
@@ -190,7 +191,7 @@ namespace quda {
 
       int comm_dim[4];
       for (int i=0; i<4; i++) comm_dim[i] = comm_dim_partitioned(i);
-      typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N> yHatArg;
+      typedef CalculateYhatArg<Float, gPreconditionedCoarse, gCoarse, N, 4, 2> yHatArg;
       yHatArg arg(yHatAccessor, yAccessor, xInvAccessor, xc_size, comm_dim, 1);
 
       CalculateYhat<location, yHatArg> yHat(arg, Y);
@@ -245,9 +246,9 @@ namespace quda {
   template <typename storeFloat, typename Float>
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
     switch (Y.Ncolor()) {
-    case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
     case 48: calculateYhat<storeFloat,Float,48>(Yhat, Xinv, Y, X); break;
 #ifdef NSPIN4
+    case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
     case 64: calculateYhat<storeFloat,Float,64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
 #ifdef NSPIN1

@@ -1,7 +1,7 @@
 #include <tune_quda.h>
-
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>
+#include <uint_to_char.h>
 
 namespace quda {
 
@@ -36,15 +36,15 @@ namespace quda {
     {
       if (type == COMPUTE_UV) {
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -144,15 +144,15 @@ namespace quda {
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
         }
 #endif
 
@@ -610,7 +610,7 @@ namespace quda {
       case COMPUTE_RESCALE:
 	resizeVector(2*coarseColor,coarseColor);
         break;
-      case COMPUTE_UV:
+      case COMPUTE_UV: resizeVector(2 * arg.uvTile.M_tiles, arg.uvTile.N_tiles); break;
       case COMPUTE_TMAV: resizeVector(2, coarseColor); break;
       case COMPUTE_AV:
       case COMPUTE_TMCAV: resizeVector(4, coarseColor); break; // y dimension is chirality and parity
@@ -737,6 +737,15 @@ namespace quda {
           type == COMPUTE_TMCAV || type == COMPUTE_TWISTED_CLOVER_INV_MAX)
         strcat(Aux, ",Dynamic");
 #endif
+      if (type == COMPUTE_UV) {
+        strcat(Aux, ",tile_size=");
+        char uvTile[16];
+        u32toa(uvTile, arg.uvTile.M);
+        strcat(Aux, uvTile);
+        strcat(Aux,"x");
+        u32toa(uvTile, arg.uvTile.N);
+        strcat(Aux, uvTile);
+      }
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {
         if      (dim == 0) strcat(Aux, ",dim=0");
