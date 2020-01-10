@@ -379,7 +379,11 @@ namespace quda {
   }
 
   void cpuGaugeField::zero() {
-    memset(gauge, 0, bytes);
+    if (order != QUDA_QDP_GAUGE_ORDER) {
+      memset(gauge, 0, bytes);
+    } else {
+      for (int g=0; g<geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
+    }
   }
 
 /*template <typename Float>
