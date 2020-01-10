@@ -26,8 +26,16 @@ _EXTERN_C_ void pmpi_init_(MPI_Fint *ierr);
 _EXTERN_C_ void pmpi_init__(MPI_Fint *ierr);
 static int in_wrapper = 0;
 #include <pthread.h>
+
+#if QUDA_NVTX_VERSION == 3
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtCudaRt.h>
+#else
 #include <nvToolsExt.h>
 #include <nvToolsExtCudaRt.h>
+#endif
+
+#include <mpi_comm_handle.h>
 // Setup event category name
 /* ================== C Wrappers for MPI_Init ================== */
 _EXTERN_C_ int PMPI_Init(int *argc, char ***argv);
@@ -39,7 +47,7 @@ _EXTERN_C_ int MPI_Init(int *argc, char ***argv) {
   nvtxNameCategoryA(999, "MPI");
   _wrap_py_return_val = PMPI_Init(argc, argv);
   int rank;
-  PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  PMPI_Comm_rank(MPI_COMM_HANDLE, &rank);
   char name[256];
   sprintf( name, "MPI Rank %d", rank );
  
@@ -64,6 +72,8 @@ _EXTERN_C_ int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int d
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Send";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Send(buf, count, datatype, dest, tag, comm);
@@ -85,6 +95,8 @@ _EXTERN_C_ int MPI_Recv(void *buf, int count, MPI_Datatype datatype, int source,
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Recv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Recv(buf, count, datatype, source, tag, comm, status);
@@ -106,6 +118,8 @@ _EXTERN_C_ int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count, MPI_
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Allreduce";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
@@ -127,6 +141,8 @@ _EXTERN_C_ int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Dat
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Reduce";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Reduce(sendbuf, recvbuf, count, datatype, op, root, comm);
@@ -148,6 +164,8 @@ _EXTERN_C_ int MPI_Wait(MPI_Request *request, MPI_Status *status) {
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Wait";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Wait(request, status);
@@ -169,6 +187,8 @@ _EXTERN_C_ int MPI_Waitany(int count, MPI_Request array_of_requests[], int *inde
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Waitany";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Waitany(count, array_of_requests, index, status);
@@ -190,6 +210,8 @@ _EXTERN_C_ int MPI_Waitall(int count, MPI_Request array_of_requests[], MPI_Statu
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Waitall";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Waitall(count, array_of_requests, array_of_statuses);
@@ -211,6 +233,8 @@ _EXTERN_C_ int MPI_Waitsome(int incount, MPI_Request array_of_requests[], int *o
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Waitsome";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Waitsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
@@ -232,6 +256,8 @@ _EXTERN_C_ int MPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendt
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Gather";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm);
@@ -253,6 +279,8 @@ _EXTERN_C_ int MPI_Gatherv(const void *sendbuf, int sendcount, MPI_Datatype send
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Gatherv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Gatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, comm);
@@ -274,6 +302,8 @@ _EXTERN_C_ int MPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype send
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Scatter";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Scatter(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, comm);
@@ -295,6 +325,8 @@ _EXTERN_C_ int MPI_Scatterv(const void *sendbuf, const int sendcounts[], const i
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Scatterv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Scatterv(sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, comm);
@@ -316,6 +348,8 @@ _EXTERN_C_ int MPI_Allgather(const void *sendbuf, int sendcount, MPI_Datatype se
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Allgather";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
@@ -337,6 +371,8 @@ _EXTERN_C_ int MPI_Allgatherv(const void *sendbuf, int sendcount, MPI_Datatype s
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Allgatherv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
@@ -358,6 +394,8 @@ _EXTERN_C_ int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sen
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Alltoall";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
@@ -379,6 +417,8 @@ _EXTERN_C_ int MPI_Alltoallv(const void *sendbuf, const int sendcounts[], const 
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Alltoallv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Alltoallv(sendbuf, sendcounts, sdispls, sendtype, recvbuf, recvcounts, rdispls, recvtype, comm);
@@ -400,6 +440,8 @@ _EXTERN_C_ int MPI_Alltoallw(const void *sendbuf, const int sendcounts[], const 
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Alltoallw";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Alltoallw(sendbuf, sendcounts, sdispls, sendtypes, recvbuf, recvcounts, rdispls, recvtypes, comm);
@@ -421,6 +463,8 @@ _EXTERN_C_ int MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int roo
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Bcast";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Bcast(buffer, count, datatype, root, comm);
@@ -442,6 +486,8 @@ _EXTERN_C_ int MPI_Sendrecv(const void *sendbuf, int sendcount, MPI_Datatype sen
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Sendrecv";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, status);
@@ -463,6 +509,8 @@ _EXTERN_C_ int MPI_Barrier(MPI_Comm comm) {
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Barrier";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Barrier(comm);
@@ -484,6 +532,8 @@ _EXTERN_C_ int MPI_Start(MPI_Request *request) {
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Start";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Start(request);
@@ -505,6 +555,8 @@ _EXTERN_C_ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Test";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Test(request, flag, status);
@@ -526,6 +578,8 @@ _EXTERN_C_ int MPI_Send_init(const void *buf, int count, MPI_Datatype datatype, 
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Send_init";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Send_init(buf, count, datatype, dest, tag, comm, request);
@@ -547,6 +601,8 @@ _EXTERN_C_ int MPI_Recv_init(void *buf, int count, MPI_Datatype datatype, int so
   eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
   eventAttrib.message.ascii  = "MPI_Recv_init";
   eventAttrib.category = 999;
+  eventAttrib.colorType = NVTX_COLOR_ARGB; \
+  eventAttrib.color = 0xffffaa00; \
  
   nvtxRangePushEx(&eventAttrib);
   _wrap_py_return_val = PMPI_Recv_init(buf, count, datatype, source, tag, comm, request);

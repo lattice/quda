@@ -10,13 +10,11 @@
 #include <map>
 #include <list>
 #include <unistd.h>
+#include <uint_to_char.h>
 
 #include <deque>
 #include <queue>
 #include <functional>
-#ifdef PTHREADS
-#include <pthread.h>
-#endif
 
 //#define LAUNCH_TIMER
 extern char* gitversion;
@@ -70,19 +68,39 @@ namespace quda {
 
   // linked list that is augmented each time we call a kernel
   static std::list<TraceKey> trace_list;
-  static bool enable_trace = false;
+  static int enable_trace = 0;
 
-  bool traceEnabled() {
+  int traceEnabled() {
     static bool init = false;
 
     if (!init) {
       char *enable_trace_env = getenv("QUDA_ENABLE_TRACE");
-      if (enable_trace_env && strcmp(enable_trace_env, "1") == 0) {
-        enable_trace = true;
+      if (enable_trace_env) {
+        if (strcmp(enable_trace_env, "1") == 0) {
+          // only explicitly posted trace events are included
+          enable_trace = 1;
+        } else if (strcmp(enable_trace_env, "2") == 0) {
+          // enable full kernel trace and posted trace events
+          enable_trace = 2;
+        }
       }
       init = true;
     }
     return enable_trace;
+  }
+
+  void postTrace_(const char *func, const char *file, int line) {
+    if (traceEnabled() >= 1) {
+      char aux[TuneKey::aux_n];
+      strcpy(aux,file);
+      strcat(aux,":");
+      char tmp[TuneKey::aux_n];
+      i32toa(tmp,line);
+      strcat(aux,tmp);
+      TuneKey key("", func, aux);
+      TraceKey trace_entry(key, 0.0);
+      trace_list.push_back(trace_entry);
+    }
   }
 
   static const std::string quda_hash = QUDA_HASH; // defined in lib/Makefile
@@ -194,9 +212,10 @@ namespace quda {
       TuneKey key = entry->first;
       TuneParam param = entry->second;
 
-      char tmp[7] = { };
-      strncpy(tmp, key.aux, 6);
-      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      char tmp[14] = { };
+      strncpy(tmp, key.aux, 13);
+      bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
+      bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       if (param.n_calls > 0 && !is_policy) total_time += param.n_calls * param.time;
       if (param.n_calls > 0 && is_policy) async_total_time += param.n_calls * param.time;
     }
@@ -206,9 +225,10 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      char tmp[7] = { };
-      strncpy(tmp, key.aux, 6);
-      bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
+      char tmp[TuneKey::aux_n] = { };
+      strncpy(tmp, key.aux, TuneKey::aux_n);
+      bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
+      bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
 
       // synchronous profile
       if (param.n_calls > 0 && !is_policy) {
@@ -245,8 +265,8 @@ namespace quda {
       TuneKey &key = it->key;
 
       // special case kernel members of a policy
-      char tmp[14] = { };
-      strncpy(tmp, key.aux, 13);
+      char tmp[TuneKey::aux_n] = { };
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strcmp(tmp, "policy_kernel") == 0 ? true : false;
 
       out << std::setw(12) << it->time << "\t";
@@ -326,6 +346,13 @@ namespace quda {
       resource_path = path;
     }
 
+    bool version_check = true;
+    char *override_version_env = getenv("QUDA_TUNE_VERSION_CHECK");
+    if (override_version_env && strcmp(override_version_env, "0") == 0) {
+      version_check = false;
+      warningQuda("Disabling QUDA tunecache version check");
+    }
+
 #ifdef MULTI_GPU
     if (comm_rank() == 0) {
 #endif
@@ -342,21 +369,32 @@ namespace quda {
 	ls >> token;
 	if (token.compare("tunecache")) errorQuda("Bad format in %s", cache_path.c_str());
 	ls >> token;
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
-	ls >> token;
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
+        ls >> token;
 #ifdef GITVERSION
-	if (token.compare(gitversion)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(gitversion))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #else
-	if (token.compare(quda_version)) errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(quda_version))
+          errorQuda("Cache file %s does not match current QUDA version. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 #endif
 	ls >> token;
-	if (token.compare(quda_hash)) errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the QUDA_RESOURCE_PATH environment variable to point to a new path.", cache_path.c_str());
+        if (version_check && token.compare(quda_hash))
+          errorQuda("Cache file %s does not match current QUDA build. \nPlease delete this file or set the "
+                    "QUDA_RESOURCE_PATH environment variable to point to a new path.",
+                    cache_path.c_str());
 
+        if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+        getline(cache_file, line); // eat the blank line
 
-	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
-	getline(cache_file, line); // eat the blank line
-
-	if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
+        if (!cache_file.good()) errorQuda("Bad format in %s", cache_path.c_str());
 	getline(cache_file, line); // eat the description line
 
 	deserializeTuneCache(cache_file);
@@ -385,7 +423,7 @@ namespace quda {
   /**
    * Write tunecache to disk.
    */
-  void saveTuneCache()
+  void saveTuneCache(bool error)
   {
     time_t now;
     int lock_handle;
@@ -402,7 +440,7 @@ namespace quda {
     if (comm_rank() == 0) {
 #endif
 
-      if (tunecache.size() == initial_cache_size) return;
+      if (tunecache.size() == initial_cache_size && !error) return;
 
       // Acquire lock.  Note that this is only robust if the filesystem supports flock() semantics, which is true for
       // NFS on recent versions of linux but not Lustre by default (unless the filesystem was mounted with "-o flock").
@@ -419,7 +457,7 @@ namespace quda {
       int stat = write(lock_handle, msg, sizeof(msg)); // check status to avoid compiler warning
       if (stat == -1) warningQuda("Unable to write to lock file for some bizarre reason");
 
-      cache_path = resource_path + "/tunecache.tsv";
+      cache_path = resource_path + (error ? "/tunecache_error.tsv" : "/tunecache.tsv");
       cache_file.open(cache_path.c_str());
 
       if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -445,6 +483,10 @@ namespace quda {
       initial_cache_size = tunecache.size();
 
 #ifdef MULTI_GPU
+    } else {
+      // give process 0 time to write out its tunecache if needed, but
+      // doesn't cause a hang if error is not triggered on process 0
+      if (error) sleep(10);
     }
 #endif
   }
@@ -525,8 +567,8 @@ namespace quda {
 	int n_policy = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
 	  // if a policy entry, then we can ignore
-	  char tmp[7] = { };
-	  strncpy(tmp, entry->first.aux, 6);
+	  char tmp[TuneKey::aux_n] = { };
+	  strncpy(tmp, entry->first.aux, TuneKey::aux_n);
 	  TuneParam param = entry->second;
 	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
 	  if (param.n_calls > 0 && !is_policy) n_entry++;
@@ -594,18 +636,12 @@ namespace quda {
 
   static TimeProfile launchTimer("tuneLaunch");
 
-//  static int tally = 0;
-
   /**
    * Return the optimal launch parameters for a given kernel, either
    * by retrieving them from tunecache or autotuning on the spot.
    */
   TuneParam& tuneLaunch(Tunable &tunable, QudaTune enabled, QudaVerbosity verbosity)
   {
-#ifdef PTHREADS // tuning should be performed serially
-//  pthread_mutex_lock(&pthread_mutex);
-//  tally++;
-#endif
 
 #ifdef LAUNCH_TIMER
     launchTimer.TPSTART(QUDA_PROFILE_TOTAL);
@@ -622,11 +658,9 @@ namespace quda {
 #endif
 
     static const Tunable *active_tunable; // for error checking
+    it = tunecache.find(key);
 
     // first check if we have the tuned value and return if we have it
-    //if (enabled == QUDA_TUNE_YES && tunecache.count(key)) {
-
-    it = tunecache.find(key);
     if (enabled == QUDA_TUNE_YES && it != tunecache.end()) {
 
 #ifdef LAUNCH_TIMER
@@ -636,6 +670,11 @@ namespace quda {
 
       TuneParam &param = it->second;
 
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Launching %s with %s at vol=%s with %s\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
+      }
+
 #ifdef LAUNCH_TIMER
       launchTimer.TPSTOP(QUDA_PROFILE_COMPUTE);
       launchTimer.TPSTART(QUDA_PROFILE_EPILOGUE);
@@ -643,11 +682,6 @@ namespace quda {
 
       tunable.checkLaunchParam(param);
 
-#ifdef PTHREADS
-      //pthread_mutex_unlock(&pthread_mutex);
-      //tally--;
-      //printfQuda("pthread_mutex_unlock a complete %d\n",tally);
-#endif
       // we could be tuning outside of the current scope
       if (!tuning && profile_count) param.n_calls++;
 
@@ -656,7 +690,7 @@ namespace quda {
       launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
-      if (traceEnabled()) {
+      if (traceEnabled() >= 2) {
         TraceKey trace_entry(key, param.time);
         trace_list.push_back(trace_entry);
       }
@@ -669,10 +703,13 @@ namespace quda {
     launchTimer.TPSTOP(QUDA_PROFILE_TOTAL);
 #endif
 
-
     if (enabled == QUDA_TUNE_NO) {
       tunable.defaultTuneParam(param);
       tunable.checkLaunchParam(param);
+      if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        printfQuda("Launching %s with %s at vol=%s with %s (untuned)\n",
+                   key.name, key.aux, key.volume, tunable.paramString(param).c_str());
+      }
     } else if (!tuning) {
 
       /* As long as global reductions are not disabled, only do the
@@ -699,13 +736,15 @@ namespace quda {
 	  printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
 	}
 
-	tunable.initTuneParam(param);
+        Timer tune_timer;
+        tune_timer.Start(__func__, __FILE__, __LINE__);
+
+        tunable.initTuneParam(param);
 	while (tuning) {
 	  cudaDeviceSynchronize();
 	  cudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
-	  if (policyTuning()) tunable.apply(0);  // do a pre call if doing policy tuning
-
+	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
@@ -731,21 +770,33 @@ namespace quda {
 	  }
 
 	  elapsed_time /= (1e3 * tunable.tuningIter());
-	  if ((elapsed_time < best_time) && (error == cudaSuccess)) {
+	  if ( (elapsed_time < best_time) && (error == cudaSuccess) && (tunable.jitifyError() == CUDA_SUCCESS) ) {
 	    best_time = elapsed_time;
 	    best_param = param;
 	  }
 	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == cudaSuccess)
+	    if (error == cudaSuccess && tunable.jitifyError() == CUDA_SUCCESS) {
 	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
-	    else
-	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
+            } else {
+	      if (tunable.jitifyError() == CUDA_SUCCESS) {
+                // if not jitify error must be regular error
+		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
+	      } else {
+                // else is a jitify error
+		const char *str;
+		cuGetErrorString(tunable.jitifyError(), &str);
+		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
+	      }
+            }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
+	  tunable.jitifyError() = CUDA_SUCCESS;
 	}
 
-	if (best_time == FLT_MAX) {
+        tune_timer.Stop(__func__, __FILE__, __LINE__);
+
+        if (best_time == FLT_MAX) {
 	  errorQuda("Auto-tuning failed for %s with %s at vol=%s", key.name, key.aux, key.volume);
 	}
 	if (verbosity >= QUDA_VERBOSE) {
@@ -753,7 +804,8 @@ namespace quda {
 		     tunable.perfString(best_time).c_str(), key.name, key.aux);
 	}
 	time(&now);
-	best_param.comment = "# " + tunable.perfString(best_time) + ", tuned ";
+	best_param.comment = "# " + tunable.perfString(best_time);
+        best_param.comment += ", tuning took " + std::to_string(tune_timer.Last()) + " seconds at ";
 	best_param.comment += ctime(&now); // includes a newline
 	best_param.time = best_time;
 
@@ -774,7 +826,7 @@ namespace quda {
       }
       param = tunecache[key]; // read this now for all processes
 
-      if (traceEnabled()) {
+      if (traceEnabled() >= 2) {
         TraceKey trace_entry(key, param.time);
         trace_list.push_back(trace_entry);
       }
@@ -782,12 +834,6 @@ namespace quda {
     } else if (&tunable != active_tunable) {
       errorQuda("Unexpected call to tuneLaunch() in %s::apply()", typeid(tunable).name());
     }
-
-#ifdef PTHREADS
-//    pthread_mutex_unlock(&pthread_mutex);
-//    tally--;
-//    printfQuda("pthread_mutex_unlock b complete %d\n",tally);
-#endif
 
     param.n_calls = profile_count ? 1 : 0;
 

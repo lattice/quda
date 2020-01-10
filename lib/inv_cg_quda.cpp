@@ -15,108 +15,212 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
+#include <eigensolve_quda.h>
 
 namespace quda {
 
   CG::CG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), init(false) {
+    Solver(param, profile), mat(mat), matSloppy(matSloppy), yp(nullptr), rp(nullptr),
+    rnewp(nullptr), pp(nullptr), App(nullptr), tmpp(nullptr), tmp2p(nullptr), tmp3p(nullptr),
+    rSloppyp(nullptr), xSloppyp(nullptr), init(false)
+  {
   }
 
-  CG::~CG() {
+  CG::~CG()
+  {
+    profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
-      for (auto pi : p) delete pi;
-      delete rp;
-      delete yp;
-      delete App;
-      delete tmpp;
+      for (auto pi : p) if (pi) delete pi;
+      if (rp) delete rp;
+      if (pp) delete pp;
+      if (yp) delete yp;
+      if (App) delete App;
+      if (param.precision != param.precision_sloppy) {
+        if (rSloppyp) delete rSloppyp;
+        if (xSloppyp) delete xSloppyp;
+      }
+      if (tmpp) delete tmpp;
+      if (!mat.isStaggered()) {
+        if (tmp2p && tmpp != tmp2p) delete tmp2p;
+        if (tmp3p && tmpp != tmp3p && param.precision != param.precision_sloppy) delete tmp3p;
+      }
+      if (rnewp) delete rnewp;
       init = false;
+
+      if (deflate_init) {
+        for (auto veci : param.evecs)
+          if (veci) delete veci;
+        delete defl_tmp1[0];
+        delete defl_tmp2[0];
+      }
     }
+    profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(mat.Expose()), init(false) {
+    CG(mmdag, mmdagSloppy, param, profile), mmdag(mat.Expose()), mmdagSloppy(matSloppy.Expose()),
+    xp(nullptr), yp(nullptr), init(false) {
   }
 
   CGNE::~CGNE() {
     if ( init ) {
-      delete xp;
+      if (xp) delete xp;
+      if (yp) delete yp;
       init = false;
     }
   }
 
   // CGNE: M Mdag y = b is solved; x = Mdag y is returned as solution.
   void CGNE::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    if (param.maxiter == 0 || param.Nsteps == 0) {
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
+
+    const int iter0 = param.iter;
 
     if (!init) {
       ColorSpinorParam csParam(x);
-      csParam.create = QUDA_COPY_FIELD_CREATE;
+      csParam.create = QUDA_NULL_FIELD_CREATE;
       xp = ColorSpinorField::Create(x, csParam);
-
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      yp = ColorSpinorField::Create(x, csParam);
       init = true;
-
-    } else if(param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
-      warningQuda("Initial guess may not work as expected with CGNE\n");
-      *xp = x;
     }
 
-    CG::operator()(*xp,b);
+    double b2 = blas::norm2(b);
 
-    mmdag.Expose()->Mdag(x,*xp);
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+
+      // compute initial residual
+      mmdag.Expose()->M(*xp,x);
+      double r2 = blas::xmyNorm(b,*xp);
+      if (b2 == 0.0) b2 = r2;
+
+      // compute solution to residual equation
+      CG::operator()(*yp,*xp);
+
+      mmdag.Expose()->Mdag(*xp,*yp);
+
+      // compute full solution
+      blas::xpy(*xp, x);
+
+    } else {
+
+      CG::operator()(*yp,b);
+      mmdag.Expose()->Mdag(x,*yp);
+
+    }
+
+    // future optimization: with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is already
+    // expected to be the CG residual which matches the CGNE residual
+    // (but only with zero initial guess).  at the moment, CG does not respect this convention
+    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+
+      // compute the true residual
+      mmdag.Expose()->M(*xp, x);
+
+      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *xp;
+      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *xp : b;
+      blas::axpby(-1.0, A, 1.0, B);
+
+      double r2;
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
+        r2 = h3.y;
+        param.true_res_hq = sqrt(h3.z);
+      } else {
+        r2 = blas::norm2(B);
+      }
+      param.true_res = sqrt(r2 / b2);
+
+      PrintSummary("CGNE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+    }
+
   }
 
   CGNR::CGNR(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(mat.Expose()), init(false) {
+    CG(mdagm, mdagmSloppy, param, profile), mdagm(mat.Expose()), mdagmSloppy(matSloppy.Expose()),
+    bp(nullptr), init(false) {
   }
 
   CGNR::~CGNR() {
     if ( init ) {
-      delete bp;
+      if (bp) delete bp;
       init = false;
     }
   }
 
   // CGNR: Mdag M x = Mdag b is solved.
   void CGNR::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+    if (param.maxiter == 0 || param.Nsteps == 0) {
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
+
     const int iter0 = param.iter;
 
     if (!init) {
       ColorSpinorParam csParam(b);
       csParam.create = QUDA_ZERO_FIELD_CREATE;
       bp = ColorSpinorField::Create(csParam);
-
       init = true;
+    }
 
+    double b2 = blas::norm2(b);
+    if (b2 == 0.0) { // compute initial residual vector
+      mdagm.Expose()->M(*bp,x);
+      b2 = blas::norm2(*bp);
     }
 
     mdagm.Expose()->Mdag(*bp,b);
     CG::operator()(x,*bp);
 
-    if (param.compute_true_res) {
-      // compute the true residuals
-      const double b2 = blas::norm2(b);
-      mdagm.Expose()->M(*bp, x);
-      const double r2 = blas::xmyNorm(b, *bp) / b2;
-      param.true_res = sqrt(r2);
-      param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, *bp).z);
+    if ( param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO ) {
 
-      PrintSummary("CGNR", param.iter - iter0, r2, b2);
+      // compute the true residual
+      mdagm.Expose()->M(*bp, x);
+
+      ColorSpinorField &A = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? b : *bp;
+      ColorSpinorField &B = param.preserve_source == QUDA_PRESERVE_SOURCE_YES ? *bp : b;
+      blas::axpby(-1.0, A, 1.0, B);
+
+      double r2;
+      if (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) {
+        double3 h3 = blas::HeavyQuarkResidualNorm(x, B);
+        r2 = h3.y;
+        param.true_res_hq = sqrt(h3.z);
+      } else {
+        r2 = blas::norm2(B);
+      }
+      param.true_res = sqrt(r2 / b2);
+      PrintSummary("CGNR", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
+
+    } else if (param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
+      mdagm.Expose()->M(*bp, x);
+      blas::axpby(-1.0, *bp, 1.0, b);
     }
+
   }
 
-  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
+  {
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
+    if (checkPrecision(x, b) != param.precision)
+      errorQuda("Precision mismatch: expected=%d, received=%d", param.precision, x.Precision());
+
+    if (param.maxiter == 0 || param.Nsteps == 0) {
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
+      return;
+    }
 
     const int Np = (param.solution_accumulator_pipeline == 0 ? 1 : param.solution_accumulator_pipeline);
     if (Np < 0 || Np > 16) errorQuda("Invalid value %d for solution_accumulator_pipeline\n", Np);
 
-#ifdef ALTRELIABLE
-    // hack to select alternative reliable updates
-    constexpr bool alternative_reliable = true;
-    warningQuda("Using alternative reliable updates. This feature is mostly ok but needs a little more testing in the real world.\n");
-#else
-    constexpr bool alternative_reliable = false;
-#endif
+    // whether to select alternative reliable updates
+    bool alternative_reliable = param.use_alternative_reliable;
+
     profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -132,54 +236,81 @@ namespace quda {
       return;
     }
 
-    ColorSpinorParam csParam(x);
     if (!init) {
+      ColorSpinorParam csParam(x);
       csParam.create = QUDA_NULL_FIELD_CREATE;
-      rp = ColorSpinorField::Create(b, csParam);
-      csParam.create = QUDA_ZERO_FIELD_CREATE;
-      yp = ColorSpinorField::Create(b, csParam);
+      rp = ColorSpinorField::Create(csParam);
+      yp = ColorSpinorField::Create(csParam);
+
       // sloppy fields
       csParam.setPrecision(param.precision_sloppy);
       App = ColorSpinorField::Create(csParam);
+      if(param.precision != param.precision_sloppy) {
+	rSloppyp = ColorSpinorField::Create(csParam);
+	xSloppyp = ColorSpinorField::Create(csParam);
+      } else {
+	rSloppyp = rp;
+	param.use_sloppy_partial_accumulator = false;
+      }
+
+      // temporary fields
       tmpp = ColorSpinorField::Create(csParam);
+      if(!mat.isStaggered()) {
+	// tmp2 only needed for multi-gpu Wilson-like kernels
+	tmp2p = ColorSpinorField::Create(csParam);
+	// additional high-precision temporary if Wilson and mixed-precision
+	csParam.setPrecision(param.precision);
+	tmp3p = (param.precision != param.precision_sloppy) ?
+	  ColorSpinorField::Create(csParam) : tmpp;
+      } else {
+	tmp3p = tmp2p = tmpp;
+      }
 
       init = true;
-
     }
+
+    // Once the CG operator is called, we are able to construct an appropriate
+    // Krylov space for deflation
+    if (param.deflate && !deflate_init) { constructDeflationSpace(b, mat, false); }
+
     ColorSpinorField &r = *rp;
     ColorSpinorField &y = *yp;
     ColorSpinorField &Ap = *App;
     ColorSpinorField &tmp = *tmpp;
+    ColorSpinorField &tmp2 = *tmp2p;
+    ColorSpinorField &tmp3 = *tmp3p;
+    ColorSpinorField &rSloppy = *rSloppyp;
+    ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
-    csParam.setPrecision(param.precision_sloppy);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    {
+      ColorSpinorParam csParam(r);
+      csParam.create = QUDA_NULL_FIELD_CREATE;
+      csParam.setPrecision(param.precision_sloppy);
 
-    // tmp2 only needed for multi-gpu Wilson-like kernels
-    ColorSpinorField *tmp2_p = !mat.isStaggered() ? ColorSpinorField::Create(x, csParam) : &tmp;
-    ColorSpinorField &tmp2 = *tmp2_p;
-
-    // additional high-precision temporary if Wilson and mixed-precision
-    csParam.setPrecision(param.precision);
-    ColorSpinorField *tmp3_p = (x.Precision() != param.precision_sloppy && !mat.isStaggered()) ?
-      ColorSpinorField::Create(x, csParam) : &tmp;
-    ColorSpinorField &tmp3 = *tmp3_p;
+      if (Np != (int)p.size()) {
+	for (auto &pi : p) delete pi;
+	p.resize(Np);
+	for (auto &pi : p) pi = ColorSpinorField::Create(csParam);
+      }
+    }
 
     // alternative reliable updates
     // alternative reliable updates - set precision - does not hurt performance here
 
-    const double u= param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
+    const double u = param.precision_sloppy == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision_sloppy == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double uhigh= param.precision == 8 ? std::numeric_limits<double>::epsilon()/2. : ((param.precision == 4) ? std::numeric_limits<float>::epsilon()/2. : pow(2.,-13));
     const double deps=sqrt(u);
     constexpr double dfac = 1.1;
-    double d_new =0 ;
-    double d =0 ;
-    double dinit =0;
+    double d_new = 0;
+    double d = 0;
+    double dinit = 0;
     double xNorm = 0;
     double xnorm = 0;
     double pnorm = 0;
     double ppnorm = 0;
     double Anorm = 0;
-    
+    double beta = 0.0;
+
     // for alternative reliable updates
     if(alternative_reliable){
       // estimate norm for reliable updates
@@ -187,51 +318,66 @@ namespace quda {
       Anorm = sqrt(blas::norm2(r)/b2);
     }
 
-
     // compute initial residual
-    mat(r, x, y, tmp3);
-    double r2 = blas::xmyNorm(b, r);
-    if (b2 == 0) {
-      b2 = r2;
-    }
-
-    csParam.setPrecision(param.precision_sloppy);
-    ColorSpinorField *r_sloppy;
-    if (param.precision_sloppy == x.Precision()) {
-      r_sloppy = &r;
+    double r2 = 0.0;
+    if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+      // Compute r = b - A * x
+      mat(r, x, y, tmp3);
+      r2 = blas::xmyNorm(b, r);
+      if (b2 == 0) b2 = r2;
+      // y contains the original guess.
+      blas::copy(y, x);
     } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      r_sloppy = ColorSpinorField::Create(r, csParam);
+      if (&r != &b) blas::copy(r, b);
+      r2 = b2;
+      blas::zero(y);
     }
 
-    ColorSpinorField *x_sloppy;
-    if (param.precision_sloppy == x.Precision() ||
-        !param.use_sloppy_partial_accumulator) {
-      x_sloppy = &x;
-    } else {
-      csParam.create = QUDA_COPY_FIELD_CREATE;
-      x_sloppy = ColorSpinorField::Create(x, csParam);
+    if (param.deflate == true) {
+      std::vector<ColorSpinorField *> rhs;
+      // Use residual from supplied guess r, or original
+      // rhs b. use `x` as a temp.
+      blas::copy(x, r);
+      rhs.push_back(&x);
+
+      // Deflate
+      eig_solve->deflate(defl_tmp1, rhs, param.evecs, param.evals);
+
+      // Compute r_defl = RHS - A * LHS
+      mat(r, *defl_tmp1[0], tmp2, tmp3);
+      r2 = blas::xmyNorm(*rhs[0], r);
+
+      if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
+        // defl_tmp1 and y must be added to the solution at the end
+        blas::axpy(1.0, *defl_tmp1[0], y);
+      } else {
+        // Just add defl_tmp1 to y, which has been zeroed out
+        blas::copy(y, *defl_tmp1[0]);
+      }
     }
 
-    ColorSpinorField &xSloppy = *x_sloppy;
-    ColorSpinorField &rSloppy = *r_sloppy;
-
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    csParam.setPrecision(param.precision_sloppy);
+    blas::zero(x);
+    if (&x != &xSloppy) blas::zero(xSloppy);
+    blas::copy(rSloppy,r);
 
     if (Np != (int)p.size()) {
       for (auto &pi : p) delete pi;
       p.resize(Np);
-      for (auto &pi : p) pi = ColorSpinorField::Create(rSloppy, csParam);
+      ColorSpinorParam csParam(rSloppy);
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      for (auto &pi : p)
+        pi = p_init ? ColorSpinorField::Create(*p_init, csParam) : ColorSpinorField::Create(rSloppy, csParam);
     } else {
-      for (auto &pi : p) *pi = rSloppy;
+      for (auto &p_i : p) *p_i = p_init ? *p_init : rSloppy;
     }
 
-    if (&x != &xSloppy) {
-      blas::copy(y, x);
-      blas::zero(xSloppy);
-    } else {
-      blas::zero(y);
+    double r2_old=0.0;
+    if (r2_old_init != 0.0 and p_init) {
+      r2_old = r2_old_init;
+      Complex rp = blas::cDotProduct(rSloppy, *p[0]) / (r2);
+      blas::caxpy(-rp, rSloppy, *p[0]);
+      beta = r2 / r2_old;
+      blas::xpayz(rSloppy, beta, *p[0], *p[0]);
     }
 
     const bool use_heavy_quark_res =
@@ -240,8 +386,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_INIT);
     profile.TPSTART(QUDA_PROFILE_PREAMBLE);
-
-    double r2_old;
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -255,7 +399,6 @@ namespace quda {
     const int heavy_quark_check = param.heavy_quark_check; // how often to check the heavy quark residual
 
     double alpha[Np];
-    double beta = 0.0;
     double pAp;
     int rUpdate = 0;
 
@@ -265,23 +408,26 @@ namespace quda {
     double maxrr = rNorm;
     double delta = param.delta;
 
-
     // this parameter determines how many consective reliable update
     // residual increases we tolerate before terminating the solver,
     // i.e., how long do we want to keep trying to converge
-    const int maxResIncrease = (use_heavy_quark_res ? 0 : param.max_res_increase); //  check if we reached the limit of our tolerance
+    const int maxResIncrease = param.max_res_increase; //  check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
-    // 0 means we have no tolerance
-    // maybe we should expose this as a parameter
-    const int hqmaxresIncrease = maxResIncrease + 1;
+
+    // this means when using heavy quarks we will switch to simple hq restarts as soon as the reliable strategy fails
+    const int hqmaxresIncrease = param.max_hq_res_increase;
+    const int hqmaxresRestartTotal
+      = param.max_hq_res_restart_total; // this limits the number of heavy quark restarts we can do
 
     int resIncrease = 0;
     int resIncreaseTotal = 0;
     int hqresIncrease = 0;
+    int hqresRestartTotal = 0;
 
     // set this to true if maxResIncrease has been exceeded but when we use heavy quark residual we still want to continue the CG
     // only used if we use the heavy_quark_res
     bool L2breakdown = false;
+    const double L2breakdown_eps = 100. * uhigh;
 
     profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -331,12 +477,11 @@ namespace quda {
         r2_old = r2;
 
         // alternative reliable updates,
-        if(alternative_reliable){
+        if (alternative_reliable) {
           double3 pAppp = blas::cDotProductNormA(*p[j],Ap);
           pAp = pAppp.x;
           ppnorm = pAppp.z;
-        }
-        else{
+        } else {
           pAp = blas::reDotProduct(*p[j], Ap);
         }
 
@@ -353,19 +498,15 @@ namespace quda {
       int updateX;
       int updateR;
 
-      if(alternative_reliable){
+      if (alternative_reliable) {
         // alternative reliable updates
         updateX = ( (d <= deps*sqrt(r2_old)) or (dfac * dinit > deps * r0Norm) ) and (d_new > deps*rNorm) and (d_new > dfac * dinit);
         updateR = 0;
-        // if(updateX)
-          // printfQuda("new reliable update conditions (%i) d_n-1 < eps r2_old %e %e;\t dn > eps r_n %e %e;\t (dnew > 1.1 dinit %e %e)\n",
-        // updateX,d,deps*sqrt(r2_old),d_new,deps*rNorm,d_new,dinit);
-      }
-      else{
+      } else {
         if (rNorm > maxrx) maxrx = rNorm;
         if (rNorm > maxrr) maxrr = rNorm;
-        updateX = (rNorm < delta*r0Norm && r0Norm <= maxrx) ? 1 : 0;
-        updateR = ((rNorm < delta*maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
+        updateX = (rNorm < delta * r0Norm && r0Norm <= maxrx) ? 1 : 0;
+        updateR = ((rNorm < delta * maxrr && r0Norm <= maxrr) || updateX) ? 1 : 0;
       }
 
       // force a reliable update if we are within target tolerance (only if doing reliable updates)
@@ -418,13 +559,13 @@ namespace quda {
 	}
 
 	// alternative reliable updates
-	if(alternative_reliable){
+	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);
 	  xnorm = sqrt(pnorm);
 	  d_new = d + u*rNorm + uhigh*Anorm * xnorm;
-	  if(steps_since_reliable==0)
-	    printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
+	  if (steps_since_reliable==0 && getVerbosity() >= QUDA_DEBUG_VERBOSE)
+            printfQuda("New dnew: %e (r %e , y %e)\n",d_new,u*rNorm,uhigh*Anorm * sqrt(blas::norm2(y)) );
 	}
 	steps_since_reliable++;
 
@@ -451,54 +592,72 @@ namespace quda {
         blas::zero(xSloppy);
 
         // alternative reliable updates
-        if(alternative_reliable){
+        if (alternative_reliable) {
           dinit = uhigh*(sqrt(r2) + Anorm * sqrt(blas::norm2(y)));
           d = d_new;
           xnorm = 0;//sqrt(norm2(x));
           pnorm = 0;//pnorm + alpha * sqrt(norm2(p));
-          printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
+          if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("New dinit: %e (r %e , y %e)\n",dinit,uhigh*sqrt(r2),uhigh*Anorm*sqrt(blas::norm2(y)));
           d_new = dinit;
-        }
-        else{
+        } else {
           rNorm = sqrt(r2);
           maxrr = rNorm;
           maxrx = rNorm;
         }
 
-
         // calculate new reliable HQ resididual
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(y, r).z);
 
         // break-out check if we have reached the limit of the precision
-        if (sqrt(r2) > r0Norm && updateX) { // reuse r0Norm for this
+        if (sqrt(r2) > r0Norm && updateX and not L2breakdown) { // reuse r0Norm for this
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-          sqrt(r2), r0Norm, resIncreaseTotal);
-          if ( resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
+          warningQuda(
+            "CG: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), r0Norm, resIncreaseTotal);
+
+          if ((use_heavy_quark_res and sqrt(r2) < L2breakdown_eps) or resIncrease > maxResIncrease
+              or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
+              warningQuda("CG: L2 breakdown %e, %e", sqrt(r2), L2breakdown_eps);
             } else {
-              warningQuda("CG: solver exiting due to too many true residual norm increases");
-              break;
+              if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal or r2 < stop) {
+                warningQuda("CG: solver exiting due to too many true residual norm increases");
+                break;
+              }
             }
           }
         } else {
           resIncrease = 0;
         }
+
         // if L2 broke down already we turn off reliable updates and restart the CG
         if (use_heavy_quark_res and L2breakdown) {
+          hqresRestartTotal++; // count the number of heavy quark restarts we've done
           delta = 0;
-          warningQuda("CG: Restarting without reliable updates for heavy-quark residual");
+          warningQuda("CG: Restarting without reliable updates for heavy-quark residual (total #inc %i)",
+                      hqresRestartTotal);
           heavy_quark_restart = true;
-          if (heavy_quark_res > heavy_quark_res_old) {
-            hqresIncrease++;
-            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e", heavy_quark_res, heavy_quark_res_old);
+
+          if (heavy_quark_res > heavy_quark_res_old) { // check if new hq residual is greater than previous
+            hqresIncrease++;                           // count the number of consecutive increases
+            warningQuda("CG: new reliable HQ residual norm %e is greater than previous reliable residual norm %e",
+                        heavy_quark_res, heavy_quark_res_old);
             // break out if we do not improve here anymore
             if (hqresIncrease > hqmaxresIncrease) {
-              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases");
+              warningQuda("CG: solver exiting due to too many heavy quark residual norm increases (%i/%i)",
+                          hqresIncrease, hqmaxresIncrease);
               break;
             }
+          } else {
+            hqresIncrease = 0;
+          }
+
+          if (hqresRestartTotal > hqmaxresRestartTotal) {
+            warningQuda("CG: solver exiting due to too many heavy quark residual restarts (%i/%i)", hqresRestartTotal,
+                        hqmaxresRestartTotal);
+            break;
           }
         }
 
@@ -531,7 +690,7 @@ namespace quda {
 
       // check for recent enough reliable updates of the HQ residual if we use it
       if (use_heavy_quark_res) {
-        // L2 is concverged or precision maxed out for L2
+        // L2 is converged or precision maxed out for L2
         bool L2done = L2breakdown or convergenceL2(r2, heavy_quark_res, stop, param.tol_hq);
         // HQ is converged and if we do reliable update the HQ residual has been calculated using a reliable update
         bool HQdone = (steps_since_reliable == 0 and param.delta > 0) and convergenceHQ(r2, heavy_quark_res, stop, param.tol_hq);
@@ -577,7 +736,7 @@ namespace quda {
       param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
     }
 
-    PrintSummary("CG", k, r2, b2);
+    PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
     // reset the flops counters
     blas::flops = 0;
@@ -585,24 +744,14 @@ namespace quda {
     matSloppy.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-    profile.TPSTART(QUDA_PROFILE_FREE);
-
-    if (&tmp3 != &tmp) delete tmp3_p;
-    if (&tmp2 != &tmp) delete tmp2_p;
-
-    if (&rSloppy != &r) delete r_sloppy;
-    if (&xSloppy != &x) delete x_sloppy;
-
-    profile.TPSTOP(QUDA_PROFILE_FREE);
 
     return;
   }
 
-
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
 #define BCGRQ 1
 #if BCGRQ
-void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
+void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   #ifndef BLOCKSOLVER
   errorQuda("QUDA_BLOCKSOLVER not built.");
   #else
@@ -635,86 +784,76 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorParam csParam(x);
   if (!init) {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    rp = ColorSpinorField::Create(b, csParam);
+    csParam.setPrecision(param.precision);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    yp = ColorSpinorField::Create(b, csParam);
+    rp = ColorSpinorField::Create(csParam);
+    yp = ColorSpinorField::Create(csParam);
+
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
+    pp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
+    if(param.precision != param.precision_sloppy) {
+      rSloppyp = ColorSpinorField::Create(csParam);
+      xSloppyp = ColorSpinorField::Create(csParam);
+    } else {
+      rSloppyp = rp;
+      param.use_sloppy_partial_accumulator = false;
+    }
 
+    // temporary fields
+    tmpp = ColorSpinorField::Create(csParam);
+    if(!mat.isStaggered()) {
+      // tmp2 only needed for multi-gpu Wilson-like kernels
+      tmp2p = ColorSpinorField::Create(csParam);
+      // additional high-precision temporary if Wilson and mixed-precision
+      csParam.setPrecision(param.precision);
+      tmp3p = (param.precision != param.precision_sloppy) ?
+	ColorSpinorField::Create(csParam) : tmpp;
+    } else {
+      tmp3p = tmp2p = tmpp;
+    }
+
+    init = true;
   }
+
+  if(!rnewp) {
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(param.precision_sloppy);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+  }
+
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
+  ColorSpinorField &p = *pp;
   ColorSpinorField &Ap = *App;
+  ColorSpinorField &rnew = *rnewp;
   ColorSpinorField &tmp = *tmpp;
+  ColorSpinorField &tmp2 = *tmp2p;
+  ColorSpinorField &tmp3 = *tmp3p;
+  ColorSpinorField &rSloppy = *rSloppyp;
+  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
   // calculate residuals for all vectors
-  for(int i=0; i<param.num_src; i++){
-    mat(r.Component(i), x.Component(i), y.Component(i));
-    blas::xmyNorm(b.Component(i), r.Component(i));
-  }
-
-  // initialize r2 matrix
+  // and initialize r2 matrix
   double r2avg=0;
   MatrixXcd r2(param.num_src, param.num_src);
   for(int i=0; i<param.num_src; i++){
-    for(int j=i; j < param.num_src; j++){
+    mat(r.Component(i), x.Component(i), y.Component(i));
+    r2(i,i) = blas::xmyNorm(b.Component(i), r.Component(i));
+    r2avg += r2(i,i).real();
+    printfQuda("r2[%i] %e\n", i, r2(i,i).real());
+  }
+  for(int i=0; i<param.num_src; i++){
+    for(int j=i+1; j < param.num_src; j++){
       r2(i,j) = blas::cDotProduct(r.Component(i),r.Component(j));
-      if (i!=j) r2(j,i) = std::conj(r2(i,j));
-      if (i==j) {
-        r2avg += r2(i,i).real();
-        printfQuda("r2[%i] %e\n", i, r2(i,i).real());
-      }
+      r2(j,i) = std::conj(r2(i,j));
     }
   }
 
-
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  ColorSpinorField *r_sloppy;
-  if (param.precision_sloppy == x.Precision()) {
-    r_sloppy = &r;
-  } else {
-    // will that work ?
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
-  }
-
-
-  ColorSpinorField *x_sloppy;
-  if (param.precision_sloppy == x.Precision() || !param.use_sloppy_partial_accumulator) {
-    x_sloppy = &x;
-  } else {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(x, csParam);
-  }
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-  ColorSpinorField *tmp3_p =
-  (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp3 = *tmp3_p;
-
-  ColorSpinorField &xSloppy = *x_sloppy;
-  ColorSpinorField &rSloppy = *r_sloppy;
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  csParam.setPrecision(param.precision_sloppy);
-  ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &p = *pp;
-  ColorSpinorField* rpnew = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &rnew = *rpnew;
+  blas::copy(rSloppy, r);
+  blas::copy(p, rSloppy);
+  blas::copy(rnew, rSloppy);
 
   if (&x != &xSloppy) {
     blas::copy(y, x);
@@ -964,7 +1103,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i]);
+    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
   // reset the flops counters
@@ -975,14 +1114,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
 
-  if (&tmp3 != &tmp) delete tmp3_p;
-  if (&tmp2 != &tmp) delete tmp2_p;
-
-  if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-  if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
-
-  delete rpnew;
-  delete pp;
   delete[] AC;
   profile.TPSTOP(QUDA_PROFILE_FREE);
 
@@ -1046,22 +1177,55 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   ColorSpinorParam csParam(x);
   if (!init) {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    rp = ColorSpinorField::Create(b, csParam);
+    csParam.setPrecision(param.precision);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    yp = ColorSpinorField::Create(b, csParam);
+    rp = ColorSpinorField::Create(csParam);
+    yp = ColorSpinorField::Create(csParam);
+
     // sloppy fields
     csParam.setPrecision(param.precision_sloppy);
+    pp = ColorSpinorField::Create(csParam);
     App = ColorSpinorField::Create(csParam);
-    tmpp = ColorSpinorField::Create(csParam);
-    init = true;
+    if(param.precision != param.precision_sloppy) {
+      rSloppyp = ColorSpinorField::Create(csParam);
+      xSloppyp = ColorSpinorField::Create(csParam);
+    } else {
+      rSloppyp = rp;
+      param.use_sloppy_partial_accumulator = false;
+    }
 
+    // temporary fields
+    tmpp = ColorSpinorField::Create(csParam);
+    if(!mat.isStaggered()) {
+      // tmp2 only needed for multi-gpu Wilson-like kernels
+      tmp2p = ColorSpinorField::Create(csParam);
+      // additional high-precision temporary if Wilson and mixed-precision
+      csParam.setPrecision(param.precision);
+      tmp3p = (param.precision != param.precision_sloppy) ?
+	ColorSpinorField::Create(csParam) : tmpp;
+    } else {
+      tmp3p = tmp2p = tmpp;
+    }
+
+    init = true;
   }
+
+  if(!rnewp) {
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    csParam.setPrecision(param.precision_sloppy);
+    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+  }
+
   ColorSpinorField &r = *rp;
   ColorSpinorField &y = *yp;
+  ColorSpinorField &p = *pp;
+  ColorSpinorField &pnew = *rnewp;
   ColorSpinorField &Ap = *App;
   ColorSpinorField &tmp = *tmpp;
-
+  ColorSpinorField &tmp2 = *tmp2p;
+  ColorSpinorField &tmp3 = *tmp3p;
+  ColorSpinorField &rSloppy = *rSloppyp;
+  ColorSpinorField &xSloppy = param.use_sloppy_partial_accumulator ? *xSloppyp : x;
 
   //  const int i = 0;  // MW: hack to be able to write Component(i) instead and try with i=0 for now
 
@@ -1085,50 +1249,9 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     }
   }
 
-  csParam.setPrecision(param.precision_sloppy);
-  // tmp2 only needed for multi-gpu Wilson-like kernels
-  ColorSpinorField *tmp2_p = !mat.isStaggered() ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp2 = *tmp2_p;
-
-  ColorSpinorField *r_sloppy;
-  if (param.precision_sloppy == x.Precision()) {
-    r_sloppy = &r;
-  } else {
-    // will that work ?
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-    r_sloppy = ColorSpinorField::Create(r, csParam);
-    for(int i=0; i<param.num_src; i++){
-      blas::copy(r_sloppy->Component(i), r.Component(i)); //nop when these pointers alias
-    }
-  }
-
-
-  ColorSpinorField *x_sloppy;
-  if (param.precision_sloppy == x.Precision() ||
-  !param.use_sloppy_partial_accumulator) {
-    x_sloppy = &x;
-  } else {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    x_sloppy = ColorSpinorField::Create(x, csParam);
-  }
-
-  // additional high-precision temporary if Wilson and mixed-precision
-  csParam.setPrecision(param.precision);
-  ColorSpinorField *tmp3_p =
-  (param.precision != param.precision_sloppy && !mat.isStaggered()) ?
-  ColorSpinorField::Create(x, csParam) : &tmp;
-  ColorSpinorField &tmp3 = *tmp3_p;
-
-  ColorSpinorField &xSloppy = *x_sloppy;
-  ColorSpinorField &rSloppy = *r_sloppy;
-
-  csParam.create = QUDA_COPY_FIELD_CREATE;
-  csParam.setPrecision(param.precision_sloppy);
-  ColorSpinorField* pp = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &p = *pp;
-  ColorSpinorField* ppnew = ColorSpinorField::Create(rSloppy, csParam);
-  ColorSpinorField &pnew = *ppnew;
+  blas::copy(rSloppy, r);
+  blas::copy(p, rSloppy);
+  blas::copy(pnew, rSloppy);
 
   if (&x != &xSloppy) {
     blas::copy(y, x);
@@ -1564,7 +1687,7 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
     param.true_res_offset[i] = param.true_res;
     param.true_res_hq_offset[i] = param.true_res_hq;
 
-    PrintSummary("CG", k, r2(i,i).real(), b2[i]);
+    PrintSummary("CG", k, r2(i,i).real(), b2[i], stop[i], 0.0);
   }
 
   // reset the flops counters
@@ -1574,14 +1697,6 @@ void CG::solve(ColorSpinorField& x, ColorSpinorField& b) {
 
   profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
   profile.TPSTART(QUDA_PROFILE_FREE);
-
-  if (&tmp3 != &tmp) delete tmp3_p;
-  if (&tmp2 != &tmp) delete tmp2_p;
-
-  if (rSloppy.Precision() != r.Precision()) delete r_sloppy;
-  if (xSloppy.Precision() != x.Precision()) delete x_sloppy;
-
-  delete pp;
 
   profile.TPSTOP(QUDA_PROFILE_FREE);
 

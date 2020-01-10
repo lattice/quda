@@ -54,6 +54,7 @@ extern QudaMatPCType matpc_type; // preconditioning type
 
 extern int niter; // max solver iterations
 extern char latfile[];
+extern bool unit_gauge;
 
 extern void usage(char** );
 
@@ -336,8 +337,14 @@ int main(int argc, char **argv)
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
@@ -432,11 +439,6 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  printfQuda("Device memory used:\n   Spinor: %f GiB\n    Gauge: %f GiB\n",
-	 inv_param.spinorGiB, gauge_param.gaugeGiB);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    printfQuda("   Clover: %f GiB\n", inv_param.cloverGiB);
-  }
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
 	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
 
@@ -543,9 +545,8 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
         dw_4d_matpc(spinorCheck[i], gauge, spinorOutMulti[i], kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-        double *kappa_b, *kappa_c;
-        kappa_b = (double*)malloc(Lsdim*sizeof(double));
-        kappa_c = (double*)malloc(Lsdim*sizeof(double));
+        double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+        double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         for(int xs = 0 ; xs < Lsdim ; xs++)
         {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));

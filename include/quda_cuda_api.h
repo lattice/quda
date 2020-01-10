@@ -1,5 +1,6 @@
 #pragma once
 
+#ifndef __CUDACC_RTC__
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <quda_cuda_api.h>
@@ -99,7 +100,7 @@ namespace quda {
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
-     @param[in,out] stream Stream which we are instructing to wait
+     @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
    */
@@ -116,13 +117,13 @@ namespace quda {
      @param[in] event Event which we are synchronizing with respect to
    */
   cudaError_t qudaEventSynchronize(cudaEvent_t &event);
-  
+
   /**
      @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
    */
-  cudaError_t qudaDeviceSynchronize();
+  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
-#if (CUDA_VERSION >= 9000)
+#if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around cudaFuncSetAttribute
      @param[in] func Function for which we are setting the attribute
@@ -138,3 +139,10 @@ namespace quda {
   void printAPIProfile();
 
 } // namespace quda
+
+#define STRINGIFY__(x) #x
+#define __STRINGIFY__(x) STRINGIFY__(x)
+#define qudaDeviceSynchronize() \
+  ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#endif

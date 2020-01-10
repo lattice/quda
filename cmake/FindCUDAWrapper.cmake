@@ -38,7 +38,7 @@ function(cuda_add_library)
   add_library(${ARGV})
   target_include_directories(${ARGV0} PUBLIC
                              ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(${ARGV0} ${CUDA_LIBRARIES})
+  target_link_libraries(${ARGV0} PUBLIC ${CUDA_LIBRARIES})
   set_target_properties(${ARGV0} PROPERTIES LINKER_LANGUAGE CUDA)
 endfunction()
 
@@ -50,7 +50,7 @@ function(cuda_add_executable)
   add_executable(${ARGV})
   target_include_directories(${ARGV0} PUBLIC
                              ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(${ARGV0} ${CUDA_LIBRARIES})
+  target_link_libraries(${ARGV0}  ${CUDA_LIBRARIES})
   set_target_properties(${ARGV0} PROPERTIES LINKER_LANGUAGE CUDA)
 endfunction()
 

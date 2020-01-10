@@ -1,9 +1,6 @@
 #include <blas_magma.h>
 #include <string.h>
 
-#include <vector>
-#include <algorithm>
-
 #include <util_quda.h>
 #include <quda_internal.h>
 

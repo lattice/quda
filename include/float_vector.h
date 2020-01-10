@@ -215,6 +215,7 @@ namespace quda {
     return fmax(fabs(b.x), fabs(b.y));
   };
 
+
   /*
     Precision conversion routines for vector types
   */
@@ -235,6 +236,14 @@ namespace quda {
     return make_double4(a.x, a.y, a.z, a.w);
   }
 
+  __forceinline__ __host__ __device__ short4 make_shortN(const char4 &a) {
+    return make_short4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ short2 make_shortN(const char2 &a) {
+    return make_short2(a.x, a.y);
+  }
+
   __forceinline__ __host__ __device__ short4 make_shortN(const float4 &a) {
     return make_short4(a.x, a.y, a.z, a.w);
   }
@@ -251,7 +260,29 @@ namespace quda {
     return make_short2(a.x, a.y);
   }
 
+  __forceinline__ __host__ __device__ char4 make_charN(const short4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
 
+  __forceinline__ __host__ __device__ char2 make_charN(const short2 &a) {
+    return make_char2(a.x, a.y);
+  }
+
+  __forceinline__ __host__ __device__ char4 make_charN(const float4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ char2 make_charN(const float2 &a) {
+    return make_char2(a.x, a.y);
+  }
+
+  __forceinline__ __host__ __device__ char4 make_charN(const double4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ char2 make_charN(const double2 &a) {
+    return make_char2(a.x, a.y);
+  }
   /* Helper functions for converting between float2/double2 and complex */
   template<typename Float2, typename Complex>
     inline Float2 make_Float2(const Complex &a) { return (Float2)0; }
@@ -290,5 +321,9 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<complex<short> > { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
+  template<> struct RealType<char> { typedef char type; };
+  template<> struct RealType<char2> { typedef char type; };
+  template<> struct RealType<complex<char> > { typedef char type; };
+  template<> struct RealType<char4> { typedef char type; };
 
 }

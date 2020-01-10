@@ -1,10 +1,13 @@
 #ifndef _LATTICE_FIELD_H
 #define _LATTICE_FIELD_H
 
+#include <map>
 #include <quda.h>
 #include <iostream>
 #include <comm_quda.h>
-#include <map>
+#include <util_quda.h>
+#include <object.h>
+#include <cuda_runtime.h>
 
 /**
  * @file lattice_field.h
@@ -43,6 +46,20 @@ namespace quda {
 
   struct LatticeFieldParam {
 
+  protected:
+    /** Field precision */
+    QudaPrecision precision;
+
+    /** Ghost precision */
+    QudaPrecision ghost_precision;
+
+  public:
+    /** Field precision */
+    QudaPrecision Precision() const { return precision; }
+
+    /** Ghost precision */
+    QudaPrecision GhostPrecision() const { return ghost_precision; }
+
     /** Number of field dimensions */
     int nDim;
 
@@ -51,7 +68,6 @@ namespace quda {
 
     int pad;
 
-    QudaPrecision precision;
     QudaSiteSubset siteSubset;
 
     QudaMemoryType mem_type; 
@@ -62,12 +78,16 @@ namespace quda {
     /** The extended field radius (if applicable) */
     int r[QUDA_MAX_DIM];
 
+    /** For fixed-point fields that need a global scaling factor */
+    double scale;
+
     /**
        @brief Default constructor for LatticeFieldParam
     */
     LatticeFieldParam()
-    : nDim(4), pad(0), precision(QUDA_INVALID_PRECISION), siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_PAD)
+    : precision(QUDA_INVALID_PRECISION), ghost_precision(QUDA_INVALID_PRECISION), nDim(4), pad(0),
+      siteSubset(QUDA_INVALID_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(QUDA_GHOST_EXCHANGE_PAD), scale(1.0)
     {
       for (int i=0; i<nDim; i++) {
 	x[i] = 0;
@@ -85,8 +105,9 @@ namespace quda {
     */
     LatticeFieldParam(int nDim, const int *x, int pad, QudaPrecision precision,
 		      QudaGhostExchange ghostExchange=QUDA_GHOST_EXCHANGE_PAD)
-    : nDim(nDim), pad(pad), precision(precision), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(ghostExchange)
+    : precision(precision), ghost_precision(precision), nDim(nDim), pad(pad),
+      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(ghostExchange), scale(1.0)
     {
       if (nDim > QUDA_MAX_DIM) errorQuda("Number of dimensions too great");
       for (int i=0; i<nDim; i++) {
@@ -102,8 +123,9 @@ namespace quda {
        @param[in] param Contains the metadata for filling out the LatticeFieldParam
     */
     LatticeFieldParam(const QudaGaugeParam &param) 
-    : nDim(4), pad(0), precision(param.cpu_prec), siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
-      ghostExchange(QUDA_GHOST_EXCHANGE_NO)
+    :  precision(param.cpu_prec), ghost_precision(param.cpu_prec), nDim(4), pad(0),
+      siteSubset(QUDA_FULL_SITE_SUBSET), mem_type(QUDA_MEMORY_DEVICE),
+      ghostExchange(QUDA_GHOST_EXCHANGE_NO), scale(param.scale)
     {
       for (int i=0; i<nDim; i++) {
 	this->x[i] = param.X[i];
@@ -148,6 +170,15 @@ namespace quda {
     /** Precision of the field */
     QudaPrecision precision;
     
+    /** Precision of the ghost */
+    mutable QudaPrecision ghost_precision;
+
+    /** Bool which is triggered if the ghost precision is reset */
+    mutable bool ghost_precision_reset;
+
+    /** For fixed-point fields that need a global scaling factor */
+    double scale;
+
     /** Whether the field is full or single parity */
     QudaSiteSubset siteSubset;
 
@@ -176,14 +207,24 @@ namespace quda {
     static void *ghost_recv_buffer_d[2];
 
     /**
-       Double buffered static pinned send/recv buffers
+       Double buffered static pinned send buffers
     */
-    static void *ghost_pinned_buffer_h[2];
+    static void *ghost_pinned_send_buffer_h[2];
 
     /**
-       Mapped version of ghost_pinned
+       Double buffered static pinned recv buffers
     */
-    static void *ghost_pinned_buffer_hd[2];
+    static void *ghost_pinned_recv_buffer_h[2];
+
+    /**
+       Mapped version of pinned send buffers
+    */
+    static void *ghost_pinned_send_buffer_hd[2];
+
+    /**
+       Mapped version of pinned recv buffers
+    */
+    static void *ghost_pinned_recv_buffer_hd[2];
 
     /**
        Remove ghost pointer for sending to
@@ -206,6 +247,11 @@ namespace quda {
     mutable size_t ghost_bytes;
 
     /**
+       Size in bytes of prior ghost allocation
+    */
+    mutable size_t ghost_bytes_old;
+
+    /**
        Size in bytes of the ghost in each dimension
     */
     mutable size_t ghost_face_bytes[QUDA_MAX_DIM];
@@ -220,10 +266,20 @@ namespace quda {
     */
     mutable int ghostNormOffset[QUDA_MAX_DIM][2];
 
-    /** Pinned memory buffer used for sending all messages */
+    /**
+       Pinned memory buffer used for sending messages
+    */
     void *my_face_h[2];
-    /** Mapped version of my_face_h */
+
+    /**
+       Mapped version of my_face_h
+    */
     void *my_face_hd[2];
+
+    /**
+       Device memory buffer for sending messages
+     */
+    void *my_face_d[2];
 
     /** Local pointers to the pinned my_face buffer */
     void *my_face_dim_dir_h[2][QUDA_MAX_DIM][2];
@@ -234,10 +290,20 @@ namespace quda {
     /** Local pointers to the device ghost_send buffer */
     void *my_face_dim_dir_d[2][QUDA_MAX_DIM][2];
 
-    /** Memory buffer used for receiving all messages */
+    /**
+       Memory buffer used for receiving all messages
+    */
     void *from_face_h[2];
-    /** Mapped version of from_face_h */
+
+    /**
+       Mapped version of from_face_h
+    */
     void *from_face_hd[2];
+
+    /**
+       Device memory buffer for receiving messages
+     */
+    void *from_face_d[2];
 
     /** Local pointers to the pinned from_face buffer */
     void *from_face_dim_dir_h[2][QUDA_MAX_DIM][2];
@@ -311,11 +377,26 @@ namespace quda {
     /** Used as a label in the autotuner */
     char vol_string[TuneKey::volume_n];
     
+    /** used as a label in the autotuner */
+    char aux_string[TuneKey::aux_n];
+
     /** Sets the vol_string for use in tuning */
     virtual void setTuningString();
 
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
+
+    void precisionCheck() {
+      switch(precision) {
+      case QUDA_QUARTER_PRECISION:
+      case QUDA_HALF_PRECISION:
+      case QUDA_SINGLE_PRECISION:
+      case QUDA_DOUBLE_PRECISION:
+	break;
+      default:
+	errorQuda("Unknown precision %d\n", precision);
+      }
+    }
 
     mutable char *backup_h;
     mutable char *backup_norm_h;
@@ -356,8 +437,11 @@ namespace quda {
        Create the communication handlers (both host and device)
        @param[in] no_comms_fill Whether to allocate halo buffers for
        dimensions that are not partitioned
+       @param[in] bidir Whether to allocate communication buffers to
+       allow for simultaneous bi-directional exchange.  If false, then
+       the forwards and backwards buffers will alias (saving memory).
     */
-    void createComms(bool no_comms_fill=false);
+    void createComms(bool no_comms_fill=false, bool bidir=true);
 
     /**
        Destroy the communication handlers
@@ -462,6 +546,22 @@ namespace quda {
     QudaPrecision Precision() const { return precision; }
 
     /**
+       @return The ghost precision
+    */
+    QudaPrecision GhostPrecision() const { return ghost_precision; }
+
+    /**
+       @return The global scaling factor for a fixed-point field
+    */
+    double Scale() const { return scale; }
+
+    /**
+       @brief Set the scale factor for a fixed-point field
+       @param[in] scale_ The new scale factor
+    */
+    void Scale(double scale_) { scale = scale_; }
+
+    /**
        @return Field subset type
      */
     virtual QudaSiteSubset SiteSubset() const { return siteSubset; }
@@ -523,11 +623,14 @@ namespace quda {
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
 
+    /** Return the aux string used by the autotuner */
+    inline const char *AuxString() const { return aux_string; }
+
     /** @brief Backs up the LatticeField */
     virtual void backup() const { errorQuda("Not implemented"); }
 
-    /** @brief Restores the cpuGaugeField */
-    virtual void restore() { errorQuda("Not implemented"); }
+    /** @brief Restores the LatticeField */
+    virtual void restore() const { errorQuda("Not implemented"); }
   };
   
   /**
@@ -606,6 +709,21 @@ namespace quda {
      @param reorder_location_ The location to set where data will be reordered
   */
   void reorder_location_set(QudaFieldLocation reorder_location_);
+
+  /**
+     @brief Helper function for setting auxilary string
+     @param[in] meta LatticeField used for querying field location
+     @return String containing location and compilation type
+   */
+  inline const char *compile_type_str(const LatticeField &meta, QudaFieldLocation location_ = QUDA_INVALID_FIELD_LOCATION)
+  {
+    QudaFieldLocation location = (location_ == QUDA_INVALID_FIELD_LOCATION ? meta.Location() : location_);
+#ifdef JITIFY
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-jitify," : "CPU,";
+#else
+    return location == QUDA_CUDA_FIELD_LOCATION ? "GPU-offline," : "CPU,";
+#endif
+  }
 
 } // namespace quda
 

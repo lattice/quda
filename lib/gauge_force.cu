@@ -2,6 +2,7 @@
 #include <quda_matrix.h>
 #include <index_helper.cuh>
 #include <generics/ldg.h>
+#include <tune_quda.h>
 
 namespace quda {
 

@@ -378,7 +378,7 @@ namespace quda {
     param.true_res = sqrt(blas::xmyNorm(b, R[0]) / b2);
 
 
-    PrintSummary("MPCG", it, r2, b2);
+    PrintSummary("MPCG", it, r2, b2, stop, param.tol_hq);
 
     delete[] d;
     delete[] d_p1;

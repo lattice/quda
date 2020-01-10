@@ -488,15 +488,15 @@ namespace quda{
       Matrix<complex<Float>,3> v_tmp, result_tmp, oprod_tmp;
 
       for(int dir=0; dir<4; ++dir){
-	arg.force_old.load((Float*)(oprod_tmp.data), idx, dir, parity);
-	arg.gauge.load((Float*)(v_tmp.data), idx, dir, parity);
+	oprod_tmp = arg.force_old(dir, idx, parity);
+	v_tmp = arg.gauge(dir, idx, parity);
 	v = v_tmp;
 	oprod = oprod_tmp;
 
 	getUnitarizeForceSite<double>(result, v, oprod, arg);
 	result_tmp = result;
 
-	arg.force.save((Float*)(result_tmp.data), idx, dir, parity);
+	arg.force(dir, idx, parity) = result_tmp;
       } // 4*4528 flops per site
       return;
     } // getUnitarizeForceField
@@ -510,15 +510,15 @@ namespace quda{
       for (int parity=0; parity<2; parity++) {
 	for (int i=0; i<arg.threads/2; i++) {
 	  for (int dir=0; dir<4; dir++) {
-	    arg.force_old.load((Float*)(oprod_tmp.data), i, dir, parity);
-	    arg.gauge.load((Float*)(v_tmp.data), i, dir, parity);
+	    oprod_tmp = arg.force_old(dir, i, parity);
+	    v_tmp = arg.gauge(dir, i, parity);
 	    v = v_tmp;
 	    oprod = oprod_tmp;
 
 	    getUnitarizeForceSite<double>(result, v, oprod, arg);
 
 	    result_tmp = result;
-	    arg.force.save((Float*)(result_tmp.data), i, dir, parity);
+	    arg.force(dir, i, parity) = result_tmp;
 	  }
 	}
       }
@@ -600,19 +600,18 @@ namespace quda{
 
     template<typename Float, typename Gauge>
     void unitarizeForce(Gauge newForce, const Gauge oldForce, const Gauge gauge,
-			const GaugeField &meta, int* fails, long long *flops) {
+			const GaugeField &meta, int* fails) {
 
       UnitarizeForceArg<Gauge,Gauge> arg(newForce, oldForce, gauge, meta, fails, unitarize_eps, force_filter,
 					 max_det_error, allow_svd, svd_only, svd_rel_error, svd_abs_error);
       UnitarizeForce<Float,UnitarizeForceArg<Gauge,Gauge> > unitarizeForce(arg, meta);
       unitarizeForce.apply(0);
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      if (flops) *flops += unitarizeForce.flops();
       checkCudaError();
     }
 
     void unitarizeForce(cudaGaugeField &newForce, const cudaGaugeField &oldForce, const cudaGaugeField &gauge,
-			int* fails, long long *flops) {
+			int* fails) {
 
       if (oldForce.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	errorQuda("Force field should not use reconstruct %d", oldForce.Reconstruct());
@@ -632,10 +631,10 @@ namespace quda{
       if (gauge.Order() == QUDA_FLOAT2_GAUGE_ORDER) {
 	if (gauge.Precision() == QUDA_DOUBLE_PRECISION) {
 	  typedef typename gauge_mapper<double,QUDA_RECONSTRUCT_NO>::type G;
-	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	  unitarizeForce<double>(G(newForce), G(oldForce), G(gauge), gauge, fails);
 	} else if (gauge.Precision() == QUDA_SINGLE_PRECISION) {
 	  typedef typename gauge_mapper<float,QUDA_RECONSTRUCT_NO>::type G;
-	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails, flops);
+	  unitarizeForce<float>(G(newForce), G(oldForce), G(gauge), gauge, fails);
 	}
       } else {
 	errorQuda("Data order %d not supported", gauge.Order());

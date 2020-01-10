@@ -316,7 +316,7 @@ namespace quda {
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
  
-      PrintSummary("BiCGstab", k, r2, b2);      
+      PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }
 
     // reset the flops counters

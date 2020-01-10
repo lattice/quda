@@ -56,6 +56,7 @@ extern "C" {
   } QudaTboundary;
 
   typedef enum QudaPrecision_s {
+    QUDA_QUARTER_PRECISION = 1,
     QUDA_HALF_PRECISION = 2,
     QUDA_SINGLE_PRECISION = 4,
     QUDA_DOUBLE_PRECISION = 8,
@@ -117,14 +118,34 @@ extern "C" {
     QUDA_BICGSTABL_INVERTER,
     QUDA_CGNE_INVERTER,
     QUDA_CGNR_INVERTER,
+    QUDA_CG3_INVERTER,
+    QUDA_CG3NE_INVERTER,
+    QUDA_CG3NR_INVERTER,
+    QUDA_CA_CG_INVERTER,
+    QUDA_CA_CGNE_INVERTER,
+    QUDA_CA_CGNR_INVERTER,
+    QUDA_CA_GCR_INVERTER,
     QUDA_INVALID_INVERTER = QUDA_INVALID_ENUM
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_LANCZOS, //Normal Lanczos eigen solver
-    QUDA_IMP_RST_LANCZOS, //implicit restarted lanczos solver
-    QUDA_INVALID_TYPE = QUDA_INVALID_ENUM
+    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
+
+  /** S=smallest L=largest
+      R=real M=modulus I=imaniary **/
+  typedef enum QudaEigSpectrumType_s {
+    QUDA_SPECTRUM_SR_EIG,
+    QUDA_SPECTRUM_LR_EIG,
+    QUDA_SPECTRUM_SM_EIG,
+    QUDA_SPECTRUM_LM_EIG,
+    QUDA_SPECTRUM_SI_EIG,
+    QUDA_SPECTRUM_LI_EIG,
+    QUDA_SPECTRUM_INVALID = QUDA_INVALID_ENUM
+  } QudaEigSpectrumType;
 
   typedef enum QudaSolutionType_s {
     QUDA_MAT_SOLUTION,
@@ -169,6 +190,13 @@ extern "C" {
     QUDA_INVALID_RESIDUAL = QUDA_INVALID_ENUM
   } QudaResidualType;
 
+  // Which basis to use for CA algorithms
+  typedef enum QudaCABasis_s {
+    QUDA_POWER_BASIS,
+    QUDA_CHEBYSHEV_BASIS,
+    QUDA_INVALID_BASIS = QUDA_INVALID_ENUM
+  } QudaCABasis;
+
   // Whether the preconditioned matrix is (1-k^2 Deo Doe) or (1-k^2 Doe Deo)
   //
   // For the clover-improved Wilson Dirac operator, QUDA_MATPC_EVEN_EVEN
@@ -191,7 +219,7 @@ extern "C" {
     QUDA_DAG_YES,
     QUDA_DAG_INVALID = QUDA_INVALID_ENUM
   } QudaDagType;
-  
+
   typedef enum QudaMassNormalization_s {
     QUDA_KAPPA_NORMALIZATION,
     QUDA_MASS_NORMALIZATION,
@@ -211,15 +239,15 @@ extern "C" {
   } QudaPreserveSource;
 
   typedef enum QudaDiracFieldOrder_s {
-    QUDA_INTERNAL_DIRAC_ORDER,   // internal dirac order used, varies on precision and dslash type
-    QUDA_DIRAC_ORDER,            // even-odd, color inside spin
-    QUDA_QDP_DIRAC_ORDER,        // even-odd, spin inside color
-    QUDA_QDPJIT_DIRAC_ORDER,     // even-odd, complex-color-spin-spacetime
-    QUDA_CPS_WILSON_DIRAC_ORDER, // odd-even, color inside spin
-    QUDA_LEX_DIRAC_ORDER,        // lexicographical order, color inside spin
+    QUDA_INTERNAL_DIRAC_ORDER,    // internal dirac order used, varies on precision and dslash type
+    QUDA_DIRAC_ORDER,             // even-odd, color inside spin
+    QUDA_QDP_DIRAC_ORDER,         // even-odd, spin inside color
+    QUDA_QDPJIT_DIRAC_ORDER,      // even-odd, complex-color-spin-spacetime
+    QUDA_CPS_WILSON_DIRAC_ORDER,  // odd-even, color inside spin
+    QUDA_LEX_DIRAC_ORDER,         // lexicographical order, color inside spin
     QUDA_TIFR_PADDED_DIRAC_ORDER, // padded z dimension for TIFR RHMC code
     QUDA_INVALID_DIRAC_ORDER = QUDA_INVALID_ENUM
-  } QudaDiracFieldOrder;  
+  } QudaDiracFieldOrder;
 
   typedef enum QudaCloverFieldOrder_s {
     QUDA_FLOAT_CLOVER_ORDER = 1,  // even-odd float ordering
@@ -261,7 +289,7 @@ extern "C" {
     QUDA_INVALID_PARITY = QUDA_INVALID_ENUM
   } QudaParity;
 
-  //  
+  //
   // Types used only internally
   //
 
@@ -272,6 +300,7 @@ extern "C" {
     QUDA_CLOVERPC_DIRAC,
     QUDA_DOMAIN_WALL_DIRAC,
     QUDA_DOMAIN_WALLPC_DIRAC,
+    QUDA_DOMAIN_WALL_4D_DIRAC,
     QUDA_DOMAIN_WALL_4DPC_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALL_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
@@ -297,14 +326,14 @@ extern "C" {
     QUDA_CUDA_FIELD_LOCATION = 2,
     QUDA_INVALID_FIELD_LOCATION = QUDA_INVALID_ENUM
   } QudaFieldLocation;
-  
+
   // Which sites are included
   typedef enum QudaSiteSubset_s {
     QUDA_PARITY_SITE_SUBSET = 1,
     QUDA_FULL_SITE_SUBSET = 2,
     QUDA_INVALID_SITE_SUBSET = QUDA_INVALID_ENUM
   } QudaSiteSubset;
-  
+
   // Site ordering (always t-z-y-x, with rightmost varying fastest)
   typedef enum QudaSiteOrder_s {
     QUDA_LEXICOGRAPHIC_SITE_ORDER, // lexicographic ordering
@@ -312,7 +341,7 @@ extern "C" {
     QUDA_ODD_EVEN_SITE_ORDER, // CPS uses this
     QUDA_INVALID_SITE_ORDER = QUDA_INVALID_ENUM
   } QudaSiteOrder;
-  
+
   // Degree of freedom ordering
   typedef enum QudaFieldOrder_s {
     QUDA_FLOAT_FIELD_ORDER = 1, // spin-color-complex-space
@@ -325,7 +354,7 @@ extern "C" {
     QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
-  
+
   typedef enum QudaFieldCreate_s {
     QUDA_NULL_FIELD_CREATE, // create new field
     QUDA_ZERO_FIELD_CREATE, // create new field and zero it
@@ -346,9 +375,16 @@ extern "C" {
     QUDA_RANDOM_SOURCE,
     QUDA_CONSTANT_SOURCE,
     QUDA_SINUSOIDAL_SOURCE,
+    QUDA_CORNER_SOURCE,
     QUDA_INVALID_SOURCE = QUDA_INVALID_ENUM
   } QudaSourceType;
-  
+
+  typedef enum QudaNoiseType_s {
+    QUDA_NOISE_GAUSS,
+    QUDA_NOISE_UNIFORM,
+    QUDA_NOISE_INVALID = QUDA_INVALID_ENUM
+  } QudaNoiseType;
+
   // used to select projection method for deflated solvers
   typedef enum QudaProjectionType_s {
       QUDA_MINRES_PROJECTION,
@@ -356,20 +392,16 @@ extern "C" {
       QUDA_INVALID_PROJECTION = QUDA_INVALID_ENUM
   } QudaProjectionType;
 
-  // used to select preconditioning method in domain-wall fermion
-  typedef enum QudaDWFPCType_s {
-    QUDA_5D_PC,
-    QUDA_4D_PC,
-    QUDA_PC_INVALID = QUDA_INVALID_ENUM
-  } QudaDWFPCType; 
+  // used to select checkerboard preconditioning method
+  typedef enum QudaPCType_s { QUDA_4D_PC = 4, QUDA_5D_PC = 5, QUDA_PC_INVALID = QUDA_INVALID_ENUM } QudaPCType;
 
   typedef enum QudaTwistFlavorType_s {
     QUDA_TWIST_SINGLET = 1,
     QUDA_TWIST_NONDEG_DOUBLET = +2,
-    QUDA_TWIST_DEG_DOUBLET = -2,    
-    QUDA_TWIST_NO  = 0,
+    QUDA_TWIST_DEG_DOUBLET = -2,
+    QUDA_TWIST_NO = 0,
     QUDA_TWIST_INVALID = QUDA_INVALID_ENUM
-  } QudaTwistFlavorType; 
+  } QudaTwistFlavorType;
 
   typedef enum QudaTwistDslashType_s {
     QUDA_DEG_TWIST_INV_DSLASH,
@@ -393,22 +425,38 @@ extern "C" {
   } QudaTwistGamma5Type;
 
   typedef enum QudaUseInitGuess_s {
-    QUDA_USE_INIT_GUESS_NO,    
+    QUDA_USE_INIT_GUESS_NO,
     QUDA_USE_INIT_GUESS_YES,
     QUDA_USE_INIT_GUESS_INVALID = QUDA_INVALID_ENUM
   } QudaUseInitGuess;
 
+  typedef enum QudaDeflatedGuess_s {
+    QUDA_DEFLATED_GUESS_NO,
+    QUDA_DEFLATED_GUESS_YES,
+    QUDA_DEFLATED_GUESS_INVALID = QUDA_INVALID_ENUM
+  } QudaDeflatedGuess;
+
   typedef enum QudaComputeNullVector_s {
-    QUDA_COMPUTE_NULL_VECTOR_NO,    
+    QUDA_COMPUTE_NULL_VECTOR_NO,
     QUDA_COMPUTE_NULL_VECTOR_YES,
     QUDA_COMPUTE_NULL_VECTOR_INVALID = QUDA_INVALID_ENUM
   } QudaComputeNullVector;
 
+  typedef enum QudaSetupType_s {
+    QUDA_NULL_VECTOR_SETUP,
+    QUDA_TEST_VECTOR_SETUP,
+    QUDA_INVALID_SETUP_TYPE = QUDA_INVALID_ENUM
+  } QudaSetupType;
+
   typedef enum QudaBoolean_s {
-    QUDA_BOOLEAN_NO = 0,
-    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_FALSE = 0,
+    QUDA_BOOLEAN_TRUE = 1,
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
+
+  // define these for backwards compatibility
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
@@ -446,19 +494,32 @@ extern "C" {
   } QudaStaggeredPhase;
 
   typedef enum QudaContractType_s {
-    QUDA_CONTRACT,
-    QUDA_CONTRACT_PLUS,
-    QUDA_CONTRACT_MINUS,
-    QUDA_CONTRACT_GAMMA5,
-    QUDA_CONTRACT_GAMMA5_PLUS,
-    QUDA_CONTRACT_GAMMA5_MINUS,
-    QUDA_CONTRACT_TSLICE,
-    QUDA_CONTRACT_TSLICE_PLUS,
-    QUDA_CONTRACT_TSLICE_MINUS,
-    QUDA_CONTRACT_INVALID = QUDA_INVALID_ENUM
+    QUDA_CONTRACT_TYPE_OPEN, // Open spin elementals
+    QUDA_CONTRACT_TYPE_DR,   // DegrandRossi
+    QUDA_CONTRACT_TYPE_INVALID = QUDA_INVALID_ENUM
   } QudaContractType;
 
-  //Allows to choose an appropriate external library
+  typedef enum QudaContractGamma_s {
+    QUDA_CONTRACT_GAMMA_I = 0,
+    QUDA_CONTRACT_GAMMA_G1 = 1,
+    QUDA_CONTRACT_GAMMA_G2 = 2,
+    QUDA_CONTRACT_GAMMA_G3 = 3,
+    QUDA_CONTRACT_GAMMA_G4 = 4,
+    QUDA_CONTRACT_GAMMA_G5 = 5,
+    QUDA_CONTRACT_GAMMA_G1G5 = 6,
+    QUDA_CONTRACT_GAMMA_G2G5 = 7,
+    QUDA_CONTRACT_GAMMA_G3G5 = 8,
+    QUDA_CONTRACT_GAMMA_G4G5 = 9,
+    QUDA_CONTRACT_GAMMA_S12 = 10,
+    QUDA_CONTRACT_GAMMA_S13 = 11,
+    QUDA_CONTRACT_GAMMA_S14 = 12,
+    QUDA_CONTRACT_GAMMA_S21 = 13,
+    QUDA_CONTRACT_GAMMA_S23 = 14,
+    QUDA_CONTRACT_GAMMA_S34 = 15,
+    QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
+  } QudaContractGamma;
+
+  // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,
     QUDA_EIGEN_EXTLIB,

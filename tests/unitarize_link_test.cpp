@@ -22,7 +22,7 @@
 #endif
 
 // google test frame work
-#include <gtest.h>
+#include <gtest/gtest.h>
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
@@ -91,7 +91,6 @@ static int unitarize_link_test(int &test_rc)
   qudaGaugeParam.anisotropy  	   = 1.0;
   qudaGaugeParam.gauge_fix   	   = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad      	   = 0;
-  qudaGaugeParam.gaugeGiB    	   = 0;
   qudaGaugeParam.cpu_prec = cpu_prec;
   qudaGaugeParam.cuda_prec = prec;
   qudaGaugeParam.cuda_prec_sloppy   = prec;
@@ -165,7 +164,7 @@ static int unitarize_link_test(int &test_rc)
   gParam.pad         = 0;
   gParam.create      = QUDA_NULL_FIELD_CREATE;
   gParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  gParam.setPrecision(prec);
+  gParam.setPrecision(prec, true);
   cudaFatLink = new cudaGaugeField(gParam);
   cudaULink   = new cudaGaugeField(gParam);
 
@@ -190,21 +189,18 @@ static int unitarize_link_test(int &test_rc)
 			     svd_rel_error,
 			     svd_abs_error);
 
-  int* num_failures_dev;
-  if(cudaMalloc(&num_failures_dev, sizeof(int)) != cudaSuccess){
-    errorQuda("cudaMalloc failed for num_failures_dev\n");
-  }
-  cudaMemset(num_failures_dev, 0, sizeof(int));
+  int *num_failures_h = (int*)mapped_malloc(sizeof(int));
+  int *num_failures_d = nullptr;
+  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
-  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_dev);
+  unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
   cudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
-
-  int num_failures=0;
-  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
   if (verify_results) {
     test_rc = RUN_ALL_TESTS();
@@ -220,7 +216,8 @@ static int unitarize_link_test(int &test_rc)
 
   free(fatlink);
 
-  cudaFree(num_failures_dev); 
+  int num_failures = *num_failures_h;
+  host_free(num_failures_h);
 
   free(inlink);
 #ifdef MULTI_GPU

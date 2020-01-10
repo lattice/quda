@@ -213,13 +213,6 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
 
-  // only apply temporal boundary condition if I'm the last node in T
-#ifdef MULTI_GPU
-  bool last_node_in_t = (comm_coord(3) == comm_dim(3)-1);
-#else
-  bool last_node_in_t = true;
-#endif
-
 #if 1        
     double coeff= 1.0;
    
@@ -247,7 +240,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
            }
        }
        if (dir == TUP){
-	 if (last_node_in_t && i4 == (X4-1) ){
+	 if (last_node_in_t() && i4 == (X4-1) ){
 	   coeff *= -1;
 	 } 
        }       
@@ -684,45 +677,50 @@ get_recon(char* s)
 QudaPrecision
 get_prec(char* s)
 {
-    QudaPrecision ret = QUDA_DOUBLE_PRECISION;
-    
-    if (strcmp(s, "double") == 0){
-	ret = QUDA_DOUBLE_PRECISION;
-    }else if (strcmp(s, "single") == 0){
-	ret = QUDA_SINGLE_PRECISION;
-    }else if (strcmp(s, "half") == 0){
-	ret = QUDA_HALF_PRECISION;
-    }else{
-	fprintf(stderr, "Error: invalid precision type\n");	
-	exit(1);
-    }
-    
-    return ret;
+  QudaPrecision ret = QUDA_DOUBLE_PRECISION;
+
+  if (strcmp(s, "double") == 0) {
+    ret = QUDA_DOUBLE_PRECISION;
+  } else if (strcmp(s, "single") == 0) {
+    ret = QUDA_SINGLE_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "half") == 0) {
+    ret = QUDA_HALF_PRECISION;
+  } else if (strcmp(s, "quarter") == 0) {
+    ret = QUDA_QUARTER_PRECISION;
+  } else {
+    fprintf(stderr, "Error: invalid precision type\n");
+    exit(1);
+  }
+
+  return ret;
 }
 
-const char* 
+const char*
 get_prec_str(QudaPrecision prec)
 {
-    const char* ret;
-    
-    switch( prec){
-	
-    case QUDA_DOUBLE_PRECISION:
-	ret=  "double";
-	break;
-    case QUDA_SINGLE_PRECISION:
-	ret= "single";
-	break;
-    case QUDA_HALF_PRECISION:
-	ret= "half";
-	break;
-    default:
-	ret = "unknown";	
-	break;
-    }
-    
-    
-    return ret;
+  const char* ret;
+
+  switch (prec) {
+  case QUDA_DOUBLE_PRECISION:
+    ret=  "double";
+    break;
+  case QUDA_SINGLE_PRECISION:
+    ret= "single";
+    break;
+  case QUDA_HALF_PRECISION:
+    ret= "half";
+    break;
+  case QUDA_QUARTER_PRECISION:
+    ret= "quarter";
+    break;
+  default:
+    ret = "unknown";
+    break;
+  }
+
+  return ret;
 }
 
 
@@ -825,6 +823,40 @@ get_test_type(int t)
     return ret;
 }
 
+const char*
+get_staggered_test_type(int t)
+{
+    const char* ret;
+    switch(t){
+    case 0:
+  ret = "full";
+  break;
+    case 1:
+  ret = "full_ee_prec";
+  break;
+    case 2:
+  ret = "full_oo_prec";
+  break;
+    case 3:
+  ret = "even";
+  break;
+    case 4:
+  ret = "odd";
+  break;
+    case 5:
+  ret = "mcg_even";
+  break;  
+    case 6:
+  ret = "mcg_odd";
+  break;  
+    default:
+  ret = "unknown";
+  break;
+    }
+    
+    return ret;
+}
+
 int get_rank_order(char* s)
 {
   int ret = -1;
@@ -920,18 +952,120 @@ get_dslash_str(QudaDslashType type)
     
 }
 
-QudaMassNormalization
-get_mass_normalization_type(char* s)
+QudaContractType get_contract_type(char *s)
 {
-  QudaMassNormalization ret =  QUDA_INVALID_NORMALIZATION;
+  QudaContractType ret = QUDA_CONTRACT_TYPE_INVALID;
 
-  if (strcmp(s, "kappa") == 0){
+  if (strcmp(s, "open") == 0 || strcmp(s, "OPEN") == 0 || strcmp(s, "Open") == 0) {
+    ret = QUDA_CONTRACT_TYPE_OPEN;
+  } else if (strcmp(s, "dr") == 0 || strcmp(s, "DR") == 0) {
+    ret = QUDA_CONTRACT_TYPE_DR;
+  } else {
+    fprintf(stderr, "Error: invalid contract type\n");
+    exit(1);
+  }
+  return ret;
+}
+
+const char *get_contract_str(QudaContractType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_CONTRACT_TYPE_OPEN: ret = "open"; break;
+  case QUDA_CONTRACT_TYPE_DR: ret = "Degrand-Rossi"; break;
+  default: ret = "unknown"; break;
+  }
+
+  return ret;
+}
+
+QudaEigSpectrumType get_eig_spectrum_type(char *s)
+{
+
+  QudaEigSpectrumType ret = QUDA_SPECTRUM_INVALID;
+
+  if (strcmp(s, "SR") == 0) {
+    ret = QUDA_SPECTRUM_SR_EIG;
+  } else if (strcmp(s, "LR") == 0) {
+    ret = QUDA_SPECTRUM_LR_EIG;
+  } else if (strcmp(s, "SM") == 0) {
+    ret = QUDA_SPECTRUM_SM_EIG;
+  } else if (strcmp(s, "LM") == 0) {
+    ret = QUDA_SPECTRUM_LM_EIG;
+  } else if (strcmp(s, "SI") == 0) {
+    ret = QUDA_SPECTRUM_SI_EIG;
+  } else if (strcmp(s, "LI") == 0) {
+    ret = QUDA_SPECTRUM_LI_EIG;
+  } else {
+    fprintf(stderr, "Error: invalid eigen spectrum type\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char *get_eig_spectrum_str(QudaEigSpectrumType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_SPECTRUM_SR_EIG: ret = "SR"; break;
+  case QUDA_SPECTRUM_LR_EIG: ret = "LR"; break;
+  case QUDA_SPECTRUM_SM_EIG: ret = "SM"; break;
+  case QUDA_SPECTRUM_LM_EIG: ret = "LM"; break;
+  case QUDA_SPECTRUM_SI_EIG: ret = "SI"; break;
+  case QUDA_SPECTRUM_LI_EIG: ret = "LI"; break;
+  default: ret = "unknown eigenspectrum"; break;
+  }
+
+  return ret;
+}
+
+QudaEigType get_eig_type(char *s)
+{
+
+  QudaEigType ret = QUDA_EIG_INVALID;
+
+  if (strcmp(s, "trlm") == 0) {
+    ret = QUDA_EIG_TR_LANCZOS;
+  } else if (strcmp(s, "irlm") == 0) {
+    ret = QUDA_EIG_IR_LANCZOS;
+  } else if (strcmp(s, "iram") == 0) {
+    ret = QUDA_EIG_IR_ARNOLDI;
+  } else {
+    fprintf(stderr, "Error: invalid quda eigensolver type\n");
+    exit(1);
+  }
+
+  return ret;
+}
+
+const char *get_eig_type_str(QudaEigType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
+  case QUDA_EIG_IR_LANCZOS: ret = "irlm"; break;
+  case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
+  default: ret = "unknown eigensolver"; break;
+  }
+
+  return ret;
+}
+
+QudaMassNormalization get_mass_normalization_type(char *s)
+{
+  QudaMassNormalization ret = QUDA_INVALID_NORMALIZATION;
+
+  if (strcmp(s, "kappa") == 0) {
     ret = QUDA_KAPPA_NORMALIZATION;
-  }else if (strcmp(s, "mass") == 0){
+  } else if (strcmp(s, "mass") == 0) {
     ret = QUDA_MASS_NORMALIZATION;
-  }else if (strcmp(s, "asym-mass") == 0){
+  } else if (strcmp(s, "asym-mass") == 0) {
     ret = QUDA_ASYMMETRIC_MASS_NORMALIZATION;
-  }else{
+  } else {
     fprintf(stderr, "Error: invalid mass normalization\n");
     exit(1);
   }
@@ -1009,8 +1143,7 @@ get_matpc_str(QudaMatPCType type)
   return ret;
 }
 
-QudaSolveType
-get_solve_type(char* s)
+QudaSolveType get_solve_type(char *s)
 {
   QudaSolveType ret = QUDA_INVALID_SOLVE;
 
@@ -1060,6 +1193,46 @@ get_solve_str(QudaSolveType type)
     break;
   default:
     fprintf(stderr, "Error: invalid solve type %d\n", type);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaSolutionType get_solution_type(char *s)
+{
+  QudaSolutionType ret = QUDA_INVALID_SOLUTION;
+
+  if (strcmp(s, "mat") == 0) {
+    ret = QUDA_MAT_SOLUTION;
+  } else if (strcmp(s, "mat-dag-mat") == 0) {
+    ret = QUDA_MATDAG_MAT_SOLUTION;
+  } else if (strcmp(s, "mat-pc") == 0) {
+    ret = QUDA_MATPC_SOLUTION;
+  } else if (strcmp(s, "mat-pc-dag") == 0) {
+    ret = QUDA_MATPC_DAG_SOLUTION;
+  } else if (strcmp(s, "mat-pc-dag-mat-pc") == 0) {
+    ret = QUDA_MATPCDAG_MATPC_SOLUTION;
+  } else {
+    fprintf(stderr, "Error: invalid solution type %s\n", s);
+    exit(1);
+  }
+
+  return ret;
+}
+
+QudaSchwarzType get_schwarz_type(char *s)
+{
+  QudaSchwarzType ret = QUDA_INVALID_SCHWARZ;
+
+  if (strcmp(s, "false") == 0) {
+    ret = QUDA_INVALID_SCHWARZ;
+  } else if (strcmp(s, "add") == 0) {
+    ret = QUDA_ADDITIVE_SCHWARZ;
+  } else if (strcmp(s, "mul") == 0) {
+    ret = QUDA_MULTIPLICATIVE_SCHWARZ;
+  } else {
+    fprintf(stderr, "Error: invalid Schwarz type %s\n", s);
     exit(1);
   }
 
@@ -1154,8 +1327,22 @@ get_solver_type(char* s)
     ret = QUDA_CGNE_INVERTER;
   } else if (strcmp(s, "cgnr") == 0){
     ret = QUDA_CGNR_INVERTER;
+  } else if (strcmp(s, "cg3") == 0){
+    ret = QUDA_CG3_INVERTER;
+  } else if (strcmp(s, "cg3ne") == 0){
+    ret = QUDA_CG3NE_INVERTER;
+  } else if (strcmp(s, "cg3nr") == 0){
+    ret = QUDA_CG3NR_INVERTER;
+  } else if (strcmp(s, "ca-cg") == 0){
+    ret = QUDA_CA_CG_INVERTER;
+  } else if (strcmp(s, "ca-cgne") == 0){
+    ret = QUDA_CA_CGNE_INVERTER;
+  } else if (strcmp(s, "ca-cgnr") == 0){
+    ret = QUDA_CA_CGNR_INVERTER;
+  } else if (strcmp(s, "ca-gcr") == 0){
+    ret = QUDA_CA_GCR_INVERTER;
   } else {
-    fprintf(stderr, "Error: invalid solver type\n");	
+    fprintf(stderr, "Error: invalid solver type %s\n", s);
     exit(1);
   }
   
@@ -1216,6 +1403,33 @@ get_solver_str(QudaInverterType type)
   case QUDA_BICGSTABL_INVERTER:
     ret = "bicgstab-l";
     break;
+  case QUDA_CGNE_INVERTER:
+    ret = "cgne";
+    break;
+  case QUDA_CGNR_INVERTER:
+    ret = "cgnr";
+    break;
+  case QUDA_CG3_INVERTER:
+    ret = "cg3";
+    break;
+  case QUDA_CG3NE_INVERTER:
+    ret = "cg3ne";
+    break;
+  case QUDA_CG3NR_INVERTER:
+    ret = "cg3nr";
+    break;
+  case QUDA_CA_CG_INVERTER:
+    ret = "ca-cg";
+    break;
+  case QUDA_CA_CGNE_INVERTER:
+    ret = "ca-cgne";
+    break;
+  case QUDA_CA_CGNR_INVERTER:
+    ret = "ca-cgnr";
+    break;
+  case QUDA_CA_GCR_INVERTER:
+    ret = "ca-gcr";
+    break;
   default:
     ret = "unknown";
     errorQuda("Error: invalid solver type %d\n", type);
@@ -1258,22 +1472,34 @@ get_solve_ext_lib_type(char* s)
 }
 
 QudaFieldLocation
-get_df_location_ritz(char* s)
+get_location(char* s)
 {
   QudaFieldLocation ret = QUDA_INVALID_FIELD_LOCATION;
 
-  if (strcmp(s, "host") == 0) {
+  if (strcmp(s, "cpu") == 0 || strcmp(s, "host") == 0) {
     ret = QUDA_CPU_FIELD_LOCATION;
-  } else if (strcmp(s, "cuda") == 0) {
+  } else if (strcmp(s, "gpu") == 0 || strcmp(s, "cuda") == 0) {
     ret = QUDA_CUDA_FIELD_LOCATION;
   } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    fprintf(stderr, "Error: invalid location %s\n", s);
     exit(1);
   }
 
   return ret;
 }
 
+const char *get_ritz_location_str(QudaFieldLocation type)
+{
+  const char *s;
+
+  switch (type) {
+  case QUDA_CPU_FIELD_LOCATION: s = "cpu"; break;
+  case QUDA_CUDA_FIELD_LOCATION: s = "cuda"; break;
+  default: fprintf(stderr, "Error: invalid location\n"); exit(1);
+  }
+
+  return s;
+}
 
 QudaMemoryType
 get_df_mem_type_ritz(char* s)
@@ -1287,12 +1513,23 @@ get_df_mem_type_ritz(char* s)
   } else if (strcmp(s, "mapped") == 0) {
     ret = QUDA_MEMORY_MAPPED;
   } else {
-    fprintf(stderr, "Error: invalid external library type %s\n", s);
+    fprintf(stderr, "Error: invalid memory type %s\n", s);
     exit(1);
   }
 
   return ret;
 }
 
+const char *get_memory_type_str(QudaMemoryType type)
+{
+  const char *s;
 
+  switch (type) {
+  case QUDA_MEMORY_DEVICE: s = "device"; break;
+  case QUDA_MEMORY_PINNED: s = "pinned"; break;
+  case QUDA_MEMORY_MAPPED: s = "mapped"; break;
+  default: fprintf(stderr, "Error: invalid memory type\n"); exit(1);
+  }
 
+  return s;
+}

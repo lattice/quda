@@ -12,6 +12,9 @@ namespace quda {
     if (precision == QUDA_HALF_PRECISION) {
       errorQuda("CPU fields do not support half precision");
     }
+    if (precision == QUDA_QUARTER_PRECISION) {
+      errorQuda("CPU fields do not support quarter precision");
+    }
     if (pad != 0) {
       errorQuda("CPU fields do not support non-zero padding");
     }
@@ -92,13 +95,12 @@ namespace quda {
     }
 
     // compute the fat link max now in case it is needed later (i.e., for half precision)
-    if (param.compute_fat_link_max) fat_link_max = maxGauge(*this);
+    if (param.compute_fat_link_max) fat_link_max = this->abs_max();
   }
 
 
   cpuGaugeField::~cpuGaugeField()
   {
-    
     int siteDim = 0;
     if (geometry == QUDA_SCALAR_GEOMETRY) siteDim = 1;
     else if (geometry == QUDA_VECTOR_GEOMETRY) siteDim = nDim;
@@ -171,7 +173,7 @@ namespace quda {
     if (link_direction != QUDA_LINK_BACKWARDS)
       errorQuda("link_direction = %d not supported", link_direction);
 
-    void *recv[QUDA_MAX_DIM];
+    void *recv[2*QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // communicate between nodes
@@ -263,7 +265,7 @@ namespace quda {
 
     if (link_type == QUDA_ASQTAD_FAT_LINKS) {
       fat_link_max = src.LinkMax();
-      if (precision == QUDA_HALF_PRECISION && fat_link_max == 0.0)
+      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && fat_link_max == 0.0)
         errorQuda("fat_link_max has not been computed");
     } else {
       fat_link_max = 1.0;
@@ -357,7 +359,8 @@ namespace quda {
     backed_up = true;
   }
 
-  void cpuGaugeField::restore() {
+  void cpuGaugeField::restore() const
+  {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
 
     if (order == QUDA_QDP_GAUGE_ORDER) {
@@ -376,7 +379,11 @@ namespace quda {
   }
 
   void cpuGaugeField::zero() {
-    memset(gauge, 0, bytes);
+    if (order != QUDA_QDP_GAUGE_ORDER) {
+      memset(gauge, 0, bytes);
+    } else {
+      for (int g=0; g<geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
+    }
   }
 
 /*template <typename Float>

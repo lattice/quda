@@ -126,7 +126,7 @@ namespace quda {
     mat(r, x, temp);
     param.true_res = sqrt(xmyNormCuda(b, r)/b2);
 
-    PrintSummary("SimpleBiCGstab", k, r2, b2);
+    PrintSummary("SimpleBiCGstab", k, r2, b2, stop, param.tol_hq);
 
     return;
   }

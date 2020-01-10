@@ -40,6 +40,10 @@ extern "C" {
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
     QudaInverterType solver_type; /** Type of solver to use */
+    double tadpole; /** Tadpole improvement factor - set to 1.0 for
+                        HISQ fermions since the tadpole factor is
+                        baked into the links during their construction */
+    double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
   } QudaInvertArgs_t;
 
   /**
@@ -108,6 +112,13 @@ extern "C" {
     int su3_source;          /** is the incoming gauge field SU(3) */
     int use_pinned_memory;   /** use page-locked memory in QUDA    */
   } QudaFatLinkArgs_t;
+
+  /**
+   * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
+   *
+   * @param input Pointer to an MPI_Comm handle, static cast as a void *
+   */
+  void qudaSetMPICommHandle(void *mycomm);
 
   /**
    * Initialize the QUDA context.
@@ -197,7 +208,6 @@ extern "C" {
    * @param inv_args Struct setting some solver metadata
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    */
@@ -206,7 +216,6 @@ extern "C" {
 		  QudaInvertArgs_t inv_args,
 		  const void* const milc_fatlink,
 		  const void* const milc_longlink,
-		  const double tadpole,
 		  void* source,
 		  void* solution,
 		  int* num_iters);
@@ -264,7 +273,6 @@ extern "C" {
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    * @param final_residual True residual
@@ -279,7 +287,6 @@ extern "C" {
 		  double target_fermilab_residual,
 		  const void* const milc_fatlink,
 		  const void* const milc_longlink,
-		  const double tadpole,
 		  void* source,
 		  void* solution,
 		  double* const final_resid,
@@ -300,7 +307,6 @@ extern "C" {
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source array of right-hand side source fields
    * @param solution array of solution spinor fields
    * @param final_residual True residual
@@ -316,7 +322,6 @@ extern "C" {
                       double target_fermilab_residual,
                       const void* const fatlink,
                       const void* const longlink,
-                      const double tadpole,
                       void** sourceArray,
                       void** solutionArray,
                       double* const final_residual,
@@ -342,7 +347,6 @@ extern "C" {
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
    * @param final_residual Array of true residuals
@@ -359,7 +363,6 @@ extern "C" {
       const double* target_fermilab_residual,
       const void* const milc_fatlink,
       const void* const milc_longlink,
-      const double tadpole,
       void* source,
       void** solutionArray,
       double* const final_residual,
@@ -385,7 +388,6 @@ extern "C" {
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
    * @param eig_args contains info about deflation space
@@ -404,7 +406,6 @@ extern "C" {
       double target_fermilab_residual,
       const void* const fatlink,
       const void* const longlink,
-      const double tadpole,
       void* source,
       void* solution,
       QudaEigArgs_t eig_args,
@@ -604,6 +605,7 @@ extern "C" {
    * @param precision       The precision of the fields
    * @param num_terms The number of quark fields
    * @param num_naik_terms The number of naik contributions
+   * @param dt Integrating step size
    * @param coeff The coefficients multiplying the fermion fields in the outer product
    * @param quark_field The input fermion field.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
@@ -616,6 +618,7 @@ extern "C" {
   void qudaHisqForce(int precision,
                      int num_terms,
                      int num_naik_terms,
+                     double dt,
                      double** coeff,
                      void** quark_field,
 		     const double level2_coeff[6],
@@ -881,7 +884,6 @@ extern "C" {
                         double scale,
 			void** quark_field,
 			void* oprod[3]);
-
 
 #ifdef __cplusplus
 }

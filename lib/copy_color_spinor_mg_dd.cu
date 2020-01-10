@@ -6,7 +6,7 @@ namespace quda {
 				  QudaFieldLocation location, void *Dst, void *Src, 
 				  void *dstNorm, void *srcNorm) {
 
-#if defined(GPU_MULTIGRID_DOUBLE) && defined(GPU_MULTIGRID)
+#if defined(GPU_MULTIGRID)
     double *dst_ptr = static_cast<double*>(Dst);
     double *src_ptr = static_cast<double*>(Src);
 

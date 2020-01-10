@@ -2,7 +2,7 @@
 #include <blas_quda.h>
 #include <iostream>
 #include <multigrid.h>
-#include <covDev.h>
+#include <dslash_quda.h>
 
 namespace quda {
 
@@ -22,8 +22,10 @@ namespace quda {
   {
     checkSpinorAlias(in, out);
 
-    ApplyCovDev(out, in, *gauge, parity, mu);
-
+    int comm_dim[4] = {};
+    // only switch on comms needed for mu derivative (FIXME - only communicate in the given direction)
+    comm_dim[mu % 4] = comm_dim_partitioned(mu % 4);
+    ApplyCovDev(out, in, *gauge, mu, parity, dagger, comm_dim, profile);
     flops += 1320ll*in.Volume(); // FIXME
   }
 

@@ -175,10 +175,26 @@
 
 // macro used for staggered dslash
 #define STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param)	\
-  GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param)
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
+
+// macro used for staggered dslash
+#define STAGGERED_DSLASH_TIFR(gridDim, blockDim, shared, stream, param)	\
+  if (!dagger) {                                                        \
+    GENERIC_DSLASH(staggeredDslashTIFR, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_DSLASH(staggeredDslashTIFR, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define IMPROVED_STAGGERED_DSLASH(gridDim, blockDim, shared, stream, param) \
-  GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) 
+  if (!dagger) {                                                        \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, , Axpy, gridDim, blockDim, shared, stream, param) \
+      } else {                                                          \
+    GENERIC_STAGGERED_DSLASH(improvedStaggeredDslash, Dagger, Axpy, gridDim, blockDim, shared, stream, param) \
+      }
 
 #define EVEN_MORE_GENERIC_ASYM_DSLASH(FUNC, FLOAT, DAG, X, kernel_type, gridDim, blockDim, shared, stream, param) \
   if (reconstruct == QUDA_RECONSTRUCT_NO) {				\
@@ -434,10 +450,11 @@ protected:
 
     // update the ghosts for the non-p2p directions
     for (int dim=0; dim<4; dim++) {
+      if (!dslashParam.commDim[dim]) continue;
 
       for (int dir=0; dir<2; dir++) {
         /* if doing interior kernel, then this is the initial call, so
-        we must all ghost pointers else if doing exterior kernel, then
+        we must set all ghost pointers else if doing exterior kernel, then
         we only have to update the non-p2p ghosts, since these may
         have been assigned to zero-copy memory */
         if (!comm_peer2peer_enabled(1-dir, dim) || dslashParam.kernel_type == INTERIOR_KERNEL) {
@@ -692,9 +709,9 @@ public:
 
   virtual long long bytes() const {
     int gauge_bytes = reconstruct * in->Precision();
-    bool isHalf = in->Precision() == sizeof(short) ? true : false;
-    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
-    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isHalf ? sizeof(float) : 0);
+    bool isFixed = (in->Precision() == sizeof(short) || in->Precision() == sizeof(char)) ? true : false;
+    int spinor_bytes = 2 * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
+    int proj_spinor_bytes = (in->Nspin()==4 ? 1 : 2) * in->Ncolor() * in->Nspin() * in->Precision() + (isFixed ? sizeof(float) : 0);
     int ghost_bytes = (proj_spinor_bytes + gauge_bytes) + spinor_bytes;
     int num_dir = 2 * 4; // set to 4 dimensions since we take care of 5-d fermions in derived classes where necessary
 

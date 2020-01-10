@@ -3,23 +3,13 @@
 #include <blas_quda.h>
 #include <multigrid.h>
 
+#define NEW_DSLASH
+
 namespace quda {
 
-  DiracClover::DiracClover(const DiracParam &param)
-    : DiracWilson(param), clover(*(param.clover))
-  {
-#ifdef DYNAMIC_CLOVER
-    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
-#endif
-  }
+  DiracClover::DiracClover(const DiracParam &param) : DiracWilson(param), clover(*(param.clover)) {}
 
-  DiracClover::DiracClover(const DiracClover &dirac) 
-    : DiracWilson(dirac), clover(dirac.clover)
-  {
-#ifdef DYNAMIC_CLOVER
-    warningQuda("Dynamic clover generation/inversion is currently not supported for pure Wilson-Clover dslash.\n");
-#endif
-  }
+  DiracClover::DiracClover(const DiracClover &dirac) : DiracWilson(dirac), clover(dirac.clover) {}
 
   DiracClover::~DiracClover() { }
 
@@ -49,16 +39,8 @@ namespace quda {
   {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
-      
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover);
-      asymCloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-			   &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-			   &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not implemented");
-    }
 
+    ApplyWilsonClover(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
     flops += 1872ll*in.Volume();
   }
 
@@ -66,42 +48,15 @@ namespace quda {
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, false, parity);
     flops += 504ll*in.Volume();
   }
 
   void DiracClover::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-    ColorSpinorField *In = &const_cast<ColorSpinorField&>(in);
-    if (in.Location() == QUDA_CPU_FIELD_LOCATION) {
-      ColorSpinorParam param(in);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
-        (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
-      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      In = ColorSpinorField::Create(param);
-      *In = in;
-    }
-
-    ColorSpinorField *Out = &out;
-    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
-      ColorSpinorParam param(out);
-      param.location = QUDA_CUDA_FIELD_LOCATION;
-      param.fieldOrder =  param.precision == QUDA_DOUBLE_PRECISION ? QUDA_FLOAT2_FIELD_ORDER :
-        (param.nSpin == 4 ? QUDA_FLOAT4_FIELD_ORDER : QUDA_FLOAT2_FIELD_ORDER);
-      param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-      Out = ColorSpinorField::Create(param);
-    }
-
-    checkFullSpinor(*Out, *In);
-    DslashXpay(Out->Odd(), In->Even(), QUDA_ODD_PARITY, In->Odd(), -kappa);
-    DslashXpay(Out->Even(), In->Odd(), QUDA_EVEN_PARITY, In->Even(), -kappa);
-
-    if (in.Location() == QUDA_CPU_FIELD_LOCATION) delete In;
-    if (out.Location() == QUDA_CPU_FIELD_LOCATION) {
-      out = *Out;
-      delete Out;
-    }
+    ApplyWilsonClover(out, in, *gauge, clover, -kappa, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+    flops += 1872ll * in.Volume();
   }
 
   void DiracClover::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -135,9 +90,10 @@ namespace quda {
     // do nothing
   }
 
-  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
   DiracCloverPC::DiracCloverPC(const DiracParam &param) : 
@@ -164,6 +120,7 @@ namespace quda {
 				const QudaParity parity) const
   {
     checkParitySpinor(in, out);
+
     ApplyClover(out, in, clover, true, parity);
     flops += 504ll*in.Volume();
   }
@@ -177,14 +134,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 0, 0.0, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-
+    ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, 0.0, in, parity, dagger, commDim, profile);
     flops += 1824ll*in.Volume();
   }
 
@@ -196,15 +146,7 @@ namespace quda {
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
-    if (checkLocation(out, in, x) == QUDA_CUDA_FIELD_LOCATION) {
-      FullClover cs(clover, true);
-      cloverDslashCuda(&static_cast<cudaColorSpinorField&>(out), *gauge, cs, 
-		       &static_cast<const cudaColorSpinorField&>(in), parity, dagger, 
-		       &static_cast<const cudaColorSpinorField&>(x), k, commDim, profile);
-    } else {
-      errorQuda("Not supported");
-    }
-
+    ApplyWilsonCloverPreconditioned(out, in, *gauge, clover, k, x, parity, dagger, commDim, profile);
     flops += 1872ll*in.Volume();
   }
 
@@ -327,9 +269,10 @@ namespace quda {
 
   }
 
-  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T, double kappa, double mu, double mu_factor) const {
+  void DiracCloverPC::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
+				     double kappa, double mass, double mu, double mu_factor) const {
     double a = - 2.0 * kappa * mu * T.Vectors().TwistFlavor();
-    CoarseOp(Y, X, Xinv, Yhat, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
+    CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
 } // namespace quda

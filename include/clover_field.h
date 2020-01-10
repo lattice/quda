@@ -22,6 +22,7 @@ namespace quda {
     QudaFieldCreate create;
     void setPrecision(QudaPrecision precision) {
       this->precision = precision;
+      this->ghost_precision = precision;
       order = (precision == QUDA_DOUBLE_PRECISION) ? 
 	QUDA_FLOAT2_CLOVER_ORDER : QUDA_FLOAT4_CLOVER_ORDER;
     }
@@ -46,8 +47,8 @@ namespace quda {
   protected:
     size_t bytes; // bytes allocated per clover full field 
     size_t norm_bytes; // sizeof each norm full field
-    int length;
-    int real_length;
+    size_t length;
+    size_t real_length;
     int nColor;
     int nSpin;
 
@@ -102,9 +103,19 @@ namespace quda {
     size_t NormBytes() const { return norm_bytes; }
 
     /**
+       @return Number of colors
+    */
+    int Ncolor() const { return nColor; }
+
+    /**
+       @return Number of spins
+    */
+    int Nspin() const { return nSpin; }
+
+    /**
        @return Clover coefficient (usually includes kappa)
     */
-    bool Csw() const { return csw; }
+    double Csw() const { return csw; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
@@ -127,6 +138,31 @@ namespace quda {
        diagonal additive Hasenbusch), e.g., A + rho
     */
     void setRho(double rho);
+
+    /**
+       @brief Compute the L1 norm of the field
+       @return L1 norm
+     */
+    double norm1() const;
+
+    /**
+       @brief Compute the L2 norm squared of the field
+       @return L2 norm squared
+     */
+    double norm2() const;
+
+    /**
+       @brief Compute the absolute maximum of the field (Linfinity norm)
+       @return Absolute maximum value
+     */
+    double abs_max() const;
+
+    /**
+       @brief Compute the absolute minimum of the field
+       @return Absolute minimum value
+     */
+    double abs_min() const;
+
   };
 
   class cudaCloverField : public CloverField {
@@ -307,9 +343,8 @@ namespace quda {
 
      @param clover The clover field (contains both the field itself and its inverse)
      @param computeTraceLog Whether to compute the trace logarithm of the clover term
-     @param location The location of the field
   */
-  void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location);
+  void cloverInvert(CloverField &clover, bool computeTraceLog);
 
   /**
      @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)

@@ -8,7 +8,6 @@
 #include "misc.h"
 #include "hisq_force_reference.h"
 #include "ks_improved_force.h"
-#include "hw_quda.h"
 #include <sys/time.h>
 #include <dslash_quda.h>
 

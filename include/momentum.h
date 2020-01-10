@@ -18,9 +18,11 @@ namespace quda {
      where [A]_TA means the traceless anti-hermitian projection of A
 
      @param mom Momentum field
+     @param coeff Integration stepsize
      @param force Force field
+     @param func The function calling this (fname will be printed if force monitoring is enabled)
    */
-  void updateMomentum(GaugeField &mom, double coeff, GaugeField &force);
+  void updateMomentum(GaugeField &mom, double coeff, GaugeField &force, const char *fname);
 
   /**
      Left multiply the force field by the gauge field
@@ -31,5 +33,16 @@ namespace quda {
      @param U Gauge field
    */
   void applyU(GaugeField &force, GaugeField &U);
+
+  /**
+     @brief Whether we are monitoring the force or not
+     @return Boolean whether we are monitoring the force
+  */
+  bool forceMonitor();
+
+  /**
+     @brief Flush any outstanding force monitoring information
+  */
+  void flushForceMonitor();
 
 } // namespace quda
