@@ -52,7 +52,7 @@ namespace quda {
       pool_pinned_free(arg.max_h);
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 
@@ -82,8 +82,8 @@ namespace quda {
 #endif
         if (compute_max_only) {
           if (!activeTuning()) { // only do copy once tuning is done
-            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), cudaMemcpyDeviceToHost, stream);
-            qudaStreamSynchronize(const_cast<cudaStream_t&>(stream));
+            qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(Float), qudaMemcpyDeviceToHost, stream);
+            qudaStreamSynchronizeDriver(const_cast<qudaStream_t&>(stream));
           }
         }
       }

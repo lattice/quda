@@ -22,7 +22,7 @@ namespace quda {
 
   using namespace colorspinor;
   
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p)
+  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, qudaStream_t *stream_p)
   {
 #ifdef MULTI_GPU
     int nFace = 0;
@@ -35,8 +35,8 @@ namespace quda {
     int gatherCompleted[2] = {0,0};
     int commsCompleted[2] = {0,0};
 
-    cudaEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) cudaEventCreate(&gatherEnd[dir], cudaEventDisableTiming);
+    qudaEvent_t gatherEnd[2];
+    for(int dir=0; dir<2; dir++) qudaEventCreateWithFlags(&gatherEnd[dir], qudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;
@@ -52,7 +52,7 @@ namespace quda {
       int dir = 1;
       while(completeSum < 2){
         if(!gatherCompleted[dir]){
-          if(cudaSuccess == cudaEventQuery(gatherEnd[dir])){
+          if(qudaSuccess == cudaEventQuery(gatherEnd[dir])){
             spinor->commsStart(nFace, 2*dim+dir, dagger);
             completeSum++;
             gatherCompleted[dir--] = 1;
@@ -76,7 +76,7 @@ namespace quda {
       qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
-    for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
+    for(int dir=0; dir<2; dir++) qudaEventDestroy(gatherEnd[dir]);
 #endif
     return;
   }
@@ -253,7 +253,7 @@ namespace quda {
       }
       virtual ~CopySpinorEx() {}
 
-      void apply(const cudaStream_t &stream){
+      void apply(const qudaStream_t &stream){
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if(location == QUDA_CPU_FIELD_LOCATION){
@@ -287,7 +287,7 @@ namespace quda {
         CopySpinorEx<FloatOut, FloatIn, Ns, Nc, OutOrder, InOrder, Basis, false> copier(arg, meta, location);
         copier.apply(0);
       }
-      if(location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+      if(location == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
     }
 
   template<typename FloatOut, typename FloatIn, int Ns, int Nc, typename OutOrder, typename InOrder>

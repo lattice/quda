@@ -110,7 +110,7 @@ namespace quda {
        orthogonalization.
      */
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const cudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
+    void GPU(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
       typedef typename mapper<vFloat>::type RegType; // need to redeclare typedef (WAR for CUDA 7 and 8)
       typedef BlockOrthoArg<Rotator,Vector,nSpin,spinBlockSize,coarseSpin,nVec> Arg;
       Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
@@ -122,12 +122,12 @@ namespace quda {
       cuMemcpyHtoDAsync(instance.get_constant_ptr("quda::B_array_d"), B_array_h, MAX_MATRIX_SIZE, stream);
       jitify_error = instance.configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
-      cudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, cudaMemcpyHostToDevice, stream);
+      qudaMemcpyToSymbolAsync(B_array_d, B_array_h, MAX_MATRIX_SIZE, 0, qudaMemcpyHostToDevice, stream);
       LAUNCH_KERNEL_MG_BLOCK_SIZE(blockOrthoGPU,tp,stream,arg,sumType,RegType,nSpin,spinBlockSize,nColor,coarseSpin,nVec,Arg);
 #endif
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
@@ -224,7 +224,7 @@ namespace quda {
     BlockOrtho<double, vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
     ortho.apply(0);
-    checkCudaError();
+    checkQudaError();
   }
 
   template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize>

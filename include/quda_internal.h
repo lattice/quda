@@ -1,7 +1,7 @@
 #ifndef _QUDA_INTERNAL_H
 #define _QUDA_INTERNAL_H
 
-#include <quda_cuda_api.h>
+#include <quda_backend_api.h>
 #include <string>
 #include <complex>
 #include <vector>
@@ -55,8 +55,8 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  extern cudaDeviceProp deviceProp;  
-  extern cudaStream_t *streams;
+  extern qudaDeviceProp deviceProp;  
+  extern qudaStream_t *streams;
  
 #ifdef __cplusplus
 }

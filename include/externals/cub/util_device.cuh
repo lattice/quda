@@ -59,7 +59,7 @@ namespace cub {
  */
 template <int ALLOCATIONS>
 __host__ __device__ __forceinline__
-cudaError_t AliasTemporaries(
+qudaError_t AliasTemporaries(
     void    *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
     size_t  &temp_storage_bytes,                ///< [in,out] Size in bytes of \t d_temp_storage allocation
     void*   (&allocations)[ALLOCATIONS],        ///< [in,out] Pointers to device allocations needed
@@ -83,7 +83,7 @@ cudaError_t AliasTemporaries(
     if (!d_temp_storage)
     {
         temp_storage_bytes = bytes_needed;
-        return cudaSuccess;
+        return qudaSuccess;
     }
 
     // Check if enough storage provided
@@ -99,7 +99,7 @@ cudaError_t AliasTemporaries(
         allocations[i] = static_cast<char*>(d_temp_storage) + allocation_offsets[i];
     }
 
-    return cudaSuccess;
+    return qudaSuccess;
 }
 
 
@@ -115,7 +115,7 @@ __global__ void EmptyKernel(void) { }
 /**
  * \brief Retrieves the PTX version that will be used on the current device (major * 100 + minor * 10)
  */
-CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t PtxVersion(int &ptx_version)
+CUB_RUNTIME_FUNCTION __forceinline__ qudaError_t PtxVersion(int &ptx_version)
 {
     struct Dummy
     {
@@ -140,14 +140,14 @@ CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t PtxVersion(int &ptx_version)
 #elif (CUB_PTX_ARCH > 0)
 
     ptx_version = CUB_PTX_ARCH;
-    return cudaSuccess;
+    return qudaSuccess;
 
 #else
 
-    cudaError_t error = cudaSuccess;
+    qudaError_t error = qudaSuccess;
     do
     {
-        cudaFuncAttributes empty_kernel_attrs;
+        qudaFuncAttributes empty_kernel_attrs;
         if (CubDebug(error = cudaFuncGetAttributes(&empty_kernel_attrs, EmptyKernel<void>))) break;
         ptx_version = empty_kernel_attrs.ptxVersion * 10;
     }
@@ -162,7 +162,7 @@ CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t PtxVersion(int &ptx_version)
 /**
  * \brief Retrieves the SM version (major * 100 + minor * 10)
  */
-CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t SmVersion(int &sm_version, int device_ordinal)
+CUB_RUNTIME_FUNCTION __forceinline__ qudaError_t SmVersion(int &sm_version, int device_ordinal)
 {
 #ifndef CUB_RUNTIME_ENABLED
     (void)sm_version;
@@ -173,7 +173,7 @@ CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t SmVersion(int &sm_version, int 
 
 #else
 
-    cudaError_t error = cudaSuccess;
+    qudaError_t error = qudaSuccess;
     do
     {
         // Fill in SM version
@@ -196,14 +196,14 @@ CUB_RUNTIME_FUNCTION __forceinline__ cudaError_t SmVersion(int &sm_version, int 
  * Synchronize the stream if specified
  */
 CUB_RUNTIME_FUNCTION __forceinline__
-static cudaError_t SyncStream(cudaStream_t stream)
+static qudaError_t SyncStream(qudaStream_t stream)
 {
 #if (CUB_PTX_ARCH == 0)
     return cudaStreamSynchronize(stream);
 #else
     (void)stream;
     // Device can't yet sync on a specific stream
-    return cudaDeviceSynchronize();
+    return qudaDeviceSynchronize();
 #endif
 }
 
@@ -241,7 +241,7 @@ static cudaError_t SyncStream(cudaStream_t stream)
  */
 template <typename KernelPtr>
 CUB_RUNTIME_FUNCTION __forceinline__
-cudaError_t MaxSmOccupancy(
+qudaError_t MaxSmOccupancy(
     int                 &max_sm_occupancy,          ///< [out] maximum number of thread blocks that can reside on a single SM
     KernelPtr           kernel_ptr,                 ///< [in] Kernel pointer for which to compute SM occupancy
     int                 block_threads,              ///< [in] Number of threads per thread block
@@ -287,12 +287,12 @@ struct KernelConfig
 
     template <typename AgentPolicyT, typename KernelPtrT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t Init(KernelPtrT kernel_ptr)
+    qudaError_t Init(KernelPtrT kernel_ptr)
     {
         block_threads        = AgentPolicyT::BLOCK_THREADS;
         items_per_thread     = AgentPolicyT::ITEMS_PER_THREAD;
         tile_size            = block_threads * items_per_thread;
-        cudaError_t retval   = MaxSmOccupancy(sm_occupancy, kernel_ptr, block_threads);
+        qudaError_t retval   = MaxSmOccupancy(sm_occupancy, kernel_ptr, block_threads);
         return retval;
     }
 };
@@ -309,7 +309,7 @@ struct ChainedPolicy
    /// Specializes and dispatches op in accordance to the first policy in the chain of adequate PTX version
    template <typename FunctorT>
    CUB_RUNTIME_FUNCTION __forceinline__
-   static cudaError_t Invoke(int ptx_version, FunctorT &op)
+   static qudaError_t Invoke(int ptx_version, FunctorT &op)
    {
        if (ptx_version < PTX_VERSION) {
            return PrevPolicyT::Invoke(ptx_version, op);
@@ -328,7 +328,7 @@ struct ChainedPolicy<PTX_VERSION, PolicyT, PolicyT>
     /// Specializes and dispatches op in accordance to the first policy in the chain of adequate PTX version
     template <typename FunctorT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Invoke(int /*ptx_version*/, FunctorT &op) {
+    static qudaError_t Invoke(int /*ptx_version*/, FunctorT &op) {
         return op.template Invoke<PolicyT>();
     }
 };

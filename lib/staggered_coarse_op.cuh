@@ -119,7 +119,7 @@ namespace quda {
     }
     virtual ~CalculateStaggeredY() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), QUDA_VERBOSE);
 
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {

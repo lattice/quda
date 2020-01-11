@@ -17,43 +17,43 @@ namespace quda {
   }
 
   template<int N>
-  void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
+  void createEventArray(qudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
     for(int i=0; i<N; ++i)
-      cudaEventCreate(&event[i],flags);
+      qudaEventCreateWithFlags(&event[i],flags);
     return;
   }
 
   template<int N>
-  void destroyEventArray(cudaEvent_t (&event)[N])
+  void destroyEventArray(qudaEvent_t (&event)[N])
   {
     for(int i=0; i<N; ++i)
-      cudaEventDestroy(event[i]);
+      qudaEventDestroy(event[i]);
   }
 
 
-  static cudaEvent_t packEnd;
-  static cudaEvent_t gatherEnd[4];
-  static cudaEvent_t scatterEnd[4];
-  static cudaEvent_t oprodStart;
-  static cudaEvent_t oprodEnd;
+  static qudaEvent_t packEnd;
+  static qudaEvent_t gatherEnd[4];
+  static qudaEvent_t scatterEnd[4];
+  static qudaEvent_t oprodStart;
+  static qudaEvent_t oprodEnd;
 
 
   void createCloverForceEvents(){
-    cudaEventCreate(&packEnd, cudaEventDisableTiming);
-    createEventArray(gatherEnd, cudaEventDisableTiming);
-    createEventArray(scatterEnd, cudaEventDisableTiming);
-    cudaEventCreate(&oprodStart, cudaEventDisableTiming);
-    cudaEventCreate(&oprodEnd, cudaEventDisableTiming);
+    qudaEventCreateWithFlags(&packEnd, qudaEventDisableTiming);
+    createEventArray(gatherEnd, qudaEventDisableTiming);
+    createEventArray(scatterEnd, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodStart, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodEnd, qudaEventDisableTiming);
     return;
   }
 
   void destroyCloverForceEvents(){
     destroyEventArray(gatherEnd);
     destroyEventArray(scatterEnd);
-    cudaEventDestroy(packEnd);
-    cudaEventDestroy(oprodStart);
-    cudaEventDestroy(oprodEnd);
+    qudaEventDestroy(packEnd);
+    qudaEventDestroy(oprodStart);
+    qudaEventDestroy(oprodEnd);
     return;
   }
 
@@ -325,7 +325,7 @@ namespace quda {
 
     virtual ~CloverForce() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if(location == QUDA_CUDA_FIELD_LOCATION){
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());
@@ -533,7 +533,7 @@ namespace quda {
    errorQuda("Clover Dirac operator has not been built!");
 #endif
 
-   checkCudaError();
+   checkQudaError();
    return;
   } // computeCloverForce
 

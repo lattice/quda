@@ -40,7 +40,7 @@ namespace quda {
       // path_coeff array
       memcpy((char*)path_h + 4 * num_paths * max_length * sizeof(int) + num_paths*sizeof(int), path_coeff_h, num_paths*sizeof(double));
 
-      qudaMemcpy(buffer, path_h, bytes, cudaMemcpyHostToDevice);
+      qudaMemcpy(buffer, path_h, bytes, qudaMemcpyHostToDevice);
       host_free(path_h);
 
       // finally set the pointers to the correct offsets in the buffer
@@ -207,10 +207,10 @@ namespace quda {
     {
       apply(0);
       qudaDeviceSynchronize();
-      checkCudaError();
+      checkQudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       GaugeForceKernel<decltype(arg)><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }

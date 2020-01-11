@@ -757,7 +757,7 @@ namespace quda
     blas::ax(1.0 / norm, *kSpace[0]);
 
     // Check for Chebyshev maximum estimation
-    if (eig_param->use_poly_acc && eig_param->a_max == 0.0) {
+    if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
       eig_param->a_max = estimateChebyOpMax(mat, *kSpace[2], *kSpace[1]);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
     }

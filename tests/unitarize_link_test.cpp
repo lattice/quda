@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <quda_backend.h>
+#include <quda_backend.h>
 
 #include "quda.h"
 #include "gauge_field.h"
@@ -180,15 +180,15 @@ static int unitarize_link_test(int &test_rc)
 
   int *num_failures_h = (int*)mapped_malloc(sizeof(int));
   int *num_failures_d = nullptr;
-  cudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-  if (error != cudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  qudaError_t error = qudaHostGetDevicePointer((void**)num_failures_d, num_failures_h, 0);
+  if (error != qudaSuccess) errorQuda("qudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
   *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {

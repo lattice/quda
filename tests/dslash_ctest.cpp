@@ -441,12 +441,12 @@ void end() {
     DslashTime dslash_time;
     timeval tstart, tstop;
 
-    cudaEvent_t start, end;
-    cudaEventCreate(&start);
-    cudaEventCreate(&end);
+    qudaEvent_t start, end;
+    qudaEventCreate(&start);
+    qudaEventCreate(&end);
 
     comm_barrier();
-    cudaEventRecord(start, 0);
+    qudaEventRecord(start, 0);
 
     for (int i = 0; i < niter; i++) {
 
@@ -594,18 +594,18 @@ void end() {
     }
     }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
+  qudaError_t stat = cudaGetLastError();
+  if (stat != qudaSuccess)
     printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;

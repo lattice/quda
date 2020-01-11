@@ -127,7 +127,7 @@ namespace quda {
     }
     virtual ~CopyGaugeEx() { ; }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
@@ -162,7 +162,7 @@ namespace quda {
       arg(outOrder, inOrder, E, X, faceVolumeCB, meta.Ndim(), meta.Geometry());
     CopyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder> copier(arg, meta, location);
     copier.apply(0);
-    if (location == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (location == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
   template <typename FloatOut, typename FloatIn, int length, typename InOrder>

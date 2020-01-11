@@ -191,7 +191,7 @@ namespace quda {
 
     virtual ~StaggeredProlongRestrictLaunch() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           StaggeredProlongRestrictArg<Float,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,transferType>
@@ -232,7 +232,7 @@ namespace quda {
     staggered_prolong_restrict(out, in, fine_to_coarse, parity);
     staggered_prolong_restrict.apply(0);
     
-    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
   template <int fineSpin, int fineColor, int coarseSpin, int coarseColor, QudaStaggeredTransferType transferType>

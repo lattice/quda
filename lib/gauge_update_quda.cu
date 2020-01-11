@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
+#include <quda_backend.h>
 #include <quda_internal.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
@@ -94,7 +94,7 @@ namespace quda {
       arg(arg),
       meta(meta) {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       updateGaugeFieldKernel<conj_mom,exact><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     } // apply
@@ -136,7 +136,7 @@ namespace quda {
           updateGauge.apply(0);
         }
       }
-      checkCudaError();
+      checkQudaError();
     }
   };
 

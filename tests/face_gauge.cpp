@@ -11,7 +11,7 @@
 
 using namespace quda;
 
-extern cudaStream_t *stream;
+extern qudaStream_t *stream;
   
 /**************************************************************
  * Staple exchange routine
@@ -1022,7 +1022,7 @@ void exchange_llfat_cleanup(void)
     }
 
   }
-  checkCudaError();
+  checkQudaError();
 }
 
 #undef gaugeSiteSize

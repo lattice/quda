@@ -289,7 +289,7 @@ namespace quda {
 
     virtual ~StaggeredOprodField() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());
@@ -398,7 +398,7 @@ namespace quda {
       }
     } // i=3,..,0
 
-    checkCudaError();
+    checkQudaError();
     } // computeStaggeredOprodCuda
 
 #endif // GPU_STAGGERED_DIRAC

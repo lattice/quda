@@ -25,7 +25,7 @@ namespace quda
       TunableVectorYZ::resizeVector(in.X(4), arg.nParity);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -76,7 +76,7 @@ namespace quda
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 

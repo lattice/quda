@@ -9,10 +9,10 @@
 #include <cub_helper.cuh>
 #include <index_helper.cuh>
 
-#include <cufft.h>
+#include <quda_fft.h>
 
 #ifdef GPU_GAUGE_ALG
-#include <CUFFT_Plans.h>
+#include <QUFFT_Plans.h>
 #endif
 
 namespace quda {
@@ -44,13 +44,13 @@ namespace quda {
 #endif
 
 
-  texture<float2, 1, cudaReadModeElementType> GXTexSingle;
-  texture<int4, 1, cudaReadModeElementType> GXTexDouble;
+  texture<float2, 1, qudaReadModeElementType> GXTexSingle;
+  texture<int4, 1, qudaReadModeElementType> GXTexDouble;
 //Delta is only stored using 12 real number parameters,
 //	(0,0), (0,1), (0,2), (1,1), (1,2) and (2,2)
 //	(0,0), (1,1) and (0,1) don't have real part, however we need a complex for the FFTs
-  texture<float2, 1, cudaReadModeElementType> DELTATexSingle;
-  texture<int4, 1, cudaReadModeElementType> DELTATexDouble;
+  texture<float2, 1, qudaReadModeElementType> DELTATexSingle;
+  texture<int4, 1, qudaReadModeElementType> DELTATexDouble;
 
 
   template <class T>
@@ -199,7 +199,7 @@ namespace quda {
       arg.tmp1 = data_out;
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if ( direction == 0 )
         fft_rotate_kernel_2D2D<0, Float ><< < tp.grid, tp.block, 0, stream >> > (arg);
@@ -313,7 +313,7 @@ namespace quda {
     }
     ~GaugeFixQuality () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       argQ.result_h[0] = make_double2(0.0,0.0);
       LAUNCH_KERNEL_LOCAL_PARITY(computeFix_quality, (*this), tp, stream, argQ, Elems, Float, Gauge, gauge_dir);
@@ -418,7 +418,7 @@ namespace quda {
     GaugeFixSETINVPSP(GaugeFixArg<Float> &arg) : arg(arg) { }
     ~GaugeFixSETINVPSP () { }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_set_invpsq<Float><< < tp.grid, tp.block, 0, stream >> > (arg);
     }
@@ -472,12 +472,12 @@ namespace quda {
     public:
     GaugeFixINVPSP(GaugeFixArg<Float> &arg)
       : arg(arg){
-      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   qudaFuncCachePreferL1);
     }
     ~GaugeFixINVPSP () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_mult_norm_2D<Float><< < tp.grid, tp.block, 0, stream >> > (arg);
     }
@@ -652,13 +652,13 @@ namespace quda {
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
       : dataOr(dataOr), arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   qudaFuncCachePreferL1);
     }
     ~GaugeFixNEW () { }
 
     void setAlpha(Float alpha){ half_alpha = alpha * 0.5; }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_fix_U_EO_NEW<Float, Gauge><< < tp.grid, tp.block, 0, stream >> > (arg, dataOr, half_alpha);
     }
@@ -769,7 +769,7 @@ namespace quda {
     GaugeFix_GX(GaugeFixArg<Float> &arg, Float alpha)
       : arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   qudaFuncCachePreferL1);
     }
     ~GaugeFix_GX () {
     }
@@ -779,7 +779,7 @@ namespace quda {
     }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_GX<Elems, Float><< < tp.grid, tp.block, 0, stream >> > (arg, half_alpha);
     }
@@ -892,12 +892,12 @@ namespace quda {
     public:
     GaugeFix(Gauge & dataOr, GaugeFixArg<Float> &arg)
       : dataOr(dataOr), arg(arg) {
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   cudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   qudaFuncCachePreferL1);
     }
     ~GaugeFix () { }
 
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       kernel_gauge_fix_U_EO<Elems, Float, Gauge><< < tp.grid, tp.block, 0, stream >> > (arg, dataOr);
     }
@@ -957,8 +957,8 @@ namespace quda {
 
     unsigned int delta_pad = data.X()[0] * data.X()[1] * data.X()[2] * data.X()[3];
     int4 size = make_int4( data.X()[0], data.X()[1], data.X()[2], data.X()[3] );
-    cufftHandle plan_xy;
-    cufftHandle plan_zt;
+    qufftHandle plan_xy;
+    qufftHandle plan_zt;
 
     GaugeFixArg<Float> arg(data, Elems);
     SetPlanFFT2DMany( plan_zt, size, 0, arg.delta);     //for space and time ZT
@@ -1003,7 +1003,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform FFT on xy plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_xy, _array, arg.gx, CUFFT_FORWARD);
+        ApplyFFT(plan_xy, _array, arg.gx, QUFFT_FORWARD);
         //------------------------------------------------------------------------
         // Rotate hypercube, xyzt -> ztxy
         //------------------------------------------------------------------------
@@ -1012,7 +1012,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform FFT on zt plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_zt, _array, arg.gx, CUFFT_FORWARD);
+        ApplyFFT(plan_zt, _array, arg.gx, QUFFT_FORWARD);
         //------------------------------------------------------------------------
         // Normalize FFT and apply pmax^2/p^2
         //------------------------------------------------------------------------
@@ -1020,7 +1020,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform IFFT on zt plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_zt, arg.gx, _array, CUFFT_INVERSE);
+        ApplyFFT(plan_zt, arg.gx, _array, QUFFT_INVERSE);
         //------------------------------------------------------------------------
         // Rotate hypercube, ztxy -> xyzt
         //------------------------------------------------------------------------
@@ -1029,7 +1029,7 @@ namespace quda {
         //------------------------------------------------------------------------
         // Perform IFFT on xy plane
         //------------------------------------------------------------------------
-        ApplyFFT(plan_xy, arg.gx, _array, CUFFT_INVERSE);
+        ApplyFFT(plan_xy, arg.gx, _array, QUFFT_INVERSE);
       }
                 #ifdef GAUGEFIXING_DONT_USE_GX
       //------------------------------------------------------------------------
@@ -1088,9 +1088,9 @@ namespace quda {
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    cudaMemset(num_failures_dev, 0, sizeof(int));
+    qudaMemset(num_failures_dev, 0, sizeof(int));
     unitarizeLinks(data, data, num_failures_dev);
-    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
 
     pool_device_free(num_failures_dev);
     if ( num_failures > 0 ) {
@@ -1101,9 +1101,9 @@ namespace quda {
 
 
     arg.free();
-    CUFFT_SAFE_CALL(cufftDestroy(plan_zt));
-    CUFFT_SAFE_CALL(cufftDestroy(plan_xy));
-    checkCudaError();
+    QUFFT_SAFE_CALL(qufftDestroy(plan_zt));
+    QUFFT_SAFE_CALL(qufftDestroy(plan_xy));
+    checkQudaError();
     qudaDeviceSynchronize();
     profileInternalGaugeFixFFT.TPSTOP(QUDA_PROFILE_COMPUTE);
 

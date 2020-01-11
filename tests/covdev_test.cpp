@@ -205,8 +205,8 @@ void init(int argc, char **argv)
     printfQuda("Sending spinor field to GPU\n");
     *cudaSpinor = *spinor;
 
-    cudaDeviceSynchronize();
-    checkCudaError();
+    qudaDeviceSynchronize();
+    checkQudaError();
 	
     double spinor_norm2 = blas::norm2(*spinor);
     double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
@@ -253,10 +253,10 @@ void end(void)
 
 double dslashCUDA(int niter, int mu) {
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  qudaEvent_t start, end;
+  qudaEventCreate(&start);
+  qudaEventRecord(start, 0);
+  qudaEventSynchronize(start);
 
   for (int i = 0; i < niter; i++) {
     if (transfer){
@@ -266,19 +266,19 @@ double dslashCUDA(int niter, int mu) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventCreate(&end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   double secs = runTime / 1000; //stopwatchReadSeconds();
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
+  qudaError_t stat = cudaGetLastError();
+  if (stat != qudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return secs;

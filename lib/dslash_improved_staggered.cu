@@ -27,7 +27,7 @@ namespace quda
   public:
     Staggered(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in) : Dslash(arg, out, in) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -149,7 +149,7 @@ namespace quda
         in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkCudaError();
+      checkQudaError();
     }
   };
 

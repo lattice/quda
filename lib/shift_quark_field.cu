@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
+#include <quda_backend.h>
 #include <quda_internal.h>
 
 namespace quda {
@@ -156,7 +156,7 @@ namespace quda {
           : arg(arg), location(location)  {}
         virtual ~ShiftColorSpinorField() {}
 
-        void apply(const cudaStream_t &stream){
+        void apply(const qudaStream_t &stream){
           if(location == QUDA_CUDA_FIELD_LOCATION){
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             shiftColorSpinorFieldKernel<Output,Input><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
@@ -244,7 +244,7 @@ namespace quda {
         if(commDimPartitioned(dim) && dim!=3){
           face->pack(src, 1-parity, dagger, dim, dir, streams); // pack in stream[1]
           qudaEventRecord(packEnd, streams[1]);
-          qudaStreamWaitEvent(streams[1], packEnd, 0); // wait for pack to end in stream[1]
+          qudaStreamWaitEventDriver(streams[1], packEnd, 0); // wait for pack to end in stream[1]
           face->gather(src, dagger, 2*dim+offset, 1); // copy packed data from device buffer to host and do this in stream[1] 
           qudaEventRecord(gatherEnd, streams[1]); // record the completion of face->gather
         }
@@ -255,8 +255,8 @@ namespace quda {
 #ifdef MULTI_GPU
         if(commDimPartitioned(dim) && dim!=3){
           while(1){
-            cudaError_t eventQuery = cudaEventQuery(gatherEnd);
-            if(eventQuery == cudaSuccess){
+            qudaError_t eventQuery = cudaEventQuery(gatherEnd);
+            if(eventQuery == qudaSuccess){
               face->commsStart(2*dim + offset); // if argument is even, send backwards, else send forwards
               break;
             }
@@ -271,7 +271,7 @@ namespace quda {
             }
           } // while(1) 
           qudaEventRecord(scatterEnd, streams[1]);
-          qudaStreamWaitEvent(streams[1], scatterEnd, 0);
+          qudaStreamWaitEventDriver(streams[1], scatterEnd, 0);
           shiftColorSpinor.apply(1);
         }
 #endif

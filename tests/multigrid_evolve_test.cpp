@@ -68,7 +68,10 @@ display_test_info()
       if (mg_eig_use_poly_acc[i]) {
         printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-        printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        if (mg_eig_amax[i] <= 0)
+          printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+        else
+          printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
       printfQuda("\n");
     }
@@ -531,10 +534,10 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
    using namespace quda;
    int *num_failures_dev = (int*)device_malloc(sizeof(int));
    int num_failures;
-   cudaMemset(num_failures_dev, 0, sizeof(int));
+   qudaMemset(num_failures_dev, 0, sizeof(int));
    unitarizeLinks(*cudaInGauge, num_failures_dev);
 
-   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+   qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
    if(num_failures>0) errorQuda("Error in the unitarization\n");
    device_free(num_failures_dev);
   }
@@ -581,7 +584,7 @@ int main(int argc, char **argv)
     mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
-    mg_eig_amax[i] = 5.0;
+    mg_eig_amax[i] = -1.0; // use power iterations
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;

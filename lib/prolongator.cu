@@ -158,7 +158,7 @@ namespace quda {
 
     virtual ~ProlongateLaunch() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
@@ -214,7 +214,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
 
@@ -347,7 +347,7 @@ namespace quda {
       errorQuda("Unsupported precision %d", out.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
 #else
     errorQuda("Multigrid has not been built");
 #endif

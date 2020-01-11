@@ -54,7 +54,7 @@ namespace quda {
     } // block size is checkerboard fine length / full coarse length
     virtual ~RestrictLaunch() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           RestrictArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>
@@ -181,7 +181,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
   }
 
   template <typename Float, int fineSpin>

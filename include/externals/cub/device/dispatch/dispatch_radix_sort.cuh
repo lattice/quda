@@ -783,7 +783,7 @@ struct DispatchRadixSort :
     OffsetT                 num_items;              ///< [in] Number of items to sort
     int                     begin_bit;              ///< [in] The beginning (least-significant) bit index needed for key comparison
     int                     end_bit;                ///< [in] The past-the-end (most-significant) bit index needed for key comparison
-    cudaStream_t            stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+    qudaStream_t            stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
     bool                    debug_synchronous;      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     int                     ptx_version;            ///< [in] PTX version
     bool                    is_overwrite_okay;      ///< [in] Whether is okay to overwrite source buffers
@@ -804,7 +804,7 @@ struct DispatchRadixSort :
         int                     begin_bit,
         int                     end_bit,
         bool                    is_overwrite_okay,
-        cudaStream_t            stream,
+        qudaStream_t            stream,
         bool                    debug_synchronous,
         int                     ptx_version)
     :
@@ -831,7 +831,7 @@ struct DispatchRadixSort :
         typename                ActivePolicyT,          ///< Umbrella policy active for the target device
         typename                SingleTileKernelT>      ///< Function type of cub::DeviceRadixSortSingleTileKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokeSingleTile(
+    qudaError_t InvokeSingleTile(
         SingleTileKernelT       single_tile_kernel)     ///< [in] Kernel function pointer to parameterization of cub::DeviceRadixSortSingleTileKernel
     {
 #ifndef CUB_RUNTIME_ENABLED
@@ -839,7 +839,7 @@ struct DispatchRadixSort :
         // Kernel launch not supported from this device
         return CubDebug(cudaErrorNotSupported );
 #else
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Return if the caller is simply requesting the size of the storage allocation
@@ -896,7 +896,7 @@ struct DispatchRadixSort :
      */
     template <typename PassConfigT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePass(
+    qudaError_t InvokePass(
         const KeyT      *d_keys_in,
         KeyT            *d_keys_out,
         const ValueT    *d_values_in,
@@ -906,7 +906,7 @@ struct DispatchRadixSort :
         int             &current_bit,
         PassConfigT     &pass_config)
     {
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             int pass_bits = CUB_MIN(pass_config.radix_bits, (end_bit - current_bit));
@@ -1004,7 +1004,7 @@ struct DispatchRadixSort :
             typename ScanPolicyT,
             typename DownsweepPolicyT>
         CUB_RUNTIME_FUNCTION __forceinline__
-        cudaError_t InitPassConfig(
+        qudaError_t InitPassConfig(
             UpsweepKernelT      upsweep_kernel,
             ScanKernelT         scan_kernel,
             DownsweepKernelT    downsweep_kernel,
@@ -1012,7 +1012,7 @@ struct DispatchRadixSort :
             int                 sm_count,
             int                 num_items)
         {
-            cudaError error = cudaSuccess;
+            cudaError error = qudaSuccess;
             do
             {
                 this->upsweep_kernel    = upsweep_kernel;
@@ -1047,7 +1047,7 @@ struct DispatchRadixSort :
         typename            ScanKernelT,            ///< Function type of cub::SpineScanKernel
         typename            DownsweepKernelT>       ///< Function type of cub::DeviceRadixSortDownsweepKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePasses(
+    qudaError_t InvokePasses(
         UpsweepKernelT      upsweep_kernel,         ///< [in] Kernel function pointer to parameterization of cub::DeviceRadixSortUpsweepKernel
         UpsweepKernelT      alt_upsweep_kernel,     ///< [in] Alternate kernel function pointer to parameterization of cub::DeviceRadixSortUpsweepKernel
         ScanKernelT         scan_kernel,            ///< [in] Kernel function pointer to parameterization of cub::SpineScanKernel
@@ -1065,7 +1065,7 @@ struct DispatchRadixSort :
         return CubDebug(cudaErrorNotSupported );
 #else
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Get device ordinal
@@ -1108,7 +1108,7 @@ struct DispatchRadixSort :
 
             // Return if the caller is simply requesting the size of the storage allocation
             if (d_temp_storage == NULL)
-                return cudaSuccess;
+                return qudaSuccess;
 
             // Pass planning.  Run passes of the alternate digit-size configuration until we have an even multiple of our preferred digit size
             int num_bits            = end_bit - begin_bit;
@@ -1173,7 +1173,7 @@ struct DispatchRadixSort :
     /// Invocation
     template <typename ActivePolicyT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t Invoke()
+    qudaError_t Invoke()
     {
         typedef typename DispatchRadixSort::MaxPolicy       MaxPolicyT;
         typedef typename ActivePolicyT::SingleTilePolicy    SingleTilePolicyT;
@@ -1206,7 +1206,7 @@ struct DispatchRadixSort :
      * Internal dispatch routine
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                   d_temp_storage,         ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                  &temp_storage_bytes,    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<KeyT>      &d_keys,                ///< [in,out] Double-buffer whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
@@ -1215,12 +1215,12 @@ struct DispatchRadixSort :
         int                     begin_bit,              ///< [in] The beginning (least-significant) bit index needed for key comparison
         int                     end_bit,                ///< [in] The past-the-end (most-significant) bit index needed for key comparison
         bool                    is_overwrite_okay,      ///< [in] Whether is okay to overwrite source buffers
-        cudaStream_t            stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t            stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                    debug_synchronous)      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
         typedef typename DispatchRadixSort::MaxPolicy MaxPolicyT;
 
-        cudaError_t error;
+        qudaError_t error;
         do {
             // Get PTX version
             int ptx_version;
@@ -1285,7 +1285,7 @@ struct DispatchSegmentedRadixSort :
     const OffsetT           *d_end_offsets;         ///< [in] %Device-accessible pointer to the sequence of ending offsets of length \p num_segments, such that <tt>d_end_offsets[i]-1</tt> is the last element of the <em>i</em><sup>th</sup> data segment in <tt>d_keys_*</tt> and <tt>d_values_*</tt>.  If <tt>d_end_offsets[i]-1</tt> <= <tt>d_begin_offsets[i]</tt>, the <em>i</em><sup>th</sup> is considered empty.
     int                     begin_bit;              ///< [in] The beginning (least-significant) bit index needed for key comparison
     int                     end_bit;                ///< [in] The past-the-end (most-significant) bit index needed for key comparison
-    cudaStream_t            stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+    qudaStream_t            stream;                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
     bool                    debug_synchronous;      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     int                     ptx_version;            ///< [in] PTX version
     bool                    is_overwrite_okay;      ///< [in] Whether is okay to overwrite source buffers
@@ -1309,7 +1309,7 @@ struct DispatchSegmentedRadixSort :
         int                     begin_bit,
         int                     end_bit,
         bool                    is_overwrite_okay,
-        cudaStream_t            stream,
+        qudaStream_t            stream,
         bool                    debug_synchronous,
         int                     ptx_version)
     :
@@ -1337,7 +1337,7 @@ struct DispatchSegmentedRadixSort :
     /// Invoke a three-kernel sorting pass at the current bit.
     template <typename PassConfigT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePass(
+    qudaError_t InvokePass(
         const KeyT      *d_keys_in,
         KeyT            *d_keys_out,
         const ValueT    *d_values_in,
@@ -1345,7 +1345,7 @@ struct DispatchSegmentedRadixSort :
         int             &current_bit,
         PassConfigT     &pass_config)
     {
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             int pass_bits = CUB_MIN(pass_config.radix_bits, (end_bit - current_bit));
@@ -1389,7 +1389,7 @@ struct DispatchSegmentedRadixSort :
         /// Initialize pass configuration
         template <typename SegmentedPolicyT>
         CUB_RUNTIME_FUNCTION __forceinline__
-        cudaError_t InitPassConfig(SegmentedKernelT segmented_kernel)
+        qudaError_t InitPassConfig(SegmentedKernelT segmented_kernel)
         {
             this->segmented_kernel  = segmented_kernel;
             this->radix_bits        = SegmentedPolicyT::RADIX_BITS;
@@ -1405,7 +1405,7 @@ struct DispatchSegmentedRadixSort :
         typename                ActivePolicyT,          ///< Umbrella policy active for the target device
         typename                SegmentedKernelT>       ///< Function type of cub::DeviceSegmentedRadixSortKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t InvokePasses(
+    qudaError_t InvokePasses(
         SegmentedKernelT     segmented_kernel,          ///< [in] Kernel function pointer to parameterization of cub::DeviceSegmentedRadixSortKernel
         SegmentedKernelT     alt_segmented_kernel)      ///< [in] Alternate kernel function pointer to parameterization of cub::DeviceSegmentedRadixSortKernel
     {
@@ -1417,7 +1417,7 @@ struct DispatchSegmentedRadixSort :
         return CubDebug(cudaErrorNotSupported );
 #else
 
-        cudaError error = cudaSuccess;
+        cudaError error = qudaSuccess;
         do
         {
             // Init regular and alternate kernel configurations
@@ -1441,7 +1441,7 @@ struct DispatchSegmentedRadixSort :
             {
                 if (temp_storage_bytes == 0)
                     temp_storage_bytes = 1;
-                return cudaSuccess;
+                return qudaSuccess;
             }
 
             // Pass planning.  Run passes of the alternate digit-size configuration until we have an even multiple of our preferred digit size
@@ -1507,7 +1507,7 @@ struct DispatchSegmentedRadixSort :
     /// Invocation
     template <typename ActivePolicyT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    cudaError_t Invoke()
+    qudaError_t Invoke()
     {
         typedef typename DispatchSegmentedRadixSort::MaxPolicy MaxPolicyT;
 
@@ -1525,7 +1525,7 @@ struct DispatchSegmentedRadixSort :
 
     /// Internal dispatch routine
     CUB_RUNTIME_FUNCTION __forceinline__
-    static cudaError_t Dispatch(
+    static qudaError_t Dispatch(
         void*                   d_temp_storage,         ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                  &temp_storage_bytes,    ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         DoubleBuffer<KeyT>      &d_keys,                ///< [in,out] Double-buffer whose current buffer contains the unsorted input keys and, upon return, is updated to point to the sorted output keys
@@ -1537,12 +1537,12 @@ struct DispatchSegmentedRadixSort :
         int                     begin_bit,              ///< [in] The beginning (least-significant) bit index needed for key comparison
         int                     end_bit,                ///< [in] The past-the-end (most-significant) bit index needed for key comparison
         bool                    is_overwrite_okay,      ///< [in] Whether is okay to overwrite source buffers
-        cudaStream_t            stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        qudaStream_t            stream,                 ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                    debug_synchronous)      ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
         typedef typename DispatchSegmentedRadixSort::MaxPolicy MaxPolicyT;
 
-        cudaError_t error;
+        qudaError_t error;
         do {
             // Get PTX version
             int ptx_version;

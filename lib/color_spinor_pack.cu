@@ -82,7 +82,7 @@ namespace quda {
 
     virtual ~GenericPackGhostLauncher() { }
 
-    inline void apply(const cudaStream_t &stream) {
+    inline void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.nDim == 5) GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,5,Arg>(arg);
 	else GenericPackGhost<Float,block_float,Ns,Ms,Nc,Mc,4,Arg>(arg);

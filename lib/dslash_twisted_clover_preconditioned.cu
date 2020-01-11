@@ -26,7 +26,7 @@ namespace quda
     {
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
@@ -121,7 +121,7 @@ namespace quda
           const_cast<cudaColorSpinorField *>(static_cast<const cudaColorSpinorField *>(&in)), in.VolumeCB(),
           in.GhostFaceCB(), profile);
       policy.apply(0);
-      checkCudaError();
+      checkQudaError();
     }
   };
 

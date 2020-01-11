@@ -92,7 +92,7 @@ namespace quda {
     @param localstate CURAND rng state
  */
   template <class T>
-  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, cuRNGState& localState){
+  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, quRNGState& localState){
     T xr1, xr2, xr3, xr4, d, r;
     int k;
     xr1 = Random<T>(localState);
@@ -304,7 +304,7 @@ namespace quda {
  */
   template <class Float, int NCOLORS>
   __device__ inline void heatBathSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F,
-                                      cuRNGState& localState, Float BetaOverNc ){
+                                      quRNGState& localState, Float BetaOverNc ){
 
     if ( NCOLORS == 3 ) {
       //////////////////////////////////////////////////////////////////
@@ -648,7 +648,7 @@ namespace quda {
       }
     arg.dataOr.load((Float*)(U.data), idx, mu, parity);
     if ( HeatbathOrRelax ) {
-      cuRNGState localState = arg.rngstate.State()[ id ];
+      quRNGState localState = arg.rngstate.State()[ id ];
       heatBathSUN<Float, NCOLORS>( U, conj(staple), localState, arg.BetaOverNc );
       arg.rngstate.State()[ id ] = localState;
     }
@@ -690,7 +690,7 @@ namespace quda {
       mu = _mu;
       parity = _parity;
     }
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, tp.shared_bytes, stream >> > (arg, mu, parity);
     }
@@ -743,13 +743,13 @@ namespace quda {
       //NEED TO CHECK THIS!!!!!!
       if ( NCOLORS == 3 ) {
         long long byte = 20LL * NElems * sizeof(Float);
-        if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
+        if ( HeatbathOrRelax ) byte += 2LL * sizeof(quRNGState);
         byte *= arg.threads;
         return byte;
       }
       else{
         long long byte = 20LL * NCOLORS * NCOLORS * 2 * sizeof(Float);
-        if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
+        if ( HeatbathOrRelax ) byte += 2LL * sizeof(quRNGState);
         byte *= arg.threads;
         return byte;
       }

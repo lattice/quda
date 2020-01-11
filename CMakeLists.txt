@@ -19,11 +19,16 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 find_package(Git)
 
-# by default we will build RELASE
+# by default we will build RELEASE and CUDA backend
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
+endif()
+if(DEFINED ENV{QUDA_BACKEND})
+  set(DEFBACKEND $ENV{QUDA_BACKEND})
+else()
+  set(DEFBACKEND "CUDA")
 endif()
 
 if(GIT_FOUND)
@@ -68,6 +73,26 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
+# Backend type
+set(VALID_BACKEND_TYPES CUDA HIP)
+set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
+set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CUDA HIP)
+
+string(TOUPPER ${QUDA_BACKEND_TYPE} CHECK_BACKEND_TYPE)
+list(FIND VALID_BACKEND_TYPES ${CHECK_BACKEND_TYPE} BACKEND_TYPE_VALID)
+
+if(BACKEND_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_BACKEND_TYPE type! Valid backend types are:" "${VALID_BACKEND_TYPES}")
+endif()
+
+# Set backend preprocessor flags
+if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
+  add_definitions(-DCUDA_BACKEND)
+endif()
+if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
+  add_definitions(-DHIP_BACKEND)
+endif()
+
 #
 # PROJECT is QUDA
 #
@@ -79,6 +104,7 @@ message(STATUS "cmake version: ${CMAKE_VERSION}")
 message(STATUS "Source location: ${CMAKE_SOURCE_DIR}")
 message(STATUS "Build location: ${CMAKE_BINARY_DIR}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Backend type: ${QUDA_BACKEND_TYPE}")
 
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users

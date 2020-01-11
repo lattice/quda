@@ -605,7 +605,7 @@ int invert_test()
 
         invertMultiShiftQuda(outArray, in->V(), &inv_param);
 
-        cudaDeviceSynchronize();
+        qudaDeviceSynchronize();
 
         printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                    inv_param.gflops / inv_param.secs);
@@ -704,6 +704,33 @@ void display_test_info()
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec),
       get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
       get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
+
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+  if (eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false");
+  }
+  if (eig_use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+    if (eig_amax < 0)
+      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+    else
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  }
 
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),

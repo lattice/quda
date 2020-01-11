@@ -48,7 +48,7 @@
 #include <nvml.h>
 #endif
 
-#include <cuda.h>
+#include <quda_backend.h>
 
 #ifdef DEVELOP_ONEAPI
 #include <ks_force_quda.h>
@@ -91,7 +91,7 @@
 
 #endif // ONEAPI
 
-#include <cuda_profiler_api.h>
+#include <quda_profiler_api.h>
 
 using namespace quda;
 
@@ -173,8 +173,8 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
-cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+qudaDeviceProp deviceProp;
+qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -519,11 +519,11 @@ void initQudaDevice(int dev) {
   }
 
   int driver_version;
-  cudaDriverGetVersion(&driver_version);
+  qudaDriverGetVersion(&driver_version);
   printfQuda("CUDA Driver version = %d\n", driver_version);
 
   int runtime_version;
-  cudaRuntimeGetVersion(&runtime_version);
+  qudaRuntimeGetVersion(&runtime_version);
   printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -552,14 +552,14 @@ void initQudaDevice(int dev) {
 #endif
 
   int deviceCount;
-  cudaGetDeviceCount(&deviceCount);
+  qudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
     errorQuda("No CUDA devices found");
   }
 
   for(int i=0; i<deviceCount; i++) {
-    cudaGetDeviceProperties(&deviceProp, i);
-    checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+    qudaGetDeviceProperties(&deviceProp, i);
+    checkQudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
@@ -576,8 +576,8 @@ void initQudaDevice(int dev) {
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
 
-  cudaGetDeviceProperties(&deviceProp, dev);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+  qudaGetDeviceProperties(&deviceProp, dev);
+  checkQudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
@@ -615,8 +615,8 @@ void initQudaDevice(int dev) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
 #ifndef USE_QDPJIT
-  cudaSetDevice(dev);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
+  qudaSetDevice(dev);
+  checkQudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
 
@@ -632,9 +632,9 @@ void initQudaDevice(int dev) {
 
 
 
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  qudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  // cudaGetDeviceProperties(&deviceProp, dev);
+  // qudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -662,17 +662,17 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new qudaStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;
-  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+  qudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+    cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+  cudaStreamCreateWithPriority(&streams[Nstream-1], qudaStreamDefault, leastPriority);
 
-  checkCudaError();
+  checkQudaError();
 #ifdef DEVELOP_ONEAPI  
   createDslashEvents();
 #endif //ONEAPI  
@@ -685,7 +685,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  qudaHostGetDevicePointer((void**)&num_failures_d, (void*)num_failures_h, 0);
 
   loadTuneCache();
 
@@ -1173,16 +1173,16 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
 
     delete hack;
-    checkCudaError();
+    checkQudaError();
   }
 
   profileClover.TPSTART(QUDA_PROFILE_FREE);
@@ -1594,7 +1594,7 @@ void endQuda(void)
   char *device_reset_env = getenv("QUDA_DEVICE_RESET");
   if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
     // end this CUDA context
-    cudaDeviceReset();
+    qudaDeviceReset();
   }
 
 }
@@ -4103,7 +4103,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
 
   profileGaugeForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  checkCudaError();
+  checkQudaError();
 #else
   errorQuda("Gauge force has not been built");
 #endif // GPU_GAUGE_FORCE
@@ -4344,7 +4344,7 @@ void computeStaggeredForceQuda(void* h_mom, double dt, double delta, void *h_for
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_FREE);
   profileStaggeredForce.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  checkCudaError();
+  checkQudaError();
   return;
 }
 
@@ -4549,7 +4549,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  qudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -4779,7 +4779,7 @@ void computeCloverForceQuda(void *h_mom, double dt, void **h_x, void **h_p,
   delete dirac;
   profileCloverForce.TPSTOP(QUDA_PROFILE_FREE);
 
-  checkCudaError();
+  checkQudaError();
   profileCloverForce.TPSTOP(QUDA_PROFILE_TOTAL);
   return;
 }
@@ -4883,7 +4883,7 @@ void updateGaugeFieldQuda(void* gauge,
   if (cpuGauge) delete cpuGauge;
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_FREE);
 
-  checkCudaError();
+  checkQudaError();
 
   profileGaugeUpdate.TPSTOP(QUDA_PROFILE_TOTAL);
   return;
@@ -5053,7 +5053,7 @@ double momActionQuda(void* momentum, QudaGaugeParam* param)
 
   profileMomAction.TPSTOP(QUDA_PROFILE_FREE);
 
-  checkCudaError();
+  checkQudaError();
 
   profileMomAction.TPSTOP(QUDA_PROFILE_TOTAL);
   return action;
@@ -5113,13 +5113,13 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
 void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
-  checkCudaError();
+  cudaHostRegister(ptr, *bytes, qudaHostRegisterDefault);
+  checkQudaError();
 }
 
 void unregister_pinned_quda_(void *ptr) {
   cudaHostUnregister(ptr);
-  checkCudaError();
+  checkQudaError();
 }
 
 void new_quda_gauge_param_(QudaGaugeParam *param) {
@@ -5595,7 +5595,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
 
   GaugeFixOVRQuda.TPSTOP(QUDA_PROFILE_H2D);
 
-  checkCudaError();
+  checkQudaError();
 
   if (comm_size() == 1) {
     // perform the update
@@ -5616,7 +5616,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
     copyExtendedGauge(*cudaInGauge, *cudaInGaugeEx, QUDA_CUDA_FIELD_LOCATION);
   }
 
-  checkCudaError();
+  checkQudaError();
   // copy the gauge field back to the host
   GaugeFixOVRQuda.TPSTART(QUDA_PROFILE_D2H);
   cudaInGauge->saveCPUField(*cpuGauge);
@@ -5637,7 +5637,7 @@ int computeGaugeFixingOVRQuda(void* gauge, const unsigned int gauge_dir,  const 
     timeinfo[2] = GaugeFixOVRQuda.Last(QUDA_PROFILE_D2H);
   }
 
-  checkCudaError();
+  checkQudaError();
   return 0;
 }
 
@@ -5682,19 +5682,19 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
 
   // perform the update
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_COMPUTE);
-  checkCudaError();
+  checkQudaError();
 
   gaugefixingFFT(*cudaInGauge, gauge_dir, Nsteps, verbose_interval, alpha, autotune, tolerance, stopWtheta);
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  checkCudaError();
+  checkQudaError();
   // copy the gauge field back to the host
   GaugeFixFFTQuda.TPSTART(QUDA_PROFILE_D2H);
-  checkCudaError();
+  checkQudaError();
   cudaInGauge->saveCPUField(*cpuGauge);
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_D2H);
-  checkCudaError();
+  checkQudaError();
 
   GaugeFixFFTQuda.TPSTOP(QUDA_PROFILE_TOTAL);
 
@@ -5711,7 +5711,7 @@ int computeGaugeFixingFFTQuda(void* gauge, const unsigned int gauge_dir,  const 
     timeinfo[2] = GaugeFixFFTQuda.Last(QUDA_PROFILE_D2H);
   }
 
-  checkCudaError();
+  checkQudaError();
   return 0;
 }
 
@@ -5757,7 +5757,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);
@@ -5835,7 +5835,7 @@ double qChargeDensityQuda(void *h_qDensity)
   profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileQCharge.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_qDensity, d_qDensity, size, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_qDensity, d_qDensity, size, qudaMemcpyDeviceToHost);
   profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
 
   profileQCharge.TPSTART(QUDA_PROFILE_FREE);

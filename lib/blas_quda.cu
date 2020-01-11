@@ -22,7 +22,7 @@ namespace quda {
     unsigned long long flops;
     unsigned long long bytes;
 
-    static cudaStream_t *blasStream;
+    static qudaStream_t *blasStream;
 
     template <typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename SpinorV, typename Functor>
@@ -84,7 +84,7 @@ namespace quda {
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.f).name(), aux); }
 
-      inline void apply(const cudaStream_t &stream)
+      inline void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
@@ -167,7 +167,7 @@ namespace quda {
       blas::bytes += blas.bytes();
       blas::flops += blas.flops();
 
-      checkCudaError();
+      checkQudaError();
     }
 
     /**
@@ -539,7 +539,7 @@ namespace quda {
       endReduce();
     }
 
-    cudaStream_t* getStream() { return blasStream; }
+    qudaStream_t* getStream() { return blasStream; }
 
     void axpbyz(double a, ColorSpinorField &x, double b,
                 ColorSpinorField &y, ColorSpinorField &z) {

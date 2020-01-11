@@ -61,12 +61,12 @@ namespace cub {
 
 
 /**
- * \brief %If \p CUB_STDERR is defined and \p error is not \p cudaSuccess, the corresponding error message is printed to \p stderr (or \p stdout in device code) along with the supplied source context.
+ * \brief %If \p CUB_STDERR is defined and \p error is not \p qudaSuccess, the corresponding error message is printed to \p stderr (or \p stdout in device code) along with the supplied source context.
  *
  * \return The CUDA error.
  */
-__host__ __device__ __forceinline__ cudaError_t Debug(
-    cudaError_t     error,
+__host__ __device__ __forceinline__ qudaError_t Debug(
+    qudaError_t     error,
     const char*     filename,
     int             line)
 {

@@ -264,7 +264,7 @@ void initFields(int prec, int order)
   if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
   if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
-  checkCudaError();
+  checkQudaError();
 
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -299,7 +299,7 @@ void initFields(int prec, int order)
   lD = new cudaColorSpinorField(param);
 
   // check for successful allocation
-  checkCudaError();
+  checkQudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 &&
@@ -370,10 +370,10 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventCreate(&end);
-  cudaEventRecord(start, 0);
+  qudaEvent_t start, end;
+  qudaEventCreate(&start);
+  qudaEventCreate(&end);
+  qudaEventRecord(start, 0);
 
   {
     switch (kernel) {
@@ -572,12 +572,12 @@ double benchmark(int kernel, const int niter) {
     }
   }
 
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
   delete[] A;
   delete[] B;
   delete[] C;

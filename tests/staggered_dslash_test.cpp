@@ -347,8 +347,8 @@ void init()
   *cudaSpinor = *spinor;
   tmp = new cudaColorSpinorField(csParam);
 
-  cudaDeviceSynchronize();
-  checkCudaError();
+  qudaDeviceSynchronize();
+  checkQudaError();
 
   bool pc = (dtest_type == dslash_test_type::MatPC); // For test_type 0, can use either pc or not pc
                               // because both call the same "Dslash" directly.
@@ -423,13 +423,13 @@ DslashTime dslashCUDA(int niter) {
   DslashTime dslash_time;
   timeval tstart, tstop;
 
-  cudaEvent_t start, end;
-  cudaEventCreate(&start);
-  cudaEventRecord(start, 0);
-  cudaEventSynchronize(start);
+  qudaEvent_t start, end;
+  qudaEventCreate(&start);
+  qudaEventRecord(start, 0);
+  qudaEventSynchronize(start);
 
   comm_barrier();
-  cudaEventRecord(start, 0);
+  qudaEventRecord(start, 0);
 
   for (int i = 0; i < niter; i++) {
 
@@ -455,19 +455,19 @@ DslashTime dslashCUDA(int niter) {
     }
   }
 
-  cudaEventCreate(&end);
-  cudaEventRecord(end, 0);
-  cudaEventSynchronize(end);
+  qudaEventCreate(&end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
   float runTime;
-  cudaEventElapsedTime(&runTime, start, end);
-  cudaEventDestroy(start);
-  cudaEventDestroy(end);
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
   dslash_time.event_time = runTime / 1000;
 
   // check for errors
-  cudaError_t stat = cudaGetLastError();
-  if (stat != cudaSuccess)
+  qudaError_t stat = cudaGetLastError();
+  if (stat != qudaSuccess)
     errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;

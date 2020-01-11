@@ -130,7 +130,7 @@ namespace quda {
       action = arg.result_h[0];
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       arg.result_h[0] = 0.0;
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -241,7 +241,7 @@ namespace quda {
       if (forceMonitor()) forceRecord(*((double2*)arg.result_h), arg.coeff, fname);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
@@ -266,7 +266,7 @@ namespace quda {
 
     checkPrecision(mom, force);
     instantiate<UpdateMom, ReconstructMom>(force, mom, coeff, fname);
-    checkCudaError();
+    checkQudaError();
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS
@@ -323,7 +323,7 @@ namespace quda {
       apply(0);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ApplyUKernel<<<tp.grid,tp.block,tp.shared_bytes,stream>>>(arg);
@@ -342,7 +342,7 @@ namespace quda {
     if (!force.isNative()) errorQuda("Unsupported output ordering: %d\n", force.Order());
     checkPrecision(force, U);
     instantiate<ApplyU, ReconstructNo12>(U, force);
-    checkCudaError();
+    checkQudaError();
 #else
     errorQuda("%s not built", __func__);
 #endif // GPU_GAUGE_TOOLS

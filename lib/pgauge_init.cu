@@ -80,10 +80,10 @@ namespace quda {
     ~InitGaugeCold () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
-      //cudaDeviceSynchronize();
+      //qudaDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {
@@ -111,7 +111,7 @@ namespace quda {
     InitGaugeColdArg<Gauge> initarg(dataOr, data);
     InitGaugeCold<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkCudaError();
+    checkQudaError();
   }
 
 
@@ -238,14 +238,14 @@ namespace quda {
     @return four real numbers of the SU(2) matrix
  */
   template <class T>
-  __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
+  __device__ static inline Matrix<T,2> randomSU2(quRNGState& localState){
     Matrix<T,2> a;
     T aabs, ctheta, stheta, phi;
     a(0,0) = Random<T>(localState, (T)-1.0, (T)1.0);
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( curand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    stheta = ( Random<T>(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
@@ -302,7 +302,7 @@ namespace quda {
     @return SU(Nc) matrix
  */
   template <class Float, int NCOLORS>
-  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState ){
+  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( quRNGState& localState ){
     Matrix<complex<Float>,NCOLORS> U;
 
     for ( int i = 0; i < NCOLORS; i++ )
@@ -330,9 +330,9 @@ namespace quda {
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
     int id = idx;
-    cuRNGState localState = arg.rngstate.State()[ id ];
+    quRNGState localState = arg.rngstate.State()[ id ];
   #else
-    cuRNGState localState = arg.rngstate.State()[ idx ];
+    quRNGState localState = arg.rngstate.State()[ idx ];
   #endif
     for ( int parity = 0; parity < 2; parity++ ) {
     #ifdef MULTI_GPU
@@ -384,10 +384,10 @@ namespace quda {
     ~InitGaugeHot () {
     }
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
-      //cudaDeviceSynchronize();
+      //qudaDeviceSynchronize();
     }
 
     TuneKey tuneKey() const {
@@ -418,7 +418,7 @@ namespace quda {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkCudaError();
+    checkQudaError();
     qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);
