@@ -866,11 +866,9 @@ RECURSIVE              = YES
 
 EXCLUDE                = @CMAKE_CURRENT_SOURCE_DIR@/../tests/gtest-all.cc \
                          @CMAKE_CURRENT_SOURCE_DIR@/../tests/gtest.h \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../include/cub \
+                         @CMAKE_CURRENT_SOURCE_DIR@/../tests/googletest \
                          @CMAKE_CURRENT_SOURCE_DIR@/../externals \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../externals \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../include/generics \
-                         @CMAKE_CURRENT_SOURCE_DIR@/../include/trove
+                         @CMAKE_CURRENT_SOURCE_DIR@/../include/externals 
 
 # The EXCLUDE_SYMLINKS tag can be used to select whether or not files or
 # directories that are symbolic links (a Unix file system feature) are excluded
@@ -886,7 +884,7 @@ EXCLUDE_SYMLINKS       = NO
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories for example use the pattern */test/*
 
-EXCLUDE_PATTERNS       = 
+EXCLUDE_PATTERNS       =  
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
@@ -1663,7 +1661,7 @@ EXTRA_SEARCH_MAPPINGS  =
 # If the GENERATE_LATEX tag is set to YES, doxygen will generate LaTeX output.
 # The default value is: YES.
 
-GENERATE_LATEX         = YES
+GENERATE_LATEX         = NO
 
 # The LATEX_OUTPUT tag is used to specify where the LaTeX docs will be put. If a
 # relative path is entered the value of OUTPUT_DIRECTORY will be put in front of
@@ -2383,7 +2381,7 @@ DOT_IMAGE_FORMAT       = png
 # The default value is: NO.
 # This tag requires that the tag HAVE_DOT is set to YES.
 
-INTERACTIVE_SVG        = NO
+INTERACTIVE_SVG        = YES
 
 # The DOT_PATH tag can be used to specify the path where the dot tool can be
 # found. If left blank, it is assumed the dot tool can be found in the path.
