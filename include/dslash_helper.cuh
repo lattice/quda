@@ -550,6 +550,7 @@ namespace quda
                 ;
               ;
             }
+            __threadfence();
           }
         }
         __syncthreads();
