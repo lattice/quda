@@ -136,7 +136,7 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // We know exactly what the scale should be: the max of all of the (fat) links.
-    double max_scale = arg.U.abs_max();
+    double max_scale = G_.abs_max();
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Global U_max = %e\n", max_scale);
 
     if (coarseGauge::fixedPoint()) {
@@ -154,11 +154,11 @@ namespace quda {
     y.apply(0);
 
     if (getVerbosity() >= QUDA_VERBOSE) {
-      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, arg.Y.norm2( 4+d ));
-      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2( d ));
+      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
+      for (int d = 0; d < nDim; d++) printfQuda("Y2[%d] = %e\n", d, Y_.norm2( d ));
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
   }
 
   template <typename Float, typename vFloat, int fineColor, int fineSpin, int coarseColor, int coarseSpin>
