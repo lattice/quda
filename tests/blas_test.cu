@@ -111,6 +111,10 @@ bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQ
 
 bool skip_kernel(int precision, int kernel, int order)
 {
+#ifdef DEVELOP_ONEAPI	
+#else	
+  if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION) return true;
+#endif
   if ((QUDA_PRECISION & getPrecision(precision)) == 0) return true;
 
   // if we've selected a given kernel then make sure we only run that
@@ -246,14 +250,24 @@ void initFields(int prec, int order)
   case 2:
     setPrec(param, QUDA_SINGLE_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
+#ifdef DEVELOP_ONEAPI
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
+#else
+    mid_aux_prec = high_aux_prec;
+    low_aux_prec = high_aux_prec;
+#endif    
     break;
   case 3:
     setPrec(param, QUDA_DOUBLE_PRECISION, order);
     high_aux_prec = QUDA_SINGLE_PRECISION;
+#ifdef DEVELOP_ONEAPI   
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
+#else
+    mid_aux_prec = high_aux_prec;
+    low_aux_prec = high_aux_prec;
+#endif    
     break;
   default:
     errorQuda("Precision option not defined");
