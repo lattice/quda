@@ -358,28 +358,28 @@ namespace quda {
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
      */
-    double norm1(int dim=-1) const;
+    double norm1(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared
      */
-    double norm2(int dim=-1) const;
+    double norm2(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute maximum value
      */
-    double abs_max(int dim=-1) const;
+    double abs_max(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute minimum value
      */
-    double abs_min(int dim=-1) const;
+    double abs_min(int dim = -1, bool fixed = false) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -389,7 +389,7 @@ namespace quda {
        a field has changed with a global update algorithm.
        @return checksum value
      */
-    uint64_t checksum(bool mini=false) const;
+    uint64_t checksum(bool mini = false) const;
 
     /**
        @brief Create the gauge field, with meta data specified in the

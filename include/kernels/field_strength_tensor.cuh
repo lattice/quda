@@ -34,7 +34,7 @@ namespace quda
   };
 
   template <int mu, int nu, typename Arg>
-  __device__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
+  __device__ __host__ __forceinline__ void computeFmunuCore(Arg &arg, int idx, int parity)
   {
     typedef Matrix<complex<typename Arg::Float>, 3> Link;
 

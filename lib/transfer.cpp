@@ -68,11 +68,8 @@ namespace quda {
     }
 
     if (ndim > 4) {
-      if (geo_bs[4] != 1) {
-        geo_bs[4] = 1;
-        warningQuda(
-          "5th dimension block size is being set to 1. This is a benign side effect of staggered fermions.\n");
-      }
+      geo_bs[4] = 1;
+      warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions");
     }
 
     this->geo_bs = new int[ndim];

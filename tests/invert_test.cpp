@@ -93,25 +93,25 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
   eig_param.cuda_prec_ritz = prec;
 
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_NO;
-    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
+    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
   eig_param.a_max = eig_amax;
 
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
 
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
     construct_spinor_source(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
 
     // if deflating preserve the deflation space between solves
-    eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     if (multishift) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
@@ -439,25 +439,34 @@ int main(int argc, char **argv)
   rng->Release();
   delete rng;
 
-  auto mean_time = 0.0;
-  auto mean_time2 = 0.0;
-  auto mean_gflops = 0.0;
-  auto mean_gflops2 = 0.0;
-  for (int i = 0; i < Nsrc; i++) {
-    mean_time += time[i];
-    mean_time2 += time[i] * time[i];
-    mean_gflops += gflops[i];
-    mean_gflops2 += gflops[i] * gflops[i];
-  }
+  if (Nsrc > 1) {
+    auto mean_time = 0.0;
+    auto mean_time2 = 0.0;
+    auto mean_gflops = 0.0;
+    auto mean_gflops2 = 0.0;
+    // skip first solve due to allocations, potential UVM swapping overhead
+    for (int i = 1; i < Nsrc; i++) {
+      mean_time += time[i];
+      mean_time2 += time[i] * time[i];
+      mean_gflops += gflops[i];
+      mean_gflops2 += gflops[i] * gflops[i];
+    }
 
-  mean_time /= Nsrc;
-  mean_time2 /= Nsrc;
-  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
-  mean_gflops /= Nsrc;
-  mean_gflops2 /= Nsrc;
-  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
-             stddev_time, mean_gflops, stddev_gflops);
+    auto NsrcM1 = Nsrc - 1;
+
+    mean_time /= NsrcM1;
+    mean_time2 /= NsrcM1;
+    auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
+                                    std::numeric_limits<double>::infinity();
+    mean_gflops /= NsrcM1;
+    mean_gflops2 /= NsrcM1;
+    auto stddev_gflops = NsrcM1 > 1 ?
+      sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+      std::numeric_limits<double>::infinity();
+    printfQuda(
+      "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
+      mean_time, stddev_time, mean_gflops, stddev_gflops);
+  }
 
   delete[] time;
   delete[] gflops;

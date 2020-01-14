@@ -401,9 +401,11 @@
 #define QUDA_INVALID_SETUP_TYPE QUDA_INVALID_ENUM
 
 #define QudaBoolean integer(4)
-#define QUDA_BOOLEAN_NO 0
-#define QUDA_BOOLEAN_YES 1
+#define QUDA_BOOLEAN_FALSE 0
+#define QUDA_BOOLEAN_TRUE 1
 #define QUDA_BOOLEAN_INVALID QUDA_INVALID_ENUM
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE // backwards compatibility
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE // backwards compatibility
 
 #define QudaDirection integer(4)
 #define QUDA_BACKWARDS -1

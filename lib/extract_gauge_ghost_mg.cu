@@ -59,13 +59,11 @@ namespace quda {
     if (u.LinkType() != QUDA_COARSE_LINKS)
       errorQuda("Link type %d not supported", u.LinkType());
 
-    if (u.Ncolor() == 12) { // free field Wilson
-      extractGhostMG<Float, 12>(u, Ghost, extract, offset);
-    } else if (u.Ncolor() == 32) {
-      extractGhostMG<Float, 32>(u, Ghost, extract, offset);
-    } else if (u.Ncolor() == 48) {
+    if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost, extract, offset);
 #ifdef NSPIN4
+    } else if (u.Ncolor() == 12) { // free field Wilson
+      extractGhostMG<Float, 12>(u, Ghost, extract, offset);
     } else if (u.Ncolor() == 64) {
       extractGhostMG<Float, 64>(u, Ghost, extract, offset);
 #endif // NSPIN4
