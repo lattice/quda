@@ -68,13 +68,27 @@ public:
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
     //Set each step type as an arg parameter, update halos if needed
+
+    // Step W1
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, WFLOW_STEP_W1);
-    if (comm_partitioned()) out.exchangeExtendedGhost(out.R(), false);
+    if (comm_partitioned()) {
+      in.exchangeExtendedGhost(in.R(), false);
+      out.exchangeExtendedGhost(out.R(), false);
+    }
+
+    // Step W2
     instantiate<GaugeWFlowStep>(in, temp, out, epsilon, WFLOW_STEP_W2);
-    if (comm_partitioned()) in.exchangeExtendedGhost(out.R(), false);
+    if (comm_partitioned()) {
+      in.exchangeExtendedGhost(in.R(), false);
+      out.exchangeExtendedGhost(out.R(), false);
+    }
+
+    // Step Vt
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, WFLOW_STEP_VT);
-    if (comm_partitioned()) out.exchangeExtendedGhost(out.R(), false);
-    
+    if (comm_partitioned()) {
+      in.exchangeExtendedGhost(in.R(), false);
+      out.exchangeExtendedGhost(out.R(), false);
+    }
 #else
     errorQuda("Gauge tools are not built");
 #endif
