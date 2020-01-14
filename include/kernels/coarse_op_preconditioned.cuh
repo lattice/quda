@@ -3,7 +3,9 @@
 
 namespace quda {
 
-  template <typename Float, typename PreconditionedGauge, typename Gauge, int n> struct CalculateYhatArg {
+  template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_> struct CalculateYhatArg {
+    using Float = Float_;
+    static constexpr int n = n_;
     PreconditionedGauge Yhat;
     const Gauge Y;
     const Gauge Xinv;
@@ -32,9 +34,10 @@ namespace quda {
     }
   };
 
-  template <typename Float, int n, bool compute_max_only, typename Arg>
-  inline __device__ __host__ Float computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j)
+  template <bool compute_max_only, typename Arg>
+  inline __device__ __host__ typename Arg::Float computeYhat(Arg &arg, int d, int x_cb, int parity, int i, int j)
   {
+    using Float = typename Arg::Float;
     constexpr int nDim = 4;
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -48,7 +51,7 @@ namespace quda {
 
       complex<Float> yHat = 0.0;
 #pragma unroll
-      for (int k = 0; k<n; k++) {
+      for (int k = 0; k<Arg::n; k++) {
         yHat = cmac(arg.Y.Ghost(d,1-parity,ghost_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
       if (compute_max_only) {
@@ -62,7 +65,7 @@ namespace quda {
 
       complex<Float> yHat = 0.0;
 #pragma unroll
-      for (int k = 0; k<n; k++) {
+      for (int k = 0; k<Arg::n; k++) {
         yHat = cmac(arg.Y(d,1-parity,back_idx,i,k), conj(arg.Xinv(0,parity,x_cb,j,k)), yHat);
       }
       if (compute_max_only) {
@@ -75,7 +78,7 @@ namespace quda {
     // now do the forwards links X^{-1} * Y^{-\mu}
     complex<Float> yHat = 0.0;
 #pragma unroll
-    for (int k = 0; k<n; k++) {
+    for (int k = 0; k<Arg::n; k++) {
       yHat = cmac(arg.Xinv(0,parity,x_cb,i,k), arg.Y(d+4,parity,x_cb,k,j), yHat);
     }
     if (compute_max_only) {
@@ -87,16 +90,16 @@ namespace quda {
     return yHatMax;
   }
 
-  template <typename Float, int n, bool compute_max_only, typename Arg> void CalculateYhatCPU(Arg &arg)
+  template <bool compute_max_only, typename Arg> void CalculateYhatCPU(Arg &arg)
   {
-    Float max = 0.0;
+    typename Arg::Float max = 0.0;
     for (int d=0; d<4; d++) {
       for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
         for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
-          for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++) {
-              Float max_x = computeYhat<Float, n, compute_max_only>(arg, d, x_cb, parity, i, j);
+          for (int i = 0; i < Arg::n; i++)
+            for (int j = 0; j < Arg::n; j++) {
+              typename Arg::Float max_x = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
               if (compute_max_only) max = max > max_x ? max : max_x;
             }
         }
@@ -105,8 +108,9 @@ namespace quda {
     if (compute_max_only) *arg.max_h = max;
   }
 
-  template <typename Float, int n, bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
+  template <bool compute_max_only, typename Arg> __global__ void CalculateYhatGPU(Arg arg)
   {
+    constexpr auto n = Arg::n;
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.coarseVolumeCB) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
@@ -119,8 +123,8 @@ namespace quda {
     int j = j_d % n;
     int d = j_d / n;
 
-    Float max = computeYhat<Float, n, compute_max_only>(arg, d, x_cb, parity, i, j);
-    if (compute_max_only) atomicMax(arg.max_d, max);
+    typename Arg::Float max = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
+    if (compute_max_only) atomicAbsMax(arg.max_d, max);
   }
 
 } // namespace quda

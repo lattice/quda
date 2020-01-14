@@ -644,7 +644,7 @@ void comm_dim_partitioned_reset(){
 
 int comm_dim_partitioned(int dim)
 {
-  return (manual_set_partition[dim] || (comm_dim(dim) > 1));
+  return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1));
 }
 
 int comm_partitioned()

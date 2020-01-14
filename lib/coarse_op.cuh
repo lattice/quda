@@ -27,7 +27,381 @@ namespace quda {
     COMPUTE_INVALID
   };
 
-  template <bool from_coarse, typename Float, int fineSpin,
+  /**
+     @brief Launcher for CPU instantiations of coarse-link construction
+   */
+  template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
+            int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
+    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
+    {
+      if (type == COMPUTE_UV) {
+        if (arg.dir == QUDA_BACKWARDS) {
+          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+        } else if (arg.dir == QUDA_FORWARDS) {
+          if      (arg.dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+        } else {
+          errorQuda("Undefined direction %d", arg.dir);
+        }
+      } else if (type == COMPUTE_AV) {
+        if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
+
+#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+        ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+#else
+        errorQuda("Clover dslash has not been built");
+#endif
+
+      } else if (type == COMPUTE_TMAV) {
+        if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
+
+#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+        ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+#else
+        errorQuda("Twisted mass dslash has not been built");
+#endif
+
+      } else if (type == COMPUTE_TMCAV) {
+        if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
+
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+        ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
+#else
+        errorQuda("Twisted clover dslash has not been built");
+#endif
+
+      } else if (type == COMPUTE_CLOVER_INV_MAX) {
+        if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
+
+#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+        ComputeCloverInvMaxCPU<Float, false>(arg);
+#else
+        errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
+#endif
+
+      } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
+        if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
+
+#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+        ComputeCloverInvMaxCPU<Float, true>(arg);
+#else
+        errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
+#endif
+
+      } else if (type == COMPUTE_VUV) {
+        if (arg.dir == QUDA_BACKWARDS) {
+          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+        } else if (arg.dir == QUDA_FORWARDS) {
+          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+        } else {
+          errorQuda("Undefined direction %d", arg.dir);
+        }
+      } else if (type == COMPUTE_COARSE_CLOVER) {
+        ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
+      } else if (type == COMPUTE_REVERSE_Y) {
+        ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_DIAGONAL) {
+        AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_TMDIAGONAL) {
+        AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_CONVERT) {
+        ConvertCPU<Float,coarseSpin,coarseColor>(arg);
+      } else if (type == COMPUTE_RESCALE) {
+        RescaleYCPU<Float,coarseSpin,coarseColor>(arg);
+      } else {
+        errorQuda("Undefined compute type %d", type);
+      }
+    }
+  };
+
+  /**
+     @brief Launcher for GPU instantiations of coarse-link construction
+  */
+  template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
+  struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
+    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
+    {
+#ifdef JITIFY
+      using namespace jitify::reflection;
+#endif
+      if (type == COMPUTE_UV) {
+
+        if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeUVGPU")
+          .instantiate(from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        if (arg.dir == QUDA_BACKWARDS) {
+          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        } else if (arg.dir == QUDA_FORWARDS) {
+          if      (arg.dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          else if (arg.dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+        }
+#endif
+
+      } else if (type == COMPUTE_AV) {
+
+        if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeAVGPU")
+          .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
+          ComputeAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+          errorQuda("Clover dslash has not been built");
+#endif
+#endif
+
+      } else if (type == COMPUTE_TMAV) {
+
+        if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeTMAVGPU")
+          .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
+        ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+        errorQuda("Twisted mass dslash has not been built");
+#endif
+#endif
+
+      } else if (type == COMPUTE_TMCAV) {
+
+        if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeTMCAVGPU")
+          .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
+        ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#else
+        errorQuda("Twisted clover dslash has not been built");
+#endif
+#endif
+
+      } else if (type == COMPUTE_CLOVER_INV_MAX) {
+
+        if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
+        arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB *sizeof(Float)));
+
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeCloverInvMaxGPU")
+          .instantiate(Type<Float>(), false, Type<Arg>())
+          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+          .launch(arg);
+#else
+#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+        ComputeCloverInvMaxGPU<Float, false><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+#else
+        errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
+#endif
+#endif
+
+        if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
+          thrust_allocator alloc;
+          thrust::device_ptr<Float> ptr(arg.max_d);
+          arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr + 2 * arg.fineVolumeCB,
+                                     static_cast<Float>(0.0), thrust::maximum<Float>());
+        }
+        pool_device_free(arg.max_d);
+
+      } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
+
+        if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
+        arg.max_d = static_cast<Float *>(pool_device_malloc(2 * arg.fineVolumeCB * sizeof(Float)));
+
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeCloverInvMaxGPU")
+          .instantiate(Type<Float>(), true, Type<Arg>())
+          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
+          .launch(arg);
+#else
+#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
+        ComputeCloverInvMaxGPU<Float, true><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+#else
+        errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
+#endif
+#endif
+
+        if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
+          thrust_allocator alloc;
+          thrust::device_ptr<Float> ptr(arg.max_d);
+          arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
+        }
+        pool_device_free(arg.max_d);
+
+      } else if (type == COMPUTE_VUV) {
+
+        // need to resize the grid since we don't tune over the entire coarseColor dimension
+        // factor of two comes from parity onto different blocks (e.g. in the grid)
+        tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
+        tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
+
+        arg.shared_atomic = tp.aux.y;
+        arg.parity_flip = tp.aux.z;
+
+        if (arg.shared_atomic) {
+          // check we have a valid problem size for shared atomics
+          // constrint is due to how shared memory initialization and global store are done
+          int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
+          if (block_size/2 < coarseSpin*coarseSpin)
+            errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
+
+          arg.aggregates_per_block = tp.aux.x;
+          tp.block.x *= tp.aux.x;
+          tp.grid.x /= tp.aux.x;
+        }
+
+        if (arg.coarse_color_wave) {
+          // swap x and y grids
+          std::swap(tp.grid.y,tp.grid.x);
+          // augment x grid with coarseColor row grid (z grid)
+          arg.grid_z = tp.grid.z;
+          arg.coarse_color_grid_z = coarseColor*tp.grid.z;
+          tp.grid.x *= tp.grid.z;
+          tp.grid.z = 1;
+        }
+
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeVUVGPU")
+          .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        if (arg.shared_atomic) {
+          if (arg.parity_flip != true) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
+          constexpr bool parity_flip = true;
+
+          if (arg.dir == QUDA_BACKWARDS) {
+            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          } else if (arg.dir == QUDA_FORWARDS) {
+            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          } else {
+            errorQuda("Undefined direction %d", arg.dir);
+          }
+        } else {
+          if (arg.parity_flip != false) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
+          constexpr bool parity_flip = false;
+
+          if (arg.dir == QUDA_BACKWARDS) {
+            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          } else if (arg.dir == QUDA_FORWARDS) {
+            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+          } else {
+            errorQuda("Undefined direction %d", arg.dir);
+          }
+        }
+#endif
+
+        if (arg.coarse_color_wave) {
+          // revert the grids
+          tp.grid.z = arg.grid_z;
+          tp.grid.x /= tp.grid.z;
+          std::swap(tp.grid.x,tp.grid.y);
+        }
+
+        if (arg.shared_atomic) {
+          tp.block.x /= tp.aux.x;
+          tp.grid.x *= tp.aux.x;
+        }
+
+      } else if (type == COMPUTE_COARSE_CLOVER) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeCoarseCloverGPU")
+          .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>
+          <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+
+      } else if (type == COMPUTE_REVERSE_Y) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::ComputeYReverseGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        ComputeYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+      } else if (type == COMPUTE_DIAGONAL) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::AddCoarseDiagonalGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+      } else if (type == COMPUTE_TMDIAGONAL) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::AddCoarseTmDiagonalGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+      } else if (type == COMPUTE_CONVERT) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::ConvertGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+      } else if (type == COMPUTE_RESCALE) {
+
+#ifdef JITIFY
+        error = program->kernel("quda::RescaleYGPU")
+          .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
+          .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
+#else
+        RescaleYGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+#endif
+
+      } else {
+        errorQuda("Undefined compute type %d", type);
+      }
+    }
+  };
+
+  template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
 	    int fineColor, int coarseSpin, int coarseColor, typename Arg>
   class CalculateY : public TunableVectorYZ {
   public:
@@ -191,408 +565,18 @@ namespace quda {
       strcat(aux, comm_dim_partitioned_string());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
-    virtual ~CalculateY() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const cudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-
-      if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-
-	if (type == COMPUTE_UV) {
-
-	  if (dir == QUDA_BACKWARDS) {
-	    if      (dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	  } else if (dir == QUDA_FORWARDS) {
-	    if      (dim==0) ComputeUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==1) ComputeUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==2) ComputeUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==3) ComputeUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	  } else {
-	    errorQuda("Undefined direction %d", dir);
-	  }
-
-	} else if (type == COMPUTE_AV) {
-
-	  if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          ComputeAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
-#else
-          errorQuda("Clover dslash has not been built");
-#endif
-
-	} else if (type == COMPUTE_TMAV) {
-
-	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-          ComputeTMAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
-#else
-          errorQuda("Twisted mass dslash has not been built");
-#endif
-
-	} else if (type == COMPUTE_TMCAV) {
-
-	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          ComputeTMCAVCPU<Float,fineSpin,fineColor,coarseColor>(arg);
-#else
-          errorQuda("Twisted clover dslash has not been built");
-#endif
-
-	} else if (type == COMPUTE_CLOVER_INV_MAX) {
-
-	  if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          ComputeCloverInvMaxCPU<Float, false>(arg);
-#else
-          errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
-#endif
-
-        } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
-
-          if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          ComputeCloverInvMaxCPU<Float, true>(arg);
-#else
-	  errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
-#endif
-
-        } else if (type == COMPUTE_VUV) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-
-          if (dir == QUDA_BACKWARDS) {
-	    if      (dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	  } else if (dir == QUDA_FORWARDS) {
-	    if      (dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	    else if (dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-	  } else {
-	    errorQuda("Undefined direction %d", dir);
-	  }
-
-        } else if (type == COMPUTE_COARSE_CLOVER) {
-
-          ComputeCoarseCloverCPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>(arg);
-
-        } else if (type == COMPUTE_REVERSE_Y) {
-
-          ComputeYReverseCPU<Float,coarseSpin,coarseColor>(arg);
-
-        } else if (type == COMPUTE_DIAGONAL) {
-
-          AddCoarseDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
-
-        } else if (type == COMPUTE_TMDIAGONAL) {
-
-          AddCoarseTmDiagonalCPU<Float,coarseSpin,coarseColor>(arg);
-
-        } else if (type == COMPUTE_CONVERT) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-	  ConvertCPU<Float,coarseSpin,coarseColor>(arg);
-
-        } else if (type == COMPUTE_RESCALE) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-	  RescaleYCPU<Float,coarseSpin,coarseColor>(arg);
-
-        } else {
-          errorQuda("Undefined compute type %d", type);
-        }
-      } else {
-
-	if (type == COMPUTE_UV) {
-
-          if (dir != QUDA_BACKWARDS && dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", dir);
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeUVGPU")
-            .instantiate(from_coarse,Type<Float>(),dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-          if (dir == QUDA_BACKWARDS) {
-	    if      (dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	  } else if (dir == QUDA_FORWARDS) {
-	    if      (dim==0) ComputeUVGPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==1) ComputeUVGPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==2) ComputeUVGPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	    else if (dim==3) ComputeUVGPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-	  }
-#endif
-
-	} else if (type == COMPUTE_AV) {
-
-	  if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeAVGPU")
-            .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          ComputeAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-          errorQuda("Clover dslash has not been built");
-#endif
-#endif
-
-	} else if (type == COMPUTE_TMAV) {
-
-	  if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeTMAVGPU")
-            .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-          ComputeTMAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-          errorQuda("Twisted mass dslash has not been built");
-#endif
-#endif
-
-	} else if (type == COMPUTE_TMCAV) {
-
-	  if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeTMCAVGPU")
-            .instantiate(Type<Float>(),fineSpin,fineColor,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          ComputeTMCAVGPU<Float,fineSpin,fineColor,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#else
-          errorQuda("Twisted clover dslash has not been built");
-#endif
-#endif
-
-	} else if (type == COMPUTE_CLOVER_INV_MAX) {
-
-	  if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
-	  arg.max_d = static_cast<Float*>(pool_device_malloc(2 * arg.fineVolumeCB *sizeof(Float)));
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeCloverInvMaxGPU")
-                             .instantiate(Type<Float>(), false, Type<Arg>())
-                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                             .launch(arg);
-#else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          ComputeCloverInvMaxGPU<Float, false><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#else
-          errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
-#endif
-#endif
-
-          if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
-            thrust_allocator alloc;
-            thrust::device_ptr<Float> ptr(arg.max_d);
-            arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr + 2 * arg.fineVolumeCB,
-                static_cast<Float>(0.0), thrust::maximum<Float>());
-          }
-          pool_device_free(arg.max_d);
-
-        } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
-
-          if (from_coarse) errorQuda("ComputeCloverInvMax should only be called from the fine grid");
-          arg.max_d = static_cast<Float *>(pool_device_malloc(2 * arg.fineVolumeCB * sizeof(Float)));
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeCloverInvMaxGPU")
-                             .instantiate(Type<Float>(), true, Type<Arg>())
-                             .configure(tp.grid, tp.block, tp.shared_bytes, stream)
-                             .launch(arg);
-#else
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          ComputeCloverInvMaxGPU<Float, true><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#else
-	  errorQuda("ComputeCloverInvMax only enabled with dynamic clover");
-#endif
-#endif
-
-          if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
-            thrust_allocator alloc;
-            thrust::device_ptr<Float> ptr(arg.max_d);
-            arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
-          }
-          pool_device_free(arg.max_d);
-
-        } else if (type == COMPUTE_VUV) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-
-          // need to resize the grid since we don't tune over the entire coarseColor dimension
-          // factor of two comes from parity onto different blocks (e.g. in the grid)
-          tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
-          tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
-
-          arg.shared_atomic = tp.aux.y;
-          arg.parity_flip = tp.aux.z;
-
-          if (arg.shared_atomic) {
-            // check we have a valid problem size for shared atomics
-            // constrint is due to how shared memory initialization and global store are done
-            int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
-            if (block_size/2 < coarseSpin*coarseSpin)
-              errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
-
-            arg.aggregates_per_block = tp.aux.x;
-            tp.block.x *= tp.aux.x;
-            tp.grid.x /= tp.aux.x;
-          }
-
-          if (arg.coarse_color_wave) {
-            // swap x and y grids
-            std::swap(tp.grid.y,tp.grid.x);
-            // augment x grid with coarseColor row grid (z grid)
-            arg.grid_z = tp.grid.z;
-            arg.coarse_color_grid_z = coarseColor*tp.grid.z;
-            tp.grid.x *= tp.grid.z;
-            tp.grid.z = 1;
-          }
-
-          tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeVUVGPU")
-            .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),dim,dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-          if (arg.shared_atomic) {
-            if (arg.parity_flip != true) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
-            constexpr bool parity_flip = true;
-
-            if (dir == QUDA_BACKWARDS) {
-              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            } else if (dir == QUDA_FORWARDS) {
-              if      (dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            } else {
-              errorQuda("Undefined direction %d", dir);
-            }
-          } else {
-            if (arg.parity_flip != false) errorQuda("parity_flip = %d not instantiated", arg.parity_flip);
-            constexpr bool parity_flip = false;
-
-            if (dir == QUDA_BACKWARDS) {
-              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            } else if (dir == QUDA_FORWARDS) {
-              if      (dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-              else if (dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            } else {
-              errorQuda("Undefined direction %d", dir);
-            }
-          }
-#endif
-          tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
-
-          if (arg.coarse_color_wave) {
-            // revert the grids
-            tp.grid.z = arg.grid_z;
-            tp.grid.x /= tp.grid.z;
-            std::swap(tp.grid.x,tp.grid.y);
-          }
-
-          if (arg.shared_atomic) {
-            tp.block.x /= tp.aux.x;
-            tp.grid.x *= tp.aux.x;
-          }
-
-        } else if (type == COMPUTE_COARSE_CLOVER) {
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeCoarseCloverGPU")
-            .instantiate(from_coarse,Type<Float>(),fineSpin,coarseSpin,fineColor,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	  ComputeCoarseCloverGPU<from_coarse,Float,fineSpin,coarseSpin,fineColor,coarseColor>
-	    <<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-
-        } else if (type == COMPUTE_REVERSE_Y) {
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ComputeYReverseGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	  ComputeYReverseGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-        } else if (type == COMPUTE_DIAGONAL) {
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::AddCoarseDiagonalGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	  AddCoarseDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-        } else if (type == COMPUTE_TMDIAGONAL) {
-
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::AddCoarseTmDiagonalGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-          AddCoarseTmDiagonalGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-        } else if (type == COMPUTE_CONVERT) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::ConvertGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	  ConvertGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-        } else if (type == COMPUTE_RESCALE) {
-
-          arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
-#ifdef JITIFY
-          using namespace jitify::reflection;
-          jitify_error = program->kernel("quda::RescaleYGPU")
-            .instantiate(Type<Float>(),coarseSpin,coarseColor,Type<Arg>())
-            .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
-#else
-	  RescaleYGPU<Float,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-#endif
-
-        } else {
-          errorQuda("Undefined compute type %d", type);
-        }
-      }
-    }
+      arg.dim = dim;
+      arg.dir = dir;
+      if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
+
+      if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
+      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, stream);
+      if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
+    };
 
     /**
        Set which dimension we are working on (where applicable)
@@ -839,8 +823,6 @@ namespace quda {
     }
   };
 
-
-
   /**
      @brief Calculate the coarse-link field, including the coarse clover field.
 
@@ -864,14 +846,15 @@ namespace quda {
      @param need_bidirectional[in] If we need to force bi-directional build or not. Required
      if some previous level was preconditioned, even if this one isn't
    */
-  template<bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
+  template<QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename F,
 	   typename Ftmp, typename Vt, typename coarseGauge, typename coarseGaugeAtomic, typename fineGauge, typename fineClover>
   void calculateY(coarseGauge &Y, coarseGauge &X,
 		  coarseGaugeAtomic &Y_atomic, coarseGaugeAtomic &X_atomic,
 		  Ftmp &UV, F &AV, Vt &V, fineGauge &G, fineClover &C, fineClover &Cinv,
 		  GaugeField &Y_, GaugeField &X_, GaugeField &Y_atomic_, GaugeField &X_atomic_,
                   ColorSpinorField &uv, ColorSpinorField &av, const ColorSpinorField &v,
-		  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
+		  const GaugeField &G_, const CloverField &C_,
+                  double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc,
 		  bool need_bidirectional, const int *fine_to_coarse, const int *coarse_to_fine) {
 
     // sanity checks
@@ -916,10 +899,10 @@ namespace quda {
     typedef CalculateYArg<Float,fineSpin,coarseSpin,fineColor,coarseColor,coarseGauge,coarseGaugeAtomic,fineGauge,F,Ftmp,Vt,fineClover> Arg;
     Arg arg(Y, X, Y_atomic, X_atomic, UV, AV, G, V, C, Cinv, kappa,
 	    mu, mu_factor, x_size, xc_size, geo_bs, spin_bs, fine_to_coarse, coarse_to_fine, bidirectional_links);
-    CalculateY<from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_);
+    CalculateY<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> y(arg, v, Y_, X_, Y_atomic_, X_atomic_);
 
-    QudaFieldLocation location = checkLocation(Y_, X_, av, v);
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
+    QudaFieldLocation location_ = checkLocation(Y_, X_, av, v);
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Running link coarsening on the %s\n", location_ == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU");
 
     // do exchange of null-space vectors
     const int nFace = 1;
@@ -942,7 +925,7 @@ namespace quda {
         y.apply(0);
         double max = 6 * arg.max_h;
 #else
-        double max = 6*arg.Cinv.abs_max(0);
+        double max = 6*C_.abs_max(true);
 #endif
         if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("clover max %e\n", max);
 	av.Scale(max);
@@ -990,7 +973,7 @@ namespace quda {
         y.apply(0);
 	double max = 6*sqrt(arg.max_h);
 #else
-	double max = 6*sqrt(arg.Cinv.abs_max(0));
+	double max = 6*sqrt(C_.abs_max(true));
 #endif
 	if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("tmc max %e\n", max);
 	av.Scale(max);
@@ -1006,7 +989,9 @@ namespace quda {
     // work out what to set the scales to
     if (coarseGaugeAtomic::fixedPoint()) {
       double max = 500.0; // Should be more than sufficient
+      Y_atomic_.Scale(max);
       arg.Y_atomic.resetScale(max);
+      X_atomic_.Scale(max);
       arg.X_atomic.resetScale(max);
     }
 
@@ -1024,7 +1009,7 @@ namespace quda {
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing forward %d UV and VUV\n", d);
 
 	if (uv.Precision() == QUDA_HALF_PRECISION) {
-	  double U_max = 3.0*arg.U.abs_max(from_coarse ? d+4 : d);
+	  double U_max = 3.0*G_.abs_max(from_coarse ? d+4 : d);
 	  double uv_max = U_max * v.Scale();
 	  uv.Scale(uv_max);
 	  arg.UV.resetScale(uv_max);
@@ -1036,18 +1021,19 @@ namespace quda {
 	y.apply(0);
 	if (getVerbosity() >= QUDA_VERBOSE) printfQuda("UV2[%d] = %e\n", d, arg.UV.norm2());
 
-      // if we are writing to a temporary, we need to zero it before each computation
+        // if we are writing to a temporary, we need to zero it before each computation
         if (Y_atomic.Geometry() == 1) Y_atomic_.zero();
 
         y.setComputeType(COMPUTE_VUV); // compute Y += VUV
         y.apply(0);
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", 4+d, arg.Y_atomic.norm2( (4+d) % arg.Y_atomic.geometry ));
+        if (getVerbosity() >= QUDA_VERBOSE)
+          printfQuda("Y2[%d] (atomic) = %e\n", 4+d, Y_atomic_.norm2((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
         // now convert from atomic to application computation format if necessary for Y[d]
         if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint()) {
 
           if (coarseGauge::fixedPoint()) {
-            double y_max = arg.Y_atomic.abs_max( (4+d) % arg.Y_atomic.geometry );
+            double y_max = Y_atomic_.abs_max((4+d) % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
 
             if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", 4+d, y_max, 4+d, Y_.Scale());
             if (!set_scale) {
@@ -1073,7 +1059,7 @@ namespace quda {
           y.setComputeType(COMPUTE_CONVERT);
           y.apply(0);
 
-          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, arg.Y.norm2( 4+d ));
+          if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", 4+d, Y_.norm2( 4+d ));
         }
 
       }
@@ -1093,7 +1079,7 @@ namespace quda {
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Computing backward %d UV and VUV\n", d);
 
       if (uv.Precision() == QUDA_HALF_PRECISION) {
-	double U_max = 3.0*arg.U.abs_max(d);
+	double U_max = 3.0*G_.abs_max(d);
 	double uv_max = U_max * av.Scale();
 	uv.Scale(uv_max);
 	arg.UV.resetScale(uv_max);
@@ -1110,13 +1096,14 @@ namespace quda {
 
       y.setComputeType(COMPUTE_VUV); // compute Y += VUV
       y.apply(0);
-      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] (atomic) = %e\n", d, arg.Y_atomic.norm2( d%arg.Y_atomic.geometry ));
+      if (getVerbosity() >= QUDA_VERBOSE)
+        printfQuda("Y2[%d] (atomic) = %e\n", d, Y_atomic_.norm2(d%arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint()));
 
       // now convert from atomic to application computation format if necessary for Y[d]
       if (coarseGaugeAtomic::fixedPoint() || coarseGauge::fixedPoint() ) {
 
         if (coarseGauge::fixedPoint()) {
-          double y_max = arg.Y_atomic.abs_max( d % arg.Y_atomic.geometry );
+          double y_max = Y_atomic_.abs_max(d % arg.Y_atomic.geometry, coarseGaugeAtomic::fixedPoint());
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Y[%d] (atomic) max = %e Y[%d] scale = %e\n", d, y_max, d, Y_.Scale());
 
           if (!set_scale) {
@@ -1152,12 +1139,12 @@ namespace quda {
         y.setComputeType(COMPUTE_CONVERT);
         y.apply(0);
 
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, arg.Y.norm2( d ));
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Y2[%d] = %e\n", d, Y_.norm2( d ));
       }
 
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X_atomic.norm2(0));
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_atomic_.norm2(0, coarseGaugeAtomic::fixedPoint()));
 
     // if not doing a preconditioned operator then we can trivially
     // construct the forward links from the backward links
@@ -1193,7 +1180,7 @@ namespace quda {
       y.setDirection(QUDA_BACKWARDS);
 
       if (coarseGauge::fixedPoint()) {
-        double x_max = arg.X_atomic.abs_max(0);
+        double x_max = X_atomic_.abs_max(0, coarseGaugeAtomic::fixedPoint());
         X_.Scale(x_max);
         arg.X.resetScale(x_max);
       }
@@ -1202,9 +1189,7 @@ namespace quda {
       y.apply(0);
     }
 
-    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", arg.X.norm2(0));
-
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("X2 = %e\n", X_.norm2(0));
   }
-
 
 } // namespace quda
