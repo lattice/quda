@@ -399,7 +399,9 @@ namespace quda
       // MWTODO: This can probably be merged
       bool amLast;
       if (!intranode && pack_internode) {
-        __threadfence();
+
+        __threadfence(); // make sure all data is visible device wide
+        __syncthreads(); // make sure all threads in this block arrived here
 
         if (threadIdx.x == 0) {
           unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
@@ -409,6 +411,7 @@ namespace quda
           if (amLast) {
             // send data over IB if necessary
             if (getShmemBuffer<1, decltype(arg)>(shmemidx, arg) != nullptr) shmem_putbuffer(shmemidx, arg);
+            nvshmem_fence(); // this might not be needed to gurantee ordering over IB
             // shmem barrier part I
             if (arg.shmem & 8) {
               if (!(getNeighborRank(2 * dim + dir, arg) < 0))
@@ -420,11 +423,13 @@ namespace quda
         }
       }
       if (intranode && pack_intranode) {
-        __threadfence();
+        __threadfence_system(); // make sure all data is visible node wide
+        __syncthreads(); // make sure all threads in this block arrived here 
         if (threadIdx.x == 0) {
           unsigned int ticket = atomicInc(retirementCount + shmemidx, (unsigned int)arg.blocks_per_dir);
           amLast = (ticket == arg.blocks_per_dir - 1);
         }
+        
 
         if (threadIdx.x == 0) {
           if (amLast) {
@@ -533,51 +538,51 @@ namespace quda
       bool intranode = getShmemBuffer<1, decltype(arg)>(shmemidx, arg) == nullptr;
       bool pack_intranode = (!arg.packkernel) != (!(shmem & 1));
       bool pack_internode = (!arg.packkernel) != (!(shmem & 2));
-
-      if (shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode)) {
-      switch (dim) {
-      case 0:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<0, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<0, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
+             if (shmem == 0 || (intranode && pack_intranode) || (!intranode && pack_internode))
+        {
+          switch (dim) {
+          case 0:
+            while (local_tid < arg.nFace * arg.dc.ghostFaceCB[0]) {
+              int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[0] + local_tid;
+              if (arg.nFace == 1)
+                packStaggered<0, 1>(arg, ghost_idx, s, parity);
+              else
+                packStaggered<0, 3>(arg, ghost_idx, s, parity);
+              local_tid += arg.blocks_per_dir * blockDim.x;
+            }
+            break;
+          case 1:
+            while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
+              int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
+              if (arg.nFace == 1)
+                packStaggered<1, 1>(arg, ghost_idx, s, parity);
+              else
+                packStaggered<1, 3>(arg, ghost_idx, s, parity);
+              local_tid += arg.blocks_per_dir * blockDim.x;
+            }
+            break;
+          case 2:
+            while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
+              int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
+              if (arg.nFace == 1)
+                packStaggered<2, 1>(arg, ghost_idx, s, parity);
+              else
+                packStaggered<2, 3>(arg, ghost_idx, s, parity);
+              local_tid += arg.blocks_per_dir * blockDim.x;
+            }
+            break;
+          case 3:
+            while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
+              int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
+              if (arg.nFace == 1)
+                packStaggered<3, 1>(arg, ghost_idx, s, parity);
+              else
+                packStaggered<3, 3>(arg, ghost_idx, s, parity);
+              local_tid += arg.blocks_per_dir * blockDim.x;
+            }
+            break;
+          }
         }
-        break;
-      case 1:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[1]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[1] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<1, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<1, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 2:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[2]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[2] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<2, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<2, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      case 3:
-        while (local_tid < arg.nFace * arg.dc.ghostFaceCB[3]) {
-          int ghost_idx = dir * arg.nFace * arg.dc.ghostFaceCB[3] + local_tid;
-          if (arg.nFace == 1)
-            packStaggered<3, 1>(arg, ghost_idx, s, parity);
-          else
-            packStaggered<3, 3>(arg, ghost_idx, s, parity);
-          local_tid += arg.blocks_per_dir * blockDim.x;
-        }
-        break;
-      }
-    }
 
 #ifdef NVSHMEM_COMMS
 if(arg.shmem){
