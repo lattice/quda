@@ -22,7 +22,7 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
-set(TEST_LIBS quda quda_test)
+set(TEST_LIBS quda quda_test ${QUDA_LIBS})
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
