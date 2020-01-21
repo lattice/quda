@@ -1,4 +1,4 @@
-Version 1.0.0 - xx December 2019
+Version 1.0.0 - 10 January 2020
 
 - Add support for CUDA 10.2: QUDA 1.0.0 is supported on CUDA 7.5-10.2
   using either GCC or clang compilers.  CUDA 10.x and either GCC >=
