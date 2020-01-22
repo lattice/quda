@@ -76,7 +76,7 @@ public:
     if (comm_partitioned()) {
       out.exchangeExtendedGhost(out.R(), false);
       temp.exchangeExtendedGhost(temp.R(), false);
-    }      
+      }      
     // Step W2
     instantiate<GaugeWFlowStep>(in, temp, out, epsilon, wflow_type, WFLOW_STEP_W2);
     if (comm_partitioned()) {
@@ -87,7 +87,6 @@ public:
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_VT);
     if (comm_partitioned()) {
       out.exchangeExtendedGhost(out.R(), false);
-      temp.exchangeExtendedGhost(temp.R(), false);
     }    
 #else
     errorQuda("Gauge tools are not built");

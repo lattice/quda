@@ -48,8 +48,7 @@ namespace quda
       Link F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
 		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
       
-      for(int i=0; i<6; i++) {
-	
+      for(int i=0; i<6; i++) {	
 	// Make tracless
 	trace = oneOnThree * getTrace(F[i]);
 	temp1 = F[i] - trace * iden;
@@ -57,7 +56,7 @@ namespace quda
 	// Sum trace of square, normalise in .cu
 	if (i<3) E.x -= getTrace(temp1 * temp1).real(); //spatial
 	else     E.y -= getTrace(temp1 * temp1).real(); //temporal
-      }
+      }      
       x_cb += blockDim.x * gridDim.x;
     }
     reduce2d<blockSize, 2>(arg, E);

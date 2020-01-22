@@ -49,7 +49,7 @@ namespace quda
       double Q2 = getTrace(conj(F[1]) * F[4]).real();
       double Q3 = getTrace(F[3] * F[2]).real();
       double Q_idx = (Q1 + Q3 + Q2);
-      Q += Q_idx;      
+      Q += Q_idx;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx;
       
       x_cb += blockDim.x * gridDim.x;

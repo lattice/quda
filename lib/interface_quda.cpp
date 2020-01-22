@@ -5541,8 +5541,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
-
   double3 plaq = plaquette(*gaugeSmeared);
+  
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after 0 WFlow steps: %.16e %.16e %.16e\n", 3*plaq.x, 3*plaq.y, 3*plaq.z);
   }
@@ -5560,16 +5560,18 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
 
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
     // https://arxiv.org/abs/1006.4518v3
+    profileWFlow.TPSTART(QUDA_PROFILE_COMPUTE);
     WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size, wflow_type);
+    profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
   
   delete cudaGaugeTemp;
   delete cudaGaugeAux;
+  profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
   plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
   }
-  profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
