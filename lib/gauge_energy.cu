@@ -43,7 +43,6 @@ public:
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-	//LAUNCH_KERNEL(energyComputeKernel, (*this), tp, stream, arg, Arg);
 	LAUNCH_KERNEL_LOCAL_PARITY(energyComputeKernel, (*this), tp, stream, arg, Arg);
 #endif
       } else { // run the CPU code

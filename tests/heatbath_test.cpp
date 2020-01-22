@@ -120,7 +120,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
    if(num_failures>0) errorQuda("Error in the unitarization\n");
    device_free(num_failures_dev);
-}
+  }
 
 int main(int argc, char **argv)
 {
@@ -178,8 +178,6 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device);
-
-  setVerbosity(verbosity);
 
   {
     using namespace quda;
@@ -251,30 +249,12 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette(*gaugeEx);
-
-    GaugeFieldParam tensorParam(gaugeEx->X(), gaugeEx->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
-    tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-    tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-    cudaGaugeField Fmunu(tensorParam);
-
-    computeFmunu(Fmunu, *gauge);
-    double charge = quda::computeQCharge(Fmunu);
-    // double charge = qChargeQuda();
-    printfQuda("Initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
+    double charge = qChargeQuda();
+    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, charge);
 
     // Reunitarization setup
     setReunitarizationConsts();
-    // CallUnitarizeLinks(gaugeEx);
-    // plaquette(*gaugeEx);
-    // CallUnitarizeLinks(gaugeEx);
-    // copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
-    plaq = plaquette(*gaugeEx);
-    computeFmunu(Fmunu, *gauge);
-    charge = quda::computeQCharge(Fmunu);
-    // charge = qChargeQuda();
-    printfQuda("Second initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
+    plaquette(*gaugeEx);
 
     // Do a warmup if requested
     if (nwarm > 0) {
@@ -283,6 +263,7 @@ int main(int argc, char **argv)
         CallUnitarizeLinks(gaugeEx);
       }
     }
+      
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -319,7 +300,7 @@ int main(int argc, char **argv)
     }
 
     // Save if output string is specified
-    if (strcmp(gauge_outfile, "")) {
+    if (strcmp(gauge_outfile,"")) {
 
       printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
 
@@ -328,25 +309,28 @@ int main(int argc, char **argv)
 
       size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
+      for (int dir = 0; dir < 4; dir++) {
+        cpu_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+      }
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
-      saveGaugeFieldQuda((void *)cpu_gauge, (void *)gauge, &gauge_param);
+      saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
 
-      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char **)0);
+      write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
 
-      for (int dir = 0; dir < 4; dir++) free(cpu_gauge[dir]);
+
+      for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
     } else {
       printfQuda("No output file specified.\n");
     }
 
     delete gauge;
     delete gaugeEx;
-    // Release all temporary memory used for data exchange between GPUs in multi-GPU mode
+    //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
-
+ 
     randstates->Release();
     delete randstates;
   }
@@ -354,20 +338,21 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-
-  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone, total time = %g secs\n", time0);
+    
+  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printfQuda("\nDone, total time = %g secs\n", 
+	 time0);
 
   freeGaugeQuda();
-
+  
   // finalize the QUDA library
   endQuda();
 
   // finalize the communications layer
   finalizeComms();
 
-  for (int dir = 0; dir < 4; dir++) free(load_gauge[dir]);
+  for (int dir = 0; dir<4; dir++) free(load_gauge[dir]);
 
   return 0;
 }
