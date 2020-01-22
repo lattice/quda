@@ -5542,9 +5542,9 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
   double3 plaq = plaquette(*gaugeSmeared);
-  
+
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after 0 WFlow steps: %.16e %.16e %.16e\n", 3*plaq.x, 3*plaq.y, 3*plaq.z);
+    printfQuda("Plaquette after 0 WFlow steps: %.16e %.16e %.16e\n", 3 * plaq.x, 3 * plaq.y, 3 * plaq.z);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
@@ -5564,7 +5564,7 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
     WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size, wflow_type);
     profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
   }
-  
+
   delete cudaGaugeTemp;
   delete cudaGaugeAux;
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
@@ -5808,10 +5808,10 @@ double qChargeQuda()
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cudaGaugeField Fmunu(tensorParam);
-  
+
   profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
   profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
-  
+
   computeFmunu(Fmunu, *gauge);
   double charge = quda::computeQCharge(Fmunu);
 

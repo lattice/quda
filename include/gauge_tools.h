@@ -81,7 +81,7 @@ namespace quda
      @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
      @param[in] epsilon Step size
-     @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples 
+     @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples
   */
   void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double epsilon, QudaWFlowType wflow_type);
 

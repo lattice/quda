@@ -84,7 +84,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -169,7 +169,8 @@ int main(int argc, char **argv)
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
+             plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
 
@@ -201,8 +202,8 @@ int main(int argc, char **argv)
 
   // Q charge Reduction and normalisation
   comm_allreduce(&qChargeCheck);
-  qChargeCheck /= (-4*M_PI*M_PI);
-  
+  qChargeCheck /= (-4 * M_PI * M_PI);
+
   printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
              qCharge - qChargeCheck);

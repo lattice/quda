@@ -1269,14 +1269,14 @@ extern "C" {
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeQuda();
-  
+
   /**
-   * Calculates the field energy from gaugeSmeared, if it exists, or from gaugePrecise 
+   * Calculates the field energy from gaugeSmeared, if it exists, or from gaugePrecise
    * if no smeared fields are present.
    * @param energy Array for total, spatial, temporal energies
    */
   void energyQuda(double energy[3]);
-  
+
   /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data

@@ -257,25 +257,23 @@ int main(int argc, char **argv)
     tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
     tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
     cudaGaugeField Fmunu(tensorParam);
-    
+
     computeFmunu(Fmunu, *gauge);
     double charge = quda::computeQCharge(Fmunu);
-    //double charge = qChargeQuda();
+    // double charge = qChargeQuda();
     printfQuda("Initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
 
     // Reunitarization setup
     setReunitarizationConsts();
-    //CallUnitarizeLinks(gaugeEx);
-    //plaquette(*gaugeEx);
-    //CallUnitarizeLinks(gaugeEx);
-    //copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-    
-    
+    // CallUnitarizeLinks(gaugeEx);
+    // plaquette(*gaugeEx);
+    // CallUnitarizeLinks(gaugeEx);
+    // copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     plaq = plaquette(*gaugeEx);
     computeFmunu(Fmunu, *gauge);
     charge = quda::computeQCharge(Fmunu);
-    //charge = qChargeQuda();
+    // charge = qChargeQuda();
     printfQuda("Second initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
 
     // Do a warmup if requested
@@ -285,7 +283,6 @@ int main(int argc, char **argv)
         CallUnitarizeLinks(gaugeEx);
       }
     }
-    
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
