@@ -15,6 +15,8 @@
 #include <quda_define.h>
 #include <quda_constants.h>
 
+#include <vector>
+
 #ifndef __CUDACC_RTC__
 #define double_complex double _Complex
 #else // keep NVRTC happy since it can't handle C types
@@ -1197,6 +1199,23 @@ extern "C" {
    * @param Location of gauge field
    */
   void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+
+
+  void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc);
+  
+  /**
+   * Calculate the LaMET objects with two spinor fields using the gauge field.
+   * @param h_out  Result correlator, contracted by gamma matrices with two spinor fields;
+   * @param h_q    Input quark field
+   * @param h_qbar Input anti-quark field (taking conjugate in the contraction)
+   * @param param  Contains all metadata regarding host and device
+   *               storage and operator which will be applied to the spinor
+   * @param s_q    shift patterm of the quark field
+   * @param s_q    shift patterm of the anti-quark field
+  **/
+  
+  void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertParam *inv_param,
+        void *s_q, void *s_qbar);
 
   /**
    * Performs Wuppertal smearing on a given spinor using the gauge field

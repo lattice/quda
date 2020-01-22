@@ -5315,6 +5315,128 @@ void copyExtendedResidentGaugeQuda(void* resident_gauge, QudaFieldLocation loc)
   return;
 }
 
+
+  /**
+   * pre_shift: shift without any contraction;
+   * pre_shift: shift with contraction at each step;
+   * both of them should have 2N elements, the 2*i -th element for the total length of the shift,
+   *         the 2*i+1 -th element for the direction of the shift.
+  **/
+
+
+  class shiftPatternQuda
+  {
+      public:
+      std::vector<int> pre_shift;
+      std::vector<int> post_shift;
+
+      void check()
+      {
+           if(pre_shift.size()%2!=0||post_shift.size()%2!=0) 
+                errorQuda("shift vector length incorrect (%5d, %5d)\n",pre_shift.size(),post_shift.size());
+           for(int i=0;i<pre_shift.size();i+=2)
+           if(pre_shift[i]<0||pre_shift[i+1]<0||pre_shift[i+1]>7)
+                errorQuda("pre_shift patterm %d incorrect, (%6d,%6d)\n",i/2,pre_shift[i],pre_shift[i+1]);
+           for(int i=0;i<post_shift.size();i+=2)
+           if(post_shift[i]<0||post_shift[i+1]<0||post_shift[i+1]>7)
+                errorQuda("post_shift patterm %d incorrect, (%6d,%6d)\n",i/2,post_shift[i],post_shift[i+1]);
+      }
+  };
+
+void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertParam *inv_param,
+        void *p_s_q, void *p_s_qbar)
+{
+
+     if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
+
+//check shiftPattern
+     shiftPatternQuda s_q=*(shiftPatternQuda *)p_s_q;
+     shiftPatternQuda s_qbar=*(shiftPatternQuda *)p_s_qbar;
+     if(s_qbar.post_shift.size()>0) errorQuda("Only the post_shift of quark is supported at present\n");
+     s_q.check();
+     s_qbar.check();
+     int count=1;
+     for(int i=0;i<s_q.post_shift.size();i+=2)
+         count+=s_q.post_shift[i];
+     if(h_out.size()!=count) errorQuda("The size of h_out is incorrect (h_out.size() v.s. count)\n");
+
+//setup input fields
+     cudaGaugeField *precise = gaugePrecise; //set the gauge field to be what defined in loadgaugeQuda;
+
+     ColorSpinorParam cpuParam_q((void *)h_q, *inv_param, precise->X(), false, inv_param->input_location);
+     ColorSpinorField *in_q = ColorSpinorField::Create(cpuParam_q);
+     ColorSpinorParam cudaParam(cpuParam_q, *inv_param);
+
+     cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
+     cudaParam.create = QUDA_NULL_FIELD_CREATE;
+       // Quda uses Degrand-Rossi gamma basis for contractions and will
+       // automatically reorder data if necessary.
+     cudaParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+     cudaParam.setPrecision(cpuParam_q.Precision(), cpuParam_q.Precision(), true);
+
+     ColorSpinorField  *q = ColorSpinorField::Create(cudaParam);
+     *q=*in_q;
+
+     ColorSpinorParam cpuParam_qbar((void*)h_qbar, *inv_param, precise->X(), false, inv_param->input_location);
+     ColorSpinorField *in_qbar = ColorSpinorField::Create(cpuParam_qbar);
+     ColorSpinorField *qbar = ColorSpinorField::Create(cudaParam);
+     *qbar=*in_qbar;
+
+     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+       double q2 = blas::norm2(*q);
+       double qbar2 = blas::norm2(*qbar);
+       printfQuda("In QUDA: norm2(q) %e  nor2(qbar) %e\n", q2, qbar2);
+     }
+
+     ColorSpinorField * tmp=ColorSpinorField::Create(cudaParam);
+
+
+//setup covDev operator;
+     DiracParam diracParam;
+     setDiracParam(diracParam, inv_param, false);
+     GaugeCovDev dirac(diracParam);
+
+
+     for(int i=0;i<s_q.pre_shift.size();i+=2)
+     for(int j=0;j<s_q.pre_shift[i];j++)
+     {
+         *tmp=*q;
+         dirac.MCD(*tmp,*q,s_q.pre_shift[i+1]);
+         *q = *tmp;
+     }
+
+     for(int i=0;i<s_qbar.pre_shift.size();i+=2)
+     for(int j=0;j<s_qbar.pre_shift[i];j++)
+     {
+         *tmp=*qbar;
+         dirac.MCD(*tmp,*qbar,s_qbar.pre_shift[i+1]);
+         *qbar = *tmp;
+     }
+     size_t data_bytes = q->Volume() * q->Nspin() * q->Nspin() * 2 * q->Precision();
+     void *d_result = pool_device_malloc(data_bytes);
+
+     contractQuda(*q,*qbar,d_result,QUDA_CONTRACT_TYPE_DR);
+     qudaMemcpy(h_out[0], d_result, data_bytes, hipMemcpyDeviceToHost);
+    
+     count=1;     
+     for(int i=0;i<s_q.post_shift.size();i+=2)
+     for(int j=0;j<s_q.post_shift[i];j++)
+     {
+         *tmp=*q;
+         dirac.MCD(*tmp,*q,(s_q.post_shift[i+1]+4)%8);
+         *q = *tmp;
+         contractQuda(*q,*qbar,d_result,QUDA_CONTRACT_TYPE_DR);
+         qudaMemcpy(h_out[count], d_result, data_bytes, hipMemcpyDeviceToHost);
+         count++;
+     }
+
+     delete in_q,in_qbar;
+     delete q,qbar;
+     delete tmp;
+     pool_device_free(d_result); 
+}
+
+
 void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *inv_param, unsigned int nSteps, double alpha)
 {
   profileWuppertal.TPSTART(QUDA_PROFILE_TOTAL);
