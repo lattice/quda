@@ -102,8 +102,8 @@ namespace quda {
 
 #ifndef __CUDACC_RTC___
   template <typename sumFloat, typename Float, int nSpin, int spinBlockSize, int nColor, int coarseSpin, int nVec, typename Arg>
-  void blockOrthoCPU(Arg &arg) {
-
+  void blockOrthoCPU(Arg &arg)
+  {
     // loop over geometric blocks
 #pragma omp parallel for
     for (int x_coarse=0; x_coarse<arg.coarseVolume; x_coarse++) {
@@ -154,7 +154,7 @@ namespace quda {
                 int x_cb = x - parity * arg.fineVolumeCB;
 
                 complex<Float> v[nSpin][nColor];
-                if (i == 0)
+                if (n == 0)
                   for (int s = 0; s < nSpin; s++)
                     for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
                 else
@@ -184,7 +184,7 @@ namespace quda {
               int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j == 0)
+              if (n == 0)
                 for (int s = 0; s < nSpin; s++)
                   for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
               else
@@ -205,7 +205,7 @@ namespace quda {
               int x_cb = x - parity * arg.fineVolumeCB;
 
               complex<Float> v[nSpin][nColor];
-              if (j == 0)
+              if (n == 0)
                 for (int s = 0; s < nSpin; s++)
                   for (int c = 0; c < nColor; c++) v[s][c] = arg.B[j](parity, x_cb, s, c);
               else
@@ -231,7 +231,6 @@ namespace quda {
             int nVec, typename Arg>
   __launch_bounds__(2 * block_size) __global__ void blockOrthoGPU(Arg arg)
   {
-
     int x_coarse = blockIdx.x;
 #ifdef SWIZZLE
     // the portion of the grid that is exactly divisible by the number of SMs
