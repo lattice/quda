@@ -81,8 +81,9 @@ namespace quda
      @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
      @param[in] epsilon Step size
+     @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples 
   */
-  void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double epsilon);
+  void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double epsilon, QudaWFlowType wflow_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -144,9 +145,9 @@ namespace quda
   /**
      @brief Compute the field energy
      @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @return double The total field energy
+     @return double3 The total, spatial, and temporal field energy
   */
-  double computeEnergy(const GaugeField &Fmunu);
+  double3 computeEnergy(const GaugeField &Fmunu);
 
   /**
      @brief Compute the topological charge density per lattice site

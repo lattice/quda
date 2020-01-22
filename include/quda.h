@@ -1261,19 +1261,22 @@ extern "C" {
    * @param n_steps Number of steps to apply.
    * @param step_size Size of Wilson Flow step
    * @param meas_interval Measure the Q charge and field energy every Nth step
+   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
    */
-  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval);
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
   double qChargeQuda();
-
+  
   /**
-   * Calculates the field energy from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
+   * Calculates the field energy from gaugeSmeared, if it exists, or from gaugePrecise 
+   * if no smeared fields are present.
+   * @param energy Array for total, spatial, temporal energies
    */
-  double energyQuda();
-
+  void energyQuda(double energy[3]);
+  
   /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data

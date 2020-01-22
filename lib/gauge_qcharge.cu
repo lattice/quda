@@ -1,7 +1,6 @@
 #include <quda_internal.h>
 #include <tune_quda.h>
 #include <gauge_field.h>
-
 #include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
 #include <kernels/gauge_qcharge.cuh>
@@ -14,13 +13,16 @@ namespace quda
   {
     Arg &arg;
     const GaugeField &meta;
-
-private:
+    
+  private:
     bool tuneGridDim() const { return true; }
     unsigned int minThreads() const { return arg.threads; }
-
-public:
-    QChargeCompute(Arg &arg, const GaugeField &meta) : arg(arg), meta(meta)
+    
+  public:
+    QChargeCompute(Arg &arg, const GaugeField &meta) : 
+      TunableLocalParity(),
+      arg(arg), 
+      meta(meta)
     {
 #ifdef JITIFY
       create_jitify_program("kernels/gauge_qcharge.cuh");
@@ -68,16 +70,16 @@ public:
 
         checkCudaError();
         comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0];
+        charge = arg.result_h[0] / (-4*M_PI*M_PI);
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qDensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
-
+	
         checkCudaError();
         comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0];
+        charge = arg.result_h[0] / (-4*M_PI*M_PI);
       }
     }
   };

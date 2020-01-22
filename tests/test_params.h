@@ -331,6 +331,7 @@ extern double ape_smear_rho;
 extern int smear_steps;
 extern double wflow_epsilon;
 extern int wflow_steps;
+extern QudaWFlowType wflow_type;
 extern int measurement_interval;
 
 extern QudaContractType contract_type;

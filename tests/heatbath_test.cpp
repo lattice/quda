@@ -120,7 +120,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
    cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
    if(num_failures>0) errorQuda("Error in the unitarization\n");
    device_free(num_failures_dev);
-  }
+}
 
 int main(int argc, char **argv)
 {
@@ -251,12 +251,32 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette(*gaugeEx);
-    double charge = qChargeQuda();
-    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, charge);
+
+    GaugeFieldParam tensorParam(gaugeEx->X(), gaugeEx->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
+    tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
+    tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
+    tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+    cudaGaugeField Fmunu(tensorParam);
+    
+    computeFmunu(Fmunu, *gauge);
+    double charge = quda::computeQCharge(Fmunu);
+    //double charge = qChargeQuda();
+    printfQuda("Initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
 
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette(*gaugeEx);
+    //CallUnitarizeLinks(gaugeEx);
+    //plaquette(*gaugeEx);
+    //CallUnitarizeLinks(gaugeEx);
+    //copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+    
+    
+
+    plaq = plaquette(*gaugeEx);
+    computeFmunu(Fmunu, *gauge);
+    charge = quda::computeQCharge(Fmunu);
+    //charge = qChargeQuda();
+    printfQuda("Second initial gauge field plaquette = %.16e topological charge = %.16e\n", plaq.x, charge);
 
     // Do a warmup if requested
     if (nwarm > 0) {
@@ -265,7 +285,7 @@ int main(int argc, char **argv)
         CallUnitarizeLinks(gaugeEx);
       }
     }
-      
+    
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

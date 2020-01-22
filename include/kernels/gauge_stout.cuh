@@ -82,7 +82,6 @@ namespace quda
     
     // Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu}
     //                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
-    
     OmegaDiff = conj(Omega) - Omega;
     
     Q = OmegaDiff;
@@ -94,6 +93,9 @@ namespace quda
     
     Q = Q - OmegaDiffTr * ODT;
     Q = i_2 * Q;
+    
+    //makeAntiHerm(Omega);
+    //Q = i_2 * Omega;
     // Q is now defined.
     
 #if 0
@@ -104,7 +106,7 @@ namespace quda
     error = OmegaDiffTr.real();
     printf("Trace test %d %d %.15e\n", idx, dir, error);
     
-    //Test for hemiticity:
+    //Test for hermiticity:
     Link Q_diff = conj(Q);
     Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
     Q_diff *= Q_diff;

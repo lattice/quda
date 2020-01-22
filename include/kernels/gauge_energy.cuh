@@ -10,8 +10,8 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_> struct EnergyArg :
-    public ReduceArg<double>
+  template <typename Float_, int nColor_, QudaReconstructType recon_> 
+  struct EnergyArg : public ReduceArg<double2>
   {
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -23,7 +23,7 @@ namespace quda
     F f;
 
     EnergyArg(const GaugeField &Fmunu) :
-      ReduceArg<double>(),
+      ReduceArg<double2>(),
       f(Fmunu),
       threads(Fmunu.VolumeCB())
     {
@@ -36,25 +36,27 @@ namespace quda
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
+    double2 E = make_double2(0.0,0.0);  
     using real = typename Arg::Float;
     typedef Matrix<complex<real>, Arg::nColor> Link;
-    
-    double E = 0.0;
+
     complex<real> trace;
+    Link temp1, iden;
+    setIdentity(&iden);
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
-      Matrix<complex<typename Arg::Float>, Arg::nColor> F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
-                                                               arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
-
-      Link temp1, temp2;
+      Link F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
+		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
+      
       for(int i=0; i<6; i++) {
-	// Rescale from 1/8
-	temp1 = 8 * F[i];
-	trace = oneOnThree * getTrace(temp1);
-	setIdentity(&temp2);
-	temp2 = trace * temp2;
-	temp1 = 0.5 * (temp1 - temp2);
-	E += getTrace(temp1 * conj(temp1)).real();
+	
+	// Make tracless
+	trace = oneOnThree * getTrace(F[i]);
+	temp1 = F[i] - trace * iden;
+	
+	// Sum trace of square, normalise in .cu
+	if (i<3) E.x -= getTrace(temp1 * temp1).real(); //spatial
+	else     E.y -= getTrace(temp1 * temp1).real(); //temporal
       }
       x_cb += blockDim.x * gridDim.x;
     }

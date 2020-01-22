@@ -57,6 +57,7 @@ void display_test_info()
     printfQuda("\nWilson Flow\n");
     printfQuda(" - epsilon %f\n", wflow_epsilon);
     printfQuda(" - Wilson flow steps %d\n", wflow_steps);
+    printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
     printfQuda(" - Measurement interval %d\n", measurement_interval);
     break;
   default: errorQuda("Undefined test type %d given", test_type);
@@ -82,7 +83,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   
   gauge_param.cpu_prec = cpu_prec;
 
@@ -168,7 +169,7 @@ int main(int argc, char **argv)
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1], plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
 
@@ -198,9 +199,10 @@ int main(int argc, char **argv)
     for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
   }
 
-  // Q charge Reduction
+  // Q charge Reduction and normalisation
   comm_allreduce(&qChargeCheck);
-
+  qChargeCheck /= (-4*M_PI*M_PI);
+  
   printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
              qCharge - qChargeCheck);
@@ -254,7 +256,7 @@ int main(int argc, char **argv)
     // Wilson Flow
     // Start the timer
     time0 = -((double)clock());
-    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval);
+    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type);
     // stop the timer
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;

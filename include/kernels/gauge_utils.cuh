@@ -269,7 +269,7 @@ namespace quda
           // Get link U_mu(x-mu-nu)
           dx[nu]--;
           dx[mu]--;
-          U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           // Get link U_nu(x-nu-mu)
           U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);

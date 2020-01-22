@@ -9,6 +9,7 @@ namespace quda
 {
 
   template <typename Float, int nColor, QudaReconstructType recon> class Fmunu : TunableVectorYZ
+  //template <typename Float, int nColor, QudaReconstructType recon> class Fmunu : TunableVector
   {
     FmunuArg<Float, nColor, recon> arg;
     const GaugeField &meta;
@@ -19,8 +20,9 @@ namespace quda
 public:
     Fmunu(const GaugeField &u, GaugeField &f) :
       TunableVectorYZ(2, 6),
+      //TunableVector(),
       arg(f, u),
-      meta(f)
+      meta(u)
     {
       strcpy(aux, meta.AuxString());
       strcat(aux, comm_dim_partitioned_string());
@@ -43,6 +45,7 @@ public:
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       computeFmunuKernel<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      //LAUNCH_KERNEL(computeFmunuKernel<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
     }
 
@@ -60,6 +63,7 @@ public:
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(f, u);
+    //instantiate<Fmunu>(u, f); // u must be first here for correct template instantiation
     instantiate<Fmunu,ReconstructWilson>(u, f); // u must be first here for correct template instantiation
 #else
     errorQuda("Gauge tools are not built");

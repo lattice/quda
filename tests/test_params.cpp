@@ -199,6 +199,7 @@ double ape_smear_rho = 0.6;
 int smear_steps = 50;
 double wflow_epsilon = 0.01;
 int wflow_steps = 100;
+QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
 int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
@@ -301,6 +302,9 @@ namespace
   CLI::TransformPairs<QudaEigSpectrumType> eig_spectrum_map {
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
+
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {
+    {"wilson", QUDA_WFLOW_TYPE_WILSON}, {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
 
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
@@ -785,6 +789,9 @@ void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--su3-wflow-steps", wflow_steps,
                       "The number of steps in the Runge-Kutta integrator (default 100)");
+  
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));;
 
   opgroup->add_option("--su3-measurement-interval", measurement_interval,
                       "Measure the field energy and topological charge every Nth step (default 5) ");

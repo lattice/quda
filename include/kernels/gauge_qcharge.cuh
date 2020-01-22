@@ -2,10 +2,6 @@
 #include <index_helper.cuh>
 #include <cub_helper.cuh>
 
-#ifndef Pi2
-#define Pi2 6.2831853071795864769252867665590
-#endif
-
 namespace quda
 {
 
@@ -39,26 +35,26 @@ namespace quda
     int parity = threadIdx.y;
 
     double Q = 0.0;
+    using real = typename Arg::Float;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
 
     while (x_cb < arg.threads) {
       // Load the field-strength tensor from global memory
-      Matrix<complex<typename Arg::Float>, Arg::nColor> F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
-                                                               arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
+      Link F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
+		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
 
-      double Q1 = getTrace(F[0] * F[5]).real();
-      double Q2 = getTrace(F[1] * F[4]).real();
+      //F1 = F[Y,X], F2 = F[Z,X], F3 = F[Z,Y], 
+      //F4 = F[T,X], F5 = F[T,Y], F6 = F[T,Z] 
+      double Q1 = getTrace(F[0] * F[5]).real(); 
+      double Q2 = getTrace(conj(F[1]) * F[4]).real();
       double Q3 = getTrace(F[3] * F[2]).real();
-      double Q_idx = (Q1 + Q3 - Q2);
-      Q += Q_idx;
-
-      if (Arg::density) {
-        int idx = x_cb + parity * arg.threads;
-        arg.qDensity[idx] = Q_idx / (Pi2 * Pi2);
-      }
+      double Q_idx = (Q1 + Q3 + Q2);
+      Q += Q_idx;      
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx;
+      
       x_cb += blockDim.x * gridDim.x;
     }
-    Q /= (Pi2 * Pi2);
-
+    
     reduce2d<blockSize, 2>(arg, Q);
   }
 
