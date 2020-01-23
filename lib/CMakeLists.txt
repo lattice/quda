@@ -227,7 +227,8 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_NVSHMEM)
-    target_link_libraries(quda PUBLIC -L${QUDA_NVSHMEM_HOME}/lib -lnvshmem  ${MPI_CXX_LIBRARIES})
+    get_filename_component(NVSHMEM_LIBPATH ${NVSHMEM_LIBS} DIRECTORY)
+    target_link_libraries(quda PUBLIC -L${NVSHMEM_LIBPATH} -lnvshmem  ${MPI_CXX_LIBRARIES})
 endif()
 
 
