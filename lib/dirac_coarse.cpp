@@ -373,6 +373,14 @@ namespace quda {
     }
   }
 
+  void DiracCoarse::prefetch(QudaFieldLocation mem_space) const {
+    Dirac::prefetch(mem_space);
+    if (Y_d) Y_d->prefetch(mem_space);
+    if (X_d) X_d->prefetch(mem_space);
+    if (Xinv_d) Xinv_d->prefetch(mem_space);
+    if (Yhat_d) Yhat_d->prefetch(mem_space);
+  }
+
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
   {
     /* do nothing */

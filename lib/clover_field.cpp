@@ -373,6 +373,23 @@ namespace quda {
     checkCudaError();
   }
 
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space) const
+  {
+    if (is_prefetch_enabled()) {
+      int dev_id = 0;
+      if (mem_space == QUDA_CUDA_FIELD_LOCATION) dev_id = comm_gpuid();
+      else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
+      else errorQuda("Invald QudaFieldLocation.");
+      
+      if (clover) cudaMemPrefetchAsync(clover, bytes, dev_id, 0);
+      if (norm) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, 0);
+      if (clover != cloverInv) {
+        if (cloverInv) cudaMemPrefetchAsync(cloverInv, bytes, dev_id, 0);
+        if (invNorm) cudaMemPrefetchAsync(invNorm, norm_bytes, dev_id, 0);
+      }
+    }
+  }
+
   /**
      Computes Fmunu given the gauge field U
   */

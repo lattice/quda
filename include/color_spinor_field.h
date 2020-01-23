@@ -906,6 +906,13 @@ namespace quda {
        @brief Restores the cudaColorSpinorField
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the spinor, the norm field (as appropriate), to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    void prefetch(QudaFieldLocation mem_space) const;
   };
 
   // CPU implementation

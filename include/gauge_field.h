@@ -575,6 +575,13 @@ namespace quda {
        @brief Restores the cudaGaugeField to CUDA memory
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and buffers to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    void prefetch(QudaFieldLocation mem_space) const;
   };
 
   class cpuGaugeField : public GaugeField {

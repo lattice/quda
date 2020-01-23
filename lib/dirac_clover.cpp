@@ -92,6 +92,11 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
   }
 
+  void DiracClover::prefetch(QudaFieldLocation mem_space) const {
+    Dirac::prefetch(mem_space);
+    clover.prefetch(mem_space);
+  }
+
   /*******
    * DiracCloverPC Starts here
    *******/

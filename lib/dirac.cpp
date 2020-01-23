@@ -295,4 +295,10 @@ namespace quda {
     return steps; 
   }
 
+  void Dirac::prefetch(QudaFieldLocation mem_space) const {
+    if (gauge) gauge->prefetch(mem_space);
+    if (tmp1) tmp1->prefetch(mem_space);
+    if (tmp2) tmp2->prefetch(mem_space);
+  }
+
 } // namespace quda

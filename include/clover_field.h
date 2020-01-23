@@ -234,6 +234,14 @@ namespace quda {
     */
     void saveCPUField(cpuCloverField &cpu) const;
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, the norm field (as appropriate), and the inverse
+      fields (as appropriate) to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    void prefetch(QudaFieldLocation mem_space) const;
+
     friend class DiracClover;
     friend class DiracCloverPC;
     friend struct FullClover;
