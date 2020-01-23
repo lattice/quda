@@ -163,7 +163,6 @@ if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
   target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
-  target_link_libraries(quda PUBLIC ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_JITIFY)
