@@ -759,25 +759,22 @@ namespace quda {
     m = 0.5*am;
   }
 
-  template<typename Complex,int N>
-    __device__ __host__ inline void makeHerm(Matrix<Complex,N> &m) {
+  template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
+  {
     typedef typename Complex::value_type real;
     // first make the matrix anti-hermitian
-    Matrix<Complex,N> am = conj(m) - m;
+    Matrix<Complex, N> am = conj(m) - m;
 
     // second make it traceless
     real imag_trace = 0.0;
 #pragma unroll
-    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+    for (int i = 0; i < N; i++) imag_trace += am(i, i).y;
 #pragma unroll
-    for (int i=0; i<N; i++) {
-      am(i,i).y -= imag_trace/N;
-    }
+    for (int i = 0; i < N; i++) { am(i, i).y -= imag_trace / N; }
     // third scale out anti hermitian part
-    Complex i_2(0.0,0.5);
-    m = i_2*am;
+    Complex i_2(0.0, 0.5);
+    m = i_2 * am;
   }
-
 
   // Matrix and array are very similar
   // Maybe I should factor out the similar
@@ -1416,5 +1413,5 @@ namespace quda {
       q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
-    
+
 } // end namespace quda
