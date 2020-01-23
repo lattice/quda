@@ -376,7 +376,7 @@ namespace quda {
 
       /**
          @brief Compute the absolute max element of the Hermitian matrix
-         @return Abosolue Max element
+         @return Absolute Max element
       */
       __device__ __host__ inline T max() const
       {
@@ -759,6 +759,24 @@ namespace quda {
     m = 0.5*am;
   }
 
+  template<typename Complex,int N>
+    __device__ __host__ inline void makeHerm(Matrix<Complex,N> &m) {
+    typedef typename Complex::value_type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex,N> am = conj(m) - m;
+
+    // second make it traceless
+    real imag_trace = 0.0;
+#pragma unroll
+    for (int i=0; i<N; i++) imag_trace += am(i,i).y;
+#pragma unroll
+    for (int i=0; i<N; i++) {
+      am(i,i).y -= imag_trace/N;
+    }
+    // third scale out anti hermitian part
+    Complex i_2(0.0,0.5);
+    m = i_2*am;
+  }
 
 
   // Matrix and array are very similar
@@ -1398,23 +1416,5 @@ namespace quda {
       q(7) = y21 * conj(wl31) + y22 * conj(wl32) + y23 * conj(wl33);
       q(8) = y31 * conj(wl31) + y32 * conj(wl32) + y33 * conj(wl33);
     }
-
-    template <class T> __device__ __host__ inline void herm_proj(const Matrix<T, 3> &Q, Matrix<T, 3> *HPQ)
-    {
-      // Compute HPQ = i/2[(Q^dag - Q) - 1/3 * Tr(Q^dag - Q)]
-      // Equation (2) https://arxiv.org/abs/hep-lat/0311018v1
-
-      typedef decltype(Q(0, 0).x) dataType;
-      Matrix<T, 3> QDT;
-      complex<dataType> i_2(0, 0.5);
-
-      *HPQ = conj(Q) - Q;
-      T QdiffTr = (1.0 / 3.0) * getTrace(*HPQ);
-
-      // Matrix proportional to QdiffTr
-      setIdentity(&QDT);
-      *HPQ -= QdiffTr * QDT;
-      *HPQ *= i_2;
-      // Hermitian projection of Q is now defined.
-    }
+    
 } // end namespace quda
