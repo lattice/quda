@@ -223,17 +223,14 @@ namespace quda
       createCoarseSolver();
     }
 
-    // All coarser levels have been built, prefetch the gauge fields back to device memory
-    diracCoarseResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
-    diracCoarseSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    // We're going back up the coarse construct stack now, prefetch the gauge fields on
+    // this level back to device memory.
+    diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracCoarseSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
 
     if (param.level == 0) {
-      // Prefetch the top level fields as well
-      diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
-      diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
-      diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
-
       // now we can run the verification if requested
       if (param.mg_global.run_verify) verify();
     }
