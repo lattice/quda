@@ -51,9 +51,9 @@ public:
     void postTune() { arg.out.load(); }
 
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
+    long long bytes() const { return ((1 + stoutDim * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
   }; // GaugeSTOUT
-
+  
   void STOUTStep(GaugeField &out, const GaugeField &in, double rho)
   {
 #ifdef GPU_GAUGE_TOOLS
@@ -111,7 +111,7 @@ public:
     void postTune() { arg.out.load(); }
 
     long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 4*((1+2*12)*arg.in.Bytes()+arg.out.Bytes())*arg.threads; }
+    long long bytes() const { return ((1 + stoutDim * 24) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } //24 links per dim, 1 in, 1 out
   }; // GaugeOvrImpSTOUT
 
   void OvrImpSTOUTStep(GaugeField &out, const GaugeField& in, double rho, double epsilon)

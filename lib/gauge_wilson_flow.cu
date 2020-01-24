@@ -58,7 +58,14 @@ public:
 
     //DMH: FIXME Re-evaluate these
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
+    long long bytes() const {
+      int links = 0;
+      switch(arg.wflow_type) {
+      case QUDA_WFLOW_TYPE_WILSON: links = 6; break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: links = 24; break;
+      default : errorQuda("Unknown Wilson Flow type");
+      }
+      return ((1 + wflow_dim * links) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
   }; // GaugeWFlowStep
   
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaWFlowType wflow_type)
