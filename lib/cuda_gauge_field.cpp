@@ -205,7 +205,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         if (ghost[i]) pool_device_free(ghost[i]);
-        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i]);
+        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i+4]);
       }
     }
 
