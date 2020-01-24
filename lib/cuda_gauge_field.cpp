@@ -840,7 +840,7 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaGaugeField::prefetch(QudaFieldLocation mem_space) const
+  void cudaGaugeField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
   {
 
     if (is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {
@@ -849,12 +849,12 @@ namespace quda {
       else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
       else errorQuda("Invalid QudaFieldLocation.");
       
-      if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, 0);
+      if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, stream);
       if ( !isNative() ) {
         for (int i=0; i<nDim; i++) {
           size_t nbytes = nFace * surface[i] * nInternal * precision;
-          if (ghost[i] && nbytes) cudaMemPrefetchAsync(ghost[i], nbytes, dev_id, 0);
-          if (ghost[i+4] && nbytes && geometry == QUDA_COARSE_GEOMETRY) cudaMemPrefetchAsync(ghost[i+4], nbytes, dev_id, 0);
+          if (ghost[i] && nbytes) cudaMemPrefetchAsync(ghost[i], nbytes, dev_id, stream);
+          if (ghost[i+4] && nbytes && geometry == QUDA_COARSE_GEOMETRY) cudaMemPrefetchAsync(ghost[i+4], nbytes, dev_id, stream);
         }
       }
     }

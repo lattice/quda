@@ -283,8 +283,9 @@ namespace quda {
       the gauge field and temporary spinors to the CPU or GPU
       as requested. Overloads may also grab a clover term
       @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space) const;
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Full Wilson
@@ -409,8 +410,9 @@ namespace quda {
       all relevant memory fields (gauge, clover, temporary spinors)
       to the CPU or GPU as requested
       @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space) const;
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned clover
@@ -1049,8 +1051,9 @@ public:
       all relevant memory fields (fat+long links, temporary spinors)
       to the CPU or GPU as requested
       @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space) const;
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1243,8 +1246,9 @@ public:
       all relevant memory fields (X, Y, Xinv, Yhat)
       to the CPU or GPU as requested
       @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    virtual void prefetch(QudaFieldLocation mem_space) const;
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   /**

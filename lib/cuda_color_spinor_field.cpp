@@ -574,7 +574,7 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space) const
+  void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
   {
 
     // conditionals based on destructor
@@ -584,8 +584,8 @@ namespace quda {
       else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
       else errorQuda("Invalid QudaFieldLocation.");
 
-      cudaMemPrefetchAsync(v, bytes, dev_id, 0);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, 0);
+      cudaMemPrefetchAsync(v, bytes, dev_id, stream);
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
     }
   }
 

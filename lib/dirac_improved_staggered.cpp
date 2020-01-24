@@ -129,10 +129,10 @@ namespace quda {
     StaggeredCoarseOp(Y, X, T, fatGauge, mass, QUDA_ASQTAD_DIRAC, QUDA_MATPC_INVALID);
   }
 
-  void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space) const {
-    Dirac::prefetch(mem_space);
-    fatGauge.prefetch(mem_space);
-    longGauge.prefetch(mem_space);
+  void DiracImprovedStaggered::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const {
+    Dirac::prefetch(mem_space, stream);
+    fatGauge.prefetch(mem_space, stream);
+    longGauge.prefetch(mem_space, stream);
   }
 
   DiracImprovedStaggeredPC::DiracImprovedStaggeredPC(const DiracParam &param)

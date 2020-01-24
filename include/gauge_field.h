@@ -580,8 +580,9 @@ namespace quda {
       @brief If managed memory and prefetch is enabled, prefetch
       the gauge field and buffers to the CPU or the GPU
       @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space) const;
+    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {

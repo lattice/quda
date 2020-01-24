@@ -674,7 +674,7 @@ namespace quda {
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
     */
-    virtual void prefetch(QudaFieldLocation mem_space) const { ; }
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const { ; }
   };
   
   /**

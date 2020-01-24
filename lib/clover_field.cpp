@@ -373,7 +373,7 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space) const
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
   {
     if (is_prefetch_enabled()) {
       int dev_id = 0;
@@ -381,11 +381,11 @@ namespace quda {
       else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
       else errorQuda("Invalid QudaFieldLocation.");
       
-      if (clover) cudaMemPrefetchAsync(clover, bytes, dev_id, 0);
-      if (norm) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, 0);
+      if (clover) cudaMemPrefetchAsync(clover, bytes, dev_id, stream);
+      if (norm) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
       if (clover != cloverInv) {
-        if (cloverInv) cudaMemPrefetchAsync(cloverInv, bytes, dev_id, 0);
-        if (invNorm) cudaMemPrefetchAsync(invNorm, norm_bytes, dev_id, 0);
+        if (cloverInv) cudaMemPrefetchAsync(cloverInv, bytes, dev_id, stream);
+        if (invNorm) cudaMemPrefetchAsync(invNorm, norm_bytes, dev_id, stream);
       }
     }
   }
