@@ -186,6 +186,12 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer operator done\n");
       }
 
+      // we no longer need the B fields for this level, can evict them to host memory
+      // (only if using managed memory and prefetching is enabled, otherwise no-op)
+      for (int i = 0; i < param.Nvec; i++) {
+        param.B[i]->prefetch(QUDA_CPU_FIELD_LOCATION);
+      }
+
       createCoarseDirac();
     }
 
@@ -217,7 +223,17 @@ namespace quda
       createCoarseSolver();
     }
 
+    // All coarser levels have been built, prefetch the gauge fields back to device memory
+    diracCoarseResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracCoarseSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
+    diracCoarseSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
+
     if (param.level == 0) {
+      // Prefetch the top level fields as well
+      diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
+      diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
+      diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
+
       // now we can run the verification if requested
       if (param.mg_global.run_verify) verify();
     }

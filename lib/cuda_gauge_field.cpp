@@ -847,7 +847,7 @@ namespace quda {
       int dev_id = 0;
       if (mem_space == QUDA_CUDA_FIELD_LOCATION) dev_id = comm_gpuid();
       else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
-      else errorQuda("Invald QudaFieldLocation.");
+      else errorQuda("Invalid QudaFieldLocation.");
       
       if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, 0);
       if ( !isNative() ) {
