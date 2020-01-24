@@ -70,7 +70,7 @@ namespace quda
 
         checkCudaError();
         comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0] / (-4*M_PI*M_PI);
+        charge = arg.result_h[0];
       } else {
         QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qDensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
@@ -79,7 +79,7 @@ namespace quda
 	
         checkCudaError();
         comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0] / (-4*M_PI*M_PI);
+        charge = arg.result_h[0];
       }
     }
   };

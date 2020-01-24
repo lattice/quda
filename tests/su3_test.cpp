@@ -202,7 +202,6 @@ int main(int argc, char **argv)
 
   // Q charge Reduction and normalisation
   comm_allreduce(&qChargeCheck);
-  qChargeCheck /= (-4 * M_PI * M_PI);
 
   printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
   printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,

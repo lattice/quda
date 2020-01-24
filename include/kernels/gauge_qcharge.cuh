@@ -14,11 +14,13 @@ namespace quda
     static constexpr QudaReconstructType recon = recon_;
     static constexpr bool density = density_;
     typedef typename gauge_mapper<Float,recon>::type F;
+    static constexpr Float norm = -1.0 / (4*M_PI*M_PI);
     
     int threads; // number of active threads required
     F f;
     Float *qDensity;
 
+    
     QChargeArg(const GaugeField &Fmunu, Float *qDensity = nullptr) :
       ReduceArg<double>(),
       f(Fmunu),
@@ -49,8 +51,8 @@ namespace quda
       double Q2 = getTrace(conj(F[1]) * F[4]).real();
       double Q3 = getTrace(F[3] * F[2]).real();
       double Q_idx = (Q1 + Q3 + Q2);
-      Q += Q_idx;
-      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx;
+      Q += Q_idx * Arg::norm;
+      if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx * Arg::norm;
       
       x_cb += blockDim.x * gridDim.x;
     }
