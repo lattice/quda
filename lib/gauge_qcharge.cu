@@ -13,15 +13,15 @@ namespace quda
   {
     Arg &arg;
     const GaugeField &meta;
-    
+
   private:
     bool tuneGridDim() const { return true; }
     unsigned int minThreads() const { return arg.threads; }
-    
+
   public:
-    QChargeCompute(Arg &arg, const GaugeField &meta) : 
+    QChargeCompute(Arg &arg, const GaugeField &meta) :
       TunableLocalParity(),
-      arg(arg), 
+      arg(arg),
       meta(meta)
     {
 #ifdef JITIFY
@@ -41,7 +41,7 @@ namespace quda
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-	LAUNCH_KERNEL(qChargeComputeKernel, (*this), tp, stream, arg, Arg);
+	LAUNCH_KERNEL_LOCAL_PARITY(qChargeComputeKernel, (*this), tp, stream, arg, Arg);
 #endif
       } else { // run the CPU code
         errorQuda("qChargeComputeKernel not supported on CPU");
@@ -76,7 +76,7 @@ namespace quda
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
-	
+
         checkCudaError();
         comm_allreduce((double *)arg.result_h);
         charge = arg.result_h[0] / (-4*M_PI*M_PI);
