@@ -10,7 +10,7 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, QudaReconstructType recon_> 
+  template <typename Float_, int nColor_, QudaReconstructType recon_>
   struct EnergyArg : public ReduceArg<double2>
   {
     using Float = Float_;
@@ -18,7 +18,7 @@ namespace quda
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     static constexpr QudaReconstructType recon = recon_;
     typedef typename gauge_mapper<Float,recon>::type F;
-    
+
     int threads; // number of active threads required
     F f;
 
@@ -36,7 +36,7 @@ namespace quda
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
-    double2 E = make_double2(0.0,0.0);  
+    double2 E = make_double2(0.0,0.0);
     using real = typename Arg::Float;
     typedef Matrix<complex<real>, Arg::nColor> Link;
 
@@ -47,18 +47,19 @@ namespace quda
       // Load the field-strength tensor from global memory
       Link F[] = {arg.f(0, x_cb, parity), arg.f(1, x_cb, parity), arg.f(2, x_cb, parity),
 		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
-      
-      for(int i=0; i<6; i++) {	
+
+#pragma unroll
+      for (int i=0; i<6; i++) {
 	// Make tracless
 	trace = oneOnThree * getTrace(F[i]);
 	temp1 = F[i] - trace * iden;
-	
+
 	// Sum trace of square, normalise in .cu
 	if (i<3) E.x -= getTrace(temp1 * temp1).real(); //spatial
 	else     E.y -= getTrace(temp1 * temp1).real(); //temporal
-      }      
+      }
       x_cb += blockDim.x * gridDim.x;
     }
     reduce2d<blockSize, 2>(arg, E);
-  }  
+  }
 } // namespace quda
