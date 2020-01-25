@@ -55,7 +55,7 @@ namespace quda {
 #else
       switch (arg.wflow_type) {
       case QUDA_WFLOW_TYPE_WILSON: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-      case QUDA_WFLOW_TYPE_SYMANZIK: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
       default : errorQuda("Unknown Wilson Flow type %d", arg.wflow_type);
       }
 #endif
