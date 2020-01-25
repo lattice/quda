@@ -1202,8 +1202,7 @@ namespace quda {
     }
 
   template<class T>
-    __device__  __host__ inline
-    void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
+    __device__  __host__ inline void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -1239,18 +1238,20 @@ namespace quda {
 
       //[25]
       theta  = acos(c0/c0_max);
+
+      sincos(theta*inv3, &w_p, &u_p);
       //[23]
-      u_p = sqrt(c1*inv3)*cos(theta*inv3);
+      u_p *= sqrt(c1*inv3);
 
       //[24]
-      w_p = sqrt(c1)*sin(theta*inv3);
+      w_p *= sqrt(c1);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
       matType u_sq = u_p * u_p;
       matType w_sq = w_p * w_p;
       matType denom_inv = 1.0 / (9 * u_sq - w_sq);
-      matType exp_iu_re = cos(u_p);
-      matType exp_iu_im = sin(u_p);
+      matType exp_iu_re, exp_iu_im;
+      sincos(u_p, &exp_iu_im, &exp_iu_re);
       matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
       matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
       matType cos_w = cos(w_p);
@@ -1264,7 +1265,6 @@ namespace quda {
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-
 
       //[34] Test for c0 < 0.
       int parity = 0;
@@ -1331,7 +1331,6 @@ namespace quda {
       *exp_iQ += temp2;
 
       //exp(iQ) is now defined.
-      return;
     }
 
     /**
