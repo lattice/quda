@@ -228,7 +228,6 @@ namespace quda
     diracResidual->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracSmoother->prefetch(QUDA_CUDA_FIELD_LOCATION);
     diracSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
-    diracCoarseSmootherSloppy->prefetch(QUDA_CUDA_FIELD_LOCATION);
 
     if (param.level == 0) {
       // now we can run the verification if requested
