@@ -46,11 +46,17 @@ namespace quda
 		  arg.f(3, x_cb, parity), arg.f(4, x_cb, parity), arg.f(5, x_cb, parity)};
 
       //F1 = F[Y,X], F2 = F[Z,X], F3 = F[Z,Y], 
-      //F4 = F[T,X], F5 = F[T,Y], F6 = F[T,Z] 
-      double Q1 = getTrace(F[0] * F[5]).real(); 
-      double Q2 = getTrace(conj(F[1]) * F[4]).real();
-      double Q3 = getTrace(F[3] * F[2]).real();
-      double Q_idx = (Q1 + Q3 + Q2);
+      //F4 = F[T,X], F5 = F[T,Y], F6 = F[T,Z]
+      double Q_idx = 0.0;
+      double Qi[3] = {0.0,0.0,0.0};
+      // unroll computation
+#pragma unroll
+      for (int i=0; i<3; i++) {
+	Qi[i] = getTrace(F[i] * F[5 - i]).real();
+      }
+
+      // apply correct levi-civita symbol
+      for (int i=0; i<3; i++) i%2 == 0 ? Q_idx += Qi[i]: Q_idx -= Qi[i];
       Q += Q_idx * Arg::norm;
       if (Arg::density) arg.qDensity[x_cb + parity * arg.threads] = Q_idx * Arg::norm;
       
