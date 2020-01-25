@@ -96,21 +96,15 @@ namespace quda {
     //Set each step type as an arg parameter, update halos if needed
     // Step W1
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_W1);
-    if (comm_partitioned()) {
-      out.exchangeExtendedGhost(out.R(), false);
-      temp.exchangeExtendedGhost(temp.R(), false);
-    }
+    out.exchangeExtendedGhost(out.R(), false);
+
     // Step W2
     instantiate<GaugeWFlowStep>(in, temp, out, epsilon, wflow_type, WFLOW_STEP_W2);
-    if (comm_partitioned()) {
-      in.exchangeExtendedGhost(in.R(), false);
-      temp.exchangeExtendedGhost(temp.R(), false);
-    }
+    in.exchangeExtendedGhost(in.R(), false);
+
     // Step Vt
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_VT);
-    if (comm_partitioned()) {
-      out.exchangeExtendedGhost(out.R(), false);
-    }
+    out.exchangeExtendedGhost(out.R(), false);
 #else
     errorQuda("Gauge tools are not built");
 #endif
