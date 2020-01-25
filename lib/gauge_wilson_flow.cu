@@ -63,8 +63,14 @@ namespace quda {
 
     TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-    void preTune() { arg.out.save(); } // defensive measure in case they alias
-    void postTune() { arg.out.load(); }
+    void preTune() {
+      arg.out.save(); // defensive measure in case out aliases in
+      arg.temp.save();
+    }
+    void postTune() {
+      arg.out.load();
+      arg.temp.load();
+    }
 
     //DMH: FIXME Re-evaluate these
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
