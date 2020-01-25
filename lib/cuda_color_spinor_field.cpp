@@ -3,6 +3,7 @@
 #include <typeinfo>
 #include <string.h>
 #include <iostream>
+#include <limits>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -29,14 +30,12 @@ namespace quda {
 
     create(param.create);
 
-    if  (param.create == QUDA_NULL_FIELD_CREATE) {
-      // do nothing
-    } else if (param.create == QUDA_ZERO_FIELD_CREATE) {
-      zero();
-    } else if (param.create == QUDA_REFERENCE_FIELD_CREATE) {
-      // do nothing
-    } else if (param.create == QUDA_COPY_FIELD_CREATE) {
-      errorQuda("not implemented");
+    switch (param.create) {
+    case QUDA_NULL_FIELD_CREATE:
+    case QUDA_REFERENCE_FIELD_CREATE: break; // do nothing;
+    case QUDA_ZERO_FIELD_CREATE: zero(); break;
+    case QUDA_COPY_FIELD_CREATE: errorQuda("Copy field create not implemented for this constructor");
+    default: errorQuda("Unexpected create type %d", param.create);
     }
   }
 
@@ -228,9 +227,14 @@ namespace quda {
         odd = new cudaColorSpinorField(*this, param);
 
         // need this hackery for the moment (need to locate the odd pointers half way into the full field)
-        (dynamic_cast<cudaColorSpinorField*>(odd))->v = (void*)((char*)v + bytes/2);
-        if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) 
-	  (dynamic_cast<cudaColorSpinorField*>(odd))->norm = (void*)((char*)norm + norm_bytes/2);
+        // check for special metadata wrapper (look at reference comments in
+        // createTexObject() below)
+        if (!((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
+              || (precision == QUDA_HALF_PRECISION && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()) )) {
+          (dynamic_cast<cudaColorSpinorField *>(odd))->v = (void *)((char *)v + bytes / 2);
+          if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+            (dynamic_cast<cudaColorSpinorField *>(odd))->norm = (void *)((char *)norm + norm_bytes / 2);
+        }
 
 #ifdef USE_TEXTURE_OBJECTS
         dynamic_cast<cudaColorSpinorField*>(even)->destroyTexObject();
@@ -294,6 +298,15 @@ namespace quda {
 
 #ifdef USE_TEXTURE_OBJECTS
   void cudaColorSpinorField::createTexObject() {
+
+    // We may set `v` and `norm` to `std::numeric_limits<unsigned long>::max()`
+    // in some cases to simply carry around a ColorSpinorField as a metadata
+    // container without actually allocating memory for it.
+    // Check for that and exit out if so.
+    if ((uint64_t)v == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()
+        && (uint64_t)norm == (uint64_t)(void *)std::numeric_limits<uint64_t>::max()) {
+      return;
+    }
 
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 ) {
       if (texInit) errorQuda("Already bound textures");
@@ -564,8 +577,9 @@ namespace quda {
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
-    hipMemsetAsync(v, 0, bytes);
-    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) hipMemsetAsync(norm, 0, norm_bytes);
+    qudaMemsetAsync(v, 0, bytes, 0);
+    if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+      qudaMemsetAsync(norm, 0, norm_bytes, 0);
   }
 
   void cudaColorSpinorField::zeroPad() {
@@ -592,7 +606,7 @@ namespace quda {
       size_t pad_bytes = (stride - volumeCB) * sizeof(float);
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          hipMemsetAsync((char*)norm + volumeCB*sizeof(float), 0, (stride-volumeCB)*sizeof(float));
+          qudaMemsetAsync((char *)norm + volumeCB * sizeof(float), 0, (stride - volumeCB) * sizeof(float), 0);
         }
     }
 
@@ -601,8 +615,8 @@ namespace quda {
       size_t subset_bytes = bytes/siteSubset;
       size_t subset_length = length/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
-        hipMemsetAsync((char*)v + subset_length*precision + subset_bytes*subset, 0,
-                        subset_bytes-subset_length*precision);
+        qudaMemsetAsync((char *)v + subset_length * precision + subset_bytes * subset, 0,
+                        subset_bytes - subset_length * precision, 0);
       }
     }
 
@@ -610,8 +624,8 @@ namespace quda {
     if (norm_bytes && norm_bytes != siteSubset*stride*sizeof(float)) {
       size_t subset_bytes = norm_bytes/siteSubset;
       for (int subset=0; subset < siteSubset; subset++) {
-        hipMemsetAsync((char*)norm + (size_t)stride*sizeof(float) + subset_bytes*subset, 0,
-                        subset_bytes-(size_t)stride*sizeof(float));
+        qudaMemsetAsync((char *)norm + (size_t)stride * sizeof(float) + subset_bytes * subset, 0,
+                        subset_bytes - (size_t)stride * sizeof(float), 0);
       }
     }
 
@@ -675,7 +689,7 @@ namespace quda {
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
-        hipMemset(v, 0, bytes); // FIXME (temporary?) bug fix for padding
+        qudaMemsetAsync(v, 0, bytes, 0); // FIXME (temporary?) bug fix for padding
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, 0, Src, 0, srcNorm);
 
         if (zeroCopy) pool_pinned_free(buffer);
@@ -1529,7 +1543,11 @@ namespace quda {
     ColorSpinorParam param(*this);
     param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
     param.location = QUDA_CPU_FIELD_LOCATION;
+    param.setPrecision((param.Precision() == QUDA_HALF_PRECISION || param.Precision() == QUDA_QUARTER_PRECISION) ?
+                         QUDA_SINGLE_PRECISION :
+                         param.Precision());
     param.create = (sourceType == QUDA_POINT_SOURCE ? QUDA_ZERO_FIELD_CREATE : QUDA_NULL_FIELD_CREATE);
+
     // since CPU fields cannot be low precision, use single precision instead
     if (precision < QUDA_SINGLE_PRECISION) param.setPrecision(QUDA_SINGLE_PRECISION, QUDA_INVALID_PRECISION, false);
 

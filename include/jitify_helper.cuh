@@ -33,6 +33,9 @@
 #include "jitify_options.hpp"
 #include <jitify.hpp>
 
+#else
+typedef hipError_t CUresult;
+
 #endif
 
 namespace quda {

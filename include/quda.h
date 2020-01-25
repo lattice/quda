@@ -280,9 +280,10 @@ extern "C" {
     /** defines deflation */
     void *eig_param;
 
-    /**
-      Dirac Dslash used in preconditioner
-    */
+    /** If true, deflate the initial guess */
+    QudaBoolean deflate;
+
+    /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
     /** Verbosity of the inner Krylov solver */
     QudaVerbosity verbosity_precondition;
@@ -395,6 +396,22 @@ extern "C" {
     double a_min;
     double a_max;
 
+    /** Whether to preserve the deflation space between solves.  If
+        true, the space will be stored in an instance of the
+        deflation_space struct, pointed to by preserve_deflation_space */
+    QudaBoolean preserve_deflation;
+
+    /** This is where we store the deflation space.  This will point
+        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this.  */
+    void *preserve_deflation_space;
+
+    /** If we restore the deflation space, this boolean indicates
+        whether we are also preserving the evalues or recomputing
+        them.  For example if a different mass shift is being used
+        than the one used to generate the space, then this should be
+        false, but preserve_deflation would be true */
+    QudaBoolean preserve_evals;
+
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
     /** If use_dagger, use Mdag **/
@@ -426,6 +443,8 @@ extern "C" {
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
+    /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
+    int batched_rotate;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
@@ -651,6 +670,9 @@ extern "C" {
 
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
+
+    /** Boolean for if this is a staggered solve or not */
+    QudaBoolean is_staggered;
 
   } QudaMultigridParam;
 

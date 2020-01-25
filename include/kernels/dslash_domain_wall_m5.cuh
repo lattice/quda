@@ -455,22 +455,6 @@ public:
 
   /**
      @brief CPU kernel for applying the M5 inverse operator
-     @param[in] arg Argument struct containing any meta data and accessors
-  */
-  template <typename Float, int nColor, bool dagger, bool xpay, Dslash5Type type, bool shared, bool var_inverse, typename Arg>
-  void dslash5invCPU(Arg &arg)
-  {
-    for (int parity = 0; parity < arg.nParity; parity++) {
-      for (int s = 0; s < arg.Ls; s++) {
-        for (int x_cb = 0; x_cb < arg.volume_4d_cb; x_cb++) { // 4-d volume
-          dslash5inv<Float, nColor, dagger, xpay, type, shared, var_inverse>(arg, parity, x_cb, s);
-        } // 4-d volumeCB
-      }   // ls
-    }     // parity
-  }
-
-  /**
-     @brief CPU kernel for applying the M5 inverse operator
      @tparam shared Whether to use a shared memory scratch pad to
      store the input field acroos the Ls dimension to minimize global
      memory reads.

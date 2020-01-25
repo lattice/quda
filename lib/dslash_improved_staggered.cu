@@ -31,7 +31,18 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
+      // operator is anti-Hermitian so do not instantiate dagger
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+      } else if (arg.nParity == 2) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+      }
     }
 
     /*

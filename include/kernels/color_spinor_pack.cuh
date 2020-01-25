@@ -40,7 +40,7 @@ namespace quda {
   };
 
   // this is the maximum number of colors for which we support block-float format
-#define MAX_BLOCK_FLOAT_NC 32
+  constexpr int max_block_float_nc = 96;
 
   /**
      Compute the max element over the spin-color components of a given site.
@@ -56,7 +56,7 @@ namespace quda {
     // just statically compute the largest size needed to avoid templating on block size
     constexpr int max_block_size = 1024; // all supported GPUs have 1024 as their max block size
     constexpr int bank_width = 32; // shared memory has 32 banks
-    constexpr int color_spin_threads = Nc <= MAX_BLOCK_FLOAT_NC ? (Ns/Ms) * (Nc/Mc) : 1;
+    constexpr int color_spin_threads = Nc <= max_block_float_nc ? (Ns/Ms) * (Nc/Mc) : 1;
     // this is the largest size of blockDim.x (rounded up to multiples of bank_width)
     constexpr int thread_width_x = ( (max_block_size / color_spin_threads + bank_width-1) / bank_width) * bank_width;
     __shared__ Float v[ (Ns/Ms) * (Nc/Mc) * thread_width_x];
@@ -93,8 +93,8 @@ namespace quda {
 
 
   template <typename Float, bool block_float, int Ns, int Ms, int Nc, int Mc, int nDim, int dim, int dir, typename Arg>
-  __device__ __host__ __forceinline__ void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block) {
-
+  __device__ __host__ __forceinline__ void packGhost(Arg &arg, int x_cb, int parity, int spinor_parity, int spin_block, int color_block)
+  {
     int x[5] = { };
     if (nDim == 5) getCoords5(x, x_cb, arg.X, parity, arg.pc_type);
     else getCoords(x, x_cb, arg.X, parity);
@@ -174,7 +174,7 @@ namespace quda {
     parity_dim_dir %= arg.nParity2dim_threads;
 
     const int dim_dir = parity_dim_dir % (2*dim_threads);
-    const int dim0 = dim_dir / 2;
+    const int dim0 = dim_dir / 2; // this is the dim offset for each thread =0 for dim_threads=1)
     const int dir = dim_dir % 2;
     const int parity = (arg.nParity == 2) ? (parity_dim_dir / (2*dim_threads) ) : arg.parity;
     const int spinor_parity = (arg.nParity == 2) ? parity : 0;
@@ -182,10 +182,10 @@ namespace quda {
     const int color_block = (spin_color_block % (Nc / Mc)) * Mc;
 
 #pragma unroll
-    for (int dim=dim0; dim<4; dim+=dim_threads) {
+    for (int dim=0; dim<4; dim+=dim_threads) {
       switch(dir) {
       case 0:
-	switch(dim) {
+	switch(dim+dim0) {
 	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,0>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
@@ -193,7 +193,7 @@ namespace quda {
 	}
 	break;
       case 1:
-	switch(dim) {
+	switch(dim+dim0) {
 	case 0: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,0,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 1: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,1,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;
 	case 2: packGhost<Float,block_float,Ns,Ms,Nc,Mc,nDim,2,1>(arg, x_cb, parity, spinor_parity, spin_block, color_block); break;

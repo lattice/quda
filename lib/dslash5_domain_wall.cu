@@ -132,50 +132,7 @@ public:
     void apply(const hipStream_t &stream)
     {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-        constexpr bool shared = false; // CPU does not have shared memory
-        if (arg.type == DSLASH5_DWF) {
-          if (arg.xpay)
-            arg.dagger ? dslash5CPU<Float, nColor, true, true, DSLASH5_DWF>(arg) :
-                         dslash5CPU<Float, nColor, false, true, DSLASH5_DWF>(arg);
-          else
-            arg.dagger ? dslash5CPU<Float, nColor, true, false, DSLASH5_DWF>(arg) :
-                         dslash5CPU<Float, nColor, false, false, DSLASH5_DWF>(arg);
-        } else if (arg.type == DSLASH5_MOBIUS_PRE) {
-          if (arg.xpay)
-            arg.dagger ? dslash5CPU<Float, nColor, true, true, DSLASH5_MOBIUS_PRE>(arg) :
-                         dslash5CPU<Float, nColor, false, true, DSLASH5_MOBIUS_PRE>(arg);
-          else
-            arg.dagger ? dslash5CPU<Float, nColor, true, false, DSLASH5_MOBIUS_PRE>(arg) :
-                         dslash5CPU<Float, nColor, false, false, DSLASH5_MOBIUS_PRE>(arg);
-        } else if (arg.type == DSLASH5_MOBIUS) {
-          if (arg.xpay)
-            arg.dagger ? dslash5CPU<Float, nColor, true, true, DSLASH5_MOBIUS>(arg) :
-                         dslash5CPU<Float, nColor, false, true, DSLASH5_MOBIUS>(arg);
-          else
-            arg.dagger ? dslash5CPU<Float, nColor, true, false, DSLASH5_MOBIUS>(arg) :
-                         dslash5CPU<Float, nColor, false, false, DSLASH5_MOBIUS>(arg);
-        } else if (arg.type == M5_INV_DWF) {
-          if (arg.xpay)
-            arg.dagger ? dslash5invCPU<Float, nColor, true, true, M5_INV_DWF, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, true, M5_INV_DWF, shared, var_inverse>(arg);
-          else
-            arg.dagger ? dslash5invCPU<Float, nColor, true, false, M5_INV_DWF, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, false, M5_INV_DWF, shared, var_inverse>(arg);
-        } else if (arg.type == M5_INV_MOBIUS) {
-          if (arg.xpay)
-            arg.dagger ? dslash5invCPU<Float, nColor, true, true, M5_INV_MOBIUS, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, true, M5_INV_MOBIUS, shared, var_inverse>(arg);
-          else
-            arg.dagger ? dslash5invCPU<Float, nColor, true, false, M5_INV_MOBIUS, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, false, M5_INV_MOBIUS, shared, var_inverse>(arg);
-        } else if (arg.type == M5_INV_ZMOBIUS) {
-          if (arg.xpay)
-            arg.dagger ? dslash5invCPU<Float, nColor, true, true, M5_INV_ZMOBIUS, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, true, M5_INV_ZMOBIUS, shared, var_inverse>(arg);
-          else
-            arg.dagger ? dslash5invCPU<Float, nColor, true, false, M5_INV_ZMOBIUS, shared, var_inverse>(arg) :
-                         dslash5invCPU<Float, nColor, false, false, M5_INV_ZMOBIUS, shared, var_inverse>(arg);
-        }
+        errorQuda("CPU variant not instantiated");
       } else {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (arg.type == DSLASH5_DWF) {

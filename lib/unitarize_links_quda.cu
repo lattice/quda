@@ -291,9 +291,9 @@ namespace {
 	} else {
 	  errorQuda("Unsupported precision\n");
 	}
-	if (isUnitary(link,max_error) == false) {
+	if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
-	  printf("site index = %d,\t direction = %d\n", i, dir);
+	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
 	  identity = conj(link)*link;
 	  printLink(identity);
@@ -324,7 +324,7 @@ namespace {
     v = tmp;
     unitarizeLinkMILC<double>(result, v, arg);
     if (arg.check_unitarization) {
-      if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
+      if (result.isUnitary(arg.max_error) == false) atomicAdd(arg.fails, 1);
     }
     tmp = result;
 
@@ -415,7 +415,7 @@ namespace {
     polarSu3<real>(u, arg.tol);
 
     // count number of failures
-    if (isUnitary(u, arg.tol) == false) {
+    if (u.isUnitary(arg.tol) == false) {
       atomicAdd(arg.fails, 1);
     }
 

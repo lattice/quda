@@ -367,10 +367,9 @@ namespace quda
 #endif
 
     // Write to array
-    Link F;
-    arg.force.load((real *)(F.data), index, mu, yIndex == 0 ? arg.parity : 1 - arg.parity);
+    Link F = arg.force(mu, index, yIndex == 0 ? arg.parity : 1 - arg.parity);
     axpy(arg.coeff, force, F);
-    arg.force.save((real *)(F.data), index, mu, yIndex == 0 ? arg.parity : 1 - arg.parity);
+    arg.force(mu, index, yIndex == 0 ? arg.parity : 1 - arg.parity) = F;
 
     return;
   } // cloverDerivativeKernel

@@ -37,7 +37,7 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeAPEStep").instantiate(Type<Arg>())
+      jitify_error = program->kernel("quda::computeAPEStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       computeAPEStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);

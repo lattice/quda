@@ -62,7 +62,10 @@ display_test_info()
       if (mg_eig_use_poly_acc[i]) {
         printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-        printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        if (mg_eig_amax[i] <= 0)
+          printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+        else
+          printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
       printfQuda("\n");
     }
@@ -130,18 +133,19 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
-  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
   mg_eig_param.cuda_prec_ritz = cuda_prec;
 
-  mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
-  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
   mg_eig_param.a_max = mg_eig_amax[level];
@@ -222,7 +226,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
     for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
-    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
@@ -278,7 +282,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
@@ -358,33 +362,36 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_NO;
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
   mg_param.setup_type = setup_type;
-  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
+  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
-  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // Is NOT a staggered solve
+  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
     strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
-  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -519,17 +526,17 @@ int main(int argc, char **argv)
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_require_convergence[i] = QUDA_BOOLEAN_YES;
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
-    mg_eig_amax[i] = 5.0;
+    mg_eig_amax[i] = -1.0; // use power iterations
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
@@ -699,25 +706,35 @@ int main(int argc, char **argv)
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
 
-  auto mean_time = 0.0;
-  auto mean_time2 = 0.0;
-  auto mean_gflops = 0.0;
-  auto mean_gflops2 = 0.0;
-  for (int i = 0; i < Nsrc; i++) {
-    mean_time += time[i];
-    mean_time2 += time[i] * time[i];
-    mean_gflops += gflops[i];
-    mean_gflops2 += gflops[i] * gflops[i];
-  }
+  // Compute timings
+  if (Nsrc > 1) {
+    auto mean_time = 0.0;
+    auto mean_time2 = 0.0;
+    auto mean_gflops = 0.0;
+    auto mean_gflops2 = 0.0;
+    // skip first solve due to allocations, potential UVM swapping overhead
+    for (int i = 1; i < Nsrc; i++) {
+      mean_time += time[i];
+      mean_time2 += time[i] * time[i];
+      mean_gflops += gflops[i];
+      mean_gflops2 += gflops[i] * gflops[i];
+    }
 
-  mean_time /= Nsrc;
-  mean_time2 /= Nsrc;
-  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
-  mean_gflops /= Nsrc;
-  mean_gflops2 /= Nsrc;
-  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
-             stddev_time, mean_gflops, stddev_gflops);
+    auto NsrcM1 = Nsrc - 1;
+
+    mean_time /= NsrcM1;
+    mean_time2 /= NsrcM1;
+    auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
+                                    std::numeric_limits<double>::infinity();
+    mean_gflops /= NsrcM1;
+    mean_gflops2 /= NsrcM1;
+    auto stddev_gflops = NsrcM1 > 1 ?
+      sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+      std::numeric_limits<double>::infinity();
+    printfQuda(
+      "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
+      mean_time, stddev_time, mean_gflops, stddev_gflops);
+  }
 
   delete[] time;
   delete[] gflops;

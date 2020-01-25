@@ -10,6 +10,18 @@ using namespace quda;
 #include <hipcub/hipcub.hpp>
 namespace cub=hipcub;
 
+// ensures we use shfl_sync and not shfl when compiling with clang
+#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
+#define CUB_USE_COOPERATIVE_GROUPS
+#endif
+
+#ifdef __CUDACC_RTC__
+// WAR for CUDA < 11 which prevents the use of cuda_fp16.h in cub with nvrtc
+struct __half { };
+#endif
+
+#include <hipcub/rocprim/block/block_reduce.hpp>
+
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
 #endif

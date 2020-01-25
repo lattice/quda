@@ -186,6 +186,7 @@ extern quda::mgarray<int> nvec;
 extern quda::mgarray<char[256]> mg_vec_infile;
 extern quda::mgarray<char[256]> mg_vec_outfile;
 extern QudaInverterType inv_type;
+extern bool inv_deflate;
 extern QudaInverterType precon_type;
 extern int multishift;
 extern bool verify_results;
@@ -195,6 +196,9 @@ extern double mass;
 extern double kappa;
 extern double mu;
 extern double epsilon;
+extern double m5;
+extern double b5;
+extern double c5;
 extern double anisotropy;
 extern double tadpole_factor;
 extern double eps_naik;
@@ -268,10 +272,10 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
-extern bool deflate;
 extern int eig_nEv;
 extern int eig_nKr;
 extern int eig_nConv; // If unchanged, will be set to nEv
+extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
 extern int eig_check_interval;
 extern int eig_max_restarts;
@@ -297,6 +301,7 @@ extern char eig_vec_outfile[256];
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_nEv;
 extern quda::mgarray<int> mg_eig_nKr;
+extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;
 extern quda::mgarray<int> mg_eig_check_interval;
 extern quda::mgarray<int> mg_eig_max_restarts;

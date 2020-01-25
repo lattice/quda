@@ -30,24 +30,27 @@ namespace quda {
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
+
 #define qudaMemcpy(dst, src, count, kind) \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemcpyAsync(dst, src, count, kind, stream) \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaMemset(ptr, value, count)                                                                                  \
+  ::quda::qudaMemset_(ptr, value, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaMemsetAsync(ptr, value, count, stream)                                                                     \
+  ::quda::qudaMemsetAsync_(ptr, value, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 namespace quda {
 
   /**
-     @brief Wrapper around hipMemcpyAsync or driver API equivalent
-     Potentially add auto-profiling support.
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
+     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
@@ -58,8 +61,8 @@ namespace quda {
                         const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around hipMemcpy2DAsync or driver API equivalent
-     Potentially add auto-profiling support.
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     Adds auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
      @param[in] src Source pointer
@@ -74,7 +77,27 @@ namespace quda {
                           const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around hipLaunchKernel
+     @brief Wrapper around cudaMemset or driver API equivalent.
+     Adds auto-profiling support.
+     @param[out] ptr Starting address pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+   */
+  void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent.
+     Adds auto-profiling support.
+     @param[out] ptr Starting address pointer
+     @param[in] value Value to set for each byte of specified memory
+     @param[in] count Size in bytes to set
+     @param[in] stream  Stream to issue memset
+   */
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const hipStream_t &stream, const char *func,
+                        const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol
      @param[in] gridDim Grid dimensions
      @param[in] blockDim Block dimensions
@@ -140,8 +163,6 @@ namespace quda {
 
 } // namespace quda
 
-#define STRINGIFY__(x) #x
-#define __STRINGIFY__(x) STRINGIFY__(x)
 #define qudaDeviceSynchronize() \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 

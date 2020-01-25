@@ -140,7 +140,7 @@ namespace quda {
 	  }
 
 	  mat *= arg.coeff;
-	  arg.gauge.save((Float*)(mat.data), x, (mu-1)*mu/2 + nu, parity);
+	  arg.gauge((mu-1)*mu/2 + nu, x, parity) = mat;
 	} // nu
       } // mu
 

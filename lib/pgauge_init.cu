@@ -36,9 +36,6 @@ namespace quda {
     }
   };
 
-
-
-
   template<typename Float, typename Gauge, int NCOLORS>
   __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -50,8 +47,7 @@ namespace quda {
     }
     Matrix<complex<Float>,NCOLORS> U;
     setIdentity(&U);
-    for ( int d = 0; d < 4; d++ )
-      arg.dataOr.save((Float*)(U.data),idx, d, parity);
+    for ( int d = 0; d < 4; d++ ) arg.dataOr(d, idx, parity) = U;
   }
 
 
@@ -83,7 +79,7 @@ namespace quda {
 
     void apply(const hipStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><<< tp.grid,tp.block >>> (arg);
+      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //hipDeviceSynchronize();
     }
 
@@ -344,7 +340,7 @@ namespace quda {
       for ( int d = 0; d < 4; d++ ) {
         Matrix<complex<Float>,NCOLORS> U;
         U = randomize<Float, NCOLORS>(localState);
-        arg.dataOr.save((Float*)(U.data),idx, d, parity);
+        arg.dataOr(d, idx, parity) = U;
       }
     }
   #ifdef MULTI_GPU
@@ -387,7 +383,7 @@ namespace quda {
 
     void apply(const hipStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<Float, Gauge, NCOLORS><<< tp.grid,tp.block >>> (arg);
+      compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //hipDeviceSynchronize();
     }
 

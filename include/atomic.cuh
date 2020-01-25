@@ -39,6 +39,8 @@
 }*/
 #endif
 
+#endif
+
 /**
    @brief Implementation of double2 atomic addition using two
    double-precision additions.
@@ -48,8 +50,15 @@
 */
 static inline __device__ double2 atomicAdd(double2 *addr, double2 val){
   double2 old = *addr;
+  // This is a necessary evil to avoid conflicts between the atomicAdd
+  // declared in CUDA 8.0+ headers which are visible for host
+  // compilation, which cause a conflict when compiled on clang-cuda.
+  // As a result we do not support any architecture without native
+  // double precision atomics on clang-cuda.
+#if defined(__CUDA_ARCH__) || CUDA_VERSION >= 8000
   old.x = atomicAdd((double*)addr, val.x);
   old.y = atomicAdd((double*)addr + 1, val.y);
+#endif
   return old;
 }
 
@@ -144,4 +153,18 @@ static inline __device__ float atomicMax(float *addr, float val){
   return __uint_as_float(old);
 }
 
-#endif
+/**
+   @brief Implementation of single-precision atomic max specialized
+   for positive-definite numbers.  Here we take advantage of the
+   property that when positive floating point numbers are
+   reinterpretted as unsigned integers, they have the same unique
+   sorted order.
+
+   @param addr Address that stores the atomic variable to be updated
+   @param val Value to be added to the atomic
+*/
+static inline __device__ float atomicAbsMax(float *addr, float val){
+  uint32_t val_ = __float_as_uint(val);
+  uint32_t *addr_ = reinterpret_cast<uint32_t*>(addr);
+  return atomicMax(addr_, val_);
+}

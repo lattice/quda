@@ -26,11 +26,14 @@ namespace quda {
   static TimeProfile apiTimer("CUDA API calls (runtime)");
 #endif
 
-  class QudaMemCopy : public Tunable {
+  class QudaMem : public Tunable
+  {
 
     void *dst;
     const void *src;
     const size_t count;
+    const int value;
+    const bool copy;
     const hipMemcpyKind kind;
     const bool async;
     const char *name;
@@ -39,10 +42,16 @@ namespace quda {
     unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
   public:
-    inline QudaMemCopy(void *dst, const void *src, size_t count, hipMemcpyKind kind,
-		       bool async, const char *func, const char *file, const char *line)
-      : dst(dst), src(src), count(count), kind(kind), async(async) {
-
+    inline QudaMem(void *dst, const void *src, size_t count, hipMemcpyKind kind, bool async, const char *func,
+                   const char *file, const char *line) :
+      dst(dst),
+      src(src),
+      count(count),
+      value(0),
+      copy(true),
+      kind(kind),
+      async(async)
+    {
       if (!async) {
         switch (kind) {
         case hipMemcpyDeviceToHost:   name = "hipMemcpyDeviceToHost";   break;
@@ -50,7 +59,7 @@ namespace quda {
         case hipMemcpyHostToHost:     name = "hipMemcpyHostToHost";     break;
         case hipMemcpyDeviceToDevice: name = "hipMemcpyDeviceToDevice"; break;
         case hipMemcpyDefault:        name = "hipMemcpyDefault";        break;
-        default: errorQuda("Unsupported hipMemcpy %d", kind);
+        default: errorQuda("Unsupported hipMemcpyKind %d", kind);
         }
       } else {
         switch(kind) {
@@ -59,7 +68,7 @@ namespace quda {
         case hipMemcpyHostToHost:     name = "hipMemcpyAsyncHostToHost";     break;
         case hipMemcpyDeviceToDevice: name = "hipMemcpyAsyncDeviceToDevice"; break;
         case hipMemcpyDefault:        name = "hipMemcpyAsyncDefault";        break;
-        default: errorQuda("Unsupported hipMemcpy %d", kind);
+        default: errorQuda("Unsupported hipMemcpyKind %d", kind);
         }
       }
       strcpy(aux, func);
@@ -69,11 +78,27 @@ namespace quda {
       strcat(aux, line);
     }
 
-    virtual ~QudaMemCopy() { }
+    inline QudaMem(void *dst, int value, size_t count, bool async, const char *func, const char *file, const char *line) :
+      dst(dst),
+      src(nullptr),
+      count(count),
+      value(value),
+      copy(false),
+      kind(hipMemcpyDefault),
+      async(async)
+    {
+      name = !async ? "cudaMemset" : "cudaMemsetAsync";
+      strcpy(aux, func);
+      strcat(aux, ",");
+      strcat(aux, file);
+      strcat(aux, ",");
+      strcat(aux, line);
+    }
 
     inline void apply(const hipStream_t &stream) {
       tuneLaunch(*this, getTuning(), getVerbosity());
-      if (async) {
+      if (copy) {
+        if (async) {
 #ifdef USE_DRIVER_API
         switch (kind) {
         case hipMemcpyDeviceToHost:
@@ -92,19 +117,32 @@ namespace quda {
         PROFILE(hipMemcpyAsync(dst, src, count, kind, stream),
                 kind == hipMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_ASYNC : QUDA_PROFILE_MEMCPY_H2D_ASYNC);
 #endif
+        } else {
+#ifdef USE_DRIVER_API
+          switch (kind) {
+          case hipMemcpyDeviceToHost:   hipMemcpyDtoH(dst, (hipDeviceptr_t)src, count);              break;
+          case hipMemcpyHostToDevice:   hipMemcpyHtoD((hipDeviceptr_t)dst, const_cast<void *>(src), count);              break;
+          case hipMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
+          case hipMemcpyDeviceToDevice: hipMemcpyDtoD((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count); break;
+          case hipMemcpyDefault:        hipMemcpy((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, kind);     break;
+          default:
+            errorQuda("Unsupported hipMemcpy %d", kind);
+          }
+#else
+          cudaMemcpy(dst, src, count, kind);
+#endif
+        }
       } else {
 #ifdef USE_DRIVER_API
-        switch(kind) {
-        case hipMemcpyDeviceToHost:   hipMemcpyDtoH(dst, (hipDeviceptr_t)src, count);              break;
-        case hipMemcpyHostToDevice:   hipMemcpyHtoD((hipDeviceptr_t)dst, const_cast<void *>(src), count);              break;
-        case hipMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
-        case hipMemcpyDeviceToDevice: hipMemcpyDtoD((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count); break;
-        case hipMemcpyDefault:        hipMemcpy((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, kind);     break;
-        default:
-	errorQuda("Unsupported hipMemcpy %d", kind);
-        }
+        if (async)
+          hipMemsetD32Async((hipDeviceptr_t)dst, value, count / 4, stream);
+        else
+          hipMemsetD32((hipDeviceptr_t)dst, value, count / 4);
 #else
-        hipMemcpy(dst, src, count, kind);
+        if (async)
+          hipMemsetAsync(dst, value, count, stream);
+        else
+          hipMemset(dst, value, count);
 #endif
       }
     }
@@ -126,12 +164,8 @@ namespace quda {
   void qudaMemcpy_(void *dst, const void *src, size_t count, hipMemcpyKind kind,
                    const char *func, const char *file, const char *line) {
     if (count == 0) return;
-#if 1
-    QudaMemCopy copy(dst, src, count, kind, false, func, file, line);
+    QudaMem copy(dst, src, count, kind, false, func, file, line);
     copy.apply(0);
-#else
-    hipMemcpy(dst, src, count, kind);
-#endif
     hipError_t error = hipGetLastError();
     if (error != hipSuccess)
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
@@ -143,7 +177,7 @@ namespace quda {
     if (count == 0) return;
 
     if (kind == hipMemcpyDeviceToDevice) {
-      QudaMemCopy copy(dst, src, count, kind, true, func, file, line);
+      QudaMem copy(dst, src, count, kind, true, func, file, line);
       copy.apply(stream);
     } else {
 #ifdef USE_DRIVER_API
@@ -197,6 +231,25 @@ namespace quda {
 #else
     PROFILE(hipMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream), QUDA_PROFILE_MEMCPY2D_D2H_ASYNC);
 #endif
+  }
+
+  void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
+  {
+    if (count == 0) return;
+    QudaMem set(ptr, value, count, false, func, file, line);
+    set.apply(0);
+    hipError_t error = hipGetLastError();
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
+  }
+
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const hipStream_t &stream, const char *func,
+                        const char *file, const char *line)
+  {
+    if (count == 0) return;
+    QudaMem copy(ptr, value, count, true, func, file, line);
+    copy.apply(0);
+    hipError_t error = hipGetLastError();
+    if (error != hipSuccess) errorQuda("(HIP) %s\n (%s:%s in %s())\n", hipGetErrorString(error), file, line, func);
   }
 
   hipError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, hipStream_t stream)

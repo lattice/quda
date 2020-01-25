@@ -391,7 +391,7 @@ namespace quda
      functor that can apply the dslash.
    */
   template <template <typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
-            typename D,
+            class D,
             typename Float, int nDim, int nColor, int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
   void dslashCPU(Arg arg)
   {
@@ -418,8 +418,8 @@ namespace quda
      are reserved for data packing, which may include communication to
      neighboring processes.
    */
-  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> typename D,
-            template <bool dagger, QudaPCType pc, typename Arg> typename P, int nParity, bool dagger, bool xpay,
+  template <template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg> class D,
+            template <bool dagger, QudaPCType pc, typename Arg> class P, int nParity, bool dagger, bool xpay,
             KernelType kernel_type, typename Arg>
   __global__ void dslashGPU(Arg arg)
   {

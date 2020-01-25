@@ -190,7 +190,7 @@ namespace quda {
 	  Ainv(k,k) = v(k);
 
 #pragma unroll
-	  for(int i=k+1;i<N;i++) if (i>k) Ainv(i,k) = v(i);
+	  for(int i=0;i<N;i++) if (i>k) Ainv(i,k) = v(i);
 	}
 
 	return Ainv;

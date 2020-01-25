@@ -115,7 +115,7 @@ namespace quda {
     /**
        @return Clover coefficient (usually includes kappa)
     */
-    bool Csw() const { return csw; }
+    double Csw() const { return csw; }
 
     /**
        @return If the clover field is associated with twisted-clover fermions
@@ -143,26 +143,25 @@ namespace quda {
        @brief Compute the L1 norm of the field
        @return L1 norm
      */
-    double norm1() const;
+    double norm1(bool inverse = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @return L2 norm squared
      */
-    double norm2() const;
+    double norm2(bool inverse = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @return Absolute maximum value
      */
-    double abs_max() const;
+    double abs_max(bool inverse = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @return Absolute minimum value
      */
-    double abs_min() const;
-
+    double abs_min(bool inverse = false) const;
   };
 
   class cudaCloverField : public CloverField {

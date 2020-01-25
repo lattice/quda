@@ -410,8 +410,8 @@ void comm_set_neighbor_ranks(Topology *topo){
   }
      
   for(int d=0; d<4; ++d){
-    int pos_displacement[4] = {0,0,0,0};
-    int neg_displacement[4] = {0,0,0,0};
+    int pos_displacement[QUDA_MAX_DIM] = { };
+    int neg_displacement[QUDA_MAX_DIM] = { };
     pos_displacement[d] = +1;
     neg_displacement[d] = -1;
     neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
@@ -629,20 +629,20 @@ void comm_dim_partitioned_set(int dim)
   manual_set_partition[dim] = 1;
 #endif
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
-           comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 void comm_dim_partitioned_reset(){
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
-           comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 int comm_dim_partitioned(int dim)
 {
-  return (manual_set_partition[dim] || (comm_dim(dim) > 1));
+  return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1));
 }
 
 int comm_partitioned()

@@ -183,15 +183,14 @@ namespace quda {
   template<typename real, typename Output, typename InputA, typename InputB>
   __global__ void interiorOprodKernel(StaggeredOprodArg<real, Output, InputA, InputB> arg)
     {
+      using complex = complex<real>;
+      using matrix = Matrix<complex,3>;
+
       unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
       const unsigned int gridSize = gridDim.x*blockDim.x;
 
-      typedef complex<real> Complex;
-      Complex x[3];
-      Complex y[3];
-      Complex z[3];
-      Matrix<Complex,3> result;
-      Matrix<Complex,3> tempA, tempB; // input
+      complex x[3], y[3], z[3];
+      matrix result;
 
       while(idx<arg.length){
         arg.inA.load(x, idx);
@@ -204,20 +203,20 @@ namespace quda {
           if(first_nbr_idx >= 0){
             arg.inB.load(y, first_nbr_idx);
             outerProd(y,x,&result);
-            arg.outA.load(reinterpret_cast<real*>(tempA.data), idx, dim, arg.parity); 
+            matrix tempA = arg.outA(dim, idx, arg.parity);
             result = tempA + result*arg.coeff[0];
     
-	    arg.outA.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity); 
+	    arg.outA(dim, idx, arg.parity) = result;
 
 	    if (arg.nFace == 3) {
 	      shift[dim] = 3;
 	      const int third_nbr_idx = neighborIndex(idx, shift, arg.partitioned, arg.parity, arg.X);
-	      if(third_nbr_idx >= 0){
+	      if (third_nbr_idx >= 0) {
 		arg.inB.load(z, third_nbr_idx);
 		outerProd(z, x, &result);
-		arg.outB.load(reinterpret_cast<real*>(tempB.data), idx, dim, arg.parity); 
+		matrix tempB = arg.outB(dim, idx, arg.parity);
 		result = tempB + result*arg.coeff[1];
-		arg.outB.save(reinterpret_cast<real*>(result.data), idx, dim, arg.parity); 
+		arg.outB(dim, idx, arg.parity) = result;
 	      }
 	    }
           }
@@ -232,33 +231,32 @@ namespace quda {
   template<int dim, typename real, typename Output, typename InputA, typename InputB>
   __global__ void exteriorOprodKernel(StaggeredOprodArg<real, Output, InputA, InputB> arg)
     {
-      typedef complex<real> Complex;
+      using complex = complex<real>;
+      using matrix = Matrix<complex,3>;
 
       unsigned int cb_idx = blockIdx.x*blockDim.x + threadIdx.x;
       const unsigned int gridSize = gridDim.x*blockDim.x;
 
-      Complex a[3];
-      Complex b[3];
-      Matrix<Complex,3> result;
-      Matrix<Complex,3> inmatrix; // input
+      complex a[3], b[3];
+      matrix result;
 
       Output& out = (arg.displacement == 1) ? arg.outA : arg.outB;
       real coeff = (arg.displacement == 1) ? arg.coeff[0] : arg.coeff[1];
 
       int x[4];
       while(cb_idx<arg.length){
-        coordsFromIndex(x, cb_idx, arg.X, arg.dir, arg.displacement, arg.parity); 
+        coordsFromIndex(x, cb_idx, arg.X, arg.dir, arg.displacement, arg.parity);
         const unsigned int bulk_cb_idx = ((((x[3]*arg.X[2] + x[2])*arg.X[1] + x[1])*arg.X[0] + x[0]) >> 1);
 
-        out.load(reinterpret_cast<real*>(inmatrix.data), bulk_cb_idx, arg.dir, arg.parity); 
+        matrix inmatrix = out(arg.dir, bulk_cb_idx, arg.parity);
         arg.inA.load(a, bulk_cb_idx);
 
         const unsigned int ghost_idx = arg.ghostOffset[dim] + cb_idx;
         arg.inB.loadGhost(b, ghost_idx, arg.dir);
 
-        outerProd(b,a,&result);
-        result = inmatrix + result*coeff; 
-        out.save(reinterpret_cast<real*>(result.data), bulk_cb_idx, arg.dir, arg.parity); 
+        outerProd(b, a, &result);
+        result = inmatrix + result*coeff;
+        out(arg.dir, bulk_cb_idx, arg.parity) = result;
 
         cb_idx += gridSize;
       }

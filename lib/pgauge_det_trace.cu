@@ -64,8 +64,7 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<complex<Float>,NCOLORS> U;
-      arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+      Matrix<complex<Float>,NCOLORS> U = arg.dataOr(mu, idx, parity);
       if(functiontype == 0) val += getDeterminant(U);
       if(functiontype == 1) val += getTrace(U);
     }

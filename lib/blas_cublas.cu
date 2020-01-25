@@ -54,7 +54,7 @@ namespace quda {
     }
 
     // FIXME do this in pipelined fashion to reduce memory overhead.
-    long long BatchInvertMatrix(void *Ainv, void* A, const int n, const int batch, QudaPrecision prec, QudaFieldLocation location)
+    long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
       long long flops = 0;
       timeval start, stop;
@@ -69,6 +69,7 @@ namespace quda {
       int *dipiv = static_cast<int*>(pool_device_malloc(batch*n*sizeof(int)));
       int *dinfo_array = static_cast<int*>(pool_device_malloc(batch*sizeof(int)));
       int *info_array = static_cast<int*>(pool_pinned_malloc(batch*sizeof(int)));
+      memset(info_array, '0', batch*sizeof(int)); // silence memcheck warnings
 
       if (prec == QUDA_SINGLE_PRECISION) {
 	typedef hipFloatComplex C;
@@ -84,11 +85,11 @@ namespace quda {
 	  errorQuda("\nError in LU decomposition (hipblasCgetrfBatched), error code = %d\n", error);
 
 	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), hipMemcpyDeviceToHost);
-	for (int i=0; i<batch; i++) {
+	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
-	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
+	    errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%lu factorization completed but the factor U is exactly singular", i);
 	  }
 	}
     
@@ -100,11 +101,11 @@ namespace quda {
 
 	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), hipMemcpyDeviceToHost);
 
-	for (int i=0; i<batch; i++) {
+	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
-	    errorQuda("%d argument had an illegal value or another error occured, such as memory allocation failed", i);
+	    errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed", i);
 	  } else if (info_array[i] > 0) {
-	    errorQuda("%d factorization completed but the factor U is exactly singular", i);
+	    errorQuda("%lu factorization completed but the factor U is exactly singular", i);
 	  }
 	}
 

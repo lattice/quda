@@ -25,7 +25,8 @@ namespace quda {
        @param[in] Location of the input/output data
        @return Number of flops done in this computation
     */
-    long long BatchInvertMatrix(void *Ainv, void* A, const int n, const int batch, QudaPrecision precision, QudaFieldLocation location);
+    long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
+                                QudaFieldLocation location);
 
   } // namespace cublas
 
