@@ -18,8 +18,7 @@ namespace quda {
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
-public:
-
+  public:
     GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon, const QudaWFlowType wflow_type, const WFlowStepType step_type) :
       TunableVectorYZ(2, wflow_dim),
       arg(out, temp, in, epsilon, wflow_type, step_type),
@@ -51,10 +50,14 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeWFlowStep").instantiate(Type<decltype(arg)>())
+      jitify_error = program->kernel("quda::computeWFlowStep").instantiate(wflow_type,Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-      computeWFlowStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+      switch (arg.wflow_type) {
+      case QUDA_WFLOW_TYPE_WILSON: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+      default : errorQuda("Unknown Wilson Flow type %d", arg.wflow_type);
+      }
 #endif
     }
 
@@ -90,7 +93,7 @@ public:
     if (comm_partitioned()) {
       out.exchangeExtendedGhost(out.R(), false);
       temp.exchangeExtendedGhost(temp.R(), false);
-      }
+    }
     // Step W2
     instantiate<GaugeWFlowStep>(in, temp, out, epsilon, wflow_type, WFLOW_STEP_W2);
     if (comm_partitioned()) {

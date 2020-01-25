@@ -26,8 +26,9 @@ namespace quda
     const Gauge in;
 
     int threads; // number of active threads required
-    int X[4];    // grid dimensions
+    int_fastdiv X[4];    // grid dimensions
     int border[4];
+    int_fastdiv E[4];
     const Float epsilon;
     const QudaWFlowType wflow_type;
     const WFlowStepType step_type;
@@ -45,68 +46,42 @@ namespace quda
         border[dir] = in.R()[dir];
         X[dir] = in.X()[dir] - border[dir] * 2;
         threads *= X[dir];
+        E[dir] = in.X()[dir];
       }
       threads /= 2;
     }
   };
 
-  // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
-  template <typename Arg> __global__ void computeWFlowStep(Arg arg)
-  {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int parity = threadIdx.y + blockIdx.y * blockDim.y;
-    int dir = threadIdx.z + blockIdx.z * blockDim.z;
-    if (idx >= arg.threads) return;
-    if (dir >= Arg::wflow_dim) return;
-
-    //Get stacetime and local coords
-    int X[4];
-    for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
-    int x[4];
-    getCoords(x, idx, X, parity);
-    for (int dr = 0; dr < 4; ++dr) {
-      x[dr] += arg.border[dr];
-      X[dr] += 2 * arg.border[dr];
-    }
-
-    switch(arg.step_type) {
-    case WFLOW_STEP_W1: computeW1Step(arg, x, X, parity, dir); break;
-    case WFLOW_STEP_W2: computeW2Step(arg, x, X, parity, dir); break;
-    case WFLOW_STEP_VT: computeVtStep(arg, x, X, parity, dir); break;
-    }
-  }
-
-  template <typename Arg>
-  __host__ __device__ void computeW1Step(Arg &arg, const int *x, const int *X, const int parity, const int dir)
+  template <QudaWFlowType wflow_type, typename Arg>
+  __host__ __device__ void computeW1Step(Arg &arg, const int *x, const int parity, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     Link U, Stap, Rect, Z0, exp_Z0, Id, temp1, temp2;
     Complex im(0.0,-1.0);
-    int dx[4] = {0, 0, 0, 0};
     const real coeff1x1 = 5.0/3.0;
     const real coeff2x1 = -1.0/12.0;
 
     // Get link U
-    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    U = arg.in(dir, linkIndex(x, arg.E), parity);
     // Compute staples and Z0
-    switch(arg.wflow_type) {
+    switch(wflow_type) {
     case QUDA_WFLOW_TYPE_WILSON :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::wflow_dim);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z0 = Stap * conj(U);
       break;
     case QUDA_WFLOW_TYPE_SYMANZIK :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z0 = (coeff1x1 * Stap + coeff2x1 * Rect) * conj(U);
       break;
     }
 
-    arg.temp(dir, linkIndexShift(x, dx, X), parity) = Z0;
+    arg.temp(dir, linkIndex(x, arg.E), parity) = Z0;
     Z0 *= (1.0 / 4.0) * arg.epsilon;
 
     // Compute anti-hermitian projection of Z0, exponentiate, update U
@@ -114,44 +89,43 @@ namespace quda
     Z0 = im * Z0;
     exponentiate_iQ(Z0, &exp_Z0);
     U = exp_Z0 * U;
-    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+    arg.out(dir, linkIndex(x, arg.E), parity) = U;
   }
 
-  template <typename Arg>
-  __host__ __device__ void computeW2Step(Arg &arg, const int *x, const int *X, const int parity, const int dir)
+  template <QudaWFlowType wflow_type, typename Arg>
+  __host__ __device__ void computeW2Step(Arg &arg, const int *x, const int parity, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     Link U, Stap, Rect, Z1, Z0, exp_Z1, Id, temp1, temp2;
     Complex im(0.0,-1.0);
-    int dx[4] = {0, 0, 0, 0};
     const real coeff1x1 = 5.0/3.0;
     const real coeff2x1 = -1.0/12.0;
 
     // Get link U
-    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    U = arg.in(dir, linkIndex(x, arg.E), parity);
     // Compute staples and Z1
-    switch(arg.wflow_type) {
+    switch(wflow_type) {
     case QUDA_WFLOW_TYPE_WILSON :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::wflow_dim);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z1 = (8.0/9.0) * Stap * conj(U);
       break;
     case QUDA_WFLOW_TYPE_SYMANZIK :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z1 = (8.0/9.0) * (coeff1x1 * Stap + coeff2x1 * Rect) * conj(U);
       break;
     }
 
     // Retrieve Z0, (8/9 Z1 - 17/36 Z0) stored in temp
-    Z0 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
+    Z0 = arg.temp(dir, linkIndex(x, arg.E), parity);
     Z0 *= (17.0 / 36.0);
     Z1 = Z1 - Z0;
-    arg.temp(dir, linkIndexShift(x, dx, X), parity) = Z1;
+    arg.temp(dir, linkIndex(x, arg.E), parity) = Z1;
     Z1 *= arg.epsilon;
 
     // Compute anti-hermitian projection of Z1, exponentiate, update U
@@ -159,41 +133,40 @@ namespace quda
     Z1 = im * Z1;
     exponentiate_iQ(Z1, &exp_Z1);
     U = exp_Z1 * U;
-    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+    arg.out(dir, linkIndex(x, arg.E), parity) = U;
   }
 
-  template <typename Arg>
-  __host__ __device__ void computeVtStep(Arg &arg, const int *x, const int *X, const int parity, const int dir)
+  template <QudaWFlowType wflow_type, typename Arg>
+  __host__ __device__ void computeVtStep(Arg &arg, const int *x, const int parity, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     Link U, Stap, Rect, Z2, Z1, exp_Z2, Id, temp1, temp2;
     Complex im(0.0,-1.0);
-    int dx[4] = {0, 0, 0, 0};
     const real coeff1x1 = 5.0/3.0;
     const real coeff2x1 = -1.0/12.0;
 
     // Get link U
-    U = arg.in(dir, linkIndexShift(x, dx, X), parity);
+    U = arg.in(dir, linkIndex(x, arg.E), parity);
     // Compute staples and Z1
-    switch(arg.wflow_type) {
+    switch(wflow_type) {
     case QUDA_WFLOW_TYPE_WILSON :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple(arg, x, X, parity, dir, Stap, Arg::wflow_dim);
+      computeStaple(arg, x, arg.E, parity, dir, Stap, Arg::wflow_dim);
       Z2 = (3.0/4.0) * Stap * conj(U);
       break;
     case QUDA_WFLOW_TYPE_SYMANZIK :
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle(arg, x, X, parity, dir, Stap, Rect, Arg::wflow_dim);
+      computeStapleRectangle(arg, x, arg.E, parity, dir, Stap, Rect, Arg::wflow_dim);
       Z2 = (3.0/4.0) * (coeff1x1 * Stap + coeff2x1 * Rect) * conj(U);
       break;
     }
 
     // Use (8/9 Z1 - 17/36 Z0) computed from W2 step
-    Z1 = arg.temp(dir, linkIndexShift(x, dx, X), parity);
+    Z1 = arg.temp(dir, linkIndex(x, arg.E), parity);
     Z2 = Z2 - Z1;
     Z2 *= arg.epsilon;
 
@@ -202,6 +175,28 @@ namespace quda
     Z2 = im * Z2;
     exponentiate_iQ(Z2, &exp_Z2);
     U = exp_Z2 * U;
-    arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
+    arg.out(dir, linkIndex(x, arg.E), parity) = U;
   }
+
+  // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
+  template <QudaWFlowType wflow_type, typename Arg> __global__ void computeWFlowStep(Arg arg)
+  {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int parity = threadIdx.y + blockIdx.y * blockDim.y;
+    int dir = threadIdx.z + blockIdx.z * blockDim.z;
+    if (idx >= arg.threads) return;
+    if (dir >= Arg::wflow_dim) return;
+
+    //Get stacetime and local coords
+    int x[4];
+    getCoords(x, idx, arg.X, parity);
+    for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
+
+    switch(arg.step_type) {
+    case WFLOW_STEP_W1: computeW1Step<wflow_type>(arg, x, parity, dir); break;
+    case WFLOW_STEP_W2: computeW2Step<wflow_type>(arg, x, parity, dir); break;
+    case WFLOW_STEP_VT: computeVtStep<wflow_type>(arg, x, parity, dir); break;
+    }
+  }
+
 } // namespace quda
