@@ -5555,7 +5555,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
       double q_charge = qChargeQuda();
       double energy[3];
       energyQuda(energy);
-      printfQuda("%le %+.16e %+.16e %+.16e %+.16e\n", step_size * i, energy[2], energy[1], energy[0], q_charge);
+      plaq = plaquette(*gaugeSmeared);
+      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * i, plaq.x, energy[2], energy[1], energy[0], q_charge);
     }
 
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
