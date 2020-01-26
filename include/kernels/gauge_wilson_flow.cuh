@@ -53,7 +53,7 @@ namespace quda
   };
 
   template <QudaWFlowType wflow_type, typename Arg>
-  __host__ __device__ void computeW1Step(Arg &arg, const int *x, const int parity, const int dir)
+  __host__ __device__ void computeW1Step(Arg &arg, const int *x, const int parity, const int x_cb, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
@@ -81,7 +81,7 @@ namespace quda
       break;
     }
 
-    arg.temp(dir, linkIndex(x, arg.E), parity) = Z0;
+    arg.temp(dir, x_cb, parity) = Z0;
     Z0 *= (1.0 / 4.0) * arg.epsilon;
 
     // Compute anti-hermitian projection of Z0, exponentiate, update U
@@ -93,7 +93,7 @@ namespace quda
   }
 
   template <QudaWFlowType wflow_type, typename Arg>
-  __host__ __device__ void computeW2Step(Arg &arg, const int *x, const int parity, const int dir)
+  __host__ __device__ void computeW2Step(Arg &arg, const int *x, const int parity, const int x_cb, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
@@ -122,10 +122,10 @@ namespace quda
     }
 
     // Retrieve Z0, (8/9 Z1 - 17/36 Z0) stored in temp
-    Z0 = arg.temp(dir, linkIndex(x, arg.E), parity);
+    Z0 = arg.temp(dir, x_cb, parity);
     Z0 *= (17.0 / 36.0);
     Z1 = Z1 - Z0;
-    arg.temp(dir, linkIndex(x, arg.E), parity) = Z1;
+    arg.temp(dir, x_cb, parity) = Z1;
     Z1 *= arg.epsilon;
 
     // Compute anti-hermitian projection of Z1, exponentiate, update U
@@ -137,7 +137,7 @@ namespace quda
   }
 
   template <QudaWFlowType wflow_type, typename Arg>
-  __host__ __device__ void computeVtStep(Arg &arg, const int *x, const int parity, const int dir)
+  __host__ __device__ void computeVtStep(Arg &arg, const int *x, const int parity, const int x_cb, const int dir)
   {
     using real = typename Arg::Float;
     typedef complex<real> Complex;
@@ -166,7 +166,7 @@ namespace quda
     }
 
     // Use (8/9 Z1 - 17/36 Z0) computed from W2 step
-    Z1 = arg.temp(dir, linkIndex(x, arg.E), parity);
+    Z1 = arg.temp(dir, x_cb, parity);
     Z2 = Z2 - Z1;
     Z2 *= arg.epsilon;
 
@@ -181,21 +181,21 @@ namespace quda
   // Wilson Flow as defined in https://arxiv.org/abs/1006.4518v3
   template <QudaWFlowType wflow_type, typename Arg> __global__ void computeWFlowStep(Arg arg)
   {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
-    if (idx >= arg.threads) return;
+    if (x_cb >= arg.threads) return;
     if (dir >= Arg::wflow_dim) return;
 
     //Get stacetime and local coords
     int x[4];
-    getCoords(x, idx, arg.X, parity);
+    getCoords(x, x_cb, arg.X, parity);
     for (int dr = 0; dr < 4; ++dr) x[dr] += arg.border[dr];
 
     switch(arg.step_type) {
-    case WFLOW_STEP_W1: computeW1Step<wflow_type>(arg, x, parity, dir); break;
-    case WFLOW_STEP_W2: computeW2Step<wflow_type>(arg, x, parity, dir); break;
-    case WFLOW_STEP_VT: computeVtStep<wflow_type>(arg, x, parity, dir); break;
+    case WFLOW_STEP_W1: computeW1Step<wflow_type>(arg, x, parity, x_cb, dir); break;
+    case WFLOW_STEP_W2: computeW2Step<wflow_type>(arg, x, parity, x_cb, dir); break;
+    case WFLOW_STEP_VT: computeVtStep<wflow_type>(arg, x, parity, x_cb, dir); break;
     }
   }
 
