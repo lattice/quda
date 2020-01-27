@@ -538,8 +538,9 @@ namespace quda {
         for (int dim=0; dim<4; dim++) {
           for (int dir=0; dir<2; dir++) {
           ghost[2*dim+dir] = static_cast<complex<ghostFloat>*>(ghost_[2*dim+dir]);
-          ghost_norm[2 * dim + dir] = reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir])
-              + a.GhostNormOffset(dim, dir) * sizeof(norm_type) - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
+          ghost_norm[2 * dim + dir] = !block_float_ghost ? nullptr :
+            reinterpret_cast<norm_type *>(static_cast<char *>(ghost_[2 * dim + dir]) + a.GhostNormOffset(dim, dir) * sizeof(norm_type)
+                                          - a.GhostOffset(dim, dir) * sizeof(ghostFloat));
           }
         }
       }
