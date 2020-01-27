@@ -104,7 +104,8 @@ set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
 set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
 set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS OFF CACHE BOOL "build non-degenerate twisted mass Dirac operators")
+set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
+set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
 set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
 set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
@@ -175,6 +176,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
+set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
@@ -200,9 +203,9 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_SHAREDLIB)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
+mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -413,7 +416,10 @@ if(QUDA_DOWNLOAD_USQCD)
 endif()
 
 if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD)
+  find_library (QMP_FOUND qmp HINTS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(QMP_FOUND)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
                         GIT_TAG qmp2-5-1
@@ -433,7 +439,8 @@ if(QUDA_QMP)
                         )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set(QUDA_QMPHOME ${INSTALL_DIR})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set(QUDA_QMPHOME ${INSTALL_DIR} CACHE PATH "path to QMP" FORCE)
     set(QUDA_QMP_LDFLAGS
         "-L${QUDA_QMPHOME}/lib"
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
@@ -474,7 +481,10 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
-  if(QUDA_DOWNLOAD_USQCD)
+  find_library (QIO_FOUND qio HINTS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
+  mark_as_advanced(QIO_FOUND)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     ExternalProject_Add(QIO
                         GIT_REPOSITORY https://github.com/usqcd-software/qio.git
                         GIT_TAG qio2-5-0
@@ -494,9 +504,9 @@ if(QUDA_QIO)
                         # LOG_OUTPUT_ON_FAILURE ON
                         )
     ExternalProject_Get_Property(QIO INSTALL_DIR)
-    set(QUDA_QIOHOME ${INSTALL_DIR})
-    set(QUDA_LIME_HOME ${INSTALL_DIR})
-
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set(QUDA_QIOHOME ${INSTALL_DIR} CACHE PATH "path to QIO" FORCE)
+    set(QUDA_LIMEHOME ${INSTALL_DIR} CACHE PATH "path to LIME" FORCE)
     ExternalProject_Add_Step(QIO reconf
                              COMMAND ${AUTORECONF_EXE} -fi
                              WORKING_DIRECTORY <SOURCE_DIR>
@@ -640,6 +650,10 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
+if(QUDA_REDUCE_SINGLE_WARP)
+add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+endif()
+
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
@@ -694,8 +708,13 @@ if(QUDA_DIRAC_TWISTED_CLOVER)
                   -DGPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_TWISTED_CLOVER)
 
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  add_definitions(-DGPU_CLOVER_HASENBUSCH_TWIST -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
+                  -DGPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
+
 if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
+  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
 if(QUDA_LINK_ASQTAD)

@@ -12,6 +12,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
@@ -45,74 +46,7 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = NULL;
 
-cudaGaugeField* padded_gauge_field = nullptr;
-
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat, 3 = MatPCDagMatPC, 4 = MatDagMat)
-extern int test_type;
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-
-// Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-extern QudaMatPCType matpc_type;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaDagType dagger;
 QudaDagType not_dagger;
-
-extern bool compute_clover;
-extern double clover_coeff;
-
-extern bool verify_results;
-extern int niter;
-extern char latfile[];
-extern bool unit_gauge;
-
-extern double mass; // mass of Dirac operator
-extern double mu;
-extern double epsilon;
-
-extern QudaVerbosity verbosity;
-
-extern int eofa_pm;
-
-static cudaGaugeField* createExtendedGauge(cudaGaugeField& in, const int* R, 
-    bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID) {
-  int y[4];
-  for (int dir = 0; dir < 4; ++dir) y[dir] = in.X()[dir] + 2 * R[dir];
-  int pad = 0;
-
-  GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
-      in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
-  gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-  gParamEx.order = in.Order();
-  gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-  gParamEx.t_boundary = in.TBoundary();
-  gParamEx.nFace = 1;
-  gParamEx.tadpole = in.Tadpole();
-  for (int d = 0; d < 4; d++) gParamEx.r[d] = R[d];
-
-  gParamEx.setPrecision(in.Precision(), true);
-
-  cudaGaugeField* out = new cudaGaugeField(gParamEx);
-
-  // copy input field into the extended device gauge field
-  copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
-
-  // now fill up the halos
-  out->exchangeExtendedGhost(R, redundant_comms);
-
-  return out;
-}
 
 double getTolerance(QudaPrecision prec)
 {
@@ -285,7 +219,8 @@ void init(int argc, char **argv) {
 
   inv_param.dslash_type = dslash_type;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.clover_cpu_prec = cpu_prec;
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
@@ -360,7 +295,8 @@ void init(int argc, char **argv) {
 
   spinor->Source(QUDA_RANDOM_SOURCE, 0);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
     double diag = 1.0; // constant added to the diagonal
     construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
@@ -378,7 +314,8 @@ void init(int argc, char **argv) {
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (compute_clover) printfQuda("Computing clover field on GPU\n");
     else printfQuda("Sending clover field to GPU\n");
     inv_param.compute_clover = compute_clover;
@@ -484,7 +421,8 @@ void end() {
   delete spinorTmp;
 
   for (int dir = 0; dir < 4; dir++) free(hostGauge[dir]);
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
+      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     free(hostClover);
     free(hostCloverInv);
   }
@@ -755,6 +693,46 @@ void dslashRef() {
     default:
       printfQuda("Test type not defined\n");
       exit(-1);
+    }
+  } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
+    printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n", inv_param.kappa, inv_param.mu);
+    fflush(stdout);
+    switch (test_type) {
+    case 0:
+      // My dslash should be the same as the clover dslash
+      clover_dslash(spinorRef->V(), hostGauge, hostCloverInv, spinor->V(), parity, dagger, inv_param.cpu_prec,
+                    gauge_param);
+      break;
+    case 1:
+      // my matpc op
+      cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+
+      break;
+    case 2:
+      // my mat
+      cloverHasenbuchTwist_mat(spinorRef->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                               dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+      break;
+    case 3:
+      // matpc^\dagger matpc
+      // my matpc op
+      cloverHasenbuschTwist_matpc(spinorTmp->V(), hostGauge, spinor->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, dagger, inv_param.cpu_prec, gauge_param);
+
+      cloverHasenbuschTwist_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), hostClover, hostCloverInv, inv_param.kappa,
+                                  inv_param.mu, inv_param.matpc_type, not_dagger, inv_param.cpu_prec, gauge_param);
+
+      break;
+    case 4:
+      // my mat
+      cloverHasenbuchTwist_mat(spinorTmp->V(), hostGauge, hostClover, spinor->V(), inv_param.kappa, inv_param.mu,
+                               dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+      cloverHasenbuchTwist_mat(spinorRef->V(), hostGauge, hostClover, spinorTmp->V(), inv_param.kappa, inv_param.mu,
+                               not_dagger, inv_param.cpu_prec, gauge_param, inv_param.matpc_type);
+
+      break;
+    default: printfQuda("Test type not defined\n"); exit(-1);
     }
   } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
     switch (test_type) {
@@ -1071,8 +1049,6 @@ void display_test_info()
     
 }
 
-extern void usage(char**);
-
 TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
@@ -1090,13 +1066,17 @@ int main(int argc, char **argv)
 
   // return code for google test
   int test_rc = 0;
-  for (int i =1;i < argc; i++) {
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}, {"MatPCDagMatPC", 3}, {"MatDagMat", 4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

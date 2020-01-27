@@ -122,26 +122,26 @@ QudaPrecision bindTwistedCloverTex(const FullClover clover, const FullClover clo
   if (oddBit) {
     dslashParam.clover	 = clover.odd;
     dslashParam.cloverNorm = (float*)clover.oddNorm;
-#ifndef DYNAMIC_CLOVER
-    dslashParam.cloverInv = cloverInv.odd;
-    dslashParam.cloverInvNorm = (float*)cloverInv.oddNorm;
-#endif
+    if (!dynamic_clover_inverse()) {
+      dslashParam.cloverInv = cloverInv.odd;
+      dslashParam.cloverInvNorm = (float*)cloverInv.oddNorm;
+    }
   } else {
     dslashParam.clover = clover.even;
     dslashParam.cloverNorm = (float*)clover.evenNorm;
-#ifndef DYNAMIC_CLOVER
-    dslashParam.clover = cloverInv.even;
-    dslashParam.cloverInvNorm = (float*)cloverInv.evenNorm;
-#endif
+    if (!dynamic_clover_inverse()) {
+      dslashParam.clover = cloverInv.even;
+      dslashParam.cloverInvNorm = (float*)cloverInv.evenNorm;
+    }
   }
 
 #ifdef USE_TEXTURE_OBJECTS
   dslashParam.cloverTex = oddBit ? clover.OddTex() : clover.EvenTex();
   if (clover.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverNormTex = oddBit ? clover.OddNormTex() : clover.EvenNormTex();
-#ifndef DYNAMIC_CLOVER
-  dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
-  if (cloverInv.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
-#endif
+  if (!dynamic_clover_inverse()) {
+    dslashParam.cloverInvTex = oddBit ? cloverInv.OddTex() : cloverInv.EvenTex();
+    if (cloverInv.precision == QUDA_HALF_PRECISION || clover.precision == QUDA_QUARTER_PRECISION) dslashParam.cloverInvNormTex = oddBit ? cloverInv.OddNormTex() : cloverInv.EvenNormTex();
+  }
 #endif // USE_TEXTURE_OBJECTS
 
   return clover.precision;

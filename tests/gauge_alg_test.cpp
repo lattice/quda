@@ -8,6 +8,7 @@
 
 #include <comm_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
@@ -25,19 +26,6 @@
 #include <gtest/gtest.h>
 
 using   namespace quda;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
 
 int num_failures=0;
 int *num_failures_dev;
@@ -312,13 +300,16 @@ int main(int argc, char **argv){
   // return code for google test
   int test_rc = 0;
   xdim=ydim=zdim=tdim=32;
-  int i;
-  for (i=1; i<argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
 
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

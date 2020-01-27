@@ -3031,42 +3031,90 @@ namespace quda {
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_TIFR_PADDED_GAUGE_ORDER,Nc> { typedef gauge::TIFRPaddedOrder<T, 2*Nc*Nc> type; };
   template<typename T, int Nc> struct gauge_order_mapper<T,QUDA_FLOAT2_GAUGE_ORDER,Nc> { typedef gauge::FloatNOrder<T, 2*Nc*Nc, 2, 2*Nc*Nc> type; };
 
-  // experiments in reducing template instantation boilerplate
-  // can this be replaced with a C++11 variant that uses variadic templates?
-
-#define INSTANTIATE_RECONSTRUCT(func, g, ...)				\
-  {									\
-    if (!data.isNative())						\
-      errorQuda("Field order %d and precision %d is not native", g.Order(), g.Precision()); \
-    if( g.Reconstruct() == QUDA_RECONSTRUCT_NO) {			\
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Gauge; \
-      func(Gauge(g), g, __VA_ARGS__);					\
-    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_13){			\
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_13>::type Gauge; \
-      func(Gauge(g), g, __VA_ARGS__);					\
-    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_12){			\
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type Gauge; \
-      func(Gauge(g), g, __VA_ARGS__);					\
-    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_9){			\
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_9>::type Gauge; \
-      func(Gauge(g), g, __VA_ARGS__);					\
-    } else if( g.Reconstruct() == QUDA_RECONSTRUCT_8){			\
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type Gauge; \
-      func(Gauge(g), g, __VA_ARGS__);					\
-    } else {								\
-      errorQuda("Reconstruction type %d of gauge field not supported", g.Reconstruct()); \
-    }									\
+  /**
+     @brief This instantiate function is used to instantiate the reconstruct types used
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for different dslash kernels
+  */
+  // FIXME - add support for further constraint of reconstruct types
+  // enabled, e.g., allow the user to provide a constexpr list of the
+  // recon types to be instantiated
+  template <template <typename, int, QudaReconstructType> class Apply, typename Float, int nColor, typename... Args>
+  inline void instantiate(const GaugeField &U, Args &&... args)
+  {
+    if (U.Reconstruct() == QUDA_RECONSTRUCT_NO) {
+#if QUDA_RECONSTRUCT & 4
+      Apply<Float, nColor, QUDA_RECONSTRUCT_NO>(U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
+#endif
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_13) {
+#if QUDA_RECONSTRUCT & 2
+      Apply<Float, nColor, QUDA_RECONSTRUCT_13>(U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-13", QUDA_RECONSTRUCT);
+#endif
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_12) {
+#if QUDA_RECONSTRUCT & 2
+      Apply<Float, nColor, QUDA_RECONSTRUCT_12>(U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+#endif
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_9) {
+#if QUDA_RECONSTRUCT & 1
+      Apply<Float, nColor, QUDA_RECONSTRUCT_9>(U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-9", QUDA_RECONSTRUCT);
+#endif
+    } else if (U.Reconstruct() == QUDA_RECONSTRUCT_8) {
+#if QUDA_RECONSTRUCT & 1
+      Apply<Float, nColor, QUDA_RECONSTRUCT_8>(U, args...);
+#else
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8", QUDA_RECONSTRUCT);
+#endif
+    } else {
+      errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());
+    }
   }
 
-#define INSTANTIATE_PRECISION(func, lat, ...)				\
-  {									\
-    if (lat.Precision() == QUDA_DOUBLE_PRECISION) {			\
-      func<double>(lat, __VA_ARGS__);					\
-    } else if(lat.Precision() == QUDA_SINGLE_PRECISION) {		\
-      func<float>(lat, __VA_ARGS__);					\
-    } else {								\
-      errorQuda("Precision %d not supported", lat.Precision());		\
-    }									\
+  /**
+     @brief This instantiate function is used to instantiate the colors
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for kernels
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename Float, typename... Args>
+  inline void instantiate(const GaugeField &U, Args &&... args)
+  {
+    if (U.Ncolor() == 3) {
+      instantiate<Apply, Float, 3>(U, args...);
+    } else {
+      errorQuda("Unsupported number of colors %d\n", U.Ncolor());
+    }
+  }
+
+  /**
+     @brief This instantiate function is used to instantiate the precisions
+     @param[in] U Gauge field
+     @param[in,out] args Additional arguments for different dslash kernels
+  */
+  template <template <typename, int, QudaReconstructType> class Apply, typename... Args>
+  inline void instantiate(const GaugeField &U, Args &&... args)
+  {
+    if (U.Precision() == QUDA_DOUBLE_PRECISION) {
+#if QUDA_PRECISION & 8
+      instantiate<Apply, double>(U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
+#endif
+    } else if (U.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
+      instantiate<Apply, float>(U, args...);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
+    } else {
+      errorQuda("Unsupported precision %d\n", U.Precision());
+    }
   }
 
 } // namespace quda

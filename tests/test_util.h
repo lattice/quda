@@ -3,6 +3,7 @@
 
 #include <quda.h>
 #include <random_quda.h>
+#include <vector>
 
 #define gaugeSiteSize 18 // real numbers per link
 #define spinorSiteSize 24 // real numbers per spinor
@@ -30,6 +31,7 @@
   
   extern int mySpinorSiteSize;
 
+  void initComms(int argc, char **argv, std::array<int, 4> &commDims);
   void initComms(int argc, char **argv, int *const commDims);
   void finalizeComms();
   void initRand();
@@ -38,6 +40,8 @@
   void dw_setDims(int *X, const int L5);
   void setSpinorSiteSize(int n);
   int dimPartitioned(int dim);
+
+  bool last_node_in_t();
 
   int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1);
   int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) ;
@@ -86,8 +90,9 @@
   
   //used by link fattening code
   int x4_from_full_index(int i);
+
   // ---------- gauge_read.cpp ----------
-  
+
   //void readGaugeField(char *filename, float *gauge[], int argc, char *argv[]);
 
   // additions for dw (quickly hacked on)
@@ -95,6 +100,7 @@
   int fullLatticeIndex_5d(int i, int oddBit);
   int fullLatticeIndex_5d_4dpc(int i, int oddBit);
   int process_command_line_option(int argc, char** argv, int* idx);
+  int process_options(int argc, char **argv);
 
   // use for some profiling
   void stopwatchStart();

@@ -14,10 +14,10 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct LaplaceArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 1;
+    static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
@@ -34,9 +34,10 @@ namespace quda
     const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
+    const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
+    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
 
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
@@ -45,7 +46,8 @@ namespace quda
       U(U),
       dir(dir),
       x(x),
-      a(a)
+      a(a),
+      b(b)
     {
       if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
@@ -70,7 +72,6 @@ namespace quda
   __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
                                                int idx, int thread_dim, bool &active)
   {
-
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
@@ -138,7 +139,7 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, 1>;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
@@ -167,7 +168,7 @@ namespace quda
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
         Vector x = arg.x(x_cb, my_spinor_parity);
-        out = x + arg.a * out;
+        out = arg.a * out + arg.b * x;
       } else if (kernel_type != INTERIOR_KERNEL) {
         Vector x = arg.out(x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);

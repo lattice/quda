@@ -86,6 +86,33 @@ namespace quda {
       double kappa, const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**
+       @brief Driver for applying the Wilson-clover stencil
+
+       out = A * x + kappa * D * in
+
+       where D is the gauged Wilson linear operator.
+
+       This operator can be applied to both single parity
+       (checker-boarded) fields, or to full fields.
+
+       @param[out] out The output result field
+       @param[in] in Input field that D is applied to
+       @param[in] x Input field that A is applied to
+       @param[in] U The gauge field used for the operator
+       @param[in] A The clover field used for the operator
+       @param[in] kappa Scale factor applied
+       @param[in] mu Twist factor
+       @param[in] x Vector field we accumulate onto to
+       @param[in] parity Destination parity
+       @param[in] dagger Whether this is for the dagger operator
+       @param[in] comm_override Override for which dimensions are partitioned
+       @param[in] profile The TimeProfile used for profiling the dslash
+    */
+  void ApplyWilsonCloverHasenbuschTwist(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                        const CloverField &A, double kappa, double mu, const ColorSpinorField &x,
+                                        int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+
+  /**
      @brief Driver for applying the preconditioned Wilson-clover stencil
 
      out = A^{-1} * D * in + x
@@ -147,8 +174,67 @@ namespace quda {
      @param[in] comm_override Override for which dimensions are partitioned
      @param[in] profile The TimeProfile used for profiling the dslash
   */
+
+  /**
+        @brief Driver for applying the Wilson-clover with twist for Hasenbusch
+
+        out = (1 +/- ig5 b A) * x + kappa * A^{-1}D * in
+
+        where D is the gauged Wilson linear operator.
+
+        This operator can be applied to both single parity
+        (checker-boarded) fields, or to full fields.
+
+        @param[out] out The output result field
+        @param[in] in Input field that D is applied to
+        @param[in] x Input field that A is applied to
+        @param[in] U The gauge field used for the operator
+        @param[in] A The clover field used for the operator
+        @param[in] kappa Scale factor applied
+        @param[in] b Twist factor applied
+        @param[in] x Vector field we accumulate onto to
+        @param[in] parity Destination parity
+        @param[in] dagger Whether this is for the dagger operator
+        @param[in] comm_override Override for which dimensions are partitioned
+        @param[in] profile The TimeProfile used for profiling the dslash
+     */
+  void ApplyWilsonCloverHasenbuschTwistPCClovInv(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                                 const CloverField &A, double kappa, double mu,
+                                                 const ColorSpinorField &x, int parity, bool dagger,
+                                                 const int *comm_override, TimeProfile &profile);
+
+  /**
+        @brief Driver for applying the Wilson-clover stencil with thist for Hasenbusch
+
+        out = (1 +/- ig5 b A) * x + kappa * D * in
+
+        where D is the gauged Wilson linear operator.
+
+        This operator can be applied to both single parity
+        (checker-boarded) fields, or to full fields.
+
+        @param[out] out The output result field
+        @param[in] in Input field that D is applied to
+        @param[in] x Input field that A is applied to
+        @param[in] U The gauge field used for the operator
+        @param[in] A The clover field used for the operator
+        @param[in] kappa Scale factor applied
+        @param[in] b Twist factor applied
+        @param[in] x Vector field we accumulate onto to
+        @param[in] parity Destination parity
+        @param[in] dagger Whether this is for the dagger operator
+        @param[in] comm_override Override for which dimensions are partitioned
+        @param[in] profile The TimeProfile used for profiling the dslash
+     */
+  void ApplyWilsonCloverHasenbuschTwistPCNoClovInv(ColorSpinorField &out, const ColorSpinorField &in,
+                                                   const GaugeField &U, const CloverField &A, double kappa, double mu,
+                                                   const ColorSpinorField &x, int parity, bool dagger,
+                                                   const int *comm_override, TimeProfile &profile);
+
+  // old
   void ApplyTwistedMass(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, double a, double b,
-      const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
+                        const ColorSpinorField &x, int parity, bool dagger, const int *comm_override,
+                        TimeProfile &profile);
 
   /**
      @brief Driver for applying the preconditioned twisted-mass stencil
@@ -463,10 +549,11 @@ namespace quda {
      @param[in] in The input field
      @param[in] U The gauge field used for the gauge Laplace
      @param[in] dir Direction of the derivative 0,1,2,3 to omit (-1 is full 4D)
-     @param[in] kappa Scale factor applied
+     @param[in] a Scale factor applied to derivative
+     @param[in] b Scale factor applied to aux field
      @param[in] x Vector field we accumulate onto to
   */
-  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double kappa,
+  void ApplyLaplace(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                     const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile);
 
   /**

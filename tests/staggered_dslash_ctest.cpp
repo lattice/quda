@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -35,10 +36,6 @@ using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-extern int test_type;
-
-extern void usage(char** argv );
 
 // Only load the gauge from a file once.
 bool gauge_loaded = false;
@@ -73,28 +70,11 @@ bool global_skip = true; // hack to skip tests
 
 
 QudaParity parity = QUDA_EVEN_PARITY;
-extern QudaDagType dagger;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int device;
-extern bool verify_results;
-extern int niter;
-extern double mass; // the mass of the Dirac operator
-extern double kappa; // will get overriden
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-extern QudaDslashType dslash_type;
 
-// extern double tadpole_factor;
-extern double eps_naik; // relativistic correction for naik term
 static int n_naiks = 1; // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
 
-extern char latfile[];
 
 int X[4];
-extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
@@ -739,14 +719,17 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
-    for (int i = 1; i < argc; i++) {
-
-      if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-      fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-      usage(argv);
+    auto app = make_app();
+    CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}};
+    app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+    // add_eigen_option_group(app);
+    // add_deflation_option_group(app);
+    // add_multigrid_option_group(app);
+    try {
+      app->parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+      return app->exit(e);
     }
-
     initComms(argc, argv, gridsize_from_cmdline);
 
     // Ensure that the default is improved staggered
