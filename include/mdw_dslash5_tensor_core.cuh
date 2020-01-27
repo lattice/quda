@@ -9,7 +9,6 @@
 #include <shared_memory_cache_helper.cuh>
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
-#include <cublas_v2.h>
 #include <mma.h>
 #endif
 

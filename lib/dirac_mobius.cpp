@@ -173,6 +173,39 @@ namespace quda {
     // do nothing
   }
 
+  static cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                             bool redundant_comms = false,
+                                             QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID)
+  {
+    int y[4];
+    for (int dir = 0; dir < 4; ++dir) y[dir] = in.X()[dir] + 2 * R[dir];
+    int pad = 0;
+
+    GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
+                             in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
+    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
+    gParamEx.order = in.Order();
+    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
+    gParamEx.t_boundary = in.TBoundary();
+    gParamEx.nFace = 1;
+    gParamEx.tadpole = in.Tadpole();
+    for (int d = 0; d < 4; d++) gParamEx.r[d] = R[d];
+
+    gParamEx.setPrecision(in.Precision(), true);
+
+    cudaGaugeField *out = new cudaGaugeField(gParamEx);
+
+    // copy input field into the extended device gauge field
+    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
+
+    // now fill up the halos
+    profile.TPSTART(QUDA_PROFILE_COMMS);
+    out->exchangeExtendedGhost(R, redundant_comms);
+    profile.TPSTOP(QUDA_PROFILE_COMMS);
+
+    return out;
+  }
+
   DiracMobiusPC::DiracMobiusPC(const DiracParam& param)
       : DiracMobius(param), m5inv_plus(Ls * Ls), m5inv_minus(Ls * Ls) {
     // Set up the matrix elements of m5inv
@@ -184,13 +217,6 @@ namespace quda {
     kappa5 = kappa_b / kappa_c;
     double inv = 1.
         / (1. + std::pow(kappa5, Ls) * mass); // has NOT been normalized for the factor of 2 in (1+/-gamma5) projector.
-
-    // printfQuda("Mobius parameters:\n");
-    // printfQuda("b       = %+6.4e\n", b);
-    // printfQuda("c       = %+6.4e\n", c);
-    // printfQuda("kappab  = %+6.4e\n", kappa_b);
-    // printfQuda("kappac  = %+6.4e\n", kappa_c);
-    // printfQuda("kappa5  = %+6.4e\n", kappa5);
 
     // m5inv_plus/minus:
     for (int s = 0; s < Ls; s++) {
@@ -204,11 +230,19 @@ namespace quda {
         m5inv_minus[s * Ls + sp] = inv * std::pow(kappa5, exp) * (s > sp ? -mass : 1.);
       }
     }
+    
+    const int R[] = {2, 2, 2, 2};
+    extended_gauge = createExtendedGauge(*gauge, R, profile, true);
   }
 
-  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC& dirac) : DiracMobius(dirac) {}
+  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC& dirac) : DiracMobius(dirac) {
+    const int R[] = {2, 2, 2, 2};
+    extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+  }
 
-  DiracMobiusPC::~DiracMobiusPC() {}
+  DiracMobiusPC::~DiracMobiusPC() {
+    delete extended_gauge;
+  }
 
   DiracMobiusPC& DiracMobiusPC::operator=(const DiracMobiusPC& dirac) {
     if (&dirac != this) { DiracMobius::operator=(dirac); }
@@ -374,9 +408,11 @@ namespace quda {
 
     deleteTmp(&tmp1, reset1);
   }
-  
+
   void DiracMobiusPC::MdagMLocal(ColorSpinorField& out, const ColorSpinorField& in) const {
 
+    checkDWF(in, out);
+    // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
@@ -396,20 +432,19 @@ namespace quda {
     int odd_bit = (getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
-
       mobius_tensor_core::apply_fused_dslash(
-          *extended_tmp1, in, *gauge, out, in, mass, m5, b_5, c_5, dagger, parity[1], shift2, shift2, dslash5pre);
+          *extended_tmp1, in, *extended_gauge, out, in, mass, m5, b_5, c_5, dagger, parity[1], shift2, shift2, dslash5pre);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp2, *extended_tmp1,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2, *extended_tmp1,
           mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2, dslash4_dslash5pre_dslash5inv);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *gauge, *unextended_tmp1, in, mass, m5,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in, mass, m5,
           b_5, c_5, dagger, parity[1], shift0, shift1, dslash4_dslash5inv_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *gauge, *extended_tmp2, *extended_tmp1,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2, *extended_tmp1,
           mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1, dslash4dag_dslash5predag_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *gauge, out, *unextended_tmp1, mass, m5, b_5, c_5,
+      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5, c_5,
           dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
 
       const long long Ls = in.X(4);
@@ -537,6 +572,7 @@ namespace quda {
   void DiracMobiusPCEofa::m5_eofa(ColorSpinorField& out, const ColorSpinorField& in) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -551,6 +587,7 @@ namespace quda {
       ColorSpinorField& out, const ColorSpinorField& in, const ColorSpinorField& x, double a) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -566,6 +603,7 @@ namespace quda {
   void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField& out, const ColorSpinorField& in) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -580,6 +618,7 @@ namespace quda {
       ColorSpinorField& out, const ColorSpinorField& in, const ColorSpinorField& x, double a) const {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
+    checkDWF(in, out);
     checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
@@ -747,3 +786,6 @@ namespace quda {
     deleteTmp(&tmp2, reset2);
   }
 } // namespace quda
+#include <iostream>
+#include <dirac_quda.h>
+#include <blas_quda.h>

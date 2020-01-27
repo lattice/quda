@@ -498,6 +498,7 @@ public:
     double kappa_c;
     double m5inv_fac = 0.;
     std::vector<double> m5inv_plus, m5inv_minus;
+    cudaGaugeField *extended_gauge;
 
   private:
   public:

@@ -12,6 +12,8 @@
 
 namespace quda {
 
+  static TimeProfile profileInvertPrecon("invertPreconQuda");
+
   using namespace blas;
   
   // set the required parameters for the inner solver
@@ -342,9 +344,11 @@ namespace quda {
     }
     delete p;
 
-    if(x.Precision() != param.precision_sloppy){
-      delete x_sloppy;
+    if(param.precision_sloppy != x.Precision()) {
       delete r_sloppy;
+      if(param.use_sloppy_partial_accumulator) {
+        delete x_sloppy;
+      }
     }
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
