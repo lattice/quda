@@ -6,6 +6,14 @@
 
 namespace quda {
 
+  // Prefetch type
+  typedef enum QudaCloverPrefetchType_s {
+    QUDA_BOTH_CLOVER_PREFETCH_TYPE, // clover and inverse
+    QUDA_CLOVER_CLOVER_PREFETCH_TYPE, // clover only
+    QUDA_INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
+    QUDA_INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
+  } QudaCloverPrefetchType;
+
   struct CloverFieldParam : public LatticeFieldParam {
     bool direct; // whether to create the direct clover 
     bool inverse; // whether to create the inverse clover
@@ -237,14 +245,27 @@ namespace quda {
     /**
       @brief If managed memory and prefetch is enabled, prefetch
       the clover, the norm field (as appropriate), and the inverse
-      fields (as appropriate) to the CPU or the GPU
+      fields (as appropriate) to the CPU or the GPU.
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
     void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the clover, norm field and/or the inverse
+      fields as specified to the CPU or the GPU.
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in
+      @param[in] type Whether to grab the clover, inverse, or both
+      @param[in] parity Whether to grab the full clover or just the even/odd parity 
+    */
+    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream, QudaCloverPrefetchType type, QudaParity parity = QUDA_INVALID_PARITY) const;
+
     friend class DiracClover;
     friend class DiracCloverPC;
+    friend class DiracTwistedClover;
+    friend class DiracTwistedCloverPC;
     friend struct FullClover;
   };
 

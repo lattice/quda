@@ -342,8 +342,9 @@ public:
        3. The emulated coarse Dirac operator matches the native one: D_c = R D P
        4. The preconditioned operator was correctly formulated: \hat{D}_c - X^{-1} D_c
        5. The normal operator is indeed normal: im(<x|D^\dag D|x>) < epsilon
+       @param recursively[in] Whether or not to recursively verify coarser levels, default false
      */
-    void verify(bool recrusively = false);
+    void verify(bool recursively = false);
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector

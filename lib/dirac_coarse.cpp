@@ -377,8 +377,6 @@ namespace quda {
     Dirac::prefetch(mem_space, stream);
     if (Y_d) Y_d->prefetch(mem_space, stream);
     if (X_d) X_d->prefetch(mem_space, stream);
-    if (Xinv_d) Xinv_d->prefetch(mem_space, stream);
-    if (Yhat_d) Yhat_d->prefetch(mem_space, stream);
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
@@ -591,6 +589,12 @@ namespace quda {
       CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
                      matpcType, true);
     }
+  }
+
+  void DiracCoarsePC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const {
+    Dirac::prefetch(mem_space, stream);
+    if (Xinv_d) Xinv_d->prefetch(mem_space, stream);
+    if (Yhat_d) Yhat_d->prefetch(mem_space, stream);
   }
 
 }

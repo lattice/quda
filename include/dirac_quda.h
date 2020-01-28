@@ -464,6 +464,17 @@ namespace quda {
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Full clover with Hasenbusch Twist
@@ -877,6 +888,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -921,6 +941,17 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // Full staggered
@@ -1243,7 +1274,7 @@ public:
 
     /**
       @brief If managed memory and prefetch is enabled, prefetch
-      all relevant memory fields (X, Y, Xinv, Yhat)
+      all relevant memory fields (X, Y)
       to the CPU or GPU as requested
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
@@ -1296,6 +1327,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (Xhat, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
 
