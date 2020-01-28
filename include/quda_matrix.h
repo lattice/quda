@@ -1202,7 +1202,7 @@ namespace quda {
     }
 
   template<class T>
-    __device__  __host__ inline void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
+    __device__  __host__ inline auto exponentiate_iQ(const Matrix<T,3>& Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -1234,14 +1234,15 @@ namespace quda {
       //      where       fj = fj(c0,c1), j=0,1,2.
 
       //[17]
-      c0_max = 2*pow(c1*inv3,1.5);
+      auto sqrt_c1_inv3 = sqrt(c1*inv3);
+      c0_max = 2*(c1*inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
       //[25]
       theta  = acos(c0/c0_max);
 
       sincos(theta*inv3, &w_p, &u_p);
       //[23]
-      u_p *= sqrt(c1*inv3);
+      u_p *= sqrt_c1_inv3;
 
       //[24]
       w_p *= sqrt(c1);
@@ -1314,23 +1315,25 @@ namespace quda {
       f2_c.y = f2_im;
 
       //[19] Construct exp{iQ}
-      setZero(exp_iQ);
+      Matrix<T,3> exp_iQ;
+      setZero(&exp_iQ);
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I
       temp1 = f0_c * UnitM;
-      *exp_iQ = temp1;
+      exp_iQ = temp1;
 
       // +f1*Q
       temp1 = f1_c * Q;
-      *exp_iQ += temp1;
+      exp_iQ += temp1;
 
       // +f2*Q^2
       temp1 = Q * Q;
       temp2 = f2_c * temp1;
-      *exp_iQ += temp2;
+      exp_iQ += temp2;
 
       //exp(iQ) is now defined.
+      return exp_iQ;
     }
 
     /**

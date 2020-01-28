@@ -15,6 +15,7 @@ namespace quda
     const GaugeField &meta;
 
   private:
+    bool tuneSharedBytes() const { return false; }
     bool tuneGridDim() const { return true; }
     unsigned int minThreads() const { return arg.threads; }
 

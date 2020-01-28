@@ -62,7 +62,7 @@ namespace quda
     }
 
     int dx[4] = {0, 0, 0, 0};
-    Link U, Stap, Omega, OmegaDiff, Q, exp_iQ;
+    Link U, Stap, Omega, OmegaDiff, Q;
     Complex i_2(0, 0.5);
 
     // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
@@ -80,7 +80,7 @@ namespace quda
     makeHerm(Q);
     // Q is now defined.
 
-    exponentiate_iQ(Q, &exp_iQ);
+    Link exp_iQ = exponentiate_iQ(Q);
     U = exp_iQ * U;
     arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 
@@ -133,7 +133,7 @@ namespace quda
     double rectangle_coeff = (1.0 - arg.epsilon) / 12.0;
 
     int dx[4] = {0, 0, 0, 0};
-    Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q, exp_iQ;
+    Link U, UDag, Stap, Rect, Omega, OmegaDiff, ODT, Q;
     Complex OmegaDiffTr;
     Complex i_2(0, 0.5);
     
@@ -154,7 +154,7 @@ namespace quda
     makeHerm(Q);
     // Q is now defined.
 
-    exponentiate_iQ(Q, &exp_iQ);
+    Link exp_iQ = exponentiate_iQ(Q);
     U = exp_iQ * U;
     arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
 

@@ -5530,8 +5530,10 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   if (gaugeSmeared != nullptr) delete gaugeSmeared;
   gaugeSmeared = createExtendedGauge(*gaugePrecise, R, profileWFlow);
 
-  GaugeFieldParam gParam(*gaugeSmeared);
-  auto *cudaGaugeTemp = new cudaGaugeField(gParam);
+  GaugeFieldParam gParamEx(*gaugeSmeared);
+  auto *cudaGaugeTemp = new cudaGaugeField(gParamEx);
+  
+  GaugeFieldParam gParam(*gaugePrecise);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
   
   double3 plaq;

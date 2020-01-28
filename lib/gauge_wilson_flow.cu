@@ -15,8 +15,12 @@ namespace quda {
     GaugeWFlowArg<Float, nColor, recon, wflow_dim> arg;
     const GaugeField &meta;
 
-    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    bool tuneSharedBytes() const { return false; }
+    bool tuneGridDim() const { return false; }
     unsigned int minThreads() const { return arg.threads; }
+    unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
+    int blockStep() const { return 8; }
+    int blockMin() const { return 8; }
 
   public:
     GaugeWFlowStep(GaugeField &out, GaugeField &temp, const GaugeField &in, const double epsilon, const QudaWFlowType wflow_type, const WFlowStepType step_type) :
@@ -50,13 +54,25 @@ namespace quda {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeWFlowStep").instantiate(wflow_type,Type<decltype(arg)>())
+      jitify_error = program->kernel("quda::computeWFlowStep").instantiate(arg.wflow_type,arg.step_type,Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       switch (arg.wflow_type) {
-      case QUDA_WFLOW_TYPE_WILSON: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-      case QUDA_WFLOW_TYPE_SYMANZIK: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
-      default : errorQuda("Unknown Wilson Flow type %d", arg.wflow_type);
+      case QUDA_WFLOW_TYPE_WILSON:
+        switch (arg.step_type) {
+        case WFLOW_STEP_W1: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W1><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_W2: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_W2><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_VT: computeWFlowStep<QUDA_WFLOW_TYPE_WILSON, WFLOW_STEP_VT><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        }
+        break;
+      case QUDA_WFLOW_TYPE_SYMANZIK:
+        switch (arg.step_type) {
+        case WFLOW_STEP_W1: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W1><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_W2: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_W2><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        case WFLOW_STEP_VT: computeWFlowStep<QUDA_WFLOW_TYPE_SYMANZIK, WFLOW_STEP_VT><<<tp.grid, tp.block, tp.shared_bytes>>>(arg); break;
+        }
+        break;
+      default: errorQuda("Unknown Wilson Flow type %d", arg.wflow_type);
       }
 #endif
     }
@@ -72,16 +88,31 @@ namespace quda {
       arg.temp.load();
     }
 
-    //DMH: FIXME Re-evaluate these
-    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const {
+    long long flops() const
+    {
+      // only counts number of mat-muls per thread
+      long long threads = 2ll * arg.threads * wflow_dim;
+      long long mat_flops = arg.nColor * arg.nColor * (8 * arg.nColor - 2);
+      long long mat_muls = 1; // 1 comes from Z * conj(U) term
+      switch(arg.wflow_type) {
+      case QUDA_WFLOW_TYPE_WILSON: mat_muls += 4 * (wflow_dim - 1); break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: mat_muls += 28 * (wflow_dim - 1); break;
+      default : errorQuda("Unknown Wilson Flow type");
+      }
+      return mat_muls * mat_flops * threads;
+    }
+
+    long long bytes() const
+    {
       int links = 0;
       switch(arg.wflow_type) {
       case QUDA_WFLOW_TYPE_WILSON: links = 6; break;
-      case QUDA_WFLOW_TYPE_SYMANZIK: links = 24; break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: links = 22; break;
       default : errorQuda("Unknown Wilson Flow type");
       }
-      return ((1 + wflow_dim * links) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
+      auto temp_io = arg.step_type == WFLOW_STEP_W2 ? 2 : arg.step_type == WFLOW_STEP_VT ? 1 : 0;
+      return ((1 + (wflow_dim-1) * links) * arg.in.Bytes() + arg.out.Bytes() + temp_io*arg.temp.Bytes()) * 2ll * arg.threads * wflow_dim;
+    }
   }; // GaugeWFlowStep
 
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaWFlowType wflow_type)
