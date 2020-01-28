@@ -2,7 +2,7 @@
 
 #include <quda.h>
 
-enum class dslash_test_type { Dslash = 0, MatPC, Mat, MatPCDagMatPC, MatDagMat, M5, M5inv, Dslash4pre, MdatPCDagMatPCLocal };
+enum class dslash_test_type { Dslash = 0, MatPC, Mat, MatPCDagMatPC, MatDagMat, M5, M5inv, Dslash4pre, MatPCDagMatPCLocal };
 
 /**
  * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.

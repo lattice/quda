@@ -200,10 +200,10 @@ void init(int argc, char **argv) {
     default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", static_cast<int>(dtest_type));
     }
   } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-    switch (test_type) {
+    switch (dtest_type) {
     case dslash_test_type::M5:
     case dslash_test_type::M5inv: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
-    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", test_type);
+    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", dtest_type);
     }
   }
   else
@@ -532,10 +532,11 @@ DslashTime dslashCUDA(int niter) {
         } else {
           dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
         }
+        break;
       default: errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-      switch (test_type) {
+      switch (dtest_type) {
       case dslash_test_type::M5: // The test for EOFA
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
@@ -551,7 +552,7 @@ DslashTime dslashCUDA(int niter) {
           static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
         }
         break;
-      default: errorQuda("Undefined test type(=%d)\n", test_type);
+      default: errorQuda("Undefined test type(=%d)\n", dtest_type);
       }
     } else {
       switch (dtest_type) {
@@ -987,7 +988,7 @@ void dslashRef() {
       kappa_5[xs] = 0.5 * kappa_b[xs] / kappa_c[xs];
       kappa_mdwf[xs] = -kappa_5[xs];
     }
-    switch (test_type) {
+    switch (dtest_type) {
       case dslash_test_type::M5:
         mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
                         (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
@@ -1034,7 +1035,7 @@ TEST(dslash, verify) {
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
   // If we are using tensor core we tolerate a greater deviation
-  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8) tol *= 10;
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
   if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8) tol *= 10; // if recon 8, we tolerate a greater deviation
 
   ASSERT_LE(deviation, tol) << "CPU and CUDA implementations do not agree";

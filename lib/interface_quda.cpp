@@ -33,8 +33,6 @@
 
 #include <deflation.h>
 
-#include <copy_color_spinor_field_5d.h>
-
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
