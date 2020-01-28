@@ -46,8 +46,8 @@ display_test_info()
 	     dimPartitioned(3));
 
   printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
-  printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
-  printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
+  // printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
+  // printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
 
   return ;
   
@@ -159,10 +159,10 @@ int main(int argc, char **argv)
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      // inv_param.b_5[k] = 2.5;
-      inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
-      // inv_param.c_5[k] = 1.5;
-      inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
+      inv_param.b_5[k] = 2.5;
+      // inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
+      inv_param.c_5[k] = 1.5;
+      // inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
     }
     inv_param.eofa_pm = 0;
     inv_param.eofa_shift = 0.12345;
@@ -227,7 +227,7 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
 
-  inv_param.maxiter_precondition = maxiter_inner_preconditioning;
+  // inv_param.maxiter_precondition = maxiter_inner_preconditioning;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;

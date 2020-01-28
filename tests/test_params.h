@@ -131,6 +131,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal t
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 // parameters
 
@@ -305,5 +306,12 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+
+extern double mobius_scale;
+extern int eofa_pm;
+extern int eofa_shift;
+extern int eofa_mq1;
+extern int eofa_mq2;
+extern int eofa_mq3;
 
 extern QudaContractType contract_type;

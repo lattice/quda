@@ -112,14 +112,14 @@ void init(int argc, char **argv) {
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 2.5; // + 0.5*k;
-      inv_param.c_5[k] = 1.5; // - 0.5*k;
+      inv_param.b_5[k] = 0.5 * (mobius_scale + 1.0);
+      inv_param.c_5[k] = 0.5 * (mobius_scale - 1.0);
     }
     inv_param.eofa_pm = eofa_pm;
-    inv_param.eofa_shift = -1.;
-    inv_param.mq1 = 1.;
-    inv_param.mq2 = 0.085;
-    inv_param.mq3 = 1.;
+    inv_param.eofa_shift = eofa_shift;
+    inv_param.mq1 = eofa_mq1;
+    inv_param.mq2 = eofa_mq2;
+    inv_param.mq3 = eofa_mq3;
   }
 
   inv_param.mu = mu;
@@ -379,13 +379,6 @@ void init(int argc, char **argv) {
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
     
-    if(dslash_type == QUDA_MOBIUS_DWF_DSLASH && test_type == 8){
-      int gR[4] = {2, 2, 2, 2};
-      extern cudaGaugeField* gaugePrecise;
-      padded_gauge_field = createExtendedGauge(*gaugePrecise, gR, true);
-      diracParam.gauge = padded_gauge_field;
-    }
-    
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
     dirac = Dirac::create(diracParam);
@@ -408,10 +401,6 @@ void end() {
     delete cudaSpinorOut;
     delete tmp1;
     delete tmp2;
-  }
-
-  if(padded_gauge_field){
-    delete padded_gauge_field;
   }
 
   // release memory
@@ -1068,8 +1057,9 @@ int main(int argc, char **argv)
   int test_rc = 0;
   // command line options
   auto app = make_app();
-  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}, {"MatPCDagMatPC", 3}, {"MatDagMat", 4}};
+  CLI::TransformPairs<int> test_type_map {{"dslash", 0}, {"MatPC", 1}, {"Mat", 2}, {"MatPCDagMatPC", 3}, {"MatDagMat", 4}, {"MatDagMatLocal", 8}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  add_eofa_option_group(app);
   // add_eigen_option_group(app);
   // add_deflation_option_group(app);
   // add_multigrid_option_group(app);

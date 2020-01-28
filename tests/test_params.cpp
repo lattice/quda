@@ -43,6 +43,7 @@ char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
+int niter_precondition = 10;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
@@ -70,6 +71,7 @@ double clover_coeff = 0.1;
 bool compute_clover = false;
 bool compute_fatlong = false;
 double tol = 1e-7;
+double tol_precondition = 1e-1;
 double tol_hq = 0.;
 double reliable_delta = 0.1;
 bool alternative_reliable = false;
@@ -186,6 +188,13 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
+double mobius_scale = 2.0;
+int eofa_pm = 1;
+int eofa_shift = -1.2345;
+int eofa_mq1 = 1.0;
+int eofa_mq2 = 0.085;
+int eofa_mq3 = 1.0;
+
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
 namespace
@@ -205,6 +214,7 @@ namespace
                                                        {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
                                                        {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
                                                        {"mobius", QUDA_MOBIUS_DWF_DSLASH},
+                                                       {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
                                                        {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
@@ -216,6 +226,7 @@ namespace
                                                            {"bicgstab", QUDA_BICGSTAB_INVERTER},
                                                            {"gcr", QUDA_GCR_INVERTER},
                                                            {"pcg", QUDA_PCG_INVERTER},
+                                                           {"mspcg", QUDA_MSPCG_INVERTER},
                                                            {"mpcg", QUDA_MPCG_INVERTER},
                                                            {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
                                                            {"mr", QUDA_MR_INVERTER},
@@ -369,7 +380,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
-  quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");
+  quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
+  quda_app->add_option("--niter-precondition", niter_precondition, "The number of iterations to perform for the preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 
@@ -434,6 +446,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--tol", tol, "Set L2 residual tolerance");
   quda_app->add_option("--tolhq", tol_hq, "Set heavy-quark residual tolerance");
+  quda_app->add_option("--tol-precondition", tol_precondition, "Set L2 residual tolerance for preconditioner");
   quda_app->add_option(
     "--unit-gauge", unit_gauge,
     "Generate a unit valued gauge field in the tests. If false, a random gauge is generated (default false)");
@@ -737,3 +750,17 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
 }
+
+void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+  auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
+
+  opgroup->add_option("--mobius-scale", mobius_scale, "Set the Mobius scale (must be equal or larger than 1.0, default 1.0)");
+  
+  opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");
+  opgroup->add_option("--eofa-shift", eofa_shift, "Set the shift for the EOFA operator (default -0.12345)");
+  opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
+  opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
+  opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
+}
+
