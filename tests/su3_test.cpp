@@ -185,8 +185,8 @@ int main(int argc, char **argv)
   void *qDensity = malloc(array_size);
   // start the timer
   double time0 = -((double)clock());
-  tensorDensityObservablesQuda(obs, qDensity);
-  
+  tensorDensityObservablesQuda(obs, qDensity, QUDA_BOOLEAN_TRUE, QUDA_BOOLEAN_TRUE);
+
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;

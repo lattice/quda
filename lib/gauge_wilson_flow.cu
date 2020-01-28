@@ -124,10 +124,7 @@ namespace quda {
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
-    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
-    in.exchangeExtendedGhost(in.R(), false);    
-    
-    //Set each step type as an arg parameter, update halos if needed
+    // Set each step type as an arg parameter, update halos if needed
     // Step W1
     instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_W1);
     out.exchangeExtendedGhost(out.R(), false);

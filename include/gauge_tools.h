@@ -76,14 +76,18 @@ namespace quda
   void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon);
 
   /**
-     @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field
+     @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field.
+     This routine assumes that the input and output fields are
+     extended, with the input field being exchanged prior to calling
+     this function.  On exit from this routine, the output field will
+     have been exchanged.
      @param[out] dataDs Output smeared field
      @param[in] dataTemp Temp space
      @param[in] dataOr Input gauge field
      @param[in] epsilon Step size
      @param[in] wflow_type Wilson (1x1) or Symanzik improved (2x1) staples
   */
-  void WFlowStep(GaugeField &dataDs, GaugeField &dataTemp, GaugeField &dataOr, double epsilon, QudaWFlowType wflow_type);
+  void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, double epsilon, QudaWFlowType wflow_type);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

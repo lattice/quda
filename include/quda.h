@@ -1266,28 +1266,32 @@ extern "C" {
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
   /**
-   * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
-   */
-  //double qChargeQuda();
-
-  /**
-   * Calculates the field energy from gaugeSmeared, if it exists, or from gaugePrecise
-   * if no smeared fields are present.
-   * @param energy Array for total, spatial, temporal energies
-   */
-  //void energyQuda(double energy[3]);
-
-  /**
-     @brief Calculates the topological charge from gaugeSmeared, if it exist,
-     or from gaugePrecise if no smeared fields are present.
-     @param[out] qDensity array holding Q charge density
+   * @brief Calculates the topological charge and field energy from
+   * gaugeSmeared, if it exists, or from gaugePrecise if no smeared
+   * fields are present.
+   * @param[out] obs host array that will stores the result.  The
+   * first three elements are the total, spatial and temporal
+   * energies, repsectively, and the final element is the topological
+   * charge.
+   * @param[in] Whether to compute the field energy
+   * @param[in] Whether to compute the topological charge
   */
-  //double qChargeDensityQuda(void *qDensity);
-
-  void tensorObservablesQuda(double obs[4], bool energy = true, bool charge = true);
+  void tensorObservablesQuda(double obs[4], QudaBoolean energy, QudaBoolean charge);
   
-  void tensorDensityObservablesQuda(double obs[4], void *qDensity, bool energy = true, bool charge = true);
-  
+  /**
+   * @brief Calculates the topological density field, as well as the
+   * topological charge and and field energy from gaugeSmeared, if it
+   * exists, or from gaugePrecise if no smeared fields are present.
+   * @param[out] obs host array that will stores the result.  The
+   * first three elements are the total, spatial and temporal
+   * energies, repsectively, and the final element is the topological
+   * charge.
+   * @param[in,out] Pointer to host array of length volume where the
+   * topological charge density will be copied
+   * @param[in] Whether to compute the field energy
+   * @param[in] Whether to compute the topological charge
+  */
+  void tensorDensityObservablesQuda(double obs[4], void *qDensity, QudaBoolean energy, QudaBoolean charge);
   
   /**
    * Public function to perform color contractions of the host spinors x and y.
