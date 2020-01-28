@@ -54,15 +54,19 @@ public:
     long long bytes() const { return ((1 + 6 * apeDim) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
   }; // GaugeAPE
 
-  void APEStep(GaugeField &out, const GaugeField& in, double alpha) {
+  void APEStep(GaugeField &out, GaugeField& in, double alpha) {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
     checkReconstruct(out, in);
 
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
-
+    
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeAPE>(out, in, alpha);
+    out.exchangeExtendedGhost(out.R(), false);
+    
 #else
     errorQuda("Gauge tools are not built");
 #endif

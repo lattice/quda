@@ -177,36 +177,33 @@ int main(int argc, char **argv)
   // All user inputs now defined
   display_test_info();
 
-  // Topological charge
-  double qCharge = 0.0, qChargeCheck = 0.0;
-  // start the timer
-  double time0 = -((double)clock());
-  qCharge = qChargeQuda();
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Computed topological charge gauge precise is %.16e Done in %g secs\n", qCharge, time0);
-
+  // Topological charge and gauge energy
+  double obs[4], q_charge_check = 0.0;
   // Size of floating point data
   size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * sSize;
   void *qDensity = malloc(array_size);
-  qCharge = qChargeDensityQuda(qDensity);
-
+  // start the timer
+  double time0 = -((double)clock());
+  tensorDensityObservablesQuda(obs, qDensity);
+  
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", obs[0], obs[1], obs[2], obs[3], time0);
+  
   // Ensure host array sums to return value
   if (prec == QUDA_DOUBLE_PRECISION) {
-    for (int i = 0; i < V; i++) qChargeCheck += ((double *)qDensity)[i];
+    for (int i = 0; i < V; i++) q_charge_check += ((double *)qDensity)[i];
   } else {
-    for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
+    for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
 
   // Q charge Reduction and normalisation
-  comm_allreduce(&qChargeCheck);
+  comm_allreduce(&q_charge_check);
 
-  printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
-  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
-             qCharge - qChargeCheck);
-
+  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", obs[3], q_charge_check, obs[3] - q_charge_check);
+  
   // Gauge Smearing Routines
   //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
@@ -222,8 +219,6 @@ int main(int argc, char **argv)
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for APE = %g secs\n", time0);
-    qCharge = qChargeQuda();
-    printfQuda("Computed topological charge after APE smearing is %.16e \n", qCharge);
     break;
   case 1:
     // STOUT
@@ -234,8 +229,6 @@ int main(int argc, char **argv)
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for STOUT = %g secs\n", time0);
-    qCharge = qChargeQuda();
-    printfQuda("Computed topological charge after STOUT smearing is %.16e \n", qCharge);
     break;
 
     // Topological charge routines
@@ -249,8 +242,6 @@ int main(int argc, char **argv)
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-    qCharge = qChargeQuda();
-    printfQuda("Computed topological charge after Over Improved STOUT smearing is %.16e \n", qCharge);
     break;
   case 3:
     // Wilson Flow
@@ -261,8 +252,6 @@ int main(int argc, char **argv)
     time0 += clock();
     time0 /= CLOCKS_PER_SEC;
     printfQuda("Total time for Wilson Flow = %g secs\n", time0);
-    qCharge = qChargeQuda();
-    printfQuda("Computed topological charge after Wilson Flow is %.16e \n", qCharge);
     break;
   default: errorQuda("Undefined test type %d given", test_type);
   }

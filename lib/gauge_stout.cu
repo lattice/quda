@@ -54,7 +54,7 @@ public:
     long long bytes() const { return ((1 + stoutDim * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
   }; // GaugeSTOUT
   
-  void STOUTStep(GaugeField &out, const GaugeField &in, double rho)
+  void STOUTStep(GaugeField &out, GaugeField &in, double rho)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -63,7 +63,10 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeSTOUT>(out, in, rho);
+    out.exchangeExtendedGhost(out.R(), false);    
 #else
     errorQuda("Gauge tools are not built");
 #endif
@@ -114,7 +117,7 @@ public:
     long long bytes() const { return ((1 + stoutDim * 24) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } //24 links per dim, 1 in, 1 out
   }; // GaugeOvrImpSTOUT
 
-  void OvrImpSTOUTStep(GaugeField &out, const GaugeField& in, double rho, double epsilon)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -123,7 +126,11 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeOvrImpSTOUT>(out, in, rho, epsilon);
+    out.exchangeExtendedGhost(out.R(), false);
+    
 #else
     errorQuda("Gauge tools are not built");
 #endif

@@ -215,6 +215,9 @@ static TimeProfile profileQCharge("qChargeQuda");
 //!< Profiler for energyQuda
 static TimeProfile profileEnergy("energyQuda");
 
+//!< Profiler for tensorQuda
+static TimeProfile profileTensor("tensorQuda");
+
 //!< Profiler for APEQuda
 static TimeProfile profileAPE("APEQuda");
 
@@ -4106,14 +4109,12 @@ void createCloverQuda(QudaInvertParam* invertParam)
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   cudaGaugeField Fmunu(tensorParam);
   profileClover.TPSTOP(QUDA_PROFILE_INIT);
-
   profileClover.TPSTART(QUDA_PROFILE_COMPUTE);
   computeFmunu(Fmunu, *gauge);
   computeClover(*cloverPrecise, Fmunu, invertParam->clover_coeff, QUDA_CUDA_FIELD_LOCATION);
   profileClover.TPSTOP(QUDA_PROFILE_COMPUTE);
-
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
-
+  
   // FIXME always preserve the extended gauge
   extendedGaugeResident = gauge;
 }
@@ -5432,28 +5433,25 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
 
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
-
-  double3 plaq = plaquette(*gaugeSmeared);
+  
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after 0 APE steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
+    double obs[4];
+    tensorObservablesQuda(obs, false, true);
+    printfQuda("Q charge at step %03d = %+.16e\n", 0, obs[3]);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
-    cudaGaugeTemp->copy(*gaugeSmeared);
-    cudaGaugeTemp->exchangeExtendedGhost(R,profileAPE,redundant_comms);
+    profileAPE.TPSTART(QUDA_PROFILE_COMPUTE);
     APEStep(*gaugeSmeared, *cudaGaugeTemp, alpha);
-    gaugeSmeared->exchangeExtendedGhost(R, profileAPE, redundant_comms);
+    profileAPE.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
-      double qCharge = qChargeQuda();
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
+      double obs[4];
+      tensorObservablesQuda(obs, false, true);
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, obs[3]);
     }
   }
-
+  
   delete cudaGaugeTemp;
-  plaq = plaquette(*gaugeSmeared);
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d APE steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
-  }
   profileAPE.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5469,27 +5467,24 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  double3 plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after 0 STOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
+    double obs[4];
+    tensorObservablesQuda(obs, false, true);
+    printfQuda("Q charge at step %03d = %+.16e\n", 0, obs[3]);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
-    cudaGaugeTemp->copy(*gaugeSmeared);
-    cudaGaugeTemp->exchangeExtendedGhost(R,profileSTOUT,redundant_comms);
+    profileSTOUT.TPSTART(QUDA_PROFILE_COMPUTE);
     STOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho);
-    gaugeSmeared->exchangeExtendedGhost(R, profileSTOUT, redundant_comms);
+    profileSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
-      double qCharge = qChargeQuda();
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
+      double obs[4];
+      tensorObservablesQuda(obs, false, true);
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, obs[3]);
     }
   }
-
+  
   delete cudaGaugeTemp;
-  plaq = plaquette(*gaugeSmeared);
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d STOUT steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
-  }
   profileSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5505,27 +5500,24 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  double3 plaq = plaquette(*gaugeSmeared);
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after 0 OvrImpSTOUT steps: %le %le %le\n", plaq.x, plaq.y, plaq.z);
+    double obs[4];
+    tensorObservablesQuda(obs, false, true);
+    printfQuda("Q charge at step %03d = %+.16e\n", 0, obs[3]);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
-    cudaGaugeTemp->copy(*gaugeSmeared);
-    cudaGaugeTemp->exchangeExtendedGhost(R,profileOvrImpSTOUT,redundant_comms);
+    profileOvrImpSTOUT.TPSTART(QUDA_PROFILE_COMPUTE);
     OvrImpSTOUTStep(*gaugeSmeared, *cudaGaugeTemp, rho, epsilon);
-    gaugeSmeared->exchangeExtendedGhost(R, profileOvrImpSTOUT, redundant_comms);
+    profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_COMPUTE);
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_VERBOSE) {
-      double qCharge = qChargeQuda();
-      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, qCharge);
+      double obs[4];
+      tensorObservablesQuda(obs, false, true);
+      printfQuda("Q charge at step %03d = %+.16e\n", i + 1, obs[3]);
     }
   }
-
+  
   delete cudaGaugeTemp;
-  plaq = plaquette(*gaugeSmeared);
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d OvrImpSTOUT steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
-  }
   profileOvrImpSTOUT.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -5541,38 +5533,33 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
   auto *cudaGaugeAux = new cudaGaugeField(gParam);
-  double3 plaq = plaquette(*gaugeSmeared);
-
+  
+  double3 plaq;
+  double obs[4];
   if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after 0 WFlow steps: %.16e %.16e %.16e\n", 3 * plaq.x, 3 * plaq.y, 3 * plaq.z);
+    tensorObservablesQuda(obs);
+    plaq = plaquette(*gaugeSmeared);
+    printfQuda("flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
+    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, plaq.x, obs[0], obs[1], obs[2], obs[3]);
   }
-
-  for (unsigned int i = 0; i < n_steps; i++) {
-    copyExtendedGauge(*cudaGaugeTemp, *gaugeSmeared, QUDA_CUDA_FIELD_LOCATION);
-    cudaGaugeTemp->exchangeExtendedGhost(R, profileWFlow, redundant_comms);
-
-    if ((i % meas_interval == 0 || i == 0) && getVerbosity() >= QUDA_SUMMARIZE) {
-      double q_charge = qChargeQuda();
-      double energy[3];
-      energyQuda(energy);
-      plaq = plaquette(*gaugeSmeared);
-      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * i, plaq.x, energy[2], energy[1], energy[0], q_charge);
-    }
-
+  
+  for (unsigned int i = 0; i < n_steps; i++) {    
     // Perform W1, W2, and Vt Wilson Flow steps as defined in
     // https://arxiv.org/abs/1006.4518v3
     profileWFlow.TPSTART(QUDA_PROFILE_COMPUTE);
     WFlowStep(*gaugeSmeared, *cudaGaugeAux, *cudaGaugeTemp, step_size, wflow_type);
     profileWFlow.TPSTOP(QUDA_PROFILE_COMPUTE);
+    
+    if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
+      tensorObservablesQuda(obs);
+      plaq = plaquette(*gaugeSmeared);
+      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size*(i+1), plaq.x, obs[0], obs[1], obs[2], obs[3]);
+    }
   }
-
+  
   delete cudaGaugeTemp;
   delete cudaGaugeAux;
   profileWFlow.TPSTOP(QUDA_PROFILE_TOTAL);
-  plaq = plaquette(*gaugeSmeared);
-  if (getVerbosity() >= QUDA_SUMMARIZE) {
-    printfQuda("Plaquette after %d WFlow steps: %le %le %le\n", n_steps, plaq.x, plaq.y, plaq.z);
-  }
 }
 
 int computeGaugeFixingOVRQuda(void *gauge, const unsigned int gauge_dir, const unsigned int Nsteps,
@@ -5789,109 +5776,73 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-double qChargeQuda()
-{
-  profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
-
-  cudaGaugeField *gauge = nullptr;
-  if (!gaugeSmeared) {
-    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileQCharge);
-    gauge = extendedGaugeResident;
-  } else {
-    gauge = gaugeSmeared;
-  }
-
-  profileQCharge.TPSTART(QUDA_PROFILE_INIT);
-  // create the Fmunu field
-
-  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
-  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField Fmunu(tensorParam);
-
-  profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
-  profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
-
-  computeFmunu(Fmunu, *gauge);
-  double charge = quda::computeQCharge(Fmunu);
-
-  profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  return charge;
+void tensorObservablesQuda(double obs[4], bool compute_energy, bool compute_qcharge) {
+  void *h_qDensity = nullptr;
+  tensorDensityObservablesQuda(obs, h_qDensity, compute_energy, compute_qcharge);
 }
 
-void energyQuda(double energy[3])
+void tensorDensityObservablesQuda(double obs[4], void *h_qDensity, bool compute_energy, bool compute_qcharge)
 {
-  profileEnergy.TPSTART(QUDA_PROFILE_TOTAL);
-
+  profileTensor.TPSTART(QUDA_PROFILE_TOTAL);
   cudaGaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
-    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileEnergy);
+    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileTensor);
     gauge = extendedGaugeResident;
   } else {
     gauge = gaugeSmeared;
   }
-
-  profileEnergy.TPSTART(QUDA_PROFILE_INIT);
+  
+  profileTensor.TPSTART(QUDA_PROFILE_INIT);
   // create the Fmunu field
   GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
   tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField Fmunu(tensorParam);
-  profileEnergy.TPSTOP(QUDA_PROFILE_INIT);
+  cudaGaugeField gaugeFmunu(tensorParam);
+  profileTensor.TPSTOP(QUDA_PROFILE_INIT);
 
-  profileEnergy.TPSTART(QUDA_PROFILE_COMPUTE);
-  computeFmunu(Fmunu, *gauge);
-  double3 energy3 = quda::computeEnergy(Fmunu);
-  // Volume normalised in kernel reduction
-  energy[0] = energy3.x;
-  energy[1] = energy3.y;
-  energy[2] = energy3.z;
-  profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
-  profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
-}
+  profileTensor.TPSTART(QUDA_PROFILE_COMPUTE);
+  computeFmunu(gaugeFmunu, *gauge);
+  profileTensor.TPSTOP(QUDA_PROFILE_COMPUTE);
+  profileTensor.TPSTOP(QUDA_PROFILE_TOTAL);
 
-double qChargeDensityQuda(void *h_qDensity)
-{
-  profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
+  if(compute_qcharge) {
+    profileQCharge.TPSTART(QUDA_PROFILE_TOTAL);
+    void *d_qDensity = nullptr;
+    size_t size = 0;
+    profileQCharge.TPSTART(QUDA_PROFILE_INIT);
+    if(h_qDensity) {
+      size = gaugeFmunu.Volume() * gaugeFmunu.Precision();
+      d_qDensity = device_malloc(size);
+    }
+    profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
 
-  cudaGaugeField *gauge = nullptr;
-  if (!gaugeSmeared) {
-    if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileQCharge);
-    gauge = extendedGaugeResident;
-  } else {
-    gauge = gaugeSmeared;
+    profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
+    if(h_qDensity) obs[3] = quda::computeQChargeDensity(gaugeFmunu, d_qDensity);
+    else obs[3] = quda::computeQCharge(gaugeFmunu);
+    profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    if(h_qDensity) {
+      profileQCharge.TPSTART(QUDA_PROFILE_D2H);
+      qudaMemcpy(h_qDensity, d_qDensity, size, cudaMemcpyDeviceToHost);
+      profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
+      
+      profileQCharge.TPSTART(QUDA_PROFILE_FREE);
+      device_free(d_qDensity);
+      profileQCharge.TPSTOP(QUDA_PROFILE_FREE);
+    }
+    profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
   }
-  // Do we keep the smeared extended field on memory, or the unsmeared one?
-  profileQCharge.TPSTART(QUDA_PROFILE_INIT);
-  // create the Fmunu field
-  GaugeFieldParam tensorParam(gaugePrecise->X(), gauge->Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
-  tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
-  tensorParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
-  cudaGaugeField Fmunu(tensorParam);
-
-  size_t size = Fmunu.Volume() * Fmunu.Precision();
-  void *d_qDensity = device_malloc(size);
-  profileQCharge.TPSTOP(QUDA_PROFILE_INIT);
-
-  profileQCharge.TPSTART(QUDA_PROFILE_COMPUTE);
-  computeFmunu(Fmunu, *gauge);
-  double charge = quda::computeQChargeDensity(Fmunu, d_qDensity);
-  profileQCharge.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  profileQCharge.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_qDensity, d_qDensity, size, cudaMemcpyDeviceToHost);
-  profileQCharge.TPSTOP(QUDA_PROFILE_D2H);
-
-  profileQCharge.TPSTART(QUDA_PROFILE_FREE);
-  device_free(d_qDensity);
-  profileQCharge.TPSTOP(QUDA_PROFILE_FREE);
-
-  profileQCharge.TPSTOP(QUDA_PROFILE_TOTAL);
-
-  return charge;
+    
+  if(compute_energy) {
+    profileEnergy.TPSTART(QUDA_PROFILE_TOTAL);
+    profileEnergy.TPSTART(QUDA_PROFILE_COMPUTE);
+    double3 energy3 = quda::computeEnergy(gaugeFmunu);
+    // Volume normalised in kernel reduction
+    obs[0] = energy3.x;
+    obs[1] = energy3.y;
+    obs[2] = energy3.z;
+    profileEnergy.TPSTOP(QUDA_PROFILE_COMPUTE);
+    profileEnergy.TPSTOP(QUDA_PROFILE_TOTAL);
+  }
 }

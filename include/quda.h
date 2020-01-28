@@ -1268,15 +1268,27 @@ extern "C" {
   /**
    * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
    */
-  double qChargeQuda();
+  //double qChargeQuda();
 
   /**
    * Calculates the field energy from gaugeSmeared, if it exists, or from gaugePrecise
    * if no smeared fields are present.
    * @param energy Array for total, spatial, temporal energies
    */
-  void energyQuda(double energy[3]);
+  //void energyQuda(double energy[3]);
 
+  /**
+     @brief Calculates the topological charge from gaugeSmeared, if it exist,
+     or from gaugePrecise if no smeared fields are present.
+     @param[out] qDensity array holding Q charge density
+  */
+  //double qChargeDensityQuda(void *qDensity);
+
+  void tensorObservablesQuda(double obs[4], bool energy = true, bool charge = true);
+  
+  void tensorDensityObservablesQuda(double obs[4], void *qDensity, bool energy = true, bool charge = true);
+  
+  
   /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data
@@ -1286,15 +1298,9 @@ extern "C" {
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] X spacetime data for construction of ColorSpinorFields.
    */
+
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
-
-  /**
-     @brief Calculates the topological charge from gaugeSmeared, if it exist,
-     or from gaugePrecise if no smeared fields are present.
-     @param[out] qDensity array holding Q charge density
-  */
-  double qChargeDensityQuda(void *qDensity);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.

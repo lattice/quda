@@ -54,7 +54,7 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] alpha smearing parameter
   */
-  void APEStep(GaugeField &dataDs, const GaugeField &dataOr, double alpha);
+  void APEStep(GaugeField &dataDs, GaugeField &dataOr, double alpha);
 
   /**
      @brief Apply STOUT smearing to the gauge field
@@ -63,7 +63,7 @@ namespace quda
      @param[in] dataOr Input gauge field
      @param[in] rho smearing parameter
   */
-  void STOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho);
+  void STOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho);
 
   /**
      @brief Apply Over Improved STOUT smearing to the gauge field
@@ -73,7 +73,7 @@ namespace quda
      @param[in] rho smearing parameter
      @param[in] epsilon smearing parameter
   */
-  void OvrImpSTOUTStep(GaugeField &dataDs, const GaugeField &dataOr, double rho, double epsilon);
+  void OvrImpSTOUTStep(GaugeField &dataDs, GaugeField &dataOr, double rho, double epsilon);
 
   /**
      @brief Apply Wilson Flow steps W1, W2, Vt to the gauge field

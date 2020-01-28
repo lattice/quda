@@ -249,9 +249,10 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     double3 plaq = plaquette(*gaugeEx);
-    double charge = qChargeQuda();
-    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, charge);
-
+    double obs[4];
+    tensorObservablesQuda(obs, false, true);
+    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, obs[3]);
+    
     // Reunitarization setup
     setReunitarizationConsts();
     plaquette(*gaugeEx);
@@ -275,9 +276,8 @@ int main(int argc, char **argv)
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     plaq = plaquette(*gaugeEx);
-    charge = qChargeQuda();
-    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
-
+    tensorObservablesQuda(obs, false, true);
+    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, obs[3]);    
 
     freeGaugeQuda();
 
@@ -293,8 +293,8 @@ int main(int argc, char **argv)
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       plaq = plaquette(*gaugeEx);
-      charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      tensorObservablesQuda(obs, false, true);
+      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, obs[3]);
 
       freeGaugeQuda();
     }
