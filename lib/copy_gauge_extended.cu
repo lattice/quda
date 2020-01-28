@@ -1,5 +1,6 @@
 #include <tune_quda.h>
 #include <gauge_field_order.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -46,57 +47,56 @@ namespace quda {
     Copy a regular/extended gauge field into an extended/regular gauge field
    */
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool regularToextended>
-    __device__ __host__ void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, int X, int parity) {
-      typedef typename mapper<FloatIn>::type RegTypeIn;
-      typedef typename mapper<FloatOut>::type RegTypeOut;
+  __device__ __host__ void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> &arg, int X, int parity) {
+    typedef typename mapper<FloatIn>::type RegTypeIn;
+    typedef typename mapper<FloatOut>::type RegTypeOut;
+    constexpr int nColor = Ncolor(length);
 
-      int x[4];
-      int R[4];
-      int xin, xout;
-      if(regularToextended){
-        //regular to extended
-        for (int d=0; d<4; d++) R[d] = (arg.Xout[d] - arg.Xin[d]) >> 1;
-        int za = X/(arg.Xin[0]/2);
-        int x0h = X - za*(arg.Xin[0]/2);
-        int zb = za/arg.Xin[1];
-        x[1] = za - zb*arg.Xin[1];
-        x[3] = zb / arg.Xin[2];
-        x[2] = zb - x[3]*arg.Xin[2];
-        x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
-        // Y is the cb spatial index into the extended gauge field
-        xout = ((((x[3]+R[3])*arg.Xout[2] + (x[2]+R[2]))*arg.Xout[1] + (x[1]+R[1]))*arg.Xout[0]+(x[0]+R[0])) >> 1;
-        xin = X;
-      } else{
-        //extended to regular gauge
-        for (int d=0; d<4; d++) R[d] = (arg.Xin[d] - arg.Xout[d]) >> 1;
-        int za = X/(arg.Xout[0]/2);
-        int x0h = X - za*(arg.Xout[0]/2);
-        int zb = za/arg.Xout[1];
-        x[1] = za - zb*arg.Xout[1];
-        x[3] = zb / arg.Xout[2];
-        x[2] = zb - x[3]*arg.Xout[2];
-        x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
-        // Y is the cb spatial index into the extended gauge field
-        xin = ((((x[3]+R[3])*arg.Xin[2] + (x[2]+R[2]))*arg.Xin[1] + (x[1]+R[1]))*arg.Xin[0]+(x[0]+R[0])) >> 1;
-        xout = X;
-      }
-      for (int d=0; d<arg.geometry; d++){
-        RegTypeIn in[length];
-        RegTypeOut out[length];
-        arg.in.load(in, xin, d, parity);
-        for (int i=0; i<length; i++) out[i] = in[i];
-        arg.out.save(out, xout, d, parity);
-      }//dir
+    int x[4];
+    int R[4];
+    int xin, xout;
+    if(regularToextended){
+      //regular to extended
+      for (int d=0; d<4; d++) R[d] = (arg.Xout[d] - arg.Xin[d]) >> 1;
+      int za = X/(arg.Xin[0]/2);
+      int x0h = X - za*(arg.Xin[0]/2);
+      int zb = za/arg.Xin[1];
+      x[1] = za - zb*arg.Xin[1];
+      x[3] = zb / arg.Xin[2];
+      x[2] = zb - x[3]*arg.Xin[2];
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      // Y is the cb spatial index into the extended gauge field
+      xout = ((((x[3]+R[3])*arg.Xout[2] + (x[2]+R[2]))*arg.Xout[1] + (x[1]+R[1]))*arg.Xout[0]+(x[0]+R[0])) >> 1;
+      xin = X;
+    } else{
+      //extended to regular gauge
+      for (int d=0; d<4; d++) R[d] = (arg.Xin[d] - arg.Xout[d]) >> 1;
+      int za = X/(arg.Xout[0]/2);
+      int x0h = X - za*(arg.Xout[0]/2);
+      int zb = za/arg.Xout[1];
+      x[1] = za - zb*arg.Xout[1];
+      x[3] = zb / arg.Xout[2];
+      x[2] = zb - x[3]*arg.Xout[2];
+      x[0] = 2*x0h + ((x[1] + x[2] + x[3] + parity) & 1);
+      // Y is the cb spatial index into the extended gauge field
+      xin = ((((x[3]+R[3])*arg.Xin[2] + (x[2]+R[2]))*arg.Xin[1] + (x[1]+R[1]))*arg.Xin[0]+(x[0]+R[0])) >> 1;
+      xout = X;
     }
+    for (int d=0; d<arg.geometry; d++) {
+      const Matrix<complex<RegTypeIn>,nColor> in = arg.in(d, xin, parity);
+      Matrix<complex<RegTypeOut>,nColor> out = in;
+      arg.out(d, xout, parity) = out;
+    }//dir
+  }
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool regularToextended>
-    void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> arg) {
-      for (int parity=0; parity<2; parity++) {
-        for(int X=0; X<arg.volume/2; X++){
-          copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, regularToextended>(arg, X, parity);
-        }
+  void copyGaugeEx(CopyGaugeExArg<OutOrder,InOrder> arg) {
+    for (int parity=0; parity<2; parity++) {
+      for(int X=0; X<arg.volume/2; X++){
+        copyGaugeEx<FloatOut, FloatIn, length, OutOrder, InOrder, regularToextended>(arg, X, parity);
       }
     }
+  }
 
   template <typename FloatOut, typename FloatIn, int length, typename OutOrder, typename InOrder, bool regularToextended>
     __global__ void copyGaugeExKernel(CopyGaugeExArg<OutOrder,InOrder> arg) {

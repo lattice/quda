@@ -205,7 +205,7 @@ namespace quda {
     if ( !isNative() ) {
       for (int i=0; i<nDim; i++) {
         if (ghost[i]) pool_device_free(ghost[i]);
-        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i]);
+        if (ghost[i+4] && geometry == QUDA_COARSE_GEOMETRY) pool_device_free(ghost[i+4]);
       }
     }
 
@@ -522,7 +522,7 @@ namespace quda {
 
       // silence cuda-memcheck initcheck errors that arise since we
       // have an oversized ghost buffer when doing the extended exchange
-      cudaMemsetAsync(send_d[dim], 0, 2*ghost_face_bytes[dim]);
+      qudaMemsetAsync(send_d[dim], 0, 2 * ghost_face_bytes[dim], 0);
       offset += 2*ghost_face_bytes[dim]; // factor of two from fwd/back
     }
 
@@ -840,9 +840,6 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaGaugeField::zero() {
-    cudaMemset(gauge, 0, bytes);
-  }
-
+  void cudaGaugeField::zero() { qudaMemset(gauge, 0, bytes); }
 
 } // namespace quda

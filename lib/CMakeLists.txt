@@ -2,11 +2,13 @@
 # cmake-format: off
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  coarse_op_preconditioned.cu
+  dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
+  coarse_op.cu coarsecoarse_op.cu
+  coarse_op_preconditioned.cu staggered_coarse_op.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
-  prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
+  prolongator.cu restrictor.cu staggered_prolong_restrict.cu
+  gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
@@ -70,7 +72,8 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
+  quda_cuda_api.cpp deflation.cpp checksum.cu
+  instantiate.cpp version.cpp )
 # cmake-format: on
 
 if(QUDA_LEGACY_DSLASH)
@@ -141,7 +144,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
                                 $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
-# some clang warnings shouds be warning even when turning warnings into errors
+# some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp
                          PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
@@ -157,10 +160,34 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_MULTIGRID)
+  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+endif(QUDA_MULTIGRID)
+
+if(QUDA_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_TOOLS)
+  add_definitions(-DGPU_UNITARIZE)
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif(QUDA_GAUGE_ALG)
+
+if(QUDA_JITIFY)
+  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
+  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
+endif()
+
+if(QUDA_NVTX)
+  if(NOT NVTX3)
+    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
+  endif()
+endif(QUDA_NVTX)
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 

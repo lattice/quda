@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -62,6 +63,54 @@ cpuColorSpinorField *tmp;
 
 static void end();
 
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &eig_param)
+{
+  eig_param.eig_type = eig_type;
+  eig_param.spectrum = eig_spectrum;
+  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  }
+
+  // The solver will exit when nConv extremal eigenpairs have converged
+  if (eig_nConv < 0) {
+    eig_param.nConv = eig_nEv;
+    eig_nConv = eig_nEv;
+  } else {
+    eig_param.nConv = eig_nConv;
+  }
+
+  eig_param.nEv = eig_nEv;
+  eig_param.nKr = eig_nKr;
+  eig_param.tol = eig_tol;
+  eig_param.batched_rotate = eig_batched_rotate;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.check_interval = eig_check_interval;
+  eig_param.max_restarts = eig_max_restarts;
+  eig_param.cuda_prec_ritz = prec;
+
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  if (eig_compute_svd) {
+    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
+    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
+  }
+
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.poly_deg = eig_poly_deg;
+  eig_param.a_min = eig_amin;
+  eig_param.a_max = eig_amax;
+
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
+  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
+
+  strcpy(eig_param.vec_infile, eig_vec_infile);
+  strcpy(eig_param.vec_outfile, eig_vec_outfile);
+}
+
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
   gauge_param.X[0] = xdim;
@@ -73,8 +122,10 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.cuda_prec = prec;
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_sloppy = prec_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
 
   gauge_param.anisotropy = 1.0;
 
@@ -121,7 +172,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   // outer solver parameters
   inv_param.inv_type = inv_type;
   inv_param.tol = tol;
-  inv_param.tol_restart = 1e-3; // now theoretical background for this parameter...
+  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
   inv_param.use_alternative_reliable = alternative_reliable;
@@ -129,7 +180,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
   inv_param.pipeline = pipeline;
 
-  inv_param.Ls = Nsrc;
+  inv_param.Ls = 1; // Nsrc;
 
   if (tol_hq == 0 && tol == 0) {
     errorQuda("qudaInvert: requesting zero residual\n");
@@ -150,11 +201,10 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.Nsteps = 2;
 
   // domain decomposition preconditioner parameters
-  inv_param.inv_type_precondition = QUDA_SD_INVERTER;
+  inv_param.inv_type_precondition = precon_type;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 10;
   inv_param.verbosity_precondition = QUDA_SILENT;
-  inv_param.cuda_prec_precondition = inv_param.cuda_prec_sloppy;
 
   // Specify Krylov sub-size for GCR, BICGSTAB(L), basis size for CA-CG, CA-GCR
   inv_param.gcrNkrylov = gcrNkrylov;
@@ -174,6 +224,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = prec;
   inv_param.cuda_prec_sloppy = prec_sloppy;
+  inv_param.cuda_prec_precondition = prec_precondition;
   inv_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // this is meaningless, but must be thus set
@@ -202,12 +253,15 @@ int invert_test()
   setGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+  QudaEigParam eig_param = newQudaEigParam();
+  setEigParam(eig_param);
+  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
+  dw_setDims(gauge_param.X, 1); // Nsrc); ...so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -225,6 +279,9 @@ int invert_test()
   }
   milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
   milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
+
+  // for load, etc
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   // load a field WITHOUT PHASES
   if (strcmp(latfile, "")) {
@@ -264,7 +321,7 @@ int invert_test()
       }
     }
 
-    // Compute fat link plaquette.
+    // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
 
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
@@ -282,7 +339,7 @@ int invert_test()
   for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
   bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) csParam.x[0] /= 2;
-  csParam.x[4] = Nsrc;
+  csParam.x[4] = 1; // Nsrc;
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -295,15 +352,6 @@ int invert_test()
   out = new cpuColorSpinorField(csParam);
   ref = new cpuColorSpinorField(csParam);
   tmp = new cpuColorSpinorField(csParam);
-
-  // Construct source
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
-  rng->Init();
-
-  construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
-
-  rng->Release();
-  delete rng;
 
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim*zdim*tdim/2, xdim*zdim*tdim/2);
@@ -341,28 +389,25 @@ int invert_test()
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = gauge_param.reconstruct_refinement_sloppy
+      = QUDA_RECONSTRUCT_NO;
   }
-  gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-  gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct
-      = (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    gauge_param.reconstruct_sloppy
-      = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 :
-                                                                                                link_recon_sloppy;
-    gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
-    gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
-
-  double time0 = -((double)clock()); // Start the timer
 
   double nrm2=0;
   double src2=0;
@@ -370,19 +415,38 @@ int invert_test()
 
   int len = 0;
   if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V*Nsrc;
+    len = V; //*Nsrc;
   } else {
-    len = Vh*Nsrc;
+    len = Vh; //*Nsrc;
   }
+
+  // Prepare rng
+  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
+  rng->Init();
+
+  // Pre-initialize some variables
+  double *time = nullptr;
+  double *gflops = nullptr;
+  double hqr = 0.0;
+  double l2r = 0.0;
 
   switch (test_type) {
   case 0: // full parity solution
   case 1: // solving prec system, reconstructing
   case 2:
 
-    invertQuda(out->V(), in->V(), &inv_param);
-    time0 += clock(); // stop the timer
-    time0 /= CLOCKS_PER_SEC;
+    time = new double[Nsrc];
+    gflops = new double[Nsrc];
+
+    for (int k = 0; k < Nsrc; k++) {
+      construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+      invertQuda(out->V(), in->V(), &inv_param);
+
+      time[k] = inv_param.secs;
+      gflops[k] = inv_param.gflops / inv_param.secs;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                 inv_param.gflops / inv_param.secs);
+    }
 
     // In QUDA, the full staggered operator has the sign convention
     //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
@@ -424,15 +488,58 @@ int invert_test()
     nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
 
+    hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+    l2r = sqrt(nrm2 / src2);
+
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+
+    // Compute timings
+    if (Nsrc > 1) {
+      auto mean_time = 0.0;
+      auto mean_time2 = 0.0;
+      auto mean_gflops = 0.0;
+      auto mean_gflops2 = 0.0;
+      // skip first solve due to allocations, potential UVM swapping overhead
+      for (int i = 1; i < Nsrc; i++) {
+        mean_time += time[i];
+        mean_time2 += time[i] * time[i];
+        mean_gflops += gflops[i];
+        mean_gflops2 += gflops[i] * gflops[i];
+      }
+
+      auto NsrcM1 = Nsrc - 1;
+
+      mean_time /= NsrcM1;
+      mean_time2 /= NsrcM1;
+      auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
+                                      std::numeric_limits<double>::infinity();
+      mean_gflops /= NsrcM1;
+      mean_gflops2 /= NsrcM1;
+      auto stddev_gflops = NsrcM1 > 1 ?
+        sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+        std::numeric_limits<double>::infinity();
+      printfQuda(
+        "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
+        Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+    }
     break;
 
   case 3: // even
   case 4:
 
-    invertQuda(out->V(), in->V(), &inv_param);
+    time = new double[Nsrc];
+    gflops = new double[Nsrc];
 
-    time0 += clock();
-    time0 /= CLOCKS_PER_SEC;
+    for (int k = 0; k < Nsrc; k++) {
+      construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+      invertQuda(out->V(), in->V(), &inv_param);
+
+      time[k] = inv_param.secs;
+      gflops[k] = inv_param.gflops / inv_param.secs;
+      printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                 inv_param.gflops / inv_param.secs);
+    }
 
     matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
               gauge_param.cpu_prec, tmp, test_type == 3 ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
@@ -446,6 +553,42 @@ int invert_test()
     mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
     src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+
+    hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+    l2r = sqrt(nrm2 / src2);
+
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+
+    // Compute timings
+    if (Nsrc > 1) {
+      auto mean_time = 0.0;
+      auto mean_time2 = 0.0;
+      auto mean_gflops = 0.0;
+      auto mean_gflops2 = 0.0;
+      // skip first solve due to allocations, potential UVM swapping overhead
+      for (int i = 1; i < Nsrc; i++) {
+        mean_time += time[i];
+        mean_time2 += time[i] * time[i];
+        mean_gflops += gflops[i];
+        mean_gflops2 += gflops[i] * gflops[i];
+      }
+
+      auto NsrcM1 = Nsrc - 1;
+
+      mean_time /= NsrcM1;
+      mean_time2 /= NsrcM1;
+      auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
+                                      std::numeric_limits<double>::infinity();
+      mean_gflops /= NsrcM1;
+      mean_gflops2 /= NsrcM1;
+      auto stddev_gflops = NsrcM1 > 1 ?
+        sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+        std::numeric_limits<double>::infinity();
+      printfQuda(
+        "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
+        Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
+    }
 
     break;
 
@@ -473,14 +616,14 @@ int invert_test()
           inv_param.offset[i] = 4*masses[i]*masses[i];
         }
 
+        construct_spinor_source(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+
         invertMultiShiftQuda(outArray, in->V(), &inv_param);
 
         cudaDeviceSynchronize();
-        time0 += clock(); // stop the timer
-        time0 /= CLOCKS_PER_SEC;
 
-        printfQuda("done: total time = %g secs, compute time = %g, %i iter / %g secs = %g gflops\n", time0,
-            inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+        printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
+                   inv_param.gflops / inv_param.secs);
 
         printfQuda("checking the solution\n");
         QudaParity parity = QUDA_INVALID_PARITY;
@@ -524,23 +667,27 @@ int invert_test()
 
     } // switch
 
-  if (test_type <=4){
+    if (time == nullptr) delete[] time;
+    if (gflops == nullptr) delete[] gflops;
 
-    double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-    double l2r = sqrt(nrm2/src2);
+    // Free RNG
+    rng->Release();
+    delete rng;
 
-    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-               inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
-
-    printfQuda("done: total time = %g secs, compute time = %g secs, %i iter / %g secs = %g gflops, \n", time0,
-        inv_param.secs, inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
-  }
-
-  // Clean up gauge fields, at least
-  for (int dir = 0; dir < 4; dir++) {
-    if (qdp_inlink[dir] != nullptr) { free(qdp_inlink[dir]); qdp_inlink[dir] = nullptr; }
-    if (qdp_fatlink[dir] != nullptr) { free(qdp_fatlink[dir]); qdp_fatlink[dir] = nullptr; }
-    if (qdp_longlink[dir] != nullptr) { free(qdp_longlink[dir]); qdp_longlink[dir] = nullptr; }
+    // Clean up gauge fields, at least
+    for (int dir = 0; dir < 4; dir++) {
+      if (qdp_inlink[dir] != nullptr) {
+        free(qdp_inlink[dir]);
+        qdp_inlink[dir] = nullptr;
+      }
+      if (qdp_fatlink[dir] != nullptr) {
+        free(qdp_fatlink[dir]);
+        qdp_fatlink[dir] = nullptr;
+      }
+      if (qdp_longlink[dir] != nullptr) {
+        free(qdp_longlink[dir]);
+        qdp_longlink[dir] = nullptr;
+      }
   }
   if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
   if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
@@ -572,6 +719,33 @@ void display_test_info()
   printfQuda("%s   %s             %s            %s            %s         %d/%d/%d          %d \n", get_prec_str(prec),
       get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
       get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
+
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+  if (eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false");
+  }
+  if (eig_use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+    if (eig_amax < 0)
+      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+    else
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  }
 
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -605,8 +779,8 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
+  add_eigen_option_group(app);
+  add_deflation_option_group(app);
   // add_multigrid_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3},
                                           {"odd", 4},  {"mcg_even", 5},     {"mcg_odd", 6}};

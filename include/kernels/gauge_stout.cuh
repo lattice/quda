@@ -6,36 +6,47 @@
 namespace quda
 {
 
-  template <typename Float, typename GaugeOr, typename GaugeDs> struct GaugeSTOUTArg {
+#define  DOUBLE_TOL	1e-15
+#define  SINGLE_TOL	2e-6
+
+  template <typename Float_, int nColor_, QudaReconstructType recon_, int stoutDim_> struct GaugeSTOUTArg {
+    using Float = Float_;
+    static constexpr int nColor = nColor_;
+    static_assert(nColor == 3, "Only nColor=3 enabled at this time");
+    static constexpr QudaReconstructType recon = recon_;
+    static constexpr int stoutDim = stoutDim_;
+    typedef typename gauge_mapper<Float,recon>::type Gauge;
+
+    Gauge out;
+    const Gauge in;
+
     int threads; // number of active threads required
     int X[4];    // grid dimensions
     int border[4];
-    GaugeOr origin;
     const Float rho;
+    const Float epsilon;
     const Float tolerance;
 
-    GaugeDs dest;
-
-    GaugeSTOUTArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float rho, const Float tolerance) :
-        threads(1),
-        origin(origin),
-        dest(dest),
-        rho(rho),
-        tolerance(tolerance)
+    GaugeSTOUTArg(GaugeField &out, const GaugeField &in, Float rho, Float epsilon=0) :
+      out(out),
+      in(in),
+      threads(1),
+      rho(rho),
+      epsilon(epsilon),
+      tolerance(in.Precision() == QUDA_DOUBLE_PRECISION ? DOUBLE_TOL : SINGLE_TOL)
     {
       for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = data.R()[dir];
-        X[dir] = data.X()[dir] - border[dir] * 2;
+        border[dir] = in.R()[dir];
+        X[dir] = in.X()[dir] - border[dir] * 2;
         threads *= X[dir];
       }
       threads /= 2;
     }
   };
 
-  template <typename Float, typename Arg, typename Link>
+  template <typename Arg, typename Link>
   __host__ __device__ void computeStaple(Arg &arg, int idx, int parity, int dir, Link &staple)
   {
-
     // compute spacetime dimensions and parity
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -61,16 +72,16 @@ namespace quda
           Link U1, U2, U3;
 
           // Get link U_{\mu}(x)
-          U1 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U1 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           dx[mu]++;
           // Get link U_{\nu}(x+\mu)
-          U2 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           dx[mu]--;
           dx[nu]++;
           // Get link U_{\mu}(x+\nu)
-          U3 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U3 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           // staple += U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
           staple = staple + U1 * U2 * conj(U3);
@@ -78,13 +89,13 @@ namespace quda
           dx[mu]--;
           dx[nu]--;
           // Get link U_{\mu}(x-\mu)
-          U1 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U1 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
           // Get link U_{\nu}(x-\mu)
-          U2 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           dx[nu]++;
           // Get link U_{\mu}(x-\mu+\nu)
-          U3 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           // staple += U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
           staple = staple + conj(U1) * U2 * U3;
@@ -93,16 +104,16 @@ namespace quda
     }
   }
 
-  template <typename Float, typename Arg> __global__ void computeSTOUTStep(Arg arg)
+  template <typename Arg> __global__ void computeSTOUTStep(Arg arg)
   {
-
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
-    if (dir >= 3) return;
-    typedef complex<Float> Complex;
-    typedef Matrix<complex<Float>, 3> Link;
+    if (dir >= Arg::stoutDim) return;
+    using real = typename Arg::Float;
+    typedef complex<real> Complex;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
 
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -122,7 +133,7 @@ namespace quda
       Complex i_2(0, 0.5);
 
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-      computeStaple<Float>(arg, idx, parity, dir, Stap);
+      computeStaple(arg, idx, parity, dir, Stap);
       //
       // |- > -|                /- > -/                /- > -
       // ^     v               ^     v                ^
@@ -132,7 +143,7 @@ namespace quda
       //           |- > -|             /- > -/                - < -/
 
       // Get link U
-      U = arg.origin(dir, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
 
@@ -191,47 +202,16 @@ namespace quda
       printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
 #endif
 
-      arg.dest(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
 
   //------------------------//
   // Over-Improved routines //
   //------------------------//
-
-  template <typename Float, typename GaugeOr, typename GaugeDs> struct GaugeOvrImpSTOUTArg {
-    int threads; // number of active threads required
-    int X[4];    // grid dimensions
-    int border[4];
-    GaugeOr origin;
-    const Float rho;
-    const Float epsilon;
-    const Float tolerance;
-
-    GaugeDs dest;
-
-    GaugeOvrImpSTOUTArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float rho, const Float epsilon,
-        const Float tolerance) :
-        threads(1),
-        origin(origin),
-        dest(dest),
-        rho(rho),
-        epsilon(epsilon),
-        tolerance(tolerance)
-    {
-      for (int dir = 0; dir < 4; ++dir) {
-        border[dir] = data.R()[dir];
-        X[dir] = data.X()[dir] - border[dir] * 2;
-        threads *= X[dir];
-      }
-      threads /= 2;
-    }
-  };
-
-  template <typename Float, typename Arg, typename Link>
+  template <typename Arg, typename Link>
   __host__ __device__ void computeStapleRectangle(Arg &arg, int idx, int parity, int dir, Link &staple, Link &rectangle)
   {
-
     // compute spacetime dimensions and parity
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -252,7 +232,6 @@ namespace quda
 
       // identify directions orthogonal to the link.
       if (mu != dir) {
-
         int nu = dir;
 
         // RECTANGLE calculation
@@ -282,24 +261,24 @@ namespace quda
           //----------------------------------------------------------------
           // R12 = U_mu(x)*U_mu(x+mu)*U_nu(x+2mu)*U^d_mu(x+nu+mu)*U^d_mu(x+nu)
           // Get link U_mu(x)
-          U1 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U1 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           dx[mu]++;
           // Get link U_mu(x+mu)
-          U2 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U2 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           dx[mu]++;
           // Get link U_nu(x+2mu)
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           dx[mu]--;
           dx[nu]++;
           // Get link U_mu(x+nu+mu)
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           dx[mu]--;
           // Get link U_mu(x+nu)
-          U5 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U5 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           rectangle = rectangle + U1 * U2 * U3 * conj(U4) * conj(U5);
           //---------------------------------------------------------------
@@ -313,7 +292,7 @@ namespace quda
 
           dx[mu]++;
           // Get link U_nu(x+mu)
-          U2 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           ///////////////////////////////////////////////////////
           // Here we get the third link in the staple and compute.
@@ -324,16 +303,16 @@ namespace quda
 
           dx[nu]++;
           // Get link U_nu(x+nu+mu)
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           dx[mu]--;
           dx[nu]++;
           // Get link U_mu(x+2nu)
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           dx[nu]--;
           // Get link U_nu(x+nu)
-          U6 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U6 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           rectangle = rectangle + U1 * U2 * U3 * conj(U4) * conj(U6);
           //---------------------------------------------------------------
@@ -345,14 +324,14 @@ namespace quda
 
           // Get link U_nu(x-nu)
           dx[nu]--;
-          U7 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U7 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           // Get link U_mu(x-nu)
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           // Get link U_nu(x-nu+mu)
           dx[mu]++;
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           // Get link U_nu(x+mu)
           // Same as U2 from R21f
@@ -375,22 +354,22 @@ namespace quda
 
           dx[mu]--;
           // Get link U_mu(x-mu)
-          U1 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U1 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           dx[mu]--;
           // Get link U_mu(x-2mu)
-          U2 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U2 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           // Get link U_nu(x-2mu)
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           dx[nu]++;
           // Get link U_mu(x-2mu+nu)
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           dx[mu]++;
           // Get link U_mu(x-mu+nu)
-          U5 = arg.origin(mu, linkIndexShift(x, dx, X), parity);
+          U5 = arg.in(mu, linkIndexShift(x, dx, X), parity);
 
           rectangle = rectangle + conj(U1) * conj(U2) * U3 * U4 * U5;
           //---------------------------------------------------------------
@@ -406,7 +385,7 @@ namespace quda
 
           dx[mu]--;
           // Get link U_nu(x-mu)
-          U2 = arg.origin(nu, linkIndexShift(x, dx, X), 1 - parity);
+          U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
 
           ///////////////////////////////////////////////////////
           // Here we get the third link in the staple and compute.
@@ -417,11 +396,11 @@ namespace quda
 
           dx[nu]++;
           // Get link U_nu(x-mu+nu)
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           dx[nu]++;
           // Get link U_mu(x-mu+2nu)
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           // Get link U_nu(x+nu)
           // Same as U6 from +ve R21f
@@ -442,10 +421,10 @@ namespace quda
           // Get link U_mu(x-mu-nu)
           dx[nu]--;
           dx[mu]--;
-          U4 = arg.origin(mu, linkIndexShift(x, dx, X), 1 - parity);
+          U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
 
           // Get link U_nu(x-nu-mu)
-          U3 = arg.origin(nu, linkIndexShift(x, dx, X), parity);
+          U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
 
           // Get link U_nu(x-mu)
           // Same as U2 from R21f
@@ -460,16 +439,17 @@ namespace quda
     }
   }
 
-  template <typename Float, typename Arg> __global__ void computeOvrImpSTOUTStep(Arg arg)
+  template <typename Arg> __global__ void computeOvrImpSTOUTStep(Arg arg)
   {
-
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y + blockIdx.y * blockDim.y;
     int dir = threadIdx.z + blockIdx.z * blockDim.z;
     if (idx >= arg.threads) return;
-    // if (dir >= 3) return;
-    typedef complex<Float> Complex;
-    typedef Matrix<complex<Float>, 3> Link;
+    if (dir >= Arg::stoutDim) return;
+
+    using real = typename Arg::Float;
+    typedef complex<real> Complex;
+    typedef Matrix<complex<real>, Arg::nColor> Link;
 
     int X[4];
     for (int dr = 0; dr < 4; ++dr) X[dr] = arg.X[dr];
@@ -494,10 +474,10 @@ namespace quda
       // This function gets stap = S_{mu,nu} i.e., the staple of length 3,
       // and the 1x2 and 2x1 rectangles of length 5. From the following paper:
       // https://arxiv.org/abs/0801.1165
-      computeStapleRectangle<Float>(arg, idx, parity, dir, Stap, Rect);
+      computeStapleRectangle(arg, idx, parity, dir, Stap, Rect);
 
       // Get link U
-      U = arg.origin(dir, linkIndexShift(x, dx, X), parity);
+      U = arg.in(dir, linkIndexShift(x, dx, X), parity);
 
       // Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
       //-------------------------------------------------------------------
@@ -561,7 +541,7 @@ namespace quda
       printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
 #endif
 
-      arg.dest(dir, linkIndexShift(x, dx, X), parity) = U;
+      arg.out(dir, linkIndexShift(x, dx, X), parity) = U;
     }
   }
 

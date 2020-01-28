@@ -36,15 +36,16 @@ extern "C" {
 
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
-    QUDA_FLOAT2_GAUGE_ORDER = 2, // no reconstruct and double precision
-    QUDA_FLOAT4_GAUGE_ORDER = 4, // 8 and 12 reconstruct half and single
-    QUDA_QDP_GAUGE_ORDER, // expect *gauge[mu], even-odd, spacetime, row-column color
-    QUDA_QDPJIT_GAUGE_ORDER, // expect *gauge[mu], even-odd, complex-column-row-spacetime
-    QUDA_CPS_WILSON_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, column-row color
-    QUDA_MILC_GAUGE_ORDER, // expect *gauge, even-odd, mu, spacetime, row-column order
-    QUDA_MILC_SITE_GAUGE_ORDER, // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-    QUDA_BQCD_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime+halos, column-row order
-    QUDA_TIFR_GAUGE_ORDER, // expect *gauge, mu, even-odd, spacetime, column-row order
+    QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
+    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 and 12 reconstruct half and single
+    QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
+    QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
+    QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime
+    QUDA_CPS_WILSON_GAUGE_ORDER,  // expect *gauge, even-odd, mu, spacetime, column-row color
+    QUDA_MILC_GAUGE_ORDER,        // expect *gauge, even-odd, mu, spacetime, row-column order
+    QUDA_MILC_SITE_GAUGE_ORDER,   // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+    QUDA_BQCD_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime+halos, column-row order
+    QUDA_TIFR_GAUGE_ORDER,        // expect *gauge, mu, even-odd, spacetime, column-row order
     QUDA_TIFR_PADDED_GAUGE_ORDER, // expect *gauge, mu, parity, t, z+halo, y, x/2, column-row order
     QUDA_INVALID_GAUGE_ORDER = QUDA_INVALID_ENUM
   } QudaGaugeFieldOrder;
@@ -455,10 +456,14 @@ extern "C" {
   } QudaSetupType;
 
   typedef enum QudaBoolean_s {
-    QUDA_BOOLEAN_NO = 0,
-    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_FALSE = 0,
+    QUDA_BOOLEAN_TRUE = 1,
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
+
+  // define these for backwards compatibility
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,

@@ -110,6 +110,10 @@ namespace quda {
 	enable_gpu=true in the constructor) */
     mutable bool use_gpu;
 
+    /** Whether or not the fine level is a staggered operator, in which
+    case we don't actually need to allocate any memory. */
+    mutable bool is_staggered;
+
     /**
      * @brief Allocate V field
      * @param[in] location Where to allocate the V field
@@ -307,7 +311,28 @@ namespace quda {
   void Restrict(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &v, 
 		int Nvec, const int *fine_to_coarse, const int *coarse_to_fine, const int * const *spin_map,
 		int parity=QUDA_INVALID_PARITY);
-  
+
+  /**
+     @brief Apply the unitary "prolongation" operator for Kahler-Dirac preconditioning
+     @param[out] out Resulting fine grid field
+     @param[in] in Input field on coarse grid
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the output fine field (if single parity output field)
+   */
+  void StaggeredProlongate(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+                           const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
+
+  /**
+     @brief Apply the unitary "restriction" operator for Kahler-Dirac preconditioning
+     @param[out] out Resulting coarse grid field
+     @param[in] in Input field on fine grid
+     @param[in] fine_to_coarse Fine-to-coarse lookup table (linear indices)
+     @param[in] spin_map Spin blocking lookup table
+     @param[in] parity of the output fine field (if single parity output field)
+   */
+  void StaggeredRestrict(ColorSpinorField &out, const ColorSpinorField &in, const int *fine_to_coarse,
+                         const int *const *spin_map, int parity = QUDA_INVALID_PARITY);
 
 } // namespace quda
 #endif // _TRANSFER_H

@@ -32,7 +32,19 @@ namespace quda
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       Dslash::setParam(tp);
-      Dslash::template instantiate<packStaggeredShmem>(tp, stream);
+
+      // operator is Hermitian so do not instantiate dagger
+      if (arg.nParity == 1) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 1, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 1, false, false>(tp, stream);
+      } else if (arg.nParity == 2) {
+        if (arg.xpay)
+          Dslash::template instantiate<packStaggeredShmem, 2, false, true>(tp, stream);
+        else
+          Dslash::template instantiate<packStaggeredShmem, 2, false, false>(tp, stream);
+      }
     }
 
     long long flops() const
@@ -167,7 +179,7 @@ namespace quda
           in.GhostFaceCB(), profile);
         policy.apply(0);
 #else
-        errorQuda("nSpin=4 Laplace operator required wilsondslash to be enabled");
+        errorQuda("nSpin=4 Laplace operator required wilson dslash to be enabled");
 #endif
       } else {
         errorQuda("Unsupported nSpin= %d", in.Nspin());

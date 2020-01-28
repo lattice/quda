@@ -291,9 +291,10 @@ extern "C" {
     /** defines deflation */
     void *eig_param;
 
-    /**
-      Dirac Dslash used in preconditioner
-    */
+    /** If true, deflate the initial guess */
+    QudaBoolean deflate;
+
+    /** Dirac Dslash used in preconditioner */
     QudaDslashType dslash_type_precondition;
     /** Verbosity of the inner Krylov solver */
     QudaVerbosity verbosity_precondition;
@@ -406,6 +407,22 @@ extern "C" {
     double a_min;
     double a_max;
 
+    /** Whether to preserve the deflation space between solves.  If
+        true, the space will be stored in an instance of the
+        deflation_space struct, pointed to by preserve_deflation_space */
+    QudaBoolean preserve_deflation;
+
+    /** This is where we store the deflation space.  This will point
+        to an instance of deflation_space. When a deflated solver is enabled, the deflation space will be obtained from this.  */
+    void *preserve_deflation_space;
+
+    /** If we restore the deflation space, this boolean indicates
+        whether we are also preserving the evalues or recomputing
+        them.  For example if a different mass shift is being used
+        than the one used to generate the space, then this should be
+        false, but preserve_deflation would be true */
+    QudaBoolean preserve_evals;
+
     /** What type of Dirac operator we are using **/
     /** If !(use_norm_op) && !(use_dagger) use M. **/
     /** If use_dagger, use Mdag **/
@@ -437,6 +454,8 @@ extern "C" {
     int check_interval;
     /** For IRLM/IRAM, quit after n restarts **/
     int max_restarts;
+    /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
+    int batched_rotate;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
@@ -651,6 +670,9 @@ extern "C" {
     /** Whether to use and initial guess during coarse grid deflation */
     QudaBoolean coarse_guess;
 
+    /** Whether to preserve the deflation space during MG update */
+    QudaBoolean preserve_deflation;
+
     /** The Gflops rate of the multigrid solver setup */
     double gflops;
 
@@ -659,6 +681,9 @@ extern "C" {
 
     /** Multiplicative factor for the mu parameter */
     double mu_factor[QUDA_MAX_MG_LEVEL];
+
+    /** Boolean for if this is a staggered solve or not */
+    QudaBoolean is_staggered;
 
   } QudaMultigridParam;
 
@@ -978,31 +1003,6 @@ extern "C" {
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
       QudaParity parity);
 
-  /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for 4D EO preconditioned DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_4dpc(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
-
-  /**
-   * Apply the Dslash operator (D_{eo} or D_{oe}) for Mobius DWF.
-   * @param h_out  Result spinor field
-   * @param h_in   Input spinor field
-   * @param param  Contains all metadata regarding host and device
-   *               storage
-   * @param parity The destination parity of the field
-   * @param test_type Choose a type of dslash operators
-   */
-  void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity, int test_type);
-
-  void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity, int test_type);
   /**
    * Apply the clover operator or its inverse.
    * @param h_out  Result spinor field

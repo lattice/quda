@@ -5,6 +5,11 @@
 #undef device_malloc
 #undef device_free
 
+// ensures we use shfl_sync and not shfl when compiling with clang
+#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
+#define CUB_USE_COOPERATIVE_GROUPS
+#endif
+
 #include <thrust/system/cuda/vector.h>
 #include <thrust/system/cuda/execution_policy.h>
 #include <thrust/transform_reduce.h>
