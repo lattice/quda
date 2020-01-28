@@ -60,19 +60,15 @@ display_test_info()
       printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3));
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 
   printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
   // printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
   // printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
 
-  return ;
-  
+  return;
 }
 
 // Parameters defining the eigensolver
@@ -226,7 +222,7 @@ int main(int argc, char **argv)
   } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
              || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     inv_param.m5 = m5;
-    kappa5 = 0.5/(5 + inv_param.m5);  
+    kappa5 = 0.5 / (5 + inv_param.m5);
     inv_param.Ls = Lsdim;
     for(int k = 0; k < Lsdim; k++) // for mobius only
     {
@@ -569,8 +565,7 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-        for(int xs = 0 ; xs < Lsdim ; xs++)
-        {
+        for (int xs = 0; xs < Lsdim; xs++) {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
           kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
         }
@@ -585,7 +580,7 @@ int main(int argc, char **argv)
             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
           ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.5 / inv_param.kappa, spinorCheck, 2 * V * spinorSiteSize, inv_param.cpu_prec);
         } else {
           ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
         }
@@ -625,8 +620,7 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-        for(int xs = 0 ; xs < Lsdim ; xs++)
-        {
+        for (int xs = 0; xs < Lsdim; xs++) {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
           kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
         }
@@ -642,7 +636,7 @@ int main(int argc, char **argv)
             || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
           ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
         } else {
-          ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, Vh * spinorSiteSize, inv_param.cpu_prec);
         }
       }
 
@@ -698,8 +692,7 @@ int main(int argc, char **argv)
       } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
         double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
-        for(int xs = 0 ; xs < Lsdim ; xs++)
-        {
+        for (int xs = 0; xs < Lsdim; xs++) {
           kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
           kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
         }

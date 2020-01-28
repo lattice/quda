@@ -3,8 +3,10 @@
 
 #include <mdw_dslash5_tensor_core.cuh>
 
-namespace quda {
-  namespace mobius_tensor_core {
+namespace quda
+{
+  namespace mobius_tensor_core
+  {
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
 
@@ -15,31 +17,31 @@ namespace quda {
     struct FusedDslashArg {
       static constexpr bool spin_project = true;
       static constexpr bool spinor_direct_load = false; // false means texture load
-      typedef typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type
-          F; // color spin field order
+      typedef
+        typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
       typedef typename mapper<storage_type>::type real; // the compute type for the in kernel computation
-      static constexpr bool gauge_direct_load = false; // false means texture load
+      static constexpr bool gauge_direct_load = false;  // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
       typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
-          ghost>::type G; // gauge field order
+                                    ghost>::type G; // gauge field order
 
-      F out; // output vector field
+      F out;      // output vector field
       const F in; // input vector field
-      F y; // auxiliary output vector field
-      const F x; // auxiliary input vector field
+      F y;        // auxiliary output vector field
+      const F x;  // auxiliary input vector field
 
       const G U; // The gauge field
 
-      const int nParity; // number of parities we're working on
-      const int parity; // output parity of this dslash operator
-      const int volume_cb; // checkerboarded volume
+      const int nParity;      // number of parities we're working on
+      const int parity;       // output parity of this dslash operator
+      const int volume_cb;    // checkerboarded volume
       const int volume_4d_cb; // 4-d checkerboarded volume
 
       const int dim[4];
 
       const int_fastdiv Ls; // length of 5th dimension
 
-      const int shift[4]; // sites where we actually calculate.
+      const int shift[4];      // sites where we actually calculate.
       const int halo_shift[4]; // halo means zero. When we are expanding we have halo of cs-field where values are zero.
 
       const int_fastdiv shrinked_dim[4]; // dimension after shifts are considered.
@@ -68,31 +70,31 @@ namespace quda {
       real m_scale = 1.; // scale factor for the matrix
 
       MdwfFusedDslashType type;
-      FusedDslashArg(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
-          const ColorSpinorField& x, double m_f_, double m_5_, const Complex* b_5, const Complex* c_5, bool dagger_,
-          int parity, int shift_[4], int halo_shift_[4], MdwfFusedDslashType type_)
-          : out(out)
-          , in(in)
-          , U(U)
-          , y(y)
-          , x(x)
-          , nParity(in.SiteSubset())
-          , parity(parity)
-          , volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB())
-          , volume_4d_cb(volume_cb / Ls_)
-          , Ls(Ls_)
-          , m_f(m_f_)
-          , m_5(m_5_)
-          , dagger(dagger_)
-          , shift{shift_[0], shift_[1], shift_[2], shift_[3]}
-          , halo_shift{halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]}
-          , dim{(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
-                in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1),
-                in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
-                in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)}
-          , shrinked_dim{dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]}
-          , volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2)
-          , type(type_) {
+      FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
+                     const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
+                     bool dagger_, int parity, int shift_[4], int halo_shift_[4], MdwfFusedDslashType type_) :
+        out(out),
+        in(in),
+        U(U),
+        y(y),
+        x(x),
+        nParity(in.SiteSubset()),
+        parity(parity),
+        volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()),
+        volume_4d_cb(volume_cb / Ls_),
+        Ls(Ls_),
+        m_f(m_f_),
+        m_5(m_5_),
+        dagger(dagger_),
+        shift{shift_[0], shift_[1], shift_[2], shift_[3]},
+        halo_shift{halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]},
+        dim{(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
+            in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
+            in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
+        shrinked_dim{dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
+        volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2),
+        type(type_)
+      {
         if (in.Nspin() != 4) { errorQuda("nSpin = %d NOT supported.\n", in.Nspin()); }
 
         if (nParity == 2) { errorQuda("nParity = 2 NOT supported, yet.\n"); }
@@ -106,8 +108,8 @@ namespace quda {
 
         if (kappa * kappa < 1e-12) { errorQuda("kappa(=%16.12e) too small.\n", kappa); }
 
-        fac_inv = 0.5
-            / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
+        fac_inv
+          = 0.5 / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
@@ -133,11 +135,13 @@ namespace quda {
       }
     };
 
-    __device__ inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4]) {
+    __device__ inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4])
+    {
       return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) >> 1;
     }
 
-    __device__ inline bool is_halo_4d(const int coordinate[4], const int dim[4], const int halo_shift[4]) {
+    __device__ inline bool is_halo_4d(const int coordinate[4], const int dim[4], const int halo_shift[4])
+    {
       bool ret = false;
 #pragma unroll
       for (int d = 0; d < 4; d++) {
@@ -150,7 +154,8 @@ namespace quda {
     -> Everything should be understood in a 4d checkboarding sense.
     */
     template <class storage_type, bool dagger, bool halo, class Vector, class Arg>
-    __device__ inline void apply_wilson_5d(Vector& out, int coordinate[4], Arg& arg, int s) {
+    __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], Arg &arg, int s)
+    {
 
       typedef typename mapper<storage_type>::type compute_type;
       typedef Matrix<complex<compute_type>, 3> Link;
@@ -191,8 +196,8 @@ namespace quda {
     -> Everything should be understood in a 4d checkboarding sense.
     */
     template <class T>
-    __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index,
-        const T shrinked_dim[4], const int shift[4], int parity) // s is the 5d stuff,
+    __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const T shrinked_dim[4],
+                                                          const int shift[4], int parity) // s is the 5d stuff,
     {
       int aux[4];
       aux[0] = shrinked_index * 2;
@@ -217,9 +222,9 @@ namespace quda {
       @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
       The kernels type(type_) will be specified in some documentations.
     */
-    template <class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg,
-        int type_>
-    __global__ void __launch_bounds__(block_dim_x* Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg) {
+    template <class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg, int type_>
+    __global__ void __launch_bounds__(block_dim_x *Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
+    {
       const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
       TensorCoreSharedMemory<float> shared_memory_data;
@@ -235,14 +240,14 @@ namespace quda {
       constexpr int N_sm = N + sm_n_pad_size;
       constexpr int M_sm = M + sm_m_pad_size;
 
-      float* smem_scale = shared_memory_data;
+      float *smem_scale = shared_memory_data;
 
-      half2* sm_b = reinterpret_cast<half2*>(smem_scale + 32);
-      half* sm_c = reinterpret_cast<half*>(sm_b);
+      half2 *sm_b = reinterpret_cast<half2 *>(smem_scale + 32);
+      half *sm_c = reinterpret_cast<half *>(sm_b);
 
-      half* sm_a = reload ? sm_c + M * N_sm : sm_c;
+      half *sm_a = reload ? sm_c + M * N_sm : sm_c;
       // This is for type == 1 ONLY.
-      half* sm_a_black = sm_a + M * M_sm;
+      half *sm_a_black = sm_a + M * M_sm;
 
       if (type_ == 0) {
         construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
@@ -277,8 +282,8 @@ namespace quda {
       const int warp_m = this_warp * warp_cycle / tn_dim;
 
       typedef
-          typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
-              a_type;
+        typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
+          a_type;
 
       a_type a_frag[reload ? 1 : tm_dim];
       a_type a_frag_black[reload ? 1 : tm_dim];
@@ -294,7 +299,7 @@ namespace quda {
 
       if (type_ == 1) {
         arg.alpha = 1.;
-        if (!reload) { // in the preload case we preload ...
+        if (!reload) {                                                            // in the preload case we preload ...
           construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
           __syncthreads();
 #pragma unroll
@@ -352,7 +357,7 @@ namespace quda {
             constexpr int in_x_shift = 2;
             int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
             int back_dim[4] = {arg.dim[0] - in_x_shift * 2, arg.dim[1] - in_x_shift * 2, arg.dim[2] - in_x_shift * 2,
-                arg.dim[3] - in_x_shift * 2};
+                               arg.dim[3] - in_x_shift * 2};
             if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
                 && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
               center = true;
@@ -388,21 +393,23 @@ namespace quda {
       } // while
     }
 
-    template <class storage_type, int Ls_, class Arg> class FusedDslash : public TunableVectorYZ {
+    template <class storage_type, int Ls_, class Arg> class FusedDslash : public TunableVectorYZ
+    {
 
-  protected:
-      Arg& arg;
-      const ColorSpinorField& meta;
+    protected:
+      Arg &arg;
+      const ColorSpinorField &meta;
       static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
       /** Whether to use variable or fixed coefficient algorithm.  Must be true if using ZMOBIUS */
       static constexpr bool var_inverse = true;
 
-      long long flops() const {
+      long long flops() const
+      {
         constexpr long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
         constexpr long long mat = 2ll * 4ll * Ls_ - 1ll;
         long long volume_4d_cb_halo_shift = (arg.dim[0] - 2 * arg.halo_shift[0]) * (arg.dim[1] - 2 * arg.halo_shift[1])
-            * (arg.dim[2] - 2 * arg.halo_shift[2]) * (arg.dim[3] - 2 * arg.halo_shift[3]) / 2;
+          * (arg.dim[2] - 2 * arg.halo_shift[2]) * (arg.dim[3] - 2 * arg.halo_shift[3]) / 2;
 
         long long flops_ = 0;
         switch (arg.type) {
@@ -415,7 +422,7 @@ namespace quda {
         case 2:
         case 3:
           flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
-              * (hop + mat); // for 2 and 3 we don't have the halo complication.
+            * (hop + mat); // for 2 and 3 we don't have the halo complication.
           break;
         case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
@@ -424,7 +431,8 @@ namespace quda {
         return flops_;
       }
 
-      long long bytes() const {
+      long long bytes() const
+      {
         const long long dim[4] = {arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3]};
         const long long b_m0 = ((dim[0] - 0) * (dim[1] - 0) * (dim[2] - 0) * (dim[3] - 0) / 2) * arg.Ls * (24 * 2 + 4);
         const long long b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * arg.Ls * (24 * 2 + 4);
@@ -445,17 +453,18 @@ namespace quda {
       virtual bool tuneSharedBytes() const { return true; }
       unsigned int minThreads() const { return arg.volume_4d_cb; }
 
-      unsigned int shared_bytes_per_block(const TuneParam& param) const {
+      unsigned int shared_bytes_per_block(const TuneParam &param) const
+      {
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half)
-                + 128;
+              * sizeof(half)
+              + 128;
           } else {
             return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
-                * sizeof(half)
-                + 128;
+              * sizeof(half)
+              + 128;
           }
         } else {
           int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
@@ -464,7 +473,8 @@ namespace quda {
         }
       }
 
-      virtual bool advanceBlockDim(TuneParam& param) const {
+      virtual bool advanceBlockDim(TuneParam &param) const
+      {
         if (param.block.x < max_block_size()) {
           param.block.x += step_block_size();
           param.shared_bytes = shared_bytes_per_block(param);
@@ -474,7 +484,8 @@ namespace quda {
         }
       }
 
-      virtual bool advanceGridDim(TuneParam& param) const {
+      virtual bool advanceGridDim(TuneParam &param) const
+      {
         const unsigned int max_blocks = maxGridSize();
         const int step = deviceProp.multiProcessorCount;
         param.grid.x += step;
@@ -487,7 +498,8 @@ namespace quda {
         }
       }
 
-      virtual bool advanceAux(TuneParam& param) const {
+      virtual bool advanceAux(TuneParam &param) const
+      {
         bool aux_advanced = false;
         if (param.aux.x == 0) { // first see if aux.x(ONLY 0(false) or 1(true))
           param.aux.x++;
@@ -517,7 +529,8 @@ namespace quda {
       unsigned int step_block_size() const { return 8; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
-      unsigned int maxSharedBytesPerBlock() const {
+      unsigned int maxSharedBytesPerBlock() const
+      {
         if (shared) {
           return maxDynamicSharedBytesPerBlock();
         } else {
@@ -525,8 +538,9 @@ namespace quda {
         }
       }
 
-  public:
-      FusedDslash(Arg& arg, const ColorSpinorField& meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta) {
+    public:
+      FusedDslash(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+      {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
         //        if (arg.xpay) strcat(aux,",xpay");
@@ -534,7 +548,7 @@ namespace quda {
         switch (arg.type) {
         case dslash4_dslash5pre_dslash5inv:
           sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-              arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
+                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
           strcat(aux, config);
           break;
         case dslash4dag_dslash5predag_dslash5invdag:
@@ -543,7 +557,7 @@ namespace quda {
           break;
         case dslash4_dslash5inv_dslash5invdag:
           sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
-              arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
+                  arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
           strcat(aux, config);
           break;
         case dslash4dag_dslash5predag:
@@ -559,17 +573,19 @@ namespace quda {
       }
       virtual ~FusedDslash() {}
 
-      template <typename T> inline void launch(T* f, const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      {
         if (shared) { setMaxDynamicSharedBytesPerBlock(f); }
-        void* args[] = {&arg};
-        qudaLaunchKernel((const void*)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
+        void *args[] = {&arg};
+        qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
 
       // The following apply<...> functions are used to turn the tune parameters into template arguments.
       // Specifically tp.aux.y dictates the minBlocksPerMultiprocessor in __launch_bounds__(..).
       // tp.aux.x dictates whether or not to reload.
       template <int block_dim_x, bool reload, int type>
-      void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+      void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      {
         switch (tp.aux.y) {
         case 1: launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 1, reload, Arg, type>, tp, arg, stream); break;
         case 2: launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 2, reload, Arg, type>, tp, arg, stream); break;
@@ -578,7 +594,8 @@ namespace quda {
         }
       }
 
-      template <bool reload, int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+      template <bool reload, int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      {
         switch (tp.block.x) {
         case 8: apply<8, reload, type>(tp, arg, stream); break;
         case 16: apply<16, reload, type>(tp, arg, stream); break;
@@ -588,7 +605,8 @@ namespace quda {
         }
       }
 
-      template <int type> void apply(const TuneParam& tp, Arg& arg, const cudaStream_t& stream) {
+      template <int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      {
         if (tp.aux.x == 0) {
           apply<false, type>(tp, arg, stream); // reload = false
         } else {
@@ -596,7 +614,8 @@ namespace quda {
         }
       }
 
-      void apply(const cudaStream_t& stream) {
+      void apply(const cudaStream_t &stream)
+      {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {
         case 0: apply<0>(tp, arg, stream); break;
@@ -608,7 +627,8 @@ namespace quda {
         }
       }
 
-      void initTuneParam(TuneParam& param) const {
+      void initTuneParam(TuneParam &param) const
+      {
         TunableVectorYZ::initTuneParam(param);
         param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
@@ -617,7 +637,7 @@ namespace quda {
         param.aux.y = 1;
       }
 
-      void defaultTuneParam(TuneParam& param) const { initTuneParam(param); }
+      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     };
@@ -625,26 +645,27 @@ namespace quda {
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5 * in
     template <class storage_type>
-    void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
-        const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
+    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
+                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
+    {
       // switch for Ls
-      switch (in.X(4)) { 
+      switch (in.X(4)) {
       case 4: {
-        FusedDslashArg<storage_type,  4> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
-        FusedDslash<storage_type,  4, FusedDslashArg<storage_type,  4>> dslash(arg, in);
+        FusedDslashArg<storage_type, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+                                            type);
+        FusedDslash<storage_type, 4, FusedDslashArg<storage_type, 4>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; 
+      } break;
       case 8: {
-        FusedDslashArg<storage_type,  8> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
-        FusedDslash<storage_type,  8, FusedDslashArg<storage_type,  8>> dslash(arg, in);
+        FusedDslashArg<storage_type, 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+                                            type);
+        FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; 
+      } break;
       case 12: {
-        FusedDslashArg<storage_type, 12> arg(
-            out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+        FusedDslashArg<storage_type, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+                                             type);
         FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break; /**
@@ -665,9 +686,10 @@ namespace quda {
     }
 #endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
 
-    void apply_fused_dslash(ColorSpinorField& out, const ColorSpinorField& in, const GaugeField& U, ColorSpinorField& y,
-        const ColorSpinorField& x, double m_f, double m_5, const Complex* b_5, const Complex* c_5, bool dagger,
-        int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type) {
+    void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
+                            const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
+                            bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
+    {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
 

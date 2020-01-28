@@ -344,11 +344,9 @@ namespace quda {
     }
     delete p;
 
-    if(param.precision_sloppy != x.Precision()) {
+    if (param.precision_sloppy != x.Precision()) {
       delete r_sloppy;
-      if(param.use_sloppy_partial_accumulator) {
-        delete x_sloppy;
-      }
+      if (param.use_sloppy_partial_accumulator) { delete x_sloppy; }
     }
 
     profile.TPSTOP(QUDA_PROFILE_FREE);

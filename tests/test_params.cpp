@@ -211,50 +211,50 @@ namespace
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
 
-  CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
-                                                       {"clover", QUDA_CLOVER_WILSON_DSLASH},
-                                                       {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
-                                                       {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
-                                                       {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
-                                                       {"staggered", QUDA_STAGGERED_DSLASH},
-                                                       {"asqtad", QUDA_ASQTAD_DSLASH},
-                                                       {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
-                                                       {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
-                                                       {"mobius", QUDA_MOBIUS_DWF_DSLASH},
-                                                       {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
-                                                       {"laplace", QUDA_LAPLACE_DSLASH}};
+  CLI::TransformPairs<QudaDslashType> dslash_type_map{{"wilson", QUDA_WILSON_DSLASH},
+                                                      {"clover", QUDA_CLOVER_WILSON_DSLASH},
+                                                      {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
+                                                      {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
+                                                      {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
+                                                      {"staggered", QUDA_STAGGERED_DSLASH},
+                                                      {"asqtad", QUDA_ASQTAD_DSLASH},
+                                                      {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
+                                                      {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
+                                                      {"mobius", QUDA_MOBIUS_DWF_DSLASH},
+                                                      {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
+                                                      {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
                                                                   {"deg-doublet", QUDA_TWIST_DEG_DOUBLET},
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
-  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"cg", QUDA_CG_INVERTER},
-                                                           {"bicgstab", QUDA_BICGSTAB_INVERTER},
-                                                           {"gcr", QUDA_GCR_INVERTER},
-                                                           {"pcg", QUDA_PCG_INVERTER},
-                                                           {"mspcg", QUDA_MSPCG_INVERTER},
-                                                           {"mpcg", QUDA_MPCG_INVERTER},
-                                                           {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
-                                                           {"mr", QUDA_MR_INVERTER},
-                                                           {"sd", QUDA_SD_INVERTER},
-                                                           {"eigcg", QUDA_EIGCG_INVERTER},
-                                                           {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
-                                                           {"gmresdr", QUDA_GMRESDR_INVERTER},
-                                                           {"gmresdr-proj", QUDA_GMRESDR_PROJ_INVERTER},
-                                                           {"gmresdr-sh", QUDA_GMRESDR_SH_INVERTER},
-                                                           {"fgmresdr", QUDA_FGMRESDR_INVERTER},
-                                                           {"mg", QUDA_MG_INVERTER},
-                                                           {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
-                                                           {"cgne", QUDA_CGNE_INVERTER},
-                                                           {"cgnr", QUDA_CGNR_INVERTER},
-                                                           {"cg3", QUDA_CG3_INVERTER},
-                                                           {"cg3ne", QUDA_CG3NE_INVERTER},
-                                                           {"cg3nr", QUDA_CG3NR_INVERTER},
-                                                           {"ca-cg", QUDA_CA_CG_INVERTER},
-                                                           {"ca-cgne", QUDA_CA_CGNE_INVERTER},
-                                                           {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
-                                                           {"ca-gcr", QUDA_CA_GCR_INVERTER}};
+  CLI::TransformPairs<QudaInverterType> inverter_type_map{{"cg", QUDA_CG_INVERTER},
+                                                          {"bicgstab", QUDA_BICGSTAB_INVERTER},
+                                                          {"gcr", QUDA_GCR_INVERTER},
+                                                          {"pcg", QUDA_PCG_INVERTER},
+                                                          {"mspcg", QUDA_MSPCG_INVERTER},
+                                                          {"mpcg", QUDA_MPCG_INVERTER},
+                                                          {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
+                                                          {"mr", QUDA_MR_INVERTER},
+                                                          {"sd", QUDA_SD_INVERTER},
+                                                          {"eigcg", QUDA_EIGCG_INVERTER},
+                                                          {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
+                                                          {"gmresdr", QUDA_GMRESDR_INVERTER},
+                                                          {"gmresdr-proj", QUDA_GMRESDR_PROJ_INVERTER},
+                                                          {"gmresdr-sh", QUDA_GMRESDR_SH_INVERTER},
+                                                          {"fgmresdr", QUDA_FGMRESDR_INVERTER},
+                                                          {"mg", QUDA_MG_INVERTER},
+                                                          {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
+                                                          {"cgne", QUDA_CGNE_INVERTER},
+                                                          {"cgnr", QUDA_CGNR_INVERTER},
+                                                          {"cg3", QUDA_CG3_INVERTER},
+                                                          {"cg3ne", QUDA_CG3NE_INVERTER},
+                                                          {"cg3nr", QUDA_CG3NR_INVERTER},
+                                                          {"ca-cg", QUDA_CA_CG_INVERTER},
+                                                          {"ca-cgne", QUDA_CA_CGNE_INVERTER},
+                                                          {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
+                                                          {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
   CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
                                                     {"single", QUDA_SINGLE_PRECISION},
@@ -394,7 +394,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
-  quda_app->add_option("--niter-precondition", niter_precondition, "The number of iterations to perform for the preconditioner (default 10)");
+  quda_app->add_option("--niter-precondition", niter_precondition,
+                       "The number of iterations to perform for the preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 
@@ -775,12 +776,13 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
 
-  opgroup->add_option("--mobius-scale", mobius_scale, "Set the Mobius scale (must be equal or larger than 1.0, default 1.0)");
-  
-  opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");
+  opgroup->add_option("--mobius-scale", mobius_scale,
+                      "Set the Mobius scale (must be equal or larger than 1.0, default 1.0)");
+
+  opgroup->add_option("--eofa-pm", eofa_pm,
+                      "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");
   opgroup->add_option("--eofa-shift", eofa_shift, "Set the shift for the EOFA operator (default -0.12345)");
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");
   opgroup->add_option("--eofa-mq3", eofa_mq1, "Set mq3 for EOFA operator (default 1.0)");
 }
-

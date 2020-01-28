@@ -142,7 +142,9 @@ void dslashQuda_mdwf(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaPa
   popVerbosity();
 }
 
-void dslashQuda_mobius_eofa(void* h_out, void* h_in, QudaInvertParam* inv_param, QudaParity parity, dslash_test_type test_type) {
+void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity,
+                            dslash_test_type test_type)
+{
   if (inv_param->dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     setKernelPackT(true);
   } else {
@@ -157,7 +159,7 @@ void dslashQuda_mobius_eofa(void* h_out, void* h_in, QudaInvertParam* inv_param,
   bool precondition_output = test_type == dslash_test_type::Dslash ? false : true;
 
   ColorSpinorParam cpuParam(h_in, *inv_param, gaugePrecise->X(), precondition_output, inv_param->input_location);
-  ColorSpinorField* in_h = ColorSpinorField::Create(cpuParam);
+  ColorSpinorField *in_h = ColorSpinorField::Create(cpuParam);
 
   ColorSpinorParam cudaParam(cpuParam, *inv_param);
   cudaColorSpinorField in(*in_h, cudaParam);

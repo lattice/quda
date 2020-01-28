@@ -48,15 +48,15 @@ Dirac *dirac = NULL;
 QudaDagType not_dagger;
 
 dslash_test_type dtest_type = dslash_test_type::Dslash;
-CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
-                                                      {"MatPC", dslash_test_type::MatPC},
-                                                      {"Mat", dslash_test_type::Mat},
-                                                      {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
-                                                      {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
-                                                      {"MatDagMat", dslash_test_type::MatDagMat},
-                                                      {"M5", dslash_test_type::M5},
-                                                      {"M5inv", dslash_test_type::M5inv},
-                                                      {"Dslash4pre", dslash_test_type::Dslash4pre}};
+CLI::TransformPairs<dslash_test_type> dtest_type_map{{"Dslash", dslash_test_type::Dslash},
+                                                     {"MatPC", dslash_test_type::MatPC},
+                                                     {"Mat", dslash_test_type::Mat},
+                                                     {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
+                                                     {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
+                                                     {"MatDagMat", dslash_test_type::MatDagMat},
+                                                     {"M5", dslash_test_type::M5},
+                                                     {"M5inv", dslash_test_type::M5inv},
+                                                     {"Dslash4pre", dslash_test_type::Dslash4pre}};
 
 double getTolerance(QudaPrecision prec)
 {
@@ -370,7 +370,7 @@ void init(int argc, char **argv) {
 
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
-    
+
     diracParam.tmp1 = tmp1;
     diracParam.tmp2 = tmp2;
     dirac = Dirac::create(diracParam);
@@ -965,11 +965,10 @@ void dslashRef() {
       break;
     case dslash_test_type::MatPCDagMatPCLocal:
       // reference for MdagM local operator
-      mdw_mdagm_local(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type, gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      mdw_mdagm_local(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type,
+                      gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
-    default:
-      printf("Test type not supported for Mobius domain wall\n");
-      exit(-1);
+    default: printf("Test type not supported for Mobius domain wall\n"); exit(-1);
     }
     free(kappa_b);
     free(kappa_c);
@@ -987,14 +986,13 @@ void dslashRef() {
       kappa_mdwf[xs] = -kappa_5[xs];
     }
     switch (dtest_type) {
-      case dslash_test_type::M5:
-        mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
-                        (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                        inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
-        break;
-      case dslash_test_type::M5inv:
-        spinorRef->copy(*spinor); break;
-      default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
+    case dslash_test_type::M5:
+      mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case dslash_test_type::M5inv: spinorRef->copy(*spinor); break;
+    default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
     }
     free(kappa_b);
     free(kappa_c);
@@ -1098,7 +1096,7 @@ int main(int argc, char **argv)
     double norm2_cpu_cuda = blas::norm2(*spinorOut);
 
     if (!transfer) {
-      double norm2_cuda= blas::norm2(*cudaSpinorOut);
+      double norm2_cuda = blas::norm2(*cudaSpinorOut);
       printfQuda("Results: CPU = %f, CUDA=%f, CPU-CUDA = %f\n", norm2_cpu, norm2_cuda, norm2_cpu_cuda);
     } else {
       printfQuda("Result: CPU = %f, CPU-QUDA = %f\n",  norm2_cpu, norm2_cpu_cuda);

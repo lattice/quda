@@ -793,8 +793,8 @@ namespace quda {
             }
 	  }
 	  tuning = tunable.advanceTuneParam(param);
-    tunable.jitifyError() = CUDA_SUCCESS;
-  }
+          tunable.jitifyError() = CUDA_SUCCESS;
+        }
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);
 

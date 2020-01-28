@@ -1805,11 +1805,10 @@ namespace quda {
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
-    double kappa
-        = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-              || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH)
-        ? kappa5
-        : param.kappa;
+    double kappa = (param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+                    || param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) ?
+      kappa5 :
+      param.kappa;
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
       printfQuda("Mass rescale: Kappa is: %g\n", kappa);
@@ -2976,7 +2975,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    param->inv_type_precondition = QUDA_CG_INVERTER; 
+    param->inv_type_precondition = QUDA_CG_INVERTER;
     SolverParam solverParam(*param);
 
     // chronological forecasting
@@ -3023,27 +3022,27 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     if (param->inv_type == QUDA_MSPCG_INVERTER) {
 #if 1
       DiracMdagMLocal mPreLocal(diracPre);
-      Solver* solve = Solver::create(solverParam, m, mSloppy, mPreLocal, profileInvert);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPreLocal, profileInvert);
       (*solve)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete solve;
 #else
-      MSPCG* mspcg = new MSPCG(param, solverParam, profileInvert);
-     
-      if(param->perform_mspcg_madwf_ml_training){
+      MSPCG *mspcg = new MSPCG(param, solverParam, profileInvert);
+
+      if (param->perform_mspcg_madwf_ml_training) {
         mspcg->mspcg_madwf_ml(*out, *in, true, true, param->Ls_cheap);
         blas::zero(*out);
       }
-      if(param->use_mspcg_madwf_ml_training){
+      if (param->use_mspcg_madwf_ml_training) {
         mspcg->mspcg_madwf_ml(*out, *in, true, false, param->Ls_cheap);
-      }else{
+      } else {
         mspcg->mspcg_madwf_ml(*out, *in, false, false, param->Ls_cheap);
       }
       solverParam.updateInvertParam(*param);
       delete mspcg;
 #endif
     } else {
-      Solver* solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileInvert);
       (*solve)(*out, *in);
       solverParam.updateInvertParam(*param);
       delete solve;
@@ -3759,7 +3758,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           // mSloppy = new DiracMdagM(diracSloppy);
         }
 
-	// need to curry in the shift if we are not doing staggered
+        // need to curry in the shift if we are not doing staggered
 	if (param->dslash_type != QUDA_ASQTAD_DSLASH &&
 	    param->dslash_type != QUDA_STAGGERED_DSLASH) {
 	  m->shift = param->offset[i];

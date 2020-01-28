@@ -29,7 +29,6 @@
 
 double kappa5; // Derived, not given. Used in matVec checks.
 
-
 namespace quda
 {
   extern void setTransferGPU(bool);

@@ -22,7 +22,7 @@ namespace quda
     DiracMobiusPC *mat;
     DiracMobiusPC *mat_sloppy;
     DiracMobiusPC *mat_precondition;
-    
+
     DiracMdagM *nrm_op;
     DiracMdagM *nrm_op_sloppy;
     DiracMdagMLocal *nrm_op_precondition;
@@ -84,7 +84,7 @@ namespace quda
     int shift2[4] = {2, 2, 2, 2};
 
     bool tc;
-    
+
     void pipelined_inner_cg(ColorSpinorField &ix, ColorSpinorField &ib);
     void Minv(ColorSpinorField &out, const ColorSpinorField &in);
 
@@ -92,12 +92,11 @@ namespace quda
     int outer_cg(ColorSpinorField &dx, ColorSpinorField &db, double quit);
 
   public:
-    
     /* --------------------------------------------------------------------------*
-     * 
+     *
      * --------------------------------------------------------------------------*/
-    MSPCG(QudaInvertParam* inv_param, SolverParam& param_, TimeProfile& profile);
-    
+    MSPCG(QudaInvertParam *inv_param, SolverParam &param_, TimeProfile &profile);
+
     ~MSPCG();
 
     int inner_iterations;
@@ -108,11 +107,10 @@ namespace quda
     void deallocate();
 
     void inner_dslash(ColorSpinorField &out, const ColorSpinorField &in);
-    
+
     void test_dslash(const ColorSpinorField &tb);
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
   };
 
 } // namespace quda

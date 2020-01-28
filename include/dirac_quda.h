@@ -204,11 +204,11 @@ namespace quda {
        @brief Apply MdagM operator which may be optimized
     */
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
-    
-    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const {
+
+    virtual void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
+    {
       errorQuda("Not implemented!\n");
     }
-    
 
     /**
         @brief Apply Mdag (daggered operator of M
@@ -721,7 +721,7 @@ public:
     void Dslash5invXpay(ColorSpinorField &out, const ColorSpinorField &in,
 			const QudaParity parity, const ColorSpinorField &x, const double &k) const;
 
-    void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const; 
+    void MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void M(ColorSpinorField &out, const ColorSpinorField &in) const;
     void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
@@ -1542,44 +1542,42 @@ public:
     }
   };
 
-  class DiracMdagMLocal : public DiracMatrix {
+  class DiracMdagMLocal : public DiracMatrix
+  {
 
-    public:
-      DiracMdagMLocal(const Dirac& d) : DiracMatrix(d) { }
-      DiracMdagMLocal(const Dirac* d) : DiracMatrix(d) { }
+  public:
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
 
-    void operator()(ColorSpinorField& out, const ColorSpinorField& in) const {
-      dirac->MdagMLocal(out, in);
-    }
-    
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
+
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
     {
       dirac->tmp1 = &tmp;
       dirac->MdagMLocal(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       dirac->tmp1 = NULL;
     }
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in, 
-			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
     {
       dirac->tmp1 = &Tmp1;
       dirac->tmp2 = &Tmp2;
       dirac->MdagMLocal(out, in);
-      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField&>(in), out);
+      if (shift != 0.0) blas::axpy(shift, const_cast<ColorSpinorField &>(in), out);
       dirac->tmp2 = NULL;
       dirac->tmp1 = NULL;
     }
- 
+
     int getStencilSteps() const
     {
-      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+      return 2 * dirac->getStencilSteps(); // 2 for M and M dagger
     }
-  
-  }; 
+  };
 
   /* Gloms onto a DiracMatrix and provides an operator() forward to its MMdag method */
-  class DiracMMdag : public DiracMatrix {
+  class DiracMMdag : public DiracMatrix
+  {
 
   public:
     DiracMMdag(const Dirac &d) : DiracMatrix(d) { }
