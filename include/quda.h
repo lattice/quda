@@ -1265,33 +1265,26 @@ extern "C" {
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
+  typedef struct QudaGaugeObservableParam_s {
+    QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
+    double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge;          /**< Whether to compute the topological charge */
+    double qcharge;                       /**< Computed topological charge */
+    QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
+    void *qcharge_density;                /**< Pointer to host array of length volume where the q-charge density will be copied */
+    QudaBoolean compute_energy;           /**< Whether to compute the field energy */
+    double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
+  } QudaGaugeObservableParam;
+
   /**
-   * @brief Calculates the topological charge and field energy from
-   * gaugeSmeared, if it exists, or from gaugePrecise if no smeared
-   * fields are present.
-   * @param[out] obs host array that will stores the result.  The
-   * first three elements are the total, spatial and temporal
-   * energies, repsectively, and the final element is the topological
-   * charge.
-   * @param[in] Whether to compute the field energy
-   * @param[in] Whether to compute the topological charge
+   * @brief Calculates a variety of gauge-field observables.  If a
+   * smeared gauge field is presently loaded (in gaugeSmeared) the
+   * observables are computed on this, else the resident gauge field
+   * will be used.
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
   */
-  void tensorObservablesQuda(double obs[4], QudaBoolean energy, QudaBoolean charge);
-  
-  /**
-   * @brief Calculates the topological density field, as well as the
-   * topological charge and and field energy from gaugeSmeared, if it
-   * exists, or from gaugePrecise if no smeared fields are present.
-   * @param[out] obs host array that will stores the result.  The
-   * first three elements are the total, spatial and temporal
-   * energies, repsectively, and the final element is the topological
-   * charge.
-   * @param[in,out] Pointer to host array of length volume where the
-   * topological charge density will be copied
-   * @param[in] Whether to compute the field energy
-   * @param[in] Whether to compute the topological charge
-  */
-  void tensorDensityObservablesQuda(double obs[4], void *qDensity, QudaBoolean energy, QudaBoolean charge);
+  void gaugeObservablesQuda(QudaGaugeObservableParam *param);
   
   /**
    * Public function to perform color contractions of the host spinors x and y.
@@ -1302,7 +1295,6 @@ extern "C" {
    * @param[in] param meta data for construction of ColorSpinorFields.
    * @param[in] X spacetime data for construction of ColorSpinorFields.
    */
-
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
 

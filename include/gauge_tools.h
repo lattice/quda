@@ -4,6 +4,15 @@ namespace quda
 {
 
   /**
+   * @brief Calculates a variety of gauge-field observables.
+   * @param[in] Gauge field upon which we are measuring.
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   * @param[in] profile TimeProfile instance used for profiling.
+  */
+  void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
+
+  /**
      @brief Compute the plaquette of the gauge field
 
      @param[in] U The gauge field upon which to compute the plaquette

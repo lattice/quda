@@ -38,22 +38,22 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
   printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
 	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
+	     get_recon_str(link_recon),
+	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n",
 	     dimPartitioned(0),
 	     dimPartitioned(1),
 	     dimPartitioned(2),
-	     dimPartitioned(3)); 
-  
+	     dimPartitioned(3));
+
   return ;
-  
+
 }
 
 QudaPrecision &cpu_prec = prec;
@@ -71,7 +71,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -92,7 +92,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile,"")) { // Copy in loaded gauge field 
+    if (strcmp(latfile,"")) { // Copy in loaded gauge field
 
       printfQuda("Loading the gauge field in %s\n", latfile);
 
@@ -248,23 +248,26 @@ int main(int argc, char **argv)
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    double3 plaq = plaquette(*gaugeEx);
-    double obs[4];
-    tensorObservablesQuda(obs, QUDA_BOOLEAN_FALSE, QUDA_BOOLEAN_TRUE);
-    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, obs[3]);
-    
+
+    QudaGaugeObservableParam param;
+    param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+    param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+    param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
+    param.compute_energy = QUDA_BOOLEAN_FALSE;
+
+    gaugeObservablesQuda(&param);
+    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
+
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette(*gaugeEx);
 
     // Do a warmup if requested
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
-        Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);  
+        Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
         CallUnitarizeLinks(gaugeEx);
       }
     }
-      
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -275,9 +278,8 @@ int main(int argc, char **argv)
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    plaq = plaquette(*gaugeEx);
-    tensorObservablesQuda(obs, QUDA_BOOLEAN_FALSE, QUDA_BOOLEAN_TRUE);
-    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, obs[3]);    
+    gaugeObservablesQuda(&param);
+    printfQuda("step=0 plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
     freeGaugeQuda();
 
@@ -292,9 +294,8 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      plaq = plaquette(*gaugeEx);
-      tensorObservablesQuda(obs, QUDA_BOOLEAN_FALSE, QUDA_BOOLEAN_TRUE);
-      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, obs[3]);
+      gaugeObservablesQuda(&param);
+      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 
       freeGaugeQuda();
     }
@@ -330,7 +331,7 @@ int main(int argc, char **argv)
     delete gaugeEx;
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
- 
+
     randstates->Release();
     delete randstates;
   }
@@ -338,14 +339,14 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
+
+  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
   //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone, total time = %g secs\n", 
+  printfQuda("\nDone, total time = %g secs\n",
 	 time0);
 
   freeGaugeQuda();
-  
+
   // finalize the QUDA library
   endQuda();
 

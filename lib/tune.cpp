@@ -291,7 +291,6 @@ namespace quda {
   static void broadcastTuneCache()
   {
 #ifdef MULTI_GPU
-
     std::stringstream serialized;
     size_t size;
 
