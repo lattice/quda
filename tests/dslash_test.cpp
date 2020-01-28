@@ -19,8 +19,6 @@
 #include "misc.h"
 #include "dslash_test_helpers.h"
 
-#include <inv_mspcg.h>
-
 #include <qio_field.h>
 // google test frame work
 #include <gtest/gtest.h>
