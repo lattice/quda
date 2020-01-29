@@ -114,15 +114,12 @@ namespace quda
         // First two links of the staple are already in memory.
 
         // Memory usage and communications.
-        // There are 10 unique links to be fetched per direction. 3 of these
+        // There are 12 unique links to be fetched per direction. 3 of these
         // links (the ones that form the simple staple) can be recycled on
         // the fly. The two links immediately succeeding and preceding
-        // U_nu(x) in the nu directon are also reused when changing from
-        // +ve to -ve mu.
+        // U_nu(x) in the nu directon are reloaded when swicthing from
+        // +ve to -ve mu to reduce the stack frame.
 
-
-#if 1
-	// New Version
         //--------//
         // +ve mu //
         //--------//
@@ -130,12 +127,12 @@ namespace quda
 	  // Accumulate backward staple in U1
 	  dx[nu]--; //0,-1
 	  // Get link U_nu(x-nu)
-	  Link U1 = conj((Link)arg.in(nu, linkIndexShift(x, dx, X), 1 - parity));
+	  Link U1 = conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  // Get link U_mu(x-nu)
-	  U1 = U1 * (Link)arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
+	  U1 = U1 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
 	  dx[mu]++; //1,-1
 	  // Get link U_nu(x-nu+mu)
-	  U1 = U1 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U1 = U1 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 	  
 	
 	  // Get links U_nu(x+mu) and U_mu(x+nu)
@@ -160,14 +157,14 @@ namespace quda
 	  // Accumulate forward staple in U2
 	  U2 = U1 * U2;
 	  // Get link U_nu(x+mu+nu)
-	  U2 = U2 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U2 = U2 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 	  dx[nu]++; //1,2
 	  dx[mu]--; //0,2
 	  // Get link U_mu(x+nu)
-	  U2 = U2 * conj((Link)(arg.in(mu, linkIndexShift(x, dx, X), parity)));
+	  U2 = U2 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
 	  dx[nu]--; //0,1
 	  // Get link U_nu(x+nu)
-	  U2 = U2 * conj((Link)(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
+	  U2 = U2 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  
 	  // complete R21f
 	  rectangle = rectangle + U2;
@@ -177,14 +174,14 @@ namespace quda
 	  dx[mu]++; //1,0
 	  // Accumulate side staple in U2
 	  // Get link U_mu(x+mu)
-	  U2 = U2 * (Link)(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
+	  U2 = U2 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
 	  dx[mu]++; //2,0
 	  // Get link U_nu(x+2mu)
-	  U2 = U2 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U2 = U2 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 	  dx[nu]++; //2,1
 	  dx[mu]--; //1,1
 	  // Get link U_mu(x+mu+nu)
-	  U2 = U2 * conj((Link)(arg.in(mu, linkIndexShift(x, dx, X), parity)));
+	  U2 = U2 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
 	  
 	  // Complete R21s
 	  rectangle = rectangle + U2 * conj(U3);
@@ -200,12 +197,12 @@ namespace quda
 	  // Accumulate backward staple in U1
 	  dx[nu]--; //0,-1
 	  // Get link U_nu(x-nu)
-	  Link U1 = conj((Link)arg.in(nu, linkIndexShift(x, dx, X), 1 - parity));
+	  Link U1 = conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  dx[mu]--; //-1,-1
 	  // Get link U_mu(x-nu-mu)
-	  U1 = U1 * conj((Link)arg.in(mu, linkIndexShift(x, dx, X), parity));
+	  U1 = U1 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
 	  // Get link U_nu(x-nu-mu)
-	  U1 = U1 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U1 = U1 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 
 
 	  dx[nu]++; //-1,0
@@ -227,12 +224,12 @@ namespace quda
 	  dx[nu]++; //-1,1
 	  // Accumulate forward staple in U2
 	  U2 = conj(U1) * U2;
-	  U2 = U2 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U2 = U2 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 	  dx[nu]++; //-1,2
-	  U2 = U2 * (Link)(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
+	  U2 = U2 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
 	  dx[mu]++; //0,2
 	  dx[nu]--; //0,1
-	  U2 = U2 * conj((Link)(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
+	  U2 = U2 * conj(static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), 1 - parity)));
 	  
 	  // Complete R21f
 	  rectangle = rectangle + U2;
@@ -242,10 +239,10 @@ namespace quda
 	  dx[mu]--; //-2,0
 	  // Accumulate side staple in U2
 	  U2 = conj(U1);
-	  U2 = U2 * conj((Link)(arg.in(mu, linkIndexShift(x, dx, X), parity)));
-	  U2 = U2 * (Link)(arg.in(nu, linkIndexShift(x, dx, X), parity));
+	  U2 = U2 * conj(static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), parity)));
+	  U2 = U2 * static_cast<Link>(arg.in(nu, linkIndexShift(x, dx, X), parity));
 	  dx[nu]++; //-2,1
-	  U2 = U2 * (Link)(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
+	  U2 = U2 * static_cast<Link>(arg.in(mu, linkIndexShift(x, dx, X), 1 - parity));
 	  
 	  // Complete R21s
 	  rectangle = rectangle + U2 * U3;
@@ -255,196 +252,6 @@ namespace quda
 	  dx[mu]++; //-1,0
 	  dx[mu]++; //0,0
 	}
-#endif
-	  
-#if 0
-	Link U1, U2, U3, U4, U5, U6, U7;
-	  
-        //--------//
-        // +ve mu //
-        //--------//
-
-        //----------------------------------------------------------------
-        // R12 = U_mu(x)*U_mu(x+mu)*U_nu(x+2mu)*U^d_mu(x+nu+mu)*U^d_mu(x+nu)
-        // Get link U_mu(x)
-        U1 = arg.in(mu, linkIndex(x, X), parity);
-
-        // Get link U_mu(x+mu)
-        dx[mu]++;
-        U2 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_nu(x+2mu)
-        dx[mu]++;
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_mu(x+nu+mu)
-        dx[mu]--;
-        dx[nu]++;
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_mu(x+nu)
-        dx[mu]--;
-        U5 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        rectangle = rectangle + U1 * U2 * U3 * conj(U4) * conj(U5);
-        //---------------------------------------------------------------
-
-        // reset dx
-        dx[nu]--;
-        //---------------------------------------------------------------
-        // R21f=U_mu(x)*U_nu(x+mu)*U_nu(x+nu+mu)*U^d_mu(x+2nu)*U^d_nu(x+nu)
-        // Get link U_mu(x)
-        // Same as U1 from R12
-
-        // Get link U_nu(x+mu)
-        dx[mu]++;
-        U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
-
-        ///////////////////////////////////////////////////////
-        // Here we get the third link in the staple and compute.
-        // Get U_mu(x+nu)
-        // Same as U5 from R12
-        staple = staple + U1 * U2 * conj(U5);
-        ///////////////////////////////////////////////////////
-
-        // Get link U_nu(x+nu+mu)
-        dx[nu]++;
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_mu(x+2nu)
-        dx[mu]--;
-        dx[nu]++;
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_nu(x+nu)
-        dx[nu]--;
-        U6 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
-
-        rectangle = rectangle + U1 * U2 * U3 * conj(U4) * conj(U6);
-        //---------------------------------------------------------------
-
-        // reset dx
-        dx[nu]--;
-        //---------------------------------------------------------------
-        // R21b=U^d_nu(x-nu)*U_mu(x-nu)*U_nu(x+nu+mu)*U^d_mu(x+2nu)*U^dag_nu(x+nu)
-
-        // Get link U_nu(x-nu)
-        dx[nu]--;
-        U7 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_mu(x-nu)
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_nu(x-nu+mu)
-        dx[mu]++;
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_nu(x+mu)
-        // Same as U2 from R21f
-
-        // Get link U_mu(x+nu)
-        // Same as U5 from R12
-
-        rectangle = rectangle + conj(U7) * U4 * U3 * U2 * conj(U5);
-        //---------------------------------------------------------------
-
-        //--------//
-        // -ve mu //
-        //--------//
-
-        // reset dx
-        dx[mu]--;
-        dx[nu]++;
-        //---------------------------------------------------------------
-        // R12 = U^dag_mu(x-mu) * U^dag_mu(x-2mu) * U_nu(x-2mu) * U_mu(x-2mu+nu) * U_mu(x-mu+nu)
-
-        // Get link U_mu(x-mu)
-        dx[mu]--;
-        U1 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_mu(x-2mu)
-        dx[mu]--;
-        U2 = arg.in(mu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_nu(x-2mu)
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_mu(x-2mu+nu)
-        dx[nu]++;
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_mu(x-mu+nu)
-        dx[mu]++;
-        U5 = arg.in(mu, linkIndexShift(x, dx, X), parity);
-
-        rectangle = rectangle + conj(U1) * conj(U2) * U3 * U4 * U5;
-        //---------------------------------------------------------------
-
-        // reset dx
-        dx[mu]++;
-        dx[nu]--;
-        //---------------------------------------------------------------
-        // R21f = U^dag_mu(x-mu) * U_nu(x-mu) * U_nu(x-mu+nu) * U_mu(x-mu+2nu) * U^dag_nu(x+nu)
-
-        // Get link U_mu(x-mu)
-        // Same as U1 from R12
-
-        // Get link U_nu(x-mu)
-        dx[mu]--;
-        U2 = arg.in(nu, linkIndexShift(x, dx, X), 1 - parity);
-
-        ///////////////////////////////////////////////////////
-        // Here we get the third link in the staple and compute.
-        // Get U_mu(x-mu+nu)
-        // Same as U5 from R12
-        staple = staple + conj(U1) * U2 * U5;
-        ///////////////////////////////////////////////////////
-
-        // Get link U_nu(x-mu+nu)
-        dx[nu]++;
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_mu(x-mu+2nu)
-        dx[nu]++;
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), 1 - parity);
-
-        // Get link U_nu(x+nu)
-        // Same as U6 from +ve R21f
-
-        rectangle = rectangle + conj(U1) * U2 * U3 * U4 * conj(U6);
-        //---------------------------------------------------------------
-
-        // reset dx
-        dx[nu]--;
-        dx[nu]--;
-        dx[mu]++;
-        //---------------------------------------------------------------
-        // R21b= U^dag_nu(x-nu) * U^dag_mu(x-mu-nu) * U_nu(x-mu-nu) * U_nu(x-mu) * U_mu(x-mu+nu)
-
-        // Get link U_nu(x-nu)
-        // Same as U7 from +ve R21b
-
-        // Get link U_mu(x-mu-nu)
-        dx[nu]--;
-        dx[mu]--;
-        U4 = arg.in(mu, linkIndexShift(x, dx, X), parity);
-
-        // Get link U_nu(x-nu-mu)
-        U3 = arg.in(nu, linkIndexShift(x, dx, X), parity);
-
-        // reset dx
-        dx[nu]++;
-        dx[mu]++;
-
-        // Get link U_nu(x-mu)
-        // Same as U2 from R21f
-
-        // Get link U_mu(x-mu+nu)
-        // Same as U5 from R12
-
-        rectangle = rectangle + conj(U7) * conj(U4) * U3 * U2 * U5;
-        //---------------------------------------------------------------
-#endif
       }
     }
   }
