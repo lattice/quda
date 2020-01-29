@@ -333,7 +333,6 @@ namespace quda {
      */
     virtual void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 				double kappa, double mass=0.,double mu=0., double mu_factor=0.) const;
-
   };
 
   // Even-odd preconditioned Wilson

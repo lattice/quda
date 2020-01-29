@@ -580,12 +580,16 @@ namespace quda {
     // conditionals based on destructor
     if (is_prefetch_enabled() && alloc && mem_type == QUDA_MEMORY_DEVICE) {
       int dev_id = 0;
-      if (mem_space == QUDA_CUDA_FIELD_LOCATION) dev_id = comm_gpuid();
-      else if (mem_space == QUDA_CPU_FIELD_LOCATION) dev_id = cudaCpuDeviceId;
-      else errorQuda("Invalid QudaFieldLocation.");
+      if (mem_space == QUDA_CUDA_FIELD_LOCATION)
+        dev_id = comm_gpuid();
+      else if (mem_space == QUDA_CPU_FIELD_LOCATION)
+        dev_id = cudaCpuDeviceId;
+      else
+        errorQuda("Invalid QudaFieldLocation.");
 
       cudaMemPrefetchAsync(v, bytes, dev_id, stream);
-      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0) cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
+      if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0)
+        cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
     }
   }
 

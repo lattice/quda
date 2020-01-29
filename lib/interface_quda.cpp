@@ -2807,7 +2807,7 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     blas::zero(*x);
   }
 
-  // if we're doing a managed memory MG solve and prefetching is 
+  // if we're doing a managed memory MG solve and prefetching is
   // enabled, prefetch all the Dirac matrices. There's probably
   // a better place to put this...
   if (param->inv_type_precondition == QUDA_MG_INVERTER) {

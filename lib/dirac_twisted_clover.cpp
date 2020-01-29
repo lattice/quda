@@ -124,7 +124,8 @@ namespace quda {
     // do nothing
   }
 
-  void DiracTwistedClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const {
+  void DiracTwistedClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
     Dirac::prefetch(mem_space, stream);
     clover.prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_CLOVER_CLOVER_PREFETCH_TYPE);
   }
@@ -339,10 +340,11 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_TWISTED_CLOVERPC_DIRAC, matpcType);
   }
 
-  void DiracTwistedCloverPC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const {
+  void DiracTwistedCloverPC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
     Dirac::prefetch(mem_space, stream);
 
-    bool symmetric =(matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
     int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 

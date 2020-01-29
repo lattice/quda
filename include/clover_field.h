@@ -8,8 +8,8 @@ namespace quda {
 
   // Prefetch type
   enum class QudaCloverPrefetchType {
-    QUDA_BOTH_CLOVER_PREFETCH_TYPE, // clover and inverse
-    QUDA_CLOVER_CLOVER_PREFETCH_TYPE, // clover only
+    QUDA_BOTH_CLOVER_PREFETCH_TYPE,    // clover and inverse
+    QUDA_CLOVER_CLOVER_PREFETCH_TYPE,  // clover only
     QUDA_INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
     QUDA_INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
   };
@@ -258,9 +258,10 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in
       @param[in] type Whether to grab the clover, inverse, or both
-      @param[in] parity Whether to grab the full clover or just the even/odd parity 
+      @param[in] parity Whether to grab the full clover or just the even/odd parity
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream, QudaCloverPrefetchType type, QudaParity parity = QUDA_INVALID_PARITY) const;
+    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream, QudaCloverPrefetchType type,
+                  QudaParity parity = QUDA_INVALID_PARITY) const;
 
     friend class DiracClover;
     friend class DiracCloverPC;
