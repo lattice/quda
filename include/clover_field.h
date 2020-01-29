@@ -7,12 +7,12 @@
 namespace quda {
 
   // Prefetch type
-  typedef enum QudaCloverPrefetchType_s {
+  enum class QudaCloverPrefetchType {
     QUDA_BOTH_CLOVER_PREFETCH_TYPE, // clover and inverse
     QUDA_CLOVER_CLOVER_PREFETCH_TYPE, // clover only
     QUDA_INVERSE_CLOVER_PREFETCH_TYPE, // inverse clover only
     QUDA_INVALID_CLOVER_PREFETCH_TYPE = QUDA_INVALID_ENUM
-  } QudaCloverPrefetchType;
+  };
 
   struct CloverFieldParam : public LatticeFieldParam {
     bool direct; // whether to create the direct clover 
