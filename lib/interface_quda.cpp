@@ -43,8 +43,6 @@
 
 #include <cuda.h>
 
-#include <inv_mspcg.h>
-
 #include <ks_force_quda.h>
 
 #ifdef GPU_GAUGE_FORCE
