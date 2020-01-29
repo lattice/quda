@@ -5528,7 +5528,7 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
 
 void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type)
 {
-  pushOutputPrefix(__func__);
+  pushOutputPrefix("performWFlownStep: ");
   profileWFlow.TPSTART(QUDA_PROFILE_TOTAL);
 
   if (gaugePrecise == nullptr) errorQuda("Gauge field must be loaded");
