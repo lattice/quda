@@ -2,6 +2,7 @@
 #include <index_helper.cuh>
 #include <quda_matrix.h>
 #include <kernels/gauge_utils.cuh>
+#include <su3_project.cuh>
 
 namespace quda
 {
@@ -20,9 +21,10 @@ namespace quda
     static constexpr QudaReconstructType recon = recon_;
     static constexpr int wflow_dim = wflow_dim_;
     typedef typename gauge_mapper<Float,recon>::type Gauge;
+    typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type Matrix; // temp field not on the manifold
 
     Gauge out;
-    Gauge temp;
+    Matrix temp;
     const Gauge in;
 
     int threads; // number of active threads required

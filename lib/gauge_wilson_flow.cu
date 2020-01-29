@@ -107,7 +107,7 @@ namespace quda {
       int links = 0;
       switch(arg.wflow_type) {
       case QUDA_WFLOW_TYPE_WILSON: links = 6; break;
-      case QUDA_WFLOW_TYPE_SYMANZIK: links = 22; break;
+      case QUDA_WFLOW_TYPE_SYMANZIK: links = 24; break;
       default : errorQuda("Unknown Wilson Flow type");
       }
       auto temp_io = arg.step_type == WFLOW_STEP_W2 ? 2 : arg.step_type == WFLOW_STEP_VT ? 1 : 0;
@@ -118,23 +118,23 @@ namespace quda {
   void WFlowStep(GaugeField &out, GaugeField &temp, GaugeField &in, const double epsilon, const QudaWFlowType wflow_type)
   {
 #ifdef GPU_GAUGE_TOOLS
-    checkPrecision(out, in);
+    checkPrecision(out, temp, in);
     checkReconstruct(out, in);
-
+    if (temp.Reconstruct() != QUDA_RECONSTRUCT_NO) errorQuda("Temporary vector must not use reconstruct");
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
     // Set each step type as an arg parameter, update halos if needed
     // Step W1
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_W1);
+    instantiate<GaugeWFlowStep,WilsonReconstruct>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_W1);
     out.exchangeExtendedGhost(out.R(), false);
 
     // Step W2
-    instantiate<GaugeWFlowStep>(in, temp, out, epsilon, wflow_type, WFLOW_STEP_W2);
+    instantiate<GaugeWFlowStep,WilsonReconstruct>(in, temp, out, epsilon, wflow_type, WFLOW_STEP_W2);
     in.exchangeExtendedGhost(in.R(), false);
 
     // Step Vt
-    instantiate<GaugeWFlowStep>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_VT);
+    instantiate<GaugeWFlowStep,WilsonReconstruct>(out, temp, in, epsilon, wflow_type, WFLOW_STEP_VT);
     out.exchangeExtendedGhost(out.R(), false);
 #else
     errorQuda("Gauge tools are not built");
