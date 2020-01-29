@@ -185,39 +185,6 @@ namespace quda {
     // do nothing
   }
 
-  static cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
-                                             bool redundant_comms = false,
-                                             QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID)
-  {
-    int y[4];
-    for (int dir = 0; dir < 4; ++dir) y[dir] = in.X()[dir] + 2 * R[dir];
-    int pad = 0;
-
-    GaugeFieldParam gParamEx(y, in.Precision(), recon != QUDA_RECONSTRUCT_INVALID ? recon : in.Reconstruct(), pad,
-                             in.Geometry(), QUDA_GHOST_EXCHANGE_EXTENDED);
-    gParamEx.create = QUDA_ZERO_FIELD_CREATE;
-    gParamEx.order = in.Order();
-    gParamEx.siteSubset = QUDA_FULL_SITE_SUBSET;
-    gParamEx.t_boundary = in.TBoundary();
-    gParamEx.nFace = 1;
-    gParamEx.tadpole = in.Tadpole();
-    for (int d = 0; d < 4; d++) gParamEx.r[d] = R[d];
-
-    gParamEx.setPrecision(in.Precision(), true);
-
-    cudaGaugeField *out = new cudaGaugeField(gParamEx);
-
-    // copy input field into the extended device gauge field
-    copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
-
-    // now fill up the halos
-    profile.TPSTART(QUDA_PROFILE_COMMS);
-    out->exchangeExtendedGhost(R, redundant_comms);
-    profile.TPSTOP(QUDA_PROFILE_COMMS);
-
-    return out;
-  }
-
   DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param), m5inv_plus(Ls * Ls), m5inv_minus(Ls * Ls)
   {
     // Set up the matrix elements of m5inv

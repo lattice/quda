@@ -45,11 +45,11 @@ namespace quda {
     fillInnerSolverParam(Kparam, param);
 
     if(param.inv_type_precondition == QUDA_CG_INVERTER){
-      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
+      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profileInvertPrecon);
     }else if(param.inv_type_precondition == QUDA_MR_INVERTER){
-      K = new MR(matPrecon, matPrecon, Kparam, profile);
+      K = new MR(matPrecon, matPrecon, Kparam, profileInvertPrecon);
     }else if(param.inv_type_precondition == QUDA_SD_INVERTER){
-      K = new SD(matPrecon, Kparam, profile);
+      K = new SD(matPrecon, Kparam, profileInvertPrecon);
     }else if(param.inv_type_precondition != QUDA_INVALID_INVERTER){ // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
@@ -62,7 +62,6 @@ namespace quda {
 
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
-
 
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
