@@ -195,7 +195,7 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
-double mobius_scale = 2.0;
+double mobius_scale = 0.0;
 int eofa_pm = 1;
 int eofa_shift = -1.2345;
 int eofa_mq1 = 1.0;
@@ -777,7 +777,7 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
   auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
 
   opgroup->add_option("--mobius-scale", mobius_scale,
-                      "Set the Mobius scale (must be equal or larger than 1.0, default 1.0)");
+                      "Set the Mobius scale (must be equal or larger than 1.0, default 0.0)");
 
   opgroup->add_option("--eofa-pm", eofa_pm,
                       "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");

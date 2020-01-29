@@ -122,8 +122,13 @@ void init(int argc, char **argv) {
     {
       // b5[k], c[k] values are chosen for arbitrary values,
       // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 0.5 * (mobius_scale + 1.0);
-      inv_param.c_5[k] = 0.5 * (mobius_scale - 1.0);
+      if (mobius_scale < 1.0) {
+        inv_param.b_5[k] = b5;  
+        inv_param.c_5[k] = c5;
+      }else{
+        inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
+        inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
+      }
     }
     inv_param.eofa_pm = eofa_pm;
     inv_param.eofa_shift = eofa_shift;

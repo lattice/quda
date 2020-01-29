@@ -226,8 +226,15 @@ int main(int argc, char **argv)
     inv_param.Ls = Lsdim;
     for(int k = 0; k < Lsdim; k++) // for mobius only
     {
-      inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
-      inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
+      // b5[k], c[k] values are chosen for arbitrary values,
+      // but the difference of them are same as 1.0
+      if (mobius_scale < 1.0) {
+        inv_param.b_5[k] = b5;  
+        inv_param.c_5[k] = c5;
+      }else{
+        inv_param.b_5[k] = (mobius_scale + 1.) / 2.;
+        inv_param.c_5[k] = (mobius_scale - 1.) / 2.;
+      }
     }
     inv_param.eofa_pm = 0;
     inv_param.eofa_shift = 0.12345;
