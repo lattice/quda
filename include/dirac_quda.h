@@ -204,10 +204,10 @@ namespace quda {
        @brief Apply MdagM operator which may be optimized
     */
     virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const = 0;
-    
+
     /**
        @brief Apply the local MdagM operator: equivalent to applying zero Dirichlet
-              boundary condition to MdagM on each rank. Depending on the number of 
+              boundary condition to MdagM on each rank. Depending on the number of
               stencil steps of the fermion type, this may require additional effort
               to include the terms that hop out of the boundary and then hop back.
     */

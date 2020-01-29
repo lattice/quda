@@ -357,7 +357,7 @@ namespace quda {
 #else
         errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
 #endif
-    } else {
+      } else {
         errorQuda("Precision %d not instantiated", in.Precision());
       }
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {

@@ -376,8 +376,8 @@ namespace quda {
   }
 
   // helper for creating extended gauge fields
-  cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
-  					   bool redundant_comms, QudaReconstructType recon)
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile, bool redundant_comms,
+                                      QudaReconstructType recon)
   {
     profile.TPSTART(QUDA_PROFILE_INIT);
     GaugeFieldParam gParamEx(in);
@@ -390,17 +390,17 @@ namespace quda {
       gParamEx.x[d] += 2 * R[d];
       gParamEx.r[d] = R[d];
     }
-  
+
     auto *out = new cudaGaugeField(gParamEx);
-  
+
     // copy input field into the extended device gauge field
     copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
-  
+
     profile.TPSTOP(QUDA_PROFILE_INIT);
-  
+
     // now fill up the halos
-    out->exchangeExtendedGhost(R,profile,redundant_comms);
-  
+    out->exchangeExtendedGhost(R, profile, redundant_comms);
+
     return out;
   }
 
