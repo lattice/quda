@@ -75,10 +75,6 @@ set (QUDA_OBJS
   instantiate.cpp version.cpp )
 # cmake-format: on
 
-if(QUDA_LEGACY_DSLASH)
-  list(APPEND QUDA_OBJS dslash_improved_staggered.cu dslash_staggered.cu)
-endif()
-
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
   string(REGEX MATCH ".+\\.cu$" item_match ${item})
