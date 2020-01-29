@@ -102,7 +102,7 @@ namespace quda
     for (int mu = 0; mu < 4; mu++) {
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological
-      // measuremnts which will include the temporal direction.
+      // measurements which will include the temporal direction.
       if (mu != nu && mu != dir_ignore) {
         // RECTANGLE calculation
         // This is done in three parts. For some link U_nu(x) there are
@@ -117,7 +117,7 @@ namespace quda
         // There are 12 unique links to be fetched per direction. 3 of these
         // links (the ones that form the simple staple) can be recycled on
         // the fly. The two links immediately succeeding and preceding
-        // U_nu(x) in the nu directon are reloaded when swicthing from
+        // U_nu(x) in the nu direction are reloaded when switching from
         // +ve to -ve mu to reduce the stack frame.
 
         //--------//
