@@ -98,8 +98,7 @@ namespace quda
     setZero(&rectangle);
     int dx[4] = { };
 
-#pragma unroll
-    for (int mu = 0; mu < 4; mu++) {
+    for (int mu = 0; mu < 4; mu++) { // do not unroll loop to prevent register spilling
       // Identify directions orthogonal to the link.
       // Over-Improved stout is usually done for topological
       // measurements which will include the temporal direction.
