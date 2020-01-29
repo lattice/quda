@@ -1,7 +1,8 @@
 #include <gauge_field.h>
 #include <gauge_tools.h>
 
-namespace quda {
+namespace quda
+{
 
   void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile)
   {
@@ -21,7 +22,7 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_INIT);
     // u is an extended field we need to shrink for the Fmunu field
     int x[4];
-    for (int i=0; i<4; i++) x[i] = u.X()[i] - 2*u.R()[i];
+    for (int i = 0; i < 4; i++) x[i] = u.X()[i] - 2 * u.R()[i];
     GaugeFieldParam tensorParam(x, u.Precision(), QUDA_RECONSTRUCT_NO, 0, QUDA_TENSOR_GEOMETRY);
     tensorParam.siteSubset = QUDA_FULL_SITE_SUBSET;
     tensorParam.order = QUDA_FLOAT2_GAUGE_ORDER;
@@ -37,14 +38,17 @@ namespace quda {
     if (param.compute_qcharge || param.compute_qcharge_density) {
       profile.TPSTART(QUDA_PROFILE_TOTAL);
       profile.TPSTART(QUDA_PROFILE_INIT);
-      if (param.compute_qcharge_density && !param.qcharge_density) errorQuda("Charge density requested, but destination field not defined");
+      if (param.compute_qcharge_density && !param.qcharge_density)
+        errorQuda("Charge density requested, but destination field not defined");
       size_t size = gaugeFmunu.Volume() * gaugeFmunu.Precision();
       void *d_qDensity = param.compute_qcharge_density ? pool_device_malloc(size) : nullptr;
       profile.TPSTOP(QUDA_PROFILE_INIT);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      if (param.compute_qcharge_density) param.qcharge = quda::computeQChargeDensity(gaugeFmunu, d_qDensity);
-      else param.qcharge = quda::computeQCharge(gaugeFmunu);
+      if (param.compute_qcharge_density)
+        param.qcharge = quda::computeQChargeDensity(gaugeFmunu, d_qDensity);
+      else
+        param.qcharge = quda::computeQCharge(gaugeFmunu);
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       if (param.compute_qcharge_density) {
@@ -57,7 +61,7 @@ namespace quda {
         profile.TPSTOP(QUDA_PROFILE_FREE);
       }
     }
-    
+
     if (param.compute_energy) {
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
       double3 energy3 = quda::computeEnergy(gaugeFmunu);
@@ -69,4 +73,4 @@ namespace quda {
     }
   }
 
-}
+} // namespace quda

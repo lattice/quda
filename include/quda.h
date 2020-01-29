@@ -1266,14 +1266,14 @@ extern "C" {
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
 
   typedef struct QudaGaugeObservableParam_s {
-    QudaBoolean compute_plaquette;        /**< Whether to compute the plaquette */
-    double plaquette[3];                  /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge;          /**< Whether to compute the topological charge */
-    double qcharge;                       /**< Computed topological charge */
-    QudaBoolean compute_qcharge_density;  /**< Whether to compute the topological charge density */
-    void *qcharge_density;                /**< Pointer to host array of length volume where the q-charge density will be copied */
-    QudaBoolean compute_energy;           /**< Whether to compute the field energy */
-    double energy[3];                     /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
+    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge */
+    double qcharge;                      /**< Computed topological charge */
+    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    void *qcharge_density;      /**< Pointer to host array of length volume where the q-charge density will be copied */
+    QudaBoolean compute_energy; /**< Whether to compute the field energy */
+    double energy[3];           /**< Total, spatial and temporal field energies, respectively */
   } QudaGaugeObservableParam;
 
   /**
@@ -1283,9 +1283,9 @@ extern "C" {
    * will be used.
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
-  */
+   */
   void gaugeObservablesQuda(QudaGaugeObservableParam *param);
-  
+
   /**
    * Public function to perform color contractions of the host spinors x and y.
    * @param[in] x pointer to host data

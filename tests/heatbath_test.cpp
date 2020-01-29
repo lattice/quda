@@ -40,20 +40,15 @@ display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon),
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
 
   printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n",
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3));
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 
   return ;
-
 }
 
 QudaPrecision &cpu_prec = prec;
@@ -221,7 +216,7 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile,"")) { // Copy in loaded gauge field
+    if (strcmp(latfile, "")) { // Copy in loaded gauge field
 
       printfQuda("Loading the gauge field in %s\n", latfile);
 
@@ -264,7 +259,7 @@ int main(int argc, char **argv)
     // Do a warmup if requested
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
-        Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
+        Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
         CallUnitarizeLinks(gaugeEx);
       }
     }
@@ -340,10 +335,9 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone, total time = %g secs\n",
-	 time0);
+  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
+  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printfQuda("\nDone, total time = %g secs\n", time0);
 
   freeGaugeQuda();
 

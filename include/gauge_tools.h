@@ -9,7 +9,7 @@ namespace quda
    * @param[in,out] param Parameter struct that defines which
    * observables we are making and the resulting observables.
    * @param[in] profile TimeProfile instance used for profiling.
-  */
+   */
   void gaugeObservables(GaugeField &u, QudaGaugeObservableParam &param, TimeProfile &profile);
 
   /**

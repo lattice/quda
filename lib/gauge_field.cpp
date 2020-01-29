@@ -360,7 +360,7 @@ namespace quda {
   uint64_t GaugeField::checksum(bool mini) const {
     return Checksum(*this, mini);
   }
-  
+
   GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
 
     GaugeField *field = nullptr;

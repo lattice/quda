@@ -196,8 +196,9 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0], param.energy[1], param.energy[2], param.qcharge, time0);
-  
+  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0],
+             param.energy[1], param.energy[2], param.qcharge, time0);
+
   // Ensure host array sums to return value
   if (prec == QUDA_DOUBLE_PRECISION) {
     for (int i = 0; i < V; i++) q_charge_check += ((double *)qDensity)[i];
@@ -208,8 +209,9 @@ int main(int argc, char **argv)
   // Q charge Reduction and normalisation
   comm_allreduce(&q_charge_check);
 
-  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check, param.qcharge - q_charge_check);
-  
+  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
+             param.qcharge - q_charge_check);
+
   // Gauge Smearing Routines
   //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
