@@ -439,7 +439,7 @@ public:
       convert<InterType, RegType>(y, x, M);
 
       if (isFixed<StoreType>::value) {
-        float C = SN::store_norm<M>(y, i, parity);
+        float C = SN::template store_norm<M>(y, i, parity);
 #pragma unroll
         for (int j = 0; j < M; j++) copyFloatN(spinor[ST::cb_offset * parity + i + j * ST::stride], C * y[j]);
       } else {
