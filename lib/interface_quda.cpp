@@ -3652,8 +3652,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   }
   solverParam.updateInvertParam(*param);
 
-  // delete m;
-  // delete mSloppy;
+  delete m;
+  delete mSloppy;
 
   if (param->compute_true_res) {
     // check each shift has the desired tolerance and use sequential CG to refine
@@ -3700,15 +3700,15 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           diracSloppy.setMass(sqrt(param->offset[i]/4));
         }
 
-        // DiracMatrix *m, *mSloppy;
+        DiracMatrix *m, *mSloppy;
 
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           m = new DiracM(dirac);
           mSloppy = new DiracM(diracSloppy);
         } else {
-          // m = new DiracMdagM(dirac);
-          // mSloppy = new DiracMdagM(diracSloppy);
+          m = new DiracMdagM(dirac);
+          mSloppy = new DiracMdagM(diracSloppy);
         }
 
         // need to curry in the shift if we are not doing staggered
@@ -3783,14 +3783,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           diracSloppy.setMass(sqrt(param->offset[0]/4)); // restore just in case
         }
 
-        // delete m;
-        // delete mSloppy;
+        delete m;
+        delete mSloppy;
       }
     }
   }
-
-  delete m;
-  delete mSloppy;
 
   // restore shifts -- avoid side effects
   for(int i=0; i < param->num_offset; i++) {
