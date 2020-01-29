@@ -375,10 +375,10 @@ namespace quda {
 
   void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
   {
-    prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_BOTH_CLOVER_PREFETCH_TYPE);
+    prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream, QudaCloverPrefetchType type,
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream, CloverPrefetchType type,
                                  QudaParity parity) const
   {
     if (is_prefetch_enabled()) {
@@ -413,7 +413,7 @@ namespace quda {
       }
 
       switch (type) {
-      case QudaCloverPrefetchType::QUDA_BOTH_CLOVER_PREFETCH_TYPE:
+      case CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE:
         if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
         if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
         if (clover_parity != cloverInv_parity) {
@@ -421,15 +421,15 @@ namespace quda {
           if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
         }
         break;
-      case QudaCloverPrefetchType::QUDA_CLOVER_CLOVER_PREFETCH_TYPE:
+      case CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE:
         if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
         if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
         break;
-      case QudaCloverPrefetchType::QUDA_INVERSE_CLOVER_PREFETCH_TYPE:
+      case CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE:
         if (cloverInv_parity) cudaMemPrefetchAsync(cloverInv_parity, bytes_parity, dev_id, stream);
         if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
         break;
-      default: errorQuda("Invalid QudaCloverPrefetchType.");
+      default: errorQuda("Invalid CloverPrefetchType.");
       }
     }
   }

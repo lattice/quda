@@ -127,7 +127,7 @@ namespace quda {
   void DiracTwistedClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
   {
     Dirac::prefetch(mem_space, stream);
-    clover.prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_CLOVER_CLOVER_PREFETCH_TYPE);
+    clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
   void DiracTwistedClover::createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
@@ -349,10 +349,10 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
 
     if (symmetric) {
-      clover.prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_INVERSE_CLOVER_PREFETCH_TYPE);
+      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
     } else {
-      clover.prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
-      clover.prefetch(mem_space, stream, QudaCloverPrefetchType::QUDA_CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
+      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
+      clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
     }
   }
 } // namespace quda
