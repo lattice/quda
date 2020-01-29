@@ -132,6 +132,7 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   add_deflation_option_group(app);
   // add_multigrid_option_group(app);
+  add_eofa_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
