@@ -7,7 +7,6 @@
 #include <complex.h>
 
 #include <quda.h>
-#include <quda_mobius.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>
 #include <comm_quda.h>
