@@ -65,8 +65,8 @@ display_test_info()
              dimPartitioned(3));
 
   printfQuda("preconditioner precision      = %s.\n", get_prec_str(prec_precondition));
-  // printfQuda("maxiter_inner_preconditioning = %02d.\n", maxiter_inner_preconditioning);
-  // printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
+  printfQuda("maxiter_inner_preconditioning = %02d.\n", niter_precondition);
+  printfQuda("M\\\"obius scale                = %.4f.\n", mobius_scale);
 
   return;
 }
@@ -294,8 +294,8 @@ int main(int argc, char **argv)
     
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = niter_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;

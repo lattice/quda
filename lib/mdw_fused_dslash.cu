@@ -69,6 +69,8 @@ namespace quda
 
       real m_scale = 1.; // scale factor for the matrix
 
+      bool small_kappa = false;
+
       MdwfFusedDslashType type;
       FusedDslashArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                      const ColorSpinorField &x, double m_f_, double m_5_, const Complex *b_5, const Complex *c_5,
@@ -106,16 +108,22 @@ namespace quda
         c = c_5[0].real();
         kappa = -(c * (4. + m_5) - 1.) / (b * (4. + m_5) + 1.); // This is actually -kappa in my(Jiqun Tu) notes.
 
-        if (kappa * kappa < 1e-12) { errorQuda("kappa(=%16.12e) too small.\n", kappa); }
+        if (kappa * kappa < 1e-6) { small_kappa = true; }
 
         fac_inv
           = 0.5 / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
         case dslash4_dslash5pre_dslash5inv:
         case dslash4dag_dslash5predag_dslash5invdag:
-          m_scale = b + c / kappa;
-          alpha = 1.;
-          beta = -1. / (1. + (kappa * b) / c);
+          if (small_kappa) {
+            m_scale = b;
+            alpha = (c - b * kappa) / (2. * b);
+            beta = 1.;
+          }else{
+            m_scale = b + c / kappa;
+            alpha = 1.;
+            beta = -1. / (1. + (kappa * b) / c);
+          }
           break;
         case dslash4_dslash5inv_dslash5invdag:
           m_scale = -0.25 / ((b * (4. + m_5) + 1.) * (b * (4. + m_5) + 1.)); // -kappa_b^2
@@ -250,9 +258,17 @@ namespace quda
       half *sm_a_black = sm_a + M * M_sm;
 
       if (type_ == 0) {
-        construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+        if(arg.small_kappa){
+          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false 
+        }else{
+          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+        }
       } else if (type_ == 2) {
-        construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+        if(arg.small_kappa){
+          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+        }else{
+          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = false
+        }
       } else if (type_ == 1) {
         construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
       } else if (type_ == 3) {
