@@ -119,7 +119,7 @@ namespace quda
             m_scale = b;
             alpha = (c - b * kappa) / (2. * b);
             beta = 1.;
-          }else{
+          } else {
             m_scale = b + c / kappa;
             alpha = 1.;
             beta = -1. / (1. + (kappa * b) / c);
@@ -258,15 +258,15 @@ namespace quda
       half *sm_a_black = sm_a + M * M_sm;
 
       if (type_ == 0) {
-        if(arg.small_kappa){
-          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false 
-        }else{
+        if (arg.small_kappa) {
+          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+        } else {
           construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
         }
       } else if (type_ == 2) {
-        if(arg.small_kappa){
+        if (arg.small_kappa) {
           construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
-        }else{
+        } else {
           construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = false
         }
       } else if (type_ == 1) {
