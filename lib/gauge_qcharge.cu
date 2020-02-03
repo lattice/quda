@@ -54,7 +54,15 @@ namespace quda
       return TuneKey(meta.VolString(), typeid(*this).name(), meta.AuxString());
     }
 
-    long long flops() const { return 2 * arg.threads * (3 * 198 + 9); }
+    long long flops() const
+    {
+      auto mm_flops = 8 * Arg::nColor * Arg::nColor * (Arg::nColor - 2);
+      auto traceless_flops = (Arg::nColor * Arg::nColor + Arg::nColor + 1);
+      auto energy_flops = 6 * (mm_flops + traceless_flops + Arg::nColor);
+      auto q_flops = 3*mm_flops + 2*Arg::nColor + 2;
+      return 2ll * arg.threads * (energy_flops + q_flops);
+    }
+
     long long bytes() const { return 2 * arg.threads * (6 * arg.f.Bytes() + Arg::density * sizeof(typename Arg::Float)); }
   }; // QChargeCompute
 
