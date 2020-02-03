@@ -185,7 +185,7 @@ int main(int argc, char **argv)
   void *qDensity = malloc(array_size);
   // start the timer
   double time0 = -((double)clock());
-  QudaGaugeObservableParam param;
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
   param.qcharge_density = qDensity;

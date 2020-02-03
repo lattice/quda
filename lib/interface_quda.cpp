@@ -5427,10 +5427,8 @@ void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval)
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  QudaGaugeObservableParam param;
-  param.compute_plaquette = QUDA_BOOLEAN_FALSE;
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservablesQuda(&param);
@@ -5463,10 +5461,8 @@ void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval)
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  QudaGaugeObservableParam param;
-  param.compute_plaquette = QUDA_BOOLEAN_FALSE;
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservablesQuda(&param);
@@ -5499,10 +5495,8 @@ void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, i
   GaugeFieldParam gParam(*gaugeSmeared);
   auto *cudaGaugeTemp = new cudaGaugeField(gParam);
 
-  QudaGaugeObservableParam param;
-  param.compute_plaquette = QUDA_BOOLEAN_FALSE;
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservablesQuda(&param);
@@ -5543,10 +5537,9 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   GaugeField *in = gaugeSmeared;
   GaugeField *out = gaugeAux;
 
-  QudaGaugeObservableParam param;
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
   param.compute_plaquette = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
-  param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
 
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservables(*in, param, profileWFlow);
@@ -5793,6 +5786,8 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
 
   profileGaugeObs.TPSTART(QUDA_PROFILE_INIT);
+  checkGaugeObservableParam(param);
+
   cudaGaugeField *gauge = nullptr;
   if (!gaugeSmeared) {
     if (!extendedGaugeResident) extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGaugeObs);

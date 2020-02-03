@@ -824,7 +824,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(is_staggered, QUDA_BOOLEAN_NO);
+  P(is_staggered, QUDA_BOOLEAN_FALSE);
 #else
   P(is_staggered, QUDA_BOOLEAN_INVALID);
 #endif
@@ -835,6 +835,34 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 }
 
+
+#if defined INIT_PARAM
+ QudaGaugeObservableParam newQudaGaugeObservableParam(void) {
+   QudaGaugeObservableParam ret;
+#elif defined CHECK_PARAM
+   static void checkGaugeObservableParam(QudaGaugeObservableParam *param) {
+#else
+void printQudaGaugeObservableParam(QudaGaugeObservableParam *param) {
+  printfQuda("QUDA Gauge-Observable Parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(su_project, QUDA_BOOLEAN_FALSE);
+  P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
+  P(qcharge_density, nullptr);
+#else
+  P(su_project, QUDA_BOOLEAN_INVALID);
+  P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 
 // clean up
 

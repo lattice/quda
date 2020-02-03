@@ -673,7 +673,16 @@ extern "C" {
 
   } QudaMultigridParam;
 
-
+  typedef struct QudaGaugeObservableParam_s {
+    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
+    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
+    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
+    double qcharge;                      /**< Computed topological charge */
+    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    void *qcharge_density;               /**< Pointer to host array of length volume where the q-charge density will be copied */
+  } QudaGaugeObservableParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -834,6 +843,15 @@ extern "C" {
   QudaEigParam newQudaEigParam(void);
 
   /**
+   * A new QudaGaugeObservableParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   */
+  QudaGaugeObservableParam newQudaGaugeObservableParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -856,6 +874,12 @@ extern "C" {
    * @param param The QudaEigParam whose elements we are to print.
    */
   void printQudaEigParam(QudaEigParam *param);
+
+  /**
+   * Print the members of QudaGaugeObservableParam.
+   * @param param The QudaGaugeObservableParam whose elements we are to print.
+   */
+  void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1264,16 +1288,6 @@ extern "C" {
    * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
    */
   void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
-
-  typedef struct QudaGaugeObservableParam_s {
-    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
-    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
-    double qcharge;                      /**< Computed topological charge */
-    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
-    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
-    void *qcharge_density;               /**< Pointer to host array of length volume where the q-charge density will be copied */
-  } QudaGaugeObservableParam;
 
   /**
    * @brief Calculates a variety of gauge-field observables.  If a
