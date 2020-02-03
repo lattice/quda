@@ -248,7 +248,6 @@ int main(int argc, char **argv)
     param.compute_plaquette = QUDA_BOOLEAN_TRUE;
     param.compute_qcharge = QUDA_BOOLEAN_TRUE;
     param.compute_qcharge_density = QUDA_BOOLEAN_FALSE;
-    param.compute_energy = QUDA_BOOLEAN_FALSE;
 
     gaugeObservablesQuda(&param);
     printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);

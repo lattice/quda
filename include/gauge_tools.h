@@ -149,25 +149,23 @@ namespace quda
   void computeFmunu(GaugeField &Fmunu, const GaugeField &gauge);
 
   /**
-     @brief Compute the topological charge
-     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @return double The total topological charge
+     @brief Compute the topological charge and field energy
+     @param[out] energy The total, spatial, and temporal field energy
+     @param[out] qcharge The total topological charge
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a
+     smeared configuration
    */
-  double computeQCharge(const GaugeField &Fmunu);
+  void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu);
 
   /**
-     @brief Compute the field energy
-     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @return double3 The total, spatial, and temporal field energy
+     @brief Compute the topological charge, field energy and the
+     topological charge density per lattice site
+     @param[out] energy The total, spatial, and temporal field energy
+     @param[out] qcharge The total topological charge
+     @param[out] qdensity The topological charge at each lattice site
+     @param[in] Fmunu The Fmunu tensor, usually calculated from a
+     smeared configuration
   */
-  double3 computeEnergy(const GaugeField &Fmunu);
-
-  /**
-     @brief Compute the topological charge density per lattice site
-     @param[in] Fmunu The Fmunu tensor, usually calculated from a smeared configuration
-     @param[out] qDensity The topological charge at each lattice site
-     @return double The total topological charge
-  */
-  double computeQChargeDensity(const GaugeField &Fmunu, void *result);
+  void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu);
 
 } // namespace quda

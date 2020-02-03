@@ -189,7 +189,6 @@ int main(int argc, char **argv)
   param.compute_qcharge = QUDA_BOOLEAN_TRUE;
   param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
   param.qcharge_density = qDensity;
-  param.compute_energy = QUDA_BOOLEAN_TRUE;
 
   gaugeObservablesQuda(&param);
 

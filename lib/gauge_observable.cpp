@@ -16,7 +16,7 @@ namespace quda
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // no point constructing Fmunu unless we are going to use it
-    if (!param.compute_qcharge && !param.compute_qcharge_density && !param.compute_energy) return;
+    if (!param.compute_qcharge && !param.compute_qcharge_density) return;
 
     // create the Fmunu field
     profile.TPSTART(QUDA_PROFILE_INIT);
@@ -45,10 +45,12 @@ namespace quda
       profile.TPSTOP(QUDA_PROFILE_INIT);
 
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
+
       if (param.compute_qcharge_density)
-        param.qcharge = quda::computeQChargeDensity(gaugeFmunu, d_qDensity);
+        computeQChargeDensity(param.energy, param.qcharge, d_qDensity, gaugeFmunu);
       else
-        param.qcharge = quda::computeQCharge(gaugeFmunu);
+        computeQCharge(param.energy, param.qcharge, gaugeFmunu);
+
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
       if (param.compute_qcharge_density) {
@@ -62,15 +64,6 @@ namespace quda
       }
     }
 
-    if (param.compute_energy) {
-      profile.TPSTART(QUDA_PROFILE_COMPUTE);
-      double3 energy3 = quda::computeEnergy(gaugeFmunu);
-      // Volume normalised in kernel reduction
-      param.energy[0] = energy3.x;
-      param.energy[1] = energy3.y;
-      param.energy[2] = energy3.z;
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    }
   }
 
 } // namespace quda

@@ -33,7 +33,7 @@ namespace quda
     void apply(const cudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
-        arg.result_h[0] = 0.;
+	for (int i=0; i<4; i++) ((double*)arg.result_h)[i] = 0.0;
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
         using namespace jitify::reflection;
@@ -55,55 +55,53 @@ namespace quda
     }
 
     long long flops() const { return 2 * arg.threads * (3 * 198 + 9); }
-    long long bytes() const { return 2 * arg.threads * ((6 * 18) + Arg::density) * sizeof(typename Arg::Float); }
+    long long bytes() const { return 2 * arg.threads * (6 * arg.f.Bytes() + Arg::density * sizeof(typename Arg::Float)); }
   }; // QChargeCompute
 
   template <typename Float, int nColor, QudaReconstructType recon> struct QCharge {
-    QCharge(const GaugeField &Fmunu, double &charge, void *qDensity, bool density)
+    QCharge(const GaugeField &Fmunu, double energy[3], double &qcharge, void *qdensity, bool density)
     {
       if (!Fmunu.isNative()) errorQuda("Topological charge computation only supported on native ordered fields");
 
       if (density) {
-        QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qDensity);
+        QChargeArg<Float, nColor, recon, true> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
 
-        checkCudaError();
-        comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0];
+        comm_allreduce_array((double *)arg.result_h, 3);
+        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
+        qcharge = ((double*)arg.result_h)[2];
       } else {
-        QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qDensity);
+        QChargeArg<Float, nColor, recon, false> arg(Fmunu, (Float*)qdensity);
         QChargeCompute<decltype(arg)> qChargeCompute(arg, Fmunu);
         qChargeCompute.apply(0);
         qudaDeviceSynchronize();
 
-        checkCudaError();
-        comm_allreduce((double *)arg.result_h);
-        charge = arg.result_h[0];
+        comm_allreduce_array((double *)arg.result_h, 3);
+        for (int i=0; i<2; i++) energy[i+1] = ((double*)arg.result_h)[i] / (2.0*arg.threads*comm_size());
+        qcharge = ((double*)arg.result_h)[2];
       }
+
+      energy[0] = energy[1] + energy[2];
     }
   };
 
-  double computeQCharge(const GaugeField &Fmunu)
+  void computeQCharge(double energy[3], double &qcharge, const GaugeField &Fmunu)
   {
-    double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    instantiate<QCharge,ReconstructNone>(Fmunu, charge, nullptr, false);
+    instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, nullptr, false);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
-    return charge;
   }
 
-  double computeQChargeDensity(const GaugeField &Fmunu, void *qDensity)
+  void computeQChargeDensity(double energy[3], double &qcharge, void *qdensity, const GaugeField &Fmunu)
   {
-    double charge = 0.0;
 #ifdef GPU_GAUGE_TOOLS
-    instantiate<QCharge,ReconstructNone>(Fmunu, charge, qDensity, true);
+    instantiate<QCharge,ReconstructNone>(Fmunu, energy, qcharge, qdensity, true);
 #else
     errorQuda("Gauge tools are not built");
 #endif // GPU_GAUGE_TOOLS
-    return charge;
   }
 } // namespace quda
