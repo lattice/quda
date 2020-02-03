@@ -209,7 +209,7 @@ static TimeProfile profileWuppertal("wuppertalQuda");
 //!<Profiler for gaussQuda
 static TimeProfile profileGauss("gaussQuda");
 
-//!< Profiler for tensorQuda
+//!< Profiler for gaugeObservableQuda
 static TimeProfile profileGaugeObs("gaugeObservablesQuda");
 
 //!< Profiler for APEQuda
@@ -5544,8 +5544,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
   if (getVerbosity() >= QUDA_SUMMARIZE) {
     gaugeObservables(*in, param, profileWFlow);
     printfQuda("flow t, plaquette, E_tot, E_spatial, E_temporal, Q charge\n");
-    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param.plaquette[0],
-               param.energy[0], param.energy[1], param.energy[2], param.qcharge);
+    printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", 0.0, param.plaquette[0], param.energy[0], param.energy[1],
+               param.energy[2], param.qcharge);
   }
 
   for (unsigned int i = 0; i < n_steps; i++) {
@@ -5559,8 +5559,8 @@ void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval
 
     if ((i + 1) % meas_interval == 0 && getVerbosity() >= QUDA_SUMMARIZE) {
       gaugeObservables(*out, param, profileWFlow);
-      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param.plaquette[0],
-                 param.energy[0], param.energy[1], param.energy[2], param.qcharge);
+      printfQuda("%le %.16e %+.16e %+.16e %+.16e %+.16e\n", step_size * (i + 1), param.plaquette[0], param.energy[0],
+                 param.energy[1], param.energy[2], param.qcharge);
     }
   }
 

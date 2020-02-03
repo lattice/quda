@@ -835,14 +835,16 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
 }
 
-
 #if defined INIT_PARAM
- QudaGaugeObservableParam newQudaGaugeObservableParam(void) {
-   QudaGaugeObservableParam ret;
+QudaGaugeObservableParam newQudaGaugeObservableParam(void)
+{
+  QudaGaugeObservableParam ret;
 #elif defined CHECK_PARAM
-   static void checkGaugeObservableParam(QudaGaugeObservableParam *param) {
+static void checkGaugeObservableParam(QudaGaugeObservableParam *param)
+{
 #else
-void printQudaGaugeObservableParam(QudaGaugeObservableParam *param) {
+void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
+{
   printfQuda("QUDA Gauge-Observable Parameters:\n");
 #endif
 

@@ -464,7 +464,7 @@ namespace {
 
     instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
 #else
-    errorQuda("Gauge tools are been built");
+    errorQuda("Gauge tools have not been built");
 #endif
   }
 
