@@ -668,6 +668,13 @@ namespace quda {
 
     /** @brief Restores the LatticeField */
     virtual void restore() const { errorQuda("Not implemented"); }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields to the current device or to the CPU.
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const { ; }
   };
   
   /**

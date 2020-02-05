@@ -295,4 +295,11 @@ namespace quda {
     return steps; 
   }
 
+  void Dirac::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    if (gauge) gauge->prefetch(mem_space, stream);
+    if (tmp1) tmp1->prefetch(mem_space, stream);
+    if (tmp2) tmp2->prefetch(mem_space, stream);
+  }
+
 } // namespace quda
