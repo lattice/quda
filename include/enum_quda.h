@@ -523,6 +523,12 @@ extern "C" {
     QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
   } QudaContractGamma;
 
+  typedef enum QudaWFlowType_s {
+    QUDA_WFLOW_TYPE_WILSON,
+    QUDA_WFLOW_TYPE_SYMANZIK,
+    QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaWFlowType;
+
   // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {
     QUDA_CUSOLVE_EXTLIB,

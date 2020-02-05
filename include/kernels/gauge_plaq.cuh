@@ -54,7 +54,7 @@ namespace quda {
 
   template<int blockSize, typename Arg>
   __global__ void computePlaq(Arg arg){
-    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int parity = threadIdx.y;
 
     double2 plaq = make_double2(0.0,0.0);
