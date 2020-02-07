@@ -14,6 +14,7 @@
 #include <type_traits>
 
 #include <register_traits.h>
+#include <convert.h>
 #include <complex_quda.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>

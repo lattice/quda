@@ -179,12 +179,11 @@ namespace quda {
     void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
     {
-
       checkPrecision(x, y, z, w, v);
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
           warningQuda("Device blas on non-native fields is not supported\n");
           return;
         }
@@ -249,6 +248,14 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(FLOAT8)
+            const int M = 3;
+            nativeBlas<float8, short8, short8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
+                a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
             const int M = 3;
@@ -280,6 +287,14 @@ namespace quda {
 #if defined(GPU_MULTIGRID) // FIXME eventually we should get rid of this and use float4 ordering
             const int M = 12;
             nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
+                                                                                                 x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(FLOAT8)
+            const int M = 3;
+            nativeBlas<float8, char8, char8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
                                                                                                  x.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());

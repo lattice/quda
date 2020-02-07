@@ -355,7 +355,7 @@ namespace quda {
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);
@@ -441,6 +441,15 @@ namespace quda {
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(FLOAT8)
+            const int M = 3; // determines how much work per thread to do
+            value
+                = nativeReduce<doubleN, ReduceType, float8, short8, short8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                    a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
           } else if (x.Nspin() == 1) { // staggered
 #if defined(NSPIN1)
             const int M = 3; // determines how much work per thread to do
@@ -473,6 +482,15 @@ namespace quda {
             const int M = 12; // determines how much work per thread to do
             value
               = nativeReduce<doubleN, ReduceType, float2, char2, char2, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
+                a, b, x, y, z, w, v, y.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(FLOAT8)
+            const int M = 3;
+            value
+              = nativeReduce<doubleN, ReduceType, float8, char8, char8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, x, y, z, w, v, y.Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
@@ -527,14 +545,12 @@ namespace quda {
     doubleN mixed_reduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
     {
-
       checkPrecision(x, y, w, v);
 
       doubleN value;
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()
-            && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
+        if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
           warningQuda("Device reductions on non-native fields is not supported\n");
           doubleN value;
           ::quda::zero(value);

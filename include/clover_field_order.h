@@ -8,6 +8,7 @@
  */
 
 #include <register_traits.h>
+#include <convert.h>
 #include <clover_field.h>
 #include <complex_quda.h>
 #include <thrust_helper.cuh>
