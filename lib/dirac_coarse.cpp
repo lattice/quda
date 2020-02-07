@@ -373,6 +373,13 @@ namespace quda {
     }
   }
 
+  void DiracCoarse::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    if (Y_d) Y_d->prefetch(mem_space, stream);
+    if (X_d) X_d->prefetch(mem_space, stream);
+  }
+
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
   {
     /* do nothing */
@@ -585,4 +592,10 @@ namespace quda {
     }
   }
 
+  void DiracCoarsePC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    if (Xinv_d) Xinv_d->prefetch(mem_space, stream);
+    if (Yhat_d) Yhat_d->prefetch(mem_space, stream);
+  }
 }

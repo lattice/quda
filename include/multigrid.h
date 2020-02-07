@@ -334,12 +334,17 @@ public:
     void destroyCoarseSolver();
 
     /**
-       This method verifies the correctness of the MG method.  It checks:
+       @brief Verify the correctness of the MG method, optionally recursively
+       starting from the top down.
+       @details This method verifies the correctness of the MG method.  It checks:
        1. Null-space vectors are exactly preserved: v_k = P R v_k
        2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c
        3. The emulated coarse Dirac operator matches the native one: D_c = R D P
+       4. The preconditioned operator was correctly formulated: \hat{D}_c - X^{-1} D_c
+       5. The normal operator is indeed normal: im(<x|D^\dag D|x>) < epsilon
+       @param recursively[in] Whether or not to recursively verify coarser levels, default false
      */
-    void verify();
+    void verify(bool recursively = false);
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector
