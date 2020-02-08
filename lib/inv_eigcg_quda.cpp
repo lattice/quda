@@ -149,7 +149,8 @@ namespace quda {
             csParam.create        = QUDA_ZERO_FIELD_CREATE;
 	    csParam.is_composite  = false;
 	    csParam.composite_dim = 1;
-            csParam.setPrecision(solver_param.precision_sloppy);
+            //csParam.setPrecision(solver_param.precision_sloppy);
+            csParam.setPrecision(solver_param.precision);
             //
             Az = MakeSharedPtr(csParam);
 
@@ -171,7 +172,8 @@ namespace quda {
             }
 
             //csParam.mem_type      = solver_param.pipeline != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
-            csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);
+            //csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);
+            csParam.setPrecision(solver_param.precision);
             csParam.composite_dim = (2*k);
             //Create a search vector set:
             V2k = MakeSharedPtr(csParam);
@@ -208,6 +210,7 @@ namespace quda {
               //
               csParam.is_composite  = false;
               csParam.composite_dim = 1;
+              csParam.setPrecision(solver_param.precision);
               hAz = MakeSharedPtr(csParam);
             }
 
@@ -309,8 +312,9 @@ namespace quda {
          MatrixXd Q2k(RealMatrix::Identity(m, 2*k));
 
          HouseholderQR<RealMatrix> eigenVecs2k_qr( eigenVecs.block(0, 0, m, 2*k) );
-
          Q2k.applyOnTheLeft( eigenVecs2k_qr.householderQ() );
+         //ColPivHouseholderQR<RealMatrix> eigenVecs2k_qr( eigenVecs.block(0, 0, m, 2*k) );
+         //Q2k.applyOnTheLeft(eigenVecs2k_qr.householderQ().setLength(eigenVecs2k_qr.nonzeroPivots()));
 
          //3. Construct H = QH*Tm*Q :
          RealMatrix H2k2 = Q2k.transpose()*Tm*Q2k;
@@ -492,7 +496,7 @@ namespace quda {
     inner.maxiter          = outer.maxiter;
     inner.deflate          = false;
     
-    inner.delta            = outer.delta;
+    inner.delta            =  1e-2; //outer.delta;
     inner.precision        = outer.precision; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
 
@@ -741,7 +745,9 @@ namespace quda {
      std::vector<ColorSpinorField*> vj_(evecs.begin(),evecs.begin()+i+1);
      std::vector<ColorSpinorField*> av_(vk(0));
 
-     matDefl(vk[0], *evecs[i]);
+     //matDefl(vk[0], *evecs[i]);
+     *args.Az = *evecs[i];
+     mat(vk[0], *args.Az); 
 
      blas::cDotProduct(alpha.get(), vj_, av_);
 
@@ -848,14 +854,19 @@ namespace quda {
 
        if( do_residual_check ) //if tol=0.0 then disable relative residual norm check
        {
-       	  *r_sloppy = *r;
-  	  matDefl(vk[0], *r_sloppy);
+       	  //*r_sloppy = *r;
+  	  //matDefl(vk[0], *r_sloppy);
+          *args.Az = *r;
+          mat(vk[0], *args.Az);
 
-	  double3 dotnorm = cDotProductNormA(*r_sloppy, vk[0]);
+	  //double3 dotnorm = cDotProductNormA(*r_sloppy, vk[0]);
+          double3 dotnorm = cDotProductNormA(*r, vk[0]);
 	  double curr_eval = dotnorm.x / dotnorm.z;
 
-	  blas::xpay(vk[0], -curr_eval, *r_sloppy);
-	  relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
+	  //blas::xpay(vk[0], -curr_eval, *r_sloppy);
+	  //relerr = sqrt(norm2(*r_sloppy) / dotnorm.z);
+          blas::xpay(vk[0], -curr_eval, *r);
+          relerr = sqrt(norm2(*r) / dotnorm.z);
 	  if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Eigenvalue: %1.12e Residual: %1.12e\n", curr_eval, relerr);
        }
 
@@ -989,7 +1000,8 @@ namespace quda {
     double r2 = blas::xmyNorm(b, r);
 
     if( K ) {//apply preconditioner
-      ColorSpinorField &rPre = *r_pre;
+  
+    ColorSpinorField &rPre = *r_pre;
       ColorSpinorField &pPre = *p_pre;
 
       blas::copy(rPre, r);
@@ -1216,7 +1228,8 @@ namespace quda {
     int k = 0;
 
     const double local_stop = x.Precision() == QUDA_DOUBLE_PRECISION ? b2*param.tol*param.tol :  (x.Precision() == QUDA_SINGLE_PRECISION ?  b2*1e-12 : b2*1e-8);
-    const double local_rel_stop = 1e-10;
+    
+    const double local_rel_stop = param.delta;
 
     double rel_r2 = nu / b2;
 
@@ -1280,7 +1293,7 @@ namespace quda {
         memcpy(reinterpret_cast<double*>(&local_buffer), recvbuff.get(), 4*sizeof(double));
       }
 
-      rel_r2 = sqrt(nu / b2);
+      rel_r2 = nu / b2;
 
       k++;
 
@@ -1338,12 +1351,13 @@ namespace quda {
   int IncEigCG::initCGsolve(ColorSpinorField &x, ColorSpinorField &b) {
     int k = 0;
     //Start init CG iterations:
-    fillInitCGSolverParam2(Kparam, param);
+    fillInitCGSolverParam(Kparam, param);
 
-    const double full_tol    = Kparam.tol;
-    const double tol_restart_= 5e-3;
-    const double inc_tol_    = 1e-2;
-    Kparam.tol         = tol_restart_;//Kparam.tol_restart;
+    const double full_tol        = param.tol;// check for 5e-8
+    const int max_restart_num    = param.max_restart_num;
+    const double inc_tol_[4]     = {1e-3, 1e-2, 1e-1, 1e-1};
+    Kparam.tol                   = param.tol_restart;//Kparam.tol_restart;
+    Kparam.deflate               = false;
 
     ColorSpinorParam csParam(x);
 
@@ -1353,8 +1367,6 @@ namespace quda {
     ColorSpinorField &tmp2  = *tmpp2;
     ColorSpinorField *rp2 = ColorSpinorField::Create(csParam);//full precision residual
     ColorSpinorField &r = *rp2;
-    ColorSpinorField *xp_2 = ColorSpinorField::Create(csParam);
-    ColorSpinorField &x2 = *xp_2;    
 
     csParam.setPrecision(param.precision_ritz);
 
@@ -1369,31 +1381,34 @@ namespace quda {
     //xProj = x;
     rProj = b;
     //launch initCG:
-    const int max_restart_num = 3;
-
     while((Kparam.tol >= full_tol) && (restart_idx < max_restart_num)) {
       restart_idx += 1;
 
+      if (restart_idx > 1) warningQuda("Restart :: id %d.\n", restart_idx);
+
       Deflate(xProj, rProj);
-      x2 = xProj;
+      x = xProj;
     
       if(!K)
 	K = std::make_shared<CG>(mat, matPrecon, matPrecon, Kparam, profile);      
       else	      
         K.reset( new CG(mat, matPrecon, matPrecon,  Kparam, profile));
-      (*K)(x2, b);
+      (*K)(x, b);
 
-      mat(r, x2, tmp2);
+      mat(r, x, tmp2);
       blas::xpay(b, -1.0, r);
 
-      xProj = x2;
+      xProj = x;
       rProj = r;
 
       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
-      Kparam.tol *= inc_tol_; //param.inc_tol;
+      Kparam.tol *= inc_tol_[restart_idx - 1]; //param.inc_tol;
 
+      if(Kparam.tol <= full_tol && (restart_idx < max_restart_num)) restart_idx = (max_restart_num-1); // durty hack
       if(restart_idx == (max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
+
+      warningQuda("Reset tol to %le and full  tol is %le\n", Kparam.tol, full_tol);
 
       param.secs   += Kparam.secs;
     }
@@ -1407,12 +1422,9 @@ namespace quda {
 
     delete rp2;
     delete tmpp2;
+    delete xp_proj;
+    delete rp_proj2;
 
-    {
-      delete xp_proj;
-      delete rp_proj2;
-      delete xp_2;
-    }
     return k;
   }
 
@@ -1530,7 +1542,7 @@ namespace quda {
          if( !dcg_cycle &&  (local_eigcg_args->restarts >= 1) && (param.eig_param.nConv < param.eig_param.nEv) ) Verify();
        }
 
-     } while ((r2 > stop && logical_rhs_id < 2) && mixed_prec);
+     } while ((r2 > stop && logical_rhs_id < max_eigcg_cycles) /*&& mixed_prec*/);
 
      //if (mixed_prec && max_eigcg_cycles > logical_rhs_id) {
        //printfQuda("Reset maximum eigcg cycles to %d (was %d)\n", logical_rhs_id, max_eigcg_cycles);
@@ -1546,10 +1558,11 @@ namespace quda {
      }
 
      if(param.eig_param.nConv == param.eig_param.nEv) {
+       if( getVerbosity() == QUDA_DEBUG_VERBOSE ) { blas::zero(out); initCGsolve(out, in);}
        printfQuda("\nRequested to reserve %d eigenvectors with max tol %le.\n", param.eig_param.nEv, param.eig_param.tol);
        Reduce(param.eig_param.tol, param.eig_param.nEv);
        param.eig_param.is_complete = QUDA_BOOLEAN_TRUE;
-       initCGsolve(out, in);       
+       if( getVerbosity() == QUDA_DEBUG_VERBOSE ) { blas::zero(out); initCGsolve(out, in);}       
      }
 
      return;

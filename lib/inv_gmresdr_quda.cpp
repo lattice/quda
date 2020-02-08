@@ -179,7 +179,9 @@ namespace quda {
      Vector em = VectorXcd::Zero(args.m);
 
      em(args.m-1) = norm( args.H(args.m, args.m-1) );
-     Gk.col(args.m-1) += cH.colPivHouseholderQr().solve(em);
+     //Gk.col(args.m-1) += cH.colPivHouseholderQr().solve(em);
+     //Gk.col(args.m-1) += cH.fullPivHouseholderQr().solve(em);
+     Gk.col(args.m-1) += cH.householderQr().solve(em);
 
      ComplexEigenSolver<DenseMatrix> es( Gk );
      harVecs = es.eigenvectors();
@@ -383,6 +385,7 @@ namespace quda {
    return;
  }
 
+//#define CAOPT_ORTH
 
 int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = false)
  {
@@ -400,12 +403,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
      args.sn.setZero();
    }
 
+   Complex c0 = args.c[0];
+
+#ifdef CAOPT_ORTH
    //Advanced Ortho objects:
    MatrixXcd R (MatrixXcd::Identity(args.m+1, args.m+1) );
    MatrixXcd T (MatrixXcd::Identity(args.m+1, args.m+1) );
    RowMajorDenseMatrix L (args.m, 2);
-
-   Complex c0 = args.c[0];
 
    while( j < args.m )
    {
@@ -485,7 +489,41 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    blas::ax(1.0 / R(args.m, args.m).real(), vm[args.m]);
    // set m+1 entry in the last col of the Hessenberg
    args.H(args.m, args.m-1) = R(args.m, args.m);
+#else
+   while( j < args.m ) 
+   {
+     if(K) {
+       ColorSpinorField &inPre  = (param.precision_precondition != param.precision_sloppy) ? *r_pre : vm[j];
+       ColorSpinorField &outPre = (param.precision_precondition != param.precision_sloppy) ? *p_pre : zm[j];
 
+       if(param.precision_precondition != param.precision_sloppy) inPre = vm[j];
+       zero(outPre);
+       pushVerbosity(param.verbosity_precondition);
+       (*K)( outPre ,inPre );
+       popVerbosity();
+
+       if(param.precision_precondition != param.precision_sloppy) zm[j] = outPre;
+     }
+
+     matSloppy(vm[j+1], zm[j], tmp);
+
+     args.H(0, j) = cDotProduct(vm[0], vm[j+1]);
+     caxpy(-args.H(0, j), vm[0], vm[j+1]);
+
+     for(int i = 1; i <= j; i++)
+     {
+        args.H(i, j) = cDotProduct(vm[i], vm[j+1]);
+        caxpy(-args.H(i, j), vm[i], vm[j+1]);
+     }
+
+     args.H(j+1, j) = Complex(sqrt(norm2(vm[j+1])), 0.0);
+     blas::ax( 1.0 / args.H(j+1, j).real(), vm[j+1]);
+
+     if(do_givens && j > start_idx) args.Givens(j);
+
+     j += 1;
+   }
+#endif
    args.LeastSquaresSolve(c0, *r_sloppy, *Vm, do_givens);
 
    return (j-start_idx);
@@ -589,7 +627,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
     if (use_heavy_quark_res)  heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
 
-    int restart_idx = 0, j = 0, check_interval = 4;
+    int restart_idx = 0, j = 0, check_interval = 8;
 
     DenseMatrix Gm = DenseMatrix::Zero(param.eig_param.nEv+1, param.eig_param.nEv+1);
 
@@ -603,7 +641,7 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
       bool   do_clean_restart = false;
       double ext_r2 = 1.0;
 
-      if((restart_idx+1) % check_interval) {
+      if((restart_idx+1) % check_interval == 0) {
         mat(y, e);
         ext_r2 = xmyNorm(r, y);
 
@@ -674,6 +712,8 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    param.true_res = sqrt(xmyNorm(b, r) / b2);
 
    PrintSummary("FGMResDR:", tot_iters, r2, b2, stop, param.tol_hq);
+
+   printfQuda("Done with %d cycles..", restart_idx);
 
    blas::flops = 0;
    mat.flops();
