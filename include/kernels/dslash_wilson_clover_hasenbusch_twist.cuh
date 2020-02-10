@@ -27,6 +27,8 @@ namespace quda
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 1/2 comes from clover normalization we need to correct for
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 
