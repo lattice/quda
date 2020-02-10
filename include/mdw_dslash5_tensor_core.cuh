@@ -200,44 +200,6 @@ namespace quda
     }
   }
 
-  // Load data(scaled short values and scale) from global memory to shared memroy.
-  // (spin,Ls) by (complex,color,4d), where left most index is the fastest
-  // changing one(spin and complex).
-  // WARNING: This only works for half precision output!
-  template <int N_sm, class Input>
-  __device__ inline void load_matrix_b_tex(Input &input, half2 *sm_b, int sid, const float scale)
-  {
-    constexpr int N_sm_d2 = N_sm / 2;
-
-    float f = __fdividef(tex1Dfetch<float>(input.texNorm, sid), scale);
-
-    float4 in_tex;
-
-    in_tex = tex1Dfetch<float4>(input.tex, 0 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 0] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 1] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-
-    in_tex = tex1Dfetch<float4>(input.tex, 1 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 2] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 0] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-
-    in_tex = tex1Dfetch<float4>(input.tex, 2 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 1] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 2] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-
-    in_tex = tex1Dfetch<float4>(input.tex, 3 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 0] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 1] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-
-    in_tex = tex1Dfetch<float4>(input.tex, 4 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 2] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 0] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-
-    in_tex = tex1Dfetch<float4>(input.tex, 5 * input.volumeCB + sid);
-    sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1] = __floats2half2_rn(in_tex.x * f, in_tex.y * f);
-    sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2] = __floats2half2_rn(in_tex.z * f, in_tex.w * f);
-  }
-
   template <class integer_vec> __device__ inline integer_vec __2half22integer4_rn(const half2 &a, const half2 &b)
   {
     integer_vec c;

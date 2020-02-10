@@ -540,8 +540,8 @@ namespace quda
 
       virtual unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
-      unsigned int min_block_size() const { return 8; }
-      unsigned int max_block_size() const { return 32; }
+      unsigned int min_block_size() const { return 16; }
+      unsigned int max_block_size() const { return 16; }
       unsigned int step_block_size() const { return 8; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
@@ -613,10 +613,10 @@ namespace quda
       template <bool reload, int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
       {
         switch (tp.block.x) {
-        case 8: apply<8, reload, type>(tp, arg, stream); break;
+        // case 8: apply<8, reload, type>(tp, arg, stream); break;
         case 16: apply<16, reload, type>(tp, arg, stream); break;
-        case 24: apply<24, reload, type>(tp, arg, stream); break;
-        case 32: apply<32, reload, type>(tp, arg, stream); break;
+        // case 24: apply<24, reload, type>(tp, arg, stream); break;
+        // case 32: apply<32, reload, type>(tp, arg, stream); break;
         default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
         }
       }
@@ -666,7 +666,7 @@ namespace quda
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
       // switch for Ls
-      switch (in.X(4)) {
+      switch (in.X(4)) { /**
       case 4: {
         FusedDslashArg<storage_type, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);
@@ -684,13 +684,13 @@ namespace quda
                                              type);
         FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; /**
+      } break; */
       case 16: {
         FusedDslashArg<storage_type, 16> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break;
+      } break; /**
       case 20: {
         FusedDslashArg<storage_type, 20> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
