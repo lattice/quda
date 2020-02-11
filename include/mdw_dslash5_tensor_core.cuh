@@ -10,6 +10,7 @@
 
 #if (__COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
+#include <mma_cutlass.cuh>
 #endif
 
 namespace quda
@@ -424,6 +425,25 @@ namespace quda
 
       nvcuda::wmma::store_matrix_sync(sm_c + c_col + c_row * N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
     }
+  }
+  
+  __device__ inline void wmma_gemm(half *sm_a, half *sm_b, half *sm_c) {
+      using ElementA = cutlass::half_t;
+      using LayoutA = cutlass::layout::ColumnMajor;
+      using ElementB = cutlass::half_t;
+      using LayoutB = cutlass::layout::RowMajor;
+      using ElementC = cutlass::half_t;
+      using LayoutC = cutlass::layout::RowMajor;
+
+      using ThreadblockShape = cutlass::gemm::GemmShape<64, 128, 64>;
+      using WarpShape = cutlass::gemm::GemmShape<32, 32, 64>;
+
+      ElementA *smem_a = reinterpret_cast<ElementA *>(sm_a);
+      ElementB *smem_b = reinterpret_cast<ElementB *>(sm_b);
+      ElementC *smem_c = reinterpret_cast<ElementC *>(sm_c);
+
+      mma_cutlass_threadblock<ElementA, LayoutA, ElementB, LayoutB, ElementC, LayoutC, ThreadblockShape, WarpShape>(
+        smem_a, smem_b, smem_c);
   }
 
 #endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)

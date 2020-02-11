@@ -7,6 +7,8 @@ namespace quda
 {
   namespace mobius_tensor_core
   {
+    constexpr int sm_m_pad_size = 0;
+    constexpr int sm_n_pad_size = 32;
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
 
@@ -242,20 +244,18 @@ namespace quda
       constexpr int M = 4 * Ls_;
       constexpr int N = 6 * block_dim_x;
 
-      constexpr int sm_m_pad_size = 0;
-      constexpr int sm_n_pad_size = 16;
-
       constexpr int N_sm = N + sm_n_pad_size;
       constexpr int M_sm = M + sm_m_pad_size;
 
       float *smem_scale = shared_memory_data;
+      
+      half *sm_a = reinterpret_cast<half *>(smem_scale + 32);
 
-      half2 *sm_b = reinterpret_cast<half2 *>(smem_scale + 32);
+      half2 *sm_b = reload ? reinterpret_cast<half2 *>(sm_a + M * M_sm) : reinterpret_cast<half2 *>(sm_a);
       half *sm_c = reinterpret_cast<half *>(sm_b);
-
-      half *sm_a = reload ? sm_c + M * N_sm : sm_c;
+      
       // This is for type == 1 ONLY.
-      half *sm_a_black = sm_a + M * M_sm;
+      half *sm_a_black = type_ == 1 ? sm_c + M * N_sm : sm_a;
 
       if (type_ == 0) {
         if (arg.small_kappa) {
@@ -362,7 +362,12 @@ namespace quda
         load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-        wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        if (type_ == 2) {
+        // if (false) {
+          wmma_gemm(sm_a, sm_c, sm_c);
+        }else{
+          wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        }
         __syncthreads();
 
         if (type_ == 1) {
@@ -474,17 +479,17 @@ namespace quda
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
-            return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
+            return ((param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size) * 2 + (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size))
               * sizeof(half)
               + 128;
           } else {
-            return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
+            return ((param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size) * 2 + (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size))
               * sizeof(half)
               + 128;
           }
         } else {
-          int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
-          int b_size = (param.block.y * 4) * (param.block.x * 6 + 16);
+          int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size);
+          int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size);
           return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
         }
       }
@@ -524,7 +529,7 @@ namespace quda
           if (param.aux.y < 3) { // second see if aux.y
             param.aux.y++;
             aux_advanced = true;
-            param.aux.x = 0;
+            param.aux.x = 1;
           }
         }
         if (aux_advanced) {
@@ -649,7 +654,7 @@ namespace quda
         param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
         param.shared_bytes = shared_bytes_per_block(param);
-        param.aux.x = 0;
+        param.aux.x = 1;
         param.aux.y = 1;
       }
 

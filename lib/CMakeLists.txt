@@ -122,7 +122,7 @@ else()
 endif()
 
 # include_directories
-target_include_directories(quda SYSTEM PRIVATE ../include/externals)
+target_include_directories(quda SYSTEM PRIVATE ../include/externals /home/hummingtree/cutlass/include)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp PRIVATE .)
