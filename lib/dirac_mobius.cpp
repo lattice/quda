@@ -402,8 +402,9 @@ namespace quda {
 
     ColorSpinorParam csParam(out);
     
-    csParam.setPrecision(QUDA_HALF_PRECISION);
+#ifdef FLOAT8    
     csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER; // need to set field order after any call to setPrecision since this can override the order
+#endif    
     csParam.create = QUDA_NULL_FIELD_CREATE;
     cudaColorSpinorField in_(csParam);
     cudaColorSpinorField out_(csParam);

@@ -1,8 +1,6 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 
-#define USE_FLOAT8
-
 #include <mdw_dslash5_tensor_core.cuh>
 
 namespace quda
@@ -23,7 +21,7 @@ namespace quda
       static constexpr bool spinor_direct_load = true; // false means texture load
       // typedef
       //   typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
-#ifdef USE_FLOAT8
+#ifdef FLOAT8
       using F = colorspinor::FloatNOrder<storage_type, 4, 3, 8, spin_project, spinor_direct_load>;
 #else
       using F = colorspinor::FloatNOrder<storage_type, 4, 3, 4, spin_project, spinor_direct_load>;

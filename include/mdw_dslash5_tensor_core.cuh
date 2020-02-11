@@ -339,7 +339,7 @@ namespace quda
     output.norm[sid] = __half2float(max_) * scale;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-#ifdef USE_FLOAT8 // use float8/short8  
+#ifdef FLOAT8 // use float8/short8  
     typedef typename VectorType<storage_type, 8>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
