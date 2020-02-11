@@ -1355,7 +1355,7 @@ namespace quda {
 
     const double full_tol        = param.tol;// check for 5e-8
     const int max_restart_num    = param.max_restart_num;
-    const double inc_tol_[4]     = {1e-3, 1e-2, 1e-1, 1e-1};
+    double inc_tol               = param.inc_tol;
     Kparam.tol                   = param.tol_restart;//Kparam.tol_restart;
     Kparam.deflate               = false;
 
@@ -1403,7 +1403,8 @@ namespace quda {
 
       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
-      Kparam.tol *= inc_tol_[restart_idx - 1]; //param.inc_tol;
+      Kparam.tol *= inc_tol;
+      inc_tol    *= 1e+1;
 
       if(Kparam.tol <= full_tol && (restart_idx < max_restart_num)) restart_idx = (max_restart_num-1); // durty hack
       if(restart_idx == (max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
