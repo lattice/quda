@@ -29,6 +29,8 @@ namespace quda
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 0.5 comes from basis transform
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 

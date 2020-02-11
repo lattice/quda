@@ -132,6 +132,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -333,5 +334,14 @@ extern int eofa_shift;
 extern int eofa_mq1;
 extern int eofa_mq2;
 extern int eofa_mq3;
+
+extern double stout_smear_rho;
+extern double stout_smear_epsilon;
+extern double ape_smear_rho;
+extern int smear_steps;
+extern double wflow_epsilon;
+extern int wflow_steps;
+extern QudaWFlowType wflow_type;
+extern int measurement_interval;
 
 extern QudaContractType contract_type;

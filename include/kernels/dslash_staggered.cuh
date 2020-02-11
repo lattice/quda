@@ -63,7 +63,11 @@ namespace quda
       is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
       dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
-      if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkPrecision(out, in, x, U); // check all precisions match
+      checkLocation(out, in, x, U);  // check all locations match
+      if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };

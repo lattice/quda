@@ -21,7 +21,10 @@ namespace quda
       a(a),
       m_f(m_f)
     {
+      pushKernelPackT(true); // with 5-d checkerboarding we must use kernel packing
     }
+
+    virtual ~DomainWall5DArg() { popKernelPackT(); }
   };
 
   template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>

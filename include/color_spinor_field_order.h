@@ -13,6 +13,7 @@
  */
 
 #include <register_traits.h>
+#include <convert.h>
 #include <typeinfo>
 #include <complex_quda.h>
 #include <index_helper.cuh>
@@ -795,19 +796,23 @@ namespace quda {
        pointer arithmetic for huge allocations (e.g., packed set of
        vectors).  Default is to use 32-bit pointer arithmetic.
      */
-    template <typename Float, int Ns, int Nc, int N, bool spin_project = false, bool huge_alloc = false>
+    template <typename Float, int Ns, int Nc, int N_, bool spin_project = false, bool huge_alloc = false>
     struct FloatNOrder {
+      static_assert((2 * Ns * Nc) % N_ == 0, "Internal degrees of freedom not divisible by short-vector length");
+      static constexpr int length = 2 * Ns * Nc;
+      static constexpr int length_ghost = spin_project ? length / 2 : length;
+      static constexpr int N = N_;
+      static constexpr int M = length / N;
+      // if spin projecting, check that short vector length is compatible, if not halve the vector length
+      static constexpr int N_ghost = !spin_project ? N : (Ns * Nc) % N == 0 ? N : N/2;
+      static constexpr int M_ghost = length_ghost / N_ghost;
       using Accessor = FloatNOrder<Float, Ns, Nc, N, spin_project, huge_alloc>;
       using real = typename mapper<Float>::type;
       using complex = complex<real>;
-      typedef typename VectorType<Float, N>::type Vector;
-      typedef typename VectorType<real, N>::type RegVector;
-      typedef typename AllocType<huge_alloc>::type AllocInt;
-      typedef float norm_type;
-      static constexpr int length = 2 * Ns * Nc;
-      static constexpr int length_ghost = spin_project ? length / 2 : length;
-      static constexpr int M = length / N;
-      static constexpr int M_ghost = spin_project ? M / 2 : M;
+      using Vector = typename VectorType<Float, N>::type;
+      using GhostVector = typename VectorType<Float, N_ghost>::type;
+      using AllocInt = typename AllocType<huge_alloc>::type;
+      using norm_type = float;
       Float *field;
       norm_type *norm;
       const AllocInt offset; // offset can be 32-bit or 64-bit
@@ -998,18 +1003,18 @@ namespace quda {
       if (!huge_alloc) {                                        // use textures unless we have a huge alloc
         TexVector vecTmp = tex1Dfetch_<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
 #pragma unroll
-        for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
+        for (int j = 0; j < N_ghost; j++) copy(v[i * N_ghost + j], reinterpret_cast<real *>(&vecTmp)[j]);
         if (isFixed<Float>::value) {
 #pragma unroll
-          for (int i = 0; i < N; i++) v[i * N + j] *= nrm;
+          for (int i = 0; i < N_ghost; i++) v[i * N_ghost + j] *= nrm;
         }
       } else
 #endif
       {
-        Vector vecTmp = vector_load<Vector>(
-            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x);
+        GhostVector vecTmp = vector_load<GhostVector>(
+            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N_ghost, i * faceVolumeCB[dim] + x);
 #pragma unroll
-        for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
+        for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
       }
     }
 
@@ -1050,12 +1055,12 @@ namespace quda {
 
 #pragma unroll
     for (int i = 0; i < M_ghost; i++) {
-      Vector vecTmp;
+      GhostVector vecTmp;
       // first do scalar copy converting into storage type
 #pragma unroll
-      for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
+      for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
       // second do vectorized copy into memory
-      vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N, i * faceVolumeCB[dim] + x, vecTmp);
+      vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N_ghost, i * faceVolumeCB[dim] + x, vecTmp);
     }
   }
 

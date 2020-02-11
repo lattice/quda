@@ -194,6 +194,26 @@ namespace quda
     return managed;
   }
 
+  bool is_prefetch_enabled()
+  {
+    static bool prefetch = false;
+    static bool init = false;
+
+    if (!init) {
+      if (use_managed_memory()) {
+        char *enable_managed_prefetch = getenv("QUDA_ENABLE_MANAGED_PREFETCH");
+        if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
+          warningQuda("Enabling prefetch support for managed memory");
+          prefetch = true;
+        }
+      }
+
+      init = true;
+    }
+
+    return prefetch;
+  }
+
   /**
    * Perform a standard cudaMalloc() with error-checking.  This
    * function should only be called via the device_malloc() macro,

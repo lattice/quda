@@ -907,6 +907,14 @@ namespace quda {
        @brief Restores the cudaColorSpinorField
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the spinor, the norm field (as appropriate), to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   // CPU implementation
@@ -1079,6 +1087,36 @@ namespace quda {
   }
 
 #define checkPCType(...) PCType_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
+  /**
+     @brief Helper function for determining if the order of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @return If order is unique return the order
+   */
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line,
+                                  const ColorSpinorField &a, const ColorSpinorField &b) {
+    QudaFieldOrder order = QUDA_INVALID_FIELD_ORDER;
+    if (a.FieldOrder() == b.FieldOrder()) order = a.FieldOrder();
+    else errorQuda("Orders %d %d do not match  (%s:%d in %s())\n",
+		   a.FieldOrder(), b.FieldOrder(), file, line, func);
+    return order;
+  }
+
+  /**
+     @brief Helper function for determining if the order of the fields is the same.
+     @param[in] a Input field
+     @param[in] b Input field
+     @param[in] args List of additional fields to check order on
+     @return If order is unique return the order
+   */
+  template <typename... Args>
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line,
+                               const ColorSpinorField &a, const ColorSpinorField &b, const Args &... args) {
+    return static_cast<QudaFieldOrder>(Order_(func,file,line,a,b) & Order_(func,file,line,a,args...));
+  }
+
+#define checkOrder(...) Order_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
 } // namespace quda
 

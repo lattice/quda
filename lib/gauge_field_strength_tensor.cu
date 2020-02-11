@@ -20,7 +20,7 @@ public:
     Fmunu(const GaugeField &u, GaugeField &f) :
       TunableVectorYZ(2, 6),
       arg(f, u),
-      meta(f)
+      meta(u)
     {
       strcpy(aux, meta.AuxString());
       strcat(aux, comm_dim_partitioned_string());

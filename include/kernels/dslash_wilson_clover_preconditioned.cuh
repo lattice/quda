@@ -25,6 +25,8 @@ namespace quda
       A(A, dynamic_clover ? false : true), // if dynamic clover we don't want the inverse field
       a(a)
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 

@@ -668,6 +668,13 @@ namespace quda {
 
     /** @brief Restores the LatticeField */
     virtual void restore() const { errorQuda("Not implemented"); }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields to the current device or to the CPU.
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const { ; }
   };
   
   /**
@@ -698,7 +705,7 @@ namespace quda {
     return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
 
-#define checkLocation(...)Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+#define checkLocation(...) Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the precision of the fields is the same.
