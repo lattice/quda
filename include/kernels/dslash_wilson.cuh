@@ -50,7 +50,11 @@ namespace quda
       checkLocation(out, in, x, U);  // check all locations match
       if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+
+      if (F::N != F::N_ghost) pushKernelPackT(true); // must use packing kernel is ghost vector length is different than bulk
     }
+
+    virtual ~WilsonArg() { if (F::N != F::N_ghost) popKernelPackT(); }
   };
 
   /**
