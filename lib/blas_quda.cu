@@ -249,7 +249,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(FLOAT8)
+#if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3;
             nativeBlas<float8, short8, short8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
@@ -292,7 +292,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(FLOAT8)
+#if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3;
             nativeBlas<float8, char8, char8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
                                                                                                  x.Volume());

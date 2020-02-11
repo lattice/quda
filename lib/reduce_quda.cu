@@ -442,7 +442,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(FLOAT8)
+#if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3; // determines how much work per thread to do
             value
                 = nativeReduce<doubleN, ReduceType, float8, short8, short8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(
@@ -487,7 +487,7 @@ namespace quda {
             errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
-#if defined(FLOAT8)
+#if defined(NSPIN4) && defined(FLOAT8)
             const int M = 3;
             value
               = nativeReduce<doubleN, ReduceType, float8, char8, char8, M, Reducer, writeX, writeY, writeZ, writeW, writeV>(

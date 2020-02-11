@@ -39,3 +39,18 @@
 #define DYNAMIC_CLOVER
 #undef QUDA_DYNAMIC_CLOVER
 #endif
+
+#cmakedefine QUDA_FLOAT8
+#ifdef QUDA_FLOAT8
+/**
+ * @def FLOAT8
+ * @brief This macro set whether float8-ordered fields are enabled or
+ * not
+ */
+#define FLOAT8
+#undef QUDA_FLOAT8
+#endif
+
+#if defined(USE_TEXTURE_OBJECTS) && defined(FLOAT8)
+#error "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8"
+#endif

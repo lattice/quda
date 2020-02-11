@@ -64,8 +64,6 @@ extern "C" {
 
 namespace quda {
 
-#define FLOAT8
-
   struct alignas(8) char8 {
     char4 x;
     char4 y;
