@@ -29,8 +29,8 @@ namespace quda
       A_inv(A_, dynamic_clover ? false : true),
       b(dagger ? -0.5 * b_ : 0.5 * b_) // if dynamic clover we don't want the inverse field
     {
-      checkPrecision(U, A);
-      checkLocation(U, A);
+      checkPrecision(U, A_);
+      checkLocation(U, A_);
     }
   };
 
