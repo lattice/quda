@@ -401,7 +401,13 @@ namespace quda {
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
+    
+    csParam.setPrecision(QUDA_HALF_PRECISION);
+    csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER; // need to set field order after any call to setPrecision since this can override the order
     csParam.create = QUDA_NULL_FIELD_CREATE;
+    cudaColorSpinorField in_(csParam);
+    cudaColorSpinorField out_(csParam);
+    in_ = in;
 
     ColorSpinorField *unextended_tmp1 = new cudaColorSpinorField(csParam);
 
@@ -417,14 +423,14 @@ namespace quda {
     int odd_bit = (getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, in, *extended_gauge, out, in, mass, m5, b_5, c_5, dagger,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, in_, *extended_gauge, out_, in_, mass, m5, b_5, c_5, dagger,
                                              parity[1], shift2, shift2, dslash5pre);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2,
                                              *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
                                              dslash4_dslash5pre_dslash5inv);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in_,
                                              mass, m5, b_5, c_5, dagger, parity[1], shift0, shift1,
                                              dslash4_dslash5inv_dslash5invdag);
 
@@ -432,8 +438,10 @@ namespace quda {
                                              *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1,
                                              dslash4dag_dslash5predag_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5,
+      mobius_tensor_core::apply_fused_dslash(out_, *extended_tmp2, *extended_gauge, out_, *unextended_tmp1, mass, m5, b_5,
                                              c_5, dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
+
+      out = out_;
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1

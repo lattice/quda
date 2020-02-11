@@ -210,6 +210,20 @@ namespace quda
     return c;
   }
 
+  template <class integer_vec> __device__ inline integer_vec __4half22integer8_rn(const half2 &a, const half2 &b, const half2 &c, const half2 &d)
+  {
+    integer_vec e;
+    e.x.x = __half2short_rn(a.x);
+    e.x.y = __half2short_rn(a.y);
+    e.x.z = __half2short_rn(b.x);
+    e.x.w = __half2short_rn(b.y);
+    e.y.x = __half2short_rn(c.x);
+    e.y.y = __half2short_rn(c.y);
+    e.y.z = __half2short_rn(d.x);
+    e.y.w = __half2short_rn(d.y);
+    return e;
+  }
+
   __device__ inline void __half_max_abs_half2__(half &max, const half2 &input)
   {
     // Set the fisrt bit of the halves to 0.
@@ -325,6 +339,29 @@ namespace quda
     output.norm[sid] = __half2float(max_) * scale;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
+#ifdef USE_FLOAT8 // use float8/short8  
+    typedef typename VectorType<storage_type, 8>::type storage_vec;
+    storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
+    half2 a, b, c, d;
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    out[sid + 0 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    out[sid + 1 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+
+    a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
+    c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
+    d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
+    out[sid + 2 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+#else
 
     typedef typename VectorType<storage_type, 4>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
@@ -353,6 +390,8 @@ namespace quda
     a = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     out[sid + 5 * output.volumeCB] = __2half22integer4_rn<storage_vec>(a, b);
+
+#endif
   }
 
   // For "reload" version(reload == true) of wmma gemm, matrix a is loaded when

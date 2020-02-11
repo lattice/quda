@@ -1,12 +1,16 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 
+#define USE_FLOAT8
+
 #include <mdw_dslash5_tensor_core.cuh>
 
 namespace quda
 {
   namespace mobius_tensor_core
   {
+    constexpr int sm_m_pad_size = 0;
+    constexpr int sm_n_pad_size = 16;
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
 
@@ -16,11 +20,16 @@ namespace quda
     template <class storage_type, int Ls_> // storage_type is the usual "Float" in other places in QUDA
     struct FusedDslashArg {
       static constexpr bool spin_project = true;
-      static constexpr bool spinor_direct_load = false; // false means texture load
-      typedef
-        typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
+      static constexpr bool spinor_direct_load = true; // false means texture load
+      // typedef
+      //   typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
+#ifdef USE_FLOAT8
+      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 8, spin_project, spinor_direct_load>;
+#else
+      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 4, spin_project, spinor_direct_load>;
+#endif
       typedef typename mapper<storage_type>::type real; // the compute type for the in kernel computation
-      static constexpr bool gauge_direct_load = false;  // false means texture load
+      static constexpr bool gauge_direct_load = true;  // false means texture load
       static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
       typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
                                     ghost>::type G; // gauge field order
@@ -101,8 +110,8 @@ namespace quda
 
         if (nParity == 2) { errorQuda("nParity = 2 NOT supported, yet.\n"); }
 
-        if (!in.isNative() || !out.isNative())
-          errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        // if (!in.isNative() || !out.isNative())
+        //   errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
 
         b = b_5[0].real();
         c = c_5[0].real();
@@ -241,9 +250,6 @@ namespace quda
 
       constexpr int M = 4 * Ls_;
       constexpr int N = 6 * block_dim_x;
-
-      constexpr int sm_m_pad_size = 0;
-      constexpr int sm_n_pad_size = 16;
 
       constexpr int N_sm = N + sm_n_pad_size;
       constexpr int M_sm = M + sm_m_pad_size;
@@ -471,20 +477,16 @@ namespace quda
 
       unsigned int shared_bytes_per_block(const TuneParam &param) const
       {
+        const int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size);
+        const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size);
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
-            return ((param.block.y * 4) * (param.block.y * 4 + 0) * 2 + (param.block.y * 4) * (param.block.x * 6 + 16))
-              * sizeof(half)
-              + 128;
+            return (a_size * 2 + b_size) * sizeof(half) + 128;
           } else {
-            return ((param.block.y * 4) * (param.block.y * 4 + 0) + (param.block.y * 4) * (param.block.x * 6 + 16))
-              * sizeof(half)
-              + 128;
+            return (a_size + b_size) * sizeof(half) + 128;
           }
         } else {
-          int a_size = (param.block.y * 4) * (param.block.y * 4 + 0);
-          int b_size = (param.block.y * 4) * (param.block.x * 6 + 16);
           return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
         }
       }
