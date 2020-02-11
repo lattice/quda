@@ -1404,7 +1404,7 @@ namespace quda {
       if(getVerbosity() >= QUDA_VERBOSE) printfQuda("\ninitCG stat: %i iter / %g secs = %g Gflops. \n", Kparam.iter, Kparam.secs, Kparam.gflops);
 
       Kparam.tol *= inc_tol;
-      inc_tol    *= 1e+1;
+      inc_tol    *= (inc_tol < 1e-1 ? 1e+1 : 1.0);
 
       if(Kparam.tol <= full_tol && (restart_idx < max_restart_num)) restart_idx = (max_restart_num-1); // durty hack
       if(restart_idx == (max_restart_num-1)) Kparam.tol = full_tol;//do the last solve in the next cycle to full tolerance
