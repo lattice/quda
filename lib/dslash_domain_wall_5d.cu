@@ -86,9 +86,7 @@ namespace quda
       const ColorSpinorField &x, int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_DOMAIN_WALL_DIRAC
-    pushKernelPackT(true); // with 5-d checkerboarding we must use kernel packing
     instantiate<DomainWall5DApply>(out, in, U, a, m_f, x, parity, dagger, comm_override, profile);
-    popKernelPackT();
 #else
     errorQuda("Domain-wall dslash has not been built");
 #endif // GPU_DOMAIN_WALL_DIRAC
