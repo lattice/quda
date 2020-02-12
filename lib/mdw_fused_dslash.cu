@@ -710,11 +710,19 @@ namespace quda
       checkLocation(out, in); // check all locations match
 
       if (checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3) {
+#if QUDA_PRECISION & 2
         apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+#else
+        errorQuda("Half precision not enabled");
+#endif
       } else if (checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3) {
+#if QUDA_PRECISION & 1
         apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+#else
+        errorQuda("Quarter precision not enabled");
+#endif
       } else {
-        errorQuda("Tensor core implemtation ONLY supports HALF/QUARTER precision and n_color = 3.\n");
+        errorQuda("Tensor core implementation ONLY supports HALF/QUARTER precision and n_color = 3.\n");
       }
 
 #else
