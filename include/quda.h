@@ -107,8 +107,8 @@ extern "C" {
     double m5;    /**< Domain wall height */
     int Ls;       /**< Extent of the 5th dimension (for domain wall) */
 
-    double _Complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
-    double _Complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex b_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
+    double_complex c_5[QUDA_MAX_DWF_LS]; /**< Mobius coefficients - only real part used if regular Mobius */
 
     /**<
      * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
