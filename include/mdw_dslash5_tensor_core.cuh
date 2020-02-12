@@ -348,19 +348,19 @@ namespace quda
     b = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     c = __hmul2(sm_b[(threadIdx.y * 4 + 0) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
-    out[sid + 0 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+    vector_store(&out[sid + 0 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
 
     a = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 1) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     c = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
-    out[sid + 1 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+    vector_store(&out[sid + 1 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
 
     a = __hmul2(sm_b[(threadIdx.y * 4 + 2) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
     b = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 0], max_i_div_max2_);
     c = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 1], max_i_div_max2_);
     d = __hmul2(sm_b[(threadIdx.y * 4 + 3) * N_sm_d2 + 3 * threadIdx.x + 2], max_i_div_max2_);
-    out[sid + 2 * output.volumeCB] = __4half22integer8_rn<storage_vec>(a, b, c, d);
+    vector_store(&out[sid + 2 * output.volumeCB], 0, __4half22integer8_rn<storage_vec>(a, b, c, d));
 #else
 
     typedef typename VectorType<storage_type, 4>::type storage_vec;
