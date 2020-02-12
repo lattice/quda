@@ -206,7 +206,7 @@ void init(int argc, char **argv) {
     switch (dtest_type) {
     case dslash_test_type::M5:
     case dslash_test_type::M5inv: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
-    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", dtest_type);
+    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", static_cast<int>(dtest_type));
     }
   }
   else
@@ -555,7 +555,7 @@ DslashTime dslashCUDA(int niter) {
           static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
         }
         break;
-      default: errorQuda("Undefined test type(=%d)\n", dtest_type);
+      default: errorQuda("Undefined test type(=%d)\n", static_cast<int>(dtest_type));
       }
     } else {
       switch (dtest_type) {

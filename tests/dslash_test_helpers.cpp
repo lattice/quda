@@ -191,6 +191,6 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   case dslash_test_type::M5: dirac.m5_eofa(out, in); break;
   case dslash_test_type::M5inv: dirac.m5inv_eofa(out, in); break;
   case dslash_test_type::Dslash: dirac.full_dslash(out, in); break;
-  default: errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", test_type);
+  default: errorQuda("test_type(=%d) NOT defined for M\"obius EOFA! :( \n", static_cast<int>(test_type));
   }
 }
