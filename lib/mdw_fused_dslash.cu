@@ -28,8 +28,8 @@ namespace quda
 #endif
       typedef typename mapper<storage_type>::type real; // the compute type for the in kernel computation
       static constexpr bool gauge_direct_load = true;  // false means texture load
-      static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-      typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
+      static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED;
+      typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_12, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
                                     ghost>::type G; // gauge field order
 
       F out;      // output vector field
@@ -152,7 +152,7 @@ namespace quda
 
     __device__ inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4])
     {
-      return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) >> 1;
+      return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) / 2;
     }
 
     __device__ inline bool is_halo_4d(const int coordinate[4], const int dim[4], const int halo_shift[4])
@@ -163,6 +163,21 @@ namespace quda
         ret = ret or (coordinate[d] >= dim[d] - halo_shift[d] or coordinate[d] < halo_shift[d]);
       }
       return ret;
+    }
+
+    __device__ inline int index_from_extended_coordinate(const int x[4], const int dim[4], const int y) {
+
+      constexpr int pad = 2;
+
+      int back_x[4] = {x[0] - pad, x[1] - pad, x[2] - pad, x[3] - pad};
+      int back_dim[4] = {dim[0] - pad * 2, dim[1] - pad * 2, dim[2] - pad * 2, dim[3] - pad * 2};
+      if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
+          && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+        int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] / 2;
+        return y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim); // the input coordinate is in the center region
+      }else{
+        return -1; // the input coordinate is not in the center region
+      }
     }
 
     /**
@@ -195,7 +210,7 @@ namespace quda
         if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
           // Backward gather - compute back offset for spinor and gauge fetch
           const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
-          ;
+
           const int back_idx = s * arg.volume_4d_cb + gauge_idx;
           constexpr int proj_dir = dagger ? -1 : +1;
 
@@ -371,23 +386,17 @@ namespace quda
 
         if (type_ == 1) {
           Vector aux_in_vec;
-          int sid_back_shift;
+          int sid_back;
           bool center = false;
           if (!idle) {
-            constexpr int in_x_shift = 2;
-            int back_x[4] = {x[0] - in_x_shift, x[1] - in_x_shift, x[2] - in_x_shift, x[3] - in_x_shift};
-            int back_dim[4] = {arg.dim[0] - in_x_shift * 2, arg.dim[1] - in_x_shift * 2, arg.dim[2] - in_x_shift * 2,
-                               arg.dim[3] - in_x_shift * 2};
-            if (back_x[0] >= 0 && back_x[0] < back_dim[0] && back_x[1] >= 0 && back_x[1] < back_dim[1] && back_x[2] >= 0
-                && back_x[2] < back_dim[2] && back_x[3] >= 0 && back_x[3] < back_dim[3]) {
+            sid_back = index_from_extended_coordinate(x, arg.dim, threadIdx.y);
+            if (sid_back >= 0) {
               center = true;
-              int volume_4d_cb_back = back_dim[0] * back_dim[1] * back_dim[2] * back_dim[3] >> 1;
-              sid_back_shift = threadIdx.y * volume_4d_cb_back + index_4d_cb_from_coordinate_4d(back_x, back_dim);
-              aux_in_vec = arg.x(sid_back_shift, explicit_parity);
+              aux_in_vec = arg.x(sid_back, explicit_parity);
             }
           }
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
-          if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back_shift, smem_scale[0]); }
+          if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
           wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
           __syncthreads();
