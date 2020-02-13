@@ -15,22 +15,22 @@ namespace quda
     /**
       @brief Parameter structure for applying the Dslash
     */
-    template <class storage_type, int Ls_> // storage_type is the usual "Float" in other places in QUDA
+    template <class storage_type_, QudaReconstructType recon_, int Ls_> // storage_type is the usual "Float" in other places in QUDA
     struct FusedDslashArg {
+      using storage_type = storage_type_;
+      using real = typename mapper<storage_type>::type; // the compute type for the in kernel computation
+      static constexpr QudaReconstructType recon = recon_;
+      static constexpr int Ls = Ls_;
       static constexpr bool spin_project = true;
       static constexpr bool spinor_direct_load = true; // false means texture load
-      // typedef
-      //   typename colorspinor_mapper<storage_type, 4, 3, spin_project, spinor_direct_load>::type F; // color spin field order
 #ifdef FLOAT8
-      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 8, spin_project, spinor_direct_load>;
+      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 8, spin_project, spinor_direct_load>; // color spin field order
 #else
-      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 4, spin_project, spinor_direct_load>;
+      using F = colorspinor::FloatNOrder<storage_type, 4, 3, 4, spin_project, spinor_direct_load>; // color spin field order
 #endif
-      typedef typename mapper<storage_type>::type real; // the compute type for the in kernel computation
       static constexpr bool gauge_direct_load = true;  // false means texture load
-      static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_PAD;
-      typedef typename gauge_mapper<storage_type, QUDA_RECONSTRUCT_NO, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load,
-                                    ghost>::type G; // gauge field order
+      static constexpr QudaGhostExchange ghost = QUDA_GHOST_EXCHANGE_EXTENDED; // gauge field used is an extended one
+      using G = typename gauge_mapper<storage_type, recon, 18, QUDA_STAGGERED_PHASE_NO, gauge_direct_load, ghost>::type; // gauge field order
 
       F out;      // output vector field
       const F in; // input vector field
@@ -45,9 +45,6 @@ namespace quda
       const int volume_4d_cb; // 4-d checkerboarded volume
 
       const int dim[4];
-
-      const int_fastdiv Ls; // length of 5th dimension
-
       const int shift[4];      // sites where we actually calculate.
       const int halo_shift[4]; // halo means zero. When we are expanding we have halo of cs-field where values are zero.
 
@@ -91,7 +88,6 @@ namespace quda
         parity(parity),
         volume_cb(in.VolumeCB() > out.VolumeCB() ? in.VolumeCB() : out.VolumeCB()),
         volume_4d_cb(volume_cb / Ls_),
-        Ls(Ls_),
         m_f(m_f_),
         m_5(m_5_),
         dagger(dagger_),
@@ -171,7 +167,6 @@ namespace quda
     template <class storage_type, bool dagger, bool halo, class Vector, class Arg>
     __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], Arg &arg, int s)
     {
-
       typedef typename mapper<storage_type>::type compute_type;
       typedef Matrix<complex<compute_type>, 3> Link;
       const int their_spinor_parity = arg.nParity == 2 ? 1 - arg.parity : 0;
@@ -237,16 +232,20 @@ namespace quda
       @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
       The kernels type(type_) will be specified in some documentations.
     */
-    template <class storage_type, int block_dim_x, int Ls_, int minBlocksPerMultiprocessor, bool reload, class Arg, int type_>
-    __global__ void __launch_bounds__(block_dim_x *Ls_, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
+    template <int block_dim_x, int minBlocksPerMultiprocessor, bool reload, class Arg, int type_>
+    __global__ void __launch_bounds__(block_dim_x * Arg::Ls, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
     {
+      using storage_type = typename Arg::storage_type;
+      using real = typename mapper<storage_type>::type;
+      using Vector = ColorSpinor<real, 3, 4>;
+      constexpr int Ls = Arg::Ls;
       const int explicit_parity = arg.nParity == 2 ? arg.parity : 0;
 
       TensorCoreSharedMemory<float> shared_memory_data;
 
-      static_assert(block_dim_x * Ls_ / 32 < 32);
+      static_assert(block_dim_x * Ls / 32 < 32);
 
-      constexpr int M = 4 * Ls_;
+      constexpr int M = 4 * Ls;
       constexpr int N = 6 * block_dim_x;
 
       constexpr int N_sm = N + sm_n_pad_size;
@@ -263,22 +262,22 @@ namespace quda
 
       if (type_ == 0) {
         if (arg.small_kappa) {
-          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+          construct_matrix_a_d5<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
         } else {
-          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+          construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
         }
       } else if (type_ == 2) {
         if (arg.small_kappa) {
-          construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+          construct_matrix_a_d5<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger =  true
         } else {
-          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = false
+          construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = false
         }
       } else if (type_ == 1) {
-        construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger = false
+        construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
       } else if (type_ == 3) {
-        construct_matrix_a_d5<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger =  true
+        construct_matrix_a_d5<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger =  true
       } else if (type_ == 4) {
-        construct_matrix_a_d5<block_dim_x, Ls_, M_sm, false, Arg>(arg, sm_a); // dagger =  true
+        construct_matrix_a_d5<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger =  true
       }
       __syncthreads();
 
@@ -293,7 +292,7 @@ namespace quda
       constexpr int tm_dim = M / WMMA_M;
       constexpr int tn_dim = N / WMMA_N;
 
-      constexpr int total_warp = block_dim_x * Ls_ >> 5;
+      constexpr int total_warp = block_dim_x * Ls >> 5;
       const int this_warp = (threadIdx.y * block_dim_x + threadIdx.x) >> 5;
 
       constexpr int total_tile = tm_dim * tn_dim;
@@ -320,7 +319,7 @@ namespace quda
       if (type_ == 1) {
         arg.alpha = 1.;
         if (!reload) {                                                            // in the preload case we preload ...
-          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a); // dagger = true
+          construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = true
           __syncthreads();
 #pragma unroll
           for (int k = 0; k < tm_dim; k++) {
@@ -330,7 +329,7 @@ namespace quda
             nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c + a_row + a_col * M_sm, M_sm);
           }
         } else {
-          construct_matrix_a_m5inv<block_dim_x, Ls_, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
+          construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
           __syncthreads();
         }
       }
@@ -342,9 +341,6 @@ namespace quda
         sid = threadIdx.y * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(x, arg.dim);
 
         if (s4_shift >= arg.volume_4d_cb_shift) { idle = true; }
-
-        typedef typename mapper<storage_type>::type real;
-        typedef ColorSpinor<real, 3, 4> Vector;
 
         Vector in_vec;
         if (!idle) {
@@ -366,7 +362,7 @@ namespace quda
         load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-        wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
         __syncthreads();
 
         if (type_ == 1) {
@@ -389,7 +385,7 @@ namespace quda
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back_shift, smem_scale[0]); }
           __syncthreads();
-          wmma_gemm<block_dim_x, Ls_, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
           __syncthreads();
 
         } else if (type_ == 3) {
@@ -413,7 +409,7 @@ namespace quda
       } // while
     }
 
-    template <class storage_type, int Ls_, class Arg> class FusedDslash : public TunableVectorYZ
+    template <class Arg> class FusedDslash : public TunableVectorYZ
     {
 
     protected:
@@ -427,24 +423,24 @@ namespace quda
       long long flops() const
       {
         constexpr long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
-        constexpr long long mat = 2ll * 4ll * Ls_ - 1ll;
+        constexpr long long mat = 2ll * 4ll * Arg::Ls - 1ll;
         long long volume_4d_cb_halo_shift = (arg.dim[0] - 2 * arg.halo_shift[0]) * (arg.dim[1] - 2 * arg.halo_shift[1])
           * (arg.dim[2] - 2 * arg.halo_shift[2]) * (arg.dim[3] - 2 * arg.halo_shift[3]) / 2;
 
         long long flops_ = 0;
         switch (arg.type) {
         case 0:
-          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * mat;
+          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * arg.Ls * hop + arg.volume_4d_cb_shift * 24ll * arg.Ls * mat;
           break;
         case 1:
-          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * Ls_ * hop + arg.volume_4d_cb_shift * 24ll * Ls_ * 2ll * mat;
+          flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * arg.Ls * hop + arg.volume_4d_cb_shift * 24ll * arg.Ls * 2ll * mat;
           break;
         case 2:
         case 3:
-          flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_
+          flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * arg.Ls
             * (hop + mat); // for 2 and 3 we don't have the halo complication.
           break;
-        case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * Ls_ * (mat); break;
+        case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * arg.Ls * (mat); break;
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
 
@@ -603,9 +599,9 @@ namespace quda
       void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
       {
         switch (tp.aux.y) {
-        case 1: launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 1, reload, Arg, type>, tp, arg, stream); break;
-        case 2: launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 2, reload, Arg, type>, tp, arg, stream); break;
-        case 3: launch(fused_tensor_core<storage_type, block_dim_x, Ls_, 3, reload, Arg, type>, tp, arg, stream); break;
+        case 1: launch(fused_tensor_core<block_dim_x, 1, reload, Arg, type>, tp, arg, stream); break;
+        case 2: launch(fused_tensor_core<block_dim_x, 2, reload, Arg, type>, tp, arg, stream); break;
+        case 3: launch(fused_tensor_core<block_dim_x, 3, reload, Arg, type>, tp, arg, stream); break;
         default: errorQuda("NOT valid tp.aux.y(=%d)\n", tp.aux.y);
         }
       }
@@ -660,7 +656,7 @@ namespace quda
 
     // Apply the 5th dimension dslash operator to a colorspinor field
     // out = Dslash5 * in
-    template <class storage_type>
+    template <class storage_type, QudaReconstructType recon>
     void apply_fused_dslash(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, ColorSpinorField &y,
                             const ColorSpinorField &x, double m_f, double m_5, const Complex *b_5, const Complex *c_5,
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
@@ -668,33 +664,33 @@ namespace quda
       // switch for Ls
       switch (in.X(4)) { /**
       case 4: {
-        FusedDslashArg<storage_type, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+        FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);
-        FusedDslash<storage_type, 4, FusedDslashArg<storage_type, 4>> dslash(arg, in);
+        FusedDslash<decltype(arg)> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
       case 8: {
-        FusedDslashArg<storage_type, 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+        FusedDslashArg<storage_type, recon, 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);
-        FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
+        FusedDslash<decltype(arg)> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break;
       case 12: {
-        FusedDslashArg<storage_type, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+        FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
-        FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
+        FusedDslash<decltype(arg)> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break; */
       case 16: {
-        FusedDslashArg<storage_type, 16> arg(
+        FusedDslashArg<storage_type, recon, 16> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
-        FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16>> dslash(arg, in);
+        FusedDslash<decltype(arg)> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break; /**
       case 20: {
-        FusedDslashArg<storage_type, 20> arg(
+        FusedDslashArg<storage_type, recon, 20> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
-        FusedDslash<storage_type, 20, FusedDslashArg<storage_type, 20>> dslash(arg, in);
+        FusedDslash<decltype(arg)> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
       } break; */
       default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
@@ -711,13 +707,49 @@ namespace quda
 
       if (checkPrecision(out, in) == QUDA_HALF_PRECISION && in.Ncolor() == 3) {
 #if QUDA_PRECISION & 2
-        apply_fused_dslash<short>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+        switch (U.Reconstruct()) {
+#if QUDA_RECONSTRUCT & 4
+        case QUDA_RECONSTRUCT_NO:
+          apply_fused_dslash<short, QUDA_RECONSTRUCT_NO>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+#if QUDA_RECONSTRUCT & 2
+        case QUDA_RECONSTRUCT_12:
+          apply_fused_dslash<short, QUDA_RECONSTRUCT_12>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+#if QUDA_RECONSTRUCT & 1
+        case QUDA_RECONSTRUCT_8:
+          apply_fused_dslash<short, QUDA_RECONSTRUCT_8>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+        default:
+          errorQuda("Reconstruct type %d not enabled with QUDA_RECONSTRUCT = %d", U.Reconstruct(), QUDA_RECONSTRUCT);
+        }
 #else
         errorQuda("Half precision not enabled");
 #endif
       } else if (checkPrecision(out, in) == QUDA_QUARTER_PRECISION && in.Ncolor() == 3) {
 #if QUDA_PRECISION & 1
-        apply_fused_dslash<char>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+        switch (U.Reconstruct()) {
+#if QUDA_RECONSTRUCT & 4
+        case QUDA_RECONSTRUCT_NO:
+          apply_fused_dslash<char, QUDA_RECONSTRUCT_NO>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+#if QUDA_RECONSTRUCT & 2
+        case QUDA_RECONSTRUCT_12:
+          apply_fused_dslash<char, QUDA_RECONSTRUCT_12>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+#if QUDA_RECONSTRUCT & 1
+        case QUDA_RECONSTRUCT_8:
+          apply_fused_dslash<char, QUDA_RECONSTRUCT_8>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          break;
+#endif
+        default:
+          errorQuda("Reconstruct type %d not enabled with QUDA_RECONSTRUCT = %d", U.Reconstruct(), QUDA_RECONSTRUCT);
+        }
 #else
         errorQuda("Quarter precision not enabled");
 #endif
