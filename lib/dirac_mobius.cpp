@@ -411,6 +411,7 @@ namespace quda {
     in_ = in;
 
     ColorSpinorField *unextended_tmp1 = new cudaColorSpinorField(csParam);
+    ColorSpinorField *unextended_tmp2 = new cudaColorSpinorField(csParam);
 
     csParam.x[0] += 2; // x direction is checkerboarded
     for (int i = 1; i < 4; ++i) { csParam.x[i] += 4; }
@@ -424,11 +425,11 @@ namespace quda {
     int odd_bit = (getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, in_, *extended_gauge, out_, in_, mass, m5, b_5, c_5, dagger,
-                                             parity[1], shift2, shift2, dslash5pre);
-
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2,
-                                             *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
+      mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in_, *extended_gauge, *unextended_tmp2, in_, mass, m5, b_5, c_5, dagger,
+                                             parity[1], shift0, shift0, dslash5pre);
+      
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *unextended_tmp2, *extended_gauge, *extended_tmp2,
+                                             *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
                                              dslash4_dslash5pre_dslash5inv);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in_,
@@ -472,6 +473,7 @@ namespace quda {
       delete extended_tmp1;
 
       delete unextended_tmp1;
+      delete unextended_tmp2;
 
     } else {
       errorQuda("DiracMobiusPC::MdagMLocal(...) only supports half and quarter precision.\n");

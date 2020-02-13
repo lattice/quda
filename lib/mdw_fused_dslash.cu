@@ -183,7 +183,7 @@ namespace quda
     /**
     -> Everything should be understood in a 4d checkboarding sense.
     */
-    template <class storage_type, bool dagger, bool halo, class Vector, class Arg>
+    template <class storage_type, bool dagger, bool halo, bool back, class Vector, class Arg>
     __device__ inline void apply_wilson_5d(Vector &out, int coordinate[4], Arg &arg, int s)
     {
 
@@ -199,7 +199,12 @@ namespace quda
         coordinate[d]++;
         if (!halo || !is_halo_4d(coordinate, arg.dim, arg.halo_shift)) {
           // Forward gather - compute fwd offset for vector fetch
-          const int fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+          int fwd_idx;
+          if(back){
+            fwd_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+          }else{
+            fwd_idx = s * arg.volume_4d_cb + index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
+          }
           constexpr int proj_dir = dagger ? +1 : -1;
 
           const Link U = arg.U(d, index_4d_cb, arg.parity);
@@ -211,7 +216,12 @@ namespace quda
           // Backward gather - compute back offset for spinor and gauge fetch
           const int gauge_idx = index_4d_cb_from_coordinate_4d(coordinate, arg.dim);
 
-          const int back_idx = s * arg.volume_4d_cb + gauge_idx;
+          int back_idx;
+          if(back){
+            back_idx = index_from_extended_coordinate(coordinate, arg.dim, s);
+          }else{
+            back_idx = s * arg.volume_4d_cb + gauge_idx;
+          }
           constexpr int proj_dir = dagger ? -1 : +1;
 
           const Link U = arg.U(d, gauge_idx, 1 - arg.parity);
@@ -365,13 +375,13 @@ namespace quda
         if (!idle) {
           // the Wilson hopping terms
           if (type_ == 0) {
-            apply_wilson_5d<storage_type, false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
+            apply_wilson_5d<storage_type, false, true,  true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
           } else if (type_ == 2) {
-            apply_wilson_5d<storage_type, true, false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
+            apply_wilson_5d<storage_type, true, false, false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
           } else if (type_ == 1) {
-            apply_wilson_5d<storage_type, false, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
+            apply_wilson_5d<storage_type, false, true, false>(in_vec, x, arg, threadIdx.y); // dagger = false; halo =  true
           } else if (type_ == 3) {
-            apply_wilson_5d<storage_type, true, false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
+            apply_wilson_5d<storage_type, true, false, false>(in_vec, x, arg, threadIdx.y); // dagger =  true; halo = false
           } else if (type_ == 4) {
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             in_vec = arg.in(sid_shift, explicit_parity);
@@ -465,7 +475,7 @@ namespace quda
         const long long dim[4] = {arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3]};
         const long long b_m0 = ((dim[0] - 0) * (dim[1] - 0) * (dim[2] - 0) * (dim[3] - 0) / 2) * arg.Ls * (24 * 2 + 4);
         const long long b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * arg.Ls * (24 * 2 + 4);
-        const long long b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * arg.Ls * (24 * 2 + 4);
+        const long long b_m2 = (dim[0] * dim[1] * dim[2] * dim[3] / 2) * arg.Ls * (24 * 2 + 4);
         switch (arg.type) {
         case 0: return b_m1 + b_m2 + arg.U.Bytes();
         case 1: return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
@@ -550,7 +560,7 @@ namespace quda
       virtual unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
       virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
       unsigned int min_block_size() const { return 16; }
-      unsigned int max_block_size() const { return 16; }
+      unsigned int max_block_size() const { return 32; }
       unsigned int step_block_size() const { return 8; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
@@ -624,8 +634,8 @@ namespace quda
         switch (tp.block.x) {
         // case 8: apply<8, reload, type>(tp, arg, stream); break;
         case 16: apply<16, reload, type>(tp, arg, stream); break;
-        // case 24: apply<24, reload, type>(tp, arg, stream); break;
-        // case 32: apply<32, reload, type>(tp, arg, stream); break;
+        case 24: apply<24, reload, type>(tp, arg, stream); break;
+        case 32: apply<32, reload, type>(tp, arg, stream); break;
         default: errorQuda("NOT valid tp.block.x(=%d)\n", tp.block.x);
         }
       }
@@ -687,19 +697,19 @@ namespace quda
                                             type);
         FusedDslash<storage_type, 8, FusedDslashArg<storage_type, 8>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break;
+      } break; */
       case 12: {
         FusedDslashArg<storage_type, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                              type);
         FusedDslash<storage_type, 12, FusedDslashArg<storage_type, 12>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; */
+      } break; /**
       case 16: {
         FusedDslashArg<storage_type, 16> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
         FusedDslash<storage_type, 16, FusedDslashArg<storage_type, 16>> dslash(arg, in);
         dslash.apply(streams[Nstream - 1]);
-      } break; /**
+      } break;
       case 20: {
         FusedDslashArg<storage_type, 20> arg(
             out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
