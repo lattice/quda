@@ -308,6 +308,20 @@ namespace quda {
 #endif
   }
 
+  template <> __device__ __host__ inline short8 vector_load(void *ptr, int idx) {
+    float4 tmp = vector_load<float4>(ptr, idx);
+    short8 recast;
+    memcpy(&recast, &tmp, sizeof(float4));
+    return recast;
+  }
+
+  template <> __device__ __host__ inline char8 vector_load(void *ptr, int idx) {
+    float2 tmp = vector_load<float2>(ptr, idx);
+    char8 recast;
+    memcpy(&recast, &tmp, sizeof(float2));
+    return recast;
+  }
+
   template <typename VectorType>
     __device__ __host__ inline void vector_store(void *ptr, int idx, const VectorType &value) {
     reinterpret_cast< VectorType* >(ptr)[idx] = value;
