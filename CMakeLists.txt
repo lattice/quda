@@ -420,7 +420,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
