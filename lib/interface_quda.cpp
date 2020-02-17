@@ -674,6 +674,17 @@ void initQudaMemory()
   profileInit.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
+void mem_info(const char *tag)
+{
+  size_t avail,total;
+  double GB=1.0/(1024*1024*1024);
+  hipMemGetInfo( &avail, &total );
+  printfQuda("RAM_GPU(%s): total %13.5f / free %13.5f\n",tag,
+        total*GB, avail*GB);  
+  fflush(stdout);
+}
+
+
 void updateR()
 {
   for (int d=0; d<4; d++) R[d] = 2 * (redundant_comms || commDimPartitioned(d));
@@ -5409,12 +5420,11 @@ void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertP
 
      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
        double q2 = blas::norm2(*q);
-       double qbar2 = blas::norm2(*qbar);
-       printfQuda("In QUDA: norm2(q) %e  nor2(qbar) %e\n", q2, qbar2);
+       double q2h = blas::norm2(*in_q);
+       printfQuda("In QUDA: norm2(q) %e  nor2(q_cpu) %e\n", q2, q2h);
      }
 
      ColorSpinorField * tmp=ColorSpinorField::Create(cudaParam);
-
 
 //setup covDev operator;
      DiracParam diracParam;
@@ -5425,7 +5435,6 @@ void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertP
      for(int i=0;i<s_q.pre_shift.size();i+=2)
      for(int j=0;j<s_q.pre_shift[i];j++)
      {
-         *tmp=*q;
          dirac.MCD(*tmp,*q,s_q.pre_shift[i+1]);
          *q = *tmp;
      }
@@ -5433,12 +5442,13 @@ void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertP
      for(int i=0;i<s_qbar.pre_shift.size();i+=2)
      for(int j=0;j<s_qbar.pre_shift[i];j++)
      {
-         *tmp=*qbar;
          dirac.MCD(*tmp,*qbar,s_qbar.pre_shift[i+1]);
          *qbar = *tmp;
      }
      size_t data_bytes = q->Volume() * q->Nspin() * q->Nspin() * 2 * q->Precision();
      void *d_result = pool_device_malloc(data_bytes);
+     
+     mem_info("d_result allocated");
 
      contractQuda(*q,*qbar,d_result,QUDA_CONTRACT_TYPE_DR);
      qudaMemcpy(h_out[0], d_result, data_bytes, hipMemcpyDeviceToHost);
@@ -5447,7 +5457,6 @@ void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertP
      for(int i=0;i<s_q.post_shift.size();i+=2)
      for(int j=0;j<s_q.post_shift[i];j++)
      {
-         *tmp=*q;
          dirac.MCD(*tmp,*q,(s_q.post_shift[i+1]+4)%8);
          *q = *tmp;
          contractQuda(*q,*qbar,d_result,QUDA_CONTRACT_TYPE_DR);
@@ -5455,8 +5464,10 @@ void LaMETQuda( std::vector< void * >h_out, void *h_q, void *h_qbar, QudaInvertP
          count++;
      }
 
-     delete in_q,in_qbar;
-     delete q,qbar;
+     delete in_q;
+     delete in_qbar;
+     delete q;
+     delete qbar;
      delete tmp;
      pool_device_free(d_result); 
 }
