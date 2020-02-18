@@ -5785,8 +5785,6 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
 void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 {
   profileGaugeObs.TPSTART(QUDA_PROFILE_TOTAL);
-
-  profileGaugeObs.TPSTART(QUDA_PROFILE_INIT);
   checkGaugeObservableParam(param);
 
   cudaGaugeField *gauge = nullptr;
@@ -5796,7 +5794,6 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   } else {
     gauge = gaugeSmeared;
   }
-  profileGaugeObs.TPSTOP(QUDA_PROFILE_INIT);
 
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);

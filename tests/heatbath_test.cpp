@@ -274,7 +274,6 @@ int main(int argc, char **argv)
     freeGaugeQuda();
 
     for(int step=1; step<=nsteps; ++step){
-      printfQuda("Step %d\n", step);
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
