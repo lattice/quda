@@ -1369,8 +1369,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
                && gauge_param.reconstruct == gaugeFatSloppy->Reconstruct()) {
       gaugeFatPrecondition = gaugeFatSloppy;
     } else {
-      gaugePrecondition = new cudaGaugeField(gauge_param);
-      gaugePrecondition->copy(*gaugeFatPrecise);
+      gaugeFatPrecondition = new cudaGaugeField(gauge_param);
+      gaugeFatPrecondition->copy(*gaugeFatPrecise);
     }
 
     // switch the parameters for creating the mirror refinement cuda gauge field
@@ -1417,8 +1417,8 @@ void loadSloppyGaugeQuda(const QudaPrecision *prec, const QudaReconstructType *r
                && gauge_param.reconstruct == gaugeLongSloppy->Reconstruct()) {
       gaugeLongPrecondition = gaugeLongSloppy;
     } else {
-      gaugePrecondition = new cudaGaugeField(gauge_param);
-      gaugePrecondition->copy(*gaugeLongPrecise);
+      gaugeLongPrecondition = new cudaGaugeField(gauge_param);
+      gaugeLongPrecondition->copy(*gaugeLongPrecise);
     }
 
     // switch the parameters for creating the mirror refinement cuda gauge field
