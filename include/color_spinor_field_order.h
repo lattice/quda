@@ -821,11 +821,6 @@ namespace quda {
       typedef typename TexVectorType<real, N>::type TexVector;
       cudaTextureObject_t tex;
       cudaTextureObject_t texNorm;
-      const int tex_offset;
-#if 0 // unused at present
-        cudaTextureObject_t ghostTex;
-        cudaTextureObject_t ghostTexNorm;
-#endif
 #endif
       int volumeCB;
       int faceVolumeCB[4];
@@ -839,13 +834,12 @@ namespace quda {
       FloatNOrder(const ColorSpinorField &a, int nFace = 1, Float *field_ = 0, norm_type *norm_ = 0, Float **ghost_ = 0,
           bool override = false) :
           field(field_ ? field_ : (Float *)a.V()),
-          offset(a.Bytes() / (2 * sizeof(Float))),
+          offset(a.Bytes() / (2 * sizeof(Float) * N)),
           norm(norm_ ? norm_ : (norm_type *)a.Norm()),
           norm_offset(a.NormBytes() / (2 * sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
           tex(0),
           texNorm(0),
-          tex_offset(offset / N),
 #endif
           volumeCB(a.VolumeCB()),
           stride(a.Stride()),
@@ -890,7 +884,7 @@ namespace quda {
       // use textures unless we have a large alloc
       nrm = !huge_alloc ? tex1Dfetch_<float>(texNorm, x + parity * norm_offset) : norm[x + parity * norm_offset];
 #else
-      nrm = norm[x + parity * norm_offset];
+      nrm = vector_load<float>(norm, x + parity * norm_offset);
 #endif
     }
 
@@ -899,7 +893,7 @@ namespace quda {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
       if (!huge_alloc) { // use textures unless we have a huge alloc
         // first do texture load from memory
-        TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*i + x);
+        TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*offset + stride*i + x);
         // now insert into output array
 #pragma unroll
         for (int j = 0; j < N; j++) copy(v[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
@@ -911,7 +905,7 @@ namespace quda {
 #endif
       {
         // first load from memory
-        Vector vecTmp = vector_load<Vector>(field + parity*offset, x + stride*i);
+        Vector vecTmp = vector_load<Vector>(field, parity*offset + x + stride*i);
         // now copy into output and scale
 #pragma unroll
         for (int j = 0; j < N; j++) copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
@@ -958,7 +952,7 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N + j]);
       // second do vectorized copy into memory
-      vector_store(field + parity*offset, x + stride*i, vecTmp);
+      vector_store(field, parity*offset + x + stride*i, vecTmp);
     }
   }
 
@@ -994,28 +988,13 @@ namespace quda {
   {
     real v[length_ghost];
     norm_type nrm;
-    if (isFixed<Float>::value) { nrm = ghost_norm[2 * dim + dir][parity * faceVolumeCB[dim] + x]; }
+    if (isFixed<Float>::value) { nrm = vector_load<float>(ghost_norm[2 * dim + dir], parity * faceVolumeCB[dim] + x); }
 
 #pragma unroll
-    for (int i = 0; i < M_ghost; i++) {                         // to do - add texture support
-                                                                // first do vectorized copy from memory into registers
-#if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__) && 0 // buggy - need to account for dim/dir offset
-      if (!huge_alloc) {                                        // use textures unless we have a huge alloc
-        TexVector vecTmp = tex1Dfetch_<TexVector>(ghostTex, parity * tex_offset + stride * i + x);
+    for (int i = 0; i < M_ghost; i++) {
+      GhostVector vecTmp = vector_load<GhostVector>(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x);
 #pragma unroll
-        for (int j = 0; j < N_ghost; j++) copy(v[i * N_ghost + j], reinterpret_cast<real *>(&vecTmp)[j]);
-        if (isFixed<Float>::value) {
-#pragma unroll
-          for (int i = 0; i < N_ghost; i++) v[i * N_ghost + j] *= nrm;
-        }
-      } else
-#endif
-      {
-        GhostVector vecTmp = vector_load<GhostVector>(
-            ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N_ghost, i * faceVolumeCB[dim] + x);
-#pragma unroll
-        for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
-      }
+      for (int j = 0; j < N_ghost; j++) copy_and_scale(v[i * N_ghost + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm);
     }
 
 #pragma unroll
@@ -1060,7 +1039,7 @@ namespace quda {
 #pragma unroll
       for (int j = 0; j < N_ghost; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], v[i * N_ghost + j]);
       // second do vectorized copy into memory
-      vector_store(ghost[2 * dim + dir] + parity * faceVolumeCB[dim] * M_ghost * N_ghost, i * faceVolumeCB[dim] + x, vecTmp);
+      vector_store(ghost[2 * dim + dir], parity * faceVolumeCB[dim] * M_ghost + i * faceVolumeCB[dim] + x, vecTmp);
     }
   }
 
