@@ -34,7 +34,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-#define mySpinorSiteSize 6
+#define my_spinor_site_size 6
 
 void **ghost_fatlink, **ghost_longlink;
 
@@ -214,7 +214,7 @@ void eigensolve_test()
     // Host side arrays to store the eigenpairs computed by QUDA
     void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
     for (int i = 0; i < eig_nConv; i++) {
-      host_evecs[i] = (void *)malloc(V * mySpinorSiteSize * eig_inv_param.cpu_prec);
+      host_evecs[i] = (void *)malloc(V * my_spinor_site_size * eig_inv_param.cpu_prec);
     }
     double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
 

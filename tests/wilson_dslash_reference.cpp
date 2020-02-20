@@ -104,7 +104,7 @@ void multiplySpinorByDiracProjector(Float *res, int projIdx, Float *spinorIn) {
 
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int oddBit, int daggerBit) {
-  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*my_spinor_site_size; i++) res[i] = 0.0;
   
   gFloat *gaugeEven[4], *gaugeOdd[4];
   for (int dir = 0; dir < 4; dir++) {  
@@ -136,7 +136,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull, sFloat *spinorField, int o
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFloat *spinorField, 
 		     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit) {
-  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*my_spinor_site_size; i++) res[i] = 0.0;
   
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
@@ -154,7 +154,7 @@ void dslashReference(sFloat *res, gFloat **gaugeFull,  gFloat **ghostGauge, sFlo
       gFloat *gauge = gaugeLink_mg4dir(i, dir, oddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);
       sFloat *spinor = spinorNeighbor_mg4dir(i, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
       
-      sFloat projectedSpinor[mySpinorSiteSize], gaugedSpinor[mySpinorSiteSize];
+      sFloat projectedSpinor[my_spinor_site_size], gaugedSpinor[my_spinor_site_size];
       int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
       multiplySpinorByDiracProjector(projectedSpinor, projIdx, spinor);
       

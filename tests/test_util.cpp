@@ -42,7 +42,7 @@ int Ls;
 int V5;
 int V5h;
 
-int mySpinorSiteSize;
+int my_spinor_site_size;
 
 extern float fat_link_max;
 
@@ -224,7 +224,7 @@ void dw_setDims(int *X, const int L5)
 
 void setSpinorSiteSize(int n)
 {
-  mySpinorSiteSize = n;
+  my_spinor_site_size = n;
 }
 
 

@@ -37,7 +37,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-#define mySpinorSiteSize 6
+#define my_spinor_site_size 6
 
 // extern void usage(char** argv);
 
@@ -436,9 +436,9 @@ int invert_test()
     printfQuda("\n\n");
     */
 
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
 
     hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
     l2r = sqrt(nrm2 / src2);
@@ -502,9 +502,9 @@ int invert_test()
       printfQuda("%f %f\n", ((double *)in->V())[12], ((double *)ref->V())[12]);
     }
 
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
 
     hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
     l2r = sqrt(nrm2 / src2);
@@ -594,9 +594,9 @@ int invert_test()
           matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, spinorOutArray[i], masses[i], 0,
                     inv_param.cpu_prec, gauge_param.cpu_prec, tmp, parity, dslash_type);
 
-          mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-          double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-          double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
+          mxpy(in->V(), ref->V(), len*my_spinor_site_size, inv_param.cpu_prec);
+          double nrm2 = norm_2(ref->V(), len*my_spinor_site_size, inv_param.cpu_prec);
+          double src2 = norm_2(in->V(), len*my_spinor_site_size, inv_param.cpu_prec);
           double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
           double l2r = sqrt(nrm2/src2);
 

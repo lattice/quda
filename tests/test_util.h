@@ -25,7 +25,7 @@ extern int Ls;
 extern int V5;
 extern int V5h;
   
-extern int mySpinorSiteSize;
+extern int my_spinor_site_size;
 extern size_t host_gauge_data_type_size;
 extern size_t host_spinor_data_type_size;
 

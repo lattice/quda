@@ -36,7 +36,7 @@
 // Various CPU fields lifted from
 // staggered_invert_test.cpp
 
-#define mySpinorSiteSize 6
+#define my_spinor_site_size 6
 
 static int n_naiks = 1;
 
@@ -469,9 +469,9 @@ int main(int argc, char **argv)
     printfQuda("\n\n");
     */
 
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
 
   } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
@@ -484,9 +484,9 @@ int main(int argc, char **argv)
       printfQuda("%f %f\n", ((double *)in->V())[12], ((double *)ref->V())[12]);
     }
 
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
+    mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+    src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
   }
 
   double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
