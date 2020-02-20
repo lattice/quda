@@ -25,10 +25,8 @@ namespace quda {
     static cudaStream_t *blasStream;
 
     static cudaStream_t *auxBlasStream;
-
-    static cudaEvent_t auxBlasEvent;
-
-    static bool run_aux_blas_stream;
+    static cudaEvent_t  auxBlasEvent;
+    static bool         run_aux_blas_stream;
 
 
     template <typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
@@ -548,7 +546,7 @@ namespace quda {
     #else
       cudaStreamCreate(auxBlasStream);
     #endif
-      run_aux_blas_stream = true;
+      //run_aux_blas_stream = true;
 
       checkCudaError();
     }

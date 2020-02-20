@@ -1247,13 +1247,13 @@ namespace quda {
 
     blas::createAuxBlasStream();
 
+    PrintStats("CAeigCG", k, nu, b2, heavy_quark_res);
+
     cudaProfilerStart();
 
     while ( !converged && k < param.maxiter ) {
       //Update search space
       PipelinedSearchSpaceUpdate(lanczos_diag, lanczos_offdiag, beta, sqrt(nu));
-
-      PrintStats("CAEigCG", k, nu, b2, heavy_quark_res);
 
       alpha_old_inv = alpha_inv;
       beta_old      = beta;
@@ -1297,6 +1297,8 @@ namespace quda {
 
       k++;
 
+      PrintStats("CAeigCG", k, nu, b2, heavy_quark_res);
+
       converged = (convergence(nu, heavy_quark_res, args.global_stop, param.tol_hq) or convergence(nu, heavy_quark_res, local_stop, param.tol_hq)) or convergence(rel_r2, heavy_quark_res, local_rel_stop, param.tol_hq);
     }
 
@@ -1333,7 +1335,7 @@ namespace quda {
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
-    PrintSummary("eigCG", k, gamma, b2, args.global_stop, param.tol_hq);
+    PrintSummary("CAeigCG", k, nu, b2, args.global_stop, param.tol_hq);
 
     // reset the flops counters
 

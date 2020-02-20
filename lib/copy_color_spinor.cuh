@@ -27,6 +27,8 @@ namespace quda {
 
   using namespace colorspinor;
 
+  namespace blas { cudaStream_t* getStream(); }
+
   template <typename FloatOut, typename FloatIn, int nSpin_, int nColor_, typename Out, typename In>
   struct CopyColorSpinorArg {
     using realOut = typename mapper<FloatOut>::type;
@@ -272,7 +274,8 @@ namespace quda {
   {
     CopyColorSpinorArg<FloatOut, FloatIn, Ns, Nc, Out, In> arg(outOrder, inOrder, out, in);
     CopyColorSpinor<Ns, decltype(arg)> copy(arg, out, in, location);
-    copy.apply(0);
+    //copy.apply(0);
+    copy.apply(*(blas::getStream()));
   }
 
   /** Decide on the output order*/
