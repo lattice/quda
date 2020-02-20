@@ -225,12 +225,12 @@ int invert_test()
   void* milc_longlink = nullptr;
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_inlink[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_fatlink[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_longlink[dir] = malloc(V*gauge_site_size*gSize);
   }
-  milc_fatlink = malloc(4*V*gaugeSiteSize*gSize);
-  milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
+  milc_fatlink = malloc(4*V*gauge_site_size*gSize);
+  milc_longlink = malloc(4 * V * gauge_site_size * gSize);
 
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -260,8 +260,8 @@ int invert_test()
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gaugeSiteSize * gSize);
-      memset(qdp_longlink[dir],0,V*gaugeSiteSize*gSize);
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize);
+      memset(qdp_longlink[dir],0,V*gauge_site_size*gSize);
     }
   } else { // QUDA_ASQTAD_DSLASH
 
@@ -269,7 +269,7 @@ int invert_test()
       computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
     } else {
       for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink[dir],qdp_inlink[dir], V*gauge_site_size*gSize);
       }
     }
 
@@ -281,8 +281,8 @@ int invert_test()
 
   // Alright, we've created all the void** links.
   // Create the void* pointers
-  reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   ColorSpinorParam csParam;
   csParam.nColor=3;

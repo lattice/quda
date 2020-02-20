@@ -144,13 +144,14 @@ int main(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  //size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  //size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+    //gauge[dir] = malloc(V*gauge_site_size*gSize);
+    gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);
   }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
@@ -171,8 +172,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V*cloverSiteSize*cSize);
-    clover_inv = malloc(V*cloverSiteSize*cSize);
+    clover = malloc(V*clover_site_size*cSize);
+    clover_inv = malloc(V*clover_site_size*cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
     inv_param.compute_clover = compute_clover;
@@ -181,17 +182,17 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorIn = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorCheck = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 
   void *spinorOut = NULL, **spinorOutMulti = NULL;
   if (multishift) {
     spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
     for (int i=0; i<inv_param.num_offset; i++) {
-      spinorOutMulti[i] = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+      spinorOutMulti[i] = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
     }
   } else {
-    spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+    spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
   }
 
   // initialize the QUDA library
@@ -272,15 +273,15 @@ int main(int argc, char **argv)
       errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
     }
 
-    void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+    void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 
     printfQuda("Host residuum checks: \n");
     for(int i=0; i < inv_param.num_offset; i++) {
-      ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+      ax(0, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh*spinorSiteSize;
+          int tm_offset = Vh*spinor_site_size;
 	  void *out0 = spinorCheck;
 	  void *out1 = (char*)out0 + tm_offset*cpu_prec;
 
@@ -320,10 +321,10 @@ int main(int argc, char **argv)
         exit(-1);
       }
 
-      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
-      mxpy(spinorIn, spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
-      double nrm2 = norm_2(spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
-      double src2 = norm_2(spinorIn, Vh*spinorSiteSize, inv_param.cpu_prec);
+      axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+      mxpy(spinorIn, spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+      double nrm2 = norm_2(spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+      double src2 = norm_2(spinorIn, Vh*spinor_site_size, inv_param.cpu_prec);
       double l2r = sqrt(nrm2 / src2);
 
       printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
@@ -340,7 +341,7 @@ int main(int argc, char **argv)
 	if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
 	  tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
 	} else {
-          int tm_offset = V*spinorSiteSize;
+          int tm_offset = V*spinor_site_size;
 	  void *evenOut = spinorCheck;
 	  void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
 
@@ -378,11 +379,11 @@ int main(int argc, char **argv)
         if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
             dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-          ax(0.5/kappa5, spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+          ax(0.5/kappa5, spinorCheck, V*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
         } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-          ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinor_site_size, inv_param.cpu_prec);
 	} else {
-          ax(0.5/inv_param.kappa, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.5/inv_param.kappa, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
         }
       }
 
@@ -390,7 +391,7 @@ int main(int argc, char **argv)
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh*spinorSiteSize;
+          int tm_offset = Vh*spinor_site_size;
 	  void *out0 = spinorCheck;
 	  void *out1 = (char*)out0 + tm_offset*cpu_prec;
 
@@ -436,22 +437,22 @@ int main(int argc, char **argv)
         if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
             dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-          ax(0.25/(kappa5*kappa5), spinorCheck, V*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+          ax(0.25/(kappa5*kappa5), spinorCheck, V*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
         } else {
-          ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinorSiteSize, inv_param.cpu_prec);
+          ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
       
 	}
       }
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
-      void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+      void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 
-      ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
+      ax(0, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
-          int tm_offset = Vh*spinorSiteSize;
+          int tm_offset = Vh*spinor_site_size;
 	  void *out0 = spinorCheck;
 	  void *out1 = (char*)out0 + tm_offset*cpu_prec;
 
@@ -517,9 +518,9 @@ int main(int argc, char **argv)
 
 
     int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
-    mxpy(spinorIn, spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    double nrm2 = norm_2(spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
-    double src2 = norm_2(spinorIn, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
+    mxpy(spinorIn, spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+    double nrm2 = norm_2(spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+    double src2 = norm_2(spinorIn, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
     double l2r = sqrt(nrm2 / src2);
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",

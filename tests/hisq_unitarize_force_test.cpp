@@ -150,7 +150,7 @@ static void hisq_force_test()
   
   printfQuda("Comparing CPU and GPU results\n");
   for(int dir=0; dir<4; ++dir){
-    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
+    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gauge_site_size, accuracy, gaugeParam.cpu_prec);
 #ifdef MULTI_GPU
     comm_allreduce_int(&res);
     res /= comm_size();

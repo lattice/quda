@@ -32,23 +32,23 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
   gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO; // probably irrelevant
 
   // inlink in different format
-  void *milc_inlink = pinned_malloc(4 * V * gaugeSiteSize * gSize);
-  reorderQDPtoMILC(milc_inlink, qdp_inlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  void *milc_inlink = pinned_malloc(4 * V * gauge_site_size * gSize);
+  reorderQDPtoMILC(milc_inlink, qdp_inlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   // Paths for step 1:
-  void *milc_vlink = pinned_malloc(4 * V * gaugeSiteSize * gSize); // V links
-  void *milc_wlink = pinned_malloc(4 * V * gaugeSiteSize * gSize); // W links
+  void *milc_vlink = pinned_malloc(4 * V * gauge_site_size * gSize); // V links
+  void *milc_wlink = pinned_malloc(4 * V * gauge_site_size * gSize); // W links
 
   // Paths for step 2:
-  void *milc_fatlink = pinned_malloc(4 * V * gaugeSiteSize * gSize);  // final fat ("X") links
-  void *milc_longlink = pinned_malloc(4 * V * gaugeSiteSize * gSize); // final long links
+  void *milc_fatlink = pinned_malloc(4 * V * gauge_site_size * gSize);  // final fat ("X") links
+  void *milc_longlink = pinned_malloc(4 * V * gauge_site_size * gSize); // final long links
 
   // Place to accumulate Naiks, step 3:
   void *milc_fatlink_eps = nullptr;
   void *milc_longlink_eps = nullptr;
   if (n_naiks > 1) {
-    milc_fatlink_eps = pinned_malloc(4 * V * gaugeSiteSize * gSize);  // epsilon fat links
-    milc_longlink_eps = pinned_malloc(4 * V * gaugeSiteSize * gSize); // epsilon long naiks
+    milc_fatlink_eps = pinned_malloc(4 * V * gauge_site_size * gSize);  // epsilon fat links
+    milc_longlink_eps = pinned_malloc(4 * V * gauge_site_size * gSize); // epsilon long naiks
   }
 
   // Create V links (fat7 links) and W links (unitarized V links), 1st path table set
@@ -59,11 +59,11 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
     computeKSLinkQuda(milc_fatlink, milc_longlink, nullptr, milc_wlink, act_path_coeffs[2], &gauge_param);
 
     // Rescale+copy Naiks into Naik field
-    cpu_axy(gauge_param.cpu_prec, eps_naik, milc_fatlink, milc_fatlink_eps, V * 4 * gaugeSiteSize);
-    cpu_axy(gauge_param.cpu_prec, eps_naik, milc_longlink, milc_longlink_eps, V * 4 * gaugeSiteSize);
+    cpu_axy(gauge_param.cpu_prec, eps_naik, milc_fatlink, milc_fatlink_eps, V * 4 * gauge_site_size);
+    cpu_axy(gauge_param.cpu_prec, eps_naik, milc_longlink, milc_longlink_eps, V * 4 * gauge_site_size);
   } else {
-    memset(milc_fatlink, 0, V * 4 * gaugeSiteSize * gSize);
-    memset(milc_longlink, 0, V * 4 * gaugeSiteSize * gSize);
+    memset(milc_fatlink, 0, V * 4 * gauge_site_size * gSize);
+    memset(milc_longlink, 0, V * 4 * gauge_site_size * gSize);
   }
 
   // Create X and long links, 2nd path table set
@@ -71,18 +71,18 @@ void computeHISQLinksGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_fat
 
   if (n_naiks > 1) {
     // Add into Naik field
-    cpu_xpy(gauge_param.cpu_prec, milc_fatlink, milc_fatlink_eps, V * 4 * gaugeSiteSize);
-    cpu_xpy(gauge_param.cpu_prec, milc_longlink, milc_longlink_eps, V * 4 * gaugeSiteSize);
+    cpu_xpy(gauge_param.cpu_prec, milc_fatlink, milc_fatlink_eps, V * 4 * gauge_site_size);
+    cpu_xpy(gauge_param.cpu_prec, milc_longlink, milc_longlink_eps, V * 4 * gauge_site_size);
   }
 
   // Copy back
-  reorderMILCtoQDP(qdp_fatlink, milc_fatlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  reorderMILCtoQDP(qdp_longlink, milc_longlink, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderMILCtoQDP(qdp_fatlink, milc_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+  reorderMILCtoQDP(qdp_longlink, milc_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   if (n_naiks > 1) {
     // Add into Naik field
-    reorderMILCtoQDP(qdp_fatlink_eps, milc_fatlink_eps, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
-    reorderMILCtoQDP(qdp_longlink_eps, milc_longlink_eps, V, gaugeSiteSize, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    reorderMILCtoQDP(qdp_fatlink_eps, milc_fatlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+    reorderMILCtoQDP(qdp_longlink_eps, milc_longlink_eps, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   }
 
   // Clean up GPU compute links
@@ -172,8 +172,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
   void *qdp_longlink_naik_temp[4];
   if (n_naiks == 2) {
     for (int dir = 0; dir < 4; dir++) {
-      qdp_fatlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
-      qdp_longlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
+      qdp_fatlink_naik_temp[dir] = malloc(V * gauge_site_size * gSize);
+      qdp_longlink_naik_temp[dir] = malloc(V * gauge_site_size * gSize);
     }
   }
 
@@ -190,8 +190,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
-      memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      memcpy(qdp_fatlink[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_longlink[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
       free(qdp_fatlink_naik_temp[dir]);
       qdp_fatlink_naik_temp[dir] = nullptr;
       free(qdp_longlink_naik_temp[dir]);
@@ -219,10 +219,10 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   void *qdp_longlink_naik_temp[4];
   if (n_naiks == 2) {
     for (int dir = 0; dir < 4; dir++) {
-      qdp_fatlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
-      qdp_longlink_naik_temp[dir] = malloc(V * gaugeSiteSize * gSize);
-      memset(qdp_fatlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
-      memset(qdp_longlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
+      qdp_fatlink_naik_temp[dir] = malloc(V * gauge_site_size * gSize);
+      qdp_longlink_naik_temp[dir] = malloc(V * gauge_site_size * gSize);
+      memset(qdp_fatlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
+      memset(qdp_longlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
     }
   }
 
@@ -237,10 +237,10 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
-      memcpy(qdp_longlink_cpu[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
-      memset(qdp_fatlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
-      memset(qdp_longlink_naik_temp[dir], 0, V * gaugeSiteSize * gSize);
+      memcpy(qdp_fatlink_cpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_longlink_cpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memset(qdp_fatlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
+      memset(qdp_longlink_naik_temp[dir], 0, V * gauge_site_size * gSize);
     }
   }
 
@@ -257,8 +257,8 @@ void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, vo
   if (n_naiks == 2) {
     // Override the naik fields into the fat/long link fields
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gaugeSiteSize * gSize);
-      memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gaugeSiteSize * gSize);
+      memcpy(qdp_fatlink_gpu[dir], qdp_fatlink_naik_temp[dir], V * gauge_site_size * gSize);
+      memcpy(qdp_longlink_gpu[dir], qdp_longlink_naik_temp[dir], V * gauge_site_size * gSize);
       free(qdp_fatlink_naik_temp[dir]);
       qdp_fatlink_naik_temp[dir] = nullptr;
       free(qdp_longlink_naik_temp[dir]);

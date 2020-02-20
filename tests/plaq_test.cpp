@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
   void *gauge[4];
 
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * gSize); }
 
   initQuda(device);
 

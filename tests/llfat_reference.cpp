@@ -934,7 +934,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   ///////////////////////////////
 
   void* sitelink_ex[4];
-  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gaugeSiteSize*gSize);
+  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gauge_site_size*gSize);
 
 
 #ifdef MULTI_GPU
@@ -988,7 +988,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     for(int dir= 0; dir < 4; dir++){
       char* src = (char*)sitelink[dir];
       char* dst = (char*)sitelink_ex[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+      memcpy(dst+i*gauge_site_size*gSize, src+idx*gauge_site_size*gSize, gauge_site_size*gSize);
     }//dir
   }//i
 
@@ -1000,9 +1000,9 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   void* w_reflink[4];         // unitarized V link
   void* w_reflink_ex[4];      // extended W link
   for(int i=0;i < 4;i++){
-    v_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    w_reflink[i] = safe_malloc(V*gaugeSiteSize*gSize);
-    w_reflink_ex[i] = safe_malloc(V_ex*gaugeSiteSize*gSize);
+    v_reflink[i] = safe_malloc(V*gauge_site_size*gSize);
+    w_reflink[i] = safe_malloc(V*gauge_site_size*gSize);
+    w_reflink_ex[i] = safe_malloc(V_ex*gauge_site_size*gSize);
   }
 
 #ifdef MULTI_GPU
@@ -1011,7 +1011,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 #endif
 
   // Copy of V link needed for CPU unitarization routines
-  void* v_sitelink = pinned_malloc(4*V*gaugeSiteSize*gSize);
+  void* v_sitelink = pinned_malloc(4*V*gauge_site_size*gSize);
 
 
   //FIXME: we have this complication because references takes coeff as float/double
@@ -1033,7 +1033,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   //we need x,y,z site links in the back and forward T slice
   // so it is 3*2*Vs_t
   int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-  for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
+  for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gauge_site_size*gSize);
 
   /*
      nu |     |
@@ -1058,8 +1058,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
             break;
           }
         }
-        ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-        memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+        ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gauge_site_size*gSize);
+        memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gauge_site_size*gSize);
       }
 
     }
@@ -1077,14 +1077,14 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // This is based on "unitarize_link_test.cpp"
 
   // Format change
-  reorderQDPtoMILC(v_sitelink,v_reflink,V,gaugeSiteSize,prec,prec);
+  reorderQDPtoMILC(v_sitelink,v_reflink,V,gauge_site_size,prec,prec);
   /*if (prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(v_sitelink);
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(v_reflink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for(int j=0; j<gauge_site_size; j++){
+          link[(i*4 + dir)*gauge_site_size + j] = slink[i*gauge_site_size + j];
         }
       }
     }
@@ -1093,8 +1093,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(v_reflink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for(int j=0; j<gauge_site_size; j++){
+          link[(i*4 + dir)*gauge_site_size + j] = slink[i*gauge_site_size + j];
         }
       }
     }
@@ -1112,14 +1112,14 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  reorderMILCtoQDP(w_reflink,cpuWLink->Gauge_p(),V,gaugeSiteSize,prec,prec);
+  reorderMILCtoQDP(w_reflink,cpuWLink->Gauge_p(),V,gauge_site_size,prec,prec);
   /*if (prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(cpuWLink->Gauge_p());
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(w_reflink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          slink[i*gaugeSiteSize + j] = link[(i*4 + dir)*gaugeSiteSize + j];
+        for(int j=0; j<gauge_site_size; j++){
+          slink[i*gauge_site_size + j] = link[(i*4 + dir)*gauge_site_size + j];
         }
       }
     }
@@ -1128,8 +1128,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(w_reflink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          slink[i*gaugeSiteSize + j] = link[(i*4 + dir)*gaugeSiteSize + j];
+        for(int j=0; j<gauge_site_size; j++){
+          slink[i*gauge_site_size + j] = link[(i*4 + dir)*gauge_site_size + j];
         }
       }
     }
@@ -1186,7 +1186,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     for(int dir= 0; dir < 4; dir++){
       char* src = (char*)w_reflink[dir];
       char* dst = (char*)w_reflink_ex[dir];
-      memcpy(dst+i*gaugeSiteSize*gSize, src+idx*gaugeSiteSize*gSize, gaugeSiteSize*gSize);
+      memcpy(dst+i*gauge_site_size*gSize, src+idx*gauge_site_size*gSize, gauge_site_size*gSize);
     }//dir
   }//i
 
@@ -1198,7 +1198,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   optflag = 0;
   //we need x,y,z site links in the back and forward T slice
   // so it is 3*2*Vs_t
-  for (int i=0; i < 4; i++) ghost_wlink[i] = safe_malloc(8*Vs[i]*gaugeSiteSize*gSize);
+  for (int i=0; i < 4; i++) ghost_wlink[i] = safe_malloc(8*Vs[i]*gauge_site_size*gSize);
 
   /*
      nu |     |
@@ -1223,8 +1223,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
             break;
           }
         }
-        ghost_wlink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
-        memset(ghost_wlink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gaugeSiteSize*gSize);
+        ghost_wlink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gauge_site_size*gSize);
+        memset(ghost_wlink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gauge_site_size*gSize);
       }
 
     }
@@ -1257,8 +1257,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 
     // Rescale fat and long links into eps links
     for (int i = 0; i < 4; i++) {
-      cpu_axy(prec, eps_naik, fatlink[i], fatlink_eps[i], V*gaugeSiteSize);
-      cpu_axy(prec, eps_naik, longlink[i], longlink_eps[i], V*gaugeSiteSize);
+      cpu_axy(prec, eps_naik, fatlink[i], fatlink_eps[i], V*gauge_site_size);
+      cpu_axy(prec, eps_naik, longlink[i], longlink_eps[i], V*gauge_site_size);
     }
   }
 
@@ -1290,8 +1290,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   if (n_naiks > 1) {
     // Accumulate into eps links.
     for (int i = 0; i < 4; i++) {
-      cpu_xpy(prec, fatlink[i], fatlink_eps[i], V*gaugeSiteSize);
-      cpu_xpy(prec, longlink[i], longlink_eps[i], V*gaugeSiteSize);
+      cpu_xpy(prec, fatlink[i], fatlink_eps[i], V*gauge_site_size);
+      cpu_xpy(prec, longlink[i], longlink_eps[i], V*gauge_site_size);
     }
   }
 

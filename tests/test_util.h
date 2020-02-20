@@ -4,15 +4,11 @@
 #include <random_quda.h>
 #include <vector>
 
-#define gaugeSiteSize 18 // real numbers per link
-#define spinorSiteSize 24 // real numbers per spinor
-#define cloverSiteSize 72 // real numbers per block-diagonal clover matrix
-#define momSiteSize    10 // real numbers per momentum
-#define hwSiteSize    12 // real numbers per half wilson
-
-#ifdef __cplusplus
-//extern "C" {
-#endif
+#define gauge_site_size 18 // real numbers per link
+#define spinor_site_size 24 // real numbers per spinor
+#define clover_site_size 72 // real numbers per block-diagonal clover matrix
+#define mom_site_size    10 // real numbers per momentum
+#define hw_site_size    12 // real numbers per half wilson
 
 extern int Z[4];
 extern int V;
@@ -30,10 +26,10 @@ extern int V5;
 extern int V5h;
   
 extern int mySpinorSiteSize;
+extern size_t host_gauge_data_type_size;
+extern size_t host_spinor_data_type_size;
 
-//extern double kappa5;
-
-// Set QUDA precisions
+// QUDA precisions
 extern QudaPrecision &cpu_prec;
 extern QudaPrecision &cuda_prec;
 extern QudaPrecision &cuda_prec_sloppy;

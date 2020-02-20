@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 
   void *gauge[4], *clover = 0, *clover_inv = 0;
 
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * gSize); }
 
   if (strcmp(latfile, "")) { // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -151,8 +151,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = eig_inv_param.clover_cpu_prec;
-    clover = malloc(V * cloverSiteSize * cSize);
-    clover_inv = malloc(V * cloverSiteSize * cSize);
+    clover = malloc(V * clover_site_size * cSize);
+    clover_inv = malloc(V * clover_site_size * cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, eig_inv_param.clover_cpu_prec);
 
     eig_inv_param.compute_clover = compute_clover;

@@ -174,24 +174,24 @@ invert_test(void)
 
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   for (int dir = 0; dir < 4; dir++) {
-    qdp_fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_longlink[dir] = malloc(V*gauge_site_size*gSize);
   }
-  fatlink = malloc(4*V*gaugeSiteSize*gSize);
-  longlink = malloc(4*V*gaugeSiteSize*gSize);
+  fatlink = malloc(4*V*gauge_site_size*gSize);
+  longlink = malloc(4*V*gauge_site_size*gSize);
 
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
 				 &gaugeParam, dslash_type);
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
-      for(int j=0; j<gaugeSiteSize; ++j){
+      for(int j=0; j<gauge_site_size; ++j){
         if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          ((double*)fatlink)[(i*4 + dir)*gauge_site_size + j] = ((double*)qdp_fatlink[dir])[i*gauge_site_size + j];
+          ((double*)longlink)[(i*4 + dir)*gauge_site_size + j] = ((double*)qdp_longlink[dir])[i*gauge_site_size + j];
         }else{
-          ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          ((float*)fatlink)[(i*4 + dir)*gauge_site_size + j] = ((float*)qdp_fatlink[dir])[i*gauge_site_size + j];
+          ((float*)longlink)[(i*4 + dir)*gauge_site_size + j] = ((float*)qdp_longlink[dir])[i*gauge_site_size + j];
         }
       }
     }

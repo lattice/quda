@@ -109,7 +109,7 @@ int main(int argc, char **argv)
   void *load_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    load_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+    load_gauge[dir] = malloc(V*gauge_site_size*gSize);
   }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
@@ -253,7 +253,7 @@ int main(int argc, char **argv)
       size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];
       for (int dir = 0; dir < 4; dir++) {
-        cpu_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+        cpu_gauge[dir] = malloc(V*gauge_site_size*gSize);
       }
 
       // copy into regular field

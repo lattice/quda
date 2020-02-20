@@ -55,6 +55,9 @@ QudaPrecision &cuda_prec_refinement_sloppy = prec_refinement_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 QudaPrecision &cuda_prec_ritz = prec_ritz;
 
+size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+
 /**
  * For MPI, the default node mapping is lexicographical with t varying fastest.
  */
@@ -242,15 +245,15 @@ void printSpinorElement(void *spinor, int X, QudaPrecision precision) {
 void printGaugeElement(void *gauge, int X, QudaPrecision precision) {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m=0; m<3; m++) printVector((double*)gauge +(X/2)*gaugeSiteSize + m*3*2);
+      for (int m=0; m<3; m++) printVector((double*)gauge +(X/2)*gauge_site_size + m*3*2);
     else
-      for (int m=0; m<3; m++) printVector((float*)gauge +(X/2)*gaugeSiteSize + m*3*2);
+      for (int m=0; m<3; m++) printVector((float*)gauge +(X/2)*gauge_site_size + m*3*2);
 
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Vh)*gaugeSiteSize + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Vh)*gauge_site_size + m*3*2);
     else
-      for (int m = 0; m < 3; m++) printVector((float*)gauge + (X/2+Vh)*gaugeSiteSize + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((float*)gauge + (X/2+Vh)*gauge_site_size + m*3*2);
   }
 }
 
@@ -719,7 +722,7 @@ template <typename Float>
 static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
-    for (int i = 0; i < gaugeSiteSize*Vh*2; i++) {
+    for (int i = 0; i < gauge_site_size*Vh*2; i++) {
       gauge[d][i] /= param->anisotropy;
     }
   }
@@ -727,9 +730,9 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
   // Apply boundary conditions to temporal links
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
-      for (int i = 0; i < gaugeSiteSize; i++) {
-	gauge[3][j*gaugeSiteSize+i] *= -1.0;
-	gauge[3][(Vh+j)*gaugeSiteSize+i] *= -1.0;
+      for (int i = 0; i < gauge_site_size; i++) {
+	gauge[3][j*gauge_site_size+i] *= -1.0;
+	gauge[3][(Vh+j)*gauge_site_size+i] *= -1.0;
       }
     }
   }
@@ -740,7 +743,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
-    Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
+    Float *odd  = gauge[dir]+Vh*gauge_site_size;
     for (int i = 0; i< iMax; i++) {
       for (int m = 0; m < 3; m++) {
 	for (int n = 0; n < 3; n++) {
@@ -766,7 +769,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   // rescale long links by the appropriate coefficient
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     for(int d=0; d<4; d++){
-      for(int i=0; i < V*gaugeSiteSize; i++){
+      for(int i=0; i < V*gauge_site_size; i++){
 	gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
       }
     }
@@ -803,7 +806,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
 
       for (int j=0; j < 18; j++) {
-	gauge[d][i*gaugeSiteSize + j] *= sign;
+	gauge[d][i*gauge_site_size + j] *= sign;
       }
     }
     //odd
@@ -833,7 +836,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
 
       for (int j=0; j<18; j++){
-	gauge[d][(Vh+i)*gaugeSiteSize + j] *= sign;
+	gauge[d][(Vh+i)*gauge_site_size + j] *= sign;
       }
     }
 
@@ -854,8 +857,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
 
       for (int i=0; i<18; i++) {
-	gauge[3][j*gaugeSiteSize + i] *= sign;
-	gauge[3][(Vh+j)*gaugeSiteSize + i] *= sign;
+	gauge[3][j*gauge_site_size + i] *= sign;
+	gauge[3][(Vh+j)*gauge_site_size + i] *= sign;
       }
     }
   }
@@ -876,7 +879,7 @@ static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -917,7 +920,7 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -994,7 +997,7 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
+    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -1110,12 +1113,12 @@ void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, Q
       const complex<double> z = polar(1.0, phase);
       for (int dir = 0; dir < 4; ++dir) {
         for (int i = 0; i < V; ++i) {
-          for (int j = 0; j < gaugeSiteSize; j += 2) {
+          for (int j = 0; j < gauge_site_size; j += 2) {
             if (precision == QUDA_DOUBLE_PRECISION) {
-              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gauge_site_size + j]));
               *l *= z;
             } else {
-              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gauge_site_size + j]));
               *l *= z;
             }
           }
@@ -1129,13 +1132,13 @@ void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, Q
     if (dslash_type == QUDA_STAGGERED_DSLASH) {
       for (int dir = 0; dir < 4; ++dir) {
         for (int i = 0; i < V; ++i) {
-          for (int j = 0; j < gaugeSiteSize; j += 2) {
+          for (int j = 0; j < gauge_site_size; j += 2) {
             if (precision == QUDA_DOUBLE_PRECISION) {
-              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
-              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+              ((double *)longlink[dir])[i * gauge_site_size + j] = 0.0;
+              ((double *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
             } else {
-              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
-              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+              ((float *)longlink[dir])[i * gauge_site_size + j] = 0.0;
+              ((float *)longlink[dir])[i * gauge_site_size + j + 1] = 0.0;
             }
           }
         }
@@ -1296,9 +1299,9 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
         if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
-	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+	  //mylink = mylink + (4*i + dir)*gauge_site_size;
 	  double* mylink = (double*)link[dir];
-	  mylink = mylink + i*gaugeSiteSize;
+	  mylink = mylink + i*gauge_site_size;
 
 	  mylink[12] *= coeff;
 	  mylink[13] *= coeff;
@@ -1309,9 +1312,9 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
         }else{
 	  //float* mylink = (float*)link;
-	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
+	  //mylink = mylink + (4*i + dir)*gauge_site_size;
 	  float* mylink = (float*)link[dir];
-	  mylink = mylink + i*gaugeSiteSize;
+	  mylink = mylink + i*gauge_site_size;
 
           mylink[12] *= coeff;
 	  mylink[13] *= coeff;
@@ -1326,7 +1329,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
 #if 1
   for(int dir= 0;dir < 4;dir++){
-    for(int i=0;i< V*gaugeSiteSize;i++){
+    for(int i=0;i< V*gauge_site_size;i++){
       if (precision ==QUDA_SINGLE_PRECISION){
 	float* f = (float*)link[dir];
 	if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
@@ -1423,13 +1426,13 @@ static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     for(int i=0; i < 3;i++){
-      printVector((double*)link+ X*gaugeSiteSize + i*6);
+      printVector((double*)link+ X*gauge_site_size + i*6);
     }
 
   }
   else{
     for(int i=0;i < 3;i++){
-      printVector((float*)link+X*gaugeSiteSize + i*6);
+      printVector((float*)link+X*gauge_site_size + i*6);
     }
   }
 }
@@ -1461,7 +1464,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
   void* temp;
 
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4*V*gaugeSiteSize*gSize);
+  temp = malloc(4*V*gauge_site_size*gSize);
   if (temp == NULL){
     fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
     exit(1);
@@ -1471,17 +1474,17 @@ void createMomCPU(void *mom, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
         double *thismom = (double *)mom;
-        for(int k=0; k < momSiteSize; k++){
-          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
-          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        for(int k=0; k < mom_site_size; k++){
+          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          if (k==mom_site_size-1) thismom[ (4*i+dir)*mom_site_size + k ]= 0.0;
         }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thismom=(float*)mom;
-	for(int k=0; k < momSiteSize; k++){
-          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
-          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+	for(int k=0; k < mom_site_size; k++){
+          thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
+          if (k==mom_site_size-1) thismom[ (4*i+dir)*mom_site_size + k ]= 0.0;
         }
       }
     }
@@ -1498,15 +1501,15 @@ createHwCPU(void* hw,  QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
 	double* thishw = (double*)hw;
-	for(int k=0; k < hwSiteSize; k++){
-	  thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+	for(int k=0; k < hw_site_size; k++){
+	  thishw[ (4*i+dir)*hw_site_size + k ]= 1.0* rand() /RAND_MAX;
 	}
       }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thishw=(float*)hw;
-	for(int k=0; k < hwSiteSize; k++){
-	  thishw[ (4*i+dir)*hwSiteSize + k ]= 1.0* rand() /RAND_MAX;
+	for(int k=0; k < hw_site_size; k++){
+	  thishw[ (4*i+dir)*hw_site_size + k ]= 1.0* rand() /RAND_MAX;
 	}
       }
     }
@@ -1522,12 +1525,12 @@ int compare_mom(Float *momA, Float *momB, int len) {
   int fail[fail_check];
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
-  int iter[momSiteSize];
-  for (int i=0; i<momSiteSize; i++) iter[i] = 0;
+  int iter[mom_site_size];
+  for (int i=0; i<mom_site_size; i++) iter[i] = 0;
 
   for (int i=0; i<len; i++) {
-    for (int j=0; j<momSiteSize-1; j++) {
-      int is = i*momSiteSize+j;
+    for (int j=0; j<mom_site_size-1; j++) {
+      int is = i*mom_site_size+j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
 	if (diff > pow(10.0,-(f+1))) fail[f]++;
@@ -1543,7 +1546,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
     }
   }
 
-  for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+  for (int i=0; i<mom_site_size; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
   for (int f=0; f<fail_check; f++) {
     printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
@@ -1555,11 +1558,11 @@ int compare_mom(Float *momA, Float *momB, int len) {
 static void printMomElement(void *mom, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
-    double* thismom = ((double*)mom)+ X*momSiteSize;
+    double* thismom = ((double*)mom)+ X*mom_site_size;
     printVector(thismom);
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }else{
-    float* thismom = ((float*)mom)+ X*momSiteSize;
+    float* thismom = ((float*)mom)+ X*mom_site_size;
     printVector(thismom);
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }
@@ -1766,7 +1769,7 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.cuda_prec = cuda_prec;
   inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
   inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-  inv_param.cuda_prec_ritz = cuda_prec_ritz;
+  //inv_param.cuda_prec_ritz = cuda_prec_ritz;
   inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;

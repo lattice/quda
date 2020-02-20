@@ -128,17 +128,17 @@ void test(int contractionType, int Prec)
   inv_param.cuda_prec_precondition = testPrec;
 
   size_t sSize = (testPrec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V * spinorSiteSize * sSize);
-  void *spinorY = malloc(V * spinorSiteSize * sSize);
+  void *spinorX = malloc(V * spinor_site_size * sSize);
+  void *spinorY = malloc(V * spinor_site_size * sSize);
   void *d_result = malloc(2 * V * 16 * sSize);
 
   if (testPrec == QUDA_SINGLE_PRECISION) {
-    for (int i = 0; i < V * spinorSiteSize; i++) {
+    for (int i = 0; i < V * spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
     }
   } else {
-    for (int i = 0; i < V * spinorSiteSize; i++) {
+    for (int i = 0; i < V * spinor_site_size; i++) {
       ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
       ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
     }

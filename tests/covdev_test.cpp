@@ -149,7 +149,7 @@ void init(int argc, char **argv)
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   for (int dir = 0; dir < 4; dir++) {
-    links[dir] = malloc(V*gaugeSiteSize*gSize);
+    links[dir] = malloc(V*gauge_site_size*gSize);
 
     if (links[dir] == NULL) {
       errorQuda("ERROR: malloc failed for gauge links");

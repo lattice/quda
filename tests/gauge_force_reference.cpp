@@ -374,13 +374,13 @@ gauge_force_reference_dir(void* refMom, int dir, double eb3, void** sitelink, vo
     void* staple;
     int gSize =  prec;    
 
-    staple = malloc(V* gaugeSiteSize* gSize);
+    staple = malloc(V* gauge_site_size* gSize);
     if (staple == NULL){
 	fprintf(stderr, "ERROR: malloc failed for staple in functon %s\n", __FUNCTION__);
 	exit(1);
     }
     
-    memset(staple, 0,  V*gaugeSiteSize* gSize);
+    memset(staple, 0,  V*gauge_site_size* gSize);
     
     for(i=0;i < num_paths; i++){	
 	if (prec == QUDA_DOUBLE_PRECISION){

@@ -52,7 +52,7 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
   
   for (int dir = 0; dir < 4; dir++) {  
     linkEven[dir] = link[dir];
-    linkOdd[dir] = link[dir] + Vh*gaugeSiteSize;
+    linkOdd[dir] = link[dir] + Vh*gauge_site_size;
   }
 
   for (int sid = 0; sid < Vh; sid++) {
@@ -191,10 +191,10 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFlo
 
   for (int dir = 0; dir < 4; dir++) {
     linkEven[dir] = link[dir];
-    linkOdd[dir]  = link[dir] + Vh*gaugeSiteSize;
+    linkOdd[dir]  = link[dir] + Vh*gauge_site_size;
     
     ghostLinkEven[dir] = ghostLink[dir];
-    ghostLinkOdd[dir]  = ghostLink[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
+    ghostLinkOdd[dir]  = ghostLink[dir] + (faceVolume[dir]/2)*gauge_site_size;
   }
 
   for (int sid = 0; sid < Vh; sid++) {

@@ -54,9 +54,9 @@ void init() {
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) {
-    qdpCpuGauge_p[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
+    qdpCpuGauge_p[dir] = malloc(V*gauge_site_size*param.cpu_prec);
   }
-  cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
+  cpsCpuGauge_p = malloc(4*V*gauge_site_size*param.cpu_prec);
 
   csParam.nColor = 3;
   csParam.nSpin = 4;

@@ -177,21 +177,21 @@ void init()
   size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   // Allocate a lot of memory because I'm very confused
-  void* milc_fatlink_cpu = malloc(4*V*gaugeSiteSize*gSize);
-  void* milc_longlink_cpu = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_fatlink_cpu = malloc(4*V*gauge_site_size*gSize);
+  void* milc_longlink_cpu = malloc(4*V*gauge_site_size*gSize);
 
-  void* milc_fatlink_gpu = malloc(4*V*gaugeSiteSize*gSize);
-  void* milc_longlink_gpu = malloc(4*V*gaugeSiteSize*gSize);
+  void* milc_fatlink_gpu = malloc(4*V*gauge_site_size*gSize);
+  void* milc_longlink_gpu = malloc(4*V*gauge_site_size*gSize);
 
   void* qdp_fatlink_gpu[4];
   void* qdp_longlink_gpu[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_fatlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink_gpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink_gpu[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_longlink_gpu[dir] = malloc(V*gauge_site_size*gSize);
 
-    qdp_fatlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink_cpu[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink_cpu[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_longlink_cpu[dir] = malloc(V*gauge_site_size*gSize);
 
     if (qdp_fatlink_gpu[dir] == NULL || qdp_longlink_gpu[dir] == NULL ||
           qdp_fatlink_cpu[dir] == NULL || qdp_longlink_cpu[dir] == NULL) {
@@ -202,7 +202,7 @@ void init()
   // create a base field
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] == nullptr) {
-      qdp_inlink[dir] = malloc(V*gaugeSiteSize*gSize);
+      qdp_inlink[dir] = malloc(V*gauge_site_size*gSize);
     }
   }
 
@@ -224,10 +224,10 @@ void init()
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-      memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-      memset(qdp_longlink_gpu[dir],0,V*gaugeSiteSize*gSize);
-      memset(qdp_longlink_cpu[dir],0,V*gaugeSiteSize*gSize);
+      memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gauge_site_size*gSize);
+      memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gauge_site_size*gSize);
+      memset(qdp_longlink_gpu[dir],0,V*gauge_site_size*gSize);
+      memset(qdp_longlink_cpu[dir],0,V*gauge_site_size*gSize);
     }
   } else { // QUDA_ASQTAD_DSLASH
 
@@ -237,19 +237,19 @@ void init()
     } else {
       // Not computing FatLong
       for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gaugeSiteSize*gSize);
-        memcpy(qdp_longlink_gpu[dir],qdp_longlink_cpu[dir],V*gaugeSiteSize*gSize);
+        memcpy(qdp_fatlink_gpu[dir],qdp_inlink[dir], V*gauge_site_size*gSize);
+        memcpy(qdp_fatlink_cpu[dir],qdp_inlink[dir], V*gauge_site_size*gSize);
+        memcpy(qdp_longlink_gpu[dir],qdp_longlink_cpu[dir],V*gauge_site_size*gSize);
       }
     }
   }
 
   // Alright, we've created all the void** links.
   // Create the void* pointers
-  reorderQDPtoMILC(milc_fatlink_gpu,qdp_fatlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderQDPtoMILC(milc_fatlink_cpu,qdp_fatlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderQDPtoMILC(milc_longlink_gpu,qdp_longlink_gpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
-  reorderQDPtoMILC(milc_longlink_cpu,qdp_longlink_cpu,V,gaugeSiteSize,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_fatlink_gpu,qdp_fatlink_gpu,V,gauge_site_size,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_fatlink_cpu,qdp_fatlink_cpu,V,gauge_site_size,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_longlink_gpu,qdp_longlink_gpu,V,gauge_site_size,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
+  reorderQDPtoMILC(milc_longlink_cpu,qdp_longlink_cpu,V,gauge_site_size,gaugeParam.cpu_prec,gaugeParam.cpu_prec);
   // Create ghost zones for CPU fields,
   // prepare and load the GPU fields
 

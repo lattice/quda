@@ -243,7 +243,7 @@ int main(int argc, char **argv)
   void *gauge[4], *clover=0, *clover_inv=0;
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+    gauge[dir] = malloc(V*gauge_site_size*gSize);
   }
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -262,8 +262,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V*cloverSiteSize*cSize);
-    clover_inv = malloc(V*cloverSiteSize*cSize);
+    clover = malloc(V*clover_site_size*cSize);
+    clover_inv = malloc(V*clover_site_size*cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
     inv_param.compute_clover = compute_clover;
@@ -272,9 +272,9 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-  void *spinorOut = malloc(V * spinorSiteSize * sSize * inv_param.Ls);
+  void *spinorIn = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+  void *spinorCheck = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+  void *spinorOut = malloc(V * spinor_site_size * sSize * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -355,14 +355,14 @@ int main(int argc, char **argv)
     inv_param.solve_type = solve_type; // restore actual solve_type we want to do
     
     // Create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinorSiteSize*sSize);
-    memset(spinorOut, 0, inv_param.Ls*V*spinorSiteSize*sSize);
+    memset(spinorIn, 0, inv_param.Ls*V*spinor_site_size*sSize);
+    memset(spinorCheck, 0, inv_param.Ls*V*spinor_site_size*sSize);
+    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*sSize);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
-      for (int i=0; i<inv_param.Ls*V*spinorSiteSize; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     // do reference BiCGStab solve
