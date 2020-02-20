@@ -316,7 +316,6 @@ namespace quda {
     __device__ __host__ inline ColorSpinor<Float, Nc, 2> project(int dim, int sign) const
     {
       ColorSpinor<Float,Nc,2> proj;
-      complex<Float> j(0.0,1.0);
 
       switch (dim) {
       case 0: // x dimension
@@ -324,15 +323,19 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = (*this)(0,i) + j * (*this)(3,i);
-	    proj(1,i) = (*this)(1,i) + j * (*this)(2,i);
+	    proj(0,i).real( (*this)(0,i).real() - (*this)(3,i).imag() );
+	    proj(0,i).imag( (*this)(0,i).imag() + (*this)(3,i).real() );
+	    proj(1,i).real( (*this)(1,i).real() - (*this)(2,i).imag() );
+	    proj(1,i).imag( (*this)(1,i).imag() + (*this)(2,i).real() );
 	  }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = (*this)(0,i) - j * (*this)(3,i);
-	    proj(1,i) = (*this)(1,i) - j * (*this)(2,i);
+	    proj(0,i).real( (*this)(0,i).real() + (*this)(3,i).imag() );
+	    proj(0,i).imag( (*this)(0,i).imag() - (*this)(3,i).real() );
+	    proj(1,i).real( (*this)(1,i).real() + (*this)(2,i).imag() );
+	    proj(1,i).imag( (*this)(1,i).imag() - (*this)(2,i).real() );
 	  }
 	  break;
 	}
@@ -360,15 +363,19 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = (*this)(0,i) + j * (*this)(2,i);
-	    proj(1,i) = (*this)(1,i) - j * (*this)(3,i);
-	  }
+	    proj(0,i).real( (*this)(0,i).real() - (*this)(2,i).imag() );
+	    proj(0,i).imag( (*this)(0,i).imag() + (*this)(2,i).real() );
+	    proj(1,i).real( (*this)(1,i).real() + (*this)(3,i).imag() );
+	    proj(1,i).imag( (*this)(1,i).imag() - (*this)(3,i).real() );
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = (*this)(0,i) - j * (*this)(2,i);
-	    proj(1,i) = (*this)(1,i) + j * (*this)(3,i);
+	    proj(0,i).real( (*this)(0,i).real() + (*this)(2,i).imag() );
+	    proj(0,i).imag( (*this)(0,i).imag() - (*this)(2,i).real() );
+	    proj(1,i).real( (*this)(1,i).real() - (*this)(3,i).imag() );
+	    proj(1,i).imag( (*this)(1,i).imag() + (*this)(3,i).real() );
 	  }
 	  break;
 	}
@@ -378,15 +385,15 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = 2*(*this)(0,i);
-	    proj(1,i) = 2*(*this)(1,i);
+	    proj(0,i) = static_cast<Float>(2.0)*(*this)(0,i);
+	    proj(1,i) = static_cast<Float>(2.0)*(*this)(1,i);
 	  }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = 2*(*this)(2,i);
-	    proj(1,i) = 2*(*this)(3,i);
+	    proj(0,i) = static_cast<Float>(2.0)*(*this)(2,i);
+	    proj(1,i) = static_cast<Float>(2.0)*(*this)(3,i);
 	  }
 	  break;
 	}
