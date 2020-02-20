@@ -654,7 +654,7 @@ namespace quda {
             nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
                                 norm[parity * norm_offset + chirality * stride + x];
 #else
-            nrm = vector_load(norm, parity * norm_offset + chirality * stride + x);
+            nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
 #endif
           }
 
