@@ -210,7 +210,8 @@ namespace quda
     return c;
   }
 
-  template <class integer_vec> __device__ inline integer_vec __4half22integer8_rn(const half2 &a, const half2 &b, const half2 &c, const half2 &d)
+  template <class integer_vec>
+  __device__ inline integer_vec __4half22integer8_rn(const half2 &a, const half2 &b, const half2 &c, const half2 &d)
   {
     integer_vec e;
     e.x.x = __half2short_rn(a.x);
@@ -339,7 +340,7 @@ namespace quda
     output.norm[sid] = __half2float(max_) * scale;
 
     const half2 max_i_div_max2_ = __half2half2(__hdiv(fixedMaxValue<storage_type>::value, max_));
-#ifdef FLOAT8 // use float8/short8  
+#ifdef FLOAT8 // use float8/short8
     typedef typename VectorType<storage_type, 8>::type storage_vec;
     storage_vec *out = reinterpret_cast<storage_vec *>(output.field);
     half2 a, b, c, d;
@@ -462,6 +463,103 @@ namespace quda
       int c_col = warp_n * WMMA_N;
 
       nvcuda::wmma::store_matrix_sync(sm_c + c_col + c_row * N_sm, c_frag, N_sm, nvcuda::wmma::mem_row_major);
+    }
+  }
+
+  template <class data_type, class smem_access_type>
+  __device__ inline void mma_load_a_frag(smem_access_type ra[], const data_type *smem_a, const int reg_offset,
+                                         const int smem_offset)
+  {
+    const smem_access_type *A = reinterpret_cast<const smem_access_type *>(smem_a);
+    ra[reg_offset + 0] = A[smem_offset + 0];
+    ra[reg_offset + 1] = A[smem_offset + 1];
+  }
+
+  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD>
+  __device__ inline void mma_sync_gemm(half *sm_a, half *sm_b, half *sm_c)
+  {
+    using data_type = half;
+    using smem_access_type = unsigned;
+    constexpr int data_pack_factor = sizeof(unsigned) / sizeof(data_type);
+
+    constexpr int WMMA_M = 16; // WMMA_M == WMMA_K
+    constexpr int WMMA_N = 16;
+
+    constexpr int tile_row_dim = M / WMMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = N / WMMA_N; // number of tiles in the row dimension
+
+    constexpr int total_warp = BlockDimX * Ls / 32;
+
+    static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
+                  "Total number of tiles should be divisible by the number of warps.");
+    static_assert(tile_col_dim % (tile_row_dim * tile_col_dim / total_warp) == 0,
+                  "Each warp should only be responsible a single tile row.");
+
+    constexpr int total_tile = tile_row_dim * tile_col_dim;
+
+    constexpr int warp_cycle = total_tile / total_warp;
+
+    const int thread_id = threadIdx.y * blockDim.x + threadIdx.x;
+    const int warp_id = thread_id >> 5;
+    const int warp_row = warp_id * warp_cycle / tile_col_dim;
+
+    const int lane_id = thread_id & 31;
+    const int octl_id = lane_id >> 2;
+    const int quad_id = octl_id & 3;
+    const int quad_row = quad_id & 1;
+    const int quad_col = quad_id >> 1;
+    const int quad_hilo = (octl_id >> 2) & 1; // quad higher or lower.
+    const int quad_thread = lane_id & 3;      // 0,1,2,3
+
+    smem_access_type ra[2 * tile_row_dim * 4];
+
+#pragma unroll
+    for (int c = 0; c < warp_cycle; c++) {
+      smem_access_type rc[4] = {0x0u, 0x0u, 0x0u, 0x0u};
+
+      // The logical warp assigned to each part of the matrix.
+      const int logical_warp_index = warp_id * warp_cycle + c;
+      const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+      // e.g. for 12 warps:
+      // 000|111|222|333
+      // 444|555|666|777
+      // 888|999|000|111
+
+#pragma unroll
+      for (int tile_k = 0; tile_k < tile_row_dim; tile_k++) {
+#pragma unroll
+        for (int warp_k = 0; warp_k < 4; warp_k++) {
+
+          smem_access_type *B = reinterpret_cast<smem_access_type *>(sm_b);
+
+          const int k_idx = (tile_k * 4 + warp_k) * 2;
+          const int idx_strided = k_idx * 2 + quad_thread;
+
+          int thread_offset_b = idx_strided * (N_PAD / data_pack_factor) + warp_col * 8 + quad_col * 4 + quad_hilo * 2;
+
+          if (c == 0) { // the data in registers can be resued.
+            const int thread_offset_a
+              = idx_strided * (M_PAD / data_pack_factor) + warp_row * 8 + quad_row * 4 + quad_hilo * 2;
+            mma_load_a_frag(ra, sm_a, k_idx, thread_offset_a);
+          }
+
+          asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+                       : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
+                       : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(B[thread_offset_b + 0]),
+                         "r"(B[thread_offset_b + 1]));
+        }
+      }
+
+      __syncthreads();
+
+      smem_access_type *C = reinterpret_cast<smem_access_type *>(sm_c);
+      const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + quad_thread;
+      const int col = warp_col * 8 + quad_col * 4;
+      int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
+
+// Now store the results to shared memory
+#pragma unroll
+      for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = rc[i]; }
     }
   }
 

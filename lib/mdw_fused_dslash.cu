@@ -9,12 +9,13 @@ namespace quda
   {
     constexpr int sm_m_pad_size(const int Ls)
     {
-      switch (Ls) {
-      case 16: return 16; break;
-      default: return 0;
-      }
+      return 10;
+      // switch (Ls) {
+      // case 16: return 16; break;
+      // default: return 0;
+      // }
     };
-    constexpr int sm_n_pad_size = 16;
+    constexpr int sm_n_pad_size = 10;
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
 
@@ -400,7 +401,11 @@ namespace quda
         load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-        wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        if(reload){
+          mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
+        }else{
+          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        }
         __syncthreads();
 
         if (type_ == 1) {
@@ -417,7 +422,11 @@ namespace quda
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
-          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          if(reload) {
+            mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
+          }else{
+            wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          }
           __syncthreads();
 
         } else if (type_ == 3) {
@@ -553,7 +562,7 @@ namespace quda
           if (param.aux.y < 3) { // second see if aux.y
             param.aux.y++;
             aux_advanced = true;
-            param.aux.x = 0;
+            param.aux.x = 1;
           }
         }
         if (aux_advanced) {
@@ -651,7 +660,7 @@ namespace quda
       template <int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
       {
         if (tp.aux.x == 0) {
-          apply<false, type>(tp, arg, stream); // reload = false
+          // apply<false, type>(tp, arg, stream); // reload = false
         } else {
           apply<true, type>(tp, arg, stream); // reload = true
         }
@@ -676,7 +685,7 @@ namespace quda
         param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
         param.shared_bytes = shared_bytes_per_block(param);
-        param.aux.x = 0;
+        param.aux.x = 1;
         param.aux.y = 1;
       }
 
