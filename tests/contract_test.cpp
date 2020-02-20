@@ -11,11 +11,11 @@
 #include <contract_reference.h>
 #include "misc.h"
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
+//#if defined(QMP_COMMS)
+//#include <qmp.h>
+//#elif defined(MPI_COMMS)
+//#include <mpi.h>
+//#endif
 
 // google test
 #include <gtest/gtest.h>
@@ -24,9 +24,12 @@
 #include <quda.h>
 #include <color_spinor_field.h>
 
-
 // If you add a new contraction type, this must be updated++
 constexpr int NcontractType = 2;
+// For googletest, names must be non-empty, unique, and may only contain ASCII
+// alphanumeric characters or underscore.
+const char *names[] = {"OpenSpin", "DegrandRossi"};
+const char *prec_str[] = {"single", "double"};
 
 namespace quda
 {
@@ -41,44 +44,12 @@ void display_test_info()
   printfQuda("%s   %s             %d/%d/%d          %d         %d\n", get_prec_str(prec), get_prec_str(prec_sloppy),
              xdim, ydim, zdim, tdim, Lsdim);
 
+  printfQuda("Contraction test");
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
   return;
 }
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-QudaPrecision &cuda_prec_precondition = prec_precondition;
-
-void setInvertParam(QudaInvertParam &inv_param)
-{
-
-  inv_param.Ls = 1;
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  // Quda performs contractions in Degrand-Rossi gamma basis,
-  // but the user may suppy vectors in any supported order.
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-}
-
-const char *prec_str[] = {"single", "double"};
-
-// For googletest, names must be non-empty, unique, and may only contain ASCII
-// alphanumeric characters or underscore.
-const char *names[] = {"OpenSpin", "DegrandRossi"};
 
 int main(int argc, char **argv)
 {
@@ -87,9 +58,6 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -153,7 +121,7 @@ void test(int contractionType, int Prec)
   int X[4] = {xdim, ydim, zdim, tdim};
 
   QudaInvertParam inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);
+  setContractInvertParam(inv_param);
   inv_param.cpu_prec = testPrec;
   inv_param.cuda_prec = testPrec;
   inv_param.cuda_prec_sloppy = testPrec;

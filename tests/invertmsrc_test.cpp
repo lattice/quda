@@ -99,7 +99,6 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
 
-  double kappa5;
 
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;

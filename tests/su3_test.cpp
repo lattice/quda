@@ -12,12 +12,6 @@
 
 #include <qio_field.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <comm_quda.h>
 
 // In a typical application, quda.h is the only QUDA header required.
@@ -68,10 +62,6 @@ void display_test_info()
              dimPartitioned(3));
   return;
 }
-
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
 void setGaugeParam(QudaGaugeParam &gauge_param) {
 

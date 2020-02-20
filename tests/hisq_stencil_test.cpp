@@ -30,7 +30,7 @@ using namespace quda;
 // to construct one naik.
 static int n_naiks = 1;
 
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+//static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 static size_t gSize;

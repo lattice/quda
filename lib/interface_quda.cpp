@@ -695,7 +695,7 @@ void initQuda(int dev)
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
 					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
 {
-  profile.TPSTART(QUDA_PROFILE_INIT);
+  //profile.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gParamEx(in);
   gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParamEx.pad = 0;
@@ -712,7 +712,7 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   // copy input field into the extended device gauge field
   copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
 
-  profile.TPSTOP(QUDA_PROFILE_INIT);
+  //profile.TPSTOP(QUDA_PROFILE_INIT);
 
   // now fill up the halos
   out->exchangeExtendedGhost(R,profile,redundant_comms);

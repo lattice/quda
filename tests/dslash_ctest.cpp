@@ -30,11 +30,6 @@ using namespace quda;
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
 const int transfer = 0; // include transfer time in the benchmark?
 
-double kappa5;
-
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec;
-
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 

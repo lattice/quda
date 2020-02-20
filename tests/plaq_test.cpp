@@ -23,9 +23,9 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
+//QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+//QudaPrecision &cuda_prec = prec;
+//QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {

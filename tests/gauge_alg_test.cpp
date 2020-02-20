@@ -17,12 +17,6 @@
 
 #include <qio_field.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <gtest/gtest.h>
 
 using   namespace quda;
@@ -32,12 +26,7 @@ int *num_failures_dev;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-
-
+/*
 void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
 
   gauge_param.X[0] = xdim;
@@ -73,7 +62,7 @@ void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.ga_pad = pad_size;    
 #endif
 }
-
+*/
 
 class GaugeAlgTest : public ::testing::Test {
  protected:
@@ -130,7 +119,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     param = newQudaGaugeParam();
 
-    //Setup Gauge container!!!!!!
+    //Setup gauge container.
     param.cpu_prec = prec;
     param.cpu_prec = prec;
     param.cuda_prec = prec;

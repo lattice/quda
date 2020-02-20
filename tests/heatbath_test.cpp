@@ -18,21 +18,41 @@
 
 #include <qio_field.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
-
-
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
-
 
 namespace quda {
   extern void setTransferGPU(bool);
 }
+
+// Local helper functions
+//------------------------------------------------------------------------------------
+void setReunitarizationConsts(){
+  using namespace quda;
+  const double unitarize_eps = 1e-14;
+  const double max_error = 1e-10;
+  const int reunit_allow_svd = 1;
+  const int reunit_svd_only  = 0;
+  const double svd_rel_error = 1e-6;
+  const double svd_abs_error = 1e-6;
+  setUnitarizeLinksConstants(unitarize_eps, max_error,
+			     reunit_allow_svd, reunit_svd_only,
+			     svd_rel_error, svd_abs_error);
+
+}
+
+void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
+  using namespace quda;
+  int *num_failures_dev = (int*)device_malloc(sizeof(int));
+  int num_failures;
+  cudaMemset(num_failures_dev, 0, sizeof(int));
+  unitarizeLinks(*cudaInGauge, num_failures_dev);
+
+  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+  if(num_failures>0) errorQuda("Error in the unitarization\n");
+  device_free(num_failures_dev);
+}
+//------------------------------------------------------------------------------------
 
 void
 display_test_info()
@@ -51,81 +71,11 @@ display_test_info()
   return ;
 }
 
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-
-void setGaugeParam(QudaGaugeParam &gauge_param) {
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.tadpole_coeff = 1.0;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-
-  gauge_param.cpu_prec = cpu_prec;
-
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
-#endif
-}
-
- void setReunitarizationConsts(){
-   using namespace quda;
-    const double unitarize_eps = 1e-14;
-    const double max_error = 1e-10;
-    const int reunit_allow_svd = 1;
-    const int reunit_svd_only  = 0;
-    const double svd_rel_error = 1e-6;
-    const double svd_abs_error = 1e-6;
-    setUnitarizeLinksConstants(unitarize_eps, max_error,
-                               reunit_allow_svd, reunit_svd_only,
-                               svd_rel_error, svd_abs_error);
-
-  }
-
-void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
-   using namespace quda;
-   int *num_failures_dev = (int*)device_malloc(sizeof(int));
-   int num_failures;
-   cudaMemset(num_failures_dev, 0, sizeof(int));
-   unitarizeLinks(*cudaInGauge, num_failures_dev);
-
-   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-   if(num_failures>0) errorQuda("Error in the unitarization\n");
-   device_free(num_failures_dev);
-  }
-
 int main(int argc, char **argv)
 {
 
   // command line options
   auto app = make_app();
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -146,13 +96,12 @@ int main(int argc, char **argv)
   // *** QUDA parameters begin here.
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setGaugeParam(gauge_param);
+  setWilsonGaugeParam(gauge_param);
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
 
   setDims(gauge_param.X);
-
   setSpinorSiteSize(24);
 
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
@@ -299,7 +248,7 @@ int main(int argc, char **argv)
       printfQuda("Saving the gauge field to file %s\n", gauge_outfile);
 
       QudaGaugeParam gauge_param = newQudaGaugeParam();
-      setGaugeParam(gauge_param);
+      setWilsonGaugeParam(gauge_param);
 
       size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];

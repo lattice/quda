@@ -14,20 +14,12 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <qio_field.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-double kappa5; // Derived, not given. Used in matVec checks.
 
 namespace quda
 {
@@ -75,198 +67,6 @@ void display_test_info()
   return;
 }
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-QudaPrecision &cuda_prec_precondition = prec_precondition;
-
-void setGaugeParam(QudaGaugeParam &gauge_param)
-{
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-
-  gauge_param.cpu_prec = cpu_prec;
-
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-
-  gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_precondition;
-
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
-#endif
-}
-
-void setInvertParam(QudaInvertParam &inv_param)
-{
-
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.kappa = 1.0 / (8 + mass);
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5 / kappa - (1.0 + 3.0 / anisotropy);
-    if (dslash_type == QUDA_LAPLACE_DSLASH) inv_param.mass = 1.0 / kappa - 8.0;
-  }
-  inv_param.laplace3D = laplace3D;
-
-  printfQuda("Kappa = %.8f Mass = %.8f\n", inv_param.kappa, inv_param.mass);
-
-  inv_param.Ls = 1;
-
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  inv_param.cpu_prec = cpu_prec;
-  inv_param.cuda_prec = cuda_prec;
-  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
-
-  inv_param.cuda_prec_precondition = cuda_prec_precondition;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-  inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-  }
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  inv_param.dslash_type = dslash_type;
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-
-    inv_param.mu = mu;
-    inv_param.epsilon = 0.1385;
-    inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-             || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.m5 = m5;
-    kappa5 = 0.5 / (5 + inv_param.m5);
-    inv_param.Ls = Lsdim;
-    for (int k = 0; k < Lsdim; k++) { // for mobius only
-      // b5[k], c[k] values are chosen for arbitrary values,
-      // but the difference of them are same as 1.0
-      inv_param.b_5[k] = b5;
-      inv_param.c_5[k] = c5;
-    }
-  }
-
-  inv_param.clover_coeff = clover_coeff;
-
-  inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-
-  inv_param.solution_type = solution_type;
-  inv_param.solve_type = (inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
-
-  inv_param.matpc_type = matpc_type;
-  inv_param.inv_type = QUDA_GCR_INVERTER;
-  inv_param.verbosity = verbosity;
-  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.tol = tol;
-
-  // require both L2 relative and heavy quark residual to determine
-  // convergence
-  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
-  // specify a tolerance for the residual for heavy quark residual
-  inv_param.tol_hq = tol_hq;
-
-  // these can be set individually
-  for (int i = 0; i < inv_param.num_offset; i++) {
-    inv_param.tol_offset[i] = inv_param.tol;
-    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-  }
-  inv_param.maxiter = niter;
-  inv_param.gcrNkrylov = 10;
-  inv_param.pipeline = 10;
-  inv_param.reliable_delta = 1e-4;
-
-  // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 1;
-  inv_param.omega = 1.0;
-}
-
-// Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
-{
-  eig_param.eig_type = eig_type;
-  eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
-      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
-  }
-
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
-  } else {
-    eig_param.nConv = eig_nConv;
-  }
-
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
-  eig_param.tol = eig_tol;
-  eig_param.batched_rotate = eig_batched_rotate;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.check_interval = eig_check_interval;
-  eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = cuda_prec;
-
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
-    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
-  }
-
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min = eig_amin;
-  eig_param.a_max = eig_amax;
-
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
-
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
-}
 
 int main(int argc, char **argv)
 {
@@ -294,9 +94,8 @@ int main(int argc, char **argv)
   // QUDA parameters begin here.
   //------------------------------------------------------------------------------
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setGaugeParam(gauge_param);
+  setWilsonGaugeParam(gauge_param);
 
-  QudaEigParam eig_param = newQudaEigParam();
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator. We encapsualte the
@@ -304,6 +103,11 @@ int main(int argc, char **argv)
   // to avoid any confusion
   QudaInvertParam eig_inv_param = newQudaInvertParam();
   setInvertParam(eig_inv_param);
+  // Specific changes to the invert param for the eigensolver
+  eig_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
+  eig_inv_param.solve_type = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+  QudaEigParam eig_param = newQudaEigParam();
+  // Place Invert param inside Eig param
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
 

@@ -36,7 +36,7 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+//static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;

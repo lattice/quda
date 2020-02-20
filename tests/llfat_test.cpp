@@ -19,21 +19,16 @@
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-//static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
-
 static size_t gSize;
 
 static void llfat_test()
 {
-
   QudaGaugeParam qudaGaugeParam;
 #ifdef MULTI_GPU
   void* ghost_sitelink[4];
   void* ghost_sitelink_diag[16];
 #endif
-
 
   initQuda(device);
 
@@ -118,8 +113,6 @@ static void llfat_test()
 #endif
     }
 
-
-
     x1 = (x1 - 2 + X1) % X1;
     x2 = (x2 - 2 + X2) % X2;
     x3 = (x3 - 2 + X3) % X3;
@@ -192,7 +185,7 @@ static void llfat_test()
        nu |     |
           |_____|
             mu
-       */
+    */
 
     for(int nu=0;nu < 4;nu++){
       for(int mu=0; mu < 4;mu++){

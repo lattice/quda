@@ -85,8 +85,8 @@ double getTolerance(QudaPrecision prec)
   }
   return 1.0;
 }
-
-void setGaugeParam(QudaGaugeParam &gaugeParam)
+/*
+void setStaggeredGaugeParam(QudaGaugeParam &gaugeParam)
 {
   gaugeParam.X[0] = X[0] = xdim;
   gaugeParam.X[1] = X[1] = ydim;
@@ -131,8 +131,10 @@ void setGaugeParam(QudaGaugeParam &gaugeParam)
 
   gaugeParam.ga_pad = tmpint;
 }
+*/
 
-void setInvertParam(QudaInvertParam &inv_param)
+/*
+void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
   inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
   inv_param.cuda_prec = prec;
@@ -156,17 +158,17 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.sp_pad = tmpint;
 }
+*/
 
 void init()
 {
-
   initQuda(device);
 
   gaugeParam = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  setGaugeParam(gaugeParam);
-  setInvertParam(inv_param);
+  setStaggeredGaugeParam(gaugeParam);
+  setStaggeredInvertParam(inv_param);
 
   setDims(gaugeParam.X);
   dw_setDims(gaugeParam.X, Nsrc); // so we can use 5-d indexing from dwf
