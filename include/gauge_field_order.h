@@ -1704,8 +1704,8 @@ namespace quda {
         typedef typename VectorType<Float, N>::type Vector;
         typedef typename AllocType<huge_alloc>::type AllocInt;
         Reconstruct<reconLenParam, Float, ghostExchange_, stag_phase> reconstruct;
-        static const int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
-        static const int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
+        static constexpr int reconLen = (reconLenParam == 11) ? 10 : reconLenParam;
+        static constexpr int hasPhase = (reconLen == 9 || reconLen == 13) ? 1 : 0;
         Float *gauge;
         const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
@@ -3070,6 +3070,12 @@ namespace quda {
     typedef gauge::FloatNOrder<float, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
+#ifdef FLOAT8
+#define N8 8
+#else
+#define N8 4
+#endif
+
   // half precision
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_NO, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
@@ -3089,11 +3095,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<short, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<short, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<short, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   // quarter precision
@@ -3115,11 +3121,11 @@ namespace quda {
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_9, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<char, N, 4, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<char, N, N8, 9, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
   template <int N, QudaStaggeredPhase stag, bool huge_alloc, QudaGhostExchange ghostExchange, bool use_inphase>
   struct gauge_mapper<char, QUDA_RECONSTRUCT_8, N, stag, huge_alloc, ghostExchange, use_inphase, QUDA_NATIVE_GAUGE_ORDER> {
-    typedef gauge::FloatNOrder<char, N, 4, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
+    typedef gauge::FloatNOrder<char, N, N8, 8, stag, huge_alloc, ghostExchange, use_inphase> type;
   };
 
   template <typename T, QudaReconstructType recon, int N, QudaStaggeredPhase stag, bool huge_alloc,

@@ -37,7 +37,8 @@ extern "C" {
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
     QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
-    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 and 12 reconstruct half and single
+    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 reconstruct single, and 12 reconstruct single, half, quarter
+    QUDA_FLOAT8_GAUGE_ORDER = 8,  // 8 reconstruct half and quarter
     QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
     QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
     QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime

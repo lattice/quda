@@ -169,23 +169,7 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
-  bool GaugeField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      }
-    }
-    return false;
-  }
+  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
