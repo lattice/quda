@@ -13,7 +13,7 @@ namespace quda
     {
       switch (Ls) {
 #ifdef USE_MMA_SYNC
-        case 16: return 16; break;
+        case 16: return 10; break;
 #else
         case 16: return 16; break;
 #endif
@@ -21,7 +21,7 @@ namespace quda
       }
     };
 #ifdef USE_MMA_SYNC
-    constexpr int sm_n_pad_size = 16;
+    constexpr int sm_n_pad_size = 10;
 #else
     constexpr int sm_n_pad_size = 16;
 #endif
@@ -437,8 +437,7 @@ namespace quda
           __syncthreads();
           if(reload) {
 #ifdef USE_MMA_SYNC
-            mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
-            // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+            mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a_black, sm_c, sm_c);
 #else 
             wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
 #endif
