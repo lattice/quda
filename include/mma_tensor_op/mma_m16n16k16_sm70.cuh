@@ -6,14 +6,34 @@ namespace quda
 {
 
 #if (__COMPUTE_CAPABILITY__ == 700)
-  
+
+  struct WarpRegisterMapping {
+
+    int quad_id;
+    int quad_row;
+    int quad_col;
+    int quad_hilo;   // quad higher or lower.
+    int quad_thread; // 0,1,2,3
+
+    __device__ WarpRegisterMapping(int thread_id)
+    {
+      const int lane_id = thread_id & 31;
+      const int octl_id = lane_id >> 2;
+      quad_id = octl_id & 3;
+      quad_row = quad_id & 1;
+      quad_col = quad_id >> 1;
+      quad_hilo = (octl_id >> 2) & 1;
+      quad_thread = lane_id & 3;
+    }
+  };
+
   // For "reload" version(reload == true) of wmma gemm, matrix a is loaded when
   // needed.
   // It is a waste of time but has less register usage.
   // For "preload" version(reload == false) of wmma gemm, matrix a is preloaded
   // before hand.
   // It saves time but uses more registers.
-  template <int block_dim_x, int Ls_, int M, int N, int M_sm, int N_sm, bool reload, class T>
+  template <int BlockDimX, int Ls, int M, int N, int M_sm, int N_sm, bool reload, class T>
   __device__ inline void wmma_gemm(T *a_frag, half *sm_a, half *sm_b, half *sm_c)
   {
     constexpr int WMMA_M = 16;
@@ -23,12 +43,12 @@ namespace quda
     constexpr int tm_dim = M / WMMA_M;
     constexpr int tn_dim = N / WMMA_N;
 
-    constexpr int total_warp = block_dim_x * Ls_ / 32;
+    constexpr int total_warp = BlockDimX * Ls / 32;
 
     static_assert((tm_dim * tn_dim) % total_warp == 0, "(tm_dim*tn_dim)%%total_warp==0\n");
     static_assert(tn_dim % (tm_dim * tn_dim / total_warp) == 0, "tn_dim%%(tm_dim*tn_dim/total_warp)==0\n");
 
-    const int this_warp = (threadIdx.y * block_dim_x + threadIdx.x) >> 5;
+    const int this_warp = (threadIdx.y * blockDim.x + threadIdx.x) >> 5;
 
     constexpr int total_tile = tm_dim * tn_dim;
 
@@ -125,13 +145,15 @@ namespace quda
     const int warp_id = thread_id >> 5;
     const int warp_row = warp_id * warp_cycle / tile_col_dim;
 
-    const int lane_id = thread_id & 31;
-    const int octl_id = lane_id >> 2;
-    const int quad_id = octl_id & 3;
-    const int quad_row = quad_id & 1;
-    const int quad_col = quad_id >> 1;
-    const int quad_hilo = (octl_id >> 2) & 1; // quad higher or lower.
-    const int quad_thread = lane_id & 3;      // 0,1,2,3
+    const WarpRegisterMapping wrm(thread_id);
+
+    // const int lane_id = thread_id & 31;
+    // const int octl_id = lane_id >> 2;
+    // const int quad_id = octl_id & 3;
+    // const int quad_row = quad_id & 1;
+    // const int quad_col = quad_id >> 1;
+    // const int quad_hilo = (octl_id >> 2) & 1; // quad higher or lower.
+    // const int quad_thread = lane_id & 3;      // 0,1,2,3
 
     smem_access_type ra[2 * tile_row_dim * 4];
 
@@ -158,13 +180,14 @@ namespace quda
           smem_access_type *B = reinterpret_cast<smem_access_type *>(sm_b);
 
           const int k_idx = (tile_k * 4 + warp_k) * 2;
-          const int idx_strided = k_idx * 2 + quad_thread;
+          const int idx_strided = k_idx * 2 + wrm.quad_thread;
 
-          int thread_offset_b = idx_strided * (N_PAD / data_pack_factor) + warp_col * 8 + quad_col * 4 + quad_hilo * 2;
+          int thread_offset_b
+            = idx_strided * (N_PAD / data_pack_factor) + warp_col * 8 + wrm.quad_col * 4 + wrm.quad_hilo * 2;
 
           if (c == 0) { // the data in registers can be resued.
             const int thread_offset_a
-              = idx_strided * (M_PAD / data_pack_factor) + warp_row * 8 + quad_row * 4 + quad_hilo * 2;
+              = idx_strided * (M_PAD / data_pack_factor) + warp_row * 8 + wrm.quad_row * 4 + wrm.quad_hilo * 2;
             mma_load_a_frag(ra, sm_a, k_idx, thread_offset_a);
           }
           unsigned rb[2];
@@ -188,16 +211,16 @@ namespace quda
       __syncthreads();
 #ifdef USE_FP16_MMA_ACCUMULATE
       smem_access_type *C = reinterpret_cast<smem_access_type *>(sm_c);
-      const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + quad_thread;
-      const int col = warp_col * 8 + quad_col * 4;
+      const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+      const int col = warp_col * 8 + wrm.quad_col * 4;
       const int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
 #pragma unroll
       for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = rc[i]; }
 #else
       half2 *C = reinterpret_cast<half2 *>(sm_c);
 
-      const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + (quad_thread % 2);
-      const int col = warp_col * 8 + quad_col * 4 + (quad_thread / 2);
+      const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+      const int col = warp_col * 8 + wrm.quad_col * 4 + (wrm.quad_thread / 2);
 
       int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
       C[thread_offset_c] = __floats2half2_rn(rc[0], rc[1]);
