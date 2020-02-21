@@ -475,6 +475,8 @@ namespace quda
     ra[reg_offset + 1] = A[smem_offset + 1];
   }
 
+  // #define USE_FP16_MMA_ACCUMULATE
+
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD>
   __device__ inline void mma_sync_gemm(half *sm_a, half *sm_b, half *sm_c)
   {
@@ -484,9 +486,13 @@ namespace quda
 
     constexpr int WMMA_M = 16; // WMMA_M == WMMA_K
     constexpr int WMMA_N = 16;
-
+#ifdef USE_FP16_MMA_ACCUMULATE
+    constexpr bool fp16_accumulate = true;
+    using accumuate_reg_type = unsigned;
+#else
     constexpr bool fp16_accumulate = false;
     using accumuate_reg_type = float;
+#endif
     constexpr int accumuate_regs = fp16_accumulate ? 4 : 8;
 
     constexpr int tile_row_dim = M / WMMA_M; // number of tiles in the column dimension
@@ -519,6 +525,7 @@ namespace quda
 
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
+
       accumuate_reg_type rc[accumuate_regs];
 #pragma unroll
       for (int r = 0; r < accumuate_regs; r++) { rc[r] = 0; }
@@ -548,48 +555,50 @@ namespace quda
               = idx_strided * (M_PAD / data_pack_factor) + warp_row * 8 + quad_row * 4 + quad_hilo * 2;
             mma_load_a_frag(ra, sm_a, k_idx, thread_offset_a);
           }
-          if (fp16_accumulate) {
-            // asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
-            //             : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
-            //             : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(B[thread_offset_b + 0]),
-            //               "r"(B[thread_offset_b + 1]));
-          } else {
-            asm volatile(
-              "mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
-              "{%0,%1,%2,%3,%4,%5,%6,%7};"
-              : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]), "+f"(rc[7])
-              : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(B[thread_offset_b + 0]), "r"(B[thread_offset_b + 1]));
-          }
+          unsigned rb[2];
+          rb[0] = B[thread_offset_b + 0];
+          rb[1] = B[thread_offset_b + 1];
+
+#ifdef USE_FP16_MMA_ACCUMULATE
+          asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+                       : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
+                       : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(rb[0]), "r"(rb[1]));
+#else
+          asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+                       "{%0,%1,%2,%3,%4,%5,%6,%7};"
+                       : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
+                         "+f"(rc[7])
+                       : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(rb[0]), "r"(rb[1]));
+#endif
         }
       }
 
       __syncthreads();
-      if (fp16_accumulate) {
-        smem_access_type *C = reinterpret_cast<smem_access_type *>(sm_c);
-        const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + quad_thread;
-        const int col = warp_col * 8 + quad_col * 4;
-        const int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
-// Now store the results to shared memory
+#ifdef USE_FP16_MMA_ACCUMULATE
+      smem_access_type *C = reinterpret_cast<smem_access_type *>(sm_c);
+      const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + quad_thread;
+      const int col = warp_col * 8 + quad_col * 4;
+      const int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
 #pragma unroll
-        for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = rc[i]; }
-      } else {
-        half2 *C = reinterpret_cast<half2 *>(sm_c);
+      for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = rc[i]; }
+#else
+      half2 *C = reinterpret_cast<half2 *>(sm_c);
 
-        const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + (quad_thread % 2);
-        const int col = warp_col * 8 + quad_col * 4 + (quad_thread / 2);
+      const int row = warp_row * 16 + quad_row * 8 + quad_hilo * 4 + (quad_thread % 2);
+      const int col = warp_col * 8 + quad_col * 4 + (quad_thread / 2);
 
-        int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
-        C[thread_offset_c] = __floats2half2_rn(rc[0], rc[1]);
+      int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
+      C[thread_offset_c] = __floats2half2_rn(rc[0], rc[1]);
 
-        thread_offset_c = (row + 2) * (N_PAD / data_pack_factor) + col;
-        C[thread_offset_c] = __floats2half2_rn(rc[2], rc[3]);
+      thread_offset_c = (row + 2) * (N_PAD / data_pack_factor) + col;
+      C[thread_offset_c] = __floats2half2_rn(rc[2], rc[3]);
 
-        thread_offset_c = row * (N_PAD / data_pack_factor) + (col + 2);
-        C[thread_offset_c] = __floats2half2_rn(rc[4], rc[5]);
+      thread_offset_c = row * (N_PAD / data_pack_factor) + (col + 2);
+      C[thread_offset_c] = __floats2half2_rn(rc[4], rc[5]);
 
-        thread_offset_c = (row + 2) * (N_PAD / data_pack_factor) + (col + 2);
-        C[thread_offset_c] = __floats2half2_rn(rc[6], rc[7]);
-      }
+      thread_offset_c = (row + 2) * (N_PAD / data_pack_factor) + (col + 2);
+      C[thread_offset_c] = __floats2half2_rn(rc[6], rc[7]);
+#endif
     }
   }
 

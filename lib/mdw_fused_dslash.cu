@@ -9,11 +9,10 @@ namespace quda
   {
     constexpr int sm_m_pad_size(const int Ls)
     {
-      return 10;
-      // switch (Ls) {
-      // case 16: return 16; break;
-      // default: return 0;
-      // }
+      switch (Ls) {
+        case 16: return 10; break;
+        default: return 0;
+      }
     };
     constexpr int sm_n_pad_size = 10;
 
@@ -402,6 +401,7 @@ namespace quda
 
         __syncthreads();
         if(reload){
+          // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
           mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
         }else{
           wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
@@ -423,6 +423,7 @@ namespace quda
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
           if(reload) {
+            // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
             mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
           }else{
             wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
