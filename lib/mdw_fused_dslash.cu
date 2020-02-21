@@ -3,6 +3,8 @@
 
 #include <mdw_dslash5_tensor_core.cuh>
 
+#define USE_MMA_SYNC // rather than using wmma
+
 namespace quda
 {
   namespace mobius_tensor_core
@@ -10,11 +12,19 @@ namespace quda
     constexpr int sm_m_pad_size(const int Ls)
     {
       switch (Ls) {
-        case 16: return 10; break;
+#ifdef USE_MMA_SYNC
+        case 16: return 16; break;
+#else
+        case 16: return 16; break;
+#endif
         default: return 0;
       }
     };
-    constexpr int sm_n_pad_size = 10;
+#ifdef USE_MMA_SYNC
+    constexpr int sm_n_pad_size = 16;
+#else
+    constexpr int sm_n_pad_size = 16;
+#endif
 
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
 
@@ -401,8 +411,11 @@ namespace quda
 
         __syncthreads();
         if(reload){
-          // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+#ifdef USE_MMA_SYNC
           mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
+#else
+          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+#endif
         }else{
           wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
         }
@@ -423,8 +436,12 @@ namespace quda
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
           if(reload) {
-            // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+#ifdef USE_MMA_SYNC
             mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
+            // wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+#else 
+            wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+#endif
           }else{
             wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
           }
