@@ -1733,7 +1733,7 @@ namespace quda {
 #endif
 	ghostExchange(u.GhostExchange()),
 	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	phaseOffset(u.PhaseOffset()), backup_h(nullptr), bytes(u.Bytes())
+	phaseOffset(u.PhaseOffset() / sizeof(Float)), backup_h(nullptr), bytes(u.Bytes())
       {
 	if (geometry == QUDA_COARSE_GEOMETRY)
 	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1802,7 +1802,7 @@ namespace quda {
           if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
             phase = inphase;
           } else {
-            copy(phase, gauge[parity * offset + phaseOffset / sizeof(Float) + stride * dir + x]);
+            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
           }
         }
@@ -1827,7 +1827,7 @@ namespace quda {
         }
         if (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(gauge[parity * offset + phaseOffset / sizeof(Float) + dir * stride + x],
+          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x],
                static_cast<real>(phase / (2. * M_PI)));
         }
       }
