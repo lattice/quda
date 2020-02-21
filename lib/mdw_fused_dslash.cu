@@ -346,6 +346,8 @@ namespace quda
       constexpr int warp_cycle = total_tile / total_warp;
       const int warp_m = this_warp * warp_cycle / tn_dim;
 
+#ifdef USE_MMA_SYNC
+#else
       typedef
         typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
           a_type;
@@ -361,12 +363,14 @@ namespace quda
           nvcuda::wmma::load_matrix_sync(a_frag[k], sm_a + a_row + a_col * M_sm, M_sm);
         }
       }
-
+#endif
       if (type_ == 1) {
         arg.alpha = 1.;
         if (!reload) {                                                           // in the preload case we preload ...
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = true
           __syncthreads();
+#ifdef USE_MMA_SYNC
+#else
 #pragma unroll
           for (int k = 0; k < tm_dim; k++) {
             const int a_row = warp_m * WMMA_M;
@@ -374,6 +378,7 @@ namespace quda
             // Load Matrix
             nvcuda::wmma::load_matrix_sync(a_frag_black[k], sm_c + a_row + a_col * M_sm, M_sm);
           }
+#endif
         } else {
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a_black); // dagger = true
           __syncthreads();
@@ -417,7 +422,10 @@ namespace quda
           wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
 #endif
         }else{
+#ifdef USE_MMA_SYNC
+#else
           wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+#endif
         }
         __syncthreads();
 
@@ -442,7 +450,10 @@ namespace quda
             wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
 #endif
           }else{
+#ifdef USE_MMA_SYNC
+#else
             wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+#endif
           }
           __syncthreads();
 

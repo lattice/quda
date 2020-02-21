@@ -296,13 +296,13 @@ namespace quda
   {
     if (accumulate) {
       float previous_scale = smem_scale[0] * m_scale;
-      half *B = reinterpret_cast<half *>(sm_b);
 #pragma unroll
       for (int spin = 0; spin < 4; spin++) {
 #pragma unroll
         for (int color = 0; color < 3; color++) {
-          int idx = (threadIdx.y * 4 + spin) * (N_sm_d2 * 2) + 6 * threadIdx.x + 2 * color;
-          v(spin, color) += complex<float>(__half2float(B[idx + 0]), __half2float(B[idx + 1])) * previous_scale;
+          int idx = (threadIdx.y * 4 + spin) * N_sm_d2 + 3 * threadIdx.x + color;
+          half2 h = sm_b[idx];
+          v(spin, color) += complex<float>(h.x, h.y) * previous_scale;
         }
       }
     }

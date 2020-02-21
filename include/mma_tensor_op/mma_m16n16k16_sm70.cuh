@@ -107,6 +107,34 @@ namespace quda
     ra[reg_offset + 1] = A[smem_offset + 1];
   }
 
+  template <int stride> struct MmaOperandA {
+
+    unsigned reg[2];
+
+    __device__ void load(unsigned *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
+    {
+      const int idx_strided = k * 4 + wrm.quad_thread;
+      const int idx_contiguous = warp_row * 8 + wrm.quad_row * 4 + wrm.quad_hilo * 2;
+      const int thread_offset_a = idx_strided * stride + idx_contiguous;
+      reg[0] = smem[thread_offset_a + 0];
+      reg[1] = smem[thread_offset_a + 1];
+    }
+  };
+
+  template <int stride> struct MmaOperandB {
+
+    unsigned reg[2];
+
+    __device__ void load(unsigned *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
+    {
+      const int idx_strided = k * 4 + wrm.quad_thread;
+      const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4 + wrm.quad_hilo * 2;
+      const int thread_offset_b = idx_strided * stride + idx_contiguous;
+      reg[0] = smem[thread_offset_b + 0];
+      reg[1] = smem[thread_offset_b + 1];
+    }
+  };
+
 #define USE_FP16_MMA_ACCUMULATE
 
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD>
@@ -146,16 +174,7 @@ namespace quda
     const int warp_row = warp_id * warp_cycle / tile_col_dim;
 
     const WarpRegisterMapping wrm(thread_id);
-
-    // const int lane_id = thread_id & 31;
-    // const int octl_id = lane_id >> 2;
-    // const int quad_id = octl_id & 3;
-    // const int quad_row = quad_id & 1;
-    // const int quad_col = quad_id >> 1;
-    // const int quad_hilo = (octl_id >> 2) & 1; // quad higher or lower.
-    // const int quad_thread = lane_id & 3;      // 0,1,2,3
-
-    smem_access_type ra[2 * tile_row_dim * 4];
+    MmaOperandA<M_PAD / data_pack_factor> op_a[tile_row_dim * 4];
 
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
@@ -177,33 +196,27 @@ namespace quda
 #pragma unroll
         for (int warp_k = 0; warp_k < 4; warp_k++) {
 
-          smem_access_type *B = reinterpret_cast<smem_access_type *>(sm_b);
-
-          const int k_idx = (tile_k * 4 + warp_k) * 2;
-          const int idx_strided = k_idx * 2 + wrm.quad_thread;
-
-          int thread_offset_b
-            = idx_strided * (N_PAD / data_pack_factor) + warp_col * 8 + wrm.quad_col * 4 + wrm.quad_hilo * 2;
+          const int k_idx = tile_k * 4 + warp_k;
 
           if (c == 0) { // the data in registers can be resued.
-            const int thread_offset_a
-              = idx_strided * (M_PAD / data_pack_factor) + warp_row * 8 + wrm.quad_row * 4 + wrm.quad_hilo * 2;
-            mma_load_a_frag(ra, sm_a, k_idx, thread_offset_a);
+            smem_access_type *A = reinterpret_cast<smem_access_type *>(sm_a);
+            op_a[k_idx].load(A, k_idx, warp_row, wrm);
           }
-          unsigned rb[2];
-          rb[0] = B[thread_offset_b + 0];
-          rb[1] = B[thread_offset_b + 1];
+
+          MmaOperandB<N_PAD / data_pack_factor> op_b;
+          smem_access_type *B = reinterpret_cast<smem_access_type *>(sm_b);
+          op_b.load(B, k_idx, warp_col, wrm);
 
 #ifdef USE_FP16_MMA_ACCUMULATE
           asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
                        : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
-                       : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(rb[0]), "r"(rb[1]));
+                       : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #else
           asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
                        "{%0,%1,%2,%3,%4,%5,%6,%7};"
                        : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
                          "+f"(rc[7])
-                       : "r"(ra[k_idx + 0]), "r"(ra[k_idx + 1]), "r"(rb[0]), "r"(rb[1]));
+                       : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
         }
       }
