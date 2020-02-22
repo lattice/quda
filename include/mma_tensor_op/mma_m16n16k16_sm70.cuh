@@ -137,8 +137,8 @@ namespace quda
 
 #define USE_FP16_MMA_ACCUMULATE
 
-  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD>
-  __device__ inline void mma_sync_gemm(half *sm_a, half *sm_b, half *sm_c)
+  template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
+  __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const WarpRegisterMapping &wrm)
   {
     using data_type = half;
     using smem_access_type = unsigned;
@@ -173,8 +173,7 @@ namespace quda
     const int warp_id = thread_id >> 5;
     const int warp_row = warp_id * warp_cycle / tile_col_dim;
 
-    const WarpRegisterMapping wrm(thread_id);
-    MmaOperandA<M_PAD / data_pack_factor> op_a[tile_row_dim * 4];
+    // MmaOperandA<M_PAD / data_pack_factor> op_a[tile_row_dim * 4];
 
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
@@ -198,26 +197,41 @@ namespace quda
 
           const int k_idx = tile_k * 4 + warp_k;
 
-          if (c == 0) { // the data in registers can be resued.
+          if (reload) { // the data in registers can be resued.
             smem_access_type *A = reinterpret_cast<smem_access_type *>(sm_a);
-            op_a[k_idx].load(A, k_idx, warp_row, wrm);
+            op_a[0].load(A, k_idx, warp_row, wrm);
           }
 
           MmaOperandB<N_PAD / data_pack_factor> op_b;
           smem_access_type *B = reinterpret_cast<smem_access_type *>(sm_b);
           op_b.load(B, k_idx, warp_col, wrm);
 
+          if (reload) {
 #ifdef USE_FP16_MMA_ACCUMULATE
-          asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
-                       : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
-                       : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+                         : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
+                         : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #else
-          asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
-                       "{%0,%1,%2,%3,%4,%5,%6,%7};"
-                       : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
-                         "+f"(rc[7])
-                       : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+                         "{%0,%1,%2,%3,%4,%5,%6,%7};"
+                         : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
+                           "+f"(rc[7])
+                         : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
+        } else {
+#ifdef USE_FP16_MMA_ACCUMULATE
+            asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+                         : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
+                         : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+#else
+            asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+                         "{%0,%1,%2,%3,%4,%5,%6,%7};"
+                         : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
+                           "+f"(rc[7])
+                         : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+#endif
+        
+        }
         }
       }
 

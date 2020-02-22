@@ -346,7 +346,22 @@ namespace quda
       constexpr int warp_cycle = total_tile / total_warp;
       const int warp_m = this_warp * warp_cycle / tn_dim;
 
+      WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
+
 #ifdef USE_MMA_SYNC
+      MmaOperandA<M_sm / 2> op_a[reload ? 1 : tm_dim * 4];
+      MmaOperandA<M_sm / 2> op_a_aux[reload ? 1 : tm_dim * 4];
+      if (!reload) { // the data in registers can be resued.
+#pragma unroll
+        for (int tile_k = 0; tile_k < tm_dim; tile_k++) {
+#pragma unroll
+          for (int warp_k = 0; warp_k < 4; warp_k++) {
+            const int k_idx = tile_k * 4 + warp_k;
+            unsigned *A = reinterpret_cast<unsigned *>(sm_a);
+            op_a[k_idx].load(A, k_idx, warp_m, wrm);
+          }
+        }
+      }
 #else
       typedef
         typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
@@ -370,6 +385,14 @@ namespace quda
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = true
           __syncthreads();
 #ifdef USE_MMA_SYNC
+          for (int tile_k = 0; tile_k < tm_dim; tile_k++) {
+#pragma unroll
+            for (int warp_k = 0; warp_k < 4; warp_k++) {
+              const int k_idx = tile_k * 4 + warp_k;
+              unsigned *A = reinterpret_cast<unsigned *>(sm_a);
+              op_a_aux[k_idx].load(A, k_idx, warp_m, wrm);
+            }
+          }
 #else
 #pragma unroll
           for (int k = 0; k < tm_dim; k++) {
@@ -415,18 +438,11 @@ namespace quda
         load_matrix_b_vector<N_sm / 2, false>(in_vec, sm_b, smem_scale); // acc(accumulation) = false
 
         __syncthreads();
-        if(reload){
 #ifdef USE_MMA_SYNC
-          mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a, sm_c, sm_c);
+        mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(op_a, sm_a, sm_c, sm_c, wrm);
 #else
-          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
+        wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
 #endif
-        }else{
-#ifdef USE_MMA_SYNC
-#else
-          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag, sm_a, sm_c, sm_c);
-#endif
-        }
         __syncthreads();
 
         if (type_ == 1) {
@@ -443,18 +459,11 @@ namespace quda
           load_matrix_b_vector<N_sm / 2, true>(aux_in_vec, sm_b, smem_scale, arg.m_scale); // acc = true
           if (!idle && center) { store_matrix_c<storage_type, N_sm>(arg.y, sm_b, sid_back, smem_scale[0]); }
           __syncthreads();
-          if(reload) {
 #ifdef USE_MMA_SYNC
-            mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm>(sm_a_black, sm_c, sm_c);
+          mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
 #else 
-            wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
+          wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
 #endif
-          }else{
-#ifdef USE_MMA_SYNC
-#else
-            wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
-#endif
-          }
           __syncthreads();
 
         } else if (type_ == 3) {
@@ -590,7 +599,7 @@ namespace quda
           if (param.aux.y < 3) { // second see if aux.y
             param.aux.y++;
             aux_advanced = true;
-            param.aux.x = 1;
+            param.aux.x = 0;
           }
         }
         if (aux_advanced) {
@@ -688,7 +697,7 @@ namespace quda
       template <int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
       {
         if (tp.aux.x == 0) {
-          // apply<false, type>(tp, arg, stream); // reload = false
+          apply<false, type>(tp, arg, stream); // reload = false
         } else {
           apply<true, type>(tp, arg, stream); // reload = true
         }
@@ -713,7 +722,7 @@ namespace quda
         param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
         param.shared_bytes = shared_bytes_per_block(param);
-        param.aux.x = 1;
+        param.aux.x = 0;
         param.aux.y = 1;
       }
 
