@@ -111,7 +111,7 @@ namespace quda
 
     unsigned reg[2];
 
-    __device__ void load(unsigned *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
+    __device__ inline void load(unsigned *smem, int k, int warp_row, const WarpRegisterMapping &wrm)
     {
       const int idx_strided = k * 4 + wrm.quad_thread;
       const int idx_contiguous = warp_row * 8 + wrm.quad_row * 4 + wrm.quad_hilo * 2;
@@ -125,13 +125,37 @@ namespace quda
 
     unsigned reg[2];
 
-    __device__ void load(unsigned *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
+    __device__ inline void load(unsigned *smem, int k, int warp_col, const WarpRegisterMapping &wrm)
     {
       const int idx_strided = k * 4 + wrm.quad_thread;
       const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4 + wrm.quad_hilo * 2;
       const int thread_offset_b = idx_strided * stride + idx_contiguous;
       reg[0] = smem[thread_offset_b + 0];
       reg[1] = smem[thread_offset_b + 1];
+    }
+  };
+
+  template <int stride, class store_type> struct MmaOperandC {
+  };
+
+  template <int stride> struct MmaOperandC<stride, half> {
+
+    using type = unsigned;
+    unsigned reg[4];
+
+    __device__ MmaOperandC()
+    {
+#pragma unroll
+      for (int i = 0; i < 4; i++) { reg[i] = 0; }
+    }
+
+    __device__ void store(unsigned *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
+    {
+      const int idx_strided = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+      const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4;
+      const int thread_offset_c = idx_strided * stride + idx_contiguous;
+#pragma unroll
+      for (int i = 0; i < 4; i++) { smem[thread_offset_c + i] = reg[i]; }
     }
   };
 
@@ -173,11 +197,9 @@ namespace quda
     const int warp_id = thread_id >> 5;
     const int warp_row = warp_id * warp_cycle / tile_col_dim;
 
-    // MmaOperandA<M_PAD / data_pack_factor> op_a[tile_row_dim * 4];
-
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
-
+      MmaOperandC<N_PAD / data_pack_factor, half> op_c;
       accumuate_reg_type rc[accumuate_regs];
 #pragma unroll
       for (int r = 0; r < accumuate_regs; r++) { rc[r] = 0; }
@@ -208,41 +230,39 @@ namespace quda
 
           if (reload) {
 #ifdef USE_FP16_MMA_ACCUMULATE
-            asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
-                         : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
-                         : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile(
+              "mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+              : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
+              : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #else
-            asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
-                         "{%0,%1,%2,%3,%4,%5,%6,%7};"
-                         : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
-                           "+f"(rc[7])
-                         : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile(
+              "mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+              "{%0,%1,%2,%3,%4,%5,%6,%7};"
+              : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]), "+f"(rc[7])
+              : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
-        } else {
+          } else {
 #ifdef USE_FP16_MMA_ACCUMULATE
-            asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
-                         : "+r"(rc[0]), "+r"(rc[1]), "+r"(rc[2]), "+r"(rc[3])
-                         : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile(
+              "mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
+              : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
+              : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #else
-            asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
-                         "{%0,%1,%2,%3,%4,%5,%6,%7};"
-                         : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]),
-                           "+f"(rc[7])
-                         : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
+            asm volatile(
+              "mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
+              "{%0,%1,%2,%3,%4,%5,%6,%7};"
+              : "+f"(rc[0]), "+f"(rc[1]), "+f"(rc[2]), "+f"(rc[3]), "+f"(rc[4]), "+f"(rc[5]), "+f"(rc[6]), "+f"(rc[7])
+              : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
-        
-        }
+          }
         }
       }
 
       __syncthreads();
+
 #ifdef USE_FP16_MMA_ACCUMULATE
       smem_access_type *C = reinterpret_cast<smem_access_type *>(sm_c);
-      const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
-      const int col = warp_col * 8 + wrm.quad_col * 4;
-      const int thread_offset_c = row * (N_PAD / data_pack_factor) + col;
-#pragma unroll
-      for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = rc[i]; }
+      op_c.store(C, warp_row, warp_col, wrm);
 #else
       half2 *C = reinterpret_cast<half2 *>(sm_c);
 
