@@ -145,7 +145,7 @@ namespace quda
     __device__ void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
     {
       unsigned *C = reinterpret_cast<unsigned *>(smem);
-      
+
       const int idx_strided = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
       const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4;
       const int thread_offset_c = idx_strided * stride + idx_contiguous;
@@ -186,7 +186,7 @@ namespace quda
     }
   };
 
-// #define USE_FP16_MMA_ACCUMULATE
+  // #define USE_FP16_MMA_ACCUMULATE
 
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
   __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const WarpRegisterMapping &wrm)
@@ -219,7 +219,7 @@ namespace quda
 
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
-      
+
       MmaOperandC<N_PAD / 2, accumuate_reg_type> op_c;
 
       // The logical warp assigned to each part of the matrix.
@@ -254,7 +254,8 @@ namespace quda
             asm volatile(
               "mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
               "{%0,%1,%2,%3,%4,%5,%6,%7};"
-              : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]), "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
+              : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]),
+                "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
               : "r"(op_a[0].reg[0]), "r"(op_a[0].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
           } else {
@@ -267,7 +268,8 @@ namespace quda
             asm volatile(
               "mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
               "{%0,%1,%2,%3,%4,%5,%6,%7};"
-              : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]), "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
+              : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]),
+                "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
               : "r"(op_a[k_idx].reg[0]), "r"(op_a[k_idx].reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
 #endif
           }
