@@ -333,7 +333,6 @@ namespace quda
 
       constexpr int WMMA_M = 16;
       constexpr int WMMA_N = 16;
-      constexpr int WMMA_K = 16;
 
       constexpr int tm_dim = M / WMMA_M;
       constexpr int tn_dim = N / WMMA_N;

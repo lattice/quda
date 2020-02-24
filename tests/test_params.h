@@ -330,10 +330,10 @@ extern bool heatbath_coldstart;
 
 extern double mobius_scale;
 extern int eofa_pm;
-extern int eofa_shift;
-extern int eofa_mq1;
-extern int eofa_mq2;
-extern int eofa_mq3;
+extern double eofa_shift;
+extern double eofa_mq1;
+extern double eofa_mq2;
+extern double eofa_mq3;
 
 extern double stout_smear_rho;
 extern double stout_smear_epsilon;

@@ -186,7 +186,7 @@ namespace quda
     }
   };
 
-  // #define USE_FP16_MMA_ACCUMULATE
+#define USE_FP16_MMA_ACCUMULATE
 
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
   __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const WarpRegisterMapping &wrm)

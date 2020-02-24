@@ -197,10 +197,10 @@ bool heatbath_coldstart = false;
 
 double mobius_scale = 0.0;
 int eofa_pm = 1;
-int eofa_shift = -1.2345;
-int eofa_mq1 = 1.0;
-int eofa_mq2 = 0.085;
-int eofa_mq3 = 1.0;
+double eofa_shift = -1.2345;
+double eofa_mq1 = 1.0;
+double eofa_mq2 = 0.085;
+double eofa_mq3 = 1.0;
 
 double stout_smear_rho = 0.1;
 double stout_smear_epsilon = -0.25;
