@@ -357,8 +357,7 @@ namespace quda
 #pragma unroll
           for (int warp_k = 0; warp_k < 4; warp_k++) {
             const int k_idx = tile_k * 4 + warp_k;
-            unsigned *A = reinterpret_cast<unsigned *>(sm_a);
-            op_a[k_idx].load(A, k_idx, warp_m, wrm);
+            op_a[k_idx].load(sm_a, k_idx, warp_m, wrm);
           }
         }
       }
@@ -389,8 +388,7 @@ namespace quda
 #pragma unroll
             for (int warp_k = 0; warp_k < 4; warp_k++) {
               const int k_idx = tile_k * 4 + warp_k;
-              unsigned *A = reinterpret_cast<unsigned *>(sm_a);
-              op_a_aux[k_idx].load(A, k_idx, warp_m, wrm);
+              op_a_aux[k_idx].load(sm_a, k_idx, warp_m, wrm);
             }
           }
 #else
