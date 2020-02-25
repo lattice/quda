@@ -43,21 +43,20 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_5D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      // we pass s=0, since x_cb is a 5-d index that includes s
+      auto coord = getCoords<QUDA_5D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
-      // we pass s=0, since x_cb is a 5-d index that includes s
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (kernel_type == INTERIOR_KERNEL) { // 5th dimension derivative always local
         constexpr int d = 4;
         const int s = coord[4];
         const int their_spinor_parity = nParity == 2 ? 1 - parity : 0;
         {
-          const int fwd_idx = getNeighborIndexCB<Arg::nDim>(coord, d, +1, arg.dc);
+          const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
           constexpr int proj_dir = dagger ? +1 : -1;
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           if (s == arg.Ls - 1) {
@@ -68,7 +67,7 @@ namespace quda
         }
 
         {
-          const int back_idx = getNeighborIndexCB<Arg::nDim>(coord, d, -1, arg.dc);
+          const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
           constexpr int proj_dir = dagger ? -1 : +1;
           Vector in = arg.in(back_idx, their_spinor_parity);
           if (s == 0) {
@@ -80,14 +79,14 @@ namespace quda
       }
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(x_cb, my_spinor_parity);
+        Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = x + arg.a * out;
       } else if (kernel_type != INTERIOR_KERNEL && active) {
-        Vector x = arg.out(x_cb, my_spinor_parity);
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
 
     __host__ __device__ void operator()(int idx, int s, int parity)
