@@ -3,7 +3,10 @@
 
 #include <mdw_dslash5_tensor_core.cuh>
 
+// The `mma.sync` PTX is only available with or after CUDA 10.1
+#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
 #define USE_MMA_SYNC // rather than using wmma
+#endif
 
 namespace quda
 {
@@ -26,7 +29,7 @@ namespace quda
     constexpr int sm_n_pad_size = 16;
 #endif
 
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700) && (__COMPUTE_CAPABILITY__ <= 750)
+#if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
 
     /**
       @brief Parameter structure for applying the Dslash

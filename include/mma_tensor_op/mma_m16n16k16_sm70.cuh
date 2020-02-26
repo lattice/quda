@@ -186,6 +186,8 @@ namespace quda
     }
   };
 
+#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
+
 #define USE_FP16_MMA_ACCUMULATE
 
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
@@ -281,6 +283,8 @@ namespace quda
       op_c.store(sm_c, warp_row, warp_col, wrm);
     }
   }
+
+#endif // #if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
 
 #endif // defined (__COMPUTE_CAPABILITY__ == 700)
 
