@@ -34,8 +34,13 @@ namespace quda
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
     // Problem parameters
-    nEv = eig_param->nEv;
-    nKr = eig_param->nKr;
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      nEv = eig_param->nEv;
+      nKr = eig_param->nKr;
+    } else {
+      mmin = eig_param->mmin;
+      mmax = eig_param->mmax;
+    }
     nConv = eig_param->nConv;
     tol = eig_param->tol;
     reverse = false;
@@ -55,17 +60,32 @@ namespace quda
     num_keep = 0;
 
     // Sanity checks
-    if (nKr <= nEv) errorQuda("nKr=%d is less than or equal to nEv=%d\n", nKr, nEv);
-    if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d\n", nConv, nEv);
-    if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver\n");
-    if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      if (nKr <= nEv) errorQuda("nKr=%d is less than or equal to nEv=%d\n", nKr, nEv);
+      if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d\n", nConv, nEv);
+      if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver\n");
+      if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
+      if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
+    } else {
+      if (mmax <= mmin) errorQuda("mmax=%d is less than or equal to mmin=%d\n", mmax, mmin);
+      if (mmin < nConv) errorQuda("nConv=%d is greater than mmin=%d\n", nConv, mmin);
+      if (mmin == 0) errorQuda("mmin=0 passed to Eigensolver\n");
+      if (mmax == 0) errorQuda("mmax=0 passed to Eigensolver\n");
+    }
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
 
-    residua = (double *)safe_malloc(nKr * sizeof(double));
-    for (int i = 0; i < nKr; i++) { residua[i] = 0.0; }
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      residua = (double *)safe_malloc(nKr * sizeof(double));
+      for (int i = 0; i < nKr; i++) { residua[i] = 0.0; }
+    } else {
+      residua = (double *)safe_malloc(mmax * sizeof(double));
+      for (int i = 0; i < mmax; i++) { residua[i] = 0.0; }
+    }
 
-    // Quda MultiBLAS friendly array
-    Qmat = (Complex *)safe_malloc(nEv * nKr * sizeof(Complex));
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      // Quda MultiBLAS friendly array
+      Qmat = (Complex *)safe_malloc(nEv * nKr * sizeof(Complex));
+    }
 
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
@@ -78,15 +98,21 @@ namespace quda
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
-    // Deduce whether to reverse the sorting
-    if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
-      reverse = true;
-    } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = true;
-      spectrum[0] = 'L';
-    } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
-      reverse = true;
-      spectrum[0] = 'S';
+    if(eig_param->eig_type==QUDA_EIG_DAV && strcmp(spectrum, "SR")){
+      errorQuda("Jacobi-Davidson eigensolver only supports SR spectrum");
+    }
+
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      // Deduce whether to reverse the sorting
+      if (strncmp("L", spectrum, 1) == 0 && !eig_param->use_poly_acc) {
+        reverse = true;
+      } else if (strncmp("S", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+        reverse = true;
+        spectrum[0] = 'L';
+      } else if (strncmp("L", spectrum, 1) == 0 && eig_param->use_poly_acc) {
+        reverse = true;
+        spectrum[0] = 'S';
+      }
     }
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -104,6 +130,10 @@ namespace quda
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
       eig_solver = new TRLM(eig_param, mat, profile);
+      break;
+    case QUDA_EIG_DAV:
+      if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Jacobi-Davidson eigensolver\n");
+      eig_solver = new JD(eig_param, mat, profile);
       break;
     default: errorQuda("Invalid eig solver type");
     }
@@ -697,7 +727,9 @@ namespace quda
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
     host_free(residua);
-    host_free(Qmat);
+    if (eig_param->eig_type != QUDA_EIG_DAV) {
+      host_free(Qmat);
+    }
   }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
@@ -1259,4 +1291,21 @@ namespace quda
 
     host_free(ritz_mat_keep);
   }
+
+  // -------------------------------
+  // Davidson-type eigensolver class
+
+  // Jacobi-Davidson Method constructor
+  JD::JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
+    EigenSolver(eig_param, profile),
+    mat(mat)
+  { }
+
+  void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
+  { printf("\nwithin JD !\n\n"); }
+
+  // Jacobi-Davidson destructor
+  JD::~JD()
+  { }
+
 } // namespace quda

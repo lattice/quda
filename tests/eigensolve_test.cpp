@@ -47,8 +47,14 @@ void display_test_info()
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
   printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  if (eig_type != QUDA_EIG_DAV) {
+    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+    printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  } else {
+    printfQuda(" - minimum size of subspace %d\n", eig_mmin);
+    printfQuda(" - maximum size of subspace %d\n", eig_mmax);
+  }
+
   printfQuda(" - solver tolerance %e\n", eig_tol);
   printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
   if (eig_compute_svd) {
@@ -61,17 +67,21 @@ void display_test_info()
     printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
                eig_use_normop ? "true" : "false");
   }
-  if (eig_use_poly_acc) {
-    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax <= 0)
-      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
-    else
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  if (eig_type != QUDA_EIG_DAV) {
+    if (eig_use_poly_acc) {
+      printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+      printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+      if (eig_amax <= 0)
+        printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+      else
+        printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+    }
   }
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
+
   return;
 }
 
@@ -228,6 +238,8 @@ void setEigParam(QudaEigParam &eig_param)
   if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  } else if ((eig_type == QUDA_EIG_DAV) && (eig_spectrum != QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only smallest real spectrum type (SR) can be passed to Jacobi-Davidson type solver");
   }
 
   // The solver will exit when nConv extremal eigenpairs have converged
@@ -238,8 +250,14 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
+  if (eig_type != QUDA_EIG_DAV) {
+    eig_param.nEv = eig_nEv;
+    eig_param.nKr = eig_nKr;
+  } else {
+    eig_param.mmin = eig_mmin;
+    eig_param.mmax = eig_mmax;
+  }
+
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -255,10 +273,12 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min = eig_amin;
-  eig_param.a_max = eig_amax;
+  if (eig_type != QUDA_EIG_DAV) {
+    eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    eig_param.poly_deg = eig_poly_deg;
+    eig_param.a_min = eig_amin;
+    eig_param.a_max = eig_amax;
+  }
 
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
@@ -377,7 +397,12 @@ int main(int argc, char **argv)
   for (int i = 0; i < eig_nConv; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+  double _Complex *host_evals;
+  if (eig_param.eig_type != QUDA_EIG_DAV) {
+    host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
+  } else {
+    host_evals = (double _Complex *)malloc(eig_nConv * sizeof(double _Complex));
+  }
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the

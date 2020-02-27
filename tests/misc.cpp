@@ -870,6 +870,7 @@ const char *get_eig_type_str(QudaEigType type)
   case QUDA_EIG_TR_LANCZOS: ret = "trlm"; break;
   case QUDA_EIG_IR_LANCZOS: ret = "irlm"; break;
   case QUDA_EIG_IR_ARNOLDI: ret = "iram"; break;
+  case QUDA_EIG_DAV:        ret = "dav";  break;
   default: ret = "unknown eigensolver"; break;
   }
 

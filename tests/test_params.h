@@ -275,6 +275,8 @@ extern QudaMemoryType mem_type_ritz;
 // Parameters for the stand alone eigensolver
 extern int eig_nEv;
 extern int eig_nKr;
+extern int eig_mmin;
+extern int eig_mmax;
 extern int eig_nConv; // If unchanged, will be set to nEv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;
@@ -301,6 +303,8 @@ extern char eig_vec_outfile[256];
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
 extern quda::mgarray<int> mg_eig_nEv;
+extern quda::mgarray<int> mg_eig_mmin;
+extern quda::mgarray<int> mg_eig_mmax;
 extern quda::mgarray<int> mg_eig_nKr;
 extern quda::mgarray<int> mg_eig_batched_rotate;
 extern quda::mgarray<bool> mg_eig_require_convergence;

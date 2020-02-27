@@ -130,6 +130,7 @@
 #define QUDA_EIG_TR_LANCZOS 0 // Thick Restarted Lanczos Solver
 #define QUDA_EIG_IR_LANCZOS 1 // Implicitly restarted Lanczos solver (not yet implemented)
 #define QUDA_EIG_IR_ARNOLDI 2 // Implicitly restarted Arnoldi solver (not yet implemented)
+#define QUDA_EIG_DAV 3        // Jacobi-Davison (upcoming, Generalized-Davidson)
 #define QUDA_EIG_INVALID QUDA_INVALID_ENUM
 
 #define QudaEigSpectrumType integer(4)

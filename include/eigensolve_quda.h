@@ -24,6 +24,8 @@ protected:
     //------------------
     int nEv;          /** Size of initial factorisation */
     int nKr;          /** Size of Krylov space after extension */
+    int mmin;         /** Minimim size of subspace for Jacobi-Davidson */
+    int mmax;         /** Maximum size of subspace for Jacobi-Davidson */
     int nConv;        /** Number of converged eigenvalues requested */
     double tol;       /** Tolerance on eigenvalues */
     bool reverse;     /** True if using polynomial acceleration */
@@ -357,5 +359,35 @@ public:
   */
   void arpack_solve(std::vector<ColorSpinorField *> &h_evecs, std::vector<Complex> &h_evals, const DiracMatrix &mat,
                     QudaEigParam *eig_param, TimeProfile &profile);
+
+  /**
+     @brief Jacobi-Davidson Method.
+  */
+  class JD : public EigenSolver
+  {
+
+public:
+    const DiracMatrix &mat;
+    /**
+       @brief Constructor for JD Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace the "acceleration" vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Destructor for JD Eigensolver class
+    */
+    virtual ~JD();
+
+  };
 
 } // namespace quda

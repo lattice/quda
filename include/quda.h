@@ -430,6 +430,10 @@ extern "C" {
     int nEv;
     /** Total size of Krylov space **/
     int nKr;
+    /** Minimum size of the subspace when using Jacobi-Davidson **/
+    int mmin;
+    /** Maximum size of the subspace when using Jacobi-Davidson **/
+    int mmax;
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/

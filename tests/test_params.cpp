@@ -143,6 +143,8 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 // Parameters for the stand alone eigensolver
 int eig_nEv = 16;
 int eig_nKr = 32;
+int eig_mmin = 16;
+int eig_mmax = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
 int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
@@ -170,6 +172,8 @@ char eig_vec_outfile[256] = "";
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_nEv = {};
 quda::mgarray<int> mg_eig_nKr = {};
+quda::mgarray<int> mg_eig_mmax = {};
+quda::mgarray<int> mg_eig_mmin = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
@@ -266,7 +270,7 @@ namespace
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {
-    {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
+    {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}, {"dav", QUDA_EIG_DAV}};
 
   CLI::TransformPairs<QudaSolveType> solve_type_map {
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},
@@ -532,6 +536,9 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-amax", eig_amax, "The maximum in the polynomial acceleration")->check(CLI::PositiveNumber);
   opgroup->add_option("--eig-amin", eig_amin, "The minimum in the polynomial acceleration")->check(CLI::PositiveNumber);
 
+  opgroup->add_option("--eig-mmax", eig_mmax, "The maximum size of the subspace in Jacobi-Davidson");
+  opgroup->add_option("--eig-mmin", eig_mmin, "The minimum size of the subspace in Jacobi-Davidson");
+
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
   opgroup->add_option("--eig-QUDA-logfile", eig_QUDA_logfile,
                       "The filename storing the stdout from the QUDA eigensolver");
@@ -658,6 +665,11 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
+  quda_app->add_mgoption(opgroup, "--mg-eig-mmax", mg_eig_mmax, CLI::Validator(),
+                         "The maximum size of the subspace in Jacobi-Davidson");
+  quda_app->add_mgoption(opgroup, "--mg-eig-mmin", mg_eig_mmin, CLI::Validator(),
+                         "The minimum size of the subspace in Jacobi-Davidson");
+
   quda_app->add_mgoption(
     opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
     "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
