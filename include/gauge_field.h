@@ -7,16 +7,18 @@
 
 namespace quda {
 
-  namespace gauge {
+  namespace gauge
+  {
 
-    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct) {
+    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
+    {
       if (precision == QUDA_DOUBLE_PRECISION) {
-        if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
+        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
       } else if (precision == QUDA_SINGLE_PRECISION) {
         if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
           if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13 ||
-                   reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
+                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
           if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
         }
       } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
@@ -34,7 +36,7 @@ namespace quda {
       }
       return false;
     }
-  }
+  } // namespace gauge
 
   struct GaugeFieldParam : public LatticeFieldParam {
 
@@ -165,11 +167,11 @@ namespace quda {
           this->ghost_precision = precision;
 
           if (native) {
-            if (precision == QUDA_DOUBLE_PRECISION || precision == QUDA_DOUBLE_PRECISION ||
-                reconstruct == QUDA_RECONSTRUCT_NO) {
+            if (precision == QUDA_DOUBLE_PRECISION || precision == QUDA_DOUBLE_PRECISION
+                || reconstruct == QUDA_RECONSTRUCT_NO) {
               order = QUDA_FLOAT2_GAUGE_ORDER;
-            } else if ( (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) &&
-                        (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) ) {
+            } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+                       && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
 #ifdef FLOAT8
               order = QUDA_FLOAT8_GAUGE_ORDER;
 #else

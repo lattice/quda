@@ -184,47 +184,47 @@ namespace quda {
       case 0: // x dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  i_(t(3,i));
-	  a(1,i) =  i_(t(2,i));
-	  a(2,i) = -i_(t(1,i));
-	  a(3,i) = -i_(t(0,i));
-	}
+          a(0, i) = i_(t(3, i));
+          a(1, i) = i_(t(2, i));
+          a(2, i) = -i_(t(1, i));
+          a(3, i) = -i_(t(0, i));
+        }
 	break;
       case 1: // y dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  t(3,i);
-	  a(1,i) = -t(2,i);
-	  a(2,i) = -t(1,i);
-	  a(3,i) =  t(0,i);
-	}
+          a(0, i) = t(3, i);
+          a(1, i) = -t(2, i);
+          a(2, i) = -t(1, i);
+          a(3, i) = t(0, i);
+        }
 	break;
       case 2: // z dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  i_(t(2,i));
-          a(1,i) = -i_(t(3,i));
-          a(2,i) = -i_(t(0,i));
-          a(3,i) =  i_(t(1,i));
-	}
+          a(0, i) = i_(t(2, i));
+          a(1, i) = -i_(t(3, i));
+          a(2, i) = -i_(t(0, i));
+          a(3, i) = i_(t(1, i));
+        }
 	break;
       case 3: // t dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  t(0,i);
-	  a(1,i) =  t(1,i);
-	  a(2,i) = -t(2,i);
-	  a(3,i) = -t(3,i);
-	}
+          a(0, i) = t(0, i);
+          a(1, i) = t(1, i);
+          a(2, i) = -t(2, i);
+          a(3, i) = -t(3, i);
+        }
 	break;
       case 4: // gamma_5
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) = t(2,i);
-	  a(1,i) = t(3,i);
-	  a(2,i) = t(0,i);
-	  a(3,i) = t(1,i);
-	}
+          a(0, i) = t(2, i);
+          a(1, i) = t(3, i);
+          a(2, i) = t(0, i);
+          a(3, i) = t(1, i);
+        }
 	break;
       }
 
@@ -244,47 +244,47 @@ namespace quda {
       case 0: // x dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) = -t(3,i);
-	  a(1,i) = -t(2,i);
-	  a(2,i) =  t(1,i);
-	  a(3,i) =  t(0,i);
-	}
+          a(0, i) = -t(3, i);
+          a(1, i) = -t(2, i);
+          a(2, i) = t(1, i);
+          a(3, i) = t(0, i);
+        }
 	break;
       case 1: // y dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  i_(t(3,i));
-	  a(1,i) = -i_(t(2,i));
-          a(2,i) = -i_(t(1,i));
-          a(3,i) =  i_(t(0,i));
-	}
+          a(0, i) = i_(t(3, i));
+          a(1, i) = -i_(t(2, i));
+          a(2, i) = -i_(t(1, i));
+          a(3, i) = i_(t(0, i));
+        }
 	break;
       case 2: // z dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) = -t(2,i);
-	  a(1,i) =  t(3,i);
-	  a(2,i) =  t(0,i);
-	  a(3,i) = -t(1,i);
-	}
+          a(0, i) = -t(2, i);
+          a(1, i) = t(3, i);
+          a(2, i) = t(0, i);
+          a(3, i) = -t(1, i);
+        }
 	break;
       case 3: // t dimension
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) =  i_(t(0,i));
-          a(1,i) =  i_(t(1,i));
-          a(2,i) = -i_(t(2,i));
-	  a(3,i) = -i_(t(3,i));
-	}
+          a(0, i) = i_(t(0, i));
+          a(1, i) = i_(t(1, i));
+          a(2, i) = -i_(t(2, i));
+          a(3, i) = -i_(t(3, i));
+        }
 	break;
       case 4: // gamma_5
 #pragma unroll
 	for (int i=0; i<Nc; i++) {
-	  a(0,i) = i_(t(2,i));
-	  a(1,i) = i_(t(3,i));
-	  a(2,i) = i_(t(0,i));
-	  a(3,i) = i_(t(1,i));
-	}
+          a(0, i) = i_(t(2, i));
+          a(1, i) = i_(t(3, i));
+          a(2, i) = i_(t(0, i));
+          a(3, i) = i_(t(1, i));
+        }
 	break;
       }
 
@@ -323,16 +323,16 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0,i) = t(0,i) + i_(t(3,i));
-	    proj(1,i) = t(1,i) + i_(t(2,i));
-	  }
+            proj(0, i) = t(0, i) + i_(t(3, i));
+            proj(1, i) = t(1, i) + i_(t(2, i));
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = t(0,i) - i_(t(3,i));
-	    proj(1,i) = t(1,i) - i_(t(2,i));
-	  }
+            proj(0, i) = t(0, i) - i_(t(3, i));
+            proj(1, i) = t(1, i) - i_(t(2, i));
+          }
 	  break;
 	}
 	break;
@@ -341,16 +341,16 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = t(0,i) + t(3,i);
-	    proj(1,i) = t(1,i) - t(2,i);
-	  }
+            proj(0, i) = t(0, i) + t(3, i);
+            proj(1, i) = t(1, i) - t(2, i);
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = t(0,i) - t(3,i);
-	    proj(1,i) = t(1,i) + t(2,i);
-	  }
+            proj(0, i) = t(0, i) - t(3, i);
+            proj(1, i) = t(1, i) + t(2, i);
+          }
 	  break;
 	}
       	break;
@@ -359,16 +359,16 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0,i) = t(0,i) + i_(t(2,i));
-	    proj(1,i) = t(1,i) - i_(t(3,i));
+            proj(0, i) = t(0, i) + i_(t(2, i));
+            proj(1, i) = t(1, i) - i_(t(3, i));
           }
-	  break;
+          break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-            proj(0,i) = t(0,i) - i_(t(2,i));
-	    proj(1,i) = t(1,i) + i_(t(3,i));
-	  }
+            proj(0, i) = t(0, i) - i_(t(2, i));
+            proj(1, i) = t(1, i) + i_(t(3, i));
+          }
 	  break;
 	}
 	break;
@@ -377,16 +377,16 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = 2*t(0,i);
-	    proj(1,i) = 2*t(1,i);
-	  }
+            proj(0, i) = 2 * t(0, i);
+            proj(1, i) = 2 * t(1, i);
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    proj(0,i) = 2*t(2,i);
-	    proj(1,i) = 2*t(3,i);
-	  }
+            proj(0, i) = 2 * t(2, i);
+            proj(1, i) = 2 * t(3, i);
+          }
 	  break;
 	}
 	break;
@@ -741,20 +741,20 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = -i_(t(1,i));
-            recon(3,i) = -i_(t(0,i));
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = -i_(t(1, i));
+            recon(3, i) = -i_(t(0, i));
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = i_(t(1,i));
-	    recon(3,i) = i_(t(0,i));
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = i_(t(1, i));
+            recon(3, i) = i_(t(0, i));
+          }
 	  break;
 	}
 	break;
@@ -763,20 +763,20 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = -t(1,i);
-	    recon(3,i) = t(0,i);
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = -t(1, i);
+            recon(3, i) = t(0, i);
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = t(1,i);
-	    recon(3,i) = -t(0,i);
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = t(1, i);
+            recon(3, i) = -t(0, i);
+          }
           break;
         }
         break;
@@ -785,20 +785,20 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = -i_(t(0,i));
-	    recon(3,i) = i_(t(1,i));
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = -i_(t(0, i));
+            recon(3, i) = i_(t(1, i));
+          }
 	  break;
 	case -1: // negative projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = i_(t(0,i));
-	    recon(3,i) = -i_(t(1,i));
-	  }
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2, i) = i_(t(0, i));
+            recon(3, i) = -i_(t(1, i));
+          }
 	  break;
 	}
 	break;
@@ -807,9 +807,9 @@ namespace quda {
 	case 1: // positive projector
 #pragma unroll
 	  for (int i=0; i<Nc; i++) {
-	    recon(0,i) = t(0,i);
-	    recon(1,i) = t(1,i);
-	    recon(2,i) = 0;
+            recon(0, i) = t(0, i);
+            recon(1, i) = t(1, i);
+            recon(2,i) = 0;
 	    recon(3,i) = 0;
 	  }
 	  break;
@@ -818,9 +818,9 @@ namespace quda {
 	  for (int i=0; i<Nc; i++) {
 	    recon(0,i) = 0;
 	    recon(1,i) = 0;
-	    recon(2,i) = t(0,i);
-	    recon(3,i) = t(1,i);
-	  }
+            recon(2, i) = t(0, i);
+            recon(3, i) = t(1, i);
+          }
 	  break;
 	}
 	break;

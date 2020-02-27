@@ -1725,15 +1725,20 @@ namespace quda {
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
 
-    FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, bool override=false)
-      : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	offset(u.Bytes()/(2*sizeof(Float)*N)),
+      FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0, bool override = false) :
+        reconstruct(u),
+        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        offset(u.Bytes() / (2 * sizeof(Float) * N)),
 #ifdef USE_TEXTURE_OBJECTS
-	tex(0),
+        tex(0),
 #endif
-	ghostExchange(u.GhostExchange()),
-	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	phaseOffset(u.PhaseOffset() / sizeof(Float)), backup_h(nullptr), bytes(u.Bytes())
+        ghostExchange(u.GhostExchange()),
+        volumeCB(u.VolumeCB()),
+        stride(u.Stride()),
+        geometry(u.Geometry()),
+        phaseOffset(u.PhaseOffset() / sizeof(Float)),
+        backup_h(nullptr),
+        bytes(u.Bytes())
       {
 	if (geometry == QUDA_COARSE_GEOMETRY)
 	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1754,14 +1759,20 @@ namespace quda {
 #endif
       }
 
-    FloatNOrder(const FloatNOrder &order)
-      : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
+      FloatNOrder(const FloatNOrder &order) :
+        reconstruct(order.reconstruct),
+        gauge(order.gauge),
+        offset(order.offset),
 #ifdef USE_TEXTURE_OBJECTS
-	tex(order.tex),
+        tex(order.tex),
 #endif
-	ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	phaseOffset(order.phaseOffset), backup_h(nullptr), bytes(order.bytes)
+        ghostExchange(order.ghostExchange),
+        volumeCB(order.volumeCB),
+        stride(order.stride),
+        geometry(order.geometry),
+        phaseOffset(order.phaseOffset),
+        backup_h(nullptr),
+        bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  X[i] = order.X[i];
@@ -1827,8 +1838,7 @@ namespace quda {
         }
         if (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x],
-               static_cast<real>(phase / (2. * M_PI)));
+          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(phase / (2. * M_PI)));
         }
       }
 

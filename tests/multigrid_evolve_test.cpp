@@ -780,8 +780,8 @@ int main(int argc, char **argv)
     printfQuda("\n======================================================\n");
     printfQuda("Running MG gauge evolution test at constant quark mass\n");
     printfQuda("======================================================\n");
-    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-               0, obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", 0,
+               obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
     // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
@@ -835,8 +835,8 @@ int main(int argc, char **argv)
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
       gaugeObservablesQuda(&obs_param);
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-                 step, obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
@@ -915,8 +915,8 @@ int main(int argc, char **argv)
         mg_param.invert_param->mu = inv_param.mu;
       }
 
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n",
-                 step, obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);

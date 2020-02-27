@@ -55,10 +55,18 @@ namespace quda {
   template<> struct mapper<short4> { typedef float4 type; };
   template<> struct mapper<char4> { typedef float4 type; };
 
-  template<> struct mapper<double8> { typedef double8 type; };
-  template<> struct mapper<float8> { typedef float8 type; };
-  template<> struct mapper<short8> { typedef float8 type; };
-  template<> struct mapper<char8> { typedef float8 type; };
+  template <> struct mapper<double8> {
+    typedef double8 type;
+  };
+  template <> struct mapper<float8> {
+    typedef float8 type;
+  };
+  template <> struct mapper<short8> {
+    typedef float8 type;
+  };
+  template <> struct mapper<char8> {
+    typedef float8 type;
+  };
 
   template<typename,typename> struct bridge_mapper { };
   template<> struct bridge_mapper<double2,double2> { typedef double2 type; };
@@ -77,27 +85,47 @@ namespace quda {
   template<> struct bridge_mapper<float2,short2> { typedef float2 type; };
   template<> struct bridge_mapper<float2,char2> { typedef float2 type; };
 
-  template<> struct bridge_mapper<double2,short8> { typedef double8 type; };
-  template<> struct bridge_mapper<double2,char8> { typedef double8 type; };
-  template<> struct bridge_mapper<float8,short8> { typedef float8 type; };
-  template<> struct bridge_mapper<float8,char8> { typedef float8 type; };
-  template<> struct bridge_mapper<float4,short8> { typedef float8 type; };
-  template<> struct bridge_mapper<float4,char8> { typedef float8 type; };
+  template <> struct bridge_mapper<double2, short8> {
+    typedef double8 type;
+  };
+  template <> struct bridge_mapper<double2, char8> {
+    typedef double8 type;
+  };
+  template <> struct bridge_mapper<float8, short8> {
+    typedef float8 type;
+  };
+  template <> struct bridge_mapper<float8, char8> {
+    typedef float8 type;
+  };
+  template <> struct bridge_mapper<float4, short8> {
+    typedef float8 type;
+  };
+  template <> struct bridge_mapper<float4, char8> {
+    typedef float8 type;
+  };
 
   template<typename> struct vec_length { static const int value = 0; };
-  template<> struct vec_length<double8> { static const int value = 8; };
+  template <> struct vec_length<double8> {
+    static const int value = 8;
+  };
   template<> struct vec_length<double4> { static const int value = 4; };
   template<> struct vec_length<double2> { static const int value = 2; };
   template<> struct vec_length<double> { static const int value = 1; };
-  template<> struct vec_length<float8> { static const int value = 8; };
+  template <> struct vec_length<float8> {
+    static const int value = 8;
+  };
   template<> struct vec_length<float4> { static const int value = 4; };
   template<> struct vec_length<float2> { static const int value = 2; };
   template<> struct vec_length<float> { static const int value = 1; };
-  template<> struct vec_length<short8> { static const int value = 8; };
+  template <> struct vec_length<short8> {
+    static const int value = 8;
+  };
   template<> struct vec_length<short4> { static const int value = 4; };
   template<> struct vec_length<short2> { static const int value = 2; };
   template<> struct vec_length<short> { static const int value = 1; };
-  template<> struct vec_length<char8> { static const int value = 8; };
+  template <> struct vec_length<char8> {
+    static const int value = 8;
+  };
   template<> struct vec_length<char4> { static const int value = 4; };
   template<> struct vec_length<char2> { static const int value = 2; };
   template<> struct vec_length<char> { static const int value = 1; };
@@ -126,22 +154,30 @@ namespace quda {
   };
 
   template<typename> struct scalar { };
-  template<> struct scalar<double8> { typedef double type; };
+  template <> struct scalar<double8> {
+    typedef double type;
+  };
   template<> struct scalar<double4> { typedef double type; };
   template<> struct scalar<double3> { typedef double type; };
   template<> struct scalar<double2> { typedef double type; };
   template<> struct scalar<double> { typedef double type; };
-  template<> struct scalar<float8> { typedef float type; };
+  template <> struct scalar<float8> {
+    typedef float type;
+  };
   template<> struct scalar<float4> { typedef float type; };
   template<> struct scalar<float3> { typedef float type; };
   template<> struct scalar<float2> { typedef float type; };
   template<> struct scalar<float> { typedef float type; };
-  template<> struct scalar<short8> { typedef short type; };
+  template <> struct scalar<short8> {
+    typedef short type;
+  };
   template<> struct scalar<short4> { typedef short type; };
   template<> struct scalar<short3> { typedef short type; };
   template<> struct scalar<short2> { typedef short type; };
   template<> struct scalar<short> { typedef short type; };
-  template<> struct scalar<char8> { typedef char type; };
+  template <> struct scalar<char8> {
+    typedef char type;
+  };
   template<> struct scalar<char4> { typedef char type; };
   template<> struct scalar<char3> { typedef char type; };
   template<> struct scalar<char2> { typedef char type; };
@@ -152,25 +188,33 @@ namespace quda {
   template<> struct isHalf<short>{ static const bool value = true; };
   template<> struct isHalf<short2>{ static const bool value = true; };
   template<> struct isHalf<short4>{ static const bool value = true; };
-  template<> struct isHalf<short8>{ static const bool value = true; };
+  template <> struct isHalf<short8> {
+    static const bool value = true;
+  };
 
   /* Traits used to determine if a variable is quarter precision or not */
   template< typename T > struct isQuarter{ static const bool value = false; };
   template<> struct isQuarter<char>{ static const bool value = true; };
   template<> struct isQuarter<char2>{ static const bool value = true; };
   template<> struct isQuarter<char4>{ static const bool value = true; };
-  template<> struct isQuarter<char8>{ static const bool value = true; };
+  template <> struct isQuarter<char8> {
+    static const bool value = true;
+  };
 
   /* Traits used to determine if a variable is fixed precision or not */
   template< typename T > struct isFixed{ static const bool value = false; };
   template<> struct isFixed<short>{ static const bool value = true; };
   template<> struct isFixed<short2>{ static const bool value = true; };
   template<> struct isFixed<short4>{ static const bool value = true; };
-  template<> struct isFixed<short8>{ static const bool value = true; };
+  template <> struct isFixed<short8> {
+    static const bool value = true;
+  };
   template<> struct isFixed<char>{ static const bool value = true; };
   template<> struct isFixed<char2>{ static const bool value = true; };
   template<> struct isFixed<char4>{ static const bool value = true; };
-  template<> struct isFixed<char8>{ static const bool value = true; };
+  template <> struct isFixed<char8> {
+    static const bool value = true;
+  };
 
   /**
      Generic wrapper for Trig functions
@@ -256,25 +300,33 @@ namespace quda {
   template <> struct VectorType<double, 1>{typedef double type; };
   template <> struct VectorType<double, 2>{typedef double2 type; };
   template <> struct VectorType<double, 4>{typedef double4 type; };
-  template <> struct VectorType<double, 8>{typedef double8 type; };
+  template <> struct VectorType<double, 8> {
+    typedef double8 type;
+  };
 
   // single precision
   template <> struct VectorType<float, 1>{typedef float type; };
   template <> struct VectorType<float, 2>{typedef float2 type; };
   template <> struct VectorType<float, 4>{typedef float4 type; };
-  template <> struct VectorType<float, 8>{typedef float8 type; };
+  template <> struct VectorType<float, 8> {
+    typedef float8 type;
+  };
 
   // half precision
   template <> struct VectorType<short, 1>{typedef short type; };
   template <> struct VectorType<short, 2>{typedef short2 type; };
   template <> struct VectorType<short, 4>{typedef short4 type; };
-  template <> struct VectorType<short, 8>{typedef short8 type; };
+  template <> struct VectorType<short, 8> {
+    typedef short8 type;
+  };
 
   // quarter precision
   template <> struct VectorType<char, 1>{typedef char type; };
   template <> struct VectorType<char, 2>{typedef char2 type; };
   template <> struct VectorType<char, 4>{typedef char4 type; };
-  template <> struct VectorType<char, 8>{typedef char8 type; };
+  template <> struct VectorType<char, 8> {
+    typedef char8 type;
+  };
 
   // This trait returns the matching texture type (needed for double precision)
   template <typename Float, int number> struct TexVectorType;
@@ -308,14 +360,16 @@ namespace quda {
 #endif
   }
 
-  template <> __device__ __host__ inline short8 vector_load(void *ptr, int idx) {
+  template <> __device__ __host__ inline short8 vector_load(void *ptr, int idx)
+  {
     float4 tmp = vector_load<float4>(ptr, idx);
     short8 recast;
     memcpy(&recast, &tmp, sizeof(float4));
     return recast;
   }
 
-  template <> __device__ __host__ inline char8 vector_load(void *ptr, int idx) {
+  template <> __device__ __host__ inline char8 vector_load(void *ptr, int idx)
+  {
     float2 tmp = vector_load<float2>(ptr, idx);
     char8 recast;
     memcpy(&recast, &tmp, sizeof(float2));
@@ -391,21 +445,21 @@ namespace quda {
 #endif
   }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const short8 &value) {
+  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const short8 &value)
+  {
 #if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float4*>(&value));
+    vector_store(ptr, idx, *reinterpret_cast<const float4 *>(&value));
 #else
-    reinterpret_cast<short8*>(ptr)[idx] = value;
+    reinterpret_cast<short8 *>(ptr)[idx] = value;
 #endif
   }
 
-  template <>
-    __device__ __host__ inline void vector_store(void *ptr, int idx, const char8 &value) {
+  template <> __device__ __host__ inline void vector_store(void *ptr, int idx, const char8 &value)
+  {
 #if defined(__CUDA_ARCH__)
-    vector_store(ptr, idx, *reinterpret_cast<const float2*>(&value));
+    vector_store(ptr, idx, *reinterpret_cast<const float2 *>(&value));
 #else
-    reinterpret_cast<char8*>(ptr)[idx] = value;
+    reinterpret_cast<char8 *>(ptr)[idx] = value;
 #endif
   }
 

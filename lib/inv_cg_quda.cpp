@@ -759,8 +759,7 @@ namespace quda {
       param.gflops = gflops;
       param.iter += k;
 
-      if (k == param.maxiter)
-        warningQuda("Exceeded maximum iterations %d", param.maxiter);
+      if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
     }
 
     if (getVerbosity() >= QUDA_VERBOSE)
