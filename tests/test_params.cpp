@@ -172,8 +172,6 @@ char eig_vec_outfile[256] = "";
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_nEv = {};
 quda::mgarray<int> mg_eig_nKr = {};
-quda::mgarray<int> mg_eig_mmax = {};
-quda::mgarray<int> mg_eig_mmin = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
@@ -665,10 +663,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
-  quda_app->add_mgoption(opgroup, "--mg-eig-mmax", mg_eig_mmax, CLI::Validator(),
-                         "The maximum size of the subspace in Jacobi-Davidson");
-  quda_app->add_mgoption(opgroup, "--mg-eig-mmin", mg_eig_mmin, CLI::Validator(),
-                         "The minimum size of the subspace in Jacobi-Davidson");
 
   quda_app->add_mgoption(
     opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
