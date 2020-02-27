@@ -289,7 +289,7 @@ namespace quda {
 
     } else { // doublet:
 
-      // repurpose the precondiitoned dslash as a vectorized operator: 1+kappa*D
+      // repurpose the preconditioned dslash as a vectorized operator: 1+kappa*D
       double mu_ = mu;
       mu = 0.0;
       double epsilon_ = epsilon;
