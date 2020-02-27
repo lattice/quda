@@ -1299,13 +1299,185 @@ namespace quda
   JD::JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
     EigenSolver(eig_param, profile),
     mat(mat)
-  { }
+  {
+
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
+    // JD-SPECIFIC CODE GOES HERE !
+
+    if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG) {
+      errorQuda("Only smallest real spectrum type (SR) can be passed to the JD solver");
+    }
+
+    if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+
+  }
 
   void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
-  { printf("\nwithin JD !\n\n"); }
+  {
+
+    // Check to see if we are loading eigenvectors
+    if (strcmp(eig_param->vec_infile, "") != 0) {
+      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      loadFromFile(mat, eigSpace, evals);
+      return;
+    }
+
+    // Setting some parameters of the eigensolver
+    //int k=0, k_max=eig_param->nConv, m=0;
+    int m_max=eig_param->mmax, m_min=eig_param->mmin;
+    // 'tau' is the <target> for the eigensolver
+    //double theta, mu, tau=0.0;
+    max_restarts = eig_param->max_restarts;
+
+    // Test for an initial guess
+    double norm = sqrt(blas::norm2(*eigSpace[0]));
+    if (norm == 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
+      if (eigSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
+        eigSpace[0]->Source(QUDA_RANDOM_SOURCE);
+      } else {
+        RNG *rng = new RNG(*eigSpace[0], 1234);
+        rng->Init();
+        spinorNoise(*eigSpace[0], *rng, QUDA_NOISE_UNIFORM);
+        rng->Release();
+        delete rng;
+      }
+    }
+
+    // Clone eigSpace's CSF params
+    ColorSpinorParam csParam(*eigSpace[0]);
+
+    // Init a zero residual
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    r.push_back(ColorSpinorField::Create(csParam));
+
+    //double t1 = clock();
+
+    // Convergence and locking criteria
+    double epsilon = DBL_EPSILON;
+    QudaPrecision prec = eigSpace[0]->Precision();
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION:
+      epsilon = DBL_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
+      break;
+    case QUDA_SINGLE_PRECISION:
+      epsilon = FLT_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
+      break;
+    case QUDA_HALF_PRECISION:
+      epsilon = 2e-3;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
+      break;
+    case QUDA_QUARTER_PRECISION:
+      epsilon = 5e-2;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
+      break;
+    default: errorQuda("Invalid precision %d", prec);
+    }
+
+    // Begin JD Eigensolver computation
+    //---------------------------------------------------------------------------
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("*****************************\n");
+      printfQuda("**** START JD SOLUTION ******\n");
+      printfQuda("*****************************\n");
+    }
+
+    // Print Eigensolver params
+    if (getVerbosity() >= QUDA_VERBOSE) {
+      printfQuda("spectrum %s\n", spectrum);
+      printfQuda("tol %.4e\n", tol);
+      printfQuda("nConv %d\n", nConv);
+      printfQuda("mmin %d\n", m_min);
+      printfQuda("mmax %d\n", m_max);
+    }
+
+    profile.TPSTART(QUDA_PROFILE_COMPUTE);
+
+    // JD-SPECIFIC CODE GOES HERE !
+
+    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    // JD-SPECIFIC CODE GOES HERE !
+
+    printfQuda("\n");
+
+    printfQuda("within JD !\n");
+
+    printfQuda("size of eigSpace = %d\n", (int)eigSpace.size());
+
+    printfQuda("\n");
+
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+      printfQuda("kSpace size at convergence/max restarts = %d\n", (int)eigSpace.size());
+    // Prune the Krylov space back to size when passed to eigensolver
+    //for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
+    //kSpace.resize(nConv);
+    //evals.resize(nConv);
+
+    // Post computation report
+    //---------------------------------------------------------------------------
+    if (!converged) {
+      if (eig_param->require_convergence) {
+        //errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
+        //          "restart steps. Exiting.",
+        //          nConv, m_min, m_min, max_restarts);
+      } else {
+        warningQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
+                  "restart steps.",
+                  nConv, m_min, m_min, max_restarts);
+      }
+    } else {
+      if (getVerbosity() >= QUDA_SUMMARIZE) {
+        printfQuda("JD computed the requested %d vectors in %d restart steps and %d iterations.\n", nConv,
+                   restart_iter, iter);
+
+        // Dump all Ritz values and residua
+        for (int i = 0; i < nConv; i++) {
+          //printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
+        }
+      }
+
+      // Compute eigenvalues
+      computeEvals(mat, eigSpace, evals);
+    }
+
+    // Local clean-up
+    delete r[0];
+
+    // Only save if outfile is defined
+    if (strcmp(eig_param->vec_outfile, "") != 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
+      // Make an array of size nConv
+      std::vector<ColorSpinorField *> vecs_ptr;
+      vecs_ptr.reserve(nConv);
+      const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
+      for (int i = 0; i < nConv; i++) {
+        eigSpace[i]->setSuggestedParity(mat_parity);
+        vecs_ptr.push_back(eigSpace[i]);
+      }
+      saveVectors(vecs_ptr, eig_param->vec_outfile);
+    }
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("*****************************\n");
+      printfQuda("***** END JD SOLUTION *******\n");
+      printfQuda("*****************************\n");
+    }
+
+    mat.flops();
+
+  }
 
   // Jacobi-Davidson destructor
   JD::~JD()
   { }
+
+  // Thick Restart Member functions
+  //---------------------------------------------------------------------------
+  // TODO
 
 } // namespace quda
