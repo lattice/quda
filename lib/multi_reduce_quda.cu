@@ -370,7 +370,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, double2, double2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
 #if defined(NSPIN1)
@@ -396,7 +396,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float4, float4, float4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (4 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
 #if defined(NSPIN1) || defined(NSPIN2)
@@ -405,7 +405,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float2, float2, float2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -423,7 +423,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float4, short4, short4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -431,7 +431,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float2, short2, short2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -449,7 +449,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float4, char4, char4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -457,7 +457,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float2, char2, char2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -494,7 +494,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, double2, float4, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
 #if defined(NSPIN1)
@@ -516,7 +516,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, double2, short4, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (4 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
 #if defined(NSPIN1)
@@ -524,7 +524,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, double2, short2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -538,7 +538,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float4, short4, float4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
@@ -546,7 +546,7 @@ namespace quda {
           multiReduce<doubleN, ReduceType, float2, short2, float2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
