@@ -21,19 +21,19 @@ namespace quda {
   __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
   __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
 
-  __host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) {
     return make_double2(x.x + y.x, x.y + y.y);
   }
 
-  __host__ __device__ inline double2 operator-(const double2& x, const double2 &y) {
+  __host__ __device__ inline double2 operator-(const double2 &x, const double2 &y) {
     return make_double2(x.x - y.x, x.y - y.y);
   }
 
-  __host__ __device__ inline float2 operator-(const float2& x, const float2 &y) {
+  __host__ __device__ inline float2 operator-(const float2 &x, const float2 &y) {
     return make_float2(x.x - y.x, x.y - y.y);
   }
 
-  __host__ __device__ inline float4 operator-(const float4& x, const float4 &y) {
+  __host__ __device__ inline float4 operator-(const float4 &x, const float4 &y) {
     return make_float4(x.x - y.x, x.y - y.y, x.z - y.z, x.w - y.w);
   }
 
@@ -45,11 +45,11 @@ namespace quda {
     return z;
   }
 
-  __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
+  __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y) {
     return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
   }
 
-  __host__ __device__ inline double4 operator+(const double4& x, const double4 &y) {
+  __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y) {
     return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
@@ -97,7 +97,7 @@ namespace quda {
     return y;
   }
 
-  __host__ __device__ inline float2 operator+(const float2 &x, const float2 y)
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y)
   {
     float2 z;
     z.x = x.x + y.x;
@@ -105,7 +105,7 @@ namespace quda {
     return z;
   }
 
-  __host__ __device__ inline float4 operator+(const float4 &x, const float4 y)
+  __host__ __device__ inline float4 operator+(const float4 &x, const float4 &y)
   {
     float4 z;
     z.x = x.x + y.x;
