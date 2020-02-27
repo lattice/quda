@@ -1379,4 +1379,15 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     return w;
   }
 
+  template <typename real>
+  __host__ __device__ inline complex<real> i_(const complex<real> &a)
+  {
+    // FIXME compiler generates worse code with "optimal" code
+#if 1
+    return complex<real>(0.0, 1.0) * a;
+#else
+    return complex<real>(-a.imag(), a.real());
+#endif
+  }
+
 } // end namespace quda
