@@ -265,9 +265,9 @@ namespace quda {
       if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
         errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
 
-      SpinorTexture<RegType, StoreType, M> X[NXZ];
+      Spinor<RegType, StoreType, M> X[NXZ];
       Spinor<RegType, yType, M, write::Y> Y[NYW_max];
-      SpinorTexture<RegType, StoreType, M> Z[NXZ];
+      Spinor<RegType, StoreType, M> Z[NXZ];
       Spinor<RegType, StoreType, M, write::W> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {

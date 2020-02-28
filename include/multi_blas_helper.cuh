@@ -100,7 +100,7 @@ namespace quda
     template <int NXZ, typename xType, typename yType, typename write, typename Functor>
     inline constexpr int max_YW_size()
     {
-      using SpinorX = SpinorTexture<typename mapper<xType>::type, xType, 6>;
+      using SpinorX = Spinor<typename mapper<xType>::type, xType, 6>;
       using SpinorY = Spinor<typename mapper<yType>::type, yType, 6, write::Y>;
       using SpinorZ = SpinorX;
       using SpinorW = Spinor<typename mapper<xType>::type, xType, 6, write::W>;
@@ -122,7 +122,7 @@ namespace quda
       size_t scalar_size = 2 * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
       NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size
-        = x_fixed ? sizeof(SpinorTexture<float4, short4, 6>) : sizeof(SpinorTexture<float4, float4, 6>);
+        = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
       size_t spinor_y_size
         = y_fixed ? sizeof(Spinor<float4, short4, 6, write::Y>) : sizeof(Spinor<float4, float4, 6, write::Y>);
 

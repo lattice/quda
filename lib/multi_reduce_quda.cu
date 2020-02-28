@@ -320,9 +320,9 @@ namespace quda {
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }
 
-      SpinorTexture<RegType, StoreType, M> X[NXZ];
+      Spinor<RegType, StoreType, M> X[NXZ];
       Spinor<RegType, yType, M, write::Y> Y[NYW_max];
-      SpinorTexture<RegType, StoreType, M> Z[NXZ];
+      Spinor<RegType, StoreType, M> Z[NXZ];
       Spinor<RegType, StoreType, M, write::W> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {

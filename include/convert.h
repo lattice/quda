@@ -254,6 +254,26 @@ template <> __device__ inline void convert<float2, double4>(float2 x[], double4 
 
 template <typename T1, typename T2> __host__ __device__ inline void copy(T1 &a, const T2 &b) { a = b; }
 
+template <> __host__ __device__ inline void copy(double2 &a, const float2 &b)
+{
+  a.x = b.x;
+  a.y = b.y;
+}
+
+template <> __host__ __device__ inline void copy(double4 &a, const float4 &b)
+{
+  a.x = b.x;
+  a.y = b.y;
+  a.z = b.z;
+  a.w = b.w;
+}
+
+template <> __host__ __device__ inline void copy(double8 &a, const float8 &b)
+{
+  copy(a.x, b.x);
+  copy(a.y, b.y);
+}
+
 template <> __host__ __device__ inline void copy(double &a, const int2 &b)
 {
 #ifdef __CUDA_ARCH__
@@ -296,6 +316,12 @@ template <> __host__ __device__ inline void copy(float4 &a, const short4 &b)
   a.w = s2f(b.w);
 }
 
+template <> __host__ __device__ inline void copy(float8 &a, const short8 &b)
+{
+  copy(a.x, b.x);
+  copy(a.y, b.y);
+}
+
 template <> __host__ __device__ inline void copy(short4 &a, const float4 &b)
 {
   a.x = f2i(b.x * fixedMaxValue<short>::value);
@@ -325,6 +351,12 @@ template <> __host__ __device__ inline void copy(float4 &a, const char4 &b)
   a.y = c2f(b.y);
   a.z = c2f(b.z);
   a.w = c2f(b.w);
+}
+
+template <> __host__ __device__ inline void copy(float8 &a, const char8 &b)
+{
+  copy(a.x, b.x);
+  copy(a.y, b.y);
 }
 
 template <> __host__ __device__ inline void copy(char4 &a, const float4 &b)
