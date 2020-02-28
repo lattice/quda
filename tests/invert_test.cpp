@@ -147,7 +147,7 @@ int main(int argc, char **argv)
   void *clover=0, *clover_inv=0;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     constructHostCloverField(clover, clover_inv, inv_param);
-    // Load the clover terms to teh device
+    // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
@@ -195,42 +195,16 @@ int main(int argc, char **argv)
   rng->Release();
   delete rng;
 
-  if (Nsrc > 1) {
-    auto mean_time = 0.0;
-    auto mean_time2 = 0.0;
-    auto mean_gflops = 0.0;
-    auto mean_gflops2 = 0.0;
-    // skip first solve due to allocations, potential UVM swapping overhead
-    for (int i = 1; i < Nsrc; i++) {
-      mean_time += time[i];
-      mean_time2 += time[i] * time[i];
-      mean_gflops += gflops[i];
-      mean_gflops2 += gflops[i] * gflops[i];
-    }
-
-    auto NsrcM1 = Nsrc - 1;
-
-    mean_time /= NsrcM1;
-    mean_time2 /= NsrcM1;
-    auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
-                                    std::numeric_limits<double>::infinity();
-    mean_gflops /= NsrcM1;
-    mean_gflops2 /= NsrcM1;
-    auto stddev_gflops = NsrcM1 > 1 ?
-      sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
-      std::numeric_limits<double>::infinity();
-    printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
-	       mean_time, stddev_time, mean_gflops, stddev_gflops);
-  }
-  
+  // Compute performance statistics
+  if (Nsrc > 1) performanceStats(time, gflops);  
   delete[] time;
   delete[] gflops;
-
-  // Perfrom host side verification of inversion if requested
+  
+  // Perform host side verification of inversion if requested
   if(verify_results) {
     verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
   }
-
+  
   // Clean up device memory allocationa
   free(spinorIn);
   free(spinorCheck);
@@ -243,7 +217,7 @@ int main(int argc, char **argv)
 
   freeGaugeQuda();
   for (int dir = 0; dir<4; dir++) free(gauge[dir]);
-
+  
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
     if (clover) free(clover);

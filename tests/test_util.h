@@ -48,6 +48,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
+void performanceStats(double *time, double *gflops);
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);
