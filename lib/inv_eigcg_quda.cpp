@@ -173,7 +173,8 @@ namespace quda {
 
             //csParam.mem_type      = solver_param.pipeline != 0 ? QUDA_MEMORY_MAPPED : QUDA_MEMORY_DEVICE;
             //csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);
-            csParam.setPrecision(solver_param.precision);
+            //csParam.setPrecision(solver_param.precision);
+            csParam.setPrecision(!is_host_location ? solver_param.precision : solver_param.precision_sloppy);
             csParam.composite_dim = (2*k);
             //Create a search vector set:
             V2k = MakeSharedPtr(csParam);
@@ -204,13 +205,14 @@ namespace quda {
               printfQuda("\nPipeline shift parameters : Lm = % d, L2kO = %d, L2kE = %d\n", Lm, L2kO, L2kE);
 
               csParam.composite_dim = m;
-              csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);//eigCG internal search space precision may not coincide with the solver precision!
+              //csParam.setPrecision(solver_param.eig_param.cuda_prec_ritz);//eigCG internal search space precision may not coincide with the solver precision!
+              csParam.setPrecision(solver_param.precision_sloppy);//eigCG internal search space precision may not coincide with the solver precision!
               //Create a search vector set:
               hVm = MakeSharedPtr(csParam);
               //
               csParam.is_composite  = false;
               csParam.composite_dim = 1;
-              csParam.setPrecision(solver_param.precision);
+              //csParam.setPrecision(solver_param.precision);
               hAz = MakeSharedPtr(csParam);
             }
 
