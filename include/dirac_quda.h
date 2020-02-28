@@ -8,9 +8,15 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 
+#include <Eigen/LU>
+
 #include <typeinfo>
 
 namespace quda {
+
+  // Forward declarations for the JD eigensolver
+  struct SolverParam;
+  class CG;
 
   // Forward declare: MG Transfer Class
   class Transfer;
@@ -110,6 +116,7 @@ namespace quda {
   class DiracMdagM;
   class DiracMMdag;
   class DiracMdag;
+  class DiracPrecProjCorr;
   //Forward declaration of multigrid Transfer class
   class Transfer;
 
@@ -121,6 +128,7 @@ namespace quda {
     friend class DiracMdagM;
     friend class DiracMMdag;
     friend class DiracMdag;
+    friend class DiracPrecProjCorr;
 
   protected:
     cudaGaugeField *gauge;
@@ -1595,6 +1603,43 @@ public:
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
+
+  class DiracPrecProjCorr : public DiracMatrix {
+
+  public:
+    // FIXME: Params for DiracPrecProjCorr
+    // Orthonormal set used in the projection of MMdag
+    std::vector<ColorSpinorField*> projSpace;
+    double theta;
+    TimeProfile *profileFromCaller_;
+    //DiracMatrix *K_;
+    Eigen::MatrixXcd Mproj;
+    std::vector<ColorSpinorField*> Qhat;
+    SolverParam *solverParam_;
+    void (CG::*cgApplier)(ColorSpinorField&, ColorSpinorField&);
+    //CG *cg_;
+    DiracMatrix *matUnconst_;
+
+    DiracPrecProjCorr(const Dirac &d) : DiracMatrix(d) { }
+    DiracPrecProjCorr(const Dirac *d) : DiracMatrix(d) { }
+
+    // TODO: put Pv as attribute of this class
+    // TODO: is K completely useless in this context? Due to CG::*cgApplier
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const;
+
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in,
+			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const;
+
+    int getStencilSteps() const
+    {
+      // FIXME ? ---> in JD we're trying to solve a shifted-and-projected-preconditioned version of MMdag
+      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+    }
+  };
+
 
   /* Gloms onto a DiracMatrix and provides an  operator() for its Mdag method */
   class DiracMdag : public DiracMatrix {

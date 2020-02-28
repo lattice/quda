@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <invert_quda.h>
+
 #include <quda_internal.h>
 #include <eigensolve_quda.h>
 #include <qio_field.h>
@@ -1306,6 +1308,9 @@ namespace quda
 
     // JD-SPECIFIC CODE GOES HERE !
 
+    profileCorrEqInvs = new TimeProfile("profileCorrEqInvs");
+    profileMatCorrEqInvs = new TimeProfile("profileMatCorrEqInvs");
+
     if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG) {
       errorQuda("Only smallest real spectrum type (SR) can be passed to the JD solver");
     }
@@ -1328,6 +1333,7 @@ namespace quda
     //int k=0, k_max=eig_param->nConv, m=0;
     int m_max=eig_param->mmax, m_min=eig_param->mmin;
     // 'tau' is the <target> for the eigensolver
+    double theta=-0.5;
     //double theta, mu, tau=0.0;
     max_restarts = eig_param->max_restarts;
 
@@ -1352,6 +1358,18 @@ namespace quda
     // Init a zero residual
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+
+    // TODO: remove !
+    RNG *rng = new RNG(*r[0], 4321);
+    rng->Init();
+    spinorNoise(*r[0], *rng, QUDA_NOISE_UNIFORM);
+    rng->Release();
+    delete rng;
+
+    //norm = sqrt(blas::norm2(*r[0]));
+    //printfQuda("NORM OF r[0] = %f\n", norm);
 
     //double t1 = clock();
 
@@ -1399,15 +1417,28 @@ namespace quda
 
     // JD-SPECIFIC CODE GOES HERE !
 
+    //--------------------
+
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    for(int i=0; i<2; i++){
+      X_tilde.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+    }
+    //r[0] <-- t[0]
+    //blas::copy(*r[0], *t[0]);
+
+    invertProjMat(X_tilde, theta, mat, *t[0], *r[0]);
+
+    for (auto p : X_tilde) { delete p; }
+
+    //--------------------
+
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     // JD-SPECIFIC CODE GOES HERE !
 
     printfQuda("\n");
 
-    printfQuda("within JD !\n");
-
-    printfQuda("size of eigSpace = %d\n", (int)eigSpace.size());
+    printfQuda("Within JD ! Testing the correction equation...\n");
 
     printfQuda("\n");
 
@@ -1447,6 +1478,7 @@ namespace quda
 
     // Local clean-up
     delete r[0];
+    delete t[0];
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -1474,10 +1506,512 @@ namespace quda
 
   // Jacobi-Davidson destructor
   JD::~JD()
-  { }
+  {
+    delete profileCorrEqInvs;
+    delete profileMatCorrEqInvs;
+  }
 
-  // Thick Restart Member functions
+  // JD Member functions
   //---------------------------------------------------------------------------
-  // TODO
+
+  void JD::invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b)
+  {
+
+    // Clone x's CSF params
+    ColorSpinorParam csParam(x);
+
+    // Buffers for the shifts of the matrix operators
+    double bareShift;
+
+    // Solver (CG) params
+
+    // TODO: remove refinement ?
+    QudaInvertParam refineparam = *eig_param->invert_param;
+    refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
+    SolverParam solverParam(refineparam);
+    //SolverParam solverParam;
+    //solverParam.iter = 0;
+    solverParam.maxiter = 100;
+    solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+    solverParam.delta = eig_param->invert_param->reliable_delta_refinement;
+
+    // 1. solve for Qhat in K * Qhat = qSpace, with K a good preconditioner, mmSloppy for now
+
+    std::vector<ColorSpinorField*> Qhat;
+    int sizePS = qSpace.size();
+
+    // Casting away contractual constness
+    DiracMatrix& matUnconst = const_cast<DiracMatrix&>(mat);
+
+    //CG cg(*mmSloppy, *mmSloppy, solverParam, profile);
+    CG cg(matUnconst, matUnconst, matUnconst, solverParam, *profileCorrEqInvs);
+    //CG cg(mat, mat, mat, solverParam, *profileCorrEqInvs);
+
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
+    // Switching to the appropriate shift for JD
+    bareShift = matUnconst.shift;
+    matUnconst.shift = bareShift - theta;
+
+    //norm = sqrt(blas::norm2(*r[0]));
+    //printfQuda("norm of b = %f\n", sqrt(blas::norm2(b)));
+    //printfQuda("norm of qSpace[0] = %f\n", sqrt(blas::norm2(*qSpace[0])));
+
+    for(int i=0; i<((int)qSpace.size()); i++){
+      Qhat.push_back(ColorSpinorField::Create(*qSpace[i], csParam));
+
+      //matVec(matUnconst, *Qhat[i], *qSpace[i]);
+
+      //double norm = sqrt(blas::norm2(*Qhat[i]));
+      // u = normalized u_tilde
+      //blas::ax(1.0 / norm, *Qhat[i]);
+      //printfQuda("norm of *Qhat[i] = %f\n", norm);
+      //norm = sqrt(blas::norm2(*Qhat[i]));
+
+      //printfQuda("norm of *Qhat[i] = %f\n", norm);
+
+      // solve
+
+      //QudaVerbosity verbTmp = getVerbosity();
+      //setVerbosity(QUDA_SILENT);
+
+      double tol_buff = solverParam.tol;
+      solverParam.tol = 1e-4;
+      int maxiter_buff = solverParam.maxiter;
+      solverParam.maxiter = 5;
+      cg(*Qhat[i], *qSpace[i]);
+      solverParam.tol = tol_buff;
+      solverParam.maxiter = maxiter_buff;
+
+      //setVerbosity(verbTmp);
+
+      //cg(*qSpace[i], *qSpace[i]);
+    }
+
+    //return;
+
+    // Switching back the shift parameters
+    matUnconst.shift = bareShift;
+
+    // 2. M = qSpacedag * Qhat
+
+    Complex* resultDotProd = (Complex*) safe_malloc( sizePS*sizePS * sizeof(Complex) );
+    blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField*>&>(qSpace),
+                      const_cast<std::vector<ColorSpinorField*>&>(Qhat));
+
+    // 3. LU decomposition of M -- TODO: move the application of .fullPivLu() to this sub-section ?
+
+    // Init eigen object
+    MatrixXcd M = MatrixXcd::Zero(sizePS,sizePS);
+    for(int i=0; i<sizePS; i++){
+      for(int j=0; j<sizePS; j++){
+        M(i,j) = resultDotProd[i*sizePS + j];
+      }
+    }
+
+    // 4. r_tilde = Ktilde^-1 * r
+
+    // Switching to the appropriate shift for JD
+    bareShift = matUnconst.shift;
+    matUnconst.shift = bareShift - theta;
+
+    // <r_tilde> is "r-hat" for a few of the upcoming lines
+    std::vector<ColorSpinorField*> r_tilde;
+    r_tilde.push_back(ColorSpinorField::Create(b, csParam));
+
+    //QudaVerbosity verbTmp = getVerbosity();
+    //setVerbosity(QUDA_SILENT);
+
+    double tol_buff = solverParam.tol;
+    solverParam.tol = 1e-4;
+    int maxiter_buff = solverParam.maxiter;
+    solverParam.maxiter = 5;
+    cg(*r_tilde[0], b);
+    solverParam.tol = tol_buff;
+    solverParam.maxiter = maxiter_buff;
+
+    //setVerbosity(verbTmp);
+
+    // Switching back the shift parameters
+    matUnconst.shift = bareShift;
+
+    MatrixXcd gamma(sizePS,1);
+    for(int i=0; i<sizePS; i++){
+      gamma(i,0) = blas::cDotProduct(*qSpace[i], *r_tilde[0]);
+    }
+
+    MatrixXcd alpha = M.fullPivLu().solve(gamma);
+
+    for(int i=0; i<sizePS; i++){
+      blas::caxpy(-alpha(i), *Qhat[i], *r_tilde[0]);
+    }
+
+    blas::ax(-1.0, *r_tilde[0]);
+
+    // 5. solve: ( Ktilde^-1 * (I - QQdag)(A - \theta I)(I - QQdag) ) x = r_tilde
+
+    // The matrix solvers for the shifted-and-proj MMdag
+    Dirac *d = nullptr;
+    //Dirac *dSloppy = nullptr;
+    // Create the dirac operator
+    // IMPORTANT: cannot call createDirac(...) as in interface_quda.cpp
+    {
+      bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || \
+                      (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE) || \
+                      (eig_param->invert_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+      DiracParam diracParam;
+      //DiracParam diracSloppyParam;
+
+      quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
+      //quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
+
+      d = Dirac::create(diracParam);
+      //dSloppy = Dirac::create(diracSloppyParam);
+    }
+    Dirac &dirac = *d;
+    //Dirac &diracSloppy = *dSloppy;
+
+    DiracPrecProjCorr mmPrecProj_buff(dirac);
+
+    mmPrecProj_buff.projSpace = qSpace;
+    mmPrecProj_buff.theta = theta;
+    mmPrecProj_buff.profileFromCaller_ = profileMatCorrEqInvs; //&profile;
+    mmPrecProj_buff.Mproj = M;
+    mmPrecProj_buff.Qhat = Qhat;
+    mmPrecProj_buff.solverParam_ = &solverParam;
+    mmPrecProj_buff.cgApplier = &CG::operator();
+    mmPrecProj_buff.matUnconst_ = &matUnconst;
+
+    DiracMatrix* mmPrecProj = &mmPrecProj_buff;
+
+    DiracMatrix &mmPP = *mmPrecProj;
+
+    //return;
+
+    //CG cgPrec(mmPP, mmPP, mmPP, solverParam, profile);
+    CG cgPrec(mmPP, mmPP, mmPP, solverParam, *profileCorrEqInvs);
+
+    blas::zero(x);
+
+    //QudaVerbosity verbTmp = getVerbosity();
+    //setVerbosity(QUDA_SILENT);
+
+    tol_buff = solverParam.tol;
+    solverParam.tol = 1e-4;
+    maxiter_buff = solverParam.maxiter;
+    solverParam.maxiter = 5;
+    //cgx(*y_hat[0], out);
+    //cgPrec(x, *r_tilde[0]);
+    solverParam.tol = tol_buff;
+    solverParam.maxiter = maxiter_buff;
+
+    //setVerbosity(verbTmp);
+
+    for (auto p : Qhat) { delete p; }
+    delete r_tilde[0];
+    host_free(resultDotProd);
+    delete d;
+
+  }
+
+  // Projection matrix used in the solution of the correction equation
+  //---------------------------------------------------------------------------
+
+  void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+
+    //return;
+
+    ///*
+
+    //printf("WITHIN1\n");
+
+    double norm_bf = sqrt(blas::norm2(in));
+
+    if( norm_bf==0 ){
+      //std::cout << "Multiplying against 0 vector.. returning immediately" << std::endl;
+      blas::zero(out);
+      return;
+    }
+
+    TimeProfile &profileFromCaller = *profileFromCaller_;
+    //DiracMatrix &K = *K_;
+    SolverParam &solverParam = *solverParam_;
+    DiracMatrix &matUnconst = *matUnconst_;
+    //CG &cg = *cg_;
+
+    ColorSpinorParam csParam(in);
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
+    // 1. y = (A - \theta I)v
+
+    //dirac->MMdag(out, in);
+    //if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+    matUnconst(out, in);
+    blas::caxpy(-theta, const_cast<ColorSpinorField&>(in), out);
+
+    // 2. y_hat = K^-1 * y
+
+    std::vector<ColorSpinorField*> y_hat;
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    //y_hat.push_back(ColorSpinorField::Create(in, csParam));
+    y_hat.push_back(ColorSpinorField::Create(out, csParam));
+
+    CG cgx(matUnconst, matUnconst, matUnconst, solverParam, profileFromCaller);
+
+    //std::cout << "inner..." << "(norm of rhs: " << sqrt(blas::norm2(out)) << ", theta: " << theta << ")" << std::endl;
+    //setVerbosity(QUDA_VERBOSE);
+
+    //(cg_->*cgApplier)(*y_hat[0], out);
+    // Switching to the appropriate shift for JD
+    double bareShift = matUnconst.shift;
+    matUnconst.shift = bareShift - theta;
+    //cg(*y_hat[0], out);
+    //cgx(*y_hat[0], *buffOut[0]);
+
+    QudaVerbosity verbTmp = getVerbosity();
+    setVerbosity(QUDA_SILENT);
+
+    double tol_buff = solverParam.tol;
+    solverParam.tol = 1e-4;
+    int maxiter_buff = solverParam.maxiter;
+    solverParam.maxiter = 5;
+    cgx(*y_hat[0], out);
+    solverParam.tol = tol_buff;
+    solverParam.maxiter = maxiter_buff;
+
+    setVerbosity(verbTmp);
+
+    // Switching back the shift parameters
+    matUnconst.shift = bareShift;
+
+    //setVerbosity(QUDA_SILENT);
+
+    int sizePS = projSpace.size();
+
+    Eigen::MatrixXcd gamma(sizePS,1);
+    for(int i=0; i<sizePS; i++){
+    gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+    }
+    Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+    for(int i=0; i<sizePS; i++){
+      blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+    }
+
+    out = *y_hat[0];
+
+    // Removing temporary buffers
+    delete y_hat[0];
+
+    //*/
+
+  }
+
+  void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+  {
+
+    //return;
+
+    ///*
+
+    //printf("WITHIN2\n");
+
+    double norm_bf = sqrt(blas::norm2(in));
+
+    if( norm_bf==0 ){
+      //std::cout << "Multiplying against 0 vector.. returning immediately" << std::endl;
+      blas::zero(out);
+      return;
+    }
+
+    dirac->tmp1 = &tmp;
+
+    TimeProfile &profileFromCaller = *profileFromCaller_;
+    //DiracMatrix &K = *K_;
+    SolverParam &solverParam = *solverParam_;
+    DiracMatrix &matUnconst = *matUnconst_;
+    //CG &cg = *cg_;
+
+    ColorSpinorParam csParam(in);
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
+    // 1. y = (A - \theta I)v
+
+    //dirac->MMdag(out, in);
+    //if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+    matUnconst(out, in);
+    blas::caxpy(-theta, const_cast<ColorSpinorField&>(in), out);
+
+    // 2. y_hat = K^-1 * y
+
+    std::vector<ColorSpinorField*> y_hat;
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    //y_hat.push_back(ColorSpinorField::Create(in, csParam));
+    y_hat.push_back(ColorSpinorField::Create(out, csParam));
+
+    CG cgx(matUnconst, matUnconst, matUnconst, solverParam, profileFromCaller);
+
+    //std::cout << "inner..." << "(norm of rhs: " << sqrt(blas::norm2(out)) << ", theta: " << theta << ")" << std::endl;
+    //setVerbosity(QUDA_VERBOSE);
+
+    //(cg_->*cgApplier)(*y_hat[0], out);
+    // Switching to the appropriate shift for JD
+    double bareShift = matUnconst.shift;
+    matUnconst.shift = bareShift - theta;
+    //cg(*y_hat[0], out);
+    //cgx(*y_hat[0], *buffOut[0]);
+
+    QudaVerbosity verbTmp = getVerbosity();
+    setVerbosity(QUDA_SILENT);
+
+    double tol_buff = solverParam.tol;
+    solverParam.tol = 1e-4;
+    int maxiter_buff = solverParam.maxiter;
+    solverParam.maxiter = 5;
+    cgx(*y_hat[0], out);
+    solverParam.tol = tol_buff;
+    solverParam.maxiter = maxiter_buff;
+
+    setVerbosity(verbTmp);
+
+    // Switching back the shift parameters
+    matUnconst.shift = bareShift;
+
+    //setVerbosity(QUDA_SILENT);
+
+    int sizePS = projSpace.size();
+
+    Eigen::MatrixXcd gamma(sizePS,1);
+    for(int i=0; i<sizePS; i++){
+      gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+    }
+    Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+    for(int i=0; i<sizePS; i++){
+      blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+    }
+
+    out = *y_hat[0];
+
+    // Removing temporary buffers
+    delete y_hat[0];
+
+    dirac->tmp1 = NULL;
+
+    //*/
+
+  }
+
+  void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in, 
+				     ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const
+  {
+
+    //return;
+
+    ///*
+
+    //printf("WITHIN3\n");
+
+    double norm_bf = sqrt(blas::norm2(in));
+
+    if( norm_bf==0 ){
+      //std::cout << "Multiplying against 0 vector.. returning immediately" << std::endl;
+      blas::zero(out);
+      return;
+    }
+
+    dirac->tmp1 = &Tmp1;
+    dirac->tmp2 = &Tmp2;
+
+    TimeProfile &profileFromCaller = *profileFromCaller_;
+    //DiracMatrix &K = *K_;
+    SolverParam &solverParam = *solverParam_;
+    DiracMatrix &matUnconst = *matUnconst_;
+    //CG &cg = *cg_;
+
+    ColorSpinorParam csParam(in);
+
+    // 1. y = (A - \theta I)v
+
+    //dirac->MMdag(out, in);
+    //if ((shift-theta) != 0.0) blas::axpy(shift-theta, const_cast<ColorSpinorField&>(in), out);
+
+    //{
+    //double norm = sqrt(blas::norm2(in));
+    //std::cout << "2) Norm of rhs: " << norm << std::endl;
+    //}
+
+    //std::cout << "inner..." << "(norm of rhs: " << sqrt(blas::norm2(in)) << ", theta: " << theta << ")" << std::endl;
+
+    matUnconst(out, in);
+    blas::caxpy(-theta, const_cast<ColorSpinorField&>(in), out);
+
+    //std::vector<ColorSpinorField*> buffOut;
+    //csParam.create = QUDA_COPY_FIELD_CREATE;
+    //buffOut.push_back(ColorSpinorField::Create(in, csParam));
+
+    // 2. y_hat = K^-1 * y
+
+    std::vector<ColorSpinorField*> y_hat;
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    //y_hat.push_back(ColorSpinorField::Create(in, csParam));
+    y_hat.push_back(ColorSpinorField::Create(out, csParam));
+
+    CG cgx(matUnconst, matUnconst, matUnconst, solverParam, profileFromCaller);
+
+    //std::cout << "inner..." << "(norm of rhs: " << sqrt(blas::norm2(out)) << ", theta: " << theta << ")" << std::endl;
+    //setVerbosity(QUDA_SILENT);
+
+    //(cg_->*cgApplier)(*y_hat[0], out);
+    // Switching to the appropriate shift for JD
+    double bareShift = matUnconst.shift;
+    matUnconst.shift = bareShift - theta;
+    //cg(*y_hat[0], out);
+    //cgx(*y_hat[0], *buffOut[0]);
+
+    QudaVerbosity verbTmp = getVerbosity();
+    setVerbosity(QUDA_SILENT);
+
+    double tol_buff = solverParam.tol;
+    solverParam.tol = 1e-4;
+    int maxiter_buff = solverParam.maxiter;
+    solverParam.maxiter = 5;
+    cgx(*y_hat[0], out);
+    solverParam.tol = tol_buff;
+    solverParam.maxiter = maxiter_buff;
+
+    setVerbosity(verbTmp);
+
+    // Switching back the shift parameters
+    matUnconst.shift = bareShift;
+
+    //setVerbosity(QUDA_VERBOSE);
+    //std::cout << "...inner" << std::endl;
+
+    int sizePS = projSpace.size();
+
+    Eigen::MatrixXcd gamma(sizePS,1);
+    for(int i=0; i<sizePS; i++){
+      gamma(i,0) = blas::cDotProduct(*projSpace[i], *y_hat[0]);
+    }
+    Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
+    for(int i=0; i<sizePS; i++){
+      blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]);
+    }
+
+    //out = *y_hat[0];
+    blas::zero(out);
+    blas::caxpy(1.0, *y_hat[0], out);
+    // Removing temporary buffers
+    delete y_hat[0];
+
+    dirac->tmp2 = NULL;
+    dirac->tmp1 = NULL;
+
+    //*/
+
+  }
 
 } // namespace quda

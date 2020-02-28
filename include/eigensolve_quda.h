@@ -366,6 +366,15 @@ public:
   class JD : public EigenSolver
   {
 
+protected:
+
+    TimeProfile *profileCorrEqInvs;
+    TimeProfile *profileMatCorrEqInvs;
+
+    // JD-specific workspace
+    std::vector<ColorSpinorField *> t;
+    std::vector<ColorSpinorField *> X_tilde;
+
 public:
     const DiracMatrix &mat;
     /**
@@ -382,6 +391,16 @@ public:
        @param[in] evals Computed eigenvalues
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
+       @param[in] qSpace The projection vector space
+       @param[in] theta Shift parameter
+       @param[in] mat The original matrix to be inverted after shift-and-project
+       @param[in] x Ouput spinor
+       @param[in] b Input spinor
+    */
+    void invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
 
     /**
        @brief Destructor for JD Eigensolver class
