@@ -172,13 +172,12 @@ invert_test(void)
   dw_setDims(gaugeParam.X,1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   for (int dir = 0; dir < 4; dir++) {
-    qdp_fatlink[dir] = malloc(V*gauge_site_size*gSize);
-    qdp_longlink[dir] = malloc(V*gauge_site_size*gSize);
+    qdp_fatlink[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
   }
-  fatlink = malloc(4*V*gauge_site_size*gSize);
-  longlink = malloc(4*V*gauge_site_size*gSize);
+  fatlink = malloc(4*V*gauge_site_size * host_gauge_data_type_size);
+  longlink = malloc(4*V*gauge_site_size * host_gauge_data_type_size);
 
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
 				 &gaugeParam, dslash_type);

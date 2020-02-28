@@ -35,11 +35,7 @@
 #include <quda.h>
 
 #define my_spinor_site_size 6
-
 void **ghost_fatlink, **ghost_longlink;
-
-size_t gSize = sizeof(double);
-
 static int n_naiks = 1;
 
 // For loading the gauge fields
@@ -92,15 +88,13 @@ void eigensolve_test()
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
 
-  gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_fatlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_longlink[dir] = malloc(V * gauge_site_size * gSize);
+    qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-  milc_fatlink = malloc(4 * V * gauge_site_size * gSize);
-  milc_longlink = malloc(4 * V * gauge_site_size * gSize);
+  milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -130,15 +124,15 @@ void eigensolve_test()
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize);
-      memset(qdp_longlink[dir], 0, V * gauge_site_size * gSize);
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
     }
   } else { // QUDA_ASQTAD_DSLASH
 
     if (compute_fatlong) {
-      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
+      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
     } else {
-      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize); }
+      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size); }
     }
 
     // Compute fat link plaquette.

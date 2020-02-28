@@ -237,13 +237,10 @@ int main(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   void *gauge[4], *clover=0, *clover_inv=0;
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size*gSize);
+    gauge[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
   }
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -272,9 +269,9 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinor_site_size*sSize*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinor_site_size*sSize*inv_param.Ls);
-  void *spinorOut = malloc(V * spinor_site_size * sSize * inv_param.Ls);
+  void *spinorIn = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorCheck = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -355,9 +352,9 @@ int main(int argc, char **argv)
     inv_param.solve_type = solve_type; // restore actual solve_type we want to do
     
     // Create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinor_site_size*sSize);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinor_site_size*sSize);
-    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*sSize);
+    memset(spinorIn, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
+    memset(spinorCheck, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
+    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
@@ -456,8 +453,6 @@ int main(int argc, char **argv)
 
       // Recompute Gauge Observables
       gaugeObservablesQuda(&gauge_obs_param);
-      //plaq = plaquette(*gaugeEx);
-      //charge = qChargeQuda();
 
       // Increment the mass/kappa and mu values to emulate heavy/light flavour updates
       if (kappa == -1.0) {

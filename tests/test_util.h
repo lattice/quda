@@ -37,6 +37,18 @@ extern QudaPrecision &cuda_prec_precondition;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
+void setQudaDefaultPrecs();
+void setQudaDefaultMgSolveTypes();
+
+void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
+void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
+void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng);
+
+void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+
+
 void initComms(int argc, char **argv, std::array<int, 4> &commDims);
 void initComms(int argc, char **argv, int *const commDims);
 void finalizeComms();
@@ -67,15 +79,11 @@ int getOddBit(int X);
 
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec);
 
-void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
 				    QudaPrecision precision, QudaGaugeParam*, 
 				    QudaDslashType dslash_type);
 
-/** Create random spinor source field using QUDA's internal hypercubic GPU RNG */
-void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
-			     quda::RNG &rng);
-void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision);
+
 void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
 
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
@@ -162,6 +170,7 @@ void setMultigridParam(QudaMultigridParam &mg_param);
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param);
 
 // Eig param types
+void setDeflationParam(QudaEigParam &df_param);
 void setMultigridEigParam(QudaEigParam &eig_param, int level);
 void setEigParam(QudaEigParam &eig_param);
 
@@ -169,9 +178,9 @@ void setEigParam(QudaEigParam &eig_param);
 void setInvertParam(QudaInvertParam &inv_param);
 void setContractInvertParam(QudaInvertParam &inv_param);
 void setMultigridInvertParam(QudaInvertParam &inv_param);
+void setDeflatedInvertParam(QudaInvertParam &inv_param);
 void setStaggeredInvertParam(QudaInvertParam &inv_param);
 
 // Gauge param types
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
 void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
-

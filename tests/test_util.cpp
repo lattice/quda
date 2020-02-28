@@ -9,12 +9,18 @@
 // This contains the appropriate ifdef guards already
 #include <mpi_comm_handle.h>
 
+#include <dslash_util.h>
+#include <blas_reference.h>
 #include <wilson_dslash_reference.h>
+#include <domain_wall_dslash_reference.h>
 #include <test_util.h>
 #include <test_params.h>
 
 #include <dslash_quda.h>
 #include "misc.h"
+
+// For reading in the gauge fields
+#include <qio_field.h>
 
 using namespace std;
 
@@ -46,7 +52,7 @@ int my_spinor_site_size;
 
 extern float fat_link_max;
 
-// Set QUDA precisions
+// Set some local QUDA precision variables
 QudaPrecision local_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cpu_prec = local_prec;
 QudaPrecision &cuda_prec = prec;
@@ -55,8 +61,287 @@ QudaPrecision &cuda_prec_refinement_sloppy = prec_refinement_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 QudaPrecision &cuda_prec_ritz = prec_ritz;
 
+void setQudaDefaultPrecs() {
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
+  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
+  if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
+  if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
+  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+}
+
+void setQudaDefaultMgSolveTypes() {
+  for (int i =0; i < QUDA_MAX_MG_LEVEL; i++) {
+    if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
+    if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
+  }  
+}
+
+void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) {
+      if (multishift) {
+      if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+	errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
+      }
+
+      void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+      printfQuda("Host residuum checks: \n");
+      for(int i=0; i < inv_param.num_offset; i++) {
+	ax(0, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
+	
+	if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
+	    int tm_offset = Vh*spinor_site_size;
+	    void *out0 = spinorCheck;
+	    void *out1 = (char*)out0 + tm_offset*cpu_prec;
+	    
+	    void *tmp0 = spinorTmp;
+	    void *tmp1 = (char*)tmp0 + tm_offset*cpu_prec;
+	    
+	    void *in0  = spinorOutMulti[i];
+	    void *in1  = (char*)in0 + tm_offset*cpu_prec;
+	    
+	    tm_ndeg_matpc(tmp0, tmp1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	    tm_ndeg_matpc(out0, out1, gauge, tmp0, tmp1, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	  } else {
+	    tm_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	    tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+		     inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	  }
+	} else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
+	    errorQuda("Twisted mass solution type not supported");
+	  tmc_matpc(spinorTmp, gauge, spinorOutMulti[i], clover, clover_inv, inv_param.kappa, inv_param.mu,
+		    inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  tmc_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+		    inv_param.twist_flavor, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_WILSON_DSLASH) {
+	  wil_matpc(spinorTmp, gauge, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
+		    inv_param.cpu_prec, gauge_param);
+	  wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
+		    inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+	  clover_matpc(spinorTmp, gauge, clover, clover_inv, spinorOutMulti[i], inv_param.kappa, inv_param.matpc_type, 0,
+		       inv_param.cpu_prec, gauge_param);
+	  clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
+		       inv_param.cpu_prec, gauge_param);
+	} else {
+	  printfQuda("Domain wall not supported for multi-shift\n");
+	  exit(-1);
+	}
+	
+	axpy(inv_param.offset[i], spinorOutMulti[i], spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+	mxpy(spinorIn, spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+	double nrm2 = norm_2(spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+	double src2 = norm_2(spinorIn, Vh*spinor_site_size, inv_param.cpu_prec);
+	double l2r = sqrt(nrm2 / src2);
+	
+	printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
+		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, 
+		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i]);
+      }
+      free(spinorTmp);
+      
+    } else {
+      // Non-multishift workflow
+      if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
+	if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	  if(inv_param.twist_flavor == QUDA_TWIST_SINGLET) {
+	    tm_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0, inv_param.cpu_prec, gauge_param);
+	  } else {
+	    int tm_offset = V*spinor_site_size;
+	    void *evenOut = spinorCheck;
+	    void *oddOut  = (char*)evenOut + tm_offset*cpu_prec;
+	    
+	    void *evenIn  = spinorOut;
+	    void *oddIn   = (char*)evenIn + tm_offset*cpu_prec;
+	    
+	    tm_ndeg_mat(evenOut, oddOut, gauge, evenIn, oddIn, inv_param.kappa, inv_param.mu, inv_param.epsilon, 0, inv_param.cpu_prec, gauge_param);
+	  }
+	} else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+	  tmc_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,
+		  inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_WILSON_DSLASH) {
+	  wil_mat(spinorCheck, gauge, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+	  clover_mat(spinorCheck, gauge, clover, spinorOut, inv_param.kappa, 0, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+	  dw_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+	  dw_4d_mat(spinorCheck, gauge, spinorOut, kappa5, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	  double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  for(int xs = 0 ; xs < Lsdim ; xs++)
+	    {
+	      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+	      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+	    }
+	  mdw_mat(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.dagger, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+	  free(kappa_b);
+	  free(kappa_c);
+	} else {
+	  errorQuda("Unsupported dslash_type");
+	}
+	if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+	  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+	      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+	      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	    ax(0.5/kappa5, spinorCheck, V*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+	  } else if (dslash_type == QUDA_TWISTED_MASS_DSLASH && twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+	    ax(0.5/inv_param.kappa, spinorCheck, 2*V*spinor_site_size, inv_param.cpu_prec);
+	  } else {
+	    ax(0.5/inv_param.kappa, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
+	  }
+	}
+	
+      } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
+	
+	if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
+	    int tm_offset = Vh*spinor_site_size;
+	    void *out0 = spinorCheck;
+	    void *out1 = (char*)out0 + tm_offset*cpu_prec;
+	    
+	    void *in0  = spinorOut;
+	    void *in1  = (char*)in0 + tm_offset*cpu_prec;
+	    
+	    tm_ndeg_matpc(out0, out1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  } else {
+	    tm_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  }
+	} else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
+	    errorQuda("Twisted mass solution type not supported");
+	  tmc_matpc(spinorCheck, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+		    inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_WILSON_DSLASH) {
+	  wil_matpc(spinorCheck, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
+		    inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+	  clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
+		       inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+	  dw_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+	  dw_4d_matpc(spinorCheck, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	  double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  for(int xs = 0 ; xs < Lsdim ; xs++)
+	    {
+	      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+	      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+	    }
+	  mdw_matpc(spinorCheck, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+	  free(kappa_b);
+	  free(kappa_c);
+	} else {
+	  errorQuda("Unsupported dslash_type");
+	}
+	
+	if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+	  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+	      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+	      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	    ax(0.25/(kappa5*kappa5), spinorCheck, V*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+	  } else {
+	    ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+	    
+	  }
+	}
+	
+      } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
+	
+	void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+	
+	ax(0, spinorCheck, V*spinor_site_size, inv_param.cpu_prec);
+	
+	if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
+	    int tm_offset = Vh*spinor_site_size;
+	    void *out0 = spinorCheck;
+	    void *out1 = (char*)out0 + tm_offset*cpu_prec;
+	    
+	    void *tmp0 = spinorTmp;
+	    void *tmp1 = (char*)tmp0 + tm_offset*cpu_prec;
+	    
+	    void *in0  = spinorOut;
+	    void *in1  = (char*)in0 + tm_offset*cpu_prec;
+	    
+	    tm_ndeg_matpc(tmp0, tmp1, gauge, in0, in1, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	    tm_ndeg_matpc(out0, out1, gauge, tmp0, tmp1, inv_param.kappa, inv_param.mu, inv_param.epsilon, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	  } else {
+	    tm_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+		     inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	    tm_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.mu, inv_param.twist_flavor,
+		     inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	  }
+	} else if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+	  if (inv_param.twist_flavor != QUDA_TWIST_SINGLET)
+	    errorQuda("Twisted mass solution type not supported");
+	  tmc_matpc(spinorTmp, gauge, spinorOut, clover, clover_inv, inv_param.kappa, inv_param.mu,
+		    inv_param.twist_flavor, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  tmc_matpc(spinorCheck, gauge, spinorTmp, clover, clover_inv, inv_param.kappa, inv_param.mu,
+		    inv_param.twist_flavor, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_WILSON_DSLASH) {
+	  wil_matpc(spinorTmp, gauge, spinorOut, inv_param.kappa, inv_param.matpc_type, 0,
+		    inv_param.cpu_prec, gauge_param);
+	  wil_matpc(spinorCheck, gauge, spinorTmp, inv_param.kappa, inv_param.matpc_type, 1,
+		    inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) {
+	  clover_matpc(spinorTmp, gauge, clover, clover_inv, spinorOut, inv_param.kappa,
+		       inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param);
+	  clover_matpc(spinorCheck, gauge, clover, clover_inv, spinorTmp, inv_param.kappa,
+		       inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH) {
+	  dw_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	  dw_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
+	  dw_4d_matpc(spinorTmp, gauge, spinorOut, kappa5, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	  dw_4d_matpc(spinorCheck, gauge, spinorTmp, kappa5, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass);
+	} else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+	  double _Complex *kappa_b = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  double _Complex *kappa_c = (double _Complex *)malloc(Lsdim * sizeof(double _Complex));
+	  for(int xs = 0 ; xs < Lsdim ; xs++)
+	    {
+	      kappa_b[xs] = 1.0/(2*(inv_param.b_5[xs]*(4.0 + inv_param.m5) + 1.0));
+	      kappa_c[xs] = 1.0/(2*(inv_param.c_5[xs]*(4.0 + inv_param.m5) - 1.0));
+	    }
+	  mdw_matpc(spinorTmp, gauge, spinorOut, kappa_b, kappa_c, inv_param.matpc_type, 0, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+	  mdw_matpc(spinorCheck, gauge, spinorTmp, kappa_b, kappa_c, inv_param.matpc_type, 1, inv_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+	  free(kappa_b);
+	  free(kappa_c);
+	} else {
+	  errorQuda("Unsupported dslash_type");
+	}
+	
+	if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
+	  errorQuda("Mass normalization not implemented");
+	}
+	
+	free(spinorTmp);
+      }
+      
+      
+      int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
+      mxpy(spinorIn, spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+      double nrm2 = norm_2(spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+      double src2 = norm_2(spinorIn, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+      double l2r = sqrt(nrm2 / src2);
+      
+      printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
+		 inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);      
+    }
+}
+  
+
+
 size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+
+
 
 /**
  * For MPI, the default node mapping is lexicographical with t varying fastest.
@@ -1057,21 +1342,6 @@ template <typename Float> static void applyStaggeredScaling(Float **res, QudaGau
   return;
 }
 
-void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
-  if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
-    else constructUnitGaugeField((float**)gauge, param);
-  } else if (type == 1) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructGaugeField((double**)gauge, param);
-    else constructGaugeField((float**)gauge, param);
-  } else {
-    if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
-    else
-      applyGaugeFieldScaling((float **)gauge, Vh, param);
-  }
-
-}
-
 void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision,
     QudaGaugeParam *param, QudaDslashType dslash_type)
 {
@@ -1175,12 +1445,6 @@ static void constructCloverField(Float *res, double norm, double diag) {
       res[i*72 + j+36] += diag;
     }
   }
-}
-
-void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision) {
-
-  if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
-  else constructCloverField((float *)clover, norm, diag);
 }
 
 /*void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
@@ -1312,7 +1576,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
         }else{
 	  //float* mylink = (float*)link;
-	  //mylink = mylink + (4*i + dir)*gauge_site_size;
+	  //mylink = mylink + (4*<i + dir)*gauge_site_size;
 	  float* mylink = (float*)link[dir];
 	  mylink = mylink + i*gauge_site_size;
 
@@ -1350,7 +1614,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
   return;
 }
 
-void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -1364,7 +1628,6 @@ void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision preci
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
   quda::cpuColorSpinorField spinor_in(param);
-
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
@@ -1463,8 +1726,8 @@ void createMomCPU(void *mom, QudaPrecision precision)
 {
   void* temp;
 
-  size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4*V*gauge_site_size*gSize);
+  size_t gauge_data_type_size = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  temp = malloc(4 * V * gauge_site_size * gauge_data_type_size);
   if (temp == NULL){
     fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
     exit(1);
@@ -1614,6 +1877,62 @@ double stopwatchReadSeconds()
 }
 
 int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }
+
+void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv) {
+  // Allocate space on the host
+  for (int dir = 0; dir < 4; dir++) {
+    gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);
+  }
+  
+  // 0 = random SU(3)
+  // 1 = unit gauge
+  // 2 = supplied field
+  int construct_type = 0; 
+  if (strcmp(latfile,"")) {  
+    // load in the command line supplied gauge field using QIO and LIME
+    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+    construct_type = 2;
+  } else { 
+    if (unit_gauge) construct_type = 1;
+    else construct_type = 0;
+  }
+  constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
+}
+
+void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
+  if (type == 0) {
+    if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
+    else constructUnitGaugeField((float**)gauge, param);
+  } else if (type == 1) {
+    if (precision == QUDA_DOUBLE_PRECISION) constructGaugeField((double**)gauge, param);
+    else constructGaugeField((float**)gauge, param);
+  } else {
+    if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
+    else
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
+  }
+}
+
+void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param) {
+  double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
+  double diag = 1.0; // constant added to the diagonal
+  
+  size_t cSize = inv_param.clover_cpu_prec;
+  clover = malloc(V*clover_site_size*cSize);
+  clover_inv = malloc(V*clover_site_size*cSize);
+  if (!compute_clover) constructQudaCloverField(clover, norm, diag, inv_param.clover_cpu_prec);
+  
+  inv_param.compute_clover = compute_clover;
+  if (compute_clover) inv_param.return_clover = 1;
+  inv_param.compute_clover_inverse = 1;
+  inv_param.return_clover_inverse = 1;
+}
+
+void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision) {
+  if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
+  else constructCloverField((float *)clover, norm, diag);
+}
+
 
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param) 
 {
@@ -2603,4 +2922,139 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = verbosity;
+}
+
+void setDeflatedInvertParam(QudaInvertParam &inv_param) {
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
+
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.clover_cpu_prec = cpu_prec;
+    inv_param.clover_cuda_prec = cuda_prec;
+    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
+    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
+  }
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+//  inv_param.tune = tune ? QUDA_TUNE_YES : QUDA_TUNE_NO;
+
+  inv_param.dslash_type = dslash_type;
+
+  if (kappa == -1.0) {
+    inv_param.mass = mass;
+    inv_param.kappa = 1.0 / (2.0 * (1 + 3/anisotropy + mass));
+  } else {
+    inv_param.kappa = kappa;
+    inv_param.mass = 0.5/kappa - (1 + 3/anisotropy);
+  }
+
+  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    inv_param.mu = mu;
+    inv_param.twist_flavor = twist_flavor;
+    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
+
+    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
+      printfQuda("Twisted-mass doublet non supported (yet)\n");
+      exit(0);
+    }
+  }
+
+  inv_param.clover_coeff = clover_coeff;
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = normalization;
+
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+  // inv_param.solution_type = QUDA_MATPC_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;
+  inv_param.matpc_type = matpc_type;
+
+  if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
+    errorQuda("Unknown deflated solver type %d.", inv_type);
+
+  //! For deflated solvers only:
+  inv_param.inv_type = inv_type;
+  inv_param.tol      = tol;
+  inv_param.tol_hq   = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  inv_param.rhs_idx  = 0;
+
+  inv_param.nev = nev;
+  inv_param.max_search_dim = max_search_dim;
+  inv_param.deflation_grid = deflation_grid;
+  inv_param.tol_restart = tol_restart;
+  inv_param.eigcg_max_restarts = eigcg_max_restarts;
+  inv_param.max_restart_num = max_restart_num;
+  inv_param.inc_tol = inc_tol;
+  inv_param.eigenval_tol = eigenval_tol;
+
+
+  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    inv_param.tol_restart = 0.0;//restart is not requested...
+  }
+
+  inv_param.cuda_prec_ritz = cuda_prec_ritz;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
+
+  inv_param.inv_type_precondition = precon_type;
+  inv_param.gcrNkrylov = 6;
+
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  // these can be set individually
+  for (int i=0; i<inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = 1e-1;
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-2;
+  inv_param.maxiter_precondition = 10;
+  inv_param.omega = 1.0;
+
+  inv_param.extlib_type = solver_ext_lib;
+}
+
+void setDeflationParam(QudaEigParam &df_param) {
+
+  df_param.import_vectors = QUDA_BOOLEAN_FALSE;
+  df_param.run_verify     = QUDA_BOOLEAN_FALSE;
+
+  df_param.nk             = df_param.invert_param->nev;
+  df_param.np             = df_param.invert_param->nev*df_param.invert_param->deflation_grid;
+  df_param.extlib_type    = deflation_ext_lib;
+
+  df_param.cuda_prec_ritz = prec_ritz;
+  df_param.location       = location_ritz;
+  df_param.mem_type_ritz  = mem_type_ritz;
+
+  // set file i/o parameters
+  strcpy(df_param.vec_infile, eig_vec_infile);
+  strcpy(df_param.vec_outfile, eig_vec_outfile);
 }

@@ -127,11 +127,9 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_LAPLACE_DSLASH) sss = 6;
   setSpinorSiteSize(sss);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   void *gauge[4], *clover = 0, *clover_inv = 0;
 
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * gSize); }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
 
   if (strcmp(latfile, "")) { // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);

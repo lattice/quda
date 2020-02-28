@@ -266,13 +266,10 @@ int main(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  size_t sSize = (inv_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   void *gauge[4], *clover_inv=0, *clover=0;
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size*gSize);
+    gauge[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
   }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
@@ -318,29 +315,29 @@ int main(int argc, char **argv)
   void **spinorIn = (void**)malloc(inv_param.num_src*sizeof(void *));
   void **spinorCheck = (void**)malloc(inv_param.num_src*sizeof(void *));
   for (int i=0; i<inv_param.num_src; i++) {
-    spinorIn[i] = malloc(V*spinor_site_size*sSize*inv_param.Ls);
-    spinorCheck[i] = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+    spinorIn[i] = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+    spinorCheck[i] = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
   }
 
   void **spinorOutMulti = NULL;
 //  if (multishift) {
     spinorOutMulti = (void**)malloc(inv_param.num_src*sizeof(void *));
     for (int i=0; i<inv_param.num_src; i++) {
-      spinorOutMulti[i] = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+      spinorOutMulti[i] = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
     }
 //  } else {
-//    spinorOut = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+//    spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 //  }
 
 
 //  if (multishift) {
     for (int i=0; i<inv_param.num_src; i++) {
-      memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinor_site_size*sSize);
-      memset(spinorIn[i], 0, inv_param.Ls*V*spinor_site_size*sSize);
-      memset(spinorCheck[i], 0, inv_param.Ls*V*spinor_site_size*sSize);
+      memset(spinorOutMulti[i], 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
+      memset(spinorIn[i], 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
+      memset(spinorCheck[i], 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
     }
 //  } else {
-//    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*sSize);
+//    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
 //  }
 
   // create a point source at 0 (in each subvolume...  FIXME)
@@ -392,7 +389,7 @@ int main(int argc, char **argv)
 //      errorQuda("Mass normalization not supported for multi-shift solver in invert_test");
 //    }
 //
-//    void *spinorTmp = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+//    void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 //
 //    printfQuda("Host residuum checks: \n");
 //    for(int i=0; i < inv_param.num_src; i++) {
@@ -514,7 +511,7 @@ int main(int argc, char **argv)
 
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
-      void *spinorTmp = malloc(V*spinor_site_size*sSize*inv_param.Ls);
+      void *spinorTmp = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
 
       ax(0, spinorCheck[i], V*spinor_site_size, inv_param.cpu_prec);
 

@@ -25,8 +25,8 @@ using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision cuda_prec;
+//QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+//QudaPrecision cuda_prec;
 
 QudaGaugeParam gaugeParam;
 QudaInvertParam inv_param;
@@ -85,7 +85,7 @@ void init(int argc, char **argv)
   gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
   gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
 
-  // ensure we use the right dslash
+  // ensure we use the correct dslash
   dslash_type = QUDA_COVDEV_DSLASH;
 
   gaugeParam.anisotropy = 1.0;
@@ -146,10 +146,8 @@ void init(int argc, char **argv)
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   for (int dir = 0; dir < 4; dir++) {
-    links[dir] = malloc(V*gauge_site_size*gSize);
+    links[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);
 
     if (links[dir] == NULL) {
       errorQuda("ERROR: malloc failed for gauge links");

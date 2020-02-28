@@ -242,7 +242,7 @@ int main(int argc, char **argv)
   setSpinorSiteSize(6);
 
   /* Taken from staggered_invert_test to load gauge fields */
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t host_gauge_data_type_size = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -251,13 +251,13 @@ int main(int argc, char **argv)
   void *milc_longlink = nullptr;
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_fatlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_longlink[dir] = malloc(V * gauge_site_size * gSize);
+    qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  milc_fatlink = malloc(4 * V * gauge_site_size * gSize);
-  milc_longlink = malloc(4 * V * gauge_site_size * gSize);
+  milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -288,16 +288,16 @@ int main(int argc, char **argv)
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize);
-      memset(qdp_longlink[dir], 0, V * gauge_site_size * gSize);
+      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
     }
   } else { // QUDA_ASQTAD_DSLASH
 
     if (compute_fatlong) {
-      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
+      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
     } else { //
 
-      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize); }
+      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size); }
     }
 
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);

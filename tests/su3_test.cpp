@@ -124,13 +124,12 @@ int main(int argc, char **argv)
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  size_t gSize = gauge_param.cpu_prec;
-
+  
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size*gSize);
-    new_gauge[dir] = malloc(V*gauge_site_size*gSize);
+    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device);
@@ -170,8 +169,8 @@ int main(int argc, char **argv)
   // Topological charge and gauge energy
   double q_charge_check = 0.0;
   // Size of floating point data
-  size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
-  size_t array_size = V * sSize;
+  size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
+  size_t array_size = V * data_size;
   void *qDensity = malloc(array_size);
   // start the timer
   double time0 = -((double)clock());

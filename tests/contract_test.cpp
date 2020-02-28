@@ -11,12 +11,6 @@
 #include <contract_reference.h>
 #include "misc.h"
 
-//#if defined(QMP_COMMS)
-//#include <qmp.h>
-//#elif defined(MPI_COMMS)
-//#include <mpi.h>
-//#endif
-
 // google test
 #include <gtest/gtest.h>
 
@@ -111,10 +105,10 @@ int main(int argc, char **argv)
 void test(int contractionType, int Prec)
 {
 
-  QudaPrecision testPrec = QUDA_INVALID_PRECISION;
+  QudaPrecision test_prec = QUDA_INVALID_PRECISION;
   switch (Prec) {
-  case 0: testPrec = QUDA_SINGLE_PRECISION; break;
-  case 1: testPrec = QUDA_DOUBLE_PRECISION; break;
+  case 0: test_prec = QUDA_SINGLE_PRECISION; break;
+  case 1: test_prec = QUDA_DOUBLE_PRECISION; break;
   default: errorQuda("Undefined QUDA precision type %d\n", Prec);
   }
 
@@ -122,17 +116,17 @@ void test(int contractionType, int Prec)
 
   QudaInvertParam inv_param = newQudaInvertParam();
   setContractInvertParam(inv_param);
-  inv_param.cpu_prec = testPrec;
-  inv_param.cuda_prec = testPrec;
-  inv_param.cuda_prec_sloppy = testPrec;
-  inv_param.cuda_prec_precondition = testPrec;
+  inv_param.cpu_prec = test_prec;
+  inv_param.cuda_prec = test_prec;
+  inv_param.cuda_prec_sloppy = test_prec;
+  inv_param.cuda_prec_precondition = test_prec;
 
-  size_t sSize = (testPrec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  void *spinorX = malloc(V * spinor_site_size * sSize);
-  void *spinorY = malloc(V * spinor_site_size * sSize);
-  void *d_result = malloc(2 * V * 16 * sSize);
+  size_t data_size = (test_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  void *spinorX = malloc(V * spinor_site_size * data_size);
+  void *spinorY = malloc(V * spinor_site_size * data_size);
+  void *d_result = malloc(2 * V * 16 * data_size);
 
-  if (testPrec == QUDA_SINGLE_PRECISION) {
+  if (test_prec == QUDA_SINGLE_PRECISION) {
     for (int i = 0; i < V * spinor_site_size; i++) {
       ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
       ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
@@ -163,7 +157,7 @@ void test(int contractionType, int Prec)
   // Compare each site contraction from the host and device.
   // It returns the number of faults it detects.
   int faults = 0;
-  if (testPrec == QUDA_DOUBLE_PRECISION) {
+  if (test_prec == QUDA_DOUBLE_PRECISION) {
     faults = contraction_reference((double *)spinorX, (double *)spinorY, (double *)d_result, cType, X);
   } else {
     faults = contraction_reference((float *)spinorX, (float *)spinorY, (float *)d_result, cType, X);
