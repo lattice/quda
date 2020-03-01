@@ -352,14 +352,14 @@ extern "C" {
 
   // Degree of freedom ordering
   typedef enum QudaFieldOrder_s {
-    QUDA_FLOAT_FIELD_ORDER = 1, // spin-color-complex-space
-    QUDA_FLOAT2_FIELD_ORDER = 2, // (spin-color-complex)/2-space-(spin-color-complex)%2
-    QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
-    QUDA_FLOAT8_FIELD_ORDER = 8, // (spin-color-complex)/8-space-(spin-color-complex)%8
-    QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
-    QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
-    QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
-    QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
+    QUDA_FLOAT_FIELD_ORDER = 1,               // spin-color-complex-space
+    QUDA_FLOAT2_FIELD_ORDER = 2,              // (spin-color-complex)/2-space-(spin-color-complex)%2
+    QUDA_FLOAT4_FIELD_ORDER = 4,              // (spin-color-complex)/4-space-(spin-color-complex)%4
+    QUDA_FLOAT8_FIELD_ORDER = 8,              // (spin-color-complex)/8-space-(spin-color-complex)%8
+    QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,        // CPS/QDP++ ordering
+    QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,        // QLA ordering (spin inside color)
+    QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)
+    QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         // QOP domain-wall ordering
     QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;

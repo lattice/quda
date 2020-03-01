@@ -1711,7 +1711,6 @@ namespace quda {
 #ifdef USE_TEXTURE_OBJECTS
         typedef typename TexVectorType<real, N>::type TexVector;
         cudaTextureObject_t tex;
-        const int tex_offset;
 #endif
       Float *ghost[4];
       QudaGhostExchange ghostExchange;
@@ -1726,15 +1725,20 @@ namespace quda {
       void *backup_h; //! host memory for backing up the field when tuning
       size_t bytes;
 
-    FloatNOrder(const GaugeField &u, Float *gauge_=0, Float **ghost_=0, bool override=false)
-      : reconstruct(u), gauge(gauge_ ? gauge_ : (Float*)u.Gauge_p()),
-	offset(u.Bytes()/(2*sizeof(Float))),
+      FloatNOrder(const GaugeField &u, Float *gauge_ = 0, Float **ghost_ = 0, bool override = false) :
+        reconstruct(u),
+        gauge(gauge_ ? gauge_ : (Float *)u.Gauge_p()),
+        offset(u.Bytes() / (2 * sizeof(Float) * N)),
 #ifdef USE_TEXTURE_OBJECTS
-	tex(0), tex_offset(offset/N),
+        tex(0),
 #endif
-	ghostExchange(u.GhostExchange()),
-	volumeCB(u.VolumeCB()), stride(u.Stride()), geometry(u.Geometry()),
-	phaseOffset(u.PhaseOffset()), backup_h(nullptr), bytes(u.Bytes())
+        ghostExchange(u.GhostExchange()),
+        volumeCB(u.VolumeCB()),
+        stride(u.Stride()),
+        geometry(u.Geometry()),
+        phaseOffset(u.PhaseOffset() / sizeof(Float)),
+        backup_h(nullptr),
+        bytes(u.Bytes())
       {
 	if (geometry == QUDA_COARSE_GEOMETRY)
 	  errorQuda("This accessor does not support coarse-link fields (lacks support for bidirectional ghost zone");
@@ -1755,14 +1759,20 @@ namespace quda {
 #endif
       }
 
-    FloatNOrder(const FloatNOrder &order)
-      : reconstruct(order.reconstruct), gauge(order.gauge), offset(order.offset),
+      FloatNOrder(const FloatNOrder &order) :
+        reconstruct(order.reconstruct),
+        gauge(order.gauge),
+        offset(order.offset),
 #ifdef USE_TEXTURE_OBJECTS
-	tex(order.tex), tex_offset(order.tex_offset),
+        tex(order.tex),
 #endif
-	ghostExchange(order.ghostExchange),
-        volumeCB(order.volumeCB), stride(order.stride), geometry(order.geometry),
-	phaseOffset(order.phaseOffset), backup_h(nullptr), bytes(order.bytes)
+        ghostExchange(order.ghostExchange),
+        volumeCB(order.volumeCB),
+        stride(order.stride),
+        geometry(order.geometry),
+        phaseOffset(order.phaseOffset),
+        backup_h(nullptr),
+        bytes(order.bytes)
       {
 	for (int i=0; i<4; i++) {
 	  X[i] = order.X[i];
@@ -1782,7 +1792,7 @@ namespace quda {
           // first do texture load from memory
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	  if (!huge_alloc) { // use textures unless we have a huge alloc
-            TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * tex_offset + (dir * M + i) * stride + x);
+            TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * offset + (dir * M + i) * stride + x);
             // now insert into output array
 #pragma unroll
             for (int j = 0; j < N; j++) copy(tmp[i * N + j], reinterpret_cast<real *>(&vecTmp)[j]);
@@ -1790,7 +1800,7 @@ namespace quda {
 #endif
           {
             // first load from memory
-            Vector vecTmp = vector_load<Vector>(gauge + parity * offset, (dir * M + i) * stride + x);
+            Vector vecTmp = vector_load<Vector>(gauge, parity * offset + (dir * M + i) * stride + x);
             // second do copy converting into register type
 #pragma unroll
 	    for (int j=0; j<N; j++) copy(tmp[i*N+j], reinterpret_cast<Float*>(&vecTmp)[j]);
@@ -1803,7 +1813,7 @@ namespace quda {
           if (static_phase<stag_phase>() && (reconLen == 13 || use_inphase)) {
             phase = inphase;
           } else {
-            copy(phase, (gauge + parity * offset)[phaseOffset / sizeof(Float) + stride * dir + x]);
+            copy(phase, gauge[parity * offset * N + phaseOffset + stride * dir + x]);
             phase *= static_cast<real>(2.0) * static_cast<real>(M_PI);
           }
         }
@@ -1824,12 +1834,11 @@ namespace quda {
 #pragma unroll
 	  for (int j=0; j<N; j++) copy(reinterpret_cast<Float*>(&vecTmp)[j], tmp[i*N+j]);
 	  // second do vectorized copy into memory
-          vector_store(gauge + parity * offset, x + (dir * M + i) * stride, vecTmp);
+          vector_store(gauge, parity * offset + x + (dir * M + i) * stride, vecTmp);
         }
         if (hasPhase) {
           real phase = reconstruct.getPhase(v);
-          copy((gauge + parity * offset)[phaseOffset / sizeof(Float) + dir * stride + x],
-               static_cast<real>(phase / (2. * M_PI)));
+          copy(gauge[parity * offset * N + phaseOffset + dir * stride + x], static_cast<real>(phase / (2. * M_PI)));
         }
       }
 

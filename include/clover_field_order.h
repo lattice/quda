@@ -555,7 +555,6 @@ namespace quda {
 	typedef typename TexVectorType<real, N>::type TexVector;
 	cudaTextureObject_t tex;
 	cudaTextureObject_t normTex;
-	const int tex_offset;
 #endif
 	const int volumeCB;
 	const int stride;
@@ -571,22 +570,21 @@ namespace quda {
 
         FloatNOrder(const CloverField &clover, bool is_inverse, Float *clover_ = 0, norm_type *norm_ = 0,
                     bool override = false) :
-            offset(clover.Bytes() / (2 * sizeof(Float))),
-            norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
+          offset(clover.Bytes() / (2 * sizeof(Float) * N)),
+          norm_offset(clover.NormBytes() / (2 * sizeof(norm_type))),
 #ifdef USE_TEXTURE_OBJECTS
-            tex(0),
-            normTex(0),
-            tex_offset(offset / N),
+          tex(0),
+          normTex(0),
 #endif
-            volumeCB(clover.VolumeCB()),
-            stride(clover.Stride()),
-            twisted(clover.Twisted()),
-            mu2(clover.Mu2()),
-            rho(clover.Rho()),
-            bytes(clover.Bytes()),
-            norm_bytes(clover.NormBytes()),
-            backup_h(nullptr),
-            backup_norm_h(nullptr)
+          volumeCB(clover.VolumeCB()),
+          stride(clover.Stride()),
+          twisted(clover.Twisted()),
+          mu2(clover.Mu2()),
+          rho(clover.Rho()),
+          bytes(clover.Bytes()),
+          norm_bytes(clover.NormBytes()),
+          backup_h(nullptr),
+          backup_norm_h(nullptr)
 	{
 	  this->clover = clover_ ? clover_ : (Float*)(clover.V(is_inverse));
           this->norm = norm_ ? norm_ : (norm_type *)(clover.Norm(is_inverse));
@@ -656,7 +654,7 @@ namespace quda {
             nrm = !huge_alloc ? tex1Dfetch_<float>(normTex, parity * norm_offset + chirality * stride + x) :
                                 norm[parity * norm_offset + chirality * stride + x];
 #else
-            nrm = norm[parity * norm_offset + chirality * stride + x];
+            nrm = vector_load<float>(norm, parity * norm_offset + chirality * stride + x);
 #endif
           }
 
@@ -665,7 +663,7 @@ namespace quda {
 #if defined(USE_TEXTURE_OBJECTS) && defined(__CUDA_ARCH__)
 	    if (!huge_alloc) { // use textures unless we have a huge alloc
                                // first do texture load from memory
-              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity*tex_offset + stride*(chirality*M+i) + x);
+              TexVector vecTmp = tex1Dfetch_<TexVector>(tex, parity * offset + stride * (chirality * M + i) + x);
               // now insert into output array
 #pragma unroll
               for (int j = 0; j < N; j++) {
@@ -676,8 +674,8 @@ namespace quda {
 #endif
 	    {
               // first load from memory
-              Vector vecTmp = vector_load<Vector>(clover + parity*offset, x + stride*(chirality*M+i));
-	      // second do scalar copy converting into register type
+              Vector vecTmp = vector_load<Vector>(clover, parity * offset + x + stride * (chirality * M + i));
+              // second do scalar copy converting into register type
 #pragma unroll
               for (int j = 0; j < N; j++) { copy_and_scale(v[i * N + j], reinterpret_cast<Float *>(&vecTmp)[j], nrm); }
             }
@@ -722,7 +720,7 @@ namespace quda {
             // first do scalar copy converting into storage type
             for (int j = 0; j < N; j++) copy_scaled(reinterpret_cast<Float *>(&vecTmp)[j], tmp[i * N + j]);
             // second do vectorized copy into memory
-	    vector_store(clover + parity*offset, x + stride*(chirality*M+i), vecTmp);
+            vector_store(clover, parity * offset + x + stride * (chirality * M + i), vecTmp);
           }
         }
 

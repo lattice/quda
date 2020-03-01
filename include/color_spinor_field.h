@@ -1094,12 +1094,14 @@ namespace quda {
      @param[in] b Input field
      @return If order is unique return the order
    */
-  inline QudaFieldOrder Order_(const char *func, const char *file, int line,
-                                  const ColorSpinorField &a, const ColorSpinorField &b) {
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                               const ColorSpinorField &b)
+  {
     QudaFieldOrder order = QUDA_INVALID_FIELD_ORDER;
-    if (a.FieldOrder() == b.FieldOrder()) order = a.FieldOrder();
-    else errorQuda("Orders %d %d do not match  (%s:%d in %s())\n",
-		   a.FieldOrder(), b.FieldOrder(), file, line, func);
+    if (a.FieldOrder() == b.FieldOrder())
+      order = a.FieldOrder();
+    else
+      errorQuda("Orders %d %d do not match  (%s:%d in %s())\n", a.FieldOrder(), b.FieldOrder(), file, line, func);
     return order;
   }
 
@@ -1111,9 +1113,10 @@ namespace quda {
      @return If order is unique return the order
    */
   template <typename... Args>
-  inline QudaFieldOrder Order_(const char *func, const char *file, int line,
-                               const ColorSpinorField &a, const ColorSpinorField &b, const Args &... args) {
-    return static_cast<QudaFieldOrder>(Order_(func,file,line,a,b) & Order_(func,file,line,a,args...));
+  inline QudaFieldOrder Order_(const char *func, const char *file, int line, const ColorSpinorField &a,
+                               const ColorSpinorField &b, const Args &... args)
+  {
+    return static_cast<QudaFieldOrder>(Order_(func, file, line, a, b) & Order_(func, file, line, a, args...));
   }
 
 #define checkOrder(...) Order_(__func__, __FILE__, __LINE__, __VA_ARGS__)
