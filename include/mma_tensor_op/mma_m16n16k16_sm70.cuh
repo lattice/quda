@@ -1,11 +1,11 @@
-#if (__COMPUTE_CAPABILITY__ == 700)
+#if (__COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
 #endif
 
 namespace quda
 {
 
-#if (__COMPUTE_CAPABILITY__ == 700)
+#if (__COMPUTE_CAPABILITY__ >= 700)
 
   struct WarpRegisterMapping {
 
