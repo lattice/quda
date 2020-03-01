@@ -342,9 +342,9 @@ namespace quda
       constexpr int warp_cycle = total_tile / total_warp;
       const int warp_m = this_warp * warp_cycle / tn_dim;
 
-      WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
 
 #ifdef USE_MMA_SYNC
+      WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
       MmaOperandA<M_sm / 2> op_a[reload ? 1 : tm_dim * 4];
       MmaOperandA<M_sm / 2> op_a_aux[reload ? 1 : tm_dim * 4];
       if (!reload) { // the data in registers can be resued.
