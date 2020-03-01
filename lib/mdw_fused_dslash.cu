@@ -1,12 +1,6 @@
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
 #include <mdw_dslash5_tensor_core.cuh>
-
-// The `mma.sync` PTX is only available with or after CUDA 10.1
-#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
-#define USE_MMA_SYNC // rather than using wmma
-#endif
 
 namespace quda
 {

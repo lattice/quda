@@ -12,6 +12,11 @@
 #include <mma.h>
 #endif
 
+// The `mma.sync` PTX is only available with or after CUDA 10.1
+#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ >= 11)
+#define USE_MMA_SYNC // rather than using wmma
+#endif
+
 #include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 
 namespace quda

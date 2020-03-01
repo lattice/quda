@@ -186,7 +186,7 @@ namespace quda
     }
   };
 
-#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
+#ifdef USE_MMA_SYNC
 
 #define USE_FP16_MMA_ACCUMULATE
 
@@ -284,7 +284,7 @@ namespace quda
     }
   }
 
-#endif // #if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
+#endif // USE_MMA_SYNC
 
 #endif // defined (__COMPUTE_CAPABILITY__ == 700)
 
