@@ -456,7 +456,7 @@ namespace quda
           __syncthreads();
 #ifdef USE_MMA_SYNC
           mma_sync_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(op_a_aux, sm_a_black, sm_c, sm_c, wrm);
-#else 
+#else
           wmma_gemm<block_dim_x, Ls, M, N, M_sm, N_sm, reload>(a_frag_black, sm_a_black, sm_c, sm_c);
 #endif
           __syncthreads();
@@ -488,7 +488,6 @@ namespace quda
     protected:
       Arg &arg;
       const ColorSpinorField &meta;
-      static constexpr bool shared = true; // whether to use shared memory cache blocking for M5inv
 
       /** Whether to use variable or fixed coefficient algorithm.  Must be true if using ZMOBIUS */
       static constexpr bool var_inverse = true;
@@ -538,12 +537,20 @@ namespace quda
         return 0ll;
       }
 
-      virtual bool tuneGridDim() const { return true; }
-      virtual bool tuneAuxDim() const { return true; }
-      virtual bool tuneSharedBytes() const { return true; }
+      bool tuneGridDim() const { return true; }
+      bool tuneAuxDim() const { return true; }
+      bool tuneSharedBytes() const { return true; }
       unsigned int minThreads() const { return arg.volume_4d_cb; }
 
-      unsigned int shared_bytes_per_block(const TuneParam &param) const
+      int blockStep() const { return 16; }
+      int blockMin() const { return 16; }
+      unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
+
+      int gridStep() const { return deviceProp.multiProcessorCount; }
+      unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
+      unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
+
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const
       {
         const int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size(arg.Ls));
         const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size);
@@ -559,32 +566,7 @@ namespace quda
         }
       }
 
-      virtual bool advanceBlockDim(TuneParam &param) const
-      {
-        if (param.block.x < max_block_size()) {
-          param.block.x += step_block_size();
-          param.shared_bytes = shared_bytes_per_block(param);
-          return true;
-        } else {
-          return false;
-        }
-      }
-
-      virtual bool advanceGridDim(TuneParam &param) const
-      {
-        const unsigned int max_blocks = maxGridSize();
-        const int step = deviceProp.multiProcessorCount;
-        param.grid.x += step;
-        if (param.grid.x > max_blocks) {
-          return false;
-        } else {
-          param.block.x = min_block_size();
-          param.shared_bytes = shared_bytes_per_block(param);
-          return true;
-        }
-      }
-
-      virtual bool advanceAux(TuneParam &param) const
+      bool advanceAux(TuneParam &param) const
       {
         bool aux_advanced = false;
         if (param.aux.x == 0) { // first see if aux.x(ONLY 0(false) or 1(true))
@@ -597,32 +579,13 @@ namespace quda
             param.aux.x = 0;
           }
         }
-        if (aux_advanced) {
-          // We have updated the "aux" so reset all other parameters.
-          param.grid.x = minGridSize();
-          param.block.x = min_block_size();
-          param.shared_bytes = shared_bytes_per_block(param);
-          return true;
-        } else {
-          return false;
-        }
+        // shared bytes depends on aux, so update if changed
+        if (aux_advanced) param.shared_bytes = sharedBytesPerBlock(param);
+        return aux_advanced;
       }
-
-      virtual unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
-      virtual unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
-      unsigned int min_block_size() const { return 16; }
-      unsigned int max_block_size() const { return 32; }
-      unsigned int step_block_size() const { return 16; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory inverse
-      unsigned int maxSharedBytesPerBlock() const
-      {
-        if (shared) {
-          return maxDynamicSharedBytesPerBlock();
-        } else {
-          return TunableVectorYZ::maxSharedBytesPerBlock();
-        }
-      }
+      unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 
     public:
       FusedDslash(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
@@ -657,11 +620,10 @@ namespace quda
         default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
         }
       }
-      virtual ~FusedDslash() {}
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
       {
-        if (shared) { setMaxDynamicSharedBytesPerBlock(f); }
+        setMaxDynamicSharedBytesPerBlock(f);
         void *args[] = {&arg};
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
@@ -714,9 +676,10 @@ namespace quda
       void initTuneParam(TuneParam &param) const
       {
         TunableVectorYZ::initTuneParam(param);
-        param.block = dim3(min_block_size(), arg.Ls, 1); // Ls must be contained in the block
+        param.block = dim3(blockMin(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
-        param.shared_bytes = shared_bytes_per_block(param);
+        resizeStep(arg.Ls, 1); // this will disable tuning in the y dimension
+        param.shared_bytes = sharedBytesPerBlock(param);
         param.aux.x = 0;
         param.aux.y = 1;
       }
