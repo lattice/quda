@@ -22,7 +22,7 @@
 namespace quda
 {
 
-#if defined(GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
+#if (__COMPUTE_CAPABILITY__ >= 700)
 
   template <class T> struct TensorCoreSharedMemory {
     __device__ inline operator T *()
@@ -402,6 +402,6 @@ namespace quda
 #endif
   }
 
-#endif // defined (GPU_DOMAIN_WALL_DIRAC) && (__COMPUTE_CAPABILITY__ >= 700)
+#endif // (__COMPUTE_CAPABILITY__ >= 700)
 
 } // namespace quda
