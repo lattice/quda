@@ -377,6 +377,8 @@ protected:
     int    corrEqMaxiter;
 
     SolverParam *solverParam;
+    SolverParam *solverParamMat;
+    SolverParam *solverParamPrec;
     CG *cgMat;
     CG *cgPrec;
     CG *cg;

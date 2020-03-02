@@ -1327,6 +1327,9 @@ namespace quda
     solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
 
+    solverParamMat = new SolverParam(*solverParam);
+    solverParamPrec = new SolverParam(*solverParam);
+
     d = nullptr;
     // Create the dirac operator
     // IMPORTANT: cannot call createDirac(...) as in interface_quda.cpp
@@ -1345,10 +1348,10 @@ namespace quda
     mmPP = new DiracPrecProjCorr(dirac);
 
     cgMat = new CG(const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), \
-                   *solverParam, *profileMatCorrEqInvs);
+                   *solverParamMat, *profileMatCorrEqInvs);
     cg = new CG(const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), \
                 *solverParam, *profileCorrEqInvs);
-    cgPrec = new CG(*mmPP, *mmPP, *mmPP, *solverParam, *profileCorrEqInvs);
+    cgPrec = new CG(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profileCorrEqInvs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -1541,6 +1544,8 @@ namespace quda
     delete profileMatCorrEqInvs;
 
     delete solverParam;
+    delete solverParamMat;
+    delete solverParamPrec;
     delete cgMat;
     delete cgPrec;
     delete cg;
@@ -1637,23 +1642,27 @@ namespace quda
     mmPP->theta = theta;
     mmPP->Mproj = M;
     mmPP->Qhat = Qhat;
-    mmPP->solverParam_ = solverParam;
+    mmPP->solverParam_ = solverParamMat;
     mmPP->matUnconst_ = &matUnconst;
     mmPP->cg_ = cgMat;
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     mmPP->eigSlvr = this;
-    mmPP->tol = corrEqTol;
-    mmPP->maxiter = corrEqMaxiter;
+
+    // Test further for the best ratio for the following two parameters
+    mmPP->tol = corrEqTol*10.0;
+    mmPP->maxiter = corrEqMaxiter/2;
+
+    printfQuda("\n");
 
     blas::zero(x);
-    cgWrapper(*cgPrec, corrEqTol, corrEqMaxiter, getVerbosity(), *solverParam, x, *r_tilde[0]);
+    cgWrapper(*cgPrec, corrEqTol, corrEqMaxiter, getVerbosity(), *solverParamPrec, x, *r_tilde[0]);
 
     // Local clean-up
     for (auto p : Qhat) { delete p; }
     host_free(resultDotProd);
   }
 
-  void JD::cgWrapper(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x, ColorSpinorField &b)
+  void JD::cgWrapper(CG &cgw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x, ColorSpinorField &b)
   {
 
     QudaVerbosity verbTmp = getVerbosity();
@@ -1665,7 +1674,7 @@ namespace quda
     slvrPrm.maxiter = maxiter;
 
     //cg(*Qhat[i], *qSpace[i]);
-    cg(x, b);
+    cgw(x, b);
 
     slvrPrm.tol = tol_buff;
     slvrPrm.maxiter = maxiter_buff;
