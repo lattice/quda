@@ -17,6 +17,7 @@ namespace quda {
   // Forward declarations for the JD eigensolver
   struct SolverParam;
   class CG;
+  class JD;
 
   // Forward declare: MG Transfer Class
   class Transfer;
@@ -1607,24 +1608,21 @@ public:
   class DiracPrecProjCorr : public DiracMatrix {
 
   public:
-    // FIXME: Params for DiracPrecProjCorr
     // Orthonormal set used in the projection of MMdag
     std::vector<ColorSpinorField*> projSpace;
     double theta;
-    TimeProfile *profileFromCaller_;
-    //DiracMatrix *K_;
     Eigen::MatrixXcd Mproj;
     std::vector<ColorSpinorField*> Qhat;
     SolverParam *solverParam_;
-    void (CG::*cgApplier)(ColorSpinorField&, ColorSpinorField&);
-    //CG *cg_;
+    CG *cg_;
     DiracMatrix *matUnconst_;
+    std::vector<ColorSpinorField*> y_hat;
+    JD *eigSlvr;
+    double tol;
+    int maxiter;
 
     DiracPrecProjCorr(const Dirac &d) : DiracMatrix(d) { }
     DiracPrecProjCorr(const Dirac *d) : DiracMatrix(d) { }
-
-    // TODO: put Pv as attribute of this class
-    // TODO: is K completely useless in this context? Due to CG::*cgApplier
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;
 

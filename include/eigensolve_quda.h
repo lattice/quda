@@ -371,9 +371,21 @@ protected:
     TimeProfile *profileCorrEqInvs;
     TimeProfile *profileMatCorrEqInvs;
 
+    double corrEqTol;
+    int    corrEqMaxiter;
+
+    SolverParam *solverParam;
+    CG *cgMat;
+    CG *cgPrec;
+    CG *cg;
+
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
     std::vector<ColorSpinorField *> X_tilde;
+    std::vector<ColorSpinorField *> r_tilde;
+
+    Dirac *d;
+    DiracPrecProjCorr *mmPP;
 
 public:
     const DiracMatrix &mat;
@@ -394,13 +406,23 @@ public:
 
     /**
        @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
-       @param[in] qSpace The projection vector space
        @param[in] theta Shift parameter
        @param[in] mat The original matrix to be inverted after shift-and-project
        @param[in] x Ouput spinor
        @param[in] b Input spinor
     */
-    void invertProjMat(std::vector<ColorSpinorField *> &qSpace, const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
+    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
+
+    /**
+       @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD
+       @param[in] cg Instance of the CG solver
+       @param[in] tol Tolerance of the solve
+       @param[in] maxiter Maximum allowed number of iterations for the solve
+       @param[in] verb Verbosity of the solve
+       @param[in] x Output spinor
+       @param[in] b Input spinor
+    */
+    void cgWrapper(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x, ColorSpinorField &b);
 
     /**
        @brief Destructor for JD Eigensolver class
