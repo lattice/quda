@@ -53,6 +53,8 @@ void display_test_info()
   } else {
     printfQuda(" - minimum size of subspace %d\n", eig_mmin);
     printfQuda(" - maximum size of subspace %d\n", eig_mmax);
+    printfQuda(" - tolerance for the correction equation %f\n", eig_corr_eq_tol);
+    printfQuda(" - maximum number of iterations for the correction equation %d\n", eig_corr_eq_maxiter);
   }
 
   printfQuda(" - solver tolerance %e\n", eig_tol);
@@ -256,6 +258,8 @@ void setEigParam(QudaEigParam &eig_param)
   } else {
     eig_param.mmin = eig_mmin;
     eig_param.mmax = eig_mmax;
+    eig_param.corr_eq_tol = eig_corr_eq_tol;
+    eig_param.corr_eq_maxiter = eig_corr_eq_maxiter;
   }
 
   eig_param.tol = eig_tol;

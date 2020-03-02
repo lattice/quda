@@ -277,6 +277,8 @@ extern int eig_nEv;
 extern int eig_nKr;
 extern int eig_mmin;
 extern int eig_mmax;
+extern int eig_corr_eq_maxiter;
+extern double eig_corr_eq_tol;
 extern int eig_nConv; // If unchanged, will be set to nEv
 extern int eig_batched_rotate; // If unchanged, will be set to maximum
 extern bool eig_require_convergence;

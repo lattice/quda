@@ -42,6 +42,8 @@ namespace quda
     } else {
       mmin = eig_param->mmin;
       mmax = eig_param->mmax;
+      corr_eq_tol = eig_param->corr_eq_tol;
+      corr_eq_maxiter = eig_param->corr_eq_maxiter;
     }
     nConv = eig_param->nConv;
     tol = eig_param->tol;
@@ -73,6 +75,7 @@ namespace quda
       if (mmin < nConv) errorQuda("nConv=%d is greater than mmin=%d\n", nConv, mmin);
       if (mmin == 0) errorQuda("mmin=0 passed to Eigensolver\n");
       if (mmax == 0) errorQuda("mmax=0 passed to Eigensolver\n");
+      if (corr_eq_maxiter == 0) errorQuda("corr_eq_maxiter=0 passed to Eigensolver\n");
     }
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
 
@@ -1309,8 +1312,8 @@ namespace quda
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    corrEqTol = 1e-3;
-    corrEqMaxiter = 5;
+    corrEqTol = eig_param->corr_eq_tol;
+    corrEqMaxiter = eig_param->corr_eq_maxiter;
 
     profileCorrEqInvs = new TimeProfile("profileCorrEqInvs");
     profileMatCorrEqInvs = new TimeProfile("profileMatCorrEqInvs");
@@ -1440,6 +1443,8 @@ namespace quda
       printfQuda("nConv %d\n", nConv);
       printfQuda("mmin %d\n", m_min);
       printfQuda("mmax %d\n", m_max);
+      printfQuda("corr-eq-maxiter %d\n", corrEqMaxiter);
+      printfQuda("corr-eq-tol %f\n", corrEqTol);
     }
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);

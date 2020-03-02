@@ -145,6 +145,8 @@ int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_mmin = 16;
 int eig_mmax = 32;
+double eig_corr_eq_tol = 1e-3;
+int eig_corr_eq_maxiter = 5;
 int eig_nConv = -1; // If unchanged, will be set to nEv
 int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
@@ -536,6 +538,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   opgroup->add_option("--eig-mmax", eig_mmax, "The maximum size of the subspace in Jacobi-Davidson");
   opgroup->add_option("--eig-mmin", eig_mmin, "The minimum size of the subspace in Jacobi-Davidson");
+  opgroup->add_option("--eig-corr-eq-tol", eig_corr_eq_tol, "Tolerance for the correction equation in Jacobi-Davidson");
+  opgroup->add_option("--eig-corr-eq-maxiter", eig_corr_eq_maxiter, "Maximum number of iterations for the correction equation in Jacobi-Davidson");
 
   opgroup->add_option("--eig-ARPACK-logfile", eig_arpack_logfile, "The filename storing the log from arpack");
   opgroup->add_option("--eig-QUDA-logfile", eig_QUDA_logfile,

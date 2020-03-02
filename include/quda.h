@@ -434,6 +434,10 @@ extern "C" {
     int mmin;
     /** Maximum size of the subspace when using Jacobi-Davidson **/
     int mmax;
+    /** Maximum number of iterations for the correction equation in JD **/
+    int corr_eq_maxiter;
+    /** TOlerance for the correction equation in JD **/
+    double corr_eq_tol;
     /** Max number of locked eigenpairs (deduced at runtime) **/
     int nLockedMax;
     /** Number of requested converged eigenvectors **/

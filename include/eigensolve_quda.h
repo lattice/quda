@@ -22,14 +22,16 @@ protected:
 
     // Problem parameters
     //------------------
-    int nEv;          /** Size of initial factorisation */
-    int nKr;          /** Size of Krylov space after extension */
-    int mmin;         /** Minimim size of subspace for Jacobi-Davidson */
-    int mmax;         /** Maximum size of subspace for Jacobi-Davidson */
-    int nConv;        /** Number of converged eigenvalues requested */
-    double tol;       /** Tolerance on eigenvalues */
-    bool reverse;     /** True if using polynomial acceleration */
-    char spectrum[3]; /** Part of the spectrum to be computed */
+    int nEv;              /** Size of initial factorisation */
+    int nKr;              /** Size of Krylov space after extension */
+    int mmin;             /** Minimim size of subspace for Jacobi-Davidson */
+    int mmax;             /** Maximum size of subspace for Jacobi-Davidson */
+    int corr_eq_maxiter;  /** Maximum number of iterations for the correction equation */
+    double corr_eq_tol;   /** Tolerance for the correction equation */
+    int nConv;            /** Number of converged eigenvalues requested */
+    double tol;           /** Tolerance on eigenvalues */
+    bool reverse;         /** True if using polynomial acceleration */
+    char spectrum[3];     /** Part of the spectrum to be computed */
 
     // Algorithm variables
     //--------------------
