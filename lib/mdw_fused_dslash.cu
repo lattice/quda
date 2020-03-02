@@ -482,7 +482,7 @@ namespace quda
       } // while
     }
 
-    template <class Arg> class FusedDslash : public TunableVectorYZ
+    template <class Arg> class FusedDslash : public Tunable
     {
 
     protected:
@@ -540,14 +540,13 @@ namespace quda
       bool tuneGridDim() const { return true; }
       bool tuneAuxDim() const { return true; }
       bool tuneSharedBytes() const { return true; }
-      unsigned int minThreads() const { return arg.volume_4d_cb; }
 
       int blockStep() const { return 16; }
       int blockMin() const { return 16; }
       unsigned int maxBlockSize(const TuneParam &param) const { return 32; }
 
       int gridStep() const { return deviceProp.multiProcessorCount; }
-      unsigned int maxGridSize() const { return 32 * deviceProp.multiProcessorCount; }
+      unsigned int maxGridSize() const { return (arg.volume_4d_cb_shift + blockMin() - 1) / blockMin(); }
       unsigned int minGridSize() const { return deviceProp.multiProcessorCount; }
 
       unsigned int sharedBytesPerBlock(const TuneParam &param) const
@@ -565,6 +564,8 @@ namespace quda
           return (a_size > b_size ? a_size : b_size) * sizeof(half) + 128;
         }
       }
+
+      unsigned int sharedBytesPerThread() const { return 0; }
 
       bool advanceAux(TuneParam &param) const
       {
@@ -588,7 +589,7 @@ namespace quda
       unsigned int maxSharedBytesPerBlock() const { return maxDynamicSharedBytesPerBlock(); }
 
     public:
-      FusedDslash(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+      FusedDslash(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta)
       {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
@@ -675,10 +676,9 @@ namespace quda
 
       void initTuneParam(TuneParam &param) const
       {
-        TunableVectorYZ::initTuneParam(param);
+        Tunable::initTuneParam(param);
         param.block = dim3(blockMin(), arg.Ls, 1); // Ls must be contained in the block
         param.grid = dim3(minGridSize(), 1, 1);
-        resizeStep(arg.Ls, 1); // this will disable tuning in the y dimension
         param.shared_bytes = sharedBytesPerBlock(param);
         param.aux.x = 0;
         param.aux.y = 1;
