@@ -359,6 +359,7 @@ namespace quda
         }
       }
 #else
+      constexpr int WMMA_K = 16;
       typedef
         typename nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, half, nvcuda::wmma::col_major>
           a_type;
