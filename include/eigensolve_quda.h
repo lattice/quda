@@ -415,7 +415,7 @@ public:
        @param[in] x Ouput spinor
        @param[in] b Input spinor
     */
-    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b);
+    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb);
 
     /**
        @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD

@@ -1367,11 +1367,10 @@ namespace quda
     }
 
     // Setting some parameters of the eigensolver
-    //int k=0, k_max=eig_param->nConv, m=0;
+    int k=0, k_max=eig_param->nConv, m=0;
     int m_max=eig_param->mmax, m_min=eig_param->mmin;
     // 'tau' is the <target> for the eigensolver
-    double theta=-0.5;
-    //double theta, mu, tau=0.0;
+    double theta=0.0, mu=0.0, tau=0.0;
     max_restarts = eig_param->max_restarts;
 
     // Test for an initial guess
@@ -1400,13 +1399,6 @@ namespace quda
     mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
     csParam.create = QUDA_COPY_FIELD_CREATE;
     t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
-
-    // TODO: remove !
-    RNG *rng = new RNG(*r[0], 4321);
-    rng->Init();
-    spinorNoise(*r[0], *rng, QUDA_NOISE_UNIFORM);
-    rng->Release();
-    delete rng;
 
     // Convergence and locking criteria
     double epsilon = DBL_EPSILON;
@@ -1454,29 +1446,260 @@ namespace quda
 
     //--------------------
 
-    // JD-SPECIFIC CODE GOES HERE !
+    // TODO: remove this line, after the overall use of <evals> if fixed
+    evals.resize(0);
 
-    printfQuda("\nWithin JD ! Testing the correction equation...\n");
+    // Create the vector subspaces used for the search of eigenpairs
+    std::vector<ColorSpinorField *> u, u_A, V, V_A;
+    // buffer spinors
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    u.push_back(ColorSpinorField::Create(csParam));
+    u_A.push_back(ColorSpinorField::Create(csParam));
 
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    for(int i=0; i<2; i++){
-      X_tilde.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
+    // Matrix with the compressed sub-space information to extract the eigenpairs
+    MatrixXcd H;
+    SelfAdjointEigenSolver<MatrixXcd> eigensolver;
+
+    // Main loop
+    while (restart_iter<max_restarts) {
+
+      // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
+      {
+        // double reorthogonalization
+        for(int i=0; i<m; i++){
+          Complex gamma = blas::cDotProduct(*V[i], *t[0]);
+          blas::caxpy(-gamma, *V[i], *t[0]);
+        }
+        // normalize before the next orthogonalization
+        norm = sqrt(blas::norm2(*t[0]));
+        blas::ax(1.0 / norm, *t[0]);
+        for(int i=0; i<m; i++){
+          Complex gamma = blas::cDotProduct(*V[i], *t[0]);
+          blas::caxpy(-gamma, *V[i], *t[0]);
+        }
+      }
+
+      m++;
+
+      // Push: V[m-1] = t, and then normalize it
+      csParam.create = QUDA_COPY_FIELD_CREATE;
+      V.push_back(ColorSpinorField::Create(*t[0], csParam));
+      norm = sqrt(blas::norm2(*V[m-1]));
+      blas::ax(1.0 / norm, *V[m-1]);
+      // and then apply A to that newly added vector
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+      V_A.push_back(ColorSpinorField::Create(csParam));
+      matVec(mat, *V_A[m-1], *V[m-1]);
+
+      // Construction of H = Vdag . V_A
+      H.conservativeResize(m,m);
+      for(int i=0; i<(m-1); i++){
+        H(i,m-1) = blas::cDotProduct(*V[i], *V_A[m-1]);
+        // TODO: is the next line necessary ?
+        H(m-1,i) = conj(H(i,m-1));
+      }
+      // this next line ensures the case m=1
+      H(m-1,m-1) = blas::cDotProduct(*V[m-1], *V_A[m-1]);
+
+      // ith eigenvalue: eigensolver.eigenvalues()[i], ith eigenvector: eigensolver.eigenvectors().col(i)
+      eigensolver.compute(H);
+
+      // Moving the eigenpairs to a vector of std::pair to sort by eigenvalue
+      // TODO: switch this whole treatment of eigenpairs to a (much) more efficient way ..
+      std::vector< std::pair < double, std::vector<Complex>* > > eigenpairs;
+      std::vector<Complex>* buffVec = 0;
+      for(int i=0; i<m; i++){
+        // TODO: switch to safe_malloc
+        buffVec = new std::vector<Complex>(eigensolver.eigenvectors().col(i).data(),
+                                           eigensolver.eigenvectors().col(i).data() + eigensolver.eigenvectors().col(i).size());
+        eigenpairs.push_back( std::make_pair( eigensolver.eigenvalues()[i], buffVec ) );
+      }
+      // Order the eigeninformation extracted from H in descending order of eigenvalues
+      // TODO: switch to using a sort-function, due to general values of <tau>. Descending
+      //       order is only applicable to the case tau=0 i.e. smallest eigenvalues
+      std::sort(eigenpairs.begin(), eigenpairs.end());
+
+      // Computing the residual
+      // u = V * s_1 -- lifting the first Ritz vector through V
+      blas::zero(*u[0]);
+      for( int i=0; i<m; i++ ){
+        blas::caxpy( (*(eigenpairs[0].second))[i], *V[i], *u[0] );
+      }
+      // and the same for u_A
+      blas::zero(*u_A[0]);
+      for( int i=0; i<m; i++ ){
+        blas::caxpy( (*(eigenpairs[0].second))[i], *V_A[i], *u_A[0] );
+      }
+      // and then compute the residual
+      theta = eigenpairs[0].first;
+      blas::copy(*r[0], *u_A[0]);
+      blas::caxpy(-theta, *u[0], *r[0]);
+
+      // Print the residual
+      norm = sqrt(blas::norm2(*r[0]));
+      //std::cout << "Norm of the residual = " << std::setprecision(15) << norm << std::endl;
+      //printfQuda("Iteration = %d, residual = %f, converged eigenpairs = %d\n", iter, norm, k);
+      //printfQuda("m = %d\n", m);
+
+      while(norm < eig_param->tol){
+
+        evals.push_back(eigenpairs[0].first);
+        csParam.create = QUDA_COPY_FIELD_CREATE;
+        X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
+        k++;
+
+        // Check for convergence
+        if (k >= nConv) {
+          //reorder(kSpace);
+          converged = true;
+          break;
+        }
+
+        //std::cout << "* just hit an eigenpair ! *" << " , k = " << k << ", k_max = " << k_max <<  std::endl;
+
+        // TODO: add a k-stopping criteria here
+
+        //m--;
+        //H = MatrixXcf::Zero(m,m);
+
+        // Shrinking the subspace
+        {
+          std::vector<ColorSpinorField*> tmpV, tmpAV;
+
+          MatrixXcd tmpH = MatrixXcd::Zero(m-1,m-1);
+
+          csParam.create = QUDA_ZERO_FIELD_CREATE;
+          // the new subspace is of size m-1
+          for(int i=0; i<(m-1); i++){
+            tmpV.push_back(ColorSpinorField::Create(csParam));
+            tmpAV.push_back(ColorSpinorField::Create(csParam));
+            // project-up with a subspace still of size m
+            for( int j=0; j<m; j++ ){
+              blas::caxpy( (*(eigenpairs[i+1].second))[j], *V[j], *tmpV[i] );
+              blas::caxpy( (*(eigenpairs[i+1].second))[j], *V_A[j], *tmpAV[i] );
+              tmpH(i,i) = eigenpairs[i+1].first;
+            }
+          }
+
+          // pop first element of eigenpairs
+          eigenpairs.erase(eigenpairs.begin());
+
+          for(int i=0; i<(m-1); i++){
+            for(int j=0; j<m; j++){
+             //eigensolver.eigenvectors().col(i)[j] = 0;
+             (*(eigenpairs[i].second))[j] = 0;
+            }
+            //eigensolver.eigenvectors().col(i)[i] = 1;
+            (*(eigenpairs[i].second))[i] = 1;
+          }
+
+          // Assign new values of H
+          // TODO: skip this resize() ?
+          H.resize(m-1,m-1);
+          H = tmpH;
+
+          // Assign new values of V and W
+          for (auto p : V){ delete p; }
+          for (auto p : V_A){ delete p; }
+          V = tmpV;
+          V_A = tmpAV;
+        }
+
+        m--;
+
+        *u[0] = *V[0];
+        *u_A[0] = *V_A[0];
+        // and then compute the residual
+        theta = eigenpairs[0].first;
+        // TODO: merge the following two lines into: r = u_A
+        blas::zero(*r[0]);
+        blas::caxpy(1.0, *u_A[0], *r[0]);
+        blas::caxpy(-theta, *u[0], *r[0]);
+
+        norm = sqrt(blas::norm2(*r[0]));
+        //std::cout << "Norm of the residual = " << std::setprecision(15) << norm << std::endl;
+
+        //std::cout << H << std::endl;
+        //exit(0);
+
+      }
+
+      // Check for convergence
+      if (k >= nConv) {
+        //reorder(kSpace);
+        //converged = true;
+        break;
+      }
+
+      // Restart: shrink the acceleration subspace
+      ///*
+      if(m >= m_max){
+        // TODO: change this section to a much more efficient way; mainly tmpV and tmpW ---> bring them to an outter scope
+
+        std::vector<ColorSpinorField*> tmpV, tmpAV;
+
+        MatrixXcd tmpH = MatrixXcd::Zero(m_min,m_min);
+
+        // 0-th element of the new (smaller) subspace
+        csParam.create = QUDA_COPY_FIELD_CREATE;
+        tmpV.push_back(ColorSpinorField::Create(*u[0], csParam));
+        tmpAV.push_back(ColorSpinorField::Create(*u_A[0], csParam));
+        tmpH(0,0) = eigenpairs[0].first;
+
+        csParam.create = QUDA_ZERO_FIELD_CREATE;
+        for(int i=1; i<m_min; i++){
+          tmpV.push_back(ColorSpinorField::Create(csParam));
+          tmpAV.push_back(ColorSpinorField::Create(csParam));
+          for( int j=0; j<m; j++ ){
+            blas::caxpy( (*(eigenpairs[i].second))[j], *V[j], *tmpV[i] );
+            blas::caxpy( (*(eigenpairs[i].second))[j], *V_A[j], *tmpAV[i] );
+            tmpH(i,i) = eigenpairs[i].first;
+          }
+        }
+
+        m = m_min;
+
+        // Assign new values of H
+        // TODO: skip this resize() ?
+        H.resize(m_min,m_min);
+        H = tmpH;
+
+        // Assign new values of V and W
+        for (auto p : V){ delete p; }
+        for (auto p : V_A){ delete p; }
+        V = tmpV;
+        V_A = tmpAV;
+
+        restart_iter++;
+
+        //printfQuda("RESTART (#%d)\n", restart_iter);
+      }
+      //*/
+
+      // Preparing for solving the correction equation
+      theta = eigenpairs[0].first;
+      X_tilde.push_back( u[0] );
+
+      invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT);
+
+      X_tilde.pop_back();
+
+      for (auto p : eigenpairs) { delete p.second; }
+
+      iter++;
+
     }
-
-    invertProjMat(theta, mat, *t[0], *r[0]);
-
-    for (auto p : X_tilde) { delete p; }
-
-    printfQuda("\n");
 
     //--------------------
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("kSpace size at convergence/max restarts = %d\n", (int)eigSpace.size());
+      printfQuda("eigSpace size at convergence/max restarts = %d\n", (int)eigSpace.size());
     // Prune the Krylov space back to size when passed to eigensolver
     //for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
+
+    // FIXME
     //kSpace.resize(nConv);
     //evals.resize(nConv);
 
@@ -1484,9 +1707,9 @@ namespace quda
     //---------------------------------------------------------------------------
     if (!converged) {
       if (eig_param->require_convergence) {
-        //errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
-        //          "restart steps. Exiting.",
-        //          nConv, m_min, m_min, max_restarts);
+        errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
+                  "restart steps. Exiting.",
+                  nConv, m_min, m_min, max_restarts);
       } else {
         warningQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                   "restart steps.",
@@ -1504,7 +1727,7 @@ namespace quda
       }
 
       // Compute eigenvalues
-      computeEvals(mat, eigSpace, evals);
+      computeEvals(mat, X_tilde, evals);
     }
 
     // Local clean-up
@@ -1512,6 +1735,11 @@ namespace quda
     delete t[0];
     delete r_tilde[0];
     delete mmPP->y_hat[0];
+    for (auto p : u) { delete p; }
+    for (auto p : u_A) { delete p; }
+    for (auto p : V) { delete p; }
+    for (auto p : V_A) { delete p; }
+    for (auto p : X_tilde) { delete p; }
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -1557,7 +1785,7 @@ namespace quda
   // JD Member functions
   //---------------------------------------------------------------------------
 
-  void JD::invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b)
+  void JD::invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb)
   {
     // TODO: correction equation pendings:
 
@@ -1589,7 +1817,7 @@ namespace quda
 
     for(int i=0; i<((int)qSpace.size()); i++){
       Qhat.push_back(ColorSpinorField::Create(*qSpace[i], csParam));
-      cgWrapper(*cg, corrEqTol, corrEqMaxiter, getVerbosity(), *solverParam, *Qhat[i], *qSpace[i]);
+      cgWrapper(*cg, corrEqTol, corrEqMaxiter, verb, *solverParam, *Qhat[i], *qSpace[i]);
     }
 
     // and, switching back the shift parameters
@@ -1620,7 +1848,7 @@ namespace quda
     // <r_tilde> is "r-hat" for a few of the upcoming lines
 
     blas::copy(*r_tilde[0], b);
-    cgWrapper(*cg, corrEqTol, corrEqMaxiter, getVerbosity(), *solverParam, *r_tilde[0], b);
+    cgWrapper(*cg, corrEqTol, corrEqMaxiter, verb, *solverParam, *r_tilde[0], b);
 
     // and, switching back the shift parameters
     matUnconst.shift = bareShift;
@@ -1649,13 +1877,13 @@ namespace quda
     mmPP->eigSlvr = this;
 
     // Test further for the best ratio for the following two parameters
-    mmPP->tol = corrEqTol*10.0;
-    mmPP->maxiter = corrEqMaxiter/2;
-
-    printfQuda("\n");
+    //mmPP->tol = corrEqTol*10.0;
+    //mmPP->maxiter = corrEqMaxiter/2;
+    mmPP->tol = corrEqTol;
+    mmPP->maxiter = corrEqMaxiter;
 
     blas::zero(x);
-    cgWrapper(*cgPrec, corrEqTol, corrEqMaxiter, getVerbosity(), *solverParamPrec, x, *r_tilde[0]);
+    cgWrapper(*cgPrec, corrEqTol, corrEqMaxiter, verb, *solverParamPrec, x, *r_tilde[0]);
 
     // Local clean-up
     for (auto p : Qhat) { delete p; }
@@ -1664,7 +1892,6 @@ namespace quda
 
   void JD::cgWrapper(CG &cgw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x, ColorSpinorField &b)
   {
-
     QudaVerbosity verbTmp = getVerbosity();
     setVerbosity(verb);
 
@@ -1673,14 +1900,12 @@ namespace quda
     int maxiter_buff = slvrPrm.maxiter;
     slvrPrm.maxiter = maxiter;
 
-    //cg(*Qhat[i], *qSpace[i]);
     cgw(x, b);
 
     slvrPrm.tol = tol_buff;
     slvrPrm.maxiter = maxiter_buff;
 
     setVerbosity(verbTmp);
-
   }
 
   // Projection matrix used in the solution of the correction equation
