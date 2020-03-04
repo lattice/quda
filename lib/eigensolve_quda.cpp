@@ -17,6 +17,8 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
+#include <chrono>  // for high_resolution_clock
+
 namespace quda
 {
 
@@ -1361,6 +1363,12 @@ namespace quda
 
   void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
   {
+
+    // TODO: general pendings:
+
+    //	1. remove informal profiling via chronos (remove the chronos' header as well)
+    //	2. switch from X_tilde to eigSpace
+
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -1408,7 +1416,7 @@ namespace quda
     t.push_back(ColorSpinorField::Create(*eigSpace[0], csParam));
 
     // Create the vector subspaces used for the search of eigenpairs
-    std::vector<ColorSpinorField *> u, u_A, V, V_A;
+    std::vector<ColorSpinorField *> u, u_A, V, V_A, X_tilde;
     // buffer spinors
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     u.push_back(ColorSpinorField::Create(csParam));
@@ -1478,6 +1486,26 @@ namespace quda
 
     // Main loop
     while (restart_iter<max_restarts) {
+
+      // Locking
+      {
+        int tmpSize = (int)X_tilde.size();
+
+        // double reorthogonalization
+        for (int i=0; i<tmpSize; i++) {
+          Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
+          blas::caxpy(-gamma, *X_tilde[i], *t[0]);
+        }
+
+        // normalize before the next orthogonalization
+        norm = sqrt(blas::norm2(*t[0]));
+        blas::ax(1.0 / norm, *t[0]);
+
+        //for (int i=0; i<tmpSize; i++) {
+        //  Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
+        //  blas::caxpy(-gamma, *X_tilde[i], *t[0]);
+        //}
+      }
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
       {
@@ -1554,6 +1582,12 @@ namespace quda
         printfQuda("Iteration = %d, m = %d, residual = %f, converged eigenpairs = %d\n", iter, m, norm, k);
       }
 
+      {
+        cudaDeviceSynchronize();
+
+        // Record start time
+        auto start = std::chrono::high_resolution_clock::now();
+
       while(norm < eig_param->tol){
         evals.push_back(eigenpairs[0].first);
         csParam.create = QUDA_COPY_FIELD_CREATE;
@@ -1574,13 +1608,12 @@ namespace quda
           // the new subspace is of size m-1
           for(int i=0; i<(m-1); i++){
             blas::zero(*tmpV[i]);
-            blas::zero(*tmpAV[i]);
             // project-up with a subspace still of size m
             for( int j=0; j<m; j++ ){
               blas::caxpy( (*(eigenpairs[i+1].second))[j], *V[j], *tmpV[i] );
-              blas::caxpy( (*(eigenpairs[i+1].second))[j], *V_A[j], *tmpAV[i] );
               tmpH(i,i) = eigenpairs[i+1].first;
             }
+            matVec(mat, *tmpAV[i], *tmpV[i]);
           }
 
           // pop first element of eigenpairs
@@ -1625,10 +1658,26 @@ namespace quda
         norm = sqrt(blas::norm2(*r[0]));
       }
 
+        cudaDeviceSynchronize();
+
+        // Record end time
+        auto finish = std::chrono::high_resolution_clock::now();
+
+
+        std::chrono::duration<double> elapsed = finish - start;
+        std::cout << "Elapsed time when hit eigenpair: " << elapsed.count() << " s\n";
+      }
+
       // Check for convergence
       if (k >= k_max) {
         break;
       }
+
+      {
+        cudaDeviceSynchronize();
+
+        // Record start time
+        auto start = std::chrono::high_resolution_clock::now();
 
       // Restart: shrink the acceleration subspace
       if(m == m_max){
@@ -1643,12 +1692,11 @@ namespace quda
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         for(int i=1; i<m_min; i++){
           blas::zero(*tmpV[i]);
-          blas::zero(*tmpAV[i]);
           for( int j=0; j<m; j++ ){
             blas::caxpy( (*(eigenpairs[i].second))[j], *V[j], *tmpV[i] );
-            blas::caxpy( (*(eigenpairs[i].second))[j], *V_A[j], *tmpAV[i] );
             tmpH(i,i) = eigenpairs[i].first;
           }
+          matVec(mat, *tmpAV[i], *tmpV[i]);
         }
 
         m = m_min;
@@ -1675,12 +1723,40 @@ namespace quda
         }
       }
 
+        cudaDeviceSynchronize();
+
+        // Record end time
+        auto finish = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double> elapsed = finish - start;
+        std::cout << "Elapsed time for shrinking search subspace: " << elapsed.count() << " s\n";
+      }
+
       // Preparing for solving the correction equation
       theta = eigenpairs[0].first;
       X_tilde.push_back( u[0] );
 
       blas::copy(*t[0], *r[0]);
-      invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1);
+      //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1);
+
+      {
+        cudaDeviceSynchronize();
+
+        // Record start time
+        auto start = std::chrono::high_resolution_clock::now();
+
+        //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1, X_tilde);
+        invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, 1, u);
+
+        cudaDeviceSynchronize();
+
+        // Record end time
+        auto finish = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double> elapsed = finish - start;
+        std::cout << "Elapsed time for correction equation: " << elapsed.count() << " s\n";
+      }
+
       //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, ( (k+1)>=1?1:k+1 ));
 
       X_tilde.pop_back();
@@ -1688,6 +1764,8 @@ namespace quda
       for (auto p : eigenpairs) { delete p.second; }
 
       iter++;
+
+      printfQuda("\n");
     }
 
     //--------------------
@@ -1791,16 +1869,17 @@ namespace quda
   // JD Member functions
   //---------------------------------------------------------------------------
 
-  void JD::invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k)
+  void JD::invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k, std::vector<ColorSpinorField*> &eigSpace)
   {
     // TODO: correction equation pendings:
 
-    //    (DONE)1. move Qhat as a JD attribute, and fully pre-allocate it at the beginning of JD::operator()
-    //		2. stop alloc / dealloc of resultDotProduct on each call of this method
-    //		3. avoid always creating and destroying Eigen objects ( both within this method as in the three
-    //		   forms of DiracPrecProjCorr::operator() )
+    //    (DONE) 1. move Qhat as a JD attribute, and fully pre-allocate it at the beginning of JD::operator()
+    //	     (?) 2. stop alloc / dealloc of resultDotProduct on each call of this method
+    //	     (?) 3. avoid always creating and destroying Eigen objects ( both within this method as in the three
+    //		    forms of DiracPrecProjCorr::operator() )
 
-    std::vector<ColorSpinorField *> &qSpace = X_tilde;
+    //std::vector<ColorSpinorField *> &qSpace = X_tilde;
+    std::vector<ColorSpinorField *> &qSpace = eigSpace;
 
     // Clone x's CSF params
     ColorSpinorParam csParam(x);
@@ -1822,9 +1901,8 @@ namespace quda
 
     for(int i=0; i<sizePS; i++){
       blas::copy(*Qhat[i], *qSpace[i]);
-      //cgWrapper(*cg, corrEqTol*100.0, corrEqMaxiter/3, verb, *solverParam, *Qhat[i], *qSpace[i]);
-      //cgWrapper(*cg, corrEqTol, corrEqMaxiter, verb, *solverParam, *Qhat[i], *qSpace[i]);
-      cgWrapper(*cg, 1e-1, 2, verb, *solverParam, *Qhat[i], *qSpace[i]);
+      //cgWrapper(*cg, corrEqTol*10.0, corrEqMaxiter, verb, *solverParam, *Qhat[i], *qSpace[i]);
+      cgWrapper(*cg, corrEqTol, corrEqMaxiter, verb, *solverParam, *Qhat[i], *qSpace[i]);
     }
 
     // and, switching back the shift parameters

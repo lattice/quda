@@ -388,7 +388,6 @@ protected:
 
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
-    std::vector<ColorSpinorField *> X_tilde;
     std::vector<ColorSpinorField *> r_tilde;
     std::vector<ColorSpinorField*> Qhat;
 
@@ -419,7 +418,7 @@ public:
        @param[in] x Ouput spinor
        @param[in] b Input spinor
     */
-    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k);
+    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k, std::vector<ColorSpinorField*> &eigSpace);
 
     /**
        @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD
