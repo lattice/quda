@@ -708,7 +708,7 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual bool hermitian() { return false; } /** CGNE is for any Hermitian system */
+    virtual bool hermitian() { return false; } /** CGNE is for any system */
   };
 
   class CGNR : public CG {
@@ -726,7 +726,7 @@ namespace quda {
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
-    virtual bool hermitian() { return false; } /** CGNR is for any Hermitian system */
+    virtual bool hermitian() { return false; } /** CGNR is for any system */
   };
 
   class MPCG : public Solver {
