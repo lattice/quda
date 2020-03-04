@@ -8,6 +8,9 @@
 namespace quda
 {
 
+  // Forward declarations for the JD eigensolver
+  class GCR;
+
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -380,13 +383,14 @@ protected:
     SolverParam *solverParamMat;
     SolverParam *solverParamPrec;
     CG *cgMat;
-    CG *cgPrec;
     CG *cg;
+    GCR *gcrPrec;
 
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
     std::vector<ColorSpinorField *> X_tilde;
     std::vector<ColorSpinorField *> r_tilde;
+    std::vector<ColorSpinorField*> Qhat;
 
     Dirac *d;
     DiracPrecProjCorr *mmPP;
@@ -415,7 +419,7 @@ public:
        @param[in] x Ouput spinor
        @param[in] b Input spinor
     */
-    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb);
+    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k);
 
     /**
        @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD

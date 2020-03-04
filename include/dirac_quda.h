@@ -1620,6 +1620,7 @@ public:
     JD *eigSlvr;
     double tol;
     int maxiter;
+    int k;
 
     DiracPrecProjCorr(const Dirac &d) : DiracMatrix(d) { }
     DiracPrecProjCorr(const Dirac *d) : DiracMatrix(d) { }
