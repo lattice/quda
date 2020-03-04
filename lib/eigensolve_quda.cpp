@@ -22,7 +22,8 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) :
+  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+    mat(mat),
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
@@ -103,10 +104,14 @@ namespace quda
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
-      eig_solver = new TRLM(eig_param, mat, profile);
+      eig_solver = new TRLM(mat, eig_param, profile);
       break;
     default: errorQuda("Invalid eig solver type");
     }
+
+    std::cout << mat.hermitian() << " " << eig_solver->hermitian() << std::endl;
+
+    if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
     return eig_solver;
   }
 
@@ -703,9 +708,8 @@ namespace quda
   //-----------------------------------------------------------------------------
 
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
-    EigenSolver(eig_param, profile),
-    mat(mat)
+  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+    EigenSolver(mat, eig_param, profile)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
