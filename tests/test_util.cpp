@@ -44,6 +44,18 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
+extern "C" {
+  /**
+     @brief Set the default ASAN options.  This ensures that QUDA just
+     works when SANITIZE is enabled without requiring ASAN_OPTIONS to
+     be set.
+   */
+  const char *__asan_default_options()
+  {
+    return "protect_shadow_gap=0";
+  }
+}
+
 /**
  * For MPI, the default node mapping is lexicographical with t varying fastest.
  */
