@@ -1025,6 +1025,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   // Full staggered
@@ -1108,6 +1110,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   /**
