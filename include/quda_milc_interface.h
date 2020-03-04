@@ -294,6 +294,37 @@ extern "C" {
 		  int* num_iters);
 
   /**
+   * Prepare a staggered/HISQ multigrid solve with given fat and
+   * long links. All fields passed are host (CPU) fields
+   * in MILC order. This function requires persistent gauge fields.
+   * This interface is experimental.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata; required for tadpole, naik coeff
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param mg_param_file Path to an input text file describing the MG solve, to be documented on QUDA wiki
+   * @return Void pointer mapping to multigrid structure created by `newMultigridQuda` in `interface_quda.cpp`
+   */
+  void* qudaSetupMultigrid(int external_precision,
+      int quda_precision,
+      double mass,
+      QudaInvertArgs_t inv_args,
+      const void* const milc_fatlink,
+      const void* const milc_longlink,
+      const char* const mg_param_file);
+
+  /**
+   * Clean up a staggered/HISQ multigrid object, freeing all internal
+   * fields and otherwise allocated memory.
+   *
+   * @param mg_preconditioner Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
+   */
+  void qudaCleanupMultigrid(void* mg_preconditioner);
+
+  /**
    * Solve Ax=b for an improved staggered operator with many right hand sides. 
    * All fields are fields passed and returned are host (CPU) field in MILC order.
    * This function requires that persistent gauge and clover fields have
