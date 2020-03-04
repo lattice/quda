@@ -109,8 +109,6 @@ namespace quda
     default: errorQuda("Invalid eig solver type");
     }
 
-    std::cout << mat.hermitian() << " " << eig_solver->hermitian() << std::endl;
-
     if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
     return eig_solver;
   }
