@@ -52,9 +52,8 @@ namespace quda
      @param[in] Checkerboard space-time index
      @param[in] Parity we are acting on
   */
-  template <KernelType type, typename Arg> __host__ __device__ inline bool isComplete(const Arg &arg, int coord[])
+  template <KernelType type, typename Arg, typename Coord> __host__ __device__ inline bool isComplete(const Arg &arg, const Coord &coord)
   {
-
     int incomplete = 0; // Have all 8 contributions been computed for this site?
 
     switch (type) {                                      // intentional fall-through
@@ -85,28 +84,28 @@ namespace quda
      @return checkerboard space-time index
   */
   template <QudaPCType pc_type, KernelType kernel_type, typename Arg, int nface_ = 1>
-  __host__ __device__ inline int getCoords(int coord[], const Arg &arg, int &idx, int parity, int &dim)
+  __host__ __device__ inline auto getCoords(const Arg &arg, int &idx, int s, int parity, int &dim)
   {
     constexpr auto nDim = Arg::nDim;
-    int x_cb, X;
+    Coord<nDim> coord;
     dim = kernel_type; // keep compiler happy
 
     // only for 5-d checkerboarding where we need to include the fifth dimension
     const int Ls = (nDim == 5 && pc_type == QUDA_5D_PC ? (int)arg.dim[4] : 1);
 
     if (kernel_type == INTERIOR_KERNEL) {
-      x_cb = idx;
+      coord.x_cb = idx;
       if (nDim == 5)
-        getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
+        coord.X = getCoords5CB(coord, idx, arg.dim, arg.X0h, parity, pc_type);
       else
-        getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
+        coord.X = getCoordsCB(coord, idx, arg.dim, arg.X0h, parity);
     } else if (kernel_type != EXTERIOR_KERNEL_ALL) {
 
       // compute face index and then compute coords
       const int face_size = nface_ * arg.dc.ghostFaceCB[kernel_type] * Ls;
       const int face_num = idx >= face_size;
       idx -= face_num * face_size;
-      coordsFromFaceIndex<nDim, pc_type, kernel_type, nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+      coordsFromFaceIndex<nDim, pc_type, kernel_type, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
 
     } else { // fused kernel
 
@@ -116,32 +115,32 @@ namespace quda
         const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 0, nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 0, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[1] * Ls) { // y face
         dim = 1;
         idx -= arg.threadDimMapLower[1] * Ls;
         const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 1, nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 1, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else if (idx < arg.threadDimMapUpper[2] * Ls) { // z face
         dim = 2;
         idx -= arg.threadDimMapLower[2] * Ls;
         const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 2, nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 2, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       } else { // t face
         dim = 3;
         idx -= arg.threadDimMapLower[3] * Ls;
         const int face_size = nface_ * arg.dc.ghostFaceCB[dim] * Ls;
         const int face_num = idx >= face_size;
         idx -= face_num * face_size;
-        coordsFromFaceIndex<nDim, pc_type, 3, nface_>(X, x_cb, coord, idx, face_num, parity, arg);
+        coordsFromFaceIndex<nDim, pc_type, 3, nface_>(coord.X, coord.x_cb, coord, idx, face_num, parity, arg);
       }
     }
-
-    return x_cb;
+    coord.s = s;
+    return coord;
   }
 
   /**
@@ -152,7 +151,7 @@ namespace quda
      @param[in] Arg Dslash argument struct
      @return True if in boundary, else false
   */
-  template <int dim, typename Arg> inline __host__ __device__ bool inBoundary(const int coord[], const Arg &arg)
+  template <int dim, typename Coord, typename Arg> inline __host__ __device__ bool inBoundary(const Coord &coord, const Arg &arg)
   {
     return ((coord[dim] >= arg.dim[dim] - arg.nFace) || (coord[dim] < arg.nFace));
   }
@@ -184,8 +183,8 @@ namespace quda
      @param[in] X Lattice dimensions
      @return true if this thread is active
   */
-  template <KernelType kernel_type, typename Arg>
-  inline __device__ bool isActive(bool &active, int threadDim, int offsetDim, const int coord[], const Arg &arg)
+  template <KernelType kernel_type, typename Coord, typename Arg>
+  inline __device__ bool isActive(bool &active, int threadDim, int offsetDim, const Coord &coord, const Arg &arg)
   {
     // Threads with threadDim = t can handle t,z,y,x offsets
     // Threads with threadDim = z can handle z,y,x offsets

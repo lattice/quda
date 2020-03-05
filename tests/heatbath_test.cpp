@@ -131,8 +131,7 @@ int main(int argc, char **argv)
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
-    gParam.order       = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
@@ -187,8 +186,7 @@ int main(int argc, char **argv)
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
@@ -215,8 +213,7 @@ int main(int argc, char **argv)
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
@@ -226,7 +223,6 @@ int main(int argc, char **argv)
     freeGaugeQuda();
 
     for(int step=1; step<=nsteps; ++step){
-      printfQuda("Step %d\n", step);
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...

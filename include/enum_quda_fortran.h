@@ -44,16 +44,18 @@
 #define QudaGaugeFieldOrder integer(4)
 #define QUDA_FLOAT_GAUGE_ORDER 1
 #define QUDA_FLOAT2_GAUGE_ORDER 2 //no reconstruct and double precision
-#define QUDA_FLOAT4_GAUGE_ORDER 4 //8 and 12 reconstruct half and single
-#define QUDA_NATIVE_GAUGE_ORDER 5 // used to denote one of the above types in a trait, not used directly
-#define QUDA_QDP_GAUGE_ORDER 6    // expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_QDPJIT_GAUGE_ORDER 7 // expect *gauge[4] even-odd spacetime row-column color
-#define QUDA_CPS_WILSON_GAUGE_ORDER 8 // expect *gauge even-odd spacetime column-row color
-#define QUDA_MILC_GAUGE_ORDER 9       // expect *gauge even-odd mu spacetime row-column order
-#define QUDA_MILC_SITE_GAUGE_ORDER 10 // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
-#define QUDA_BQCD_GAUGE_ORDER 11 // expect *gauge mu even-odd spacetime+halos row-column order
-#define QUDA_TIFR_GAUGE_ORDER 12
-#define QUDA_TIFR_PADDED_GAUGE_ORDER 13
+#define QUDA_FLOAT4_GAUGE_ORDER 4 // 8 reconstruct single, and 12 reconstruct single, half, quarter
+#define QUDA_FLOAT8_GAUGE_ORDER 8 // 8 reconstruct half and quarter
+#define QUDA_NATIVE_GAUGE_ORDER 9 // used to denote one of the above types in a trait, not used directly
+#define QUDA_QDP_GAUGE_ORDER 10   // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_QDPJIT_GAUGE_ORDER 11     // expect *gauge[4] even-odd spacetime row-column color
+#define QUDA_CPS_WILSON_GAUGE_ORDER 12 // expect *gauge even-odd spacetime column-row color
+#define QUDA_MILC_GAUGE_ORDER 13       // expect *gauge even-odd mu spacetime row-column order
+#define QUDA_MILC_SITE_GAUGE_ORDER                                                                                     \
+  14                             // packed into MILC site AoS [even-odd][spacetime] array, and [dir][row][col] inside
+#define QUDA_BQCD_GAUGE_ORDER 15 // expect *gauge mu even-odd spacetime+halos row-column order
+#define QUDA_TIFR_GAUGE_ORDER 16
+#define QUDA_TIFR_PADDED_GAUGE_ORDER 17
 #define QUDA_INVALID_GAUGE_ORDER QUDA_INVALID_ENUM
 
 #define QudaTboundary integer(4)
@@ -317,11 +319,12 @@
 #define QUDA_FLOAT_FIELD_ORDER 1 // spin-color-complex-space
 #define QUDA_FLOAT2_FIELD_ORDER 2 // (spin-color-complex)/2-space-(spin-color-complex)%2
 #define QUDA_FLOAT4_FIELD_ORDER 4 // (spin-color-complex)/4-space-(spin-color-complex)%4
-#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 5 // CPS/QDP++ ordering
-#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 6 // QLA ordering (spin inside color)
-#define QUDA_QDPJIT_FIELD_ORDER 7 // QDP field ordering (complex-color-spin-spacetime)
-#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 8 // QOP domain-wall ordering
-#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 9 // TIFR RHMC ordering
+#define QUDA_FLOAT8_FIELD_ORDER 8 // (spin-color-complex)/8-space-(spin-color-complex)%8
+#define QUDA_SPACE_SPIN_COLOR_FIELD_ORDER 9         // CPS/QDP++ ordering
+#define QUDA_SPACE_COLOR_SPIN_FIELD_ORDER 10        // QLA ordering (spin inside color)
+#define QUDA_QDPJIT_FIELD_ORDER 11                  // QDP field ordering (complex-color-spin-spacetime)
+#define QUDA_QOP_DOMAIN_WALL_FIELD_ORDER 12         // QOP domain-wall ordering
+#define QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER 13 // TIFR RHMC ordering
 #define QUDA_INVALID_FIELD_ORDER QUDA_INVALID_ENUM
   
 #define QudaFieldCreate integer(4)

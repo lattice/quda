@@ -40,7 +40,7 @@ namespace quda {
 
   CG::~CG()
   {
-    profile.TPSTART(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_FREE);
     if ( init ) {
       for (auto pi : p) if (pi) delete pi;
       if (rp) delete rp;
@@ -61,7 +61,7 @@ namespace quda {
 
       destroyDeflationSpace();
     }
-    profile.TPSTOP(QUDA_PROFILE_FREE);
+    if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
   CGNE::CGNE(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
@@ -239,14 +239,14 @@ namespace quda {
     // whether to select alternative reliable updates
     bool alternative_reliable = param.use_alternative_reliable;
 
-    profile.TPSTART(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Check to see that we're not trying to invert on a zero-field source
     double b2 = blas::norm2(b);
 
     // Check to see that we're not trying to invert on a zero-field source
     if (b2 == 0 && param.compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_NO) {
-      profile.TPSTOP(QUDA_PROFILE_INIT);
+      if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
       printfQuda("Warning: inverting on zero-field source\n");
       x = b;
       param.true_res = 0.0;
@@ -292,9 +292,9 @@ namespace quda {
       constructDeflationSpace(b, matPrecon);
       if (deflate_compute) {
         // compute the deflation space.
-        profile.TPSTOP(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_INIT);
         (*eig_solve)(evecs, evals);
-        profile.TPSTART(QUDA_PROFILE_INIT);
+        if (!param.is_preconditioner) profile.TPSTART(QUDA_PROFILE_INIT);
         deflate_compute = false;
       }
       if (recompute_evals) {
@@ -403,8 +403,10 @@ namespace quda {
       (param.residual_type & QUDA_HEAVY_QUARK_RESIDUAL) ? true : false;
     bool heavy_quark_restart = false;
 
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_INIT);
+      profile.TPSTART(QUDA_PROFILE_PREAMBLE);
+    }
 
     double stop = stopping(param.tol, b2, param.residual_type);  // stopping condition of solver
 
@@ -449,9 +451,11 @@ namespace quda {
     bool L2breakdown = false;
     const double L2breakdown_eps = 100. * uhigh;
 
-    profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
-    profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    blas::flops = 0;
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_PREAMBLE);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      blas::flops = 0;
+    }
 
     int k = 0;
     int j = 0;
@@ -746,16 +750,17 @@ namespace quda {
     blas::copy(x, xSloppy);
     blas::xpy(y, x);
 
-    profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-    profile.TPSTART(QUDA_PROFILE_EPILOGUE);
+    if (!param.is_preconditioner) {
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
-    param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
-    param.gflops = gflops;
-    param.iter += k;
+      param.secs = profile.Last(QUDA_PROFILE_COMPUTE);
+      double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops()) * 1e-9;
+      param.gflops = gflops;
+      param.iter += k;
 
-    if (k == param.maxiter)
-      warningQuda("Exceeded maximum iterations %d", param.maxiter);
+      if (k == param.maxiter) warningQuda("Exceeded maximum iterations %d", param.maxiter);
+    }
 
     if (getVerbosity() >= QUDA_VERBOSE)
       printfQuda("CG: Reliable updates = %d\n", rUpdate);
@@ -769,15 +774,15 @@ namespace quda {
 
     PrintSummary("CG", k, r2, b2, stop, param.tol_hq);
 
-    // reset the flops counters
-    blas::flops = 0;
-    mat.flops();
-    matSloppy.flops();
-    matPrecon.flops();
+    if (!param.is_preconditioner) {
+      // reset the flops counters
+      blas::flops = 0;
+      mat.flops();
+      matSloppy.flops();
+      matPrecon.flops();
 
-    profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
-
-    return;
+      profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
+    }
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
