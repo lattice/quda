@@ -6,7 +6,7 @@
 #include "misc.h"
  #include <assert.h>
 #include "util_quda.h"
-#include <test_util.h>
+#include <host_utils.h>
 
 
 #define stSpinorSiteSize 6
@@ -67,12 +67,12 @@ void display_link(void* link, int len, int precision)
     if (precision == QUDA_DOUBLE_PRECISION){
 	double* mylink = (double*)link;
 	for (i = 0;i < len; i++){
-	    display_link_internal(mylink + gauge_site_size*i);
+	    display_link_internal(mylink + gaugeSiteSize*i);
 	}
     }else if (precision == QUDA_SINGLE_PRECISION){
 	float* mylink = (float*)link;
 	for (i=0;i < len ;i++){
-	    display_link_internal(mylink + gauge_site_size*i);
+	    display_link_internal(mylink + gaugeSiteSize*i);
 	}
     }
     return;
@@ -473,21 +473,21 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 	double* mylink = (double*)link;
 	//even
 	for (i = 0;i < len/2; i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    rc = link_sanity_check_internal_12(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 0);
 	    if (rc != 0){
 		printf("ERROR: even link sanity check failed, i=%d\n",i);
-		display_link_internal(mylink+gauge_site_size*i);
+		display_link_internal(mylink+gaugeSiteSize*i);
 		exit(1);
 	    }
 	}
 	
-	mylink = mylink + gauge_site_size*len/2;
+	mylink = mylink + gaugeSiteSize*len/2;
 	//odd
 	for (i = 0;i < len/2; i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
+	    rc = link_sanity_check_internal_12(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 1);
 	    if (rc != 0){
 		printf("ERROR: odd link sanity check failed, i=%d\n",i);
-		display_link_internal(mylink+gauge_site_size*i);
+		display_link_internal(mylink+gaugeSiteSize*i);
 		exit(1);
 	    }
 	}	
@@ -497,13 +497,13 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 
 	//even
 	for (i=0;i < len/2 ;i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    rc = link_sanity_check_internal_12(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 0);
 	    if (rc != 0){
 		printf("ERROR: even link sanity check 12 failed, i=%d\n",i);
 		exit(1);
 	    }
 	    /*
-	    rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    rc = link_sanity_check_internal_8(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 0);
 	    if (rc != 0){
 		printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
 		exit(1);
@@ -511,16 +511,16 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 	    */
 	    
 	}
-	mylink = mylink + gauge_site_size*len/2;
+	mylink = mylink + gaugeSiteSize*len/2;
 	//odd
 	for (i=0;i < len/2 ;i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
+	    rc = link_sanity_check_internal_12(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 1);
 	    if (rc != 0){
 		printf("ERROR: odd link sanity check 12 failed, i=%d\n", i);
 		exit(1);
 	    }	
 	    /*
-	    rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    rc = link_sanity_check_internal_8(mylink + gaugeSiteSize*i, dir, i, gaugeParam, 0);
 	    if (rc != 0){
 		printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
 		exit(1);
@@ -548,23 +548,23 @@ site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gauge
 	//even	
 	for (i = 0;i < len/2; i++){
 	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
+		rc = site_link_sanity_check_internal_12(mylink + gaugeSiteSize*(4*i+dir), dir, i, gaugeParam, 0);
 		if (rc != 0){
 		    printf("ERROR: even link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
-		    display_link_internal(mylink+gauge_site_size*i);
+		    display_link_internal(mylink+gaugeSiteSize*i);
 		    exit(1);
 		}
 	    }
 	}
 	
-	mylink = mylink + 4*gauge_site_size*len/2;
+	mylink = mylink + 4*gaugeSiteSize*len/2;
 	//odd
 	for (i = 0;i < len/2; i++){
 	    for(dir=XUP;dir <= TUP; dir++){	    
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
+		rc = site_link_sanity_check_internal_12(mylink + gaugeSiteSize*(4*i+dir), dir, i, gaugeParam, 1);
 		if (rc != 0){
 		    printf("ERROR: odd link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
-		    display_link_internal(mylink+gauge_site_size*i);
+		    display_link_internal(mylink+gaugeSiteSize*i);
 		    exit(1);
 		}
 	    }
@@ -576,18 +576,18 @@ site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gauge
 	//even
 	for (i=0;i < len/2 ;i++){
 	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
+		rc = site_link_sanity_check_internal_12(mylink + gaugeSiteSize*(4*i+dir), dir, i, gaugeParam, 0);
 		if (rc != 0){
 		    printf("ERROR: even link sanity check 12 failed, i=%d, function %s\n",i, __FUNCTION__);
 		    exit(1);
 		}
 	    }
 	}
-	mylink = mylink + 4*gauge_site_size*len/2;
+	mylink = mylink + 4*gaugeSiteSize*len/2;
 	//odd
 	for (i=0;i < len/2 ;i++){
 	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
+		rc = site_link_sanity_check_internal_12(mylink + gaugeSiteSize*(4*i+dir), dir, i, gaugeParam, 1);
 		if (rc != 0){
 		    printf("ERROR: odd link sanity check 12 failed, i=%d, function %s\n", i, __FUNCTION__);
 		    exit(1);

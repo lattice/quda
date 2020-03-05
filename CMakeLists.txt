@@ -945,5 +945,7 @@ endif()
 # add tests, programs, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(utils)
+add_subdirectory(host_reference)
 add_subdirectory(programs)
 add_subdirectory(doc)

@@ -3,21 +3,19 @@
 #include <math.h>
 #include <string.h>
 
-#include <test_util.h>
+#include <host_utils.h>
+#include <misc.h>
+#include <blas_reference.h>
+#include <dslash_util.h>
+
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>
 #include <covdev_reference.h>
-#include "misc.h"
 #include <blas_quda.h>
-
-#include <blas_reference.h>
 
 extern void *memset(void *s, int c, size_t n);
 
-#include <dslash_util.h>
-
-//
 // covdevReference()
 //
 // if oddBit is zero: calculate even parity spinor elements (using odd parity spinor) 
@@ -46,19 +44,19 @@ template <typename sFloat, typename gFloat>
 void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField, 
 		     int oddBit, int daggerBit, int mu) 
 {
-  for (int i=0; i<Vh*my_spinor_site_size; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
   
   gFloat *linkEven[4], *linkOdd[4];
   
   for (int dir = 0; dir < 4; dir++) {  
     linkEven[dir] = link[dir];
-    linkOdd[dir] = link[dir] + Vh*gauge_site_size;
+    linkOdd[dir] = link[dir] + Vh*gaugeSiteSize;
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = my_spinor_site_size*sid;
+    int offset = mySpinorSiteSize*sid;
 
-    sFloat gaugedSpinor[my_spinor_site_size];
+    sFloat gaugedSpinor[mySpinorSiteSize];
 
     gFloat *lnk    = gaugeLink(sid, mu, oddBit, linkEven, linkOdd, 1);
     sFloat *spinor = spinorNeighbor(sid, mu, oddBit, spinorField, 1);
@@ -71,7 +69,7 @@ void covdevReference(sFloat *res, gFloat **link, sFloat *spinorField,
         su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
     }
 
-    sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
   } // 4-d volume
 }
 
@@ -99,9 +97,9 @@ template <typename sFloat, typename gFloat>
 void Mat(sFloat *out, gFloat **link, sFloat *in, int daggerBit, int mu) 
 {
   sFloat *inEven = in;
-  sFloat *inOdd  = in + Vh*my_spinor_site_size;
+  sFloat *inOdd  = in + Vh*mySpinorSiteSize;
   sFloat *outEven = out;
-  sFloat *outOdd = out + Vh*my_spinor_site_size;
+  sFloat *outOdd = out + Vh*mySpinorSiteSize;
     
   // full dslash operator
   covdevReference(outOdd,  link, inEven, 1, daggerBit, mu);
@@ -184,26 +182,26 @@ template <typename sFloat, typename gFloat>
 void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFloat *spinorField,
                             sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit, int mu)
 {
-  for (int i=0; i<Vh*my_spinor_site_size; i++) res[i] = 0.0;
+  for (int i=0; i<Vh*mySpinorSiteSize; i++) res[i] = 0.0;
 
   gFloat *linkEven[4], *linkOdd[4];
   gFloat *ghostLinkEven[4], *ghostLinkOdd[4];
 
   for (int dir = 0; dir < 4; dir++) {
     linkEven[dir] = link[dir];
-    linkOdd[dir]  = link[dir] + Vh*gauge_site_size;
+    linkOdd[dir]  = link[dir] + Vh*gaugeSiteSize;
     
     ghostLinkEven[dir] = ghostLink[dir];
-    ghostLinkOdd[dir]  = ghostLink[dir] + (faceVolume[dir]/2)*gauge_site_size;
+    ghostLinkOdd[dir]  = ghostLink[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
   }
 
   for (int sid = 0; sid < Vh; sid++) {
-    int offset = my_spinor_site_size*sid;
+    int offset = mySpinorSiteSize*sid;
 
     gFloat *lnk    = gaugeLink_mg4dir(sid, mu, oddBit, linkEven, linkOdd, ghostLinkEven, ghostLinkOdd, 1, 1);
     sFloat *spinor = spinorNeighbor_mg4dir(sid, mu, oddBit, spinorField, fwd_nbr_spinor, back_nbr_spinor, 1, 1);
 
-    sFloat gaugedSpinor[my_spinor_site_size];
+    sFloat gaugedSpinor[mySpinorSiteSize];
 
     if (daggerBit) {
       for (int s = 0; s < 4; s++)
@@ -212,7 +210,7 @@ void covdevReference_mg4dir(sFloat *res, gFloat **link, gFloat **ghostLink, sFlo
       for (int s = 0; s < 4; s++)
         su3Mul (&gaugedSpinor[s*6], lnk, &spinor[s*6]);
     }
-    sum(&res[offset], &res[offset], gaugedSpinor, my_spinor_site_size);
+    sum(&res[offset], &res[offset], gaugedSpinor, mySpinorSiteSize);
   } // 4-d volume
 }
 

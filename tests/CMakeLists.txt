@@ -1,9 +1,7 @@
-include_directories(. googletest/include googletest)
-
-# enable_language(Fortran)
+include_directories(. googletest/include googletest ../utils ../host_reference)
 
 # enable tests build a common library for all test utilities
-set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp test_params.cpp misc.cpp face_gauge.cpp)
+set(QUDA_TEST_COMMON googletest/src/gtest-all.cc)
 cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
   add_dependencies(quda_test QMP)
@@ -22,7 +20,7 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
-set(TEST_LIBS quda quda_test)
+set(TEST_LIBS quda quda_test quda_reference quda_utils)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(NOT ${qudabuildtests})
@@ -57,28 +55,24 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL)
-  cuda_add_executable(dslash_test dslash_test.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
-                      clover_reference.cpp blas_reference.cpp)
-  cuda_add_executable(dslash_ctest dslash_ctest.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
-                      clover_reference.cpp blas_reference.cpp)
+  cuda_add_executable(dslash_test dslash_test.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
-  target_link_libraries(dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(dslash_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(dslash_ctest dslash_ctest.cpp)
+  target_link_libraries(dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(dslash_ctest QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(invert_test invert_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
-                      clover_reference.cpp blas_reference.cpp)
+  cuda_add_executable(invert_test invert_test.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   quda_checkbuildtest(invert_test QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(eigensolve_test eigensolve_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
-                      clover_reference.cpp blas_reference.cpp)
+  cuda_add_executable(eigensolve_test eigensolve_test.cpp)
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
 
   if(QUDA_BLOCKSOLVER)
-    cuda_add_executable(invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp domain_wall_dslash_reference.cpp
-                        blas_reference.cpp)
+    cuda_add_executable(invertmsrc_test invertmsrc_test.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
@@ -90,40 +84,36 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
-  cuda_add_executable(deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp
-                      domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(deflated_invert_test deflated_invert_test.cpp)
   target_link_libraries(deflated_invert_test ${TEST_LIBS})
   quda_checkbuildtest(deflated_invert_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp
-                      llfat_reference.cpp)
+  cuda_add_executable(staggered_dslash_test staggered_dslash_test.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
-  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp
-                      blas_reference.cpp llfat_reference.cpp)
-  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
+
+  cuda_add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp)
+  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp
-                      llfat_reference.cpp)
+  cuda_add_executable(staggered_invert_test staggered_invert_test.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_invert_test QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(staggered_eigensolve_test staggered_eigensolve_test.cpp staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
+  cuda_add_executable(staggered_eigensolve_test staggered_eigensolve_test.cpp)
   target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
 
   if(QUDA_BLOCKSOLVER)
-    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp
-                        blas_reference.cpp)
+    cuda_add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
     target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
   endif()
 
   if(QUDA_MULTIGRID)
-    cuda_add_executable(staggered_multigrid_invert_test staggered_multigrid_invert_test.cpp staggered_dslash_reference.cpp staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
+    cuda_add_executable(staggered_multigrid_invert_test staggered_multigrid_invert_test.cpp)
     target_link_libraries(staggered_multigrid_invert_test ${TEST_LIBS})
     QUDA_CHECKBUILDTEST(staggered_multigrid_invert_test QUDA_BUILD_ALL_TESTS)
   endif()
@@ -136,8 +126,7 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
 endif()
   
 if(QUDA_MULTIGRID)
-  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
-                      domain_wall_dslash_reference.cpp blas_reference.cpp)
+  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_invert_test QUDA_BUILD_ALL_TESTS)
 
@@ -146,8 +135,7 @@ if(QUDA_MULTIGRID)
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
 
   if(${QUDA_GAUGE_ALG})
-    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
-                        domain_wall_dslash_reference.cpp blas_reference.cpp)
+    cuda_add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
     target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
     quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
   endif()
@@ -167,7 +155,7 @@ target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
 
 if(QUDA_COVDEV)
-  cuda_add_executable(covdev_test covdev_test.cpp covdev_reference.cpp)
+  cuda_add_executable(covdev_test covdev_test.cpp)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
 endif()
@@ -179,7 +167,7 @@ if(QUDA_CONTRACT)
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  cuda_add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
+  cuda_add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
   quda_checkbuildtest(llfat_test QUDA_BUILD_ALL_TESTS)
 
@@ -187,13 +175,13 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   quda_checkbuildtest(unitarize_link_test QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(hisq_stencil_test hisq_stencil_test.cpp llfat_reference.cpp)
+  cuda_add_executable(hisq_stencil_test hisq_stencil_test.cpp)
   target_link_libraries(hisq_stencil_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  cuda_add_executable(gauge_force_test gauge_force_test.cpp gauge_force_reference.cpp)
+  cuda_add_executable(gauge_force_test gauge_force_test.cpp)
   target_link_libraries(gauge_force_test ${TEST_LIBS})
   quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
 endif()
@@ -209,12 +197,11 @@ if(QUDA_GAUGE_ALG)
 endif()
 
 if(QUDA_FORCE_HISQ)
-  cuda_add_executable(hisq_paths_force_test hisq_paths_force_test.cpp hisq_force_reference.cpp
-                      hisq_force_reference2.cpp)
+  cuda_add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
 
-  cuda_add_executable(hisq_unitarize_force_test hisq_unitarize_force_test.cpp hisq_force_reference.cpp)
+  cuda_add_executable(hisq_unitarize_force_test hisq_unitarize_force_test.cpp)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
 endif()

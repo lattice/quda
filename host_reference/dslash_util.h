@@ -1,7 +1,7 @@
 #ifndef _DSLASH_UTIL_H
 #define _DSLASH_UTIL_H
 
-#include <test_util.h>
+#include <host_utils.h>
 #include <comm_quda.h>
 
 template <typename Float>
@@ -140,7 +140,7 @@ static inline Float *spinorNeighbor(int i, int dir, int oddBit, Float *spinorFie
   default: j = -1; break;
   }
     
-  return &spinorField[j*(my_spinor_site_size)];
+  return &spinorField[j*(mySpinorSiteSize)];
 }
 
 
@@ -310,7 +310,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x1 = (x1 + nb)% X1;
       if(x1+nb >=X1 && comm_dim_partitioned(0) ){
         int offset = ( x1 + nb -X1)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
-        return fwd_nbr_spinor[0] + offset*my_spinor_site_size;
+        return fwd_nbr_spinor[0] + offset*mySpinorSiteSize;
       }
       j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
       break;
@@ -320,7 +320,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x1 = (x1 - nb + X1)% X1;
       if(x1 - nb < 0 && comm_dim_partitioned(0)){
         int offset = ( x1+nFace- nb)*X4*X3*X2/2+(x4*X3*X2 + x3*X2+x2)/2;
-        return back_nbr_spinor[0] + offset*my_spinor_site_size;
+        return back_nbr_spinor[0] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + x3*X2*X1 + x2*X1 + new_x1) / 2;
       break;
@@ -330,7 +330,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x2 = (x2 + nb)% X2;
       if(x2+nb >=X2 && comm_dim_partitioned(1)){
         int offset = ( x2 + nb -X2)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
-        return fwd_nbr_spinor[1] + offset*my_spinor_site_size;
+        return fwd_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
       break;
@@ -340,7 +340,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x2 = (x2 - nb + X2)% X2;
       if(x2 - nb < 0 && comm_dim_partitioned(1)){
         int offset = ( x2 + nFace -nb)*X4*X3*X1/2+(x4*X3*X1 + x3*X1+x1)/2;
-        return back_nbr_spinor[1] + offset*my_spinor_site_size;
+        return back_nbr_spinor[1] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + x3*X2*X1 + new_x2*X1 + x1) / 2;
       break;
@@ -350,7 +350,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x3 = (x3 + nb)% X3;
       if(x3+nb >=X3 && comm_dim_partitioned(2)){
         int offset = ( x3 + nb -X3)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
-        return fwd_nbr_spinor[2] + offset*my_spinor_site_size;
+        return fwd_nbr_spinor[2] + offset*mySpinorSiteSize;
       } 
       j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
       break;
@@ -360,7 +360,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int new_x3 = (x3 - nb + X3)% X3;
       if(x3 - nb < 0 && comm_dim_partitioned(2)){
         int offset = ( x3 + nFace -nb)*X4*X2*X1/2+(x4*X2*X1 + x2*X1+x1)/2;
-        return back_nbr_spinor[2] + offset*my_spinor_site_size;
+        return back_nbr_spinor[2] + offset*mySpinorSiteSize;
       }
       j = (x4*X3*X2*X1 + new_x3*X2*X1 + x2*X1 + x1) / 2;
       break;
@@ -371,7 +371,7 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int x4 = x4_mg(i, oddBit);
       if ( (x4 + nb) >= Z[3]  && comm_dim_partitioned(3)){
         int offset = (x4+nb - Z[3])*Vsh_t;
-        return &fwd_nbr_spinor[3][(offset+j)*my_spinor_site_size];
+        return &fwd_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }
       break;
     }
@@ -381,14 +381,14 @@ static inline Float *spinorNeighbor_mg4dir(int i, int dir, int oddBit, Float *sp
       int x4 = x4_mg(i, oddBit);
       if ( (x4 - nb) < 0 && comm_dim_partitioned(3)){
         int offset = ( x4 - nb +nFace)*Vsh_t;
-        return &back_nbr_spinor[3][(offset+j)*my_spinor_site_size];
+        return &back_nbr_spinor[3][(offset+j)*mySpinorSiteSize];
       }
       break;
     }
   default: j = -1; printf("ERROR: wrong dir\n"); exit(1);
   }
 
-  return &spinorField[j*(my_spinor_site_size)];
+  return &spinorField[j*(mySpinorSiteSize)];
 }
 
 template <QudaPCType type> int neighborIndex_5d_mgpu(int i, int oddBit, int dxs, int dx4, int dx3, int dx2, int dx1)

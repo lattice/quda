@@ -1,4 +1,4 @@
-#include "test_params.h"
+#include "command_line_params.h"
 #include <comm_quda.h>
 
 // parameters parsed from the command line
@@ -402,7 +402,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
 
   // precision options
-  
+
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
   quda_app->add_option("--prec-precondition", prec_precondition, "Preconditioner precision in GPU")->transform(prec_transform);
