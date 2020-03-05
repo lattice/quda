@@ -105,7 +105,8 @@ int main(int argc, char **argv)
   setInvertParam(eig_inv_param);
   // Specific changes to the invert param for the eigensolver
   eig_inv_param.gamma_basis = QUDA_UKQCD_GAMMA_BASIS;
-  eig_inv_param.solve_type = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
+  eig_inv_param.solve_type
+    = (eig_inv_param.solution_type == QUDA_MAT_SOLUTION ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE);
   QudaEigParam eig_param = newQudaEigParam();
   // Place Invert param inside Eig param
   eig_param.invert_param = &eig_inv_param;

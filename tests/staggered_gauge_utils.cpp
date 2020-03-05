@@ -204,8 +204,8 @@ void computeFatLongGPU(void **qdp_fatlink, void **qdp_longlink, void **qdp_inlin
 }
 
 void computeFatLongGPUandCPU(void **qdp_fatlink_gpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu,
-                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param, size_t gauge_data_type_size,
-                             int n_naiks, double eps_naik)
+                             void **qdp_longlink_cpu, void **qdp_inlink, QudaGaugeParam &gauge_param,
+                             size_t gauge_data_type_size, int n_naiks, double eps_naik)
 {
   double **act_paths = new double *[3];
   for (int i = 0; i < 3; i++) act_paths[i] = new double[6];

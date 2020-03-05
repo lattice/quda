@@ -1479,7 +1479,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
   return;
 }
 
-void createHwCPU(void* hw,  QudaPrecision precision)
+void createHwCPU(void *hw, QudaPrecision precision)
 {
   for(int i=0;i < V;i++){
     if (precision == QUDA_DOUBLE_PRECISION){

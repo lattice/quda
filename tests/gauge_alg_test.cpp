@@ -38,7 +38,7 @@ void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -59,7 +59,7 @@ void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 */
@@ -119,7 +119,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     param = newQudaGaugeParam();
 
-    //Setup gauge container.
+    // Setup gauge container.
     param.cpu_prec = prec;
     param.cpu_prec = prec;
     param.cuda_prec = prec;

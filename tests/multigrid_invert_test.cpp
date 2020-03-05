@@ -496,7 +496,7 @@ void setInvertParamLocal(QudaInvertParam &inv_param) {
 
 int main(int argc, char **argv)
 {
-  //Set parameters for the test type we wish to perfrom.
+  // Set parameters for the test type we wish to perfrom.
   //------------------------------------------------------------------------------
 
   // We give here the default values to some of the array
@@ -565,7 +565,7 @@ int main(int argc, char **argv)
   // Set some default values for precisions if none are passed through the command line
   setQudaDefaultPrecs();
   setQudaDefaultMgSolveTypes();
-  
+
   // Check we are using a supported dslash type
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
@@ -577,10 +577,10 @@ int main(int argc, char **argv)
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
-  //setGaugeParamLocal(gauge_param);
+  // setGaugeParamLocal(gauge_param);
 
   QudaInvertParam inv_param = newQudaInvertParam();
-  //setInvertParamLocal(inv_param);
+  // setInvertParamLocal(inv_param);
   setMultigridInvertParam(inv_param);
 
   QudaMultigridParam mg_param = newQudaMultigridParam();
@@ -591,7 +591,7 @@ int main(int argc, char **argv)
     if (mg_eig[i]) {
       mg_eig_param[i] = newQudaEigParam();
       setMultigridEigParam(mg_eig_param[i], i);
-      //setEigParamLocal(mg_eig_param[i], i);
+      // setEigParamLocal(mg_eig_param[i], i);
       mg_param.eig_param[i] = &mg_eig_param[i];
     } else {
       mg_param.eig_param[i] = nullptr;
@@ -601,13 +601,12 @@ int main(int argc, char **argv)
   // Set MG
   mg_param.invert_param = &mg_inv_param;
   setMultigridParam(mg_param);
-  //setMultigridParamLocal(mg_param);
+  // setMultigridParamLocal(mg_param);
 
-  // All parameters have been set. Display the parameters via stdout  
+  // All parameters have been set. Display the parameters via stdout
   display_test_info();
   //------------------------------------------------------------------------------
   //------------------------------------------------------------------------------
-
 
   // We now initialise the QUDA library with the given parameters
   //------------------------------------------------------------------------------
@@ -618,15 +617,13 @@ int main(int argc, char **argv)
   // Call srand() with a rank-dependent seed
   initRand();
 
-  // Set the dimensions and the spinor size 
+  // Set the dimensions and the spinor size
   setDims(gauge_param.X);
   setSpinorSiteSize(24);
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
-  }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -646,8 +643,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V*clover_site_size*cSize);
-    clover_inv = malloc(V*clover_site_size*cSize);
+    clover = malloc(V * clover_site_size * cSize);
+    clover_inv = malloc(V * clover_site_size * cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
     inv_param.compute_clover = compute_clover;
@@ -656,8 +653,8 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // initialize the QUDA library
@@ -800,15 +797,15 @@ int main(int argc, char **argv)
     }
 
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
-      ax(0.25/(inv_param.kappa*inv_param.kappa), spinorCheck, Vh*spinor_site_size, inv_param.cpu_prec);
+      ax(0.25 / (inv_param.kappa * inv_param.kappa), spinorCheck, Vh * spinor_site_size, inv_param.cpu_prec);
     }
 
   }
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
-  mxpy(spinorIn, spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+  mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);
 
   printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",

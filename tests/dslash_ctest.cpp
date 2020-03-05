@@ -219,14 +219,14 @@ void init(int precision, QudaReconstructType link_recon) {
     inv_param.clover_cuda_prec_refinement_sloppy = inv_param.clover_cuda_prec_precondition;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
-    hostClover = malloc((size_t)V*clover_site_size*inv_param.clover_cpu_prec);
-    hostCloverInv = malloc((size_t)V*clover_site_size*inv_param.clover_cpu_prec);
+    hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+    hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
   }
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V*gauge_site_size*gauge_param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
 
-    ColorSpinorParam csParam;
+  ColorSpinorParam csParam;
 
   csParam.nColor = 3;
   csParam.nSpin = 4;

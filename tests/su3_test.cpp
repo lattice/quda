@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  
+
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {

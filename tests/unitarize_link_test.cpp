@@ -36,7 +36,7 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-//static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
+// static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
@@ -102,29 +102,29 @@ static int unitarize_link_test(int &test_rc)
 
   TimeProfile profile("dummy");
 
-  void* fatlink = (void*)malloc(4*V*gauge_site_size*cpu_prec);
+  void *fatlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
   if(fatlink == NULL){
     errorQuda("ERROR: allocating fatlink failed\n");
   }
 
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gauge_site_size*cpu_prec);
+    cudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
     if(sitelink[i] == NULL){
       errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
     }
   }
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
-  void* inlink =  (void*)malloc(4*V*gauge_site_size*cpu_prec);
+  void *inlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gauge_site_size; j++){
-          link[(i*4 + dir)*gauge_site_size + j] = slink[i*gauge_site_size + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }
@@ -133,8 +133,8 @@ static int unitarize_link_test(int &test_rc)
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gauge_site_size; j++){
-          link[(i*4 + dir)*gauge_site_size + j] = slink[i*gauge_site_size + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }

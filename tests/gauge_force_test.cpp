@@ -362,14 +362,14 @@ gauge_force_test(void)
 
   void* sitelink = nullptr;
   void* sitelink_1d = nullptr;
-  
-  sitelink_1d = pinned_malloc(4*V*gauge_site_size*host_gauge_data_type_size);
-  
+
+  sitelink_1d = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+
   // this is a hack to have site link generated in 2d 
   // then copied to 1d array in "MILC" format
   void* sitelink_2d[4];
-  for(int i=0;i<4;i++) sitelink_2d[i] = pinned_malloc(V*gauge_site_size*qudaGaugeParam.cpu_prec); 
-  
+  for (int i = 0; i < 4; i++) sitelink_2d[i] = pinned_malloc(V * gauge_site_size * qudaGaugeParam.cpu_prec);
+
   // fills the gauge field with random numbers
   createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
   
@@ -377,9 +377,9 @@ gauge_force_test(void)
   
   for(int dir = 0; dir < 4; dir++){
     for(int i=0; i < V; i++){
-      char* src =  ((char*)sitelink_2d[dir]) + i * gauge_site_size* qudaGaugeParam.cpu_prec;
-      char* dst =  ((char*)sitelink_1d) + (4*i+dir)*gauge_site_size*qudaGaugeParam.cpu_prec ;
-      memcpy(dst, src, gauge_site_size*qudaGaugeParam.cpu_prec);
+      char *src = ((char *)sitelink_2d[dir]) + i * gauge_site_size * qudaGaugeParam.cpu_prec;
+      char *dst = ((char *)sitelink_1d) + (4 * i + dir) * gauge_site_size * qudaGaugeParam.cpu_prec;
+      memcpy(dst, src, gauge_site_size * qudaGaugeParam.cpu_prec);
     }
   }
   if (qudaGaugeParam.gauge_order ==  QUDA_MILC_GAUGE_ORDER){ 
@@ -394,8 +394,8 @@ gauge_force_test(void)
   void* sitelink_ex_2d[4];
   void* sitelink_ex_1d;
 
-  sitelink_ex_1d = pinned_malloc(4*V_ex*gauge_site_size*host_gauge_data_type_size);
-  for(int i=0;i < 4;i++) sitelink_ex_2d[i] = pinned_malloc(V_ex*gauge_site_size*host_gauge_data_type_size);
+  sitelink_ex_1d = pinned_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink_ex_2d[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
 
   int X1= Z[0];
   int X2= Z[1];
@@ -438,25 +438,26 @@ gauge_force_test(void)
     for(int dir= 0; dir < 4; dir++){
       char* src = (char*)sitelink_2d[dir];
       char* dst = (char*)sitelink_ex_2d[dir];
-      memcpy(dst+i*gauge_site_size*host_gauge_data_type_size, src+idx*gauge_site_size*host_gauge_data_type_size, gauge_site_size*host_gauge_data_type_size);
+      memcpy(dst + i * gauge_site_size * host_gauge_data_type_size,
+             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
     }//dir
   }//i
   
   
   for(int dir = 0; dir < 4; dir++){
     for(int i=0; i < V_ex; i++){
-      char* src =  ((char*)sitelink_ex_2d[dir]) + i * gauge_site_size* qudaGaugeParam.cpu_prec;
-      char* dst =  ((char*)sitelink_ex_1d) + (4*i+dir)*gauge_site_size*qudaGaugeParam.cpu_prec ;
-      memcpy(dst, src, gauge_site_size*qudaGaugeParam.cpu_prec);
+      char *src = ((char *)sitelink_ex_2d[dir]) + i * gauge_site_size * qudaGaugeParam.cpu_prec;
+      char *dst = ((char *)sitelink_ex_1d) + (4 * i + dir) * gauge_site_size * qudaGaugeParam.cpu_prec;
+      memcpy(dst, src, gauge_site_size * qudaGaugeParam.cpu_prec);
     }
   }
   
 #endif
 
-  void* mom = pinned_malloc(4*V*mom_site_size*host_gauge_data_type_size);
-  void* refmom = safe_malloc(4*V*mom_site_size*host_gauge_data_type_size);
+  void *mom = pinned_malloc(4 * V * mom_site_size * host_gauge_data_type_size);
+  void *refmom = safe_malloc(4 * V * mom_site_size * host_gauge_data_type_size);
 
-  memset(mom, 0, 4*V*mom_site_size*host_gauge_data_type_size);
+  memset(mom, 0, 4 * V * mom_site_size * host_gauge_data_type_size);
   //initialize some data in cpuMom
   createMomCPU(mom, qudaGaugeParam.cpu_prec);      
   
@@ -489,7 +490,7 @@ gauge_force_test(void)
 
   if (getTuning() == QUDA_TUNE_YES) {
     printfQuda("Tuning...\n");
-    memcpy(refmom, mom, 4*V*mom_site_size*host_gauge_data_type_size);
+    memcpy(refmom, mom, 4 * V * mom_site_size * host_gauge_data_type_size);
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff_d, num_paths, max_length, eb3,
 			  &qudaGaugeParam);
@@ -500,7 +501,7 @@ gauge_force_test(void)
   double total_time = 0.0;
   /* Multiple execution to exclude warmup time in the first run*/
   for (int i =0; i<niter; i++){
-    memcpy(mom, refmom, 4*V*mom_site_size*host_gauge_data_type_size); // restore initial momentum for correctness
+    memcpy(mom, refmom, 4 * V * mom_site_size * host_gauge_data_type_size); // restore initial momentum for correctness
     gettimeofday(&t0, NULL);
     computeGaugeForceQuda(mom, sitelink,  input_path_buf, length,
 			  loop_coeff_d, num_paths, max_length, eb3,
@@ -527,8 +528,8 @@ gauge_force_test(void)
 #endif
   
     int res;
-    res = compare_floats(mom, refmom, 4*V*mom_site_size, 1e-3, qudaGaugeParam.cpu_prec);
-    
+    res = compare_floats(mom, refmom, 4 * V * mom_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+
     strong_check_mom(mom, refmom, 4*V, qudaGaugeParam.cpu_prec);
     
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
