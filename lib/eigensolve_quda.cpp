@@ -1366,8 +1366,8 @@ namespace quda
 
     // TODO: general pendings:
 
-    //	1. remove informal profiling via chronos (remove the chronos' header as well)
-    //	2. switch from X_tilde to eigSpace
+    //	(DONE) 1. remove informal profiling via chronos (remove the chronos' header as well)
+    //	       2. switch from X_tilde to eigSpace
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -1484,6 +1484,8 @@ namespace quda
     MatrixXcd H;
     SelfAdjointEigenSolver<MatrixXcd> eigensolver;
 
+    int loopr = 0;
+
     // Main loop
     while (restart_iter<max_restarts) {
 
@@ -1501,10 +1503,10 @@ namespace quda
         norm = sqrt(blas::norm2(*t[0]));
         blas::ax(1.0 / norm, *t[0]);
 
-        //for (int i=0; i<tmpSize; i++) {
-        //  Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
-        //  blas::caxpy(-gamma, *X_tilde[i], *t[0]);
-        //}
+        for (int i=0; i<tmpSize; i++) {
+          Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
+          blas::caxpy(-gamma, *X_tilde[i], *t[0]);
+        }
       }
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
@@ -1563,16 +1565,20 @@ namespace quda
       // Computing the residual
       // u = V * s_1 -- lifting the first Ritz vector through V
       blas::zero(*u[0]);
-      for( int i=0; i<m; i++ ){
-        blas::caxpy( (*(eigenpairs[0].second))[i], *V[i], *u[0] );
+      for (int i=0; i<m; i++) {
+        //blas::caxpy( (*(eigenpairs[0].second))[i], *V[i], *u[0] );
+        // use this due to frequent-shrinking-avoiding
+        blas::caxpy( (*(eigenpairs[loopr].second))[i], *V[i], *u[0] );
       }
       // and the same for u_A
       blas::zero(*u_A[0]);
-      for( int i=0; i<m; i++ ){
-        blas::caxpy( (*(eigenpairs[0].second))[i], *V_A[i], *u_A[0] );
+      for (int i=0; i<m; i++) {
+        //blas::caxpy( (*(eigenpairs[0].second))[i], *V_A[i], *u_A[0] );
+        // use this due to frequent-shrinking-avoiding
+        blas::caxpy( (*(eigenpairs[loopr].second))[i], *V_A[i], *u_A[0] );
       }
       // and then compute the residual
-      theta = eigenpairs[0].first;
+      theta = eigenpairs[loopr].first;
       blas::copy(*r[0], *u_A[0]);
       blas::caxpy(-theta, *u[0], *r[0]);
 
@@ -1582,14 +1588,8 @@ namespace quda
         printfQuda("Iteration = %d, m = %d, residual = %f, converged eigenpairs = %d\n", iter, m, norm, k);
       }
 
-      {
-        cudaDeviceSynchronize();
-
-        // Record start time
-        auto start = std::chrono::high_resolution_clock::now();
-
       while(norm < eig_param->tol){
-        evals.push_back(eigenpairs[0].first);
+        evals.push_back(eigenpairs[loopr].first);
         csParam.create = QUDA_COPY_FIELD_CREATE;
         X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
         k++;
@@ -1601,6 +1601,7 @@ namespace quda
         }
 
         // Shrinking the subspace
+        /*
         {
           MatrixXcd tmpH = MatrixXcd::Zero(m-1,m-1);
 
@@ -1644,28 +1645,29 @@ namespace quda
             tmpAV[i] = tmpf;
           }
         }
+        */
 
-        m--;
+        //m--;
 
-        *u[0] = *V[0];
-        *u_A[0] = *V_A[0];
+        blas::zero(*u[0]);
+        // project-up with a subspace still of size m
+        for( int j=0; j<m; j++ ){
+          blas::caxpy( (*(eigenpairs[loopr+1].second))[j], *V[j], *u[0] );
+          //tmpH(i,i) = eigenpairs[i+1].first;
+        }
+        matVec(mat, *u_A[0], *u[0]);
+
+        //*u[0] = *V[0];
+        //*u_A[0] = *V_A[0];
+
         // and then compute the residual
-        theta = eigenpairs[0].first;
-        // TODO: merge the following two lines into: r = u_A
+        theta = eigenpairs[loopr+1].first;
         blas::copy(*r[0], *u_A[0]);
         blas::caxpy(-theta, *u[0], *r[0]);
 
         norm = sqrt(blas::norm2(*r[0]));
-      }
 
-        cudaDeviceSynchronize();
-
-        // Record end time
-        auto finish = std::chrono::high_resolution_clock::now();
-
-
-        std::chrono::duration<double> elapsed = finish - start;
-        std::cout << "Elapsed time when hit eigenpair: " << elapsed.count() << " s\n";
+        loopr++;
       }
 
       // Check for convergence
@@ -1673,13 +1675,8 @@ namespace quda
         break;
       }
 
-      {
-        cudaDeviceSynchronize();
-
-        // Record start time
-        auto start = std::chrono::high_resolution_clock::now();
-
       // Restart: shrink the acceleration subspace
+      // FIXME: add exceptions for case: (loopr+m_min) > m_max
       if(m == m_max){
         MatrixXcd tmpH = MatrixXcd::Zero(m_min,m_min);
 
@@ -1687,14 +1684,14 @@ namespace quda
         csParam.create = QUDA_COPY_FIELD_CREATE;
         blas::copy(*tmpV[0], *u[0]);
         blas::copy(*tmpAV[0], *u_A[0]);
-        tmpH(0,0) = eigenpairs[0].first;
+        tmpH(0,0) = eigenpairs[loopr].first;
 
         csParam.create = QUDA_ZERO_FIELD_CREATE;
         for(int i=1; i<m_min; i++){
           blas::zero(*tmpV[i]);
           for( int j=0; j<m; j++ ){
-            blas::caxpy( (*(eigenpairs[i].second))[j], *V[j], *tmpV[i] );
-            tmpH(i,i) = eigenpairs[i].first;
+            blas::caxpy( (*(eigenpairs[loopr+i].second))[j], *V[j], *tmpV[i] );
+            tmpH(i,i) = eigenpairs[loopr+i].first;
           }
           matVec(mat, *tmpAV[i], *tmpV[i]);
         }
@@ -1721,15 +1718,8 @@ namespace quda
         if (getVerbosity() >= QUDA_SUMMARIZE) {
           printfQuda("RESTART (#%d)\n", restart_iter);
         }
-      }
 
-        cudaDeviceSynchronize();
-
-        // Record end time
-        auto finish = std::chrono::high_resolution_clock::now();
-
-        std::chrono::duration<double> elapsed = finish - start;
-        std::cout << "Elapsed time for shrinking search subspace: " << elapsed.count() << " s\n";
+        loopr=0;
       }
 
       // Preparing for solving the correction equation
@@ -1740,21 +1730,8 @@ namespace quda
       //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1);
 
       {
-        cudaDeviceSynchronize();
-
-        // Record start time
-        auto start = std::chrono::high_resolution_clock::now();
-
         //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1, X_tilde);
         invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, 1, u);
-
-        cudaDeviceSynchronize();
-
-        // Record end time
-        auto finish = std::chrono::high_resolution_clock::now();
-
-        std::chrono::duration<double> elapsed = finish - start;
-        std::cout << "Elapsed time for correction equation: " << elapsed.count() << " s\n";
       }
 
       //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, ( (k+1)>=1?1:k+1 ));
@@ -1764,8 +1741,6 @@ namespace quda
       for (auto p : eigenpairs) { delete p.second; }
 
       iter++;
-
-      printfQuda("\n");
     }
 
     //--------------------
