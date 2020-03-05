@@ -151,6 +151,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_BUILD_ALL_PROGRAMS OFF CACHE BOOL "do not build programs by default")
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
@@ -159,6 +160,7 @@ endif()
 set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
+set(QUDA_FLOAT8 OFF CACHE BOOL "enable float-8 ordered fixed-point fields?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity")
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
@@ -201,8 +203,10 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_BUILD_ALL_PROGRAMS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
+mark_as_advanced(QUDA_FLOAT8)
 mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
@@ -938,7 +942,8 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-# add tests and quda library
+# add tests, programs, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(programs)
 add_subdirectory(doc)
