@@ -578,7 +578,10 @@ namespace quda {
     }
 
     void synchronizeAuxBlasStream() {
-      if(!auxBlasStream) errorQuda("Concurrent stream was not created.\n");
+      if(!auxBlasStream) {
+        warningQuda("Concurrent stream was not created.\n");
+        return;
+      }
       qudaStreamSynchronize(*auxBlasStream);
     }
 

@@ -513,7 +513,7 @@ namespace quda {
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
-    matDefl(param.precision_ritz == param.precision ? mat : ( param.precision_ritz == param.precision_sloppy ? matSloppy : matPrecon ) ),
+    matDefl(matSloppy),
     K(nullptr),
     Kparam(param),
     m(param.eig_param.nKr),    
@@ -744,12 +744,15 @@ namespace quda {
    for(int i = first_idx; i < (first_idx + k); i++) {
      std::unique_ptr<Complex[] > alpha(new Complex[i+1]);
 
-     std::vector<ColorSpinorField*> vj_(evecs.begin(),evecs.begin()+i+1);
-     std::vector<ColorSpinorField*> av_(vk(0));
+     ColorSpinorField &vk0   = (*work_space)[0];
+     ColorSpinorField &swp   = work_space->Precision() != evecs[i]->Precision() ?  (*work_space)[1] : *evecs[i];
 
-     //matDefl(vk[0], *evecs[i]);
-     *args.Az = *evecs[i];
-     mat(vk[0], *args.Az); 
+     std::vector<ColorSpinorField*> vj_(evecs.begin(),evecs.begin()+i+1);
+     //std::vector<ColorSpinorField*> av_(vk(0));
+     std::vector<ColorSpinorField*> av_(ws(0));
+
+     swp = *evecs[i];
+     matDefl(vk0, *evecs[i]);
 
      blas::cDotProduct(alpha.get(), vj_, av_);
 
