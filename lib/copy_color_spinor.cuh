@@ -177,8 +177,11 @@ namespace quda {
 	copyColorSpinor<FloatOut, FloatIn, Ns, Nc>(arg, PreserveBasis<Ns,Nc>());
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-	copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, PreserveBasis<Ns,Nc>());
+	//copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	//  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, PreserveBasis<Ns,Nc>());
+	qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+		   (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+		   arg, PreserveBasis<Ns,Nc>());
       }
     }
 
@@ -239,20 +242,36 @@ namespace quda {
       } else {
 	TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 	if (out.GammaBasis()==in.GammaBasis()) {
-	  copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, PreserveBasis<Ns,Nc>());
+	  //copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, PreserveBasis<Ns,Nc>());
+	  qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+	             (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+	             arg, (PreserveBasis<Ns,Nc>()));
+
 	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, NonRelBasis<Ns,Nc>());
+	  //copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, NonRelBasis<Ns,Nc>());
+	  qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+	             (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+	             arg, (NonRelBasis<Ns,Nc>()));
 	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_DEGRAND_ROSSI_GAMMA_BASIS) {
-	  copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, RelBasis<Ns,Nc>());
+	  //copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, RelBasis<Ns,Nc>());
+	  qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+	             (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+	             arg, (RelBasis<Ns,Nc>()));
 	} else if (out.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && in.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, ChiralToNonRelBasis<Ns,Nc>());
+	  //copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, ChiralToNonRelBasis<Ns,Nc>());
+	  qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+	             (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+	             arg, (ChiralToNonRelBasis<Ns,Nc>()));
 	} else if (in.GammaBasis() == QUDA_UKQCD_GAMMA_BASIS && out.GammaBasis() == QUDA_CHIRAL_GAMMA_BASIS) {
-	  copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
-	    <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, NonRelToChiralBasis<Ns,Nc>());
+	  //copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>
+	  //  <<<tp.grid, tp.block, tp.shared_bytes, stream>>> (arg, NonRelToChiralBasis<Ns,Nc>());
+	  qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+	             (copyColorSpinorKernel<FloatOut, FloatIn, Ns, Nc>),
+	             arg, (NonRelToChiralBasis<Ns,Nc>()));
 	}
       }
     }

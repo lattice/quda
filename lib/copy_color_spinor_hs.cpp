@@ -1,0 +1,1 @@
+copy_color_spinor_hs.cu

@@ -50,7 +50,7 @@ namespace quda {
       int idd
         = (((x[3] * arg.commDim[2] * arg.X[2] + x[2]) * arg.commDim[1] * arg.X[1]) + x[1]) * arg.commDim[0] * arg.X[0]
         + x[0];
-      qurand_init(seed, idd, 0, state[parity * size_cb + id]);
+      //qurand_init(seed, idd, 0, state[parity * size_cb + id]);
     }
   }
 
@@ -68,7 +68,7 @@ namespace quda {
     dim3 nblocks = GetBlockDim(nthreads.x, size_cb);
     rngArg arg(X);
     nblocks.y = n_parity;
-    kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
+    //kernel_random<<<nblocks, nthreads>>>(state, seed, size_cb, arg);
     qudaDeviceSynchronize();
   }
 

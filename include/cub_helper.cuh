@@ -6,7 +6,9 @@
 
 using namespace quda;
 
+#ifndef CPU_BACKEND
 #include <cub/block/block_reduce.cuh>
+#endif
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
@@ -85,6 +87,7 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
+#ifndef CPU_BACKEND
   template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
   __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
@@ -130,6 +133,18 @@ namespace quda {
 
   template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
+
+#else  // CPU_BACKEND
+
+  template <int block_size, typename T, bool do_sum = true>
+  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) {
+    // FIXME
+    printfQuda("reduce not implemented\n");
+    exit(1);
+    //reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx);
+ }
+
+#endif
 
 
   __shared__ volatile bool isLastWarpDone[16];
@@ -202,11 +217,15 @@ namespace quda {
   __device__ inline void reduceRow(ReduceArg<T> arg, const T &in) {
 
     typedef vector_type<T,block_size_y> vector;
+#ifndef CPU_BACKEND
     typedef cub::BlockReduce<vector, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+#endif
     constexpr int n_word = sizeof(T) / sizeof(int);
 
     __shared__ union {
+#ifndef CPU_BACKEND
       typename BlockReduce::TempStorage cub;
+#endif
       int exchange[n_word*block_size_x*block_size_y];
     } shared;
 

@@ -23,7 +23,7 @@ namespace quda
       SpinorW W;
       SpinorV V;
       Reducer r;
-      const int length;
+      const unsigned int length;
       ReductionArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Reducer r, int length) :
           X(X),
           Y(Y),
@@ -49,6 +49,11 @@ namespace quda
 
       ReduceType sum;
       ::quda::zero(sum);
+#ifdef CPU_BACKEND
+      if(i==0) {
+        arg.result_d[parity] = sum;
+      }
+#endif
 
       while (i < arg.length) {
         FloatN x[M], y[M], z[M], w[M], v[M];
@@ -74,7 +79,11 @@ namespace quda
         i += gridSize;
       }
 
+#ifdef CPU_BACKEND
+      arg.result_d[parity] += sum;
+#else
       ::quda::reduce<block_size, ReduceType>(arg, sum, parity);
+#endif
     }
 
     /**

@@ -74,9 +74,9 @@ if(BUILD_TYPE_VALID LESS 0)
 endif()
 
 # Backend type
-set(VALID_BACKEND_TYPES CUDA HIP)
+set(VALID_BACKEND_TYPES CPU CUDA HIP)
 set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
-set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CUDA HIP)
+set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CPU CUDA HIP)
 
 string(TOUPPER ${QUDA_BACKEND_TYPE} CHECK_BACKEND_TYPE)
 list(FIND VALID_BACKEND_TYPES ${CHECK_BACKEND_TYPE} BACKEND_TYPE_VALID)
@@ -86,6 +86,9 @@ if(BACKEND_TYPE_VALID LESS 0)
 endif()
 
 # Set backend preprocessor flags
+if(${QUDA_BACKEND_TYPE} STREQUAL "CPU")
+  add_definitions(-DCPU_BACKEND)
+endif()
 if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
   add_definitions(-DCUDA_BACKEND)
 endif()
@@ -112,7 +115,11 @@ message(STATUS "Backend type: ${QUDA_BACKEND_TYPE}")
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+  if(${QUDA_BACKEND_TYPE} STREQUAL "CPU")
+    set(QUDA_DEFAULT_GPU_ARCH sm_00)
+  else()
+    set(QUDA_DEFAULT_GPU_ARCH sm_35)
+  endif()
 endif()
 if(NOT QUDA_GPU_ARCH)
   message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
@@ -835,6 +842,8 @@ endif()
 
 # CUDA stuff
 
+if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
+
 set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
 set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
@@ -880,6 +889,12 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
 # CUDA Wrapper for finding libs etc
 find_package(CUDAWrapper)
 
+file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
+string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+
+endif()
+
 # We need threads
 find_package(Threads REQUIRED)
 
@@ -896,9 +911,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
 endif()
-file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
-string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
 
 # this allows simplified running of clang-tidy

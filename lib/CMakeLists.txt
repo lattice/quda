@@ -4,25 +4,53 @@ set (QUDA_OBJS
   # cmake-format: sortable
   timer.cpp malloc.cpp
   interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu
+  color_spinor_field.cpp
+  #color_spinor_util.cu
+  color_spinor_util.cpp
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp
   lattice_field.cpp
   tune.cpp
-  blas_quda.cu reduce_quda.cu
-  random.cu
+  #blas_quda.cu
+  blas_quda.cpp
+  #reduce_quda.cu
+  reduce_quda.cpp
+  #random.cu
+  random.cpp
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  copy_color_spinor.cu spinor_noise.cu
-  copy_color_spinor_dd.cu copy_color_spinor_ds.cu
-  copy_color_spinor_dh.cu copy_color_spinor_dq.cu
-  copy_color_spinor_ss.cu copy_color_spinor_sd.cu
-  copy_color_spinor_sh.cu copy_color_spinor_sq.cu
-  copy_color_spinor_hd.cu copy_color_spinor_hs.cu
-  copy_color_spinor_hh.cu copy_color_spinor_hq.cu
-  copy_color_spinor_qd.cu copy_color_spinor_qs.cu
-  copy_color_spinor_qh.cu copy_color_spinor_qq.cu
-  quda_cuda_api.cpp
+  #copy_color_spinor.cu
+  copy_color_spinor.cpp
+  #spinor_noise.cu
+  spinor_noise.cpp
+  #copy_color_spinor_dd.cu copy_color_spinor_ds.cu
+  #copy_color_spinor_dh.cu copy_color_spinor_dq.cu
+  #copy_color_spinor_ss.cu copy_color_spinor_sd.cu
+  #copy_color_spinor_sh.cu copy_color_spinor_sq.cu
+  #copy_color_spinor_hd.cu copy_color_spinor_hs.cu
+  #copy_color_spinor_hh.cu copy_color_spinor_hq.cu
+  #copy_color_spinor_qd.cu copy_color_spinor_qs.cu
+  #copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_dd.cpp copy_color_spinor_ds.cpp
+  copy_color_spinor_dh.cpp copy_color_spinor_dq.cpp
+  copy_color_spinor_ss.cpp copy_color_spinor_sd.cpp
+  copy_color_spinor_sh.cpp copy_color_spinor_sq.cpp
+  copy_color_spinor_hd.cpp copy_color_spinor_hs.cpp
+  copy_color_spinor_hh.cpp copy_color_spinor_hq.cpp
+  copy_color_spinor_qd.cpp copy_color_spinor_qs.cpp
+  copy_color_spinor_qh.cpp copy_color_spinor_qq.cpp
   version.cpp )
 # cmake-format: on
+
+if(${QUDA_BACKEND_TYPE} STREQUAL "CPU")
+  list(APPEND QUDA_OBJS quda_cpu_api.cpp)
+endif()
+
+if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
+  list(APPEND QUDA_OBJS quda_cuda_api.cpp)
+endif()
+
+if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
+  list(APPEND QUDA_OBJS quda_hip_api.cpp)
+endif()
 
 # split source into cu and cpp files
 foreach(item ${QUDA_OBJS})
@@ -32,7 +60,7 @@ foreach(item ${QUDA_OBJS})
   endif(item_match)
 endforeach(item ${QUDA_OBJS})
 
-list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
+#list(REMOVE_ITEM QUDA_OBJS ${QUDA_CU_OBJS})
 
 if(BUILD_FORTRAN_INTERFACE)
   list(APPEND QUDA_OBJS quda_fortran.F90)
@@ -63,11 +91,15 @@ if(GITVERSION)
 endif()
 
 # make one library
+if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
   cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 else()
   cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+endif()
+else()
+  add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
 # include_directories

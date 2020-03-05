@@ -325,13 +325,15 @@ namespace quda {
 
       if (tuneGridDim()) {
 	param.block = dim3(min_block_size,1,1);
-
 	param.grid = dim3(min_grid_size,1,1);
       } else {
 	// find the minimum valid blockDim
 	param.block = dim3((minThreads()+max_blocks-1)/max_blocks, 1, 1);
 	param.block.x = ((param.block.x+min_block_size-1) / min_block_size) * min_block_size; // round up to the nearest multiple of desired minimum block size
-	if (param.block.x > max_threads) errorQuda("Local lattice volume is too large for device");
+	if (param.block.x > max_threads) {
+	  printfQuda("param.block.x(%i) > max_threads(%i)\n", param.block.x, max_threads);
+	  errorQuda("Local lattice volume is too large for device");
+	}
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       }

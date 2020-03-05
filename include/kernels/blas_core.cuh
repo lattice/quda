@@ -23,7 +23,7 @@ namespace quda
       SpinorW W;
       SpinorV V;
       Functor f;
-      const int length;
+      const unsigned int length;
       BlasArg(SpinorX X, SpinorY Y, SpinorZ Z, SpinorW W, SpinorV V, Functor f, int length) :
           X(X),
           Y(Y),

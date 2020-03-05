@@ -56,7 +56,7 @@ namespace quda {
         }
         if (count++ % 10000 == 0) { // check error every 10000 iterations
           // if there is an error in the kernel then we need to exit the spin-wait
-          if (qudaSuccess != cudaPeekAtLastError()) break;
+          if (qudaSuccess != qudaPeekAtLastError()) break;
         }
       }
     }
@@ -182,9 +182,8 @@ namespace quda {
   private:
       const int nParity; // for composite fields this includes the number of composites
       mutable ReductionArg<ReduceType, SpinorX, SpinorY, SpinorZ, SpinorW, SpinorV, Reducer> arg;
-      doubleN &result;
-
       const ColorSpinorField &x, &y, &z, &w, &v;
+      doubleN &result;
 
       // host pointers used for backing up fields when tuning
       // these can't be curried into the Spinors because of Tesla argument length restriction
@@ -247,6 +246,7 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         result = reduceLaunch<doubleN, ReduceType, FloatN, M>(arg, tp, stream, *this);
+	//printfQuda("reduce apply result: %g\n", result);
       }
 
       void preTune()
@@ -297,6 +297,7 @@ namespace quda {
     doubleN nativeReduce(const double2 &a, const double2 &b, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
     {
+      //printfQuda("nativeReduce\n");
 
       checkLength(x, y);
       checkLength(x, z);

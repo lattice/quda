@@ -45,6 +45,8 @@ default:								\
 
 #else
 
+#ifndef CPU_BACKEND
+
 #define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
   switch (tp.block.x) {							\
   case 32:								\
@@ -178,6 +180,34 @@ default:								\
   default:								\
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }
+#else
+
+#define LKCASEBODY(n,tp,stream,kernel,arg,...) \
+        qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream, \
+                   (kernel<n,__VA_ARGS__>), arg); break
+
+#define LKCASE(n,tp,stream,kernel,arg,...) \
+        case n: LKCASEBODY(n,tp,stream,kernel,arg,__VA_ARGS__)
+
+#define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
+  /*printf("tp.block.x: %i\n", tp.block.x);*/ \
+  switch (tp.block.x) {							\
+  LKCASE(1, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(2, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(3, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(4, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(5, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(6, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(7, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(8, tp, stream, kernel, arg, __VA_ARGS__); \
+  LKCASE(32, tp, stream, kernel, arg, __VA_ARGS__); \
+  default:								\
+    printf("launch_kernel unknown tp.block.x: %i\n", tp.block.x); \
+    LKCASEBODY(64, tp, stream, kernel, arg, __VA_ARGS__); \
+  }
+
+#endif // CPU_BACKEND
+
 
 #endif // REDUCE_SINGLE_WARP
 

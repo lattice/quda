@@ -40,3 +40,26 @@ inline  __device__ double qurand_normal_double(quRNGState state) {
 #ifdef HIP_BACKEND
 #include <hiprand_kernel.h>
 #endif
+
+
+#ifdef CPU_BACKEND
+
+typedef int quRNGState;
+
+inline  __device__ float qurand_uniform(quRNGState state) {
+  return 0;
+}
+
+inline  __device__ double qurand_uniform_double(quRNGState state) {
+  return 0;
+}
+
+inline  __device__ float qurand_normal(quRNGState state) {
+  return 0;
+}
+
+inline  __device__ double qurand_normal_double(quRNGState state) {
+  return 0;
+}
+
+#endif

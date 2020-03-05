@@ -6,6 +6,8 @@
 #include <sys/time.h>
 #include <complex.h>
 
+//#define DEVELOP_ONEAPI
+
 #include <quda.h>
 #include <quda_fortran.h>
 #include <quda_internal.h>

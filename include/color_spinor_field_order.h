@@ -743,6 +743,18 @@ namespace quda {
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
+#ifdef CPU_BACKEND
+      double norm2(bool global=true) const {
+        double nrm2 = 0;
+	int n = nParity*volumeCB*nSpin*nColor*nVec;
+	//printfQuda("norm2 n: %i\n", n);
+	for(int i=0; i<n; i++) {
+	  nrm2 += norm2(v[i]);
+	}
+        if (global) comm_allreduce(&nrm2);
+        return nrm2;
+      }
+#else
       __host__ double norm2(bool global=true) const {
         double nrm2 = 0;
         if (location == QUDA_CUDA_FIELD_LOCATION) {
@@ -757,14 +769,24 @@ namespace quda {
         if (global) comm_allreduce(&nrm2);
         return nrm2;
       }
-
+#endif // CPU_BACKEND
       /**
        * Returns the Linfinity norm of the field
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
       */
+#ifdef CPU_BACKEND
+      double abs_max(bool global=true) const {
+	double absmax = 0;
+	int n = nParity*volumeCB*nSpin*nColor*nVec;
+	for(int i=0; i<n; i++) {
+	  absmax = fmax(absmax, (double)abs(v[i]));
+	}
+	if (global) comm_allreduce_max(&absmax);
+	return absmax;
+      }
+#else
       __host__ double abs_max(bool global=true) const {
-
 	double absmax = 0;
 	if (location == QUDA_CUDA_FIELD_LOCATION) {
 	  thrust_allocator alloc;
@@ -778,6 +800,7 @@ namespace quda {
 	if (global) comm_allreduce_max(&absmax);
 	return absmax;
       }
+#endif
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }
 #endif

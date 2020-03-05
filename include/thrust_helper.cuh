@@ -1,5 +1,7 @@
 #pragma once
 
+#ifndef CPU_BACKEND
+
 #include <malloc_quda.h>
 
 #undef device_malloc
@@ -32,3 +34,5 @@ public:
   void deallocate(char *ptr, size_t n) { pool_device_free(ptr); }
 
 };
+
+#endif

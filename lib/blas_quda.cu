@@ -94,7 +94,11 @@ namespace quda {
                            .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                            .launch(arg);
 #else
-        blasKernel<FloatN, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        //blasKernel<FloatN, M><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+	//void (*f)(arg) = blasKernel<FloatN, M>;
+	//qudaLaunchKernel(f, tp.grid, tp.block, arg, tp.shared_bytes, stream);
+	qudaLaunch(tp.grid, tp.block, tp.shared_bytes, stream,
+		   (blasKernel<FloatN, M>), arg);
 #endif
       }
 
@@ -143,7 +147,6 @@ namespace quda {
     void nativeBlas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, int length)
     {
-
       checkLength(x, y);
       checkLength(x, z);
       checkLength(x, w);

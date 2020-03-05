@@ -12,7 +12,9 @@
 #include <convert.h>
 #include <generics/ldg.h>
 #include <complex_quda.h>
+#ifdef CUDA_BACKEND
 #include <inline_ptx.h>
+#endif
 
 namespace quda {
 

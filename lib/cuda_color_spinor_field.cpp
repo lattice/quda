@@ -601,7 +601,8 @@ namespace quda {
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
 	  // Left as cuda for now.
-          cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+          //cudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
+          qudaMemset2D(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad);
         }
     }
 

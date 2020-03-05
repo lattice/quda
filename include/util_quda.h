@@ -148,7 +148,13 @@ namespace quda {
   } while (0)
 
 #else
-//Alt Error Check
+
+#define checkQudaErrorNoSync() do {					\
+    qudaError_t error = qudaGetLastError();				\
+    if (error != qudaSuccess)						\
+      errorQuda("(QUDA) %s\n", qudaGetErrorString(error));		\
+  } while (0)
+
 #endif
 
 #ifdef HOST_DEBUG
