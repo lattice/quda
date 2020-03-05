@@ -373,6 +373,67 @@ namespace quda {
     checkCudaError();
   }
 
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
+  }
+
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream, CloverPrefetchType type,
+                                 QudaParity parity) const
+  {
+    if (is_prefetch_enabled()) {
+      int dev_id = 0;
+      if (mem_space == QUDA_CUDA_FIELD_LOCATION)
+        dev_id = comm_gpuid();
+      else if (mem_space == QUDA_CPU_FIELD_LOCATION)
+        dev_id = cudaCpuDeviceId;
+      else
+        errorQuda("Invalid QudaFieldLocation.");
+
+      auto clover_parity = clover;
+      auto norm_parity = norm;
+      auto cloverInv_parity = cloverInv;
+      auto invNorm_parity = invNorm;
+      auto bytes_parity = bytes;
+      auto norm_bytes_parity = norm_bytes;
+      if (parity != QUDA_INVALID_PARITY) {
+        bytes_parity /= 2;
+        norm_bytes_parity /= 2;
+        if (parity == QUDA_EVEN_PARITY) {
+          clover_parity = even;
+          norm_parity = evenNorm;
+          cloverInv_parity = evenInv;
+          invNorm_parity = evenInvNorm;
+        } else { // odd
+          clover_parity = odd;
+          norm_parity = oddNorm;
+          cloverInv_parity = oddInv;
+          invNorm_parity = oddInvNorm;
+        }
+      }
+
+      switch (type) {
+      case CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE:
+        if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
+        if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
+        if (clover_parity != cloverInv_parity) {
+          if (cloverInv_parity) cudaMemPrefetchAsync(cloverInv_parity, bytes_parity, dev_id, stream);
+          if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
+        }
+        break;
+      case CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE:
+        if (clover_parity) cudaMemPrefetchAsync(clover_parity, bytes_parity, dev_id, stream);
+        if (norm_parity) cudaMemPrefetchAsync(norm_parity, norm_bytes_parity, dev_id, stream);
+        break;
+      case CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE:
+        if (cloverInv_parity) cudaMemPrefetchAsync(cloverInv_parity, bytes_parity, dev_id, stream);
+        if (invNorm_parity) cudaMemPrefetchAsync(invNorm_parity, norm_bytes_parity, dev_id, stream);
+        break;
+      default: errorQuda("Invalid CloverPrefetchType.");
+      }
+    }
+  }
+
   /**
      Computes Fmunu given the gauge field U
   */

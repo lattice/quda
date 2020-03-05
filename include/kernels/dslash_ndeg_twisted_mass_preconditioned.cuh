@@ -60,25 +60,24 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, flavor, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       if (!dagger || Arg::asymmetric) // defined in dslash_wilson.cuh
-        applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+        applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
       else // defined in dslash_twisted_mass_preconditioned
-        applyWilsonTM<nParity, dagger, 2, kernel_type>(out, arg, coord, x_cb, flavor, parity, idx, thread_dim, active);
+        applyWilsonTM<nParity, dagger, 2, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      int my_flavor_idx = x_cb + flavor * arg.dc.volume_4d_cb;
+      int my_flavor_idx = coord.x_cb + flavor * arg.dc.volume_4d_cb;
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
 
         if (!dagger || Arg::asymmetric) { // apply inverse twist which is undone below
           // use consistent load order across s to ensure better cache locality
-          Vector x0 = arg.x(x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
-          Vector x1 = arg.x(x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
+          Vector x0 = arg.x(coord.x_cb + 0 * arg.dc.volume_4d_cb, my_spinor_parity);
+          Vector x1 = arg.x(coord.x_cb + 1 * arg.dc.volume_4d_cb, my_spinor_parity);
           if (flavor == 0)
             out += arg.a_inv * (x0 + arg.b_inv * x0.igamma(4) + arg.c_inv * x1);
           else

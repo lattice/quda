@@ -2,6 +2,8 @@
 
 #ifdef USE_TEXTURE_OBJECTS
 
+#include <texture_helper.cuh>
+
 template <typename OutputType, typename InputType> class Texture
 {
   typedef typename quda::mapper<InputType>::type RegType;
@@ -14,7 +16,6 @@ template <typename OutputType, typename InputType> class Texture
   Texture(const cudaColorSpinorField *x, bool use_ghost = false)
     : spinor(use_ghost ? x->GhostTex() : x->Tex()) { }
   Texture(const Texture &tex) : spinor(tex.spinor) { }
-  ~Texture() { }
 
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -24,7 +25,7 @@ template <typename OutputType, typename InputType> class Texture
   __device__ inline OutputType fetch(unsigned int idx) const
   {
     OutputType rtn;
-    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    copyFloatN(rtn, tex1Dfetch_<RegType>(spinor, idx));
     return rtn;
   }
 
@@ -38,10 +39,10 @@ __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
 template <> __device__ inline double2 Texture<double2, double2>::fetch(unsigned int idx) const
-{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned int idx) const
-{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 #else // !USE_TEXTURE_OBJECTS - use direct reads
 
@@ -59,7 +60,6 @@ template <typename OutputType, typename InputType> class Texture
   {
   }
   Texture(const Texture &tex) : spinor(tex.spinor) {}
-  ~Texture() {}
 
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -100,13 +100,13 @@ template <typename RegType, typename InterType, typename StoreType> void checkTy
     errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n", (unsigned long)reg_size,
         (unsigned long)inter_size);
 
-  if (vecLength<InterType>() != vecLength<StoreType>()) {
+  if (vec_length<InterType>::value != vec_length<StoreType>::value) {
     errorQuda("Vector lengths intermediate and register types must match\n");
   }
 
-  if (vecLength<RegType>() == 0) errorQuda("Vector type not supported\n");
-  if (vecLength<InterType>() == 0) errorQuda("Vector type not supported\n");
-  if (vecLength<StoreType>() == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<RegType>::value == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<InterType>::value == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<StoreType>::value == 0) errorQuda("Vector type not supported\n");
 }
 
 template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm {
@@ -136,8 +136,6 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
     norm = (float *)x.Norm();
     cb_norm_offset = x.NormBytes() / (2 * sizeof(float));
   }
-
-  virtual ~SpinorNorm() {}
 
   __device__ inline float load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
@@ -286,8 +284,6 @@ public:
     checkTypes<RegType, InterType, StoreType>();
   }
 
-  virtual ~SpinorTexture() {}
-
   __device__ inline void load(RegType x[], const int i, const int parity = 0) const
   {
     // load data into registers first using the storage order
@@ -425,8 +421,6 @@ public:
 #endif
   }
 
-  ~Spinor() {}
-
   // default store used for simple fields
   __device__ inline void save(RegType x[], int i, const int parity = 0)
   {
@@ -439,7 +433,7 @@ public:
       convert<InterType, RegType>(y, x, M);
 
       if (isFixed<StoreType>::value) {
-        float C = SN::store_norm<M>(y, i, parity);
+        float C = SN::template store_norm<M>(y, i, parity);
 #pragma unroll
         for (int j = 0; j < M; j++) copyFloatN(spinor[ST::cb_offset * parity + i + j * ST::stride], C * y[j]);
       } else {

@@ -4,7 +4,7 @@
 
 namespace quda {
 
-  MinResExt::MinResExt(DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile)
+  MinResExt::MinResExt(const DiracMatrix &mat, bool orthogonal, bool apply_mat, bool hermitian, TimeProfile &profile)
     : mat(mat), orthogonal(orthogonal), apply_mat(apply_mat), hermitian(hermitian), profile(profile){
 
   }
@@ -87,7 +87,8 @@ namespace quda {
 
     const int N = p.size();
 
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Constructing minimum residual extrapolation with basis size %d\n", N);
+    if (getVerbosity() >= QUDA_VERBOSE)
+      printfQuda("Constructing minimum residual extrapolation with basis size %d\n", N);
 
     // if no guess is required, then set initial guess = 0
     if (N == 0) {

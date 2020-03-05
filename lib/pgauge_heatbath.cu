@@ -626,27 +626,26 @@ namespace quda {
     Matrix<complex<Float>,NCOLORS> U;
     for ( int nu = 0; nu < 4; nu++ ) if ( mu != nu ) {
         int dx[4] = { 0, 0, 0, 0 };
-        Matrix<complex<Float>,NCOLORS> link;
-        arg.dataOr.load((Float*)(link.data), idx, nu, parity);
+        Matrix<complex<Float>,NCOLORS> link = arg.dataOr(nu, idx, parity);
         dx[nu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), mu, 1 - parity);
+        U = arg.dataOr(mu, linkIndexShift(x,dx,X), 1 - parity);
         link *= U;
         dx[nu]--;
         dx[mu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), nu, 1 - parity);
+        U = arg.dataOr(nu, linkIndexShift(x,dx,X), 1 - parity);
         link *= conj(U);
         staple += link;
         dx[mu]--;
         dx[nu]--;
-        arg.dataOr.load((Float*)(link.data), linkIndexShift(x,dx,X), nu, 1 - parity);
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), mu, 1 - parity);
+        link = arg.dataOr(nu, linkIndexShift(x,dx,X), 1 - parity);
+        U = arg.dataOr(mu, linkIndexShift(x,dx,X), 1 - parity);
         link = conj(link) * U;
         dx[mu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), nu, parity);
+        U = arg.dataOr(nu, linkIndexShift(x,dx,X), parity);
         link *= U;
         staple += link;
       }
-    arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+    U = arg.dataOr(mu, idx, parity);
     if ( HeatbathOrRelax ) {
       cuRNGState localState = arg.rngstate.State()[ id ];
       heatBathSUN<Float, NCOLORS>( U, conj(staple), localState, arg.BetaOverNc );
@@ -655,7 +654,7 @@ namespace quda {
     else{
       overrelaxationSUN<Float, NCOLORS>( U, conj(staple) );
     }
-    arg.dataOr.save((Float*)(U.data), idx, mu, parity);
+    arg.dataOr(mu, idx, parity) = U;
   }
 
 
@@ -692,7 +691,7 @@ namespace quda {
     }
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, tp.shared_bytes, stream >> > (arg, mu, parity);
+      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax > <<< tp.grid,tp.block, tp.shared_bytes, stream >>> (arg, mu, parity);
     }
 
     TuneKey tuneKey() const {
@@ -782,7 +781,7 @@ namespace quda {
         }
       }
     }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
+    if ( getVerbosity() >= QUDA_VERBOSE ) {
       qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);
@@ -795,7 +794,7 @@ namespace quda {
     #endif
     }
 
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
+    if ( getVerbosity() >= QUDA_VERBOSE ) profileHBOVR.TPSTART(QUDA_PROFILE_COMPUTE);
     GaugeHB<Float, Gauge, NCOLORS, NElems, false> relax(montearg);
     for ( int step = 0; step < nover; ++step ) {
       for ( int parity = 0; parity < 2; ++parity ) {
@@ -808,7 +807,7 @@ namespace quda {
         }
       }
     }
-    if ( getVerbosity() >= QUDA_SUMMARIZE ) {
+    if ( getVerbosity() >= QUDA_VERBOSE ) {
       qudaDeviceSynchronize();
       profileHBOVR.TPSTOP(QUDA_PROFILE_COMPUTE);
       double secs = profileHBOVR.Last(QUDA_PROFILE_COMPUTE);

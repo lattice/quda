@@ -109,12 +109,9 @@ void packTest() {
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
-    cpsParam.setPrecision(param.cuda_prec);
     cpsParam.reconstruct = param.reconstruct;
+    cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cpsParam.order = (cpsParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      cpsParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
@@ -136,12 +133,9 @@ void packTest() {
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
-    qdpParam.setPrecision(param.cuda_prec);
     qdpParam.reconstruct = param.reconstruct;
+    qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    qdpParam.order = (qdpParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      qdpParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();

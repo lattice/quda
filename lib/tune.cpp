@@ -225,8 +225,8 @@ namespace quda {
       TuneKey key = q.top().first;
       TuneParam param = q.top().second;
 
-      char tmp[14] = { };
-      strncpy(tmp, key.aux, 13);
+      char tmp[TuneKey::aux_n] = { };
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strncmp(tmp, "policy_kernel", 13) == 0 ? true : false;
       bool is_policy = (strncmp(tmp, "policy", 6) == 0 && !is_policy_kernel) ? true : false;
       bool is_nested_policy = (strncmp(tmp, "nested_policy", 6) == 0) ? true : false; // nested policies not included
@@ -266,8 +266,8 @@ namespace quda {
       TuneKey &key = it->key;
 
       // special case kernel members of a policy
-      char tmp[14] = { };
-      strncpy(tmp, key.aux, 13);
+      char tmp[TuneKey::aux_n] = { };
+      strncpy(tmp, key.aux, TuneKey::aux_n);
       bool is_policy_kernel = strcmp(tmp, "policy_kernel") == 0 ? true : false;
 
       out << std::setw(12) << it->time << "\t";
@@ -291,7 +291,6 @@ namespace quda {
   static void broadcastTuneCache()
   {
 #ifdef MULTI_GPU
-
     std::stringstream serialized;
     size_t size;
 
@@ -568,8 +567,8 @@ namespace quda {
 	int n_policy = 0;
 	for (map::iterator entry = tunecache.begin(); entry != tunecache.end(); entry++) {
 	  // if a policy entry, then we can ignore
-	  char tmp[7] = { };
-	  strncpy(tmp, entry->first.aux, 6);
+	  char tmp[TuneKey::aux_n] = { };
+	  strncpy(tmp, entry->first.aux, TuneKey::aux_n);
 	  TuneParam param = entry->second;
 	  bool is_policy = strcmp(tmp, "policy") == 0 ? true : false;
 	  if (param.n_calls > 0 && !is_policy) n_entry++;

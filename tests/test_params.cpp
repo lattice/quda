@@ -54,6 +54,7 @@ quda::mgarray<int> nvec = {};
 quda::mgarray<char[256]> mg_vec_infile;
 quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
+bool inv_deflate = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 0;
 bool verify_results = true;
@@ -63,6 +64,9 @@ double mass = 0.1;
 double kappa = -1.0;
 double mu = 0.1;
 double epsilon = 0.01;
+double m5 = -1.5;
+double b5 = 1.5;
+double c5 = 0.5;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
@@ -140,6 +144,7 @@ QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
+int eig_batched_rotate = 0; // If unchanged, will be set to maximum
 bool eig_require_convergence = true;
 int eig_check_interval = 10;
 int eig_max_restarts = 1000;
@@ -147,7 +152,7 @@ double eig_tol = 1e-6;
 bool eig_use_poly_acc = true;
 int eig_poly_deg = 100;
 double eig_amin = 0.1;
-double eig_amax = 4.0;
+double eig_amax = 0.0; // If zero is passed to the solver, an estimate will be computed
 bool eig_use_normop = true;
 bool eig_use_dagger = false;
 bool eig_compute_svd = false;
@@ -165,6 +170,7 @@ char eig_vec_outfile[256] = "";
 quda::mgarray<bool> mg_eig = {};
 quda::mgarray<int> mg_eig_nEv = {};
 quda::mgarray<int> mg_eig_nKr = {};
+quda::mgarray<int> mg_eig_batched_rotate = {};
 quda::mgarray<bool> mg_eig_require_convergence = {};
 quda::mgarray<int> mg_eig_check_interval = {};
 quda::mgarray<int> mg_eig_max_restarts = {};
@@ -178,6 +184,7 @@ quda::mgarray<bool> mg_eig_use_dagger = {};
 quda::mgarray<QudaEigSpectrumType> mg_eig_spectrum = {};
 quda::mgarray<QudaEigType> mg_eig_type = {};
 bool mg_eig_coarse_guess = false;
+bool mg_eig_preserve_deflation = false;
 
 double heatbath_beta_value = 6.2;
 int heatbath_warmup_steps = 10;
@@ -185,6 +192,15 @@ int heatbath_num_steps = 10;
 int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
+
+double stout_smear_rho = 0.1;
+double stout_smear_epsilon = -0.25;
+double ape_smear_rho = 0.6;
+int smear_steps = 50;
+double wflow_epsilon = 0.01;
+int wflow_steps = 100;
+QudaWFlowType wflow_type = QUDA_WFLOW_TYPE_WILSON;
+int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
@@ -287,6 +303,9 @@ namespace
     {"SR", QUDA_SPECTRUM_SR_EIG}, {"LR", QUDA_SPECTRUM_LR_EIG}, {"SM", QUDA_SPECTRUM_SM_EIG},
     {"LM", QUDA_SPECTRUM_LM_EIG}, {"SI", QUDA_SPECTRUM_SI_EIG}, {"LI", QUDA_SPECTRUM_LI_EIG}};
 
+  CLI::TransformPairs<QudaWFlowType> wflow_type_map {{"wilson", QUDA_WFLOW_TYPE_WILSON},
+                                                     {"symanzik", QUDA_WFLOW_TYPE_SYMANZIK}};
+
   CLI::TransformPairs<QudaSetupType> setup_type_map {{"test", QUDA_TEST_VECTOR_SETUP}, {"null", QUDA_TEST_VECTOR_SETUP}};
 
   CLI::TransformPairs<QudaExtLibType> extlib_map {{"eigen", QUDA_EIGEN_EXTLIB}, {"magma", QUDA_MAGMA_EXTLIB}};
@@ -351,6 +370,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
+  quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -368,6 +388,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--msrc", Msrc,
                        "Used for testing non-square block blas routines where nsrc defines the other dimension");
   quda_app->add_option("--mu", mu, "Twisted-Mass chiral twist of Dirac operator (default 0.1)");
+  quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
+  quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
+  quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
   quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
@@ -378,7 +401,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--pipeline", pipeline,
                        "The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)");
 
-  // // precision options
+  // precision options
 
   CLI::QUDACheckedTransformer prec_transform(precision_map);
   quda_app->add_option("--prec", prec, "Precision in GPU")->transform(prec_transform);
@@ -503,7 +526,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
 
-  // Ooption group for Eigensolver related options
+  // Option group for Eigensolver related options
   auto opgroup = quda_app->add_option_group("Eigensolver", "Options controlling eigensolver");
 
   opgroup->add_option("--eig-amax", eig_amax, "The maximum in the polynomial acceleration")->check(CLI::PositiveNumber);
@@ -523,6 +546,8 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested");
   opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
+  opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
+                      "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   opgroup->add_option("--eig-poly-deg", eig_poly_deg, "TODO");
   opgroup->add_option(
     "--eig-require-convergence",
@@ -623,14 +648,19 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   quda_app->add_mgoption(
     opgroup, "--mg-eig-check-interval", mg_eig_check_interval, CLI::Validator(),
     "Perform a convergence check every nth restart/iteration (only used in Implicit Restart types)");
-  quda_app->add_mgoption(opgroup, "--mg-eig-coarse-guess", mg_eig_use_poly_acc, CLI::Validator(),
-                         "If deflating on the coarse grid, optionaly use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-coarse-guess", mg_eig_coarse_guess,
+                       "If deflating on the coarse grid, optionally use an initial guess (default = false)");
+  quda_app->add_option("--mg-eig-preserve-deflation", mg_eig_preserve_deflation,
+                       "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
   quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
                          "The size of the Krylov subspace to use in the eigensolver");
+  quda_app->add_mgoption(
+    opgroup, "--mg-eig-batched-rotate", mg_eig_batched_rotate, CLI::Validator(),
+    "The maximum number of extra eigenvectors the solver may allocate to perform a Ritz rotation.");
   quda_app->add_mgoption(opgroup, "--mg-eig-poly-deg", mg_eig_poly_deg, CLI::PositiveNumber,
                          "Set the degree of the Chebyshev polynomial (default 100)");
   quda_app->add_mgoption(
@@ -738,4 +768,32 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
+}
+
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
+{
+
+  // Option group for SU(3) related options
+  auto opgroup = quda_app->add_option_group("SU(3)", "Options controlling SU(3) tests");
+  opgroup->add_option("--su3-ape-rho", ape_smear_rho, "rho coefficient for APE smearing (default 0.6)");
+
+  opgroup->add_option("--su3-stout-rho", stout_smear_rho,
+                      "rho coefficient for Stout and Over-Improved Stout smearing (default 0.08)");
+
+  opgroup->add_option("--su3-stout-epsilon", stout_smear_epsilon,
+                      "epsilon coefficient for Over-Improved Stout smearing (default -0.25)");
+
+  opgroup->add_option("--su3-smear-steps", smear_steps, "The number of smearing steps to perform (default 50)");
+
+  opgroup->add_option("--su3-wflow-epsilon", wflow_epsilon, "The step size in the Runge-Kutta integrator (default 0.01)");
+
+  opgroup->add_option("--su3-wflow-steps", wflow_steps,
+                      "The number of steps in the Runge-Kutta integrator (default 100)");
+
+  opgroup->add_option("--su3-wflow-type", wflow_type, "The type of action to use in the wilson flow (default wilson)")
+    ->transform(CLI::QUDACheckedTransformer(wflow_type_map));
+  ;
+
+  opgroup->add_option("--su3-measurement-interval", measurement_interval,
+                      "Measure the field energy and topological charge every Nth step (default 5) ");
 }

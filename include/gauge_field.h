@@ -7,6 +7,37 @@
 
 namespace quda {
 
+  namespace gauge
+  {
+
+    inline bool isNative(QudaGaugeFieldOrder order, QudaPrecision precision, QudaReconstructType reconstruct)
+    {
+      if (precision == QUDA_DOUBLE_PRECISION) {
+        if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+      } else if (precision == QUDA_SINGLE_PRECISION) {
+        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13
+                   || reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+        }
+      } else if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
+        if (reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+          if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+        } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
+#ifdef FLOAT8
+          if (order == QUDA_FLOAT8_GAUGE_ORDER) return true;
+#else
+          if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
+#endif
+        }
+      }
+      return false;
+    }
+  } // namespace gauge
+
   struct GaugeFieldParam : public LatticeFieldParam {
 
     QudaFieldLocation location; // where are we storing the field (CUDA or GPU)?
@@ -131,30 +162,24 @@ namespace quda {
         void setPrecision(QudaPrecision precision, bool force_native = false)
         {
           // is the current status in native field order?
-          bool native = force_native ? true : false;
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-          } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-                     || precision == QUDA_QUARTER_PRECISION) {
-            if (reconstruct == QUDA_RECONSTRUCT_NO) {
-              if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-              if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-              if (order == QUDA_FLOAT4_GAUGE_ORDER) native = true;
-            } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-              if (order == QUDA_FLOAT2_GAUGE_ORDER) native = true;
-            }
-          }
-
+          bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
           this->precision = precision;
           this->ghost_precision = precision;
 
           if (native) {
-            order = (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
-                     || reconstruct == QUDA_RECONSTRUCT_10) ?
-              QUDA_FLOAT2_GAUGE_ORDER :
-              QUDA_FLOAT4_GAUGE_ORDER;
+            if (precision == QUDA_DOUBLE_PRECISION || precision == QUDA_DOUBLE_PRECISION
+                || reconstruct == QUDA_RECONSTRUCT_NO) {
+              order = QUDA_FLOAT2_GAUGE_ORDER;
+            } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+                       && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
+#ifdef FLOAT8
+              order = QUDA_FLOAT8_GAUGE_ORDER;
+#else
+              order = QUDA_FLOAT4_GAUGE_ORDER;
+#endif
+            } else {
+              order = QUDA_FLOAT4_GAUGE_ORDER;
+            }
           }
         }
   };
@@ -281,7 +306,7 @@ namespace quda {
     int Nface() const { return nFace; }
 
     /**
-       @brief This does routine will populate the border / halo region of a
+       @brief This routine will populate the border / halo region of a
        gauge field that has been created using copyExtendedGauge.
        @param R The thickness of the extended region in each dimension
        @param no_comms_fill Do local exchange to fill out the extended
@@ -290,7 +315,7 @@ namespace quda {
     virtual void exchangeExtendedGhost(const int *R, bool no_comms_fill = false) = 0;
 
     /**
-       @brief This does routine will populate the border / halo region
+       @brief This routine will populate the border / halo region
        of a gauge field that has been created using copyExtendedGauge.
        Overloaded variant that will start and stop a comms profile.
        @param R The thickness of the extended region in each dimension
@@ -358,28 +383,28 @@ namespace quda {
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L1 norm
      */
-    double norm1(int dim=-1) const;
+    double norm1(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the L2 norm squared of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return L2 norm squared
      */
-    double norm2(int dim=-1) const;
+    double norm2(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute maximum of the field (Linfinity norm)
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute maximum value
      */
-    double abs_max(int dim=-1) const;
+    double abs_max(int dim = -1, bool fixed = false) const;
 
     /**
        @brief Compute the absolute minimum of the field
        @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
        @return Absolute minimum value
      */
-    double abs_min(int dim=-1) const;
+    double abs_min(int dim = -1, bool fixed = false) const;
 
     /**
        Compute checksum of this gauge field: this uses a XOR-based checksum method
@@ -389,7 +414,7 @@ namespace quda {
        a field has changed with a global update algorithm.
        @return checksum value
      */
-    uint64_t checksum(bool mini=false) const;
+    uint64_t checksum(bool mini = false) const;
 
     /**
        @brief Create the gauge field, with meta data specified in the
@@ -575,6 +600,14 @@ namespace quda {
        @brief Restores the cudaGaugeField to CUDA memory
     */
     void restore() const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and buffers to the CPU or the GPU
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {

@@ -56,9 +56,6 @@ namespace quda {
     /** The null space vectors */
     std::vector<ColorSpinorField*> &B;
 
-    /** The eigenvalue array */
-    std::vector<Complex> evals;
-
     /** Number of pre-smoothing applications to perform */
     int nu_pre;
 
@@ -102,6 +99,9 @@ namespace quda {
     /** Filename for where to load/store the null space */
     char filename[100];
 
+    /** Whether or not this is a staggered solve or not */
+    bool is_staggered;
+
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
@@ -127,7 +127,8 @@ namespace quda {
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
       location(param.location[level]),
-      setup_location(param.setup_location[level])
+      setup_location(param.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
@@ -136,8 +137,8 @@ namespace quda {
       omega = param.omega[level];
     }
 
-    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, std::vector<Complex> evals,
-            DiracMatrix *matResidual, DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+            DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),
@@ -148,7 +149,6 @@ namespace quda {
       coarse(param.coarse),
       fine(param.fine),
       B(B),
-      evals(evals),
       nu_pre(param.mg_global.nu_pre[level]),
       nu_post(param.mg_global.nu_post[level]),
       smoother_tol(param.mg_global.smoother_tol[level]),
@@ -161,7 +161,8 @@ namespace quda {
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
       location(param.mg_global.location[level]),
-      setup_location(param.mg_global.setup_location[level])
+      setup_location(param.mg_global.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
     {
       // set the block size
       for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
@@ -225,7 +226,7 @@ namespace quda {
     /** Residual vector */
     ColorSpinorField *r;
 
-    /** Projected source vector for preconditioned syste, else just points to source */
+    /** Projected source vector for preconditioned system, else just points to source */
     ColorSpinorField *b_tilde;
 
     /** Coarse residual vector */
@@ -297,6 +298,11 @@ public:
     virtual ~MG();
 
     /**
+       @return MG can solve non-Hermitian systems
+     */
+    bool hermitian() { return false; };
+
+    /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
        @param Whether we are refreshing the null-space components or just updating the operators
      */
@@ -333,12 +339,17 @@ public:
     void destroyCoarseSolver();
 
     /**
-       This method verifies the correctness of the MG method.  It checks:
+       @brief Verify the correctness of the MG method, optionally recursively
+       starting from the top down.
+       @details This method verifies the correctness of the MG method.  It checks:
        1. Null-space vectors are exactly preserved: v_k = P R v_k
        2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c
        3. The emulated coarse Dirac operator matches the native one: D_c = R D P
+       4. The preconditioned operator was correctly formulated: \hat{D}_c - X^{-1} D_c
+       5. The normal operator is indeed normal: im(<x|D^\dag D|x>) < epsilon
+       @param recursively[in] Whether or not to recursively verify coarser levels, default false
      */
-    void verify();
+    void verify(bool recursively = false);
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector
@@ -426,6 +437,20 @@ public:
 		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
+     @brief Coarse operator construction from a fine-grid operator (Staggered)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param mass[in] Mass parameter
+     @param matpc[in] The type of even-odd preconditioned fine-grid
+     operator we are constructing the coarse grid operator from.
+     For staggered, should always be QUDA_MATPC_INVALID.
+   */
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
+                         QudaDiracType dirac, QudaMatPCType matpc);
+
+  /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
@@ -440,10 +465,13 @@ public:
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
+     @param need_bidirectional[in] Whether or not we need to force a bi-directional
+     build, even if the given level isn't preconditioned---if any previous level is
+     preconditioned, we've violated that symmetry.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
-		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
@@ -470,7 +498,6 @@ public:
     DiracM *mSmoothSloppy;
 
     std::vector<ColorSpinorField*> B;
-    std::vector<Complex> evals;
 
     MGParam *mgParam;
 

@@ -252,8 +252,8 @@ namespace quda {
     extern Worker* aux_worker;
   } 
   
-  BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
+  BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, param, profile), nKrylov(param.Nkrylov), init(false)
   {
     r.resize(nKrylov+1);
     u.resize(nKrylov+1);

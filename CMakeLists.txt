@@ -71,7 +71,7 @@ endif()
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 0.9.0 LANGUAGES)
+project("QUDA" VERSION 1.0.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -106,8 +106,6 @@ set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
 set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
 set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
-set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
-set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
@@ -161,6 +159,7 @@ endif()
 set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
+set(QUDA_FLOAT8 OFF CACHE BOOL "enable float-8 ordered fixed-point fields?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity")
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
@@ -176,7 +175,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
-set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+set(QUDA_FAST_COMPILE_REDUCE OFF CACHE BOOL "enable fast compilation in blas and reduction kernels (single warp per reduction)")
+set(QUDA_FAST_COMPILE_DSLASH OFF CACHE BOOL "enable fast compilation in dslash kernels (~20% perf impact)")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
@@ -205,7 +205,9 @@ set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
-mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
+mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
+mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -311,10 +313,10 @@ set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
@@ -332,9 +334,9 @@ set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING "Flags used by the C compi
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING "Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall -DDEVICE_DEBUG" CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline -DHOST_DEBUG"
+    "-Wall -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
     "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
@@ -422,7 +424,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
@@ -650,8 +652,12 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
-if(QUDA_REDUCE_SINGLE_WARP)
-add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+if(QUDA_FAST_COMPILE_REDUCE)
+add_definitions(-DQUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+add_definitions(-DQUDA_FAST_COMPILE_DSLASH)
 endif()
 
 # set which precisions to enable
@@ -713,13 +719,9 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_LINK_ASQTAD)
-  add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_ASQTAD)
-
-if(QUDA_LINK_HISQ)
-  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_HISQ)
+if(QUDA_DIRAC_STAGGERED)
+  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE)
+endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
@@ -737,7 +739,6 @@ if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
-  list(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_MPI_NVTX)
@@ -754,8 +755,6 @@ if(QUDA_NVTX)
   find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
   if(NVTX3)
     add_definitions(-DQUDA_NVTX_VERSION=3)
-  else(NVTX)
-    list(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
   endif(NVTX3)
 endif(QUDA_NVTX)
 
@@ -842,10 +841,10 @@ set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "${QUDA_NVCC_FLAGS} -G"
+    "${QUDA_NVCC_FLAGS} -G -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G"
+    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -DDEVICE_DEBUG -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined"
@@ -894,6 +893,11 @@ endif()
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
+
+if(${CUDA_VERSION} STREQUAL "10.2")
+  set(CMAKE_CUDA_FLAGS
+      "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
+endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )

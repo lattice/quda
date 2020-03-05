@@ -13,21 +13,14 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
 #include <qio_field.h>
-
+#include <color_spinor_field.h>
 
 #include <gauge_field.h>
 #include <gauge_tools.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
 #include <unitarization_links.h>
-
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -60,7 +53,31 @@ display_test_info()
   printfQuda("Outer solver paramers\n");
   printfQuda(" - pipeline = %d\n", pipeline);
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
+  printfQuda("Eigensolver parameters\n");
+  for (int i = 0; i < mg_levels; i++) {
+    if (low_mode_check || mg_eig[i]) {
+      printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
+      printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+      printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
+      printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+      printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+      printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
+      printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
+                 mg_eig_use_normop[i] ? "true" : "false");
+      if (mg_eig_use_poly_acc[i]) {
+        printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+        printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+        if (mg_eig_amax[i] <= 0)
+          printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+        else
+          printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+      }
+      printfQuda("\n");
+    }
+  }
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", 
 	     dimPartitioned(0),
 	     dimPartitioned(1),
@@ -76,7 +93,8 @@ QudaPrecision &cuda_prec = prec;
 QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 QudaPrecision &cuda_prec_precondition = prec_precondition;
 
-void setGaugeParam(QudaGaugeParam &gauge_param) {
+void setGaugeParam(QudaGaugeParam &gauge_param)
+{
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
@@ -114,7 +132,46 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 #endif
 }
 
-void setMultigridParam(QudaMultigridParam &mg_param) {
+// Parameters defining the eigensolver
+void setEigParam(QudaEigParam &mg_eig_param, int level)
+{
+  mg_eig_param.eig_type = mg_eig_type[level];
+  mg_eig_param.spectrum = mg_eig_spectrum[level];
+  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
+      && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
+  }
+
+  mg_eig_param.nEv = mg_eig_nEv[level];
+  mg_eig_param.nKr = mg_eig_nKr[level];
+  mg_eig_param.nConv = nvec[level];
+  mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  mg_eig_param.tol = mg_eig_tol[level];
+  mg_eig_param.check_interval = mg_eig_check_interval[level];
+  mg_eig_param.max_restarts = mg_eig_max_restarts[level];
+  mg_eig_param.cuda_prec_ritz = cuda_prec;
+
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.poly_deg = mg_eig_poly_deg[level];
+  mg_eig_param.a_min = mg_eig_amin[level];
+  mg_eig_param.a_max = mg_eig_amax[level];
+
+  // set file i/o parameters
+  // Give empty strings, Multigrid will handle IO.
+  strcpy(mg_eig_param.vec_infile, "");
+  strcpy(mg_eig_param.vec_outfile, "");
+
+  strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
+}
+
+void setMultigridParam(QudaMultigridParam &mg_param)
+{
   QudaInvertParam &inv_param = *mg_param.invert_param;
 
   inv_param.Ls = 1;
@@ -135,6 +192,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
   }
@@ -162,6 +220,8 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
       printfQuda("Twisted-mass doublet non supported (yet)\n");
       exit(0);
     }
+  } else {
+    inv_param.mu = 0.0;
   }
 
   inv_param.dagger = QUDA_DAG_NO;
@@ -175,10 +235,12 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<QUDA_MAX_DIM; j++) {
+    for (int j = 0; j < 4; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
+    for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.spin_block_size[i] = 1;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
@@ -235,7 +297,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
@@ -308,33 +370,44 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 
     }
 
-    mg_param.omega[i] = 0.85; // over/under relaxation factor
+    mg_param.omega[i] = omega; // over/under relaxation factor
 
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
   }
 
+  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
+
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
   mg_param.setup_type = setup_type;
-  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
+  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
-  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // Is NOT a staggered solve
+  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
     strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
+
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.preserve_deflation = QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -349,6 +422,7 @@ void setMultigridParam(QudaMultigridParam &mg_param) {
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
+
   inv_param.Ls = 1;
 
   inv_param.sp_pad = 0;
@@ -368,6 +442,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
     inv_param.clover_cuda_prec = cuda_prec;
     inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
     inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
+    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
   }
 
@@ -394,6 +469,8 @@ void setInvertParam(QudaInvertParam &inv_param) {
       printfQuda("Twisted-mass doublet non supported (yet)\n");
       exit(0);
     }
+  } else {
+    inv_param.mu = 0.0;
   }
 
   inv_param.clover_coeff = clover_coeff;
@@ -468,6 +545,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
 int main(int argc, char **argv)
 {
   // We give here the default values to some of the array
+  solve_type = QUDA_DIRECT_PC_SOLVE;
   for (int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
@@ -490,6 +568,23 @@ int main(int argc, char **argv)
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
+
+    // Default eigensolver params
+    mg_eig[i] = false;
+    mg_eig_tol[i] = 1e-3;
+    mg_eig_nEv[i] = nvec[i];
+    mg_eig_nKr[i] = 3 * nvec[i];
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
+    mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
+    mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
+    mg_eig_check_interval[i] = 5;
+    mg_eig_max_restarts[i] = 100;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
+    mg_eig_poly_deg[i] = 100;
+    mg_eig_amin[i] = 1.0;
+    mg_eig_amax[i] = -1.0; // use power iterations
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
@@ -523,7 +618,7 @@ int main(int argc, char **argv)
   if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
-  for(int i =0; i<QUDA_MAX_MG_LEVEL; i++) {
+  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
     if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
   }
@@ -533,8 +628,6 @@ int main(int argc, char **argv)
 
   // call srand() with a rank-dependent seed
   initRand();
-
-  display_test_info();
 
   // *** QUDA parameters begin here.
 
@@ -549,15 +642,28 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setGaugeParam(gauge_param);
 
-  QudaInvertParam mg_inv_param = newQudaInvertParam();
-  QudaMultigridParam mg_param = newQudaMultigridParam();
-  mg_param.invert_param = &mg_inv_param;
-
-  setMultigridParam(mg_param);
-
-
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
+
+  QudaMultigridParam mg_param = newQudaMultigridParam();
+  // Set sub structures
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
+  QudaEigParam mg_eig_param[mg_levels];
+  for (int i = 0; i < mg_levels; i++) {
+    if (mg_eig[i]) {
+      mg_eig_param[i] = newQudaEigParam();
+      setEigParam(mg_eig_param[i], i);
+      mg_param.eig_param[i] = &mg_eig_param[i];
+    } else {
+      mg_param.eig_param[i] = nullptr;
+    }
+  }
+
+  // Set MG
+  mg_param.invert_param = &mg_inv_param;
+  setMultigridParam(mg_param);
+
+  display_test_info();
 
   // *** Everything between here and the call to initQuda() is
   // *** application-specific.
@@ -578,12 +684,14 @@ int main(int argc, char **argv)
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate a random SU(3) field
-    //generate a random SU(3) field
-    //construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    //generate a unit SU(3) field
-    construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    
+  } else { // else generate an SU(3) field
+    if (unit_gauge) {
+      // unit SU(3) field
+      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      // random SU(3) field
+      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
+    }
   }
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
@@ -603,9 +711,7 @@ int main(int argc, char **argv)
 
   void *spinorIn = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
   void *spinorCheck = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-
-  void *spinorOut = NULL;
-  spinorOut = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
+  void *spinorOut = malloc(V * spinorSiteSize * sSize * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -621,8 +727,7 @@ int main(int argc, char **argv)
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
-    gParam.order       = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
@@ -639,6 +744,11 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
+
+    QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
+    obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+    obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
@@ -646,7 +756,7 @@ int main(int argc, char **argv)
     int nsteps = 10;
     int nhbsteps = 1;
     int novrsteps = 1;
-    bool  coldstart = false;
+    bool coldstart = false;
     double beta_value = 6.2;
 
     if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *gaugeEx);
@@ -655,22 +765,31 @@ int main(int argc, char **argv)
     }
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette(*gaugeEx);
 
     Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    double3 plaq = plaquette(*gaugeEx);
-    double charge = qChargeQuda();
-    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
+    gaugeObservablesQuda(&obs_param);
+    // Demonstrate MG evolution on an evolving gauge field
+    //----------------------------------------------------
+    printfQuda("\n======================================================\n");
+    printfQuda("Running MG gauge evolution test at constant quark mass\n");
+    printfQuda("======================================================\n");
+    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", 0,
+               obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+
+    // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
+    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
+      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
+      loadCloverQuda(clover, clover_inv, &inv_param);
+
+    inv_param.solve_type = solve_type; // restore actual solve_type we want to do
 
     // create a point source at 0 (in each subvolume...  FIXME)
     memset(spinorIn, 0, inv_param.Ls*V*spinorSiteSize*sSize);
@@ -702,12 +821,10 @@ int main(int argc, char **argv)
     // setup the multigrid solver
     void *mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
-
     invertQuda(spinorOut, spinorIn, &inv_param);
 
-    freeGaugeQuda();
-
-    for(int step=1; step<=nsteps; ++step){
+    for (int step = 1; step < nsteps; ++step) {
+      freeGaugeQuda();
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
@@ -717,27 +834,21 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      plaq = plaquette(*gaugeEx);
-      charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      gaugeObservablesQuda(&obs_param);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
 
-      if (1) {
-	updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new gauge and clover fields
-      } else {
-	destroyMultigridQuda(mg_preconditioner);
-	mg_preconditioner = newMultigridQuda(&mg_param);
-	inv_param.preconditioner = mg_preconditioner;
-      }
+      updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new gauge and clover fields
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_param.iter == inv_param.maxiter) {
         char vec_outfile[QUDA_MAX_MG_LEVEL][256];
         for (int i=0; i<mg_param.n_level; i++) {
           strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
-          sprintf(mg_param.vec_outfile[i], "dump_step_%d", step);
+          sprintf(mg_param.vec_outfile[i], "dump_step_evolve_%d", step);
         }
         warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
                     mg_param.vec_outfile[0]);
@@ -747,8 +858,86 @@ int main(int argc, char **argv)
           strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
         }
       }
+    }
 
-      freeGaugeQuda();
+    // free the multigrid solver
+    destroyMultigridQuda(mg_preconditioner);
+
+    // Demonstrate MG evolution on a fixed gauge field and different masses
+    //---------------------------------------------------------------------
+    // setup the multigrid solver
+    printfQuda("\n====================================================\n");
+    printfQuda("Running MG mass scaling test at constant gauge field\n");
+    printfQuda("====================================================\n");
+
+    invertQuda(spinorOut, spinorIn, &inv_param2);
+
+    mg_param.preserve_deflation = mg_eig_preserve_deflation ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    for (int i = 0; i < mg_param.n_level; i++) mg_param.setup_maxiter_refresh[i] = 0;
+
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+    invertQuda(spinorOut, spinorIn, &inv_param);
+
+    freeGaugeQuda();
+
+    // Reunitarize gauge links...
+    CallUnitarizeLinks(gaugeEx);
+
+    // copy into regular field
+    copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
+
+    loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
+    for (int step = 1; step < nsteps; ++step) {
+
+      gaugeObservablesQuda(&obs_param);
+
+      // Increment the mass/kappa and mu values to emulate heavy/light flavour updates
+      if (kappa == -1.0) {
+        inv_param.mass = mass + 0.01 * step;
+        inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
+        mg_param.invert_param->mass = inv_param.mass;
+        mg_param.invert_param->kappa = inv_param.kappa;
+        inv_param2.mass = mass + 0.01 * step;
+        inv_param2.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass + 0.01 * step));
+      } else {
+        inv_param.kappa = kappa - 0.001 * step;
+        inv_param.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
+        mg_param.invert_param->mass = inv_param.mass;
+        mg_param.invert_param->kappa = inv_param.kappa;
+        inv_param2.kappa = kappa - 0.001 * step;
+        inv_param2.mass = 0.5 / (kappa - 0.001 * step) - (1 + 3 / anisotropy);
+      }
+      if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        // Multiply by -1.0 to emulate twist switch
+        inv_param.mu = -1.0 * mu + 0.01 * step;
+        inv_param2.mu = -1.0 * mu + 0.01 * step;
+        mg_param.invert_param->mu = inv_param.mu;
+      }
+
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+
+      // reference BiCGStab for comparison
+      invertQuda(spinorOut, spinorIn, &inv_param2);
+
+      updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
+      invertQuda(spinorOut, spinorIn, &inv_param);
+
+      if (inv_param.iter == inv_param.maxiter) {
+        char vec_outfile[QUDA_MAX_MG_LEVEL][256];
+        for (int i = 0; i < mg_param.n_level; i++) {
+          strcpy(vec_outfile[i], mg_param.vec_outfile[i]);
+          sprintf(mg_param.vec_outfile[i], "dump_step_shift_%d", step);
+        }
+        warningQuda("Solver failed to converge within max iteration count - dumping null vectors to %s",
+                    mg_param.vec_outfile[0]);
+
+        dumpMultigridQuda(mg_preconditioner, &mg_param);
+        for (int i = 0; i < mg_param.n_level; i++) {
+          strcpy(mg_param.vec_outfile[i], vec_outfile[i]); // restore output file name
+        }
+      }
     }
 
     // free the multigrid solver
@@ -787,6 +976,10 @@ int main(int argc, char **argv)
   }
 
   for (int dir = 0; dir<4; dir++) free(gauge[dir]);
+
+  free(spinorIn);
+  free(spinorCheck);
+  free(spinorOut);
 
   return 0;
 }

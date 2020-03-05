@@ -145,22 +145,26 @@ void printQudaEigParam(QudaEigParam *param) {
 #endif
 
 #if defined INIT_PARAM
-  P(use_poly_acc, QUDA_BOOLEAN_NO);
+  P(use_poly_acc, QUDA_BOOLEAN_FALSE);
   P(poly_deg, 0);
   P(a_min, 0.0);
   P(a_max, 0.0);
-  P(use_dagger, QUDA_BOOLEAN_NO);
-  P(use_norm_op, QUDA_BOOLEAN_NO);
-  P(compute_svd, QUDA_BOOLEAN_NO);
-  P(require_convergence, QUDA_BOOLEAN_YES);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
+  P(preserve_deflation_space, 0);
+  P(preserve_evals, QUDA_BOOLEAN_TRUE);
+  P(use_dagger, QUDA_BOOLEAN_FALSE);
+  P(use_norm_op, QUDA_BOOLEAN_FALSE);
+  P(compute_svd, QUDA_BOOLEAN_FALSE);
+  P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
   P(nEv, 0);
   P(nKr, 0);
   P(nConv, 0);
+  P(batched_rotate, 0);
   P(tol, 0.0);
   P(check_interval, 0);
   P(max_restarts, 0);
-  P(arpack_check, QUDA_BOOLEAN_NO);
+  P(arpack_check, QUDA_BOOLEAN_FALSE);
   P(nk, 0);
   P(np, 0);
   P(eig_type, QUDA_EIG_TR_LANCZOS);
@@ -171,6 +175,8 @@ void printQudaEigParam(QudaEigParam *param) {
   P(poly_deg, INVALID_INT);
   P(a_min, INVALID_DOUBLE);
   P(a_max, INVALID_DOUBLE);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
+  P(preserve_evals, QUDA_BOOLEAN_INVALID);
   P(use_dagger, QUDA_BOOLEAN_INVALID);
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
@@ -178,6 +184,7 @@ void printQudaEigParam(QudaEigParam *param) {
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
+  P(batched_rotate, INVALID_INT);
   P(tol, INVALID_DOUBLE);
   P(check_interval, INVALID_INT);
   P(max_restarts, INVALID_INT);
@@ -478,6 +485,14 @@ void printQudaInvertParam(QudaInvertParam *param) {
   }
 #endif
 
+#if defined(INIT_PARAM)
+  P(eig_param, 0);
+#elif defined(CHECK_PARAM)
+  if (param->eig_param && param->inv_type_precondition != QUDA_INVALID_INVERTER) {
+    errorQuda("At present cannot combine deflation with Schwarz preconditioner");
+  }
+#endif
+
 #ifdef INIT_PARAM
   P(use_init_guess, QUDA_USE_INIT_GUESS_NO); //set the default to no
   P(omega, 1.0); // set default to no relaxation
@@ -623,13 +638,13 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
-  P(pre_orthonormalize, QUDA_BOOLEAN_NO);
+  P(pre_orthonormalize, QUDA_BOOLEAN_FALSE);
 #else
   P(pre_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
 
 #ifdef INIT_PARAM
-  P(post_orthonormalize, QUDA_BOOLEAN_YES);
+  P(post_orthonormalize, QUDA_BOOLEAN_TRUE);
 #else
   P(post_orthonormalize, QUDA_BOOLEAN_INVALID);
 #endif
@@ -651,7 +666,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(num_setup_iter[i], INVALID_INT);
 #endif
 #ifdef INIT_PARAM
-    P(use_eig_solver[i], QUDA_BOOLEAN_NO);
+    P(use_eig_solver[i], QUDA_BOOLEAN_FALSE);
 #else
     P(use_eig_solver[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -741,7 +756,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(coarse_solver_tol[i], INVALID_DOUBLE);
     P(smoother_tol[i], INVALID_DOUBLE);
 #ifdef INIT_PARAM
-    P(global_reduction[i], QUDA_BOOLEAN_YES);
+    P(global_reduction[i], QUDA_BOOLEAN_TRUE);
 #else
     P(global_reduction[i], QUDA_BOOLEAN_INVALID);
 #endif
@@ -757,7 +772,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
   }
 
 #ifdef INIT_PARAM
-  P(setup_minimize_memory, QUDA_BOOLEAN_NO);
+  P(setup_minimize_memory, QUDA_BOOLEAN_FALSE);
 #else
   P(setup_minimize_memory, QUDA_BOOLEAN_INVALID);
 #endif
@@ -768,7 +783,7 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #ifdef CHECK_PARAM
   // if only doing top-level null-space generation, check that n_vec
   // is equal on all levels
-  if (param->generate_all_levels == QUDA_BOOLEAN_NO && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
+  if (param->generate_all_levels == QUDA_BOOLEAN_FALSE && param->compute_null_vector == QUDA_COMPUTE_NULL_VECTOR_YES) {
     for (int i=1; i<n_level-1; i++)
       if (param->n_vec[0] != param->n_vec[i])
 	errorQuda("n_vec %d != %d must be equal on all levels if generate_all_levels == false",
@@ -777,13 +792,17 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
   P(run_verify, QUDA_BOOLEAN_INVALID);
-  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
-  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
 
 #ifdef INIT_PARAM
-  P(coarse_guess, QUDA_BOOLEAN_NO);
+  P(run_low_mode_check, QUDA_BOOLEAN_FALSE);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_FALSE);
+  P(coarse_guess, QUDA_BOOLEAN_FALSE);
+  P(preserve_deflation, QUDA_BOOLEAN_FALSE);
 #else
+  P(run_low_mode_check, QUDA_BOOLEAN_INVALID);
+  P(run_oblique_proj_check, QUDA_BOOLEAN_INVALID);
   P(coarse_guess, QUDA_BOOLEAN_INVALID);
+  P(preserve_deflation, QUDA_BOOLEAN_INVALID);
 #endif
 
   for (int i = 0; i < n_level - 1; i++) {
@@ -791,8 +810,8 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
     P(vec_load[i], QUDA_BOOLEAN_INVALID);
     P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #else
-    P(vec_load[i], QUDA_BOOLEAN_NO);
-    P(vec_store[i], QUDA_BOOLEAN_NO);
+    P(vec_load[i], QUDA_BOOLEAN_FALSE);
+    P(vec_store[i], QUDA_BOOLEAN_FALSE);
 #endif
   }
 
@@ -805,11 +824,47 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 #endif
 
 #ifdef INIT_PARAM
+  P(is_staggered, QUDA_BOOLEAN_FALSE);
+#else
+  P(is_staggered, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
   return ret;
 #endif
 
 }
 
+#if defined INIT_PARAM
+QudaGaugeObservableParam newQudaGaugeObservableParam(void)
+{
+  QudaGaugeObservableParam ret;
+#elif defined CHECK_PARAM
+static void checkGaugeObservableParam(QudaGaugeObservableParam *param)
+{
+#else
+void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
+{
+  printfQuda("QUDA Gauge-Observable Parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(su_project, QUDA_BOOLEAN_FALSE);
+  P(compute_plaquette, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge, QUDA_BOOLEAN_FALSE);
+  P(compute_qcharge_density, QUDA_BOOLEAN_FALSE);
+  P(qcharge_density, nullptr);
+#else
+  P(su_project, QUDA_BOOLEAN_INVALID);
+  P(compute_plaquette, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge, QUDA_BOOLEAN_INVALID);
+  P(compute_qcharge_density, QUDA_BOOLEAN_INVALID);
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
 
 // clean up
 

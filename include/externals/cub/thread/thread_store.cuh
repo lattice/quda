@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -348,7 +348,7 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     for (int i = 0; i < SHUFFLE_MULTIPLE; ++i)
         reinterpret_cast<ShuffleWord*>(words)[i] = reinterpret_cast<ShuffleWord*>(&val)[i];
 
-    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
+    IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference<volatile VolatileWord*,VolatileWord>(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
 }

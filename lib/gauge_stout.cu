@@ -38,7 +38,7 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeSTOUTStep").instantiate(Type<Arg>())
+      jitify_error = program->kernel("quda::computeSTOUTStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       computeSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
@@ -51,10 +51,10 @@ public:
     void postTune() { arg.out.load(); }
 
     long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 3 * ((1 + 2 * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; }
+    long long bytes() const { return ((1 + stoutDim * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
   }; // GaugeSTOUT
-
-  void STOUTStep(GaugeField &out, const GaugeField &in, double rho)
+  
+  void STOUTStep(GaugeField &out, GaugeField &in, double rho)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -63,7 +63,10 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeSTOUT>(out, in, rho);
+    out.exchangeExtendedGhost(out.R(), false);    
 #else
     errorQuda("Gauge tools are not built");
 #endif
@@ -71,7 +74,7 @@ public:
 
   template <typename Float, int nColor, QudaReconstructType recon> class GaugeOvrImpSTOUT : TunableVectorYZ
   {
-    static constexpr int stoutDim = 4; // apply stouting in space only
+    static constexpr int stoutDim = 4; // apply stouting in all dims
     GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
     const GaugeField &meta;
 
@@ -98,7 +101,7 @@ public:
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;
-      jitify_error = program->kernel("quda::computeOvrImpSTOUTStep").instantiate(Type<Arg>())
+      jitify_error = program->kernel("quda::computeOvrImpSTOUTStep").instantiate(Type<decltype(arg)>())
         .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
       computeOvrImpSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
@@ -111,10 +114,10 @@ public:
     void postTune() { arg.out.load(); }
 
     long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
-    long long bytes() const { return 4*((1+2*12)*arg.in.Bytes()+arg.out.Bytes())*arg.threads; }
+    long long bytes() const { return ((1 + stoutDim * 24) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } //24 links per dim, 1 in, 1 out
   }; // GaugeOvrImpSTOUT
 
-  void OvrImpSTOUTStep(GaugeField &out, const GaugeField& in, double rho, double epsilon)
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
   {
 #ifdef GPU_GAUGE_TOOLS
     checkPrecision(out, in);
@@ -123,7 +126,11 @@ public:
     if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
     if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
     instantiate<GaugeOvrImpSTOUT>(out, in, rho, epsilon);
+    out.exchangeExtendedGhost(out.R(), false);
+    
 #else
     errorQuda("Gauge tools are not built");
 #endif
