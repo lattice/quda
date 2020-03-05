@@ -95,7 +95,7 @@ namespace quda
             ghostFaceIndex<1, Arg::nDim>(coord, arg.dim, d, arg.nFace) : idx;
 
           Link U = arg.U(d, gauge_idx, gauge_parity);
-          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], parity);
+          HalfVector in = arg.in.Ghost(d, 1, ghost_idx + coord.s * arg.dc.ghostFaceCB[d], their_spinor_parity);
           if (d == 3) in *= arg.t_proj_scale; // put this in the Ghost accessor and merge with any rescaling?
 
           out += (U * in).reconstruct(d, proj_dir);

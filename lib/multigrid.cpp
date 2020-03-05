@@ -12,7 +12,7 @@ namespace quda
   static bool debug = false;
 
   MG::MG(MGParam &param, TimeProfile &profile_global) :
-    Solver(param, profile),
+    Solver(*param.matResidual, *param.matSmooth, *param.matSmoothSloppy, param, profile),
     param(param),
     transfer(0),
     resetTransfer(false),
