@@ -295,7 +295,6 @@ namespace quda {
     profile(profile),
     init(false) { }
 
-
  GMResDR::~GMResDR() { if(K && param.inv_type_precondition != QUDA_MG_INVERTER) delete K;}
 
 

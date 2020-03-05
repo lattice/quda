@@ -112,6 +112,11 @@ namespace quda
       return (ReduceType)sqrt(a.x * a.x + a.y * a.y) + (ReduceType)sqrt(a.z * a.z + a.w * a.w);
     }
 
+    template <typename ReduceType> __device__ __host__ ReduceType norm1_(const float8 &a)
+    {
+      return norm1_<ReduceType>(a.x) + norm1_<ReduceType>(a.y);
+    }
+
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Norm1(const Float2 &a, const Float2 &b) { ; }
@@ -146,6 +151,12 @@ namespace quda
       sum += (ReduceType)a.w * (ReduceType)a.w;
     }
 
+    template <typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float8 &a)
+    {
+      norm2_(sum, a.x);
+      norm2_(sum, a.y);
+    }
+
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Norm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Norm2(const Float2 &a, const Float2 &b) { ; }
@@ -178,6 +189,12 @@ namespace quda
       sum += (ReduceType)a.y * (ReduceType)b.y;
       sum += (ReduceType)a.z * (ReduceType)b.z;
       sum += (ReduceType)a.w * (ReduceType)b.w;
+    }
+
+    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float8 &a, const float8 &b)
+    {
+      dot_(sum, a.x, b.x);
+      dot_(sum, a.y, b.y);
     }
 
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -253,6 +270,11 @@ namespace quda
       y.z -= a.y * x.w;
       y.w += a.y * x.z;
       y.w += a.x * x.w;
+    }
+    __device__ __host__ void Caxpy_(const float2 &a, const float8 &x, float8 &y)
+    {
+      Caxpy_(a, x.x, y.x);
+      Caxpy_(a, x.y, y.y);
     }
 
     /**
@@ -346,6 +368,12 @@ namespace quda
       sum.y -= (scalar)a.y * (scalar)b.x;
       sum.y += (scalar)a.z * (scalar)b.w;
       sum.y -= (scalar)a.w * (scalar)b.z;
+    }
+
+    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float8 &a, const float8 &b)
+    {
+      cdot_(sum, a.x, b.x);
+      cdot_(sum, a.y, b.y);
     }
 
     template <typename ReduceType, typename Float2, typename FloatN>
