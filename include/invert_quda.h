@@ -319,7 +319,7 @@ namespace quda {
       }
 
       if (param.rhs_idx != 0
-          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GMRESDR_PROJ_INVERTER)) {
+          && (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.inv_type == QUDA_GCRODR_INVERTER || param.inv_type == QUDA_FGCRODR_INVERTER)) {
         rhs_idx = param.rhs_idx;
       }
 

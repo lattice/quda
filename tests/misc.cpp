@@ -1023,14 +1023,14 @@ get_solver_str(QudaInverterType type)
   case QUDA_GMRESDR_INVERTER:
     ret = "gmresdr";
     break;
-  case QUDA_GMRESDR_PROJ_INVERTER:
-    ret = "gmresdr-proj";
-    break;
-  case QUDA_GMRESDR_SH_INVERTER:
-    ret = "gmresdr-sh";
-    break;
   case QUDA_FGMRESDR_INVERTER:
     ret = "fgmresdr";
+    break;
+  case QUDA_GCRODR_INVERTER:
+    ret = "gcrodr";
+    break;
+  case QUDA_FGCRODR_INVERTER:
+    ret = "fgcrodr";
     break;
   case QUDA_MG_INVERTER:
     ret= "mg";
