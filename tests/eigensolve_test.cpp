@@ -5,18 +5,9 @@
 #include <string.h>
 #include <algorithm>
 
-#include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
-#include <blas_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
 #include "misc.h"
-
-#include <qio_field.h>
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
@@ -70,29 +61,30 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // command line options
+  // Only these fermions are supported in this file
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
+      && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+    printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
+
+  // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
+  // Set some default values for precisions if none are passed through the command line
+  setQudaDefaultPrecs();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // call srand() with a rank-dependent seed
-  initRand();
-
-  // QUDA parameters begin here.
-  //------------------------------------------------------------------------------
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
@@ -112,69 +104,38 @@ int main(int argc, char **argv)
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
 
-  // All user inputs now defined
+  // Initialize the QUDA library
+  initQuda(device);
   display_test_info();
 
-  // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-      || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  // Set some dimension parameters
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
+      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
+      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     dw_setDims(gauge_param.X, eig_inv_param.Ls);
   } else {
     setDims(gauge_param.X);
   }
-
-  // set spinor site size
-  int sss = 24;
-  if (dslash_type == QUDA_LAPLACE_DSLASH) sss = 6;
+  // Set spinor site size
+  int sss = (dslash_type == QUDA_LAPLACE_DSLASH ? 6 : 24);
   setSpinorSiteSize(sss);
-
-  void *gauge[4], *clover = 0, *clover_inv = 0;
-
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
-
-  if (strcmp(latfile, "")) { // load in the command line supplied gauge field
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    double norm = 0.1; // clover components are rands in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    size_t cSize = eig_inv_param.clover_cpu_prec;
-    clover = malloc(V * clover_site_size * cSize);
-    clover_inv = malloc(V * clover_site_size * cSize);
-    if (!compute_clover) construct_clover_field(clover, norm, diag, eig_inv_param.clover_cpu_prec);
-
-    eig_inv_param.compute_clover = compute_clover;
-    if (compute_clover) eig_inv_param.return_clover = 1;
-    eig_inv_param.compute_clover_inverse = 1;
-    eig_inv_param.return_clover_inverse = 1;
-  }
-
-  // initialize the QUDA library
-  initQuda(device);
-
-  // load the gauge field
+  
+  // Allocate host side memory for the gauge field.
+  void *gauge[4];
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
-  // this line ensure that if we need to construct the clover inverse
-  // (in either the smoother or the solver) we do so
+  // Allocate host side memory for clover terms if needed.
+  void *clover = 0, *clover_inv = 0;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    constructHostCloverField(clover, clover_inv, eig_inv_param);
+    // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
   }
 
-  // QUDA eigensolver test
+  // QUDA eigensolver test BEGIN
   //----------------------------------------------------------------------------
-
   // Host side arrays to store the eigenpairs computed by QUDA
   void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
   for (int i = 0; i < eig_nConv; i++) {
@@ -194,26 +155,27 @@ int main(int argc, char **argv)
   eigensolveQuda(host_evecs, host_evals, &eig_param);
   time += (double)clock();
   printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
+  // QUDA eigensolver test COMPLETE
+  //----------------------------------------------------------------------------
 
-  // Deallocate host memory
+  // Clean up memory allocations
   for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
 
   freeGaugeQuda();
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) { freeCloverQuda(); }
-
-  // finalize the QUDA library
-  endQuda();
-
-  // finalize the communications layer
-  finalizeComms();
+  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    freeCloverQuda();
     if (clover) free(clover);
     if (clover_inv) free(clover_inv);
   }
-  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
+
+  // finalize the QUDA library
+  endQuda();
+  finalizeComms();
+
 
   return 0;
 }

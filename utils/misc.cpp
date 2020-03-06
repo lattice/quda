@@ -4,10 +4,12 @@
 #include <string.h>
 #include "invert_quda.h"
 #include "misc.h"
- #include <assert.h>
+#include <assert.h>
 #include "util_quda.h"
 #include <host_utils.h>
 
+
+/*
 #define stSpinorSiteSize 6
 template<typename Float>
 void display_spinor_internal(Float* spinor)
@@ -501,13 +503,13 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 		printf("ERROR: even link sanity check 12 failed, i=%d\n",i);
 		exit(1);
 	    }
-	    /*
-	    rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    if (rc != 0){
-		printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
-		exit(1);
-	    }
-	    */
+	    
+	    // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    // if (rc != 0){
+	    // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
+	    // 	exit(1);
+	    // }
+	    
 	    
 	}
 	mylink = mylink + gauge_site_size*len/2;
@@ -518,13 +520,11 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 		printf("ERROR: odd link sanity check 12 failed, i=%d\n", i);
 		exit(1);
 	    }	
-	    /*
-	    rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    if (rc != 0){
-		printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
-		exit(1);
-	    }
-	    */
+	    // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+	    // if (rc != 0){
+	    // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
+	    // 	exit(1);
+	    // }
 	}	
 
     }
@@ -598,6 +598,7 @@ site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gauge
     
     return rc;
 }
+*/
 
 const char *
 get_verbosity_str(QudaVerbosity type)

@@ -5,17 +5,10 @@
 #include <string.h>
 #include <limits>
 
-#include <util_quda.h>
 #include <random_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
-#include <blas_reference.h>
-#include <wilson_dslash_reference.h>
-#include <domain_wall_dslash_reference.h>
 #include "misc.h"
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
@@ -78,8 +71,8 @@ int main(int argc, char **argv)
 {
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
-      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
-      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
+      && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH       
+      && dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
       && dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
@@ -148,6 +141,8 @@ int main(int argc, char **argv)
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
+  // QUDA invert test BEGIN
+  //----------------------------------------------------------------------------
   // Allocate host side memory for the spinor fields
   void *spinorOut = NULL, **spinorOutMulti = NULL;
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
@@ -160,10 +155,6 @@ int main(int argc, char **argv)
   } else {
     spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   }
-
-  double plaq[3];
-  plaqQuda(plaq);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
@@ -188,6 +179,8 @@ int main(int argc, char **argv)
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
+  // QUDA invert test COMPLETE
+  //----------------------------------------------------------------------------
 
   rng->Release();
   delete rng;
@@ -202,7 +195,7 @@ int main(int argc, char **argv)
     verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
   }
 
-  // Clean up device memory allocationa
+  // Clean up memory allocations
   free(spinorIn);
   free(spinorCheck);
   if (multishift) {

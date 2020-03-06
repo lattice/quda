@@ -1930,17 +1930,17 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
     gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);
   }
   
-  // 0 = random SU(3)
-  // 1 = unit gauge
+  // 0 = unit gauge
+  // 1 = random SU(3)
   // 2 = supplied field
   int construct_type = 0; 
   if (strcmp(latfile,"")) {  
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
-  } else { 
-    if (unit_gauge) construct_type = 1;
-    else construct_type = 0;
+  } else {
+    if (unit_gauge) construct_type = 0;
+    else construct_type = 1;
   }
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
