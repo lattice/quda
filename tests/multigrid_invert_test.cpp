@@ -6,13 +6,13 @@
 #include <limits>
 
 #include <util_quda.h>
-#include <test_util.h>
+#include <host_utils.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
-#include <test_params.h>
+#include <command_line_params.h>
 
 #include <qio_field.h>
 #include <color_spinor_field.h>
@@ -612,7 +612,7 @@ int main(int argc, char **argv)
   // We now initialise the QUDA library with the given parameters
   //------------------------------------------------------------------------------
 
-  // Initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // Initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Call srand() with a rank-dependent seed

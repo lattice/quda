@@ -12,8 +12,8 @@
 #include <blas_quda.h>
 
 #include <misc.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>

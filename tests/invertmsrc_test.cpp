@@ -5,8 +5,8 @@
 #include <string.h>
 
 #include <util_quda.h>
-#include <test_params.h>
-#include <test_util.h>
+#include <command_line_params.h>
+#include <host_utils.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     link_recon_sloppy = link_recon;
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();

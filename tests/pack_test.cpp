@@ -6,8 +6,8 @@
 #include <gauge_field.h>
 #include <util_quda.h>
 
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 
 #include <color_spinor_field.h>

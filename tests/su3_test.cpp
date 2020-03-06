@@ -5,8 +5,8 @@
 #include <string.h>
 
 #include <util_quda.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 #include "misc.h"
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();

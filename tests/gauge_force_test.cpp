@@ -3,8 +3,8 @@
 #include <string.h>
 
 #include <quda.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <gauge_field.h>
 #include "misc.h"
 #include "gauge_force_reference.h"

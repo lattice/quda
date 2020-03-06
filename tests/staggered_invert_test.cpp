@@ -13,8 +13,8 @@
 #include <blas_quda.h>
 
 #include <misc.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -582,7 +582,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   if (test_type < 0 || test_type > 6) {

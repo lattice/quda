@@ -3,7 +3,7 @@
 #include <math.h>
 #include <string.h>
 
-#include <test_util.h>
+#include <host_utils.h>
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>

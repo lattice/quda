@@ -11,8 +11,8 @@
 #include <util_quda.h>
 #include <blas_quda.h>
 
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>

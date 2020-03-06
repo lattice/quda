@@ -7,8 +7,8 @@
 #include <gauge_field.h>
 
 #include <comm_quda.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <gauge_tools.h>
 #include "misc.h"
 
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // call srand() with a rank-dependent seed

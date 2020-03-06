@@ -20,7 +20,7 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_utils QMP)
 endif()
 
-set(UTILS_LIBS quda quda_utils)
+set(UTILS_LIBS quda quda_utils quda_reference)
 
 macro(QUDA_CHECKBUILDUTILS mytarget qudabuildutils)
   if(NOT ${qudabuildutils})
