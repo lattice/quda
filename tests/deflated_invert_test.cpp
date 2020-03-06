@@ -135,9 +135,7 @@ int main(int argc, char **argv)
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
-  }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -157,8 +155,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V*clover_site_size*cSize);
-    clover_inv = malloc(V*clover_site_size*cSize);
+    clover = malloc(V * clover_site_size * cSize);
+    clover_inv = malloc(V * clover_site_size * cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
     inv_param.compute_clover = compute_clover;
@@ -167,11 +165,11 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   void *spinorOut = NULL;
-  spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // start the timer
   double time0 = -((double)clock());
@@ -190,16 +188,16 @@ int main(int argc, char **argv)
 
   for (int i=0; i<Nsrc; i++) {
     // create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinor_site_size * host_spinor_data_type_size);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinor_site_size * host_spinor_data_type_size);
-    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size * host_spinor_data_type_size);
+    memset(spinorIn, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorCheck, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorOut, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
       //((float*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
       //((double*)spinorIn)[i] = 1.0;
-      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -303,9 +301,9 @@ int main(int argc, char **argv)
   }
 
   int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
-  mxpy(spinorIn, spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
-  double nrm2 = norm_2(spinorCheck, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
-  double src2 = norm_2(spinorIn, vol*spinor_site_size*inv_param.Ls, inv_param.cpu_prec);
+  mxpy(spinorIn, spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  double nrm2 = norm_2(spinorCheck, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
+  double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);
 
   printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",

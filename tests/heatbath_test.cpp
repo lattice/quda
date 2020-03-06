@@ -27,29 +27,28 @@ namespace quda {
 
 // Local helper functions
 //------------------------------------------------------------------------------------
-void setReunitarizationConsts(){
+void setReunitarizationConsts()
+{
   using namespace quda;
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
   const int reunit_allow_svd = 1;
-  const int reunit_svd_only  = 0;
+  const int reunit_svd_only = 0;
   const double svd_rel_error = 1e-6;
   const double svd_abs_error = 1e-6;
-  setUnitarizeLinksConstants(unitarize_eps, max_error,
-			     reunit_allow_svd, reunit_svd_only,
-			     svd_rel_error, svd_abs_error);
-
+  setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
 }
 
-void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
+void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
+{
   using namespace quda;
-  int *num_failures_dev = (int*)device_malloc(sizeof(int));
+  int *num_failures_dev = (int *)device_malloc(sizeof(int));
   int num_failures;
   cudaMemset(num_failures_dev, 0, sizeof(int));
   unitarizeLinks(*cudaInGauge, num_failures_dev);
 
   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-  if(num_failures>0) errorQuda("Error in the unitarization\n");
+  if (num_failures > 0) errorQuda("Error in the unitarization\n");
   device_free(num_failures_dev);
 }
 //------------------------------------------------------------------------------------
@@ -108,9 +107,7 @@ int main(int argc, char **argv)
 
   void *load_gauge[4];
 
-  for (int dir = 0; dir < 4; dir++) {
-    load_gauge[dir] = malloc(V*gauge_site_size*gSize);
-  }
+  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gSize); }
 
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, load_gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -248,9 +245,7 @@ int main(int argc, char **argv)
 
       size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) {
-        cpu_gauge[dir] = malloc(V*gauge_site_size*gSize);
-      }
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gSize); }
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);

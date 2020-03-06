@@ -53,10 +53,8 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) {
-    qdpCpuGauge_p[dir] = malloc(V*gauge_site_size*param.cpu_prec);
-  }
-  cpsCpuGauge_p = malloc(4*V*gauge_site_size*param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = malloc(V * gauge_site_size * param.cpu_prec); }
+  cpsCpuGauge_p = malloc(4 * V * gauge_site_size * param.cpu_prec);
 
   csParam.nColor = 3;
   csParam.nSpin = 4;

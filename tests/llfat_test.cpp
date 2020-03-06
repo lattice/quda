@@ -32,7 +32,7 @@ static void llfat_test()
   initQuda(device);
 
   cpu_prec = prec;
-  host_gauge_data_type_size = cpu_prec;  
+  host_gauge_data_type_size = cpu_prec;
   qudaGaugeParam = newQudaGaugeParam();
 
   qudaGaugeParam.anisotropy = 1.0;
@@ -54,20 +54,20 @@ static void llfat_test()
   qudaGaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
   qudaGaugeParam.ga_pad = 0;
 
-  void* fatlink = pinned_malloc(4*V*gauge_site_size*host_gauge_data_type_size);
-  void* longlink = pinned_malloc(4*V*gauge_site_size*host_gauge_data_type_size);
+  void *fatlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  void *longlink = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void* sitelink[4];
-  for(int i=0;i < 4;i++) sitelink[i] = pinned_malloc(V*gauge_site_size*host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink[i] = pinned_malloc(V * gauge_site_size * host_gauge_data_type_size);
 
   void* sitelink_ex[4];
-  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gauge_site_size*host_gauge_data_type_size);
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * host_gauge_data_type_size);
 
   void* milc_sitelink;
-  milc_sitelink = (void*)safe_malloc(4*V*gauge_site_size*host_gauge_data_type_size);
+  milc_sitelink = (void *)safe_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   void* milc_sitelink_ex;
-  milc_sitelink_ex = (void*)safe_malloc(4*V_ex*gauge_site_size*host_gauge_data_type_size);
+  milc_sitelink_ex = (void *)safe_malloc(4 * V_ex * gauge_site_size * host_gauge_data_type_size);
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
 
@@ -75,7 +75,8 @@ static void llfat_test()
     for(int i=0; i<V; ++i){
       for(int dir=0; dir<4; ++dir){
         char* src = (char*)sitelink[dir];
-        memcpy((char*)milc_sitelink + (i*4 + dir)*gauge_site_size*host_gauge_data_type_size, src+i*gauge_site_size*host_gauge_data_type_size, gauge_site_size*host_gauge_data_type_size);
+        memcpy((char *)milc_sitelink + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
+               src + i * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
       }	
     }
   }
@@ -124,10 +125,12 @@ static void llfat_test()
     for(int dir= 0; dir < 4; dir++){
       char* src = (char*)sitelink[dir];
       char* dst = (char*)sitelink_ex[dir];
-      memcpy(dst+i*gauge_site_size*host_gauge_data_type_size, src+idx*gauge_site_size*host_gauge_data_type_size, gauge_site_size*host_gauge_data_type_size);
+      memcpy(dst + i * gauge_site_size * host_gauge_data_type_size,
+             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
 
-      // milc ordering 
-      memcpy((char*)milc_sitelink_ex + (i*4 + dir)*gauge_site_size*host_gauge_data_type_size, src+idx*gauge_site_size*host_gauge_data_type_size, gauge_site_size*host_gauge_data_type_size);
+      // milc ordering
+      memcpy((char *)milc_sitelink_ex + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
+             src + idx * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
     }//dir
   }//i
 
@@ -159,8 +162,8 @@ static void llfat_test()
   void* fat_reflink[4];
   void* long_reflink[4];
   for(int i=0;i < 4;i++){
-    fat_reflink[i] = safe_malloc(V*gauge_site_size*host_gauge_data_type_size);
-    long_reflink[i] = safe_malloc(V*gauge_site_size*host_gauge_data_type_size);
+    fat_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    long_reflink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   if (verify_results){
@@ -178,7 +181,8 @@ static void llfat_test()
     //we need x,y,z site links in the back and forward T slice
     // so it is 3*2*Vs_t
     int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-    for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gauge_site_size*host_gauge_data_type_size);
+    for (int i = 0; i < 4; i++)
+      ghost_sitelink[i] = safe_malloc(8 * Vs[i] * gauge_site_size * host_gauge_data_type_size);
 
     /*
        nu |     |
@@ -203,8 +207,8 @@ static void llfat_test()
               break;
             }
           }
-          ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gauge_site_size*host_gauge_data_type_size);
-          memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gauge_site_size*host_gauge_data_type_size);
+          ghost_sitelink_diag[nu * 4 + mu] = safe_malloc(Z[dir1] * Z[dir2] * gauge_site_size * host_gauge_data_type_size);
+          memset(ghost_sitelink_diag[nu * 4 + mu], 0, Z[dir1] * Z[dir2] * gauge_site_size * host_gauge_data_type_size);
         }
 
       }
@@ -229,21 +233,21 @@ static void llfat_test()
   void* myfatlink[4];
   void* mylonglink[4];
   for(int i=0; i < 4; i++){
-    myfatlink[i] = safe_malloc(V*gauge_site_size*host_gauge_data_type_size);
-    mylonglink[i] = safe_malloc(V*gauge_site_size*host_gauge_data_type_size);
-    memset(myfatlink[i], 0, V*gauge_site_size*host_gauge_data_type_size);
-    memset(mylonglink[i], 0, V*gauge_site_size*host_gauge_data_type_size);
+    myfatlink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    mylonglink[i] = safe_malloc(V * gauge_site_size * host_gauge_data_type_size);
+    memset(myfatlink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
+    memset(mylonglink[i], 0, V * gauge_site_size * host_gauge_data_type_size);
   }
 
   for(int i=0; i < V; i++){
     for(int dir=0; dir< 4; dir++){
-      char* src = ((char*)fatlink)+ (4*i+dir)*gauge_site_size*host_gauge_data_type_size;
-      char* dst = ((char*)myfatlink[dir]) + i*gauge_site_size*host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size*host_gauge_data_type_size);
+      char *src = ((char *)fatlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
+      char *dst = ((char *)myfatlink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
+      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
 
-      src = ((char*)longlink)+ (4*i+dir)*gauge_site_size*host_gauge_data_type_size;
-      dst = ((char*)mylonglink[dir]) + i*gauge_site_size*host_gauge_data_type_size;
-      memcpy(dst, src, gauge_site_size*host_gauge_data_type_size);
+      src = ((char *)longlink) + (4 * i + dir) * gauge_site_size * host_gauge_data_type_size;
+      dst = ((char *)mylonglink[dir]) + i * gauge_site_size * host_gauge_data_type_size;
+      memcpy(dst, src, gauge_site_size * host_gauge_data_type_size);
     }
   }
 
@@ -251,7 +255,7 @@ static void llfat_test()
     printfQuda("Checking fat links...\n");
     int res=1;
     for(int dir=0; dir<4; dir++){
-      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V*gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
     
     strong_check_link(myfatlink, "GPU results: ",
@@ -263,7 +267,7 @@ static void llfat_test()
     printfQuda("Checking long links...\n");
     res = 1;
     for(int dir=0; dir<4; ++dir){
-      res &= compare_floats(long_reflink[dir], mylonglink[dir], V*gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
+      res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
       
     strong_check_link(mylonglink, "GPU results: ",

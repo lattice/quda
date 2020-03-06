@@ -220,7 +220,7 @@ int main(int argc, char **argv)
   setStaggeredInvertParam(inv_param);
   // Change some default params for staggered MG
   inv_param.inv_type_precondition = QUDA_MG_INVERTER;
-  inv_param.inv_type = QUDA_GCR_INVERTER; 
+  inv_param.inv_type = QUDA_GCR_INVERTER;
   inv_param.sp_pad = 0;
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
@@ -297,7 +297,9 @@ int main(int argc, char **argv)
       computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
     } else { //
 
-      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size); }
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
     }
 
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);

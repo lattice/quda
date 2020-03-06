@@ -8,7 +8,6 @@
 #include "util_quda.h"
 #include <host_utils.h>
 
-
 #define stSpinorSiteSize 6
 template<typename Float>
 void display_spinor_internal(Float* spinor)

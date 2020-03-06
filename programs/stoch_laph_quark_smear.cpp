@@ -13,10 +13,8 @@
 
 #include <qio_field.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 using namespace quda;
 
-int main(int argc, char **argv)
-{
-}
+int main(int argc, char **argv) {}

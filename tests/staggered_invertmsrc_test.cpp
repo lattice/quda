@@ -173,24 +173,27 @@ invert_test(void)
   setSpinorSiteSize(6);
 
   for (int dir = 0; dir < 4; dir++) {
-    qdp_fatlink[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
-    qdp_longlink[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-  fatlink = malloc(4*V*gauge_site_size * host_gauge_data_type_size);
-  longlink = malloc(4*V*gauge_site_size * host_gauge_data_type_size);
+  fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
 				 &gaugeParam, dslash_type);
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
-      for(int j=0; j<gauge_site_size; ++j){
+      for (int j = 0; j < gauge_site_size; ++j) {
         if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)fatlink)[(i*4 + dir)*gauge_site_size + j] = ((double*)qdp_fatlink[dir])[i*gauge_site_size + j];
-          ((double*)longlink)[(i*4 + dir)*gauge_site_size + j] = ((double*)qdp_longlink[dir])[i*gauge_site_size + j];
+          ((double *)fatlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((double *)qdp_fatlink[dir])[i * gauge_site_size + j];
+          ((double *)longlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((double *)qdp_longlink[dir])[i * gauge_site_size + j];
         }else{
-          ((float*)fatlink)[(i*4 + dir)*gauge_site_size + j] = ((float*)qdp_fatlink[dir])[i*gauge_site_size + j];
-          ((float*)longlink)[(i*4 + dir)*gauge_site_size + j] = ((float*)qdp_longlink[dir])[i*gauge_site_size + j];
+          ((float *)fatlink)[(i * 4 + dir) * gauge_site_size + j] = ((float *)qdp_fatlink[dir])[i * gauge_site_size + j];
+          ((float *)longlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((float *)qdp_longlink[dir])[i * gauge_site_size + j];
         }
       }
     }
@@ -339,9 +342,9 @@ invert_test(void)
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
 
-      mxpy(in->V(), ref->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
 
       for(int i=1; i < inv_param.num_src;i++) delete spinorOutArray[i];
       for(int i=1; i < inv_param.num_src;i++) delete spinorInArray[i];
@@ -368,9 +371,9 @@ invert_test(void)
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
 #endif
-      mxpy(in->V(), ref->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*my_spinor_site_size, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
 
       break;
 
@@ -448,10 +451,10 @@ invert_test(void)
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
 
-	  mxpy(in->V(), ref->V(), len*my_spinor_site_size, inv_param.cpu_prec);
-	  double nrm2 = norm_2(ref->V(), len*my_spinor_site_size, inv_param.cpu_prec);
-	  double src2 = norm_2(in->V(), len*my_spinor_site_size, inv_param.cpu_prec);
-	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
+          mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
 	  double l2r = sqrt(nrm2/src2);
 
 	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",

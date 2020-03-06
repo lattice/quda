@@ -31,30 +31,29 @@ namespace quda {
   extern void setTransferGPU(bool);
 }
 
-void setReunitarizationConsts(){
+void setReunitarizationConsts()
+{
   using namespace quda;
   const double unitarize_eps = 1e-14;
   const double max_error = 1e-10;
   const int reunit_allow_svd = 1;
-  const int reunit_svd_only  = 0;
+  const int reunit_svd_only = 0;
   const double svd_rel_error = 1e-6;
   const double svd_abs_error = 1e-6;
-  setUnitarizeLinksConstants(unitarize_eps, max_error,
-			     reunit_allow_svd, reunit_svd_only,
-			     svd_rel_error, svd_abs_error);
-  
+  setUnitarizeLinksConstants(unitarize_eps, max_error, reunit_allow_svd, reunit_svd_only, svd_rel_error, svd_abs_error);
 }
 
-void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
+void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
+{
   using namespace quda;
-  int *num_failures_dev = (int*)device_malloc(sizeof(int));
-   int num_failures;
-   cudaMemset(num_failures_dev, 0, sizeof(int));
-   unitarizeLinks(*cudaInGauge, num_failures_dev);
-   
-   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-   if(num_failures>0) errorQuda("Error in the unitarization\n");
-   device_free(num_failures_dev);
+  int *num_failures_dev = (int *)device_malloc(sizeof(int));
+  int num_failures;
+  cudaMemset(num_failures_dev, 0, sizeof(int));
+  unitarizeLinks(*cudaInGauge, num_failures_dev);
+
+  cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
+  if (num_failures > 0) errorQuda("Error in the unitarization\n");
+  device_free(num_failures_dev);
 }
 
 void
@@ -239,9 +238,7 @@ int main(int argc, char **argv)
 
   void *gauge[4], *clover=0, *clover_inv=0;
 
-  for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gauge_site_size * host_gauge_data_type_size);
-  }
+  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
   if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
@@ -259,8 +256,8 @@ int main(int argc, char **argv)
     double diag = 1.0; // constant added to the diagonal
 
     size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V*clover_site_size*cSize);
-    clover_inv = malloc(V*clover_site_size*cSize);
+    clover = malloc(V * clover_site_size * cSize);
+    clover_inv = malloc(V * clover_site_size * cSize);
     if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
 
     inv_param.compute_clover = compute_clover;
@@ -269,8 +266,8 @@ int main(int argc, char **argv)
     inv_param.return_clover_inverse = 1;
   }
 
-  void *spinorIn = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
-  void *spinorCheck = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 
   // start the timer
@@ -317,7 +314,8 @@ int main(int argc, char **argv)
     double beta_value = 6.2;
 
     if(link_recon != QUDA_RECONSTRUCT_8 && coldstart) InitGaugeField( *gaugeEx);
-    else InitGaugeField( *gaugeEx, *randstates );
+    else
+      InitGaugeField(*gaugeEx, *randstates);
     // Reunitarization setup
     setReunitarizationConsts();
 
@@ -345,18 +343,18 @@ int main(int argc, char **argv)
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
       inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH)
-      loadCloverQuda(clover, clover_inv, &inv_param);    
+      loadCloverQuda(clover, clover_inv, &inv_param);
     inv_param.solve_type = solve_type; // restore actual solve_type we want to do
-    
+
     // Create a point source at 0 (in each subvolume...  FIXME)
-    memset(spinorIn, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
-    memset(spinorCheck, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
-    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
+    memset(spinorIn, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorCheck, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorOut, 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
 
     if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((float*)spinorIn)[i] = rand() / (float)RAND_MAX;
+      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((float *)spinorIn)[i] = rand() / (float)RAND_MAX;
     } else {
-      for (int i=0; i<inv_param.Ls*V*spinor_site_size; i++) ((double*)spinorIn)[i] = rand() / (double)RAND_MAX;
+      for (int i = 0; i < inv_param.Ls * V * spinor_site_size; i++) ((double *)spinorIn)[i] = rand() / (double)RAND_MAX;
     }
 
     // do reference BiCGStab solve
@@ -396,13 +394,14 @@ int main(int argc, char **argv)
 
       // Recompute Gauge Observables
       gaugeObservablesQuda(&gauge_obs_param);
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step, gauge_obs_param.plaquette[0], gauge_obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
-      
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 gauge_obs_param.plaquette[0], gauge_obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+
       // Reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
-      
+
       // Update the multigrid operator for new gauge and clover fields
-      updateMultigridQuda(mg_preconditioner, &mg_param); 
+      updateMultigridQuda(mg_preconditioner, &mg_param);
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_param.iter == inv_param.maxiter) {
