@@ -3,6 +3,7 @@
 #include <quda.h>
 #include <random_quda.h>
 #include <vector>
+#include <color_spinor_field.h>
 
 #define gauge_site_size 18 // real numbers per link
 #define spinor_site_size 24 // real numbers per spinor
@@ -45,6 +46,12 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng);
+
+//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
+//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
+
+//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
+//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
 
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 

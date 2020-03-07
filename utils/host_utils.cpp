@@ -9,6 +9,7 @@
 // This contains the appropriate ifdef guards already
 #include <mpi_comm_handle.h>
 
+#include <color_spinor_field.h>
 #include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
@@ -19,6 +20,8 @@
 #include <dslash_quda.h>
 #include <misc.h>
 #include <qio_field.h>
+
+
 
 using namespace std;
 
@@ -102,6 +105,10 @@ void performanceStats(double *time, double *gflops){
   printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
 	     mean_time, stddev_time, mean_gflops, stddev_gflops);
 }
+
+
+//using namespace quda;
+
 
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) {
   if (multishift) {

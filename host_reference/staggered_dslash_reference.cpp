@@ -8,6 +8,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <staggered_dslash_reference.h>
+#include <command_line_params.h>
 #include "misc.h"
 #include <blas_quda.h>
 
@@ -17,15 +18,6 @@ extern void *memset(void *s, int c, size_t n);
 
 #include <dslash_util.h>
 
-//
-// dslashReference()
-//
-// if oddBit is zero: calculate even parity spinor elements (using odd parity spinor)
-// if oddBit is one:  calculate odd parity spinor elements
-//
-// if daggerBit is zero: perform ordinary dslash operator
-// if daggerBit is one:  perform hermitian conjugate of dslash
-//
 template<typename Float>
 void display_link_internal(Float* link)
 {
@@ -41,6 +33,12 @@ void display_link_internal(Float* link)
   return;
 }
 
+// dslashReference()
+//
+// if oddBit is zero: calculate even parity spinor elements (using odd parity spinor)
+// if oddBit is one:  calculate odd parity spinor elements
+// if daggerBit is zero: perform ordinary dslash operator
+// if daggerBit is one:  perform hermitian conjugate of dslash
 template <typename sFloat, typename gFloat>
 void dslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **ghostFatlink, gFloat **ghostLonglink,
     sFloat *spinorField, sFloat **fwd_nbr_spinor, sFloat **back_nbr_spinor, int oddBit, int daggerBit, int nSrc,
@@ -125,16 +123,15 @@ void dslashReference(sFloat *res, gFloat **fatlink, gFloat **longlink, gFloat **
 
       if (daggerBit) negx(&res[offset], my_spinor_site_size);
     } // 4-d volume
-  } // right-hand-side
-
+  } // right-hand-side  
 }
 
-void staggered_dslash(cpuColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink,
-    void **ghost_longlink, cpuColorSpinorField *in, int oddBit, int daggerBit, QudaPrecision sPrecision,
+void staggered_dslash(ColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink,
+    void **ghost_longlink, ColorSpinorField *in, int oddBit, int daggerBit, QudaPrecision sPrecision,
     QudaPrecision gPrecision, QudaDslashType dslash_type)
 {
   const int nSrc = in->X(4);
-
+  
   QudaParity otherparity = QUDA_INVALID_PARITY;
   if (oddBit == QUDA_EVEN_PARITY) {
     otherparity = QUDA_ODD_PARITY;
@@ -147,8 +144,8 @@ void staggered_dslash(cpuColorSpinorField *out, void **fatlink, void **longlink,
 
   in->exchangeGhost(otherparity, nFace, daggerBit);
 
-  void** fwd_nbr_spinor = in->fwdGhostFaceBuffer;
-  void** back_nbr_spinor = in->backGhostFaceBuffer;
+  void** fwd_nbr_spinor = ((cpuColorSpinorField*)in)->fwdGhostFaceBuffer;
+  void** back_nbr_spinor = ((cpuColorSpinorField*)in)->backGhostFaceBuffer;
 
   if (sPrecision == QUDA_DOUBLE_PRECISION) {
     if (gPrecision == QUDA_DOUBLE_PRECISION) {
@@ -173,9 +170,9 @@ void staggered_dslash(cpuColorSpinorField *out, void **fatlink, void **longlink,
   }
 }
 
-void matdagmat(cpuColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink, void **ghost_longlink,
-    cpuColorSpinorField *in, double mass, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision,
-    cpuColorSpinorField *tmp, QudaParity parity, QudaDslashType dslash_type)
+void matdagmat(ColorSpinorField *out, void **fatlink, void **longlink, void **ghost_fatlink, void **ghost_longlink,
+    ColorSpinorField *in, double mass, int dagger_bit, QudaPrecision sPrecision, QudaPrecision gPrecision,
+    ColorSpinorField *tmp, QudaParity parity, QudaDslashType dslash_type)
 {
   //assert sPrecision and gPrecision must be the same
   if (sPrecision != gPrecision){
@@ -203,5 +200,59 @@ void matdagmat(cpuColorSpinorField *out, void **fatlink, void **longlink, void *
   }else{
     axmy((float*)in->V(), (float)msq_x4, (float*)out->V(), out->X(4)*Vh*my_spinor_site_size);
   }
+}
 
+void verifyStaggeredInversion(ColorSpinorField *tmp, ColorSpinorField *ref, ColorSpinorField *in, ColorSpinorField *out, 
+			      void *qdp_fatlink[], void *qdp_longlink[], void **ghost_fatlink, void **ghost_longlink, 
+			      QudaGaugeParam &gauge_param, QudaInvertParam &inv_param) {
+  switch (test_type) {
+  case 0: // full parity solution
+  case 1: // solving prec system, reconstructing
+  case 2:
+    
+    // In QUDA, the full staggered operator has the sign convention
+    // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+    // have the minus sign. Passing in QUDA_DAG_YES solves this
+    // discrepancy.
+    staggered_dslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink,
+		     ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Odd()), QUDA_EVEN_PARITY,
+		     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    staggered_dslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink,
+		     ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Even()), QUDA_ODD_PARITY,
+		     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      xpay(out->V(), kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+    } else {
+      axpy(2 * mass, out->V(), ref->V(), ref->Length(), gauge_param.cpu_prec);
+    }
+    break;
+    
+  case 3: // even
+  case 4:
+    
+    matdagmat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
+	      gauge_param.cpu_prec, tmp, test_type == 3 ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
+    break;
+    
+  }
+  
+  int len = 0;
+  if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    len = V;
+  } else {
+    len = Vh;
+  }
+
+  mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+  
+  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
+  double l2r = sqrt(nrm2 / src2);
+  
+  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n", 
+	     inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+  
 }

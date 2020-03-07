@@ -3,7 +3,7 @@
 #include <math.h>
 #include <string.h>
 
-#include <host_utils.h>
+//#include <host_utils.h>
 #include <misc.h>
 #include <blas_reference.h>
 #include <dslash_util.h>
