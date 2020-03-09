@@ -248,11 +248,8 @@ namespace quda {
      inner.sloppy_converge = true;
    }
 
- GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile),
-    mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
+ GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
     K(nullptr),
     Kparam(param),
     nKrylov(param.Nkrylov),	
@@ -281,11 +278,8 @@ namespace quda {
      return;
  }
 
- GMResDR::GMResDR(DiracMatrix &mat, Solver &K_, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile),
-    mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
+ GMResDR::GMResDR(const DiracMatrix &mat, Solver &K_, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
     K(&K_),
     Kparam(param),
     nKrylov(param.Nkrylov),	

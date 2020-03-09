@@ -386,7 +386,7 @@ namespace quda {
 	tol_hq_offset[i] = param.tol_hq_offset[i];
       }
 
-      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GMRESDR_PROJ_INVERTER)){
+      if(param.rhs_idx != 0 && (param.inv_type==QUDA_INC_EIGCG_INVERTER || param.inv_type==QUDA_GCRODR_INVERTER || param.inv_type==QUDA_FGCRODR_INVERTER)){
         rhs_idx = param.rhs_idx;
       }
     }
@@ -1275,10 +1275,7 @@ public:
   class IncEigCG : public Solver {
 
   private:
-    DiracMatrix &mat;
-    DiracMatrix &matSloppy;
-    DiracMatrix &matPrecon;
-    DiracMatrix &matDefl;
+    const DiracMatrix &matDefl;
 
     std::shared_ptr<Solver> K;
     SolverParam Kparam; // parameters for preconditioner solve
@@ -1307,7 +1304,7 @@ public:
   public:
     static std::shared_ptr<EigCGArgs> persistant_eigcg_args;
 
-    IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
 
     virtual ~IncEigCG();
 

@@ -508,11 +508,8 @@ namespace quda {
     inner.use_sloppy_partial_accumulator= false;//outer.use_sloppy_partial_accumulator;
   }
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile),
-    mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
+  IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
     matDefl(matSloppy),
     K(nullptr),
     Kparam(param),
@@ -646,6 +643,7 @@ namespace quda {
 
     ColorSpinorFieldSet &vm = *args.Vm;
     ColorSpinorFieldSet &vk = *args.V2k;
+    ColorSpinorFieldSet &ws = *work_space;
 
     const int k = param.eig_param.nLockedMax;
 
