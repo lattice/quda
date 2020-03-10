@@ -14,7 +14,7 @@
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_reference.h>

@@ -6,7 +6,8 @@
 #include <color_spinor_field.h>
 
 #define gauge_site_size 18 // real numbers per link
-#define spinor_site_size 24 // real numbers per spinor
+#define spinor_site_size 24 // real numbers per wilson spinor
+#define stag_spinor_site_size 6 // real numbers per staggered 'spinor'
 #define clover_site_size 72 // real numbers per block-diagonal clover matrix
 #define mom_site_size    10 // real numbers per momentum
 #define hw_site_size    12 // real numbers per half wilson
@@ -29,6 +30,7 @@ extern int V5h;
 extern int my_spinor_site_size;
 extern size_t host_gauge_data_type_size;
 extern size_t host_spinor_data_type_size;
+extern size_t host_clover_data_type_size;
 
 // QUDA precisions
 extern QudaPrecision &cpu_prec;
@@ -40,20 +42,35 @@ extern QudaPrecision &cuda_prec_ritz;
 
 void setQudaDefaultPrecs();
 void setQudaDefaultMgSolveTypes();
+void setQudaStaggeredTestParams();
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink, QudaGaugeParam &gauge_param, int argc, char **argv);
+
+void constructFatLongGaugeField(void **fatlink, void** longlink, int type, 
+				QudaPrecision precision, QudaGaugeParam*, 
+				QudaDslashType dslash_type);
+
+
+
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
+
+void constructStaggeredTestSpinorParam(quda::ColorSpinorParam &csParam, QudaInvertParam &inv_param, QudaGaugeParam &gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng);
 
-//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
-//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
 
-//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
-//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
+void computeLongLinkCPU(void** longlink, void **sitelink, QudaPrecision prec, void* act_path_coeff);  
 
-void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+void computeHISQLinksCPU(void** fatlink, void** longlink, void** fatlink_eps, void** longlink_eps,
+			 void** sitelink, void* qudaGaugeParamPtr, 
+			 double** act_path_coeffs, double eps_naik);
+
+// data reordering routines
+void reorderQDPtoMILC(void* milc_out, void** qdp_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision);
+void reorderMILCtoQDP(void** qdp_out, void* milc_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision);
+
 
 void performanceStats(double *time, double *gflops);
 
@@ -87,9 +104,6 @@ int getOddBit(int X);
 
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec);
 
-void construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
-				    QudaPrecision precision, QudaGaugeParam*, 
-				    QudaDslashType dslash_type);
 
 
 void createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) ;
@@ -123,19 +137,15 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char** argv, int* idx);
 int process_options(int argc, char **argv);
 
-// use for some profiling
+// Use for profiling
 void stopwatchStart();
 double stopwatchReadSeconds();
-
-#ifdef __cplusplus
-//}
-#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-  // implemented in face_gauge.cpp
+  // Implemented in face_gauge.cpp
   void exchange_cpu_sitelink(int* X,void** sitelink, void** ghost_sitelink,
 			     void** ghost_sitelink_diag,
 			     QudaPrecision gPrecision, QudaGaugeParam* param, int optflag);
@@ -145,6 +155,17 @@ extern "C" {
 			   QudaPrecision gPrecision);
   void exchange_llfat_init(QudaPrecision prec);
   void exchange_llfat_cleanup(void);
+
+  // Implemented in host_blas.cpp
+  double norm_2(void *vector, int len, QudaPrecision precision);
+  void mxpy(void *x, void *y, int len, QudaPrecision precision);
+  void ax(double a, void *x, int len, QudaPrecision precision);
+  void axpy(double a, void *x, void *y, int len, QudaPrecision precision);
+  void xpay(void *x, double a, void *y, int len, QudaPrecision precision);
+  void cxpay(void *x, double _Complex a, void *y, int len, QudaPrecision precision);
+  void cpu_axy(QudaPrecision prec, double a, void* x, void* y, int size);
+  void cpu_xpy(QudaPrecision prec, void* x, void* y, int size);
+  
 
 #ifdef __cplusplus
 }
@@ -191,4 +212,5 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param);
 
 // Gauge param types
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
-void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);
+void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param);
+void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, QudaBoolean is_longlink);

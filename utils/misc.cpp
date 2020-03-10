@@ -319,7 +319,7 @@ void accumulateComplexDotProduct(Float *a, Float *b, Float *c) {
 
 
 template<typename Float>
-int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit)
+int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit) 
 {
     int ret =0;
     

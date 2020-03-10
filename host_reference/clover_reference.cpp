@@ -6,8 +6,6 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <wilson_dslash_reference.h>
-#include <blas_reference.h>
-
 
 /**
    @brief Apply the clover matrix field

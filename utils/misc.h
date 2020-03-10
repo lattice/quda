@@ -1,6 +1,4 @@
-#ifndef __MISC_H__
-#define __MISC_H__
-
+#pragma once
 #include <quda.h>
 
 #ifdef __cplusplus
@@ -85,8 +83,3 @@ extern "C" {
 #define OPP_DIR(dir)    (7-(dir))
 #define GOES_FORWARDS(dir) (dir<=3)
 #define GOES_BACKWARDS(dir) (dir>3)
-
-
-#endif
-
-

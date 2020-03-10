@@ -70,6 +70,7 @@ double c5 = 0.5;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
+int n_naiks = 1;
 double clover_coeff = 0.1;
 bool compute_clover = false;
 bool compute_fatlong = false;

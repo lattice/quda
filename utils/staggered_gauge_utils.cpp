@@ -8,7 +8,7 @@
 #include <quda.h>
 #include <util_quda.h>
 #include <staggered_gauge_utils.h>
-#include <llfat_reference.h>
+#include <llfat_utils.h>
 #include <unitarization_links.h>
 #include "misc.h"
 

@@ -1,10 +1,10 @@
 include_directories(../utils)
 
 # enable utils build a common library for all utils
-set(QUDA_REFERENCE_COMMON blas_reference.cpp    covdev_reference.cpp              dslash_test_helpers.cpp    hisq_force_reference.cpp   llfat_reference.cpp             wilson_dslash_reference.cpp
-clover_reference.cpp  domain_wall_dslash_reference.cpp  gauge_force_reference.cpp  hisq_force_reference2.cpp  staggered_dslash_reference.cpp)
+set(QUDA_REFERENCE_COMMON covdev_reference.cpp dslash_test_helpers.cpp hisq_force_reference.cpp 
+  dslash_reference.cpp wilson_dslash_reference.cpp clover_reference.cpp domain_wall_dslash_reference.cpp 
+  gauge_force_reference.cpp hisq_force_reference2.cpp staggered_dslash_reference.cpp)
 cuda_add_library(quda_reference STATIC ${QUDA_REFERENCE_COMMON})
-#cuda_add_library(quda_utils STATIC ../utils/libquda_utils.a)
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
   add_dependencies(quda_reference QMP)
 endif()
@@ -22,7 +22,7 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_reference QMP)
 endif()
 
-set(REFERENCE_LIBS quda quda_reference)
+set(REFERENCE_LIBS quda quda_utils quda_reference)
 
 macro(QUDA_CHECKBUILDREFERENCE mytarget qudabuildreference)
   if(NOT ${qudabuildreference})

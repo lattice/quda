@@ -13,7 +13,7 @@
 
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"

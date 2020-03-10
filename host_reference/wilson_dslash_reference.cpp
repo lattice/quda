@@ -5,13 +5,12 @@
 #include <util_quda.h>
 
 #include <host_utils.h>
-#include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
 
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <string.h>
 
 using namespace quda;

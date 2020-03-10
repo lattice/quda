@@ -3,30 +3,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+// QUDA headers
 #include <quda_internal.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <blas_quda.h>
+#include <unitarization_links.h>
+#include <gauge_field.h>
 
+// External headers
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <unitarization_links.h>
-#include <llfat_reference.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
-#include <blas_reference.h>
-
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
+#include <llfat_utils.h>
 #include <qio_field.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -36,7 +29,7 @@
 
 #define my_spinor_site_size 6
 void **ghost_fatlink, **ghost_longlink;
-static int n_naiks = 1;
+//static int n_naiks = 1;
 
 // For loading the gauge fields
 int argc_copy;
@@ -107,10 +100,10 @@ void eigensolve_test()
     }
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
-                                     compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
+				 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
 

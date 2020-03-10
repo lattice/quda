@@ -1,5 +1,4 @@
-#ifndef _DSLASH_UTIL_H
-#define _DSLASH_UTIL_H
+#pragma once
 
 #include <host_utils.h>
 #include <comm_quda.h>
@@ -88,6 +87,17 @@ static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
   su3Mul(res, matT, vec);
 }
 
+//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
+//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
+
+//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
+//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
+
+void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+
+void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+
+void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
@@ -201,7 +211,6 @@ Float *spinorNeighbor_5d(int i, int dir, int oddBit, Float *spinorField, int nei
 }
 
 #ifdef MULTI_GPU
-
 inline int x4_mg(int i, int oddBit)
 {
   int Y = fullLatticeIndex(i, oddBit);
@@ -532,5 +541,3 @@ Float *spinorNeighbor_5d_mgpu(int i, int dir, int oddBit, Float *spinorField, Fl
 
 
 #endif // MULTI_GPU
-
-#endif // _DSLASH_UTIL_H

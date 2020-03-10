@@ -8,7 +8,7 @@
 
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>

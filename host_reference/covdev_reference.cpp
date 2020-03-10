@@ -3,15 +3,14 @@
 #include <math.h>
 #include <string.h>
 
-//#include <host_utils.h>
+#include <host_utils.h>
 #include <misc.h>
-#include <blas_reference.h>
-#include <dslash_util.h>
+#include <covdev_reference.h>
+#include <dslash_reference.h>
 
 #include <quda_internal.h>
 #include <quda.h>
 #include <util_quda.h>
-#include <covdev_reference.h>
 #include <blas_quda.h>
 
 extern void *memset(void *s, int c, size_t n);

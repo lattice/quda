@@ -7,9 +7,8 @@
 
 #include <quda.h>
 #include <host_utils.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
-#include <blas_reference.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
@@ -330,8 +329,8 @@ template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  int my_spinor_site_size = 24;		    
-  for (int i=0; i<V5h*my_spinor_site_size; i++) res[i] = 0.0;
+  //int my_spinor_site_size = 24;		    
+  for (int i=0; i<V5h*spinor_site_size; i++) res[i] = 0.0;
   
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
@@ -357,7 +356,7 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 	gFloat *gauge = gaugeLink_mgpu(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);//this is unchanged from MPi version
 	sFloat *spinor = spinorNeighbor_5d_mgpu<type>(sp_idx, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
 	
-	sFloat projectedSpinor[my_spinor_site_size], gaugedSpinor[my_spinor_site_size];
+	sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
 	int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
 	multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
       

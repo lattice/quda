@@ -44,7 +44,7 @@ static int volumeCB;
 static int Vs[4], Vsh[4];
 
 #include "gauge_field.h"
-extern void setup_dims_in_gauge(int *XX);
+//extern void setup_dims_in_gauge(int *XX);
 
 static void
 setup_dims(int* X)

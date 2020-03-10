@@ -12,11 +12,9 @@
 #include "misc.h"
 #include <blas_quda.h>
 
-#include <blas_reference.h>
-
 extern void *memset(void *s, int c, size_t n);
 
-#include <dslash_util.h>
+#include <dslash_reference.h>
 
 template<typename Float>
 void display_link_internal(Float* link)
