@@ -22,7 +22,8 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(QudaEigParam *eig_param, TimeProfile &profile) :
+  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+    mat(mat),
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
@@ -103,10 +104,12 @@ namespace quda
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
-      eig_solver = new TRLM(eig_param, mat, profile);
+      eig_solver = new TRLM(mat, eig_param, profile);
       break;
     default: errorQuda("Invalid eig solver type");
     }
+
+    if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
     return eig_solver;
   }
 
@@ -121,6 +124,9 @@ namespace quda
       if (!tmp2) tmp2 = ColorSpinorField::Create(param);
     }
     mat(out, in, *tmp1, *tmp2);
+
+    // Save mattrix * vector tuning
+    saveTuneCache();
   }
 
   void EigenSolver::chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
@@ -189,6 +195,9 @@ namespace quda
 
     delete tmp1;
     delete tmp2;
+
+    // Save Chebyshev tuning
+    saveTuneCache();
   }
 
   double EigenSolver::estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in)
@@ -223,6 +232,9 @@ namespace quda
 
     // Increase final result by 10% for safety
     return result * 1.10;
+
+    // Save Chebyshev Max tuning
+    saveTuneCache();
   }
 
   // Orthogonalise r against V_[j]
@@ -245,6 +257,10 @@ namespace quda
     blas::caxpy(s, vecs_ptr, rvec);
 
     host_free(s);
+
+    // Save orthonormalisation tuning
+    saveTuneCache();
+    
     return sum;
   }
 
@@ -320,6 +336,9 @@ namespace quda
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
+
+    // Save Krylov block rotation tuning
+    saveTuneCache();
   }
 
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end)
@@ -373,8 +392,11 @@ namespace quda
       evals[i] = sigma_tmp[i];
       //--------------------------------------------------------------------------
     }
-  }
 
+    // Save SVD tuning
+    saveTuneCache();
+  }
+  
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
                                const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
@@ -411,6 +433,9 @@ namespace quda
       s[i] /= evals[i].real();
     }
     blas::caxpy(s.data(), right_vecs, sol);
+
+    // Save SVD deflation tuning
+    saveTuneCache();
   }
 
   void EigenSolver::computeEvals(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs,
@@ -437,6 +462,9 @@ namespace quda
         printfQuda("Eval[%04d] = (%+.16e,%+.16e) residual = %+.16e\n", i, evals[i].real(), evals[i].imag(), residua[i]);
     }
     delete temp[0];
+
+    // Save Eval tuning
+    saveTuneCache();
   }
 
   // Deflate vec, place result in vec_defl
@@ -470,6 +498,9 @@ namespace quda
     if (!accumulate)
       for (auto &x : sol) blas::zero(*x);
     blas::caxpy(s.data(), eig_vecs, sol);
+
+    // Save Deflation tuning
+    saveTuneCache();
   }
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
@@ -703,9 +734,8 @@ namespace quda
   //-----------------------------------------------------------------------------
 
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile) :
-    EigenSolver(eig_param, profile),
-    mat(mat)
+  TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+    EigenSolver(mat, eig_param, profile)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -730,6 +760,8 @@ namespace quda
 
   void TRLM::operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
+    // In case we are deflating an operator, save the tunechache from the inverter
+    saveTuneCache();
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
@@ -962,6 +994,9 @@ namespace quda
       printfQuda("*****************************\n");
     }
 
+    // Save TRLM tuning
+    saveTuneCache();
+    
     mat.flops();
   }
 
@@ -1016,6 +1051,9 @@ namespace quda
     // v_{j+1} = r / b_j
     blas::zero(*v[j + 1]);
     blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
+
+    // Save Lanczos step tuning
+    saveTuneCache();
   }
 
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
@@ -1258,5 +1296,8 @@ namespace quda
     for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * ritz_mat[dim * (i + 1) - 1];
 
     host_free(ritz_mat_keep);
+
+    // Save Krylov rotation tuning
+    saveTuneCache();
   }
 } // namespace quda

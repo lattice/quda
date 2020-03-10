@@ -13,8 +13,8 @@
 
 namespace quda {
 
-  CG3NE::CG3NE(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matDagSloppy(matSloppy), init(false)
+  CG3NE::CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, param, profile), matDagSloppy(matSloppy), init(false)
   {
   }
 
