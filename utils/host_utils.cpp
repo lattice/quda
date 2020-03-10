@@ -1821,12 +1821,6 @@ static void constructCloverField(Float *res, double norm, double diag) {
   }
 }
 
-void construct_clover_field(void *clover, double norm, double diag, QudaPrecision precision) {
-
-  if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
-  else constructCloverField((float *)clover, norm, diag);
-}
-
 /*void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
   printf("Reference:\n");
   printSpinorElement(spinorRef, 0, prec); printf("...\n");

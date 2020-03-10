@@ -123,6 +123,7 @@ int main(int argc, char **argv)
   
   // Allocate host side memory for the gauge field.
   void *gauge[4];
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);  
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -130,6 +131,8 @@ int main(int argc, char **argv)
   // Allocate host side memory for clover terms if needed.
   void *clover = 0, *clover_inv = 0;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    clover = malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);    
     constructHostCloverField(clover, clover_inv, eig_inv_param);
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
