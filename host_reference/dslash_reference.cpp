@@ -1,7 +1,12 @@
+// QUDA header (for HeavyQuarkResidualNorm)
+#include <blas_quda.h>
+
+// External headers
 #include <host_utils.h>
 #include <dslash_reference.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
+#include <staggered_dslash_reference.h>
 #include <command_line_params.h>
 
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) {
@@ -317,5 +322,67 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
 	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);      
+  }
+}
+
+void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorField *ref, quda::ColorSpinorField *in, quda::ColorSpinorField *out, double mass, void *qdp_fatlink[], void *qdp_longlink[], void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, int shift) {
+  
+  switch (test_type) {
+  case 0: // full parity solution, full parity system
+  case 1: // full parity solution, solving EVEN EVEN prec system
+  case 2: // full parity solution, solving ODD ODD prec system
+    
+    // In QUDA, the full staggered operator has the sign convention
+    // {{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
+    // have the minus sign. Passing in QUDA_DAG_YES solves this
+    // discrepancy.
+    staggeredDslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink,
+		    ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Odd()), QUDA_EVEN_PARITY,
+		    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    staggeredDslash(reinterpret_cast<quda::cpuColorSpinorField *>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink,
+		    ghost_longlink, reinterpret_cast<quda::cpuColorSpinorField *>(&out->Even()), QUDA_ODD_PARITY,
+		    QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+    
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      xpay(out->V(), kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+      ax(0.5 / kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
+    } else {
+      axpy(2 * mass, out->V(), ref->V(), ref->Length(), gauge_param.cpu_prec);
+    }
+    break;
+    
+  case 3: // even parity solution, solving EVEN system
+  case 4: // odd parity solution, solving ODD system
+  case 5: // multi mass CG, even parity solution, solving EVEN system
+  case 6: // multi mass CG, odd parity solution, solving ODD system
+    
+    staggeredMatDagMat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmp, (test_type == 3 || test_type == 5) ? QUDA_EVEN_PARITY : QUDA_ODD_PARITY, dslash_type);
+    break;    
+  }
+  
+  int len = 0;
+  if (solution_type == QUDA_MAT_SOLUTION || solution_type == QUDA_MATDAG_MAT_SOLUTION) {
+    len = V;
+  } else {
+    len = Vh;
+  }
+  
+  mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+  double nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+  double src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);  
+  double hqr = sqrt(quda::blas::HeavyQuarkResidualNorm(*out, *ref).z);
+  double l2r = sqrt(nrm2 / src2);
+
+  if(multishift == 1) {
+    printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n", 
+	       inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
+  } else {
+    printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
+	       shift, inv_param.tol_offset[shift], inv_param.true_res_offset[shift], l2r, inv_param.tol_hq_offset[shift],
+	       inv_param.true_res_hq_offset[shift], hqr);
+    // Empirical: if the cpu residue is more than 1 order the target accuracy, then it fails to converge
+    if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[shift]) { 
+      printfQuda("Shift %d has empirically failed to converge\n", shift);
+    }    
   }
 }

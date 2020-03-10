@@ -3495,7 +3495,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
 
-
   if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
       param->dslash_type == QUDA_STAGGERED_DSLASH) {
 
@@ -3506,7 +3505,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
     if (param->solve_type != QUDA_DIRECT_PC_SOLVE) {
       errorQuda("For Staggered-type fermions, multi-shift solver only supports DIRECT_PC solve types");
     }
-
+    
   } else { // Wilson type
 
     if (mat_solution) {

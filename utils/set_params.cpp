@@ -1,5 +1,5 @@
-#include <host_utils.h>
 #include <command_line_params.h>
+#include <host_utils.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -1199,11 +1199,7 @@ void setDeflationParam(QudaEigParam &df_param) {
 }
 
 void setQudaStaggeredInvTestParams() {
-  
-  if(inv_type != QUDA_CG_INVERTER && (test_type == 5 || test_type == 6)) {
-    errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
-  }    
-  
+
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (test_type != 0) {
       errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type);
@@ -1211,7 +1207,10 @@ void setQudaStaggeredInvTestParams() {
 
     solve_type = QUDA_DIRECT_SOLVE;
     solution_type = QUDA_MAT_SOLUTION;
+    matpc_type = QUDA_MATPC_EVEN_EVEN; // doesn't matter
+
   } else {
+
     if (test_type == 0 && (inv_type == QUDA_CG_INVERTER || inv_type == QUDA_PCG_INVERTER) &&
         solve_type != QUDA_NORMOP_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
       warningQuda("The full spinor staggered operator (test 0) can't be inverted with (P)CG. Switching to BiCGstab.\n");
@@ -1225,7 +1224,7 @@ void setQudaStaggeredInvTestParams() {
         solve_type = QUDA_DIRECT_PC_SOLVE;
       }
     }
-    
+
     if (test_type == 1 || test_type == 3 || test_type == 5) {
       matpc_type = QUDA_MATPC_EVEN_EVEN;
     } else if (test_type == 2 || test_type == 4 || test_type == 6) {
@@ -1239,6 +1238,21 @@ void setQudaStaggeredInvTestParams() {
     } else {
       solution_type = QUDA_MATPC_SOLUTION;
     }
+  }
+
+  if (prec_sloppy == QUDA_INVALID_PRECISION){
+    prec_sloppy = prec;
+  }
+
+  if (prec_refinement_sloppy == QUDA_INVALID_PRECISION){
+    prec_refinement_sloppy = prec_sloppy;
+  }
+  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID){
+    link_recon_sloppy = link_recon;
+  }
+
+  if(inv_type != QUDA_CG_INVERTER && (test_type == 5 || test_type == 6)) {
+    errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
   
   // Set n_naiks to 2 if eps_naik != 0.0
@@ -1254,8 +1268,10 @@ void setQudaStaggeredInvTestParams() {
     } else {
       printfQuda("Note: epsilon-naik = 0, testing original HISQ links.\n");
     }
-  }  
+  }
 }
+
+
 
 void setQudaStaggeredEigTestParams() {
   
@@ -1300,3 +1316,4 @@ void setQudaStaggeredEigTestParams() {
     }
   }
 }
+

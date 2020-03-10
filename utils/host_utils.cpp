@@ -182,24 +182,24 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
-void constructStaggeredTestSpinorParam(quda::ColorSpinorParam &cs_param, QudaInvertParam &inv_param, QudaGaugeParam &gauge_param) {
-  cs_param.nColor = 3;
-  cs_param.nSpin = 1;
-  cs_param.nDim = 5;
-  for (int d = 0; d < 4; d++) cs_param.x[d] = gauge_param.X[d];
-  bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || 
-	     inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  if (pc) cs_param.x[0] /= 2;
-  cs_param.x[4] = 1; 
+void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param, const QudaGaugeParam *gauge_param) {
+  cs_param->nColor = 3;
+  cs_param->nSpin = 1;
+  cs_param->nDim = 5;
+  for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || 
+	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  if (pc) cs_param->x[0] /= 2;
+  cs_param->x[4] = 1; 
   
-  cs_param.setPrecision(inv_param.cpu_prec);
-  cs_param.pad = 0;
-  cs_param.siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-  cs_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  cs_param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  cs_param.gammaBasis = inv_param.gamma_basis;
-  cs_param.create = QUDA_ZERO_FIELD_CREATE;
-  cs_param.location = QUDA_CPU_FIELD_LOCATION;
+  cs_param->setPrecision(inv_param->cpu_prec);
+  cs_param->pad = 0;
+  cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
+  cs_param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  cs_param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  cs_param->gammaBasis = inv_param->gamma_basis;
+  cs_param->create = QUDA_ZERO_FIELD_CREATE;
+  cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
   
 
@@ -2267,7 +2267,7 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   if (strcmp(latfile,"")) {  
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_type = 2;
+    //construct_type = 2;
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }
@@ -2275,9 +2275,9 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
       if (unit_gauge) construct_type = 0;
       else construct_type = 1;
-      constructQudaGaugeField(qdp_inlink, construct_type, gauge_param.cpu_prec, &gauge_param);
+      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink, construct_type, gauge_param.cpu_prec, &gauge_param,
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
 				 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }

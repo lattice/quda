@@ -87,17 +87,14 @@ static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
   su3Mul(res, matT, vec);
 }
 
-//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
-//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
-
-//void verifyStaggeredInversion(ColorSpinorField *ref, ColorSpinorField *out, void *qdp_fatlink[], void *qdp_longlink[], 
-//void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param);
-
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
+
+void verifyStaggeredInversion(quda::ColorSpinorField *tmp, quda::ColorSpinorField *ref, quda::ColorSpinorField *in, quda::ColorSpinorField *out, double mass, void *qdp_fatlink[], void *qdp_longlink[], void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, int shift);
+
 
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.

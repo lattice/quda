@@ -785,8 +785,7 @@ get_staggered_test_type(int t)
   return ret;
 }
 
-const char* 
-get_dslash_str(QudaDslashType type)
+const char* get_dslash_str(QudaDslashType type)
 {
   const char* ret;
   
