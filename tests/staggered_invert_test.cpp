@@ -265,9 +265,10 @@ int main(int argc, char **argv)
   case 5: // multi mass CG, even parity solution, solving EVEN system
   case 6: // multi mass CG, odd parity solution, solving ODD system
     
-    {   
+    {
       int num_offsets = inv_param.num_offset;
-      double masses[num_offsets] = {0.06, 0.061, 0.064, 0.070, 0.077, 0.081, 0.1, 0.11, 0.12, 0.13, 0.14, 0.205};
+      std::vector<double> masses(inv_param.num_offset);
+      for(int i=0; i<num_offsets; i++) masses[i] = 0.06 + i*i*0.01;      
       
       // Set tolerances for the heavy quarks, these can be set independently if desired
       for (int i = 0; i <num_offsets; i++) {
@@ -276,12 +277,11 @@ int main(int argc, char **argv)
       }
       
       // Host array for solutions
-      void *outArray[num_offsets];
+      void **outArray = (void**)malloc(num_offsets*sizeof(void*));
       
       // QUDA host array for internal checks
-      ColorSpinorField *qudaOutArray[num_offsets];
-      qudaOutArray[0] = out;
-      for (int i = 1; i < num_offsets; i++) { 
+      std::vector<ColorSpinorField*> qudaOutArray(num_offsets);
+      for (int i = 0; i < num_offsets; i++) { 
 	qudaOutArray[i] = ColorSpinorField::Create(cs_param); 
       }
       
@@ -306,7 +306,8 @@ int main(int argc, char **argv)
 	  verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, gauge_param, inv_param, i);	
 	}
       }
-      for (int i = 1; i < num_offsets; i++) delete qudaOutArray[i];
+      for (int i = 0; i < num_offsets; i++) delete qudaOutArray[i];
+      free(outArray);
     }
     break;    
     
