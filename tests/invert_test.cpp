@@ -3,16 +3,16 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
-#include <limits>
 
+// QUDA headers
 #include <random_quda.h>
+#include <quda.h>
+
+// External headers
 #include <host_utils.h>
 #include <command_line_params.h>
-#include "misc.h"
+#include <misc.h>
 #include <dslash_reference.h>
-
-// In a typical application, quda.h is the only QUDA header required.
-#include <quda.h>
 
 namespace quda
 {
@@ -21,8 +21,7 @@ namespace quda
 
 void display_test_info()
 {
-  printfQuda("running the following test:\n");
-    
+  printfQuda("running the following test:\n");    
   printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
   printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
              get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
@@ -70,15 +69,6 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // Only these fermions are supported in this file
-  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
-      dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
-      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
-  }
-
   // Move these
   mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
   if (multishift) solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // set a correct default for the multi-shift solver
@@ -99,26 +89,36 @@ int main(int argc, char **argv)
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // Only these fermions are supported in this file
+  if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
+      dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH &&
+      dslash_type != QUDA_MOBIUS_DWF_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH &&
+      dslash_type != QUDA_DOMAIN_WALL_DSLASH) {
+    printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }  
+
+  // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
-
   QudaInvertParam inv_param = newQudaInvertParam();
   setInvertParam(inv_param);
-
   // Check for deflation
   QudaEigParam eig_param = newQudaEigParam();
   if (inv_deflate) {
-    inv_param.eig_param = &eig_param;
     setEigParam(eig_param);
+    inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
   }
 
-  // Initialize the QUDA library
-  initQuda(device);
+  // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
-  // Set some dimension parameters
+  // Initialize the QUDA library
+  initQuda(device);
+
+  // Set some dimension parameters for the host routines
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
@@ -137,7 +137,6 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
 
-
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   void *clover = 0, *clover_inv = 0;
@@ -150,11 +149,15 @@ int main(int argc, char **argv)
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
+  // Compute plaquette as a sanity check
+  double plaq[3];
+  plaqQuda(plaq);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
   // Allocate host side memory for the spinor fields
-  void *spinorOut = NULL, **spinorOutMulti = NULL;
+  void *spinorOut = nullptr, **spinorOutMulti = nullptr;
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   if (multishift) {

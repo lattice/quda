@@ -1,7 +1,5 @@
-#include_directories(../host_reference) #Included to use the host dslash routines
-
 # enable utils build a common library for all utils
-set(QUDA_UTILS_COMMON misc.cpp face_gauge.cpp host_utils.cpp host_blas.cpp command_line_params.cpp llfat_utils.cpp staggered_gauge_utils.cpp)
+set(QUDA_UTILS_COMMON misc.cpp face_gauge.cpp host_utils.cpp host_blas.cpp command_line_params.cpp llfat_utils.cpp staggered_gauge_utils.cpp set_params.cpp)
 cuda_add_library(quda_utils STATIC ${QUDA_UTILS_COMMON})
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
   add_dependencies(quda_utils QMP)

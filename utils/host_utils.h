@@ -42,7 +42,9 @@ extern QudaPrecision &cuda_prec_ritz;
 
 void setQudaDefaultPrecs();
 void setQudaDefaultMgSolveTypes();
-void setQudaStaggeredTestParams();
+void setQudaDefaultMgTestParams();
+void setQudaStaggeredEigTestParams();
+void setQudaStaggeredInvTestParams();
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);

@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits>
 
 // QUDA headers
 #include <quda.h>
@@ -25,8 +24,6 @@
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
 #include <qio_field.h>
-
-#define MAX(a,b) ((a)>(b)?(a):(b))
 
 void display_test_info()
 {
@@ -73,14 +70,6 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // Only these fermions are supported in this file
-  if (dslash_type != QUDA_STAGGERED_DSLASH && 
-      dslash_type != QUDA_ASQTAD_DSLASH && 
-      dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
-  }
-
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
@@ -100,21 +89,30 @@ int main(int argc, char **argv)
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-
-  // Deduce solve, solution, and matrix preconditioning type
   setQudaDefaultPrecs();
-  setQudaStaggeredTestParams();
+
+  // Only these fermions are supported in this file
+  if (dslash_type != QUDA_STAGGERED_DSLASH && 
+      dslash_type != QUDA_ASQTAD_DSLASH && 
+      dslash_type != QUDA_LAPLACE_DSLASH) {
+    printfQuda("dslash_type %d not supported\n", dslash_type);
+    exit(0);
+  }
+  
+  // Deduce operator, solution, and operator preconditioning types
+  setQudaStaggeredInvTestParams();
   display_test_info();
 
+  // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setStaggeredQDPGaugeParam(gauge_param);
-
   QudaInvertParam inv_param = newQudaInvertParam();
   setStaggeredInvertParam(inv_param);
-
   QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
+  // We encapsulate the eigensolver parameters inside the invert parameter structure
   inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
+
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
@@ -125,7 +123,7 @@ int main(int argc, char **argv)
   setSpinorSiteSize(6);
 
   // Staggered Gauge construct START
-  //------------------------------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------------
   // Allocate host staggered gauge fields
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
@@ -189,10 +187,10 @@ int main(int argc, char **argv)
   setStaggeredMILCGaugeParam(gauge_param, is_longlink);
   loadGaugeQuda(milc_longlink, &gauge_param);
   // Staggered Gauge construct END
-  //------------------------------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------------
 
   // Staggered vector construct START
-  //------------------------------------------------------------------------------------------------
+  //-----------------------------------------------------------------------------------
   ColorSpinorField *in;
   ColorSpinorField *out;
   ColorSpinorField *ref;
@@ -204,7 +202,7 @@ int main(int argc, char **argv)
   ref = quda::ColorSpinorField::Create(cs_param);
   tmp = quda::ColorSpinorField::Create(cs_param);
   // Staggered vector construct END
-  //------------------------------------------------------------------------------------------------    
+  //-----------------------------------------------------------------------------------
     
   // Prepare rng
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
