@@ -251,7 +251,6 @@ int main(int argc, char **argv)
   }
 
   // Clean up memory allocations
-
   delete in;
   delete out;
   delete check;

@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 
   // Parse command line options
   auto app = make_app();
-  add_multigrid_option_group(app);
+  if(inv_multigrid) add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  setQudaDefaultMgSolveTypes();
+  if(inv_multigrid) setQudaDefaultMgSolveTypes();
 
   // Initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -109,25 +109,29 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
-  setMultigridInvertParam(inv_param);
   QudaMultigridParam mg_param = newQudaMultigridParam();
-  // Set sub structures
-  QudaInvertParam mg_inv_param = newQudaInvertParam();
-  mg_param.invert_param = &mg_inv_param;
-  QudaEigParam mg_eig_param[mg_levels];
-  for (int i = 0; i < mg_levels; i++) {
-    if (mg_eig[i]) {
-      mg_eig_param[i] = newQudaEigParam();
-      setMultigridEigParam(mg_eig_param[i], i);
-      // setEigParamLocal(mg_eig_param[i], i);
-      mg_param.eig_param[i] = &mg_eig_param[i];
-    } else {
-      mg_param.eig_param[i] = nullptr;
+  if(inv_multigrid) {
+    setMultigridInvertParam(inv_param);
+    // Set sub structures
+    QudaInvertParam mg_inv_param = newQudaInvertParam();
+    mg_param.invert_param = &mg_inv_param;
+    QudaEigParam mg_eig_param[mg_levels];
+    for (int i = 0; i < mg_levels; i++) {
+      if (mg_eig[i]) {
+	mg_eig_param[i] = newQudaEigParam();
+	setMultigridEigParam(mg_eig_param[i], i);
+	mg_param.eig_param[i] = &mg_eig_param[i];
+      } else {
+	mg_param.eig_param[i] = nullptr;
+      }
     }
+    // Set MG
+    setMultigridParam(mg_param);  
   }
-  // Set MG
-  setMultigridParam(mg_param);
-
+  else {
+    setInvertParam(inv_param);
+  }
+  
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
@@ -158,20 +162,27 @@ int main(int argc, char **argv)
   clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     constructHostCloverField(clover, clover_inv, inv_param);
-    // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    if(inv_multigrid) {
+      // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
+      if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+	inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+      }
     }
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
-    // Restore actual solve_type we want to do
-    inv_param.solve_type = solve_type;
+    if(inv_multigrid) {
+      // Restore actual solve_type we want to do
+      inv_param.solve_type = solve_type;
+    }
   }
 
-  // Now QUDA is initialised and teh fields are loaded, we may setup the preconditioner
-  void *mg_preconditioner = newMultigridQuda(&mg_param);
-  inv_param.preconditioner = mg_preconditioner;
-
+  // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
+  void *mg_preconditioner = nullptr;
+  if(inv_multigrid) {
+    mg_preconditioner = newMultigridQuda(&mg_param);
+    inv_param.preconditioner = mg_preconditioner;
+  }
+  
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);
@@ -204,7 +215,7 @@ int main(int argc, char **argv)
   delete rng;
 
   // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
+  if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
 
   // Compute performance statistics
   if (Nsrc > 1) performanceStats(time, gflops);

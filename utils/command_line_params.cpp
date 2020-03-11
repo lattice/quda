@@ -55,6 +55,7 @@ quda::mgarray<char[256]> mg_vec_infile;
 quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
+bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
 int multishift = 1;
 bool verify_results = true;
@@ -372,6 +373,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
+  quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,

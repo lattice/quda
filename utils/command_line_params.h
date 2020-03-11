@@ -188,6 +188,7 @@ extern quda::mgarray<char[256]> mg_vec_infile;
 extern quda::mgarray<char[256]> mg_vec_outfile;
 extern QudaInverterType inv_type;
 extern bool inv_deflate;
+extern bool inv_multigrid;
 extern QudaInverterType precon_type;
 extern int multishift;
 extern bool verify_results;
