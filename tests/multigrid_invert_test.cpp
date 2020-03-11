@@ -15,6 +15,9 @@
 #include <command_line_params.h>
 #include <dslash_reference.h>
 
+#include <staggered_gauge_utils.h>
+
+
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -70,12 +73,9 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // Prior to command line parsing, we set some default parameters.
-  setQudaDefaultMgTestParams();
-
   // Parse command line options
   auto app = make_app();
-  if(inv_multigrid) add_multigrid_option_group(app);
+  add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -85,11 +85,14 @@ int main(int argc, char **argv)
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  if(inv_multigrid) setQudaDefaultMgSolveTypes();
-
+  if(inv_multigrid) {
+    setQudaDefaultMgTestParams();    
+    setQudaDefaultMgSolveTypes();
+  }
+  
   // Initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-
+  
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH &&
       dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
@@ -100,22 +103,22 @@ int main(int argc, char **argv)
   }
 
   // Only these solve types are supported in this file
-  if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
+  if (inv_multigrid && solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
     printfQuda("\nsolve_type %d not supported. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n", solve_type);
     exit(0);
   }
-
+  
   // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaInvertParam mg_inv_param = newQudaInvertParam();
+  QudaEigParam mg_eig_param[mg_levels];
   if(inv_multigrid) {
     setMultigridInvertParam(inv_param);
     // Set sub structures
-    QudaInvertParam mg_inv_param = newQudaInvertParam();
     mg_param.invert_param = &mg_inv_param;
-    QudaEigParam mg_eig_param[mg_levels];
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
 	mg_eig_param[i] = newQudaEigParam();
@@ -153,14 +156,13 @@ int main(int argc, char **argv)
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
-
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   void *clover = 0, *clover_inv = 0;
   // Allocate space on the host (always best to allocate and free in the same scope)
-  clover = malloc(V * clover_site_size * host_clover_data_type_size);
-  clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    clover = malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
     if(inv_multigrid) {
       // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
@@ -175,7 +177,6 @@ int main(int argc, char **argv)
       inv_param.solve_type = solve_type;
     }
   }
-
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
   if(inv_multigrid) {
@@ -193,22 +194,31 @@ int main(int argc, char **argv)
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
 
-  // QUDA multigrid invert test BEGIN
-  //----------------------------------------------------------------------------
-  // Allocate host side memory for the spinor fields
-  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  for (int i = 0; i < Nsrc; i++) {
-    constructRandomSpinorSource(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-    invertQuda(spinorOut, spinorIn, &inv_param);
+  // Vector construct START
+  //-----------------------------------------------------------------------------------
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *check;
+  ColorSpinorParam cs_param;
+  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  cs_param.location = QUDA_CPU_FIELD_LOCATION;
+  in = quda::ColorSpinorField::Create(cs_param);
+  out = quda::ColorSpinorField::Create(cs_param);
+  check = quda::ColorSpinorField::Create(cs_param);
+  // Vector construct END
+  //-----------------------------------------------------------------------------------
 
+  // QUDA invert test BEGIN
+  //----------------------------------------------------------------------------
+  for (int i = 0; i < Nsrc; i++) {
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    invertQuda(out->V(), in->V(), &inv_param);
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
   }
-  // QUDA multigrid invert test COMPLETE
+  // QUDA invert test COMPLETE
   //----------------------------------------------------------------------------
 
   rng->Release();
@@ -224,14 +234,13 @@ int main(int argc, char **argv)
 
   // Perform host side verification of inversion if requested
   if (verify_results) {
-    verifyInversion(spinorOut, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
+    verifyInversion(out->V(), in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
   }
-
+  
   // Clean up memory allocations
-  free(spinorIn);
-  free(spinorCheck);
-  free(spinorOut);
-
+  delete in;
+  delete out;
+  delete check;
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 
