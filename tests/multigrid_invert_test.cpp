@@ -19,11 +19,14 @@ namespace quda {
   extern void setTransferGPU(bool);
 }
 
-void display_test_info() {
+void display_test_info()
+{
   printfQuda("running the following test:\n");
-  
+
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec), get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim);
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
@@ -66,8 +69,8 @@ void display_test_info() {
 }
 
 int main(int argc, char **argv)
-{  
-  // Prior to command line parsing, we set some default parameters. 
+{
+  // Prior to command line parsing, we set some default parameters.
   setQudaDefaultMgTestParams();
 
   // Parse command line options
@@ -79,7 +82,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  // Set some default values for precisions and solve types 
+  // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
   setQudaDefaultMgSolveTypes();
@@ -95,14 +98,13 @@ int main(int argc, char **argv)
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-  
+
   // Only these solve types are supported in this file
-  if (solve_type != QUDA_DIRECT_SOLVE &&
-      solve_type != QUDA_DIRECT_PC_SOLVE) {
+  if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
     printfQuda("\nsolve_type %d not supported. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n", solve_type);
     exit(0);
   }
-  
+
   // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -125,7 +127,7 @@ int main(int argc, char **argv)
   }
   // Set MG
   setMultigridParam(mg_param);
-  
+
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
@@ -143,11 +145,11 @@ int main(int argc, char **argv)
   //----------------------------------------------------------------------------
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);  
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
-  
+
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
   void *clover = 0, *clover_inv = 0;
@@ -157,11 +159,12 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     constructHostCloverField(clover, clover_inv, inv_param);
     // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
+      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
     // Restore actual solve_type we want to do
-    inv_param.solve_type = solve_type; 
+    inv_param.solve_type = solve_type;
   }
 
   // Now QUDA is initialised and teh fields are loaded, we may setup the preconditioner
@@ -183,11 +186,11 @@ int main(int argc, char **argv)
   // Allocate host side memory for the spinor fields
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);  
+  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   for (int i = 0; i < Nsrc; i++) {
     constructRandomSpinorSource(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     invertQuda(spinorOut, spinorIn, &inv_param);
-    
+
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
@@ -211,15 +214,15 @@ int main(int argc, char **argv)
   if (verify_results) {
     verifyInversion(spinorOut, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
   }
-  
+
   // Clean up memory allocations
   free(spinorIn);
   free(spinorCheck);
   free(spinorOut);
-  
+
   freeGaugeQuda();
-  for (int dir = 0; dir<4; dir++) free(gauge[dir]);
-  
+  for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
+
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     freeCloverQuda();
     if (clover) free(clover);

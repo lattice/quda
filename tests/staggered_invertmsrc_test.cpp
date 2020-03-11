@@ -455,7 +455,7 @@ invert_test(void)
           double nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
           double src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
           double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
-	  double l2r = sqrt(nrm2/src2);
+          double l2r = sqrt(nrm2/src2);
 
 	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
 		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r,
@@ -566,7 +566,6 @@ int main(int argc, char** argv)
   if(inv_type != QUDA_CG_INVERTER){
     if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
-
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);

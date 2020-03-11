@@ -166,12 +166,9 @@ int main(int argc, char **argv)
   inv_param.mass_normalization = normalization;
   inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
 
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
-      dslash_type == QUDA_TWISTED_MASS_DSLASH ||
-      dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
-      (multishift > 1) || inv_type == QUDA_CG_INVERTER) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_TWISTED_MASS_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH || (multishift > 1) || inv_type == QUDA_CG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -319,19 +316,19 @@ int main(int argc, char **argv)
 
   void **spinorOutMulti = NULL;
   //  if (multishift) {
-  spinorOutMulti = (void**)malloc(inv_param.num_src*sizeof(void *));
-  for (int i=0; i<inv_param.num_src; i++) {
+  spinorOutMulti = (void **)malloc(inv_param.num_src * sizeof(void *));
+  for (int i = 0; i < inv_param.num_src; i++) {
     spinorOutMulti[i] = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   }
-    //  } else {
-    //    spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
-    //  }
+  //  } else {
+  //    spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
+  //  }
 
-    //  if (multishift) {
-    for (int i=0; i<inv_param.num_src; i++) {
-      memset(spinorOutMulti[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
-      memset(spinorIn[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
-      memset(spinorCheck[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+  //  if (multishift) {
+  for (int i = 0; i < inv_param.num_src; i++) {
+    memset(spinorOutMulti[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorIn[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
+    memset(spinorCheck[i], 0, inv_param.Ls * V * spinor_site_size * host_spinor_data_type_size);
     }
     //  } else {
     //    memset(spinorOut, 0, inv_param.Ls*V*spinor_site_size*host_spinor_data_type_size);
@@ -548,7 +545,7 @@ int main(int argc, char **argv)
      printfQuda("rhs %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", i,
                 inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
                 inv_param.true_res_hq_offset[i]);
-  }
+   }
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();

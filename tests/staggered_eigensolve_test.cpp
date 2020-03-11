@@ -59,14 +59,12 @@ void display_test_info()
       printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
 
-  
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 
   return;
 }
-
 
 int main(int argc, char **argv)
 {
@@ -77,34 +75,32 @@ int main(int argc, char **argv)
   add_eigen_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-  
+
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
   setQudaDefaultPrecs();
-  
+
   // Only these fermions are supported in this file
-  if (dslash_type != QUDA_STAGGERED_DSLASH && 
-      dslash_type != QUDA_ASQTAD_DSLASH && 
-      dslash_type != QUDA_LAPLACE_DSLASH) {
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-  
+
   if (test_type != 0 && test_type != 3 && test_type != 4) {
     errorQuda("Test type %d is outside the valid range.\n", test_type);
   }
 
   setQudaStaggeredEigTestParams();
-  
+
   display_test_info();
 
-  // Set QUDA internal parameters  
+  // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setStaggeredQDPGaugeParam(gauge_param);
   // Though no inversions are performed, the inv_param
@@ -122,24 +118,23 @@ int main(int argc, char **argv)
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
   }
-  
+
   // This must be before the FaceBuffer is created
   // (this is because it allocates pinned memory - FIXME)
   initQuda(device);
-  
+
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
-
   // Staggered Gauge construct START
-  //-----------------------------------------------------------------------------------  
+  //-----------------------------------------------------------------------------------
   void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
-  
+
   for (int dir = 0; dir < 4; dir++) {
     qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -149,13 +144,13 @@ int main(int argc, char **argv)
   milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
-  
+
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
   computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
-  if(dslash_type == QUDA_ASQTAD_DSLASH) {
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
     // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
@@ -166,20 +161,22 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;  
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     setStaggeredMILCGaugeParam(gauge_param);
   }
   loadGaugeQuda(milc_fatlink, &gauge_param);
-  
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {  
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
     setStaggeredMILCGaugeParam(gauge_param);
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-  
+
   // Host side arrays to store the eigenpairs computed by QUDA
   void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
   for (int i = 0; i < eig_nConv; i++) {
@@ -188,13 +185,13 @@ int main(int argc, char **argv)
   double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
 
   double time = 0.0;
-  
+
   // QUDA eigensolver test
   //----------------------------------------------------------------------------
   switch (test_type) {
   case 0: // full parity solution
   case 3: // even
-  case 4: // odd    
+  case 4: // odd
     // This function returns the host_evecs and host_evals pointers, populated with
     // the requested data, at the requested prec. All the information needed to
     // perfom the solve is in the eig_param container.
@@ -204,19 +201,19 @@ int main(int argc, char **argv)
     time = -((double)clock());
     eigensolveQuda(host_evecs, host_evals, &eig_param);
     time += (double)clock();
-    
-    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);  
+
+    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);
     break;
-    
+
   default: errorQuda("Unsupported test type");
-    
+
   } // switch
 
   // Deallocate host memory
   for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
   free(host_evecs);
   free(host_evals);
-  
+
   // Clean up gauge fields.
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] != nullptr) {
@@ -240,7 +237,7 @@ int main(int argc, char **argv)
     free(milc_longlink);
     milc_longlink = nullptr;
   }
-  
+
   endQuda();
   finalizeComms();
 }

@@ -260,7 +260,7 @@ namespace quda
 
     // Save orthonormalisation tuning
     saveTuneCache();
-    
+
     return sum;
   }
 
@@ -396,7 +396,7 @@ namespace quda
     // Save SVD tuning
     saveTuneCache();
   }
-  
+
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
                                const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
@@ -996,7 +996,7 @@ namespace quda
 
     // Save TRLM tuning
     saveTuneCache();
-    
+
     mat.flops();
   }
 

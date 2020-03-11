@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-  
+
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_DOMAIN_WALL_4D_DSLASH
@@ -84,7 +84,6 @@ int main(int argc, char **argv)
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -110,9 +109,8 @@ int main(int argc, char **argv)
   display_test_info();
 
   // Set some dimension parameters
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || 
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || 
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     dw_setDims(gauge_param.X, eig_inv_param.Ls);
   } else {
     setDims(gauge_param.X);
@@ -120,10 +118,10 @@ int main(int argc, char **argv)
   // Set spinor site size
   int sss = (dslash_type == QUDA_LAPLACE_DSLASH ? 6 : 24);
   setSpinorSiteSize(sss);
-  
+
   // Allocate host side memory for the gauge field.
   void *gauge[4];
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V*gauge_site_size*host_gauge_data_type_size);  
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -132,7 +130,7 @@ int main(int argc, char **argv)
   void *clover = 0, *clover_inv = 0;
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
-    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);    
+    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, eig_inv_param);
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &eig_inv_param);
@@ -179,7 +177,6 @@ int main(int argc, char **argv)
   // finalize the QUDA library
   endQuda();
   finalizeComms();
-
 
   return 0;
 }

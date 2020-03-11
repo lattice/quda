@@ -8,16 +8,15 @@
 #include "util_quda.h"
 #include <host_utils.h>
 
-
 /*
 #define stSpinorSiteSize 6
 template<typename Float>
 void display_spinor_internal(Float* spinor)
 {
-    printf("(%f,%f) (%f,%f) (%f,%f) \t", 
-	   spinor[0], spinor[1], spinor[2], 
-	   spinor[3], spinor[4], spinor[5]);
-    
+    printf("(%f,%f) (%f,%f) (%f,%f) \t",
+           spinor[0], spinor[1], spinor[2],
+           spinor[3], spinor[4], spinor[5]);
+
     printf("\n");
     return;
 }
@@ -25,19 +24,19 @@ void display_spinor_internal(Float* spinor)
 
 
 void display_spinor(void* spinor, int len, int precision)
-{    
+{
     int i;
-    
+
     if (precision == QUDA_DOUBLE_PRECISION){
-	double* myspinor = (double*)spinor;
-	for (i = 0;i < len; i++){
-	    display_spinor_internal(myspinor + stSpinorSiteSize*i);
-	}
+        double* myspinor = (double*)spinor;
+        for (i = 0;i < len; i++){
+            display_spinor_internal(myspinor + stSpinorSiteSize*i);
+        }
     }else if (precision == QUDA_SINGLE_PRECISION){
-	float* myspinor = (float*)spinor;
-	for (i=0;i < len ;i++){
-	    display_spinor_internal(myspinor + stSpinorSiteSize*i);
-	}
+        float* myspinor = (float*)spinor;
+        for (i=0;i < len ;i++){
+            display_spinor_internal(myspinor + stSpinorSiteSize*i);
+        }
     }
     return;
 }
@@ -48,12 +47,12 @@ template<typename Float>
 void display_link_internal(Float* link)
 {
     int i, j;
-    
+
     for (i = 0;i < 3; i++){
-	for(j=0;j < 3; j++){
-	    printf("(%.10f,%.10f) \t", link[i*3*2 + j*2], link[i*3*2 + j*2 + 1]);
-	}
-	printf("\n");
+        for(j=0;j < 3; j++){
+            printf("(%.10f,%.10f) \t", link[i*3*2 + j*2], link[i*3*2 + j*2 + 1]);
+        }
+        printf("\n");
     }
     printf("\n");
     return;
@@ -62,19 +61,19 @@ void display_link_internal(Float* link)
 
 
 void display_link(void* link, int len, int precision)
-{    
+{
     int i;
-    
+
     if (precision == QUDA_DOUBLE_PRECISION){
-	double* mylink = (double*)link;
-	for (i = 0;i < len; i++){
-	    display_link_internal(mylink + gauge_site_size*i);
-	}
+        double* mylink = (double*)link;
+        for (i = 0;i < len; i++){
+            display_link_internal(mylink + gauge_site_size*i);
+        }
     }else if (precision == QUDA_SINGLE_PRECISION){
-	float* mylink = (float*)link;
-	for (i=0;i < len ;i++){
-	    display_link_internal(mylink + gauge_site_size*i);
-	}
+        float* mylink = (float*)link;
+        for (i=0;i < len ;i++){
+            display_link_internal(mylink + gauge_site_size*i);
+        }
     }
     return;
 }
@@ -92,9 +91,9 @@ template<typename Float>
 int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit)
 {
     //printf("link sanity check is called\n");
-    
+
     int ret =0;
-    
+
     Float refc_buf[6];
     Float* refc = &refc_buf[0];
 
@@ -103,16 +102,16 @@ int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugePar
     Float* a = link;
     Float* b = link + 6;
     Float* c = link + 12;
-    
+
     accumulateConjugateProduct(refc + 0*2, a + 1*2, b + 2*2, +1);
     accumulateConjugateProduct(refc + 0*2, a + 2*2, b + 1*2, -1);
     accumulateConjugateProduct(refc + 1*2, a + 2*2, b + 0*2, +1);
     accumulateConjugateProduct(refc + 1*2, a + 0*2, b + 2*2, -1);
     accumulateConjugateProduct(refc + 2*2, a + 0*2, b + 1*2, +1);
     accumulateConjugateProduct(refc + 2*2, a + 1*2, b + 0*2, -1);
-    
+
     int X1h=gaugeParam->X[0]/2;
-    int X1 =gaugeParam->X[0];    
+    int X1 =gaugeParam->X[0];
     int X2 =gaugeParam->X[1];
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
@@ -120,20 +119,20 @@ int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugePar
 
    double u0 = gaugeParam->tadpole_coeff;
    double coff= -u0*u0*24;
-   //coff = (dir < 6) ? coff : ( (ga_idx >= (X4-3)*X1h*X2*X3 )? t_boundary : 1); 
+   //coff = (dir < 6) ? coff : ( (ga_idx >= (X4-3)*X1h*X2*X3 )? t_boundary : 1);
 
-   //float u0 = (dir < 6) ? gaugeParam->anisotropy : ( (ga_idx >= (X4-3)*X1h*X2*X3 )? t_boundary : 1); 
+   //float u0 = (dir < 6) ? gaugeParam->anisotropy : ( (ga_idx >= (X4-3)*X1h*X2*X3 )? t_boundary : 1);
 
-  
+
 #if 1
-   
+
    {
        int index = fullLatticeIndex(ga_idx, oddBit);
        int i4 = index /(X3*X2*X1);
        int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
        int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
        int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-       
+
        if (dir == 0) {
            if (i4 % 2 == 1){
                coff *= -1;
@@ -153,35 +152,35 @@ int link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugePar
        if (dir == 6){
            if (ga_idx >= (X4-3)*X1h*X2*X3 ){
                coff *= -1;
-           } 
+           }
        }
 
        //printf("local ga_idx =%d, index=%d, i4,3,2,1 =%d %d %d %d\n", ga_idx, index, i4, i3, i2,i1);
- 
+
    }
 #endif
- 
+
 
    refc[0]*=coff; refc[1]*=coff; refc[2]*=coff; refc[3]*=coff; refc[4]*=coff; refc[5]*=coff;
-   
-    
+
+
     double delta = 0.0001;
     int i;
     for (i =0;i < 6; i++){
-	double diff =  refc[i] -  c[i];
-	double absdiff = diff > 0? diff: (-diff);
-	if (absdiff  > delta){
-	    printf("ERROR: sanity check failed for link\n");
-	    display_link_internal(link);
-	    printf("refc = (%.10f,%.10f) (%.10f,%.10f) (%.10f,%.10f)\n", 
-		   refc[0], refc[1], refc[2], refc[3], refc[4], refc[5]);
-	    printf("dir=%d, ga_idx=%d, coff=%f, t_boundary=%f\n",dir, ga_idx,coff, t_boundary);
-	    printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
-	    return -1;
-	}
-	
+        double diff =  refc[i] -  c[i];
+        double absdiff = diff > 0? diff: (-diff);
+        if (absdiff  > delta){
+            printf("ERROR: sanity check failed for link\n");
+            display_link_internal(link);
+            printf("refc = (%.10f,%.10f) (%.10f,%.10f) (%.10f,%.10f)\n",
+                   refc[0], refc[1], refc[2], refc[3], refc[4], refc[5]);
+            printf("dir=%d, ga_idx=%d, coff=%f, t_boundary=%f\n",dir, ga_idx,coff, t_boundary);
+            printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
+            return -1;
+        }
+
     }
-    
+
 
     return ret;
 }
@@ -191,7 +190,7 @@ template<typename Float>
 int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit)
 {
     int ret = 0;
-    
+
     Float refc_buf[6];
     Float* refc = &refc_buf[0];
 
@@ -200,7 +199,7 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
     Float* a = link;
     Float* b = link + 6;
     Float* c = link + 12;
-    
+
     accumulateConjugateProduct(refc + 0*2, a + 1*2, b + 2*2, +1);
     accumulateConjugateProduct(refc + 0*2, a + 2*2, b + 1*2, -1);
     accumulateConjugateProduct(refc + 1*2, a + 2*2, b + 0*2, +1);
@@ -209,21 +208,21 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
     accumulateConjugateProduct(refc + 2*2, a + 1*2, b + 0*2, -1);
 
     int X1h=gaugeParam->X[0]/2;
-    int X1 =gaugeParam->X[0];    
+    int X1 =gaugeParam->X[0];
     int X2 =gaugeParam->X[1];
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
 
-#if 1        
+#if 1
     double coeff= 1.0;
-   
+
    {
        int index = fullLatticeIndex(ga_idx, oddBit);
        int i4 = index /(X3*X2*X1);
        int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
        int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
        int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-       
+
        if (dir == XUP) {
            if (i4 % 2 == 1){
                coeff *= -1;
@@ -242,30 +241,30 @@ int site_link_sanity_check_internal_12(Float* link, int dir, int ga_idx, QudaGau
        }
        if (dir == TUP){
          if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
-       }       
+       }
    }
- 
-   
+
+
    refc[0]*=coeff; refc[1]*=coeff; refc[2]*=coeff; refc[3]*=coeff; refc[4]*=coeff; refc[5]*=coeff;
 #endif
-   
-    
+
+
     double delta = 0.0001;
     int i;
     for (i =0;i < 6; i++){
-	double diff =  refc[i] -  c[i];
-	double absdiff = diff > 0? diff: (-diff);
-	if (absdiff  > delta){
-	    printf("ERROR: sanity check failed for site link\n");
-	    display_link_internal(link);
-	    printf("refc = (%.10f,%.10f) (%.10f,%.10f) (%.10f,%.10f)\n", 
-		   refc[0], refc[1], refc[2], refc[3], refc[4], refc[5]);
-	    printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
-	    return -1;
-	}
-	
+        double diff =  refc[i] -  c[i];
+        double absdiff = diff > 0? diff: (-diff);
+        if (absdiff  > delta){
+            printf("ERROR: sanity check failed for site link\n");
+            display_link_internal(link);
+            printf("refc = (%.10f,%.10f) (%.10f,%.10f) (%.10f,%.10f)\n",
+                   refc[0], refc[1], refc[2], refc[3], refc[4], refc[5]);
+            printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
+            return -1;
+        }
+
     }
-    
+
 
     return ret;
 }
@@ -319,18 +318,18 @@ void accumulateComplexDotProduct(Float *a, Float *b, Float *c) {
 
 
 template<typename Float>
-int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit) 
+int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugeParam* gaugeParam, int oddBit)
 {
     int ret =0;
-    
+
     Float ref_link_buf[18];
-    Float* ref = & ref_link_buf[0];    
+    Float* ref = & ref_link_buf[0];
     memset(ref, 0, sizeof(ref_link_buf));
-    
+
     ref[0] = atan2(link[1], link[0]);
     ref[1] = atan2(link[13], link[12]);
     for (int i=2; i<7; i++) {
-	ref[i] = link[i];
+        ref[i] = link[i];
     }
 
     int X1h=gaugeParam->X[0]/2;
@@ -338,8 +337,8 @@ int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugePara
     int X3 =gaugeParam->X[2];
     int X4 =gaugeParam->X[3];
     double t_boundary = (gaugeParam->t_boundary ==QUDA_ANTI_PERIODIC_T)? -1.0:1.0;
-    
-    
+
+
     // First reconstruct first row
     Float row_sum = 0.0;
     row_sum += ref[2]*ref[2];
@@ -352,48 +351,48 @@ int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugePara
 #if 1
     Float u0= -gaugeParam->tadpole_coeff*gaugeParam->tadpole_coeff*24;
     {
-	int X1h=gaugeParam->X[0]/2;
-	int X1 =gaugeParam->X[0];
-	int X2 =gaugeParam->X[1];
-	int X3 =gaugeParam->X[2];
-	int X4 =gaugeParam->X[3];
-      
-	int index = fullLatticeIndex(ga_idx, oddBit);
-	int i4 = index /(X3*X2*X1);
-	int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
-	int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
-	int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
-      
-	if (dir == 0) {
-	    if (i4 % 2 == 1){
-		u0 *= -1;
-	    }
-	}
-      
-	if (dir == 1){
-	    if ((i1+i4) % 2 == 1){
-		u0 *= -1;
-	    }
-	}
-	if (dir == 2){
-	    if ( (i4+i1+i2) % 2 == 1){
-		u0 *= -1;
-	    }
-	}
-	if (dir == 3){
-	    if (ga_idx >= (X4-3)*X1h*X2*X3 ){
-		u0 *= -1;
-	    }
-	}
-       
-	//printf("local ga_idx =%d, index=%d, i4,3,2,1 =%d %d %d %d\n", ga_idx, index, i4, i3, i2,i1);
-       
+        int X1h=gaugeParam->X[0]/2;
+        int X1 =gaugeParam->X[0];
+        int X2 =gaugeParam->X[1];
+        int X3 =gaugeParam->X[2];
+        int X4 =gaugeParam->X[3];
+
+        int index = fullLatticeIndex(ga_idx, oddBit);
+        int i4 = index /(X3*X2*X1);
+        int i3 = (index - i4*(X3*X2*X1))/(X2*X1);
+        int i2 = (index - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
+        int i1 = index - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;
+
+        if (dir == 0) {
+            if (i4 % 2 == 1){
+                u0 *= -1;
+            }
+        }
+
+        if (dir == 1){
+            if ((i1+i4) % 2 == 1){
+                u0 *= -1;
+            }
+        }
+        if (dir == 2){
+            if ( (i4+i1+i2) % 2 == 1){
+                u0 *= -1;
+            }
+        }
+        if (dir == 3){
+            if (ga_idx >= (X4-3)*X1h*X2*X3 ){
+                u0 *= -1;
+            }
+        }
+
+        //printf("local ga_idx =%d, index=%d, i4,3,2,1 =%d %d %d %d\n", ga_idx, index, i4, i3, i2,i1);
+
     }
 #endif
-    
+
 
     Float U00_mag = sqrt( (1.f/(u0*u0) - row_sum)>0? (1.f/(u0*u0)-row_sum):0);
-  
+
     ref[14] = ref[0];
     ref[15] = ref[1];
 
@@ -444,20 +443,20 @@ int link_sanity_check_internal_8(Float* link, int dir, int ga_idx, QudaGaugePara
     int i;
     for (i =0;i < 18; i++){
 
-	double diff =  ref[i] -  link[i];
-	double absdiff = diff > 0? diff: (-diff);
-	if ( (ref[i] !=  ref[i]) || (absdiff  > delta)){
-	    printf("ERROR: sanity check failed for link\n");
-	    display_link_internal(link);
-	    printf("reconstructed link is\n");
-	    display_link_internal(ref);
-	    printf("dir=%d, ga_idx=%d, u0=%f, t_boundary=%f\n",dir, ga_idx, u0, t_boundary);
-	    printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
-	    return -1;
-	}
-	
+        double diff =  ref[i] -  link[i];
+        double absdiff = diff > 0? diff: (-diff);
+        if ( (ref[i] !=  ref[i]) || (absdiff  > delta)){
+            printf("ERROR: sanity check failed for link\n");
+            display_link_internal(link);
+            printf("reconstructed link is\n");
+            display_link_internal(ref);
+            printf("dir=%d, ga_idx=%d, u0=%f, t_boundary=%f\n",dir, ga_idx, u0, t_boundary);
+            printf("X=%d %d %d %d, X1h=%d\n", gaugeParam->X[0], X2, X3, X4, X1h);
+            return -1;
+        }
+
     }
-    
+
 
     return ret;
 }
@@ -469,66 +468,66 @@ link_sanity_check(void* link, int len, int precision, int dir, QudaGaugeParam* g
 {
     int i;
     int rc = 0;
-    
-    if (precision == QUDA_DOUBLE_PRECISION){
-	double* mylink = (double*)link;
-	//even
-	for (i = 0;i < len/2; i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    if (rc != 0){
-		printf("ERROR: even link sanity check failed, i=%d\n",i);
-		display_link_internal(mylink+gauge_site_size*i);
-		exit(1);
-	    }
-	}
-	
-	mylink = mylink + gauge_site_size*len/2;
-	//odd
-	for (i = 0;i < len/2; i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
-	    if (rc != 0){
-		printf("ERROR: odd link sanity check failed, i=%d\n",i);
-		display_link_internal(mylink+gauge_site_size*i);
-		exit(1);
-	    }
-	}	
-	
-    }else if (precision == QUDA_SINGLE_PRECISION){
-	float* mylink = (float*)link;
 
-	//even
-	for (i=0;i < len/2 ;i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    if (rc != 0){
-		printf("ERROR: even link sanity check 12 failed, i=%d\n",i);
-		exit(1);
-	    }
-	    
-	    // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    // if (rc != 0){
-	    // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
-	    // 	exit(1);
-	    // }
-	    
-	    
-	}
-	mylink = mylink + gauge_site_size*len/2;
-	//odd
-	for (i=0;i < len/2 ;i++){
-	    rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
-	    if (rc != 0){
-		printf("ERROR: odd link sanity check 12 failed, i=%d\n", i);
-		exit(1);
-	    }	
-	    // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
-	    // if (rc != 0){
-	    // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
-	    // 	exit(1);
-	    // }
-	}	
+    if (precision == QUDA_DOUBLE_PRECISION){
+        double* mylink = (double*)link;
+        //even
+        for (i = 0;i < len/2; i++){
+            rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+            if (rc != 0){
+                printf("ERROR: even link sanity check failed, i=%d\n",i);
+                display_link_internal(mylink+gauge_site_size*i);
+                exit(1);
+            }
+        }
+
+        mylink = mylink + gauge_site_size*len/2;
+        //odd
+        for (i = 0;i < len/2; i++){
+            rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
+            if (rc != 0){
+                printf("ERROR: odd link sanity check failed, i=%d\n",i);
+                display_link_internal(mylink+gauge_site_size*i);
+                exit(1);
+            }
+        }
+
+    }else if (precision == QUDA_SINGLE_PRECISION){
+        float* mylink = (float*)link;
+
+        //even
+        for (i=0;i < len/2 ;i++){
+            rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+            if (rc != 0){
+                printf("ERROR: even link sanity check 12 failed, i=%d\n",i);
+                exit(1);
+            }
+
+            // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+            // if (rc != 0){
+            // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
+            // 	exit(1);
+            // }
+
+
+        }
+        mylink = mylink + gauge_site_size*len/2;
+        //odd
+        for (i=0;i < len/2 ;i++){
+            rc = link_sanity_check_internal_12(mylink + gauge_site_size*i, dir, i, gaugeParam, 1);
+            if (rc != 0){
+                printf("ERROR: odd link sanity check 12 failed, i=%d\n", i);
+                exit(1);
+            }
+            // rc = link_sanity_check_internal_8(mylink + gauge_site_size*i, dir, i, gaugeParam, 0);
+            // if (rc != 0){
+            // 	printf("ERROR: even link sanity check 8 failed, i=%d\n",i);
+            // 	exit(1);
+            // }
+        }
 
     }
-    
+
     return rc;
 }
 
@@ -541,61 +540,61 @@ site_link_sanity_check(void* link, int len, int precision, QudaGaugeParam* gauge
     int i;
     int rc = 0;
     int dir;
-    
-    if (precision == QUDA_DOUBLE_PRECISION){
-	double* mylink = (double*)link;
-	//even	
-	for (i = 0;i < len/2; i++){
-	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
-		if (rc != 0){
-		    printf("ERROR: even link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
-		    display_link_internal(mylink+gauge_site_size*i);
-		    exit(1);
-		}
-	    }
-	}
-	
-	mylink = mylink + 4*gauge_site_size*len/2;
-	//odd
-	for (i = 0;i < len/2; i++){
-	    for(dir=XUP;dir <= TUP; dir++){	    
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
-		if (rc != 0){
-		    printf("ERROR: odd link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
-		    display_link_internal(mylink+gauge_site_size*i);
-		    exit(1);
-		}
-	    }
-	}	
-	
-    }else if (precision == QUDA_SINGLE_PRECISION){
-	float* mylink = (float*)link;
 
-	//even
-	for (i=0;i < len/2 ;i++){
-	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
-		if (rc != 0){
-		    printf("ERROR: even link sanity check 12 failed, i=%d, function %s\n",i, __FUNCTION__);
-		    exit(1);
-		}
-	    }
-	}
-	mylink = mylink + 4*gauge_site_size*len/2;
-	//odd
-	for (i=0;i < len/2 ;i++){
-	    for(dir=XUP;dir <= TUP; dir++){
-		rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
-		if (rc != 0){
-		    printf("ERROR: odd link sanity check 12 failed, i=%d, function %s\n", i, __FUNCTION__);
-		    exit(1);
-		}	
-	    }
-	}	
+    if (precision == QUDA_DOUBLE_PRECISION){
+        double* mylink = (double*)link;
+        //even
+        for (i = 0;i < len/2; i++){
+            for(dir=XUP;dir <= TUP; dir++){
+                rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
+                if (rc != 0){
+                    printf("ERROR: even link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
+                    display_link_internal(mylink+gauge_site_size*i);
+                    exit(1);
+                }
+            }
+        }
+
+        mylink = mylink + 4*gauge_site_size*len/2;
+        //odd
+        for (i = 0;i < len/2; i++){
+            for(dir=XUP;dir <= TUP; dir++){
+                rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
+                if (rc != 0){
+                    printf("ERROR: odd link sanity check failed, i=%d, function %s\n",i, __FUNCTION__);
+                    display_link_internal(mylink+gauge_site_size*i);
+                    exit(1);
+                }
+            }
+        }
+
+    }else if (precision == QUDA_SINGLE_PRECISION){
+        float* mylink = (float*)link;
+
+        //even
+        for (i=0;i < len/2 ;i++){
+            for(dir=XUP;dir <= TUP; dir++){
+                rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 0);
+                if (rc != 0){
+                    printf("ERROR: even link sanity check 12 failed, i=%d, function %s\n",i, __FUNCTION__);
+                    exit(1);
+                }
+            }
+        }
+        mylink = mylink + 4*gauge_site_size*len/2;
+        //odd
+        for (i=0;i < len/2 ;i++){
+            for(dir=XUP;dir <= TUP; dir++){
+                rc = site_link_sanity_check_internal_12(mylink + gauge_site_size*(4*i+dir), dir, i, gaugeParam, 1);
+                if (rc != 0){
+                    printf("ERROR: odd link sanity check 12 failed, i=%d, function %s\n", i, __FUNCTION__);
+                    exit(1);
+                }
+            }
+        }
 
     }
-    
+
     return rc;
 }
 */
@@ -785,7 +784,7 @@ get_staggered_test_type(int t)
   return ret;
 }
 
-const char* get_dslash_str(QudaDslashType type)
+const char *get_dslash_str(QudaDslashType type)
 {
   const char* ret;
   

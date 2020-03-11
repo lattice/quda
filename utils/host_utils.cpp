@@ -64,7 +64,8 @@ size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_clover_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-void setQudaDefaultPrecs() {
+void setQudaDefaultPrecs()
+{
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
   if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
   if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
@@ -73,8 +74,9 @@ void setQudaDefaultPrecs() {
   if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
 }
 
-void setQudaDefaultMgTestParams() {
-  // We give here some default values 
+void setQudaDefaultMgTestParams()
+{
+  // We give here some default values
   for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     mg_verbosity[i] = QUDA_SUMMARIZE;
     setup_inv[i] = QUDA_BICGSTAB_INVERTER;
@@ -96,7 +98,7 @@ void setQudaDefaultMgTestParams() {
     nu_pre[i] = 2;
     nu_post[i] = 2;
     n_block_ortho[i] = 1;
-    
+
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
@@ -116,7 +118,7 @@ void setQudaDefaultMgTestParams() {
     setup_ca_basis_size[i] = 4;
     setup_ca_lambda_min[i] = 0.0;
     setup_ca_lambda_max[i] = -1.0; // use power iterations
-    
+
     coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
     coarse_solver_ca_basis_size[i] = 4;
     coarse_solver_ca_lambda_min[i] = 0.0;
@@ -128,14 +130,16 @@ void setQudaDefaultMgTestParams() {
   reliable_delta = 1e-4;
 }
 
-void setQudaDefaultMgSolveTypes() {
-  for (int i =0; i < QUDA_MAX_MG_LEVEL; i++) {
+void setQudaDefaultMgSolveTypes()
+{
+  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
     if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
     if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
-  }  
+  }
 }
 
-void performanceStats(double *time, double *gflops){
+void performanceStats(double *time, double *gflops)
+{
   auto mean_time = 0.0;
   auto mean_time2 = 0.0;
   auto mean_gflops = 0.0;
@@ -147,24 +151,24 @@ void performanceStats(double *time, double *gflops){
     mean_gflops += gflops[i];
     mean_gflops2 += gflops[i] * gflops[i];
   }
-  
+
   auto NsrcM1 = Nsrc - 1;
-  
+
   mean_time /= NsrcM1;
   mean_time2 /= NsrcM1;
   auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
-    std::numeric_limits<double>::infinity();
+                                  std::numeric_limits<double>::infinity();
   mean_gflops /= NsrcM1;
   mean_gflops2 /= NsrcM1;
-  auto stddev_gflops = NsrcM1 > 1 ?
-    sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
-    std::numeric_limits<double>::infinity();
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
-	     mean_time, stddev_time, mean_gflops, stddev_gflops);
+  auto stddev_gflops = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+                                    std::numeric_limits<double>::infinity();
+  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
+             Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
 }
 
 // Spinor construction routines
-void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
+void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
+                                 quda::RNG &rng)
 {
   quda::ColorSpinorParam param;
   param.v = v;
@@ -176,22 +180,23 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.nDim = 4;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  param.location = QUDA_CPU_FIELD_LOCATION; //DMH FIXME so one can construct device noise
+  param.location = QUDA_CPU_FIELD_LOCATION; // DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
-  quda::cpuColorSpinorField spinor_in(param);  
+  quda::cpuColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
-void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param, const QudaGaugeParam *gauge_param) {
+void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+                                       const QudaGaugeParam *gauge_param)
+{
   cs_param->nColor = 3;
   cs_param->nSpin = 1;
   cs_param->nDim = 5;
   for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
-  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || 
-	     inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) cs_param->x[0] /= 2;
-  cs_param->x[4] = 1; 
-  
+  cs_param->x[4] = 1;
+
   cs_param->setPrecision(inv_param->cpu_prec);
   cs_param->pad = 0;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
@@ -201,158 +206,157 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   cs_param->create = QUDA_ZERO_FIELD_CREATE;
   cs_param->location = QUDA_CPU_FIELD_LOCATION;
 }
-  
 
-#ifndef MULTI_GPU 
-template<typename su3_matrix, typename Float> 
-void computeLongLinkCPU(void** longlink, su3_matrix** sitelink, 
-			Float* act_path_coeff)
+#ifndef MULTI_GPU
+template <typename su3_matrix, typename Float>
+void computeLongLinkCPU(void **longlink, su3_matrix **sitelink, Float *act_path_coeff)
 {
-  
+
   su3_matrix temp;
-  for(int dir=XUP; dir<=TUP; ++dir){
-    int dx[4] = {0,0,0,0}; 
-    for(int i=0; i<V; ++i){
+  for (int dir = XUP; dir <= TUP; ++dir) {
+    int dx[4] = {0, 0, 0, 0};
+    for (int i = 0; i < V; ++i) {
       // Initialize the longlinks
-      su3_matrix* llink = ((su3_matrix*)longlink[dir]) + i;
-      llfat_scalar_mult_su3_matrix(sitelink[dir]+i, act_path_coeff[1], llink);
+      su3_matrix *llink = ((su3_matrix *)longlink[dir]) + i;
+      llfat_scalar_mult_su3_matrix(sitelink[dir] + i, act_path_coeff[1], llink);
       dx[dir] = 1;
       int nbr_idx = neighborIndexFullLattice(Z, i, dx);
-      llfat_mult_su3_nn(llink, sitelink[dir]+nbr_idx, &temp);
-      dx[dir] = 2;  
+      llfat_mult_su3_nn(llink, sitelink[dir] + nbr_idx, &temp);
+      dx[dir] = 2;
       nbr_idx = neighborIndexFullLattice(Z, i, dx);
-      llfat_mult_su3_nn(&temp, sitelink[dir]+nbr_idx, llink);
+      llfat_mult_su3_nn(&temp, sitelink[dir] + nbr_idx, llink);
     }
   }
   return;
 }
 #else
 
-template<typename su3_matrix, typename Float>
-void computeLongLinkCPU(void** longlink, su3_matrix** sitelinkEx, Float* act_path_coeff)
+template <typename su3_matrix, typename Float>
+void computeLongLinkCPU(void **longlink, su3_matrix **sitelinkEx, Float *act_path_coeff)
 {
   int E[4];
-  for(int dir=0; dir<4; ++dir) E[dir] = Z[dir]+4;
-  const int extended_volume = E[3]*E[2]*E[1]*E[0];
-  
+  for (int dir = 0; dir < 4; ++dir) E[dir] = Z[dir] + 4;
+  const int extended_volume = E[3] * E[2] * E[1] * E[0];
+
   su3_matrix temp;
-  for(int t=0; t<Z[3]; ++t){
-    for(int z=0; z<Z[2]; ++z){
-      for(int y=0; y<Z[1]; ++y){
-        for(int x=0; x<Z[0]; ++x){
-          const int oddBit = (x+y+z+t)&1;
-          int little_index = ((((t*Z[2] + z)*Z[1] + y)*Z[0] + x)/2) + oddBit*Vh;
-          int large_index  = (((((t+2)*E[2] + (z+2))*E[1] + (y+2))*E[0] + x+2)/2) + oddBit*(extended_volume/2);
-	  
-	  
-          for(int dir=XUP; dir<=TUP; ++dir){
-            int dx[4] = {0,0,0,0};
-            su3_matrix* llink = ((su3_matrix*)longlink[dir]) + little_index;
-            llfat_scalar_mult_su3_matrix(sitelinkEx[dir]+large_index, act_path_coeff[1], llink);
+  for (int t = 0; t < Z[3]; ++t) {
+    for (int z = 0; z < Z[2]; ++z) {
+      for (int y = 0; y < Z[1]; ++y) {
+        for (int x = 0; x < Z[0]; ++x) {
+          const int oddBit = (x + y + z + t) & 1;
+          int little_index = ((((t * Z[2] + z) * Z[1] + y) * Z[0] + x) / 2) + oddBit * Vh;
+          int large_index
+            = (((((t + 2) * E[2] + (z + 2)) * E[1] + (y + 2)) * E[0] + x + 2) / 2) + oddBit * (extended_volume / 2);
+
+          for (int dir = XUP; dir <= TUP; ++dir) {
+            int dx[4] = {0, 0, 0, 0};
+            su3_matrix *llink = ((su3_matrix *)longlink[dir]) + little_index;
+            llfat_scalar_mult_su3_matrix(sitelinkEx[dir] + large_index, act_path_coeff[1], llink);
             dx[dir] = 1;
             int nbr_index = neighborIndexFullLattice(E, large_index, dx);
-            llfat_mult_su3_nn(llink, sitelinkEx[dir]+nbr_index, &temp);
+            llfat_mult_su3_nn(llink, sitelinkEx[dir] + nbr_index, &temp);
             dx[dir] = 2;
-            nbr_index = neighborIndexFullLattice(E, large_index, dx);  
-            llfat_mult_su3_nn(&temp, sitelinkEx[dir]+nbr_index, llink);
+            nbr_index = neighborIndexFullLattice(E, large_index, dx);
+            llfat_mult_su3_nn(&temp, sitelinkEx[dir] + nbr_index, llink);
           }
         } // x
-      } // y
-    } // z
-  } // t
+      }   // y
+    }     // z
+  }       // t
   return;
 }
 #endif
 
-
-void computeLongLinkCPU(void** longlink, void** sitelink, QudaPrecision prec, void* act_path_coeff)
+void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff)
 {
-  if(longlink){
-    switch(prec){
-    case QUDA_DOUBLE_PRECISION: 
-      computeLongLinkCPU((void**)longlink, (su3_matrix<double>**)sitelink, (double*)act_path_coeff);
+  if (longlink) {
+    switch (prec) {
+    case QUDA_DOUBLE_PRECISION:
+      computeLongLinkCPU((void **)longlink, (su3_matrix<double> **)sitelink, (double *)act_path_coeff);
       break;
-      
-    case QUDA_SINGLE_PRECISION: 
-      computeLongLinkCPU((void**)longlink, (su3_matrix<float>**)sitelink, (float*)act_path_coeff);
+
+    case QUDA_SINGLE_PRECISION:
+      computeLongLinkCPU((void **)longlink, (su3_matrix<float> **)sitelink, (float *)act_path_coeff);
       break;
     default:
       fprintf(stderr, "ERROR: unsupported precision(%d)\n", prec);
       exit(1);
       break;
     }
-  } // if(longlink)  
+  } // if(longlink)
 }
 
 // data reordering routines
-template <typename Out, typename In>
-void reorderQDPtoMILC(Out* milc_out, In** qdp_in, int V, int siteSize) {
+template <typename Out, typename In> void reorderQDPtoMILC(Out *milc_out, In **qdp_in, int V, int siteSize)
+{
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
       for (int j = 0; j < siteSize; j++) {
-	milc_out[(i*4+dir)*siteSize+j] = static_cast<Out>(qdp_in[dir][i*siteSize+j]);
+        milc_out[(i * 4 + dir) * siteSize + j] = static_cast<Out>(qdp_in[dir][i * siteSize + j]);
       }
     }
   }
 }
 
-void reorderQDPtoMILC(void* milc_out, void** qdp_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision) {
+void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPrecision out_precision,
+                      QudaPrecision in_precision)
+{
   if (out_precision == QUDA_SINGLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderQDPtoMILC<float,float>((float*)milc_out, (float**)qdp_in, V, siteSize);
+      reorderQDPtoMILC<float, float>((float *)milc_out, (float **)qdp_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderQDPtoMILC<float,double>((float*)milc_out, (double**)qdp_in, V, siteSize);
+      reorderQDPtoMILC<float, double>((float *)milc_out, (double **)qdp_in, V, siteSize);
     }
   } else if (out_precision == QUDA_DOUBLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderQDPtoMILC<double,float>((double*)milc_out, (float**)qdp_in, V, siteSize);
+      reorderQDPtoMILC<double, float>((double *)milc_out, (float **)qdp_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderQDPtoMILC<double,double>((double*)milc_out, (double**)qdp_in, V, siteSize);
+      reorderQDPtoMILC<double, double>((double *)milc_out, (double **)qdp_in, V, siteSize);
     }
   }
 }
 
-template <typename Out, typename In>
-void reorderMILCtoQDP(Out** qdp_out, In* milc_in, int V, int siteSize) {
+template <typename Out, typename In> void reorderMILCtoQDP(Out **qdp_out, In *milc_in, int V, int siteSize)
+{
   for (int i = 0; i < V; i++) {
     for (int dir = 0; dir < 4; dir++) {
       for (int j = 0; j < siteSize; j++) {
-	qdp_out[dir][i*siteSize+j] = static_cast<Out>(milc_in[(i*4+dir)*siteSize+j]);
+        qdp_out[dir][i * siteSize + j] = static_cast<Out>(milc_in[(i * 4 + dir) * siteSize + j]);
       }
     }
   }
 }
 
-void reorderMILCtoQDP(void** qdp_out, void* milc_in, int V, int siteSize, QudaPrecision out_precision, QudaPrecision in_precision) {
+void reorderMILCtoQDP(void **qdp_out, void *milc_in, int V, int siteSize, QudaPrecision out_precision,
+                      QudaPrecision in_precision)
+{
   if (out_precision == QUDA_SINGLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderMILCtoQDP<float,float>((float**)qdp_out, (float*)milc_in, V, siteSize);
+      reorderMILCtoQDP<float, float>((float **)qdp_out, (float *)milc_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderMILCtoQDP<float,double>((float**)qdp_out, (double*)milc_in, V, siteSize);
+      reorderMILCtoQDP<float, double>((float **)qdp_out, (double *)milc_in, V, siteSize);
     }
   } else if (out_precision == QUDA_DOUBLE_PRECISION) {
     if (in_precision == QUDA_SINGLE_PRECISION) {
-      reorderMILCtoQDP<double,float>((double**)qdp_out, (float*)milc_in, V, siteSize);
+      reorderMILCtoQDP<double, float>((double **)qdp_out, (float *)milc_in, V, siteSize);
     } else if (in_precision == QUDA_DOUBLE_PRECISION) {
-      reorderMILCtoQDP<double,double>((double**)qdp_out, (double*)milc_in, V, siteSize);
+      reorderMILCtoQDP<double, double>((double **)qdp_out, (double *)milc_in, V, siteSize);
     }
   }
 }
 
-// Compute the full HISQ stencil on the CPU. 
+// Compute the full HISQ stencil on the CPU.
 // If "eps_naik" is 0, there's no naik correction,
 // and this routine skips building the paths in "act_path_coeffs[2]"
-void computeHISQLinksCPU(void** fatlink, void** longlink,
-        void** fatlink_eps, void** longlink_eps,
-        void** sitelink, void* qudaGaugeParamPtr,
-        double** act_path_coeffs, double eps_naik)
+void computeHISQLinksCPU(void **fatlink, void **longlink, void **fatlink_eps, void **longlink_eps, void **sitelink,
+                         void *qudaGaugeParamPtr, double **act_path_coeffs, double eps_naik)
 {
   // Prepare various things
-  QudaGaugeParam& qudaGaugeParam = *((QudaGaugeParam*)qudaGaugeParamPtr);
+  QudaGaugeParam &qudaGaugeParam = *((QudaGaugeParam *)qudaGaugeParamPtr);
   // Needed for unitarization, following "unitarize_link_test.cpp"
   quda::GaugeFieldParam gParam(0, qudaGaugeParam);
   gParam.pad = 0;
-  gParam.link_type   = QUDA_GENERAL_LINKS;
+  gParam.link_type = QUDA_GENERAL_LINKS;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
   gParam.order = QUDA_MILC_GAUGE_ORDER; // must be true!
 
@@ -366,42 +370,37 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // Create extended CPU field //
   ///////////////////////////////
 
-  void* sitelink_ex[4];
-  for(int i=0;i < 4;i++) sitelink_ex[i] = pinned_malloc(V_ex*gauge_site_size*gSize);
-
+  void *sitelink_ex[4];
+  for (int i = 0; i < 4; i++) sitelink_ex[i] = pinned_malloc(V_ex * gauge_site_size * gSize);
 
 #ifdef MULTI_GPU
-  void* ghost_sitelink[4];
-  void* ghost_sitelink_diag[16];
+  void *ghost_sitelink[4];
+  void *ghost_sitelink_diag[16];
 #endif
 
-  int X1=Z[0];
-  int X2=Z[1];
-  int X3=Z[2];
-  int X4=Z[3];
+  int X1 = Z[0];
+  int X2 = Z[1];
+  int X3 = Z[2];
+  int X4 = Z[3];
 
-  for(int i=0; i < V_ex; i++){
+  for (int i = 0; i < V_ex; i++) {
     int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
+    int oddBit = 0;
+    if (i >= Vh_ex) {
       sid = i - Vh_ex;
       oddBit = 1;
     }
 
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
+    int za = sid / E1h;
+    int x1h = sid - za * E1h;
+    int zb = za / E2;
+    int x2 = za - zb * E2;
+    int x4 = zb / E3;
+    int x3 = zb - x4 * E3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
+    int x1 = 2 * x1h + x1odd;
 
-
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
+    if (x1 < 2 || x1 >= X1 + 2 || x2 < 2 || x2 >= X2 + 2 || x3 < 2 || x3 >= X3 + 2 || x4 < 2 || x4 >= X4 + 2) {
 #ifdef MULTI_GPU
       continue;
 #endif
@@ -412,86 +411,77 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     x3 = (x3 - 2 + X3) % X3;
     x4 = (x4 - 2 + X4) % X4;
 
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = (char*)sitelink[dir];
-      char* dst = (char*)sitelink_ex[dir];
-      memcpy(dst+i*gauge_site_size*gSize, src+idx*gauge_site_size*gSize, gauge_site_size*gSize);
-    }//dir
-  }//i
+    int idx = (x4 * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
+    if (oddBit) { idx += Vh; }
+    for (int dir = 0; dir < 4; dir++) {
+      char *src = (char *)sitelink[dir];
+      char *dst = (char *)sitelink_ex[dir];
+      memcpy(dst + i * gauge_site_size * gSize, src + idx * gauge_site_size * gSize, gauge_site_size * gSize);
+    } // dir
+  }   // i
 
   /////////////////////////////////////
   // Allocate all CPU intermediaries //
   /////////////////////////////////////
 
-  void* v_reflink[4];         // V link -- fat7 smeared link
-  void* w_reflink[4];         // unitarized V link
-  void* w_reflink_ex[4];      // extended W link
-  for(int i=0;i < 4;i++){
-    v_reflink[i] = safe_malloc(V*gauge_site_size*gSize);
-    w_reflink[i] = safe_malloc(V*gauge_site_size*gSize);
-    w_reflink_ex[i] = safe_malloc(V_ex*gauge_site_size*gSize);
+  void *v_reflink[4];    // V link -- fat7 smeared link
+  void *w_reflink[4];    // unitarized V link
+  void *w_reflink_ex[4]; // extended W link
+  for (int i = 0; i < 4; i++) {
+    v_reflink[i] = safe_malloc(V * gauge_site_size * gSize);
+    w_reflink[i] = safe_malloc(V * gauge_site_size * gSize);
+    w_reflink_ex[i] = safe_malloc(V_ex * gauge_site_size * gSize);
   }
 
 #ifdef MULTI_GPU
-  void* ghost_wlink[4];
-  void* ghost_wlink_diag[16];
+  void *ghost_wlink[4];
+  void *ghost_wlink_diag[16];
 #endif
 
   // Copy of V link needed for CPU unitarization routines
-  void* v_sitelink = pinned_malloc(4*V*gauge_site_size*gSize);
+  void *v_sitelink = pinned_malloc(4 * V * gauge_site_size * gSize);
 
-
-  //FIXME: we have this complication because references takes coeff as float/double
+  // FIXME: we have this complication because references takes coeff as float/double
   //        depending on the precision while the GPU code aways take coeff as double
-  void* coeff;
+  void *coeff;
   double coeff_dp[6];
-  float  coeff_sp[6];
+  float coeff_sp[6];
 
   /////////////////////////////////////////////////////
   // Create V links (fat7 links), 1st path table set //
   /////////////////////////////////////////////////////
 
-  for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[0][i];
-  coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+  for (int i = 0; i < 6; i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[0][i];
+  coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void *)coeff_dp : (void *)coeff_sp;
 
   // Only need fat links.
 #ifdef MULTI_GPU
   int optflag = 0;
-  //we need x,y,z site links in the back and forward T slice
+  // we need x,y,z site links in the back and forward T slice
   // so it is 3*2*Vs_t
   int Vs[4] = {Vs_x, Vs_y, Vs_z, Vs_t};
-  for (int i=0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8*Vs[i]*gauge_site_size*gSize);
+  for (int i = 0; i < 4; i++) ghost_sitelink[i] = safe_malloc(8 * Vs[i] * gauge_site_size * gSize);
 
-  
-  //nu |     |
+  // nu |     |
   //   |_____|
   //     mu
 
-  for(int nu=0;nu < 4;nu++){
-    for(int mu=0; mu < 4;mu++){
-      if(nu == mu){
-        ghost_sitelink_diag[nu*4+mu] = NULL;
-      }else{
-        //the other directions
+  for (int nu = 0; nu < 4; nu++) {
+    for (int mu = 0; mu < 4; mu++) {
+      if (nu == mu) {
+        ghost_sitelink_diag[nu * 4 + mu] = NULL;
+      } else {
+        // the other directions
         int dir1, dir2;
-        for(dir1= 0; dir1 < 4; dir1++){
-          if(dir1 !=nu && dir1 != mu){
-            break;
-          }
+        for (dir1 = 0; dir1 < 4; dir1++) {
+          if (dir1 != nu && dir1 != mu) { break; }
         }
-        for(dir2=0; dir2 < 4; dir2++){
-          if(dir2 != nu && dir2 != mu && dir2 != dir1){
-            break;
-          }
+        for (dir2 = 0; dir2 < 4; dir2++) {
+          if (dir2 != nu && dir2 != mu && dir2 != dir1) { break; }
         }
-        ghost_sitelink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gauge_site_size*gSize);
-        memset(ghost_sitelink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gauge_site_size*gSize);
+        ghost_sitelink_diag[nu * 4 + mu] = safe_malloc(Z[dir1] * Z[dir2] * gauge_site_size * gSize);
+        memset(ghost_sitelink_diag[nu * 4 + mu], 0, Z[dir1] * Z[dir2] * gauge_site_size * gSize);
       }
-
     }
   }
   exchange_cpu_sitelink(gParam.x, sitelink, ghost_sitelink, ghost_sitelink_diag, prec, &qudaGaugeParam, optflag);
@@ -507,22 +497,22 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // This is based on "unitarize_link_test.cpp"
 
   // Format change
-  reorderQDPtoMILC(v_sitelink,v_reflink,V,gauge_site_size,prec,prec);
+  reorderQDPtoMILC(v_sitelink, v_reflink, V, gauge_site_size, prec, prec);
 
   // Prepare cpuGaugeFields for unitarization
   gParam.create = QUDA_REFERENCE_FIELD_CREATE;
   gParam.gauge = v_sitelink;
   gParam.location = QUDA_CPU_FIELD_LOCATION;
-  quda::GaugeField* cpuVLink = quda::GaugeField::Create(gParam);
+  quda::GaugeField *cpuVLink = quda::GaugeField::Create(gParam);
 
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  quda::GaugeField* cpuWLink = quda::GaugeField::Create(gParam);
+  quda::GaugeField *cpuWLink = quda::GaugeField::Create(gParam);
 
   // unitarize
   unitarizeLinksCPU(*cpuWLink, *cpuVLink);
 
   // Copy back into "w_reflink"
-  reorderMILCtoQDP(w_reflink,cpuWLink->Gauge_p(),V,gauge_site_size,prec,prec);
+  reorderMILCtoQDP(w_reflink, cpuWLink->Gauge_p(), V, gauge_site_size, prec, prec);
 
   // Clean up cpuGaugeFields, we don't need them anymore.
   delete cpuVLink;
@@ -532,27 +522,24 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // Prepare for extended W fields //
   ///////////////////////////////////
 
-  for(int i=0; i < V_ex; i++) {
+  for (int i = 0; i < V_ex; i++) {
     int sid = i;
-    int oddBit=0;
-    if(i >= Vh_ex){
+    int oddBit = 0;
+    if (i >= Vh_ex) {
       sid = i - Vh_ex;
       oddBit = 1;
     }
 
-    int za = sid/E1h;
-    int x1h = sid - za*E1h;
-    int zb = za/E2;
-    int x2 = za - zb*E2;
-    int x4 = zb/E3;
-    int x3 = zb - x4*E3;
+    int za = sid / E1h;
+    int x1h = sid - za * E1h;
+    int zb = za / E2;
+    int x2 = za - zb * E2;
+    int x4 = zb / E3;
+    int x3 = zb - x4 * E3;
     int x1odd = (x2 + x3 + x4 + oddBit) & 1;
-    int x1 = 2*x1h + x1odd;
+    int x1 = 2 * x1h + x1odd;
 
-    if( x1< 2 || x1 >= X1 +2
-        || x2< 2 || x2 >= X2 +2
-        || x3< 2 || x3 >= X3 +2
-        || x4< 2 || x4 >= X4 +2){
+    if (x1 < 2 || x1 >= X1 + 2 || x2 < 2 || x2 >= X2 + 2 || x3 < 2 || x3 >= X3 + 2 || x4 < 2 || x4 >= X4 + 2) {
 #ifdef MULTI_GPU
       continue;
 #endif
@@ -563,16 +550,14 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
     x3 = (x3 - 2 + X3) % X3;
     x4 = (x4 - 2 + X4) % X4;
 
-    int idx = (x4*X3*X2*X1+x3*X2*X1+x2*X1+x1)>>1;
-    if(oddBit){
-      idx += Vh;
-    }
-    for(int dir= 0; dir < 4; dir++){
-      char* src = (char*)w_reflink[dir];
-      char* dst = (char*)w_reflink_ex[dir];
-      memcpy(dst+i*gauge_site_size*gSize, src+idx*gauge_site_size*gSize, gauge_site_size*gSize);
-    }//dir
-  }//i
+    int idx = (x4 * X3 * X2 * X1 + x3 * X2 * X1 + x2 * X1 + x1) >> 1;
+    if (oddBit) { idx += Vh; }
+    for (int dir = 0; dir < 4; dir++) {
+      char *src = (char *)w_reflink[dir];
+      char *dst = (char *)w_reflink_ex[dir];
+      memcpy(dst + i * gauge_site_size * gSize, src + idx * gauge_site_size * gSize, gauge_site_size * gSize);
+    } // dir
+  }   // i
 
   //////////////////////////////
   // Create extended W fields //
@@ -580,35 +565,30 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 
 #ifdef MULTI_GPU
   optflag = 0;
-  //we need x,y,z site links in the back and forward T slice
+  // we need x,y,z site links in the back and forward T slice
   // so it is 3*2*Vs_t
-  for (int i=0; i < 4; i++) ghost_wlink[i] = safe_malloc(8*Vs[i]*gauge_site_size*gSize);
-  
-  //nu |     |
+  for (int i = 0; i < 4; i++) ghost_wlink[i] = safe_malloc(8 * Vs[i] * gauge_site_size * gSize);
+
+  // nu |     |
   //   |_____|
   //     mu
-  
-  for(int nu=0;nu < 4;nu++){
-    for(int mu=0; mu < 4;mu++){
-      if(nu == mu){
-        ghost_wlink_diag[nu*4+mu] = NULL;
-      } else {
-        //the other directions
-        int dir1, dir2;
-        for(dir1= 0; dir1 < 4; dir1++){
-          if(dir1 !=nu && dir1 != mu){
-            break;
-          }
-        }
-        for(dir2=0; dir2 < 4; dir2++){
-          if(dir2 != nu && dir2 != mu && dir2 != dir1){
-            break;
-          }
-        }
-        ghost_wlink_diag[nu*4+mu] = safe_malloc(Z[dir1]*Z[dir2]*gauge_site_size*gSize);
-        memset(ghost_wlink_diag[nu*4+mu], 0, Z[dir1]*Z[dir2]*gauge_site_size*gSize);
-      }
 
+  for (int nu = 0; nu < 4; nu++) {
+    for (int mu = 0; mu < 4; mu++) {
+      if (nu == mu) {
+        ghost_wlink_diag[nu * 4 + mu] = NULL;
+      } else {
+        // the other directions
+        int dir1, dir2;
+        for (dir1 = 0; dir1 < 4; dir1++) {
+          if (dir1 != nu && dir1 != mu) { break; }
+        }
+        for (dir2 = 0; dir2 < 4; dir2++) {
+          if (dir2 != nu && dir2 != mu && dir2 != dir1) { break; }
+        }
+        ghost_wlink_diag[nu * 4 + mu] = safe_malloc(Z[dir1] * Z[dir2] * gauge_site_size * gSize);
+        memset(ghost_wlink_diag[nu * 4 + mu], 0, Z[dir1] * Z[dir2] * gauge_site_size * gSize);
+      }
     }
   }
 #endif
@@ -619,16 +599,17 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 
   if (n_naiks > 1) {
 
-    for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[2][i];
-    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+    for (int i = 0; i < 6; i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[2][i];
+    coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void *)coeff_dp : (void *)coeff_sp;
 
 #ifdef MULTI_GPU
 
-    exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
+    exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
+                          &qudaGaugeParam, optflag);
     llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
-  
+
     {
-      int R[4] = {2,2,2,2};
+      int R[4] = {2, 2, 2, 2};
       exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
       computeLongLinkCPU(longlink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
     }
@@ -639,8 +620,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
 
     // Rescale fat and long links into eps links
     for (int i = 0; i < 4; i++) {
-      cpu_axy(prec, eps_naik, fatlink[i], fatlink_eps[i], V*gauge_site_size);
-      cpu_axy(prec, eps_naik, longlink[i], longlink_eps[i], V*gauge_site_size);
+      cpu_axy(prec, eps_naik, fatlink[i], fatlink_eps[i], V * gauge_site_size);
+      cpu_axy(prec, eps_naik, longlink[i], longlink_eps[i], V * gauge_site_size);
     }
   }
 
@@ -648,19 +629,20 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // Prepare to create X links and long links, 2nd table set //
   /////////////////////////////////////////////////////////////
 
-  for (int i=0; i < 6;i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[1][i];
-  coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void*)coeff_dp : (void*)coeff_sp;
+  for (int i = 0; i < 6; i++) coeff_sp[i] = coeff_dp[i] = act_path_coeffs[1][i];
+  coeff = (prec == QUDA_DOUBLE_PRECISION) ? (void *)coeff_dp : (void *)coeff_sp;
 
 #ifdef MULTI_GPU
   optflag = 0;
 
   // We've already built the extended W fields.
 
-  exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, &qudaGaugeParam, optflag);
+  exchange_cpu_sitelink(qudaGaugeParam.X, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec,
+                        &qudaGaugeParam, optflag);
   llfat_reference_mg(fatlink, w_reflink, ghost_wlink, ghost_wlink_diag, qudaGaugeParam.cpu_prec, coeff);
 
   {
-    int R[4] = {2,2,2,2};
+    int R[4] = {2, 2, 2, 2};
     exchange_cpu_sitelink_ex(qudaGaugeParam.X, R, w_reflink_ex, QUDA_QDP_GAUGE_ORDER, qudaGaugeParam.cpu_prec, 0, 4);
     computeLongLinkCPU(longlink, w_reflink_ex, qudaGaugeParam.cpu_prec, coeff);
   }
@@ -672,8 +654,8 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   if (n_naiks > 1) {
     // Accumulate into eps links.
     for (int i = 0; i < 4; i++) {
-      cpu_xpy(prec, fatlink[i], fatlink_eps[i], V*gauge_site_size);
-      cpu_xpy(prec, longlink[i], longlink_eps[i], V*gauge_site_size);
+      cpu_xpy(prec, fatlink[i], fatlink_eps[i], V * gauge_site_size);
+      cpu_xpy(prec, longlink[i], longlink_eps[i], V * gauge_site_size);
     }
   }
 
@@ -681,7 +663,7 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   // Clean up //
   //////////////
 
-  for(int i=0; i < 4; i++){
+  for (int i = 0; i < 4; i++) {
     host_free(sitelink_ex[i]);
     host_free(v_reflink[i]);
     host_free(w_reflink[i]);
@@ -690,13 +672,13 @@ void computeHISQLinksCPU(void** fatlink, void** longlink,
   host_free(v_sitelink);
 
 #ifdef MULTI_GPU
-  for(int i=0; i<4; i++){
+  for (int i = 0; i < 4; i++) {
     host_free(ghost_sitelink[i]);
     host_free(ghost_wlink[i]);
-    for(int j=0;j <4; j++){
-      if (i==j) continue;
-      host_free(ghost_sitelink_diag[i*4+j]);
-      host_free(ghost_wlink_diag[i*4+j]);
+    for (int j = 0; j < 4; j++) {
+      if (i == j) continue;
+      host_free(ghost_sitelink_diag[i * 4 + j]);
+      host_free(ghost_wlink_diag[i * 4 + j]);
     }
   }
 #endif
@@ -758,7 +740,7 @@ void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(
 void initComms(int argc, char **argv, int *const commDims)
 {
   if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
-  
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
@@ -877,12 +859,7 @@ void dw_setDims(int *X, const int L5)
   Vsh_t = Vs_t/2;  //?
 }
 
-
-void setSpinorSiteSize(int n)
-{
-  my_spinor_site_size = n;
-}
-
+void setSpinorSiteSize(int n) { my_spinor_site_size = n; }
 
 template <typename Float>
 static void printVector(Float *v) {
@@ -901,15 +878,15 @@ void printSpinorElement(void *spinor, int X, QudaPrecision precision) {
 void printGaugeElement(void *gauge, int X, QudaPrecision precision) {
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m=0; m<3; m++) printVector((double*)gauge +(X/2)*gauge_site_size + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
     else
-      for (int m=0; m<3; m++) printVector((float*)gauge +(X/2)*gauge_site_size + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
 
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
-      for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Vh)*gauge_site_size + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
     else
-      for (int m = 0; m < 3; m++) printVector((float*)gauge + (X/2+Vh)*gauge_site_size + m*3*2);
+      for (int m = 0; m < 3; m++) printVector((float *)gauge + (X / 2 + Vh) * gauge_site_size + m * 3 * 2);
   }
 }
 
@@ -921,7 +898,6 @@ int getOddBit(int Y) {
   int x1 = Y % Z[0];
   return (x4+x3+x2+x1) % 2;
 }
-
 
 // a+=b
 template <typename Float>
@@ -1379,17 +1355,15 @@ template <typename Float>
 static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
-    for (int i = 0; i < gauge_site_size*Vh*2; i++) {
-      gauge[d][i] /= param->anisotropy;
-    }
+    for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
   }
 
   // Apply boundary conditions to temporal links
   if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gauge_site_size; i++) {
-	gauge[3][j*gauge_site_size+i] *= -1.0;
-	gauge[3][(Vh+j)*gauge_site_size+i] *= -1.0;
+        gauge[3][j * gauge_site_size + i] *= -1.0;
+        gauge[3][(Vh + j) * gauge_site_size + i] *= -1.0;
       }
     }
   }
@@ -1400,7 +1374,7 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
     int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
-    Float *odd  = gauge[dir]+Vh*gauge_site_size;
+    Float *odd = gauge[dir] + Vh * gauge_site_size;
     for (int i = 0; i< iMax; i++) {
       for (int m = 0; m < 3; m++) {
 	for (int n = 0; n < 3; n++) {
@@ -1426,8 +1400,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   // rescale long links by the appropriate coefficient
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     for(int d=0; d<4; d++){
-      for(int i=0; i < V*gauge_site_size; i++){
-	gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+      for (int i = 0; i < V * gauge_site_size; i++) {
+        gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
       }
     }
   }
@@ -1462,9 +1436,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0; j < 18; j++) {
-	gauge[d][i*gauge_site_size + j] *= sign;
-      }
+      for (int j = 0; j < 18; j++) { gauge[d][i * gauge_site_size + j] *= sign; }
     }
     //odd
     for (int i = 0; i < Vh; i++) {
@@ -1492,9 +1464,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
 	}
       }
 
-      for (int j=0; j<18; j++){
-	gauge[d][(Vh+i)*gauge_site_size + j] *= sign;
-      }
+      for (int j = 0; j < 18; j++) { gauge[d][(Vh + i) * gauge_site_size + j] *= sign; }
     }
 
   }
@@ -1514,8 +1484,8 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
 
       for (int i=0; i<18; i++) {
-	gauge[3][j*gauge_site_size + i] *= sign;
-	gauge[3][(Vh+j)*gauge_site_size + i] *= sign;
+        gauge[3][j * gauge_site_size + i] *= sign;
+        gauge[3][(Vh + j) * gauge_site_size + i] *= sign;
       }
     }
   }
@@ -1536,7 +1506,7 @@ static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
+    resOdd[dir] = res[dir] + Vh * gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -1577,7 +1547,7 @@ static void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDs
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
+    resOdd[dir] = res[dir] + Vh * gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -1654,7 +1624,7 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
-    resOdd[dir]  = res[dir]+Vh*gauge_site_size;
+    resOdd[dir] = res[dir] + Vh * gauge_site_size;
   }
 
   for (int dir = 0; dir < 4; dir++) {
@@ -1715,7 +1685,7 @@ template <typename Float> static void applyStaggeredScaling(Float **res, QudaGau
 }
 
 void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaPrecision precision,
-				QudaGaugeParam *param, QudaDslashType dslash_type)
+                                QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1729,22 +1699,26 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      if(type != 3) constructRandomGaugeField((double**)fatlink, param, dslash_type);
+      if (type != 3)
+        constructRandomGaugeField((double **)fatlink, param, dslash_type);
       else applyStaggeredScaling((double**)fatlink, param, type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH)
       {
-        if(type != 3) constructRandomGaugeField((double**)longlink, param, dslash_type);
+        if (type != 3)
+          constructRandomGaugeField((double **)longlink, param, dslash_type);
         else applyStaggeredScaling((double**)longlink, param, type);
       }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      if(type != 3) constructRandomGaugeField((float**)fatlink, param, dslash_type);
+      if (type != 3)
+        constructRandomGaugeField((float **)fatlink, param, dslash_type);
       else applyStaggeredScaling((float**)fatlink, param, type);
 
       param->type = QUDA_ASQTAD_LONG_LINKS;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
-        if(type != 3) constructRandomGaugeField((float**)longlink, param, dslash_type);
+        if (type != 3)
+          constructRandomGaugeField((float **)longlink, param, dslash_type);
         else applyStaggeredScaling((float**)longlink, param, type);
       }
     }
@@ -1933,12 +1907,12 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 	}
 
         if (precision == QUDA_DOUBLE_PRECISION){
-	  //double* mylink = (double*)link;
-	  //mylink = mylink + (4*i + dir)*gauge_site_size;
-	  double* mylink = (double*)link[dir];
-	  mylink = mylink + i*gauge_site_size;
+          // double* mylink = (double*)link;
+          // mylink = mylink + (4*i + dir)*gauge_site_size;
+          double* mylink = (double*)link[dir];
+          mylink = mylink + i * gauge_site_size;
 
-	  mylink[12] *= coeff;
+          mylink[12] *= coeff;
 	  mylink[13] *= coeff;
 	  mylink[14] *= coeff;
 	  mylink[15] *= coeff;
@@ -1946,10 +1920,10 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 	  mylink[17] *= coeff;
 
         }else{
-	  //float* mylink = (float*)link;
-	  //mylink = mylink + (4*i + dir)*gauge_site_size;
-	  float* mylink = (float*)link[dir];
-	  mylink = mylink + i*gauge_site_size;
+          // float* mylink = (float*)link;
+          // mylink = mylink + (4*i + dir)*gauge_site_size;
+          float* mylink = (float*)link[dir];
+          mylink = mylink + i * gauge_site_size;
 
           mylink[12] *= coeff;
 	  mylink[13] *= coeff;
@@ -1964,7 +1938,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 
 #if 1
   for(int dir= 0;dir < 4;dir++){
-    for(int i=0;i< V*gauge_site_size;i++){
+    for (int i = 0; i < V * gauge_site_size; i++) {
       if (precision ==QUDA_SINGLE_PRECISION){
 	float* f = (float*)link[dir];
 	if (f[i] != f[i] || (fabsf(f[i]) > 1.e+3) ){
@@ -2043,15 +2017,11 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
-    for(int i=0; i < 3;i++){
-      printVector((double*)link+ X*gauge_site_size + i*6);
-    }
+    for (int i = 0; i < 3; i++) { printVector((double *)link + X * gauge_site_size + i * 6); }
 
   }
   else{
-    for(int i=0;i < 3;i++){
-      printVector((float*)link+X*gauge_site_size + i*6);
-    }
+    for (int i = 0; i < 3; i++) { printVector((float *)link + X * gauge_site_size + i * 6); }
   }
 }
 
@@ -2082,7 +2052,7 @@ void createMomCPU(void *mom, QudaPrecision precision)
   void* temp;
 
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-  temp = malloc(4*V*gauge_site_size*gSize);
+  temp = malloc(4 * V * gauge_site_size * gSize);
   if (temp == NULL){
     fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
     exit(1);
@@ -2092,17 +2062,17 @@ void createMomCPU(void *mom, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
         double *thismom = (double *)mom;
-        for(int k=0; k < mom_site_size; k++){
+        for (int k = 0; k < mom_site_size; k++) {
           thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
-          if (k==mom_site_size-1) thismom[ (4*i+dir)*mom_site_size + k ]= 0.0;
+          if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thismom=(float*)mom;
-	for(int k=0; k < mom_site_size; k++){
+        for (int k = 0; k < mom_site_size; k++) {
           thismom[(4 * i + dir) * mom_site_size + k] = 1.0 * rand() / RAND_MAX;
-          if (k==mom_site_size-1) thismom[ (4*i+dir)*mom_site_size + k ]= 0.0;
+          if (k == mom_site_size - 1) thismom[(4 * i + dir) * mom_site_size + k] = 0.0;
         }
       }
     }
@@ -2118,16 +2088,12 @@ void createHwCPU(void *hw, QudaPrecision precision)
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
 	double* thishw = (double*)hw;
-	for(int k=0; k < hw_site_size; k++){
-	  thishw[ (4*i+dir)*hw_site_size + k ]= 1.0* rand() /RAND_MAX;
-	}
+        for (int k = 0; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
       }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thishw=(float*)hw;
-	for(int k=0; k < hw_site_size; k++){
-	  thishw[ (4*i+dir)*hw_site_size + k ]= 1.0* rand() /RAND_MAX;
-	}
+        for (int k = 0; k < hw_site_size; k++) { thishw[(4 * i + dir) * hw_site_size + k] = 1.0 * rand() / RAND_MAX; }
       }
     }
   }
@@ -2143,11 +2109,11 @@ int compare_mom(Float *momA, Float *momB, int len) {
   for (int f=0; f<fail_check; f++) fail[f] = 0;
 
   int iter[mom_site_size];
-  for (int i=0; i<mom_site_size; i++) iter[i] = 0;
+  for (int i = 0; i < mom_site_size; i++) iter[i] = 0;
 
   for (int i=0; i<len; i++) {
-    for (int j=0; j<mom_site_size-1; j++) {
-      int is = i*mom_site_size+j;
+    for (int j = 0; j < mom_site_size - 1; j++) {
+      int is = i * mom_site_size + j;
       double diff = fabs(momA[is]-momB[is]);
       for (int f=0; f<fail_check; f++)
 	if (diff > pow(10.0,-(f+1))) fail[f]++;
@@ -2163,7 +2129,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
     }
   }
 
-  for (int i=0; i<mom_site_size; i++) printfQuda("%d fails = %d\n", i, iter[i]);
+  for (int i = 0; i < mom_site_size; i++) printfQuda("%d fails = %d\n", i, iter[i]);
 
   for (int f=0; f<fail_check; f++) {
     printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
@@ -2175,11 +2141,11 @@ int compare_mom(Float *momA, Float *momB, int len) {
 static void printMomElement(void *mom, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
-    double* thismom = ((double*)mom)+ X*mom_site_size;
+    double *thismom = ((double *)mom) + X * mom_site_size;
     printVector(thismom);
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }else{
-    float* thismom = ((float*)mom)+ X*mom_site_size;
+    float *thismom = ((float *)mom) + X * mom_site_size;
     printVector(thismom);
     printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }
@@ -2233,26 +2199,31 @@ double stopwatchReadSeconds()
 
 int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }
 
-void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv) {
-  
+void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
+{
+
   // 0 = unit gauge
   // 1 = random SU(3)
   // 2 = supplied field
-  int construct_type = 0; 
-  if (strcmp(latfile,"")) {  
+  int construct_type = 0;
+  if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_type = 2;
   } else {
-    if (unit_gauge) construct_type = 0;
-    else construct_type = 1;
+    if (unit_gauge)
+      construct_type = 0;
+    else
+      construct_type = 1;
   }
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink, QudaGaugeParam &gauge_param, int argc, char **argv) {
-  
-  if (strcmp(latfile,"")) {  
+void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
+                                      QudaGaugeParam &gauge_param, int argc, char **argv)
+{
+
+  if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
@@ -2263,10 +2234,10 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
       constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
       constructFatLongGaugeField(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
-				 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
-    
+
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -2274,8 +2245,8 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
       memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
       memset(qdp_longlink[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
     }
-  } else { 
-    // QUDA_ASQTAD_DSLASH    
+  } else {
+    // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
       computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
     } else {
@@ -2286,37 +2257,43 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   }
 }
 
-
-void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) 
+void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
   if (type == 0) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructUnitGaugeField((double**)gauge, param);
-    else constructUnitGaugeField((float**)gauge, param);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      constructUnitGaugeField((double **)gauge, param);
+    else
+      constructUnitGaugeField((float **)gauge, param);
   } else if (type == 1) {
-    if (precision == QUDA_DOUBLE_PRECISION) constructRandomGaugeField((double**)gauge, param);
-    else constructRandomGaugeField((float**)gauge, param);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      constructRandomGaugeField((double **)gauge, param);
+    else
+      constructRandomGaugeField((float **)gauge, param);
   } else {
-    if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
-    else applyGaugeFieldScaling((float **)gauge, Vh, param);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      applyGaugeFieldScaling((double **)gauge, Vh, param);
+    else
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
   }
 }
 
-void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param) 
+void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param)
 {
   double norm = 0.01; // clover components are random numbers in the range (-norm, norm)
-  double diag = 1.0; // constant added to the diagonal  
+  double diag = 1.0;  // constant added to the diagonal
 
   if (!compute_clover) constructQudaCloverField(clover, norm, diag, inv_param.clover_cpu_prec);
-  
+
   inv_param.compute_clover = compute_clover;
   if (compute_clover) inv_param.return_clover = 1;
   inv_param.compute_clover_inverse = 1;
   inv_param.return_clover_inverse = 1;
 }
 
-void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision) 
+void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision)
 {
-  if (precision == QUDA_DOUBLE_PRECISION) constructCloverField((double *)clover, norm, diag);
-  else constructCloverField((float *)clover, norm, diag);
+  if (precision == QUDA_DOUBLE_PRECISION)
+    constructCloverField((double *)clover, norm, diag);
+  else
+    constructCloverField((float *)clover, norm, diag);
 }
-
