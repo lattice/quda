@@ -189,6 +189,7 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
 void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param)
 {
+  // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
   cs_param->nSpin = 1;
   cs_param->nDim = 5;
@@ -196,10 +197,40 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) cs_param->x[0] /= 2;
   cs_param->x[4] = 1;
+  cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
 
+  // Lattice vector data properties
   cs_param->setPrecision(inv_param->cpu_prec);
   cs_param->pad = 0;
+  cs_param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  cs_param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  cs_param->gammaBasis = inv_param->gamma_basis;
+  cs_param->create = QUDA_ZERO_FIELD_CREATE;
+  cs_param->location = QUDA_CPU_FIELD_LOCATION;
+}
+
+void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
+				    const QudaGaugeParam *gauge_param)
+{
+  // Lattice vector spacetime/colour/spin/parity properties
+  cs_param->nColor = 3;
+  cs_param->nSpin = 4;
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
+      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
+      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {    
+    cs_param->nDim = 5;
+    cs_param->x[4] = inv_param->Ls;
+  } else {
+    cs_param->nDim = 4;
+  }
+  for (int d = 0; d < 4; d++) cs_param->x[d] = gauge_param->X[d];
+  bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
+  if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
+  
+  // Lattice vector data properties
+  cs_param->setPrecision(inv_param->cpu_prec);
+  cs_param->pad = 0;
   cs_param->siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   cs_param->fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   cs_param->gammaBasis = inv_param->gamma_basis;

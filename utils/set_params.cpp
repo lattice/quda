@@ -129,7 +129,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
   // Offsets used only by multi-shift solver
-  // should be set in application
+  // These should be set in the application code. We set the them here by way of
+  // example
   inv_param.num_offset = multishift;
   for (int i = 0; i < inv_param.num_offset; i++) inv_param.offset[i] = 0.06 + i * i * 0.1;
   // these can be set individually

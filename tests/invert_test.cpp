@@ -5,10 +5,31 @@
 #include <string.h>
 
 // QUDA headers
+#include <quda.h>
+#include <quda_internal.h>
+#include <dirac_quda.h>
+#include <dslash_quda.h>
+#include <invert_quda.h>
+#include <util_quda.h>
+#include <blas_quda.h>
+#include <gauge_field.h>
+#include <unitarization_links.h>
+#include <random_quda.h>
+
 #include <random_quda.h>
 #include <quda.h>
+#include <quda_internal.h>
 
 // External headers
+#include <misc.h>
+#include <host_utils.h>
+#include <command_line_params.h>
+#include <dslash_reference.h>
+#include <staggered_dslash_reference.h>
+#include <staggered_gauge_utils.h>
+#include <llfat_utils.h>
+#include <qio_field.h>
+
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <misc.h>
@@ -130,7 +151,6 @@ int main(int argc, char **argv)
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
@@ -153,21 +173,44 @@ int main(int argc, char **argv)
   plaqQuda(plaq);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
+  // Vector construct START
+  //-----------------------------------------------------------------------------------
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *check;
+  ColorSpinorParam cs_param;
+  constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  in = quda::ColorSpinorField::Create(cs_param);
+  out = quda::ColorSpinorField::Create(cs_param);
+  check = quda::ColorSpinorField::Create(cs_param);
+  // Host array for solutions
+  void **outMulti = (void **)malloc(multishift * sizeof(void *));
+  // QUDA host array for internal checks and malloc
+  std::vector<ColorSpinorField *> qudaOutMulti(multishift);
+  // Vector construct END
+  //-----------------------------------------------------------------------------------
+
+  // Quark masses
+  std::vector<double> masses(multishift);
+  
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
-  // Allocate host side memory for the spinor fields
-  void *spinorOut = nullptr, **spinorOutMulti = nullptr;
-  void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   if (multishift > 1) {
-    spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
-    for (int i=0; i<inv_param.num_offset; i++) {
-      spinorOutMulti[i] = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+    inv_param.num_offset = multishift;
+    for (int i = 0; i < multishift; i++) {
+      // Set masses and offsets
+      masses[i] = 0.06 + i * i * 0.01;
+      inv_param.offset[i] = 4 * masses[i] * masses[i];
+      // Set tolerances for the heavy quarks, these can be set independently
+      // (functions of i) if desired
+      inv_param.tol_offset[i] = inv_param.tol;
+      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+      // Allocate memory and set pointers
+      qudaOutMulti[i] = ColorSpinorField::Create(cs_param);
+      outMulti[i] = qudaOutMulti[i]->V();
     }
-  } else {
-    spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   }
-
+  
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
@@ -176,16 +219,16 @@ int main(int argc, char **argv)
   for (int i = 0; i < Nsrc; i++) {
 
     // Populate the host spinor with random numbers.
-    constructRandomSpinorSource(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+    constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     // If deflating, preserve the deflation space between solves
     eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
     if (multishift > 1) {
-      invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
+      invertMultiShiftQuda((void **)outMulti, in->V(), &inv_param);
     } else {
-      invertQuda(spinorOut, spinorIn, &inv_param);
+      invertQuda(out->V(), in->V(), &inv_param);
     }
-
+    
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
@@ -204,19 +247,19 @@ int main(int argc, char **argv)
 
   // Perform host side verification of inversion if requested
   if (verify_results) {
-    verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
+    verifyInversion(out->V(), (void**)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
   }
 
   // Clean up memory allocations
-  free(spinorIn);
-  free(spinorCheck);
-  if (multishift > 1) {
-    for (int i = 0; i < inv_param.num_offset; i++) free(spinorOutMulti[i]);
-    free(spinorOutMulti);
-  } else {
-    free(spinorOut);
-  }
 
+  delete in;
+  delete out;
+  delete check;
+  if(multishift > 1) {
+    for (int i = 0; i < multishift; i++) delete qudaOutMulti[i];
+    free(outMulti);
+  }
+  
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 

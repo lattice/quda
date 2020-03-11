@@ -361,24 +361,24 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
 
   if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(NULL, NULL, &inv_param);
-
+  
   // perform the inversion
-//  if (multishift) {
-//    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
-//  } else {
-    invertMultiSrcQuda(spinorOutMulti, spinorIn, &inv_param);
-
-
+  //  if (multishift) {
+  //    invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
+  //  } else {
+  invertMultiSrcQuda(spinorOutMulti, spinorIn, &inv_param);
+  
+  
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-
+  
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-	 inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-
-   for(int i = 0; i < inv_param.num_src ; i++){
-     invertQuda(spinorOutMulti[i], spinorIn[i], &inv_param);
-   }
+	     inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  
+  for(int i = 0; i < inv_param.num_src ; i++){
+    invertQuda(spinorOutMulti[i], spinorIn[i], &inv_param);
+  }
 
    //  if (true) {
    //    if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
    for (int i = 0; i < inv_param.num_src; i++) {
 
      if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-
+       
        if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
          if (inv_param.twist_flavor == QUDA_TWIST_SINGLET)
            tm_mat(spinorCheck[i], gauge, spinorOutMulti[i], inv_param.kappa, inv_param.mu, inv_param.twist_flavor, 0,

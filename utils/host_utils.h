@@ -57,10 +57,18 @@ void constructFatLongGaugeField(void **fatlink, void **longlink, int type, QudaP
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 
+
+// Spinor utils
+// Merge these two with argument passing to discriminate
+//------------------------------------------------------
 void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
+void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
+				    const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng);
+//------------------------------------------------------
+
 
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
 

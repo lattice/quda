@@ -159,8 +159,9 @@ int main(int argc, char **argv)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     constructHostCloverField(clover, clover_inv, inv_param);
     // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
-    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
+    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
       inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    }
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
     // Restore actual solve_type we want to do
