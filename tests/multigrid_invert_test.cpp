@@ -141,9 +141,6 @@ int main(int argc, char **argv)
   // Initialize the QUDA library
   initQuda(device);
 
-  // Call srand() with a rank-dependent seed
-  initRand();
-
   // Set some dimension parameters for the host routines.
   setDims(gauge_param.X);
   setSpinorSiteSize(24);
@@ -156,9 +153,11 @@ int main(int argc, char **argv)
   constructHostGaugeField(gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
+  
   // Allocate host side memory for clover terms if needed.
   //----------------------------------------------------------------------------
-  void *clover = 0, *clover_inv = 0;
+  void *clover = nullptr;
+  void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
