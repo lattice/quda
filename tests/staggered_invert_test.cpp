@@ -131,7 +131,7 @@ int main(int argc, char **argv)
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* milc_fatlink = nullptr;
   void* milc_longlink = nullptr;
-  void** ghost_fatlink = nullptr;
+  void **ghost_fatlink = nullptr;
   void **ghost_longlink = nullptr;
   GaugeField *cpuFat;
   GaugeField *cpuLong;
@@ -160,22 +160,7 @@ int main(int argc, char **argv)
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-  
-  // Staggered vector construct START
-  //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *ref;
-  ColorSpinorField *tmp;
-  ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
-  ref = quda::ColorSpinorField::Create(cs_param);
-  tmp = quda::ColorSpinorField::Create(cs_param);
-  // Staggered vector construct END
-  //-----------------------------------------------------------------------------------
-    
+      
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------
   // FIXME: currently assume staggered is SU(3)
@@ -211,6 +196,21 @@ int main(int argc, char **argv)
   }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
+
+  // Staggered vector construct START
+  //-----------------------------------------------------------------------------------
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *ref;
+  ColorSpinorField *tmp;
+  ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  in = quda::ColorSpinorField::Create(cs_param);
+  out = quda::ColorSpinorField::Create(cs_param);
+  ref = quda::ColorSpinorField::Create(cs_param);
+  tmp = quda::ColorSpinorField::Create(cs_param);
+  // Staggered vector construct END
+  //-----------------------------------------------------------------------------------
   
   // Prepare rng
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
@@ -227,7 +227,10 @@ int main(int argc, char **argv)
   void **outArray = (void**)malloc(multishift*sizeof(void*));      
   // QUDA host array for internal checks and malloc
   std::vector<ColorSpinorField*> qudaOutArray(multishift);
-  
+
+
+  // QUDA invert test
+  //----------------------------------------------------------------------------  
   switch (test_type) {
   case 0: // full parity solution, full parity system
   case 1: // full parity solution, solving EVEN EVEN prec system
