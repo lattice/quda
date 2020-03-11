@@ -126,10 +126,6 @@ if(QUDA_DIRAC_WILSON OR QUDA_DIRAC_CLOVER OR QUDA_DIRAC_TWISTED_MASS OR QUDA_DIR
 endif()
   
 if(QUDA_MULTIGRID)
-  cuda_add_executable(multigrid_invert_test multigrid_invert_test.cpp)
-  target_link_libraries(multigrid_invert_test ${TEST_LIBS})
-  quda_checkbuildtest(multigrid_invert_test QUDA_BUILD_ALL_TESTS)
-
   cuda_add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
