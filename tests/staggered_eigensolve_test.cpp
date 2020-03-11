@@ -23,6 +23,7 @@
 #include <llfat_utils.h>
 #include <qio_field.h>
 
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -66,44 +67,46 @@ void display_test_info()
   return;
 }
 
+
 int main(int argc, char **argv)
-{  
-  // Parse command line options
+{
+  // Set a default
+  solve_type = QUDA_INVALID_SOLVE;
+
   auto app = make_app();
   add_eigen_option_group(app);
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
-  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));  
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-
-  if (test_type != 0 && test_type != 3 && test_type != 4) { 
-    errorQuda("Test type %d is outside the valid range.\n", test_type);
-  }
   
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
   setQudaDefaultPrecs();
-
+  
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_STAGGERED_DSLASH && 
-      dslash_type != QUDA_ASQTAD_DSLASH &&
+      dslash_type != QUDA_ASQTAD_DSLASH && 
       dslash_type != QUDA_LAPLACE_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
   
-  // Deduce operator, solution, and operator preconditioning types
-  setQudaStaggeredEigTestParams();
+  if (test_type != 0 && test_type != 3 && test_type != 4) {
+    errorQuda("Test type %d is outside the valid range.\n", test_type);
+  }
 
+  setQudaStaggeredEigTestParams();
+  
   display_test_info();
 
-  // Set QUDA internal parameters
+  // Set QUDA internal parameters  
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setStaggeredQDPGaugeParam(gauge_param);
-  QudaEigParam eig_param = newQudaEigParam();
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator. We encapsualte the
@@ -111,33 +114,31 @@ int main(int argc, char **argv)
   // to avoid any confusion
   QudaInvertParam eig_inv_param = newQudaInvertParam();
   setStaggeredInvertParam(eig_inv_param);
-  eig_param.invert_param = &eig_inv_param;
+  QudaEigParam eig_param = newQudaEigParam();
   setEigParam(eig_param);
+  // We encapsulate the eigensolver parameters inside the invert parameter structure
+  eig_param.invert_param = &eig_inv_param;
 
   if (eig_param.arpack_check && !(prec == QUDA_DOUBLE_PRECISION)) {
     errorQuda("ARPACK check only available in double precision");
-  }  
+  }
   
-  // This must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
+  // This must be before the FaceBuffer is created
+  // (this is because it allocates pinned memory - FIXME)
   initQuda(device);
-
-  setDims(gauge_param.X);
-  // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing
-  dw_setDims(gauge_param.X, 1);
-  setSpinorSiteSize(6);
   
+  setDims(gauge_param.X);
+  dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
+  setSpinorSiteSize(6);
+
+
   // Staggered Gauge construct START
-  //-----------------------------------------------------------------------------------
-  // Allocate host staggered gauge fields
+  //-----------------------------------------------------------------------------------  
   void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
-  GaugeField *cpuFat;
-  GaugeField *cpuLong;
-  void **ghost_fatlink = nullptr;
-  void **ghost_longlink = nullptr;
   
   for (int dir = 0; dir < 4; dir++) {
     qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -155,56 +156,30 @@ int main(int argc, char **argv)
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
   if(dslash_type == QUDA_ASQTAD_DSLASH) {
-    // Compute fat link plaquette  // Compute fat link plaquette.
+    // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
 
-  printfQuda("dslash_type = %s\n", get_dslash_str(dslash_type));
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-  printfQuda("dslash_type = %s\n", get_dslash_str(dslash_type));
   // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
-  // Create ghost gauge fields in case of multi GPU builds.
-#ifdef MULTI_GPU
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-
-  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
-  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuFat = GaugeField::Create(cpuFatParam);
-  ghost_fatlink = (void**)cpuFat->Ghost();
-
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
-  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuLong = GaugeField::Create(cpuLongParam);
-  ghost_longlink = (void**)cpuLong->Ghost();
-#endif
-  
-  
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;  
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    printfQuda("here 1\n");
     setStaggeredMILCGaugeParam(gauge_param);
-    printfQuda("here 2\n");
   }
   loadGaugeQuda(milc_fatlink, &gauge_param);
-  printfQuda("here 3\n");
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    printfQuda("here 4\n");
+  
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {  
     setStaggeredMILCGaugeParam(gauge_param);
-    printfQuda("here 5\n");
     loadGaugeQuda(milc_longlink, &gauge_param);
-    printfQuda("here 6\n");
-  }  
+  }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-
+  
   // Host side arrays to store the eigenpairs computed by QUDA
   void **host_evecs = (void **)malloc(eig_nConv * sizeof(void *));
   for (int i = 0; i < eig_nConv; i++) {
@@ -215,27 +190,28 @@ int main(int argc, char **argv)
   double time = 0.0;
   
   // QUDA eigensolver test
-  //----------------------------------------------------------------------------  
+  //----------------------------------------------------------------------------
   switch (test_type) {
-  case 0: eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;  // full parity solution 
-  case 3: eig_param.use_norm_op = QUDA_BOOLEAN_FALSE; // even parity only
-  case 4: eig_param.use_norm_op = QUDA_BOOLEAN_FALSE; // odd parity only
-      
+  case 0: // full parity solution
+  case 3: // even
+  case 4: // odd    
     // This function returns the host_evecs and host_evals pointers, populated with
     // the requested data, at the requested prec. All the information needed to
     // perfom the solve is in the eig_param container.
     // If eig_param.arpack_check == true and precision is double, the routine will
     // use ARPACK rather than the GPU.
+
     time = -((double)clock());
-    eigensolveQuda(host_evecs, host_evals, &eig_param);    
+    eigensolveQuda(host_evecs, host_evals, &eig_param);
     time += (double)clock();
     
-    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);      
+    printfQuda("Time for %s solution = %f\n", eig_param.arpack_check ? "ARPACK" : "QUDA", time / CLOCKS_PER_SEC);  
     break;
     
   default: errorQuda("Unsupported test type");
+    
   } // switch
-  
+
   // Deallocate host memory
   for (int i = 0; i < eig_nConv; i++) free(host_evecs[i]);
   free(host_evecs);
@@ -256,16 +232,15 @@ int main(int argc, char **argv)
       qdp_longlink[dir] = nullptr;
     }
   }
-  if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
-  if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
-
-  //#ifdef MULTI_GPU
-  //delete cpuFat;
-  //delete cpuLong;
-  //#endif
+  if (milc_fatlink != nullptr) {
+    free(milc_fatlink);
+    milc_fatlink = nullptr;
+  }
+  if (milc_longlink != nullptr) {
+    free(milc_longlink);
+    milc_longlink = nullptr;
+  }
   
-  finalizeComms();
   endQuda();
-  
-  return 0;
+  finalizeComms();
 }

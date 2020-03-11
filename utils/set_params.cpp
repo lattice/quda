@@ -1278,8 +1278,6 @@ void setQudaStaggeredInvTestParams() {
   }
 }
 
-
-
 void setQudaStaggeredEigTestParams() {
   
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -1291,12 +1289,13 @@ void setQudaStaggeredEigTestParams() {
     solution_type = QUDA_MAT_SOLUTION;
   } else {
     // STAGGERED operator path
-    if (test_type == 0) {
-      solve_type = QUDA_DIRECT_SOLVE;
-    } else {
-      solve_type = QUDA_DIRECT_PC_SOLVE;
-    }
-    
+    if (solve_type == QUDA_INVALID_SOLVE) {
+      if (test_type == 0) {
+	solve_type = QUDA_DIRECT_SOLVE;
+      } else {
+	solve_type = QUDA_DIRECT_PC_SOLVE;
+      }
+    } 
     // If test type is not 3, it is 4 or 0. If 0, the matpc type is irrelevant
     if (test_type == 3) matpc_type = QUDA_MATPC_EVEN_EVEN;
     else matpc_type = QUDA_MATPC_ODD_ODD;
