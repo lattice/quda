@@ -3486,8 +3486,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT)
     errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d",
-        param->num_offset, QUDA_MAX_MULTI_SHIFT);
-
+	      param->num_offset, QUDA_MAX_MULTI_SHIFT);
+  
   pushVerbosity(param->verbosity);
 
   bool pc_solution = (param->solution_type == QUDA_MATPC_SOLUTION) || (param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
@@ -3537,12 +3537,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   // Host pointers for x, take a copy of the input host pointers
   void** hp_x;
   hp_x = new void* [ param->num_offset ];
-
+  
   void* hp_b = _hp_b;
   for(int i=0;i < param->num_offset;i++){
     hp_x[i] = _hp_x[i];
   }
-
+  
   // Create the matrix.
   // The way this works is that createDirac will create 'd' and 'dSloppy'
   // which are global. We then grab these with references...
@@ -3554,7 +3554,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
       param->dslash_type == QUDA_STAGGERED_DSLASH){
     param->mass = sqrt(param->offset[0]/4);
   }
-
+  
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
   Dirac *dPre = nullptr;
@@ -3599,6 +3599,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   ColorSpinorParam cudaParam(cpuParam, *param);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
   profileMulti.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -3608,9 +3609,13 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // now check if we need to invalidate the solutionResident vectors
   bool invalidate = false;
-  for (auto v : solutionResident)
-    if (cudaParam.Precision() != v->Precision()) { invalidate = true; break; }
-
+  for (auto v : solutionResident) {
+    if (cudaParam.Precision() != v->Precision()) {
+      invalidate = true;
+      break;
+    }
+  }
+  
   if (invalidate) {
     for (auto v : solutionResident) delete v;
     solutionResident.clear();
@@ -3618,10 +3623,14 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // grow resident solutions to be big enough
   for (int i=solutionResident.size(); i < param->num_offset; i++) {
+    printfQuda("Adding vector %d to solutionsResident\n", i);
     solutionResident.push_back(new cudaColorSpinorField(cudaParam));
   }
   for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
 
+  // DMH Heisenbug...
+  //printfQuda("Solution vectors size %d\n", (int)x.size());
+  
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
 
 
@@ -3702,16 +3711,16 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	if (getVerbosity() >= QUDA_SUMMARIZE)
 	  printfQuda("Refining shift %d: L2 residual %e / %e, heavy quark %e / %e (actual / requested)\n",
 		     i, param->true_res_offset[i], param->tol_offset[i], rsd_hq, tol_hq);
-
+	
         // for staggered the shift is just a change in mass term (FIXME: for twisted mass also)
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           dirac.setMass(sqrt(param->offset[i]/4));
           diracSloppy.setMass(sqrt(param->offset[i]/4));
         }
-
+	
         DiracMatrix *m, *mSloppy;
-
+	
         if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
             param->dslash_type == QUDA_STAGGERED_DSLASH) {
           m = new DiracM(dirac);
@@ -3735,7 +3744,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 #else
 	  const int nRefine = param->num_offset - i + 1;
 #endif
-
+	  
 	  std::vector<ColorSpinorField*> q;
 	  q.resize(nRefine);
 	  std::vector<ColorSpinorField*> z;
@@ -3754,7 +3763,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 #else
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
 #endif
-
+	  
 	  bool orthogonal = true;
 	  bool apply_mat = true;
           bool hermitian = true;

@@ -56,7 +56,7 @@ quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
-int multishift = 0;
+int multishift = 1;
 bool verify_results = true;
 bool low_mode_check = false;
 bool oblique_proj_check = false;

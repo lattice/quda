@@ -86,6 +86,7 @@ static inline void su3Tmul(sFloat *res, gFloat *mat, sFloat *vec) {
   su3Transpose(matT, mat);
   su3Mul(res, matT, vec);
 }
+void verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv);
 

@@ -158,7 +158,7 @@ int main(int argc, char **argv)
   if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     inv_param.solution_type = QUDA_MAT_SOLUTION;
   } else {
-    inv_param.solution_type = multishift ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
+    inv_param.solution_type = (multishift > 1) ? QUDA_MATPCDAG_MATPC_SOLUTION : QUDA_MATPC_SOLUTION;
   }
   inv_param.matpc_type = matpc_type;
 
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
       dslash_type == QUDA_MOBIUS_DWF_DSLASH ||
       dslash_type == QUDA_TWISTED_MASS_DSLASH ||
       dslash_type == QUDA_TWISTED_CLOVER_DSLASH ||
-      multishift || inv_type == QUDA_CG_INVERTER) {
+      (multishift > 1) || inv_type == QUDA_CG_INVERTER) {
     inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
   } else {
     inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
@@ -318,11 +318,11 @@ int main(int argc, char **argv)
   }
 
   void **spinorOutMulti = NULL;
-//  if (multishift) {
-    spinorOutMulti = (void**)malloc(inv_param.num_src*sizeof(void *));
-    for (int i=0; i<inv_param.num_src; i++) {
-      spinorOutMulti[i] = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-    }
+  //  if (multishift) {
+  spinorOutMulti = (void**)malloc(inv_param.num_src*sizeof(void *));
+  for (int i=0; i<inv_param.num_src; i++) {
+    spinorOutMulti[i] = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
+  }
     //  } else {
     //    spinorOut = malloc(V*spinor_site_size*host_spinor_data_type_size*inv_param.Ls);
     //  }

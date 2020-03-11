@@ -31,6 +31,34 @@ void display_test_info()
              get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
              get_staggered_test_type(test_type), xdim, ydim, zdim, tdim);
 
+  printfQuda("\n   Eigensolver parameters\n");
+  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+  printfQuda(" - size of Krylov space %d\n", eig_nKr);
+  printfQuda(" - solver tolerance %e\n", eig_tol);
+  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+  if (eig_compute_svd) {
+    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+    printfQuda(" - ***********************************************************\n");
+    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+    printfQuda(" - ***********************************************************\n");
+  } else {
+    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+               eig_use_normop ? "true" : "false");
+  }
+  if (eig_use_poly_acc) {
+    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+    if (eig_amax < 0)
+      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+    else
+      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  }
+
+  
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -71,9 +99,6 @@ int main(int argc, char **argv)
   setQudaStaggeredEigTestParams();
   display_test_info();
   
-  //argc_copy = argc;
-  //argv_copy = argv;
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setStaggeredQDPGaugeParam(gauge_param);
   QudaEigParam eig_param = newQudaEigParam();
@@ -121,22 +146,26 @@ int main(int argc, char **argv)
   computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
 
-  // Compute fat link plaquette.
-  computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-  printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
+  if(dslash_type == QUDA_ASQTAD_DSLASH) {
+    // Compute fat link plaquette  // Compute fat link plaquette.
+    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+  
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   
   // Set MILC specific params and load the gauge fields
-  QudaBoolean is_longlink = QUDA_BOOLEAN_FALSE;
-  setStaggeredMILCGaugeParam(gauge_param, is_longlink);
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {    
+    setStaggeredMILCGaugeParam(gauge_param);
+  }
   loadGaugeQuda(milc_fatlink, &gauge_param);
-  
-  is_longlink = QUDA_BOOLEAN_TRUE;
-  setStaggeredMILCGaugeParam(gauge_param, is_longlink);
-  loadGaugeQuda(milc_longlink, &gauge_param);
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {    
+    setStaggeredMILCGaugeParam(gauge_param);
+    loadGaugeQuda(milc_longlink, &gauge_param);
+  }  
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 

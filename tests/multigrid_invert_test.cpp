@@ -183,8 +183,7 @@ int main(int argc, char **argv)
   // Allocate host side memory for the spinor fields
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  void **spinorOutMulti = nullptr;
+  void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);  
   for (int i = 0; i < Nsrc; i++) {
     constructRandomSpinorSource(spinorIn, 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     invertQuda(spinorOut, spinorIn, &inv_param);
@@ -210,19 +209,14 @@ int main(int argc, char **argv)
 
   // Perform host side verification of inversion if requested
   if (verify_results) {
-    verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
+    verifyInversion(spinorOut, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
   }
   
   // Clean up memory allocations
   free(spinorIn);
   free(spinorCheck);
-  if (multishift) {
-    for (int i = 0; i < inv_param.num_offset; i++) free(spinorOutMulti[i]);
-    free(spinorOutMulti);
-  } else {
-    free(spinorOut);
-  }
-
+  free(spinorOut);
+  
   freeGaugeQuda();
   for (int dir = 0; dir<4; dir++) free(gauge[dir]);
   

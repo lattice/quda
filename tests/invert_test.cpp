@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 {
   // Move these
   mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
-  if (multishift) solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // set a correct default for the multi-shift solver
+  if (multishift > 1) solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // set a correct default for the multi-shift solver
 
   // Parse command line options
   auto app = make_app();
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
   void *spinorOut = nullptr, **spinorOutMulti = nullptr;
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
-  if (multishift) {
+  if (multishift > 1) {
     spinorOutMulti = (void**)malloc(inv_param.num_offset*sizeof(void *));
     for (int i=0; i<inv_param.num_offset; i++) {
       spinorOutMulti[i] = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
     // If deflating, preserve the deflation space between solves
     eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
-    if (multishift) {
+    if (multishift > 1) {
       invertMultiShiftQuda(spinorOutMulti, spinorIn, &inv_param);
     } else {
       invertQuda(spinorOut, spinorIn, &inv_param);
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
   // Clean up memory allocations
   free(spinorIn);
   free(spinorCheck);
-  if (multishift) {
+  if (multishift > 1) {
     for (int i = 0; i < inv_param.num_offset; i++) free(spinorOutMulti[i]);
     free(spinorOutMulti);
   } else {

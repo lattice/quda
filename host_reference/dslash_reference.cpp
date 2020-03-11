@@ -9,6 +9,12 @@
 #include <staggered_dslash_reference.h>
 #include <command_line_params.h>
 
+// Overload for workflows without multishift
+void verifyInversion(void *spinorOut, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) {
+  void **spinorOutMulti = nullptr;
+  verifyInversion(spinorOut, spinorOutMulti, spinorIn, spinorCheck, gauge_param, inv_param, gauge, clover, clover_inv);
+}
+
 void verifyInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) {
   
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
@@ -126,7 +132,7 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void 
 
 void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spinorIn, void *spinorCheck, QudaGaugeParam &gauge_param, QudaInvertParam &inv_param, void **gauge, void *clover, void *clover_inv) 
 {
-  if (multishift) {
+  if (multishift > 1) {
     // ONLY WILSON/CLOVER/TWISTED TYPES
     if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) {
       errorQuda("Mass normalization not supported for multi-shift solver in invert_test");

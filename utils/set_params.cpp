@@ -30,18 +30,18 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
 
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
-  gauge_param.ga_pad = 0; 
+  int pad_size = 0;
   // For multi-GPU, ga_pad must be large enough to store a time-slice
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
   int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
   int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
   int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif  
+#endif
+  gauge_param.ga_pad = pad_size; 
 }
 
 void setInvertParam(QudaInvertParam &inv_param)
@@ -96,11 +96,6 @@ void setInvertParam(QudaInvertParam &inv_param)
     inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
     inv_param.clover_coeff = clover_coeff;
   }
-
-  // Offsets used only by multi-shift solver
-  inv_param.num_offset = 12;
-  double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
-  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
   
   // General parameter setup
   inv_param.inv_type = inv_type;
@@ -130,6 +125,10 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
+  // Offsets used only by multi-shift solver
+  // should be set in application
+  inv_param.num_offset = multishift;
+  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = 0.06 + i*i*0.1;
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
@@ -543,6 +542,10 @@ void setMultigridInvertParam(QudaInvertParam &inv_param) {
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
   inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
+  // Offsets used only by multi-shift solver
+  // should be set in application
+  inv_param.num_offset = multishift;
+  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = 0.06 + i*i*0.1;
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;
@@ -652,21 +655,22 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.ga_pad = 0;
+
+  int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
 #endif
+  gauge_param.ga_pad = pad_size;
 }
 
 
-void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, QudaBoolean is_longlink)
+void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
 {
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
@@ -702,19 +706,18 @@ void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, QudaBoolean is_long
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
-  gauge_param.ga_pad = 0;
-
+  int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
 #endif
-
+  gauge_param.ga_pad = pad_size;
+  
   // Specific parameter settings for MILC
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.type = QUDA_SU3_LINKS;
@@ -729,7 +732,7 @@ void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, QudaBoolean is_long
   }
   gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
   
-  if ((dslash_type == QUDA_ASQTAD_DSLASH) && is_longlink) {
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = 3*pad_size;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
@@ -1162,6 +1165,10 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param) {
 
   // require both L2 relative and heavy quark residual to determine convergence
   inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  // Offsets used only by multi-shift solver
+  // should be set in application
+  inv_param.num_offset = multishift;
+  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = 0.06 + i*i*0.1;
   // these can be set individually
   for (int i=0; i<inv_param.num_offset; i++) {
     inv_param.tol_offset[i] = inv_param.tol;

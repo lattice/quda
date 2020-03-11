@@ -101,13 +101,7 @@ int main(int argc, char **argv)
   }
 
   // Deduce operator, solution, and operator preconditioning types
-  printfQuda("dslash_type is %s \n", get_dslash_str(dslash_type));
-  printfQuda("matpc_type is %s \n", get_matpc_str(matpc_type));
-  //printfQuda("solve_type is %s \n", get_solve_str(solve_type));
   setQudaStaggeredInvTestParams();
-  printfQuda("dslash_type is %s \n", get_dslash_str(dslash_type));
-  printfQuda("matpc_type is %s \n", get_matpc_str(matpc_type));
-  printfQuda("solve_type is %s \n", get_solve_str(solve_type));
 
   display_test_info();
   
@@ -121,12 +115,7 @@ int main(int argc, char **argv)
   // We encapsulate the eigensolver parameters inside the invert parameter structure
   inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
 
-  printfQuda("dslash_type is %s \n", get_dslash_str(inv_param.dslash_type));
-  printfQuda("matpc_type is %s \n", get_matpc_str(inv_param.matpc_type));
-  printfQuda("solve_type is %s \n", get_solve_str(inv_param.solve_type));
-  
-
-  // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
+  // This must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
   setDims(gauge_param.X);
@@ -154,7 +143,7 @@ int main(int argc, char **argv)
   }
   milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
-
+  
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
   
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
@@ -171,31 +160,22 @@ int main(int argc, char **argv)
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
-
+  
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
-
-  //cpuColorSpinorField *in;
-  //cpuColorSpinorField *out;
-  //cpuColorSpinorField *ref;
-  //cpuColorSpinorField *tmp;
   ColorSpinorField *in;
   ColorSpinorField *out;
   ColorSpinorField *ref;
   ColorSpinorField *tmp;
   ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  //in = new cpuColorSpinorField(cs_param);
-  //out = new cpuColorSpinorField(cs_param);
-  //ref = new cpuColorSpinorField(cs_param);
-  //tmp = new cpuColorSpinorField(cs_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
   ref = quda::ColorSpinorField::Create(cs_param);
   tmp = quda::ColorSpinorField::Create(cs_param);
   // Staggered vector construct END
   //-----------------------------------------------------------------------------------
-
+    
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------
   // FIXME: currently assume staggered is SU(3)
@@ -221,25 +201,32 @@ int main(int argc, char **argv)
   
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    QudaBoolean is_longlink = QUDA_BOOLEAN_FALSE;
-    setStaggeredMILCGaugeParam(gauge_param, is_longlink);
+    setStaggeredMILCGaugeParam(gauge_param);
   }
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {  
-    QudaBoolean is_longlink = QUDA_BOOLEAN_TRUE;
-    setStaggeredMILCGaugeParam(gauge_param, is_longlink);
+    setStaggeredMILCGaugeParam(gauge_param);
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-    
+  
   // Prepare rng
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
 
+  // Performance measuring
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
+
+  // Pointers for tests 5 and 6
+  // Quark masses
+  std::vector<double> masses(multishift);
+  // Host array for solutions
+  void **outArray = (void**)malloc(multishift*sizeof(void*));      
+  // QUDA host array for internal checks and malloc
+  std::vector<ColorSpinorField*> qudaOutArray(multishift);
   
   switch (test_type) {
   case 0: // full parity solution, full parity system
@@ -247,76 +234,68 @@ int main(int argc, char **argv)
   case 2: // full parity solution, solving ODD ODD prec system
   case 3: // even parity solution, solving EVEN system
   case 4: // odd parity solution, solving ODD system
+
+    if(multishift != 1) {
+      printfQuda("Multishift not supported for test %d\n", test_type);
+      exit(0);
+    }
     
     for (int k = 0; k < Nsrc; k++) {
       constructRandomSpinorSource(in->V(), 1, 3, inv_param.cpu_prec, cs_param.x, *rng);
+      //quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
       invertQuda(out->V(), in->V(), &inv_param);
       
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
-      // Set to one to change code path in verification
-      multishift = 1;
       verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, gauge_param, inv_param, 0);      
-    } 
+    }
+
+    // Compute timings
+    if (Nsrc > 1) performanceStats(time, gflops);
     break;
     
   case 5: // multi mass CG, even parity solution, solving EVEN system
   case 6: // multi mass CG, odd parity solution, solving ODD system
     
-    {
-      int num_offsets = inv_param.num_offset;
-      std::vector<double> masses(inv_param.num_offset);
-      for(int i=0; i<num_offsets; i++) masses[i] = 0.06 + i*i*0.01;      
-      
-      // Set tolerances for the heavy quarks, these can be set independently if desired
-      for (int i = 0; i <num_offsets; i++) {
-	inv_param.tol_offset[i] = inv_param.tol;
-	inv_param.tol_hq_offset[i] = inv_param.tol_hq;
-      }
-      
-      // Host array for solutions
-      void **outArray = (void**)malloc(num_offsets*sizeof(void*));
-      
-      // QUDA host array for internal checks
-      std::vector<ColorSpinorField*> qudaOutArray(num_offsets);
-      for (int i = 0; i < num_offsets; i++) { 
-	qudaOutArray[i] = ColorSpinorField::Create(cs_param); 
-      }
-      
-      for (int i = 0; i < num_offsets; i++) {
-	outArray[i] = qudaOutArray[i]->V();
-	inv_param.offset[i] = 4 * masses[i] * masses[i];
-      }
-
-      for (int k = 0; k < Nsrc; k++) {      
-	constructRandomSpinorSource(in->V(), 1, 3, inv_param.cpu_prec, cs_param.x, *rng);
-	invertMultiShiftQuda(outArray, in->V(), &inv_param);      
-	cudaDeviceSynchronize();      
-
-	time[k] = inv_param.secs;
-	gflops[k] = inv_param.gflops / inv_param.secs;
-	printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
-	
-	// Set to greater than one to change code path in verification     
-	multishift = num_offsets;
-	for (int i = 0; i < num_offsets; i++) {
-	  printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-	  verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, gauge_param, inv_param, i);	
-	}
-      }
-      for (int i = 0; i < num_offsets; i++) delete qudaOutArray[i];
-      free(outArray);
+    if(multishift < 2) {
+      printfQuda("Multishift inverter requires more than one shift, multishift = %d\n", multishift);
+      exit(0);
     }
+    
+    inv_param.num_offset = multishift;    
+    for(int i=0; i<multishift; i++) {
+      // Set masses and offsets
+      masses[i] = 0.06 + i*i*0.01;	
+      inv_param.offset[i] = 4 * masses[i] * masses[i];
+      // Set tolerances for the heavy quarks, these can be set independently
+      // (functions of i) if desired
+      inv_param.tol_offset[i] = inv_param.tol;
+      inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+      // Allocate memory and set pointers
+      qudaOutArray[i] = ColorSpinorField::Create(cs_param);
+      outArray[i] = qudaOutArray[i]->V();
+    }
+    
+    constructRandomSpinorSource(in->V(), 1, 3, inv_param.cpu_prec, cs_param.x, *rng);
+    invertMultiShiftQuda((void**)outArray, in->V(), &inv_param);      
+    cudaDeviceSynchronize();
+    
+    printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs, inv_param.gflops / inv_param.secs);
+    
+    for (int i = 0; i < multishift; i++) {
+      printfQuda("%dth solution: mass=%f, ", i, masses[i]);
+      verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, gauge_param, inv_param, i);	
+    }
+    
+    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
+    free(outArray);
     break;    
     
   default: errorQuda("Unsupported test type");    
     
   } // switch
-  
-  // Compute timings
-  if (Nsrc > 1) performanceStats(time, gflops);
   
   delete[] time;
   delete[] gflops;

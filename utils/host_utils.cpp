@@ -176,9 +176,9 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   param.nDim = 4;
   param.siteSubset = QUDA_FULL_SITE_SUBSET;
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  param.location = QUDA_CPU_FIELD_LOCATION; //DMH FIXME so one can construct device noise
   for (int d = 0; d < 4; d++) param.x[d] = x[d];
-  quda::cpuColorSpinorField spinor_in(param);
-
+  quda::cpuColorSpinorField spinor_in(param);  
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
 
@@ -233,8 +233,6 @@ void computeLongLinkCPU(void** longlink, su3_matrix** sitelinkEx, Float* act_pat
 {
   int E[4];
   for(int dir=0; dir<4; ++dir) E[dir] = Z[dir]+4;
-  
-
   const int extended_volume = E[3]*E[2]*E[1]*E[0];
   
   su3_matrix temp;
@@ -260,7 +258,7 @@ void computeLongLinkCPU(void** longlink, su3_matrix** sitelinkEx, Float* act_pat
           }
         } // x
       } // y
-    }  // z
+    } // z
   } // t
   return;
 }
@@ -2254,21 +2252,14 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
 
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink, QudaGaugeParam &gauge_param, int argc, char **argv) {
   
-  // 0 = unit gauge
-  // 1 = random SU(3)
-  // 2 = supplied field
-  int construct_type = 0; 
   if (strcmp(latfile,"")) {  
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    //construct_type = 2;
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     }
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if (unit_gauge) construct_type = 0;
-      else construct_type = 1;
       constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
       constructFatLongGaugeField(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
