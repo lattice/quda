@@ -51,6 +51,40 @@ void display_test_info()
              get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
              get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
+  if(inv_multigrid) {
+    printfQuda("MG parameters\n");
+    printfQuda(" - number of levels %d\n", mg_levels);
+    for (int i=0; i<mg_levels-1; i++) {
+      printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
+      printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
+      printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+    }
+
+    printfQuda("MG Eigensolver parameters\n");
+    for (int i = 0; i < mg_levels; i++) {
+      if (low_mode_check || mg_eig[i]) {
+	printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
+	printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+	printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
+	printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
+	printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+	printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+	printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
+	printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
+		   mg_eig_use_normop[i] ? "true" : "false");
+	if (mg_eig_use_poly_acc[i]) {
+	  printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+	  printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+	  if (mg_eig_amax[i] <= 0)
+	    printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+	  else
+	    printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+	}
+	printfQuda("\n");
+      }
+    }
+  }
+  
   if (inv_deflate) {
     printfQuda("\n   Eigensolver parameters\n");
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
@@ -80,6 +114,8 @@ void display_test_info()
     }
   }
 
+  
+  
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -98,9 +134,16 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
+  if(inv_deflate && inv_multigrid) {
+    printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
+    exit(0);
+  }
+  
   // Move these
-  //mg_verbosity[0] = QUDA_SILENT; // set default preconditioner verbosity
-  if (multishift > 1) solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; // set a correct default for the multi-shift solver
+  if (multishift > 1) {
+    // set a correct default for the multi-shift solver
+    solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
+  }
 
   // Set some default values for precisions and solve types
   // if none are passed through the command line
@@ -123,16 +166,16 @@ int main(int argc, char **argv)
   }
 
   if(inv_multigrid) {
-    // Only these fermions are supported in this file with MG
+    // Only these fermions are supported with MG
     if (dslash_type != QUDA_WILSON_DSLASH &&
 	dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-      dslash_type != QUDA_TWISTED_MASS_DSLASH &&
+	dslash_type != QUDA_TWISTED_MASS_DSLASH &&
 	dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
       printfQuda("dslash_type %d not supported for MG\n", dslash_type);
       exit(0);
     }
 
-    // Only these solve types are supported in this file
+    // Only these solve types are supported with MG
     if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
       printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n", solve_type);
       exit(0);
@@ -166,8 +209,13 @@ int main(int argc, char **argv)
   else {
     setInvertParam(inv_param);
   }
-
-  if(inv_deflate) setEigParam(eig_param);
+  
+  if(inv_deflate) {
+    setEigParam(eig_param);
+    inv_param.eig_param = &eig_param;
+  } else {
+    inv_param.eig_param = nullptr;
+  }
   
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
