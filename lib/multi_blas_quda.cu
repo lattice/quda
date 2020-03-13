@@ -167,8 +167,10 @@ namespace quda {
 
         switch (tp.aux.x) {
         case 1: multiBlasKernel<FloatN, M, NXZ, 1><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+#ifdef WARP_SPLIT
         case 2: multiBlasKernel<FloatN, M, NXZ, 2><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
         case 4: multiBlasKernel<FloatN, M, NXZ, 4><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;
+#endif
         default: errorQuda("warp-split factor %d not instantiated", tp.aux.x);
         }
 

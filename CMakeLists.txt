@@ -175,7 +175,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
-set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+set(QUDA_FAST_COMPILE_REDUCE OFF CACHE BOOL "enable fast compilation in blas and reduction kernels (single warp per reduction)")
+set(QUDA_FAST_COMPILE_DSLASH OFF CACHE BOOL "enable fast compilation in dslash kernels (~20% perf impact)")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
@@ -205,7 +206,8 @@ mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
-mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
+mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
+mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -650,8 +652,12 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
-if(QUDA_REDUCE_SINGLE_WARP)
-add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+if(QUDA_FAST_COMPILE_REDUCE)
+add_definitions(-DQUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+add_definitions(-DQUDA_FAST_COMPILE_DSLASH)
 endif()
 
 # set which precisions to enable
