@@ -2,6 +2,9 @@
 
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
+#include <quda_matrix.h>
+#include <complex_quda.h>
+#include <matrix_field.h>
 
 namespace quda
 {
@@ -22,11 +25,14 @@ namespace quda
 
     F4 x;
     F1 y;
+    matrix_field<complex<real>, nSpinX> s;
+    // Why can't I declare this as a complex<real>?
+    //complex<real> *s;
     
     EvecProjectArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *s) :
       threads(x.VolumeCB()),
       x(x),
-      y(y),
+      y(y),      
       s(s, x.VolumeCB())
     {
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
@@ -46,12 +52,14 @@ namespace quda
     typedef ColorSpinor<real, nColor, nSpinY> Vector1;
 
     complex<real> A[nSpinX * nSpinY];
+    
     Vector4 x = arg.x(x_cb, parity);
     Vector1 y = arg.y(x_cb, parity);
-    int alpha = arg.alpha;
+    
 #pragma unroll
     for (int mu = 0; mu < nSpinX; mu++) {
-      A[mu] = innerProduct(y, x, 0, mu);
+      //A[mu] = innerProduct(y, x, 0, mu);
+      A[mu] = 0.0;
     }
     arg.s.save(A, x_cb, parity);
   }  

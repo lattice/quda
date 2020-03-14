@@ -15,5 +15,6 @@
 using namespace quda;
 
 //void display_driver_info();
+void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result);
 void spinDiluteQuda(ColorSpinorField &x, ColorSpinorField &y, const int alpha);
 void laphSourceConstruct(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs, const Complex *noise, const int dil_scheme);

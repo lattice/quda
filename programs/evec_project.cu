@@ -26,7 +26,7 @@ public:
       TunableVectorY(2),
       arg(arg),
       x(x),
-      y(y),
+      y(y)
     {
       strcat(aux, "evec_project,");
       strcat(aux, x.AuxString());
@@ -74,7 +74,8 @@ public:
   };
   
   template <typename real>
-  void evec_project_quda(const ColorSpinorField &x, const ColorSpinorField &y, const int alpha)
+  void evec_project_quda(const ColorSpinorField &x, const ColorSpinorField &y,
+			 complex<real> *result)
   {
     EvecProjectArg<real> arg(x, y, result);
     EvecProject<real, EvecProjectArg<real>> evec_project(arg, x, y);
@@ -90,9 +91,9 @@ public:
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
     
     if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      evec_project_quda<float>(x, y, (complex<float> *)result);
+      evec_project_quda<float>(x, y, (complex<float>*)result);
     } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      evec_project_quda<double>(x, y, (complex<double> *)result);
+      evec_project_quda<double>(x, y, (complex<double>*)result);
     } else {
       errorQuda("Precision %d not supported", x.Precision());
     }

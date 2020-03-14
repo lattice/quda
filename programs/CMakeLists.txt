@@ -1,12 +1,3 @@
-include_directories( ../utils)
-
-# enable programs build a common library for all programs
-if(QUDA_QDPJIT)
-  target_link_libraries(quda
-    INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-    ${QMP_LIB} ${MPI_CXX_LIBRARIES})
-endif()
-
 # all files for quda -- needs some cleanup
 # cmake-format: off
 set (PROGRAMS_OBJS
@@ -32,24 +23,12 @@ if(BUILD_FORTRAN_INTERFACE)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
-# PROGRAMS_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
-
-# if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
-if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
-  if(GITVERSION)
-    find_path(QUDA_GITDIR NAME HEAD PATHS ${CMAKE_SOURCE_DIR}/.git/logs NO_DEFAULT_PATH)
-    include(AddFileDependencies)
-    if(QUDA_GITDIR)
-      add_file_dependencies(version.cpp ${QUDA_GITDIR}/HEAD)
-    endif()
-  endif()
-  mark_as_advanced(QUDA_GITDIR)
-endif()
+# PROGRAMS_CU_OBJS should contain all cuda files now PROGRAMS_OBJS all c, cpp, fortran sources
 
 # generate a cmake object library for all cpp files first
 add_library(programs_cpp OBJECT ${PROGRAMS_OBJS})
 
-# add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
+# add some definitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(programs_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(programs_cpp PUBLIC -DGITVERSION="${GITVERSION}")
@@ -70,32 +49,7 @@ target_include_directories(programs_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(programs_cpp PRIVATE .)
 
 target_include_directories(quda_progs PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
-
-# propagate CXX flags to CUDA host compiler
-if(${QUDA_PROPAGATE_CXX_FLAGS})
-  target_compile_options(quda_progs
-                         PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: $<$<CONFIG:DEVEL>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVEL}>
-                                $<$<CONFIG:STRICT>:-Xcompiler ${CMAKE_CXX_FLAGS_STRICT}> $<$<CONFIG:RELEASE>:-Xcompiler
-                                ${CMAKE_CXX_FLAGS_RELEASE}> $<$<CONFIG:DEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEBUG}>
-                                $<$<CONFIG:HOSTDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_HOSTDEBUG}>
-                                $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
-endif()
-
-# some clang warnings should be warning even when turning warnings into errors
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(programs_cpp
-                         PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
-  target_compile_options(quda_progs
-                         PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
-                                "SHELL:-Xcompiler -Wno-error=unused-function" >)
-
-  # this is a hack to get colored diagnostics back when using Ninja and clang
-  if(CMAKE_GENERATOR MATCHES "Ninja")
-    target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fcolor-diagnostics>)
-  endif()
-endif()
-
-target_link_libraries(quda_progs INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_include_directories(quda_progs PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/.> $<INSTALL_INTERFACE:.>)
 
 if(QUDA_MULTIGRID)
   target_link_libraries(quda_progs PUBLIC ${CUDA_cublas_LIBRARY})
@@ -192,38 +146,13 @@ if(QUDA_DOWNLOAD_EIGEN)
   add_dependencies(quda_progs Eigen)
 endif()
 
-configure_file(../include/quda_define.h.in ../include/quda_define.h @ONLY)
-install(FILES "${CMAKE_BINARY_DIR}/include/quda_define.h" DESTINATION include/)
-
 if(QUDA_JITIFY)
   configure_file(../include/jitify_options.hpp.in ../include/jitify_options.hpp)
   install(FILES "${CMAKE_BINARY_DIR}/include/jitify_options.hpp" DESTINATION include/)
 endif()
 
-# until we define an install step copy the include directory to the build directory
-add_custom_command(TARGET quda_progs POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
-
-# some hackery to prevent having old shared / static builds of quda messing with the current build
-add_custom_command(TARGET quda_progs PRE_LINK
-                   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a
-                                               ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
-
-install(TARGETS quda_progs EXPORT qudaProgsTargets LIBRARY DESTINATION programs ARCHIVE DESTINATION programs INCLUDES DESTINATION .)
-
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"
-                                 VERSION ${QUDA_VERSION}
-                                 COMPATIBILITY AnyNewerVersion)
-
-export(EXPORT qudaProgsTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/qudaProgsTargets.cmake" NAMESPACE quda::)
-set(ConfigPackageLocation programs/cmake/quda_progs/)
-install(EXPORT qudaProgsTargets NAMESPACE quda:: DESTINATION ${ConfigPackageLocation})
-
-add_custom_target(mpi_nvtx_progs ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvtx_pmpi.c generate/nvtx.w
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                  COMMENT "Generating mpi_nvtx_progs wrapper")
+# Compile and link the executable
+include_directories( ../utils)
 
 set(PROGRAMS_LIBS quda quda_progs quda_utils)
 

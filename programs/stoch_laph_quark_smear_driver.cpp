@@ -207,10 +207,20 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
   delete dPre;
 }
 
+// There will be nSpin * dil_scheme quark sinks, and n_evecs eigenvectors. We will produce
+// n_evecs * dil_scheme smeared sinks, each of which has a lattice and spin index 
 void laphSinkProject(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs,
-		     const Complex *noise, const int dil_scheme)
+		     void **host_sinks, const int dil_scheme)
 {
+  int n_evecs = (int)(evecs.size());
+  int n_quarks = (int)(quarks.size());
   
+  for(int i=0; i<n_evecs; i++) {
+    for(int k=0; k<n_quarks; k++) {
+      //FIXME Indexing....
+      evecProjectQuda(*quarks[k], *evecs[i], host_sinks[k * n_evecs  + i]);
+    }
+  }
 }
 
 
@@ -346,18 +356,23 @@ int main(int argc, char **argv) {
     noise[i].real(rand() / (double)RAND_MAX);
     noise[i].imag(rand() / (double)RAND_MAX);
   }
-  
-  laphSourceConstruct(quda_quarks, quda_evecs, noise, dil_scheme);
-  laphSourceInvert(quda_quarks, &inv_param, gauge_param.X);
 
+  // Use the dilution scheme and stochstic noise to construct quark sources
+  laphSourceConstruct(quda_quarks, quda_evecs, noise, dil_scheme);
+
+  // The quarks sources are located in quda_quarks. We invert using those
+  // sources and place the propagator back into quda_quarks
+  laphSourceInvert(quda_quarks, &inv_param, gauge_param.X);
+  
   // Host side data for sinks
-  void **host_sinks = (void **)malloc(n_sources * sizeof(void *));
-  for (int i = 0; i < n_evecs * 4; i++) {
-    host_sinks[i] = (void *)malloc(V * inv_param.cpu_prec);
+  void **host_sinks = (void **)malloc(n_evecs * dil_scheme * sizeof(void *));
+  for (int i = 0; i < n_evecs * dil_scheme; i++) {
+    host_sinks[i] = (void *)malloc(V * 4 * inv_param.cpu_prec);
   }
   
+  // We now perfrom the projection back onto the eigenspace. The data
+  // is placed in host_sinks in i, X, Y, Z, T, spin order 
   laphSinkProject(quda_quarks, quda_evecs, host_sinks, dil_scheme);
-  
   
   return 0;
 }
