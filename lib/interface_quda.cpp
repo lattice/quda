@@ -1746,9 +1746,6 @@ namespace quda {
                 inv_param->cuda_prec_precondition);
   }
 
-
-
-  
   static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
 
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
