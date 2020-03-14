@@ -1686,7 +1686,6 @@ public:
     }
   };
 
-<<<<<<< HEAD
   /**
    * Create the Dirac operator
    * @param[in] d        User prec
@@ -1707,9 +1706,6 @@ public:
    * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
    */
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
-
-=======
->>>>>>> parent of 42faa3103... Expose create_dirac to the user via dirac_quda.h
 } // namespace quda
 
 #endif // _DIRAC_QUDA_H
