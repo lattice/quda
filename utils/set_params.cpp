@@ -277,7 +277,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; // DMH
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; 
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -310,7 +310,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set DMH
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set 
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
@@ -431,7 +431,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2; // DMH
+  mg_param.spin_block_size[0] = 2; 
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -746,6 +746,78 @@ void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
   }
 }
 
+void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
+{
+  // Solver params
+  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.mass = mass;
+
+  // outer solver parameters
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.tol = tol;
+  inv_param.maxiter = niter;
+  inv_param.reliable_delta = 1e-4;
+  inv_param.pipeline = pipeline;
+
+  inv_param.Ls = 1;
+
+  if (tol_hq == 0 && tol == 0) {
+    errorQuda("qudaInvert: requesting zero residual\n");
+    exit(1);
+  }
+
+  // require both L2 relative and heavy quark residual to determine convergence
+  inv_param.residual_type = static_cast<QudaResidualType>(QUDA_L2_RELATIVE_RESIDUAL);
+  inv_param.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
+
+  /* ESW HACK: comment this out to do a non-MG solve. */
+  inv_param.inv_type_precondition = QUDA_MG_INVERTER;
+  // inv_param.verbosity_precondition = mg_verbosity[0];
+  inv_param.verbosity_precondition = QUDA_SUMMARIZE; // ESW HACK
+  inv_param.cuda_prec_precondition = cuda_prec_precondition;
+
+  // Specify Krylov sub-size for GCR, BICGSTAB(L)
+  inv_param.gcrNkrylov = gcrNkrylov;
+
+  // do we want full solution or single-parity solution
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  // do we want to use an even-odd preconditioned solve or not
+  inv_param.solve_type = solve_type;
+  inv_param.matpc_type = matpc_type;
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  inv_param.cpu_prec = cpu_prec;
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.dslash_type = dslash_type;
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  // these can be set individually
+  for (int i = 0; i < inv_param.num_offset; i++) {
+    inv_param.tol_offset[i] = inv_param.tol;
+    inv_param.tol_hq_offset[i] = inv_param.tol_hq;
+  }
+
+  // domain decomposition preconditioner parameters
+  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  inv_param.precondition_cycle = 1;
+  inv_param.tol_precondition = 1e-1;
+  inv_param.maxiter_precondition = 1;
+  inv_param.omega = 1.0;
+}
+
+
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
@@ -844,50 +916,23 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_precondition = cuda_prec_precondition;
-    inv_param.clover_cuda_prec_refinement_sloppy = cuda_prec_sloppy;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
-  }
-
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
   inv_param.dslash_type = dslash_type;
 
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3 / anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5 / kappa - (1 + 3 / anisotropy);
-  }
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.mu = mu;
-    inv_param.epsilon = epsilon;
-    inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-
-    if (twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) {
-      printfQuda("Twisted-mass doublet non supported (yet)\n");
-      exit(0);
-    }
-  }
-
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
+  
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION; // DMH
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION; 
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
 
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
-  mg_param.is_staggered = QUDA_BOOLEAN_TRUE; // DMH
+  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
@@ -896,7 +941,6 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
-    for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
     mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
@@ -915,7 +959,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = (i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set DMH
+    mg_param.n_vec[i] = (i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];                    // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                          // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec;        // precision of the halo exchange in the smoother
@@ -1014,7 +1058,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       } else {
         errorQuda("Unexpected solve_type = %d\n", solve_type);
       }
+      
     } else {
+      
       if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
@@ -1028,15 +1074,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
-    nu_pre[i] = 2;  // DMH
-    nu_post[i] = 2; // DMH
+    nu_pre[i] = 2;  
+    nu_post[i] = 2; 
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
-  mg_param.spin_block_size[0] = 0; // DMH
+  mg_param.spin_block_size[0] = 0; 
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

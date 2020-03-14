@@ -88,7 +88,7 @@ void setQudaDefaultMgTestParams()
     smoother_solve_type[i] = QUDA_INVALID_SOLVE;
     schwarz_type[i] = QUDA_INVALID_SCHWARZ;
     schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_MR_INVERTER;
+    smoother_type[i] = QUDA_GCR_INVERTER;
     smoother_tol[i] = 0.25;
     coarse_solver[i] = QUDA_GCR_INVERTER;
     coarse_solver_tol[i] = 0.25;
@@ -2250,10 +2250,30 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
+void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param) {
+  
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+  
+  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
+  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuFat = GaugeField::Create(cpuFatParam);
+  ghost_fatlink = (void**)cpuFat->Ghost();
+
+  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
+  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuLong = GaugeField::Create(cpuLongParam);
+  ghost_longlink = (void**)cpuLong->Ghost();
+  
+}
+
+
+  
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
                                       QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO; 
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);

@@ -48,6 +48,8 @@ void setQudaStaggeredInvTestParams();
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
+
+void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param);
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
                                       QudaGaugeParam &gauge_param, int argc, char **argv);
 
@@ -215,6 +217,7 @@ void setContractInvertParam(QudaInvertParam &inv_param);
 void setMultigridInvertParam(QudaInvertParam &inv_param);
 void setDeflatedInvertParam(QudaInvertParam &inv_param);
 void setStaggeredInvertParam(QudaInvertParam &inv_param);
+void setStaggeredMGInvertParam(QudaInvertParam &inv_param);
 
 // Gauge param types
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);

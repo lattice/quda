@@ -5,33 +5,27 @@
 #include <string.h>
 #include <limits>
 
+#include <quda.h>
+#include <blas_quda.h>
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
-#include <blas_reference.h>
-#include <staggered_dslash_reference.h>
+#include <dslash_reference.h>
+//#include <blas_reference.h>
+//#include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
-#include <llfat_reference.h>
+//#include <llfat_reference.h>
 #include "misc.h"
-#include <gauge_field.h>
-#include <covdev_reference.h>
-#include <unitarization_links.h>
-#include <random_quda.h>
+//#include <gauge_field.h>
+//#include <covdev_reference.h>
+//#include <unitarization_links.h>
+//#include <random_quda.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
-
-#include <qio_field.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // In a typical application, quda.h is the only QUDA header required.
-#include <quda.h>
-#include <blas_quda.h>
+
 
 // Various CPU fields lifted from
 // staggered_invert_test.cpp
@@ -103,63 +97,12 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
-  // We give here the default values to some of the array
-  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-    mg_verbosity[i] = QUDA_SUMMARIZE;
-    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
-    num_setup_iter[i] = 1;
-    setup_tol[i] = 5e-6;
-    setup_maxiter[i] = 500;
-    mu_factor[i] = 1.;
-    coarse_solve_type[i] = QUDA_INVALID_SOLVE;
-    smoother_solve_type[i] = QUDA_INVALID_SOLVE;
-    schwarz_type[i] = QUDA_INVALID_SCHWARZ;
-    schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_GCR_INVERTER;
-    smoother_tol[i] = 0.25;
-    coarse_solver[i] = QUDA_GCR_INVERTER;
-    coarse_solver_tol[i] = 0.25;
-    coarse_solver_maxiter[i] = 100;
-    solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
-    setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
-    nu_pre[i] = 2;
-    nu_post[i] = 2;
-    n_block_ortho[i] = 1;
+  solve_type = QUDA_INVALID_SOLVE;
 
-    // Default eigensolver params
-    mg_eig[i] = false;
-    mg_eig_tol[i] = 1e-3;
-    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
-    mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
-    mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
-    mg_eig_check_interval[i] = 5;
-    mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
-    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
-    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
-    mg_eig_poly_deg[i] = 100;
-    mg_eig_amin[i] = 1.0;
-    mg_eig_amax[i] = -1.0; // use power iterations
-
-    setup_ca_basis[i] = QUDA_POWER_BASIS;
-    setup_ca_basis_size[i] = 4;
-    setup_ca_lambda_min[i] = 0.0;
-    setup_ca_lambda_max[i] = -1.0; // use power iterations
-
-    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-    coarse_solver_ca_basis_size[i] = 4;
-    coarse_solver_ca_lambda_min[i] = 0.0;
-    coarse_solver_ca_lambda_max[i] = -1.0;
-
-    strcpy(mg_vec_infile[i], "");
-    strcpy(mg_vec_outfile[i], "");
-  }
+  setQudaDefaultMgTestParams();
   reliable_delta = 1e-4;
 
-  // Give the dslash type a reasonable default.
-  dslash_type = QUDA_STAGGERED_DSLASH;
-
-  // command line options
+  // Parse command line options
   auto app = make_app();
   add_multigrid_option_group(app);
   try {
@@ -168,16 +111,8 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
-  if (prec_precondition == QUDA_INVALID_PRECISION) prec_precondition = prec_sloppy;
-  if (prec_null == QUDA_INVALID_PRECISION) prec_null = prec_precondition;
-  if (smoother_halo_prec == QUDA_INVALID_PRECISION) smoother_halo_prec = prec_null;
-  if (link_recon_sloppy == QUDA_RECONSTRUCT_INVALID) link_recon_sloppy = link_recon;
-  if (link_recon_precondition == QUDA_RECONSTRUCT_INVALID) link_recon_precondition = link_recon_sloppy;
-  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-    if (coarse_solve_type[i] == QUDA_INVALID_SOLVE) coarse_solve_type[i] = solve_type;
-    if (smoother_solve_type[i] == QUDA_INVALID_SOLVE) smoother_solve_type[i] = QUDA_DIRECT_PC_SOLVE;
-  }
+  setQudaDefaultPrecs();
+  setQudaDefaultMgSolveTypes();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -194,12 +129,6 @@ int main(int argc, char **argv)
     printfQuda("dslash_type %d not supported\n", dslash_type);
     exit(0);
   }
-
-  // ESW HACK: needs to be addressed
-  /*if (solve_type == QUDA_DIRECT_PC_SOLVE || coarse_solve_type[0] == QUDA_DIRECT_PC_SOLVE || smoother_solve_type[0] ==
-  QUDA_DIRECT_PC_SOLVE) { printfQuda("staggered_multigtid_invert_test doesn't support preconditioned outer solve
-  yet.\n"); exit(0);
-  }*/
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
