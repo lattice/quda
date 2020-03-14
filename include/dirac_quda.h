@@ -1686,27 +1686,6 @@ public:
     }
   };
 
-  /**
-   * Create the Dirac operator
-   * @param[in] d        User prec
-   * @param[in] dSloppy  Sloppy prec
-   * @param[in] dPre     Preconditioner prec
-   * @param[in] param    Invert param container
-   * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
-   */
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
-
-  /**
-   * Create the Dirac operator
-   * @param[in] d        User prec
-   * @param[in] dSloppy  Sloppy prec
-   * @param[in] dPre     Preconditioner prec
-   * @param[in] dRef     Reference prec (EigCG and deflation)
-   * @param[in] param    Invert param container
-   * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
-   */
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
-  
 } // namespace quda
 
 #endif // _DIRAC_QUDA_H
