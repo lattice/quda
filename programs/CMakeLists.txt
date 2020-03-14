@@ -13,6 +13,7 @@ set (PROGRAMS_OBJS
   # cmake-format: sortable
   stoch_laph_quark_smear_utils.cpp
   spin_dilute.cu
+  evec_project.cu
   )
 # cmake-format: on
 

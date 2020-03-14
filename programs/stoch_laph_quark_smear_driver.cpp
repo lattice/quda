@@ -207,6 +207,12 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
   delete dPre;
 }
 
+void laphSinkProject(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs,
+		     const Complex *noise, const int dil_scheme)
+{
+  
+}
+
 
 // Experimental routine for LAPH quark smearing.
 // This routine accepts the noise data from a single stochastic noise vector in noise array, the T 3D
@@ -343,6 +349,14 @@ int main(int argc, char **argv) {
   
   laphSourceConstruct(quda_quarks, quda_evecs, noise, dil_scheme);
   laphSourceInvert(quda_quarks, &inv_param, gauge_param.X);
+
+  // Host side data for sinks
+  void **host_sinks = (void **)malloc(n_sources * sizeof(void *));
+  for (int i = 0; i < n_evecs * 4; i++) {
+    host_sinks[i] = (void *)malloc(V * inv_param.cpu_prec);
+  }
+  
+  laphSinkProject(quda_quarks, quda_evecs, host_sinks, dil_scheme);
   
   
   return 0;
