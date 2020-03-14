@@ -302,7 +302,7 @@ namespace quda {
     if (tmp2) tmp2->prefetch(mem_space, stream);
   }
 
-  // Some dirac helper functions for creating dirac objects  
+  // Some dirac helper functions for creating dirac objects
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
     DiracParam diracParam;
