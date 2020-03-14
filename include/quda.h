@@ -992,7 +992,7 @@ extern "C" {
    * storage and solver parameters
    */
   void updateMultigridQuda(void *mg_instance, QudaMultigridParam *param);
-
+  
   /**
    * @brief Dump the null-space vectors to disk
    * @param[in] mg_instance Pointer to the instance of multigrid_solver
@@ -1011,7 +1011,7 @@ extern "C" {
    * @param parity The destination parity of the field
    */
   void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity);
+		  QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.

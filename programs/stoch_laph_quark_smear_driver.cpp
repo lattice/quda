@@ -15,10 +15,15 @@
 #include <host_utils.h>
 #include <misc.h>
 
+#include <stoch_laph_quark_smear.h>
+
 using namespace quda;
 
-void display_test_info() {
-  printfQuda("running the following test:\n");
+//!< Profiler for laphInvertSourcesQuda
+static TimeProfile profileLaphInvert("laphInvertSourcesQuda");
+
+void display_driver_info() {
+  printfQuda("Running the stochastic laph quark smear driver:\n");
     
   printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
   printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
@@ -95,27 +100,6 @@ void display_test_info() {
              dimPartitioned(3));
 }
 
-
-// Experimental routine for LAPH quark smearing.
-// This routine accepts the noise data from a single stochastic noise vector in noise array, the T 3D
-// eigenvectors in eigen_vecs, and returns the smeared quarks in quark. Below is a description
-// of the workflow.
-//
-// 1. The eigenvector array we use is a matrix with nColor * L^3 * T rows and 
-// nEigenVec/dilution_scheme columns. This is right multiplied by a matrix of stochastic noise coefficents
-// with nEigenVec/dilution_scheme rows and nSpin columns. The result is a matrix with nSpin columns and 
-// nColor * L^3 * T rows. Each column contains the data for one source.
-//
-// 2. We copy the data in each column to a QUDA ColorSpinorField object of length nSpin * nColor * L^3 * T, 
-// with the spin elements populated/zeroed out as dictated by the dilution scheme.
-// 
-// 3. We pass each of these sources to the inverter, and then populated the apprpriate quark 
-// array with the solution.
-// 
-// 4. We then repopulate the eigenvector array and stochastic noise coefficents with the next set of 
-// LapH dilution data and repeat steps 1,2,3.
-
-
 void laphSourceConstruct(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs,
 			 const Complex *noise, const int dil_scheme)
 {  
@@ -151,17 +135,97 @@ void laphSourceConstruct(std::vector<ColorSpinorField*> &quarks, std::vector<Col
     // Construct source
     blas::caxpy(noise, dil_evecs_ptr, sources);
     
-    // INSERT SPIN DIL kernel (color_spinor.h + boiler plate kernel instantiation)
-    
-    // Copy spin diluted sources into quark array
-    
-    //for (int j = 0; j < 4; i++) *quarks[j + 4 * i] = *sources[i];
+    for (int spin = 0; spin < 4; spin++) {
+      spinDiluteQuda(*dil_sources[spin], *sources[spin], spin);
+      // Copy spin diluted sources into quark array
+      *quarks[4 * i + spin] = *dil_sources[spin];
+    }
   }
-
-  // All 4 * dil_scheme sources constructed
-  
+  // All 4 * dil_scheme sources constructed  
 }
 
+void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
+		      QudaInvertParam *inv_param, const int *X)
+{  
+  bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
+    (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
+
+  Dirac *d = nullptr;
+  Dirac *dSloppy = nullptr;
+  Dirac *dPre = nullptr;
+
+  // create the dirac operator
+  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+
+  Dirac &dirac = *d;
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPre = *dPre;
+
+  // `in` will point to the relevant quark[i] source
+  // `out` will be copy back to quark[i]
+  ColorSpinorField *in = nullptr;
+  ColorSpinorField *out = nullptr;
+  ColorSpinorField *x = nullptr;
+  ColorSpinorField *b = nullptr;
+
+  ColorSpinorParam cuda_param(*quarks[0]);
+  b = ColorSpinorField::Create(cuda_param);  
+  x = ColorSpinorField::Create(cuda_param);
+  
+  // Zero solver stats
+  inv_param->secs = 0;
+  inv_param->gflops = 0;
+  inv_param->iter = 0;
+  double secs = 0.0;
+  double gflops = 0.0;
+  int iter = 0;
+  
+  for(int i=0; i<(int)quarks.size(); i++) {
+    *b = *quarks[i];
+    dirac.prepare(in, out, *x, *b, inv_param->solution_type);  
+    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+    SolverParam solverParam(*inv_param);  
+    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileLaphInvert);
+    (*solve)(*out, *in);    
+    *quarks[i] = *out;    
+    solverParam.updateInvertParam(*inv_param);
+
+    // Accumulate Solver stats
+    secs += inv_param->secs;
+    gflops += inv_param->gflops;
+    iter += inv_param->iter;
+    // Zero solver stats
+    inv_param->secs = 0;
+    inv_param->gflops = 0;
+    inv_param->iter = 0;
+    delete solve;
+  }
+
+  delete out;
+  delete d;
+  delete dSloppy;
+  delete dPre;
+}
+
+
+// Experimental routine for LAPH quark smearing.
+// This routine accepts the noise data from a single stochastic noise vector in noise array, the T 3D
+// eigenvectors in eigen_vecs, and returns the smeared quarks in quark. Below is a description
+// of the workflow.
+//
+// 1. The eigenvector array we use is a matrix with nColor * L^3 * T rows and 
+// nEigenVec/dilution_scheme columns. This is right multiplied by a matrix of stochastic noise coefficents
+// with nEigenVec/dilution_scheme rows and nSpin columns. The result is a matrix with nSpin columns and 
+// nColor * L^3 * T rows. Each column contains the data for one source.
+//
+// 2. We copy the data in each column to a QUDA ColorSpinorField object of length nSpin * nColor * L^3 * T, 
+// with the spin elements populated/zeroed out as dictated by the dilution scheme.
+// 
+// 3. We pass each of these sources to the inverter, and then populated the apprpriate quark 
+// array with the solution.
+// 
+// 4. We then repopulate the eigenvector array and stochastic noise coefficents with the next set of 
+// LapH dilution data and repeat steps 1,2,3.
 
 int main(int argc, char **argv) {
 
@@ -189,7 +253,7 @@ int main(int argc, char **argv) {
   initRand();
   setSpinorSiteSize(24);
   setDims(gauge_param.X);
-  display_test_info();
+  display_driver_info();
   
   // Make up some junk data
   int dil_scheme = 16;
@@ -278,6 +342,8 @@ int main(int argc, char **argv) {
   }
   
   laphSourceConstruct(quda_quarks, quda_evecs, noise, dil_scheme);
+  laphSourceInvert(quda_quarks, &inv_param, gauge_param.X);
+  
   
   return 0;
 }

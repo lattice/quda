@@ -15,7 +15,7 @@ namespace quda {
   // Forward declare: MG Transfer Class
   class Transfer;
 
-  // Forward declar: Dirac Op Base Class
+  // Forward declare: Dirac Op Base Class
   class Dirac;
 
   // Params for Dirac operator
@@ -1685,7 +1685,28 @@ public:
       return mat.getStencilSteps(); 
     }
   };
+  
+  /**
+   * Create the Dirac operator
+   * @param[in] d        User prec
+   * @param[in] dSloppy  Sloppy prec
+   * @param[in] dPre     Preconditioner prec
+   * @param[in] param    Invert param container
+   * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
 
-} // namespace quda
+  /**
+   * Create the Dirac operator
+   * @param[in] d        User prec
+   * @param[in] dSloppy  Sloppy prec
+   * @param[in] dPre     Preconditioner prec
+   * @param[in] dRef     Reference prec (EigCG and deflation)
+   * @param[in] param    Invert param container
+   * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
+  
+}// namespace quda
 
 #endif // _DIRAC_QUDA_H

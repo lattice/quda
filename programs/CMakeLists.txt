@@ -11,8 +11,8 @@ endif()
 # cmake-format: off
 set (PROGRAMS_OBJS
   # cmake-format: sortable
-  stoch_laph_quark_smear.cpp
-  test.cu
+  stoch_laph_quark_smear_utils.cpp
+  spin_dilute.cu
   )
 # cmake-format: on
 
@@ -208,7 +208,7 @@ add_custom_command(TARGET quda_progs PRE_LINK
                    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_CURRENT_BINARY_DIR}/libquda.a
                                                ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
-install(TARGETS quda_progs EXPORT qudaProgsTargets LIBRARY DESTINATION programs ARCHIVE DESTINATION programs INCLUDES DESTINATION include)
+install(TARGETS quda_progs EXPORT qudaProgsTargets LIBRARY DESTINATION programs ARCHIVE DESTINATION programs INCLUDES DESTINATION .)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 include(CMakePackageConfigHelpers)
@@ -224,7 +224,7 @@ add_custom_target(mpi_nvtx_progs ${PYTHON_EXECUTABLE} generate/wrap.py -g -o nvt
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                   COMMENT "Generating mpi_nvtx_progs wrapper")
 
-set(PROGRAMS_LIBS quda quda_utils quda_progs)
+set(PROGRAMS_LIBS quda quda_progs quda_utils)
 
-cuda_add_executable(stoch_laph_quark_smear stoch_laph_quark_smear.cpp)
+cuda_add_executable(stoch_laph_quark_smear stoch_laph_quark_smear_driver.cpp)
 target_link_libraries(stoch_laph_quark_smear ${PROGRAMS_LIBS})
