@@ -1706,7 +1706,7 @@ public:
    * @param[in] pc_solve Whether or not to perform an even/odd preconditioned solve
    */
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
-  
+
 } // namespace quda
 
 #endif // _DIRAC_QUDA_H

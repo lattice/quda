@@ -1746,44 +1746,6 @@ namespace quda {
                 inv_param->cuda_prec_precondition);
   }
 
-
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
-  {
-    DiracParam diracParam;
-    DiracParam diracSloppyParam;
-    DiracParam diracPreParam;
-
-    setDiracParam(diracParam, &param, pc_solve);
-    setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-
-    d = Dirac::create(diracParam); // create the Dirac operator
-    dSloppy = Dirac::create(diracSloppyParam);
-    dPre = Dirac::create(diracPreParam);
-  }
-
-  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve)
-  {
-    DiracParam diracParam;
-    DiracParam diracSloppyParam;
-    DiracParam diracPreParam;
-    DiracParam diracRefParam;
-
-    setDiracParam(diracParam, &param, pc_solve);
-    setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
-    setDiracRefineParam(diracRefParam, &param, pc_solve);
-    // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
-    setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-
-    d = Dirac::create(diracParam); // create the Dirac operator
-    dSloppy = Dirac::create(diracSloppyParam);
-    dPre = Dirac::create(diracPreParam);
-    dRef = Dirac::create(diracRefParam);
-  }
-
   static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
 
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
