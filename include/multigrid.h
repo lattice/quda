@@ -1,7 +1,7 @@
-#ifndef _MG_QUDA_H
-#define _MG_QUDA_H
+#pragma once
 
 #include <invert_quda.h>
+//#include <eigensolve_quda.h>
 #include <transfer.h>
 #include <vector>
 #include <complex_quda.h>
@@ -44,6 +44,9 @@ namespace quda {
     /** Number of vectors used to define coarse space */
     int Nvec;
 
+    /** Number of times to apply Gram-Schmidt within a block */
+    int NblockOrtho;
+
     /** This is the next lower level */
     MG *coarse;
 
@@ -69,13 +72,13 @@ namespace quda {
     QudaBoolean global_reduction;
 
     /** The Dirac operator to use for residual computation */
-    DiracMatrix &matResidual;
+    DiracMatrix *matResidual;
 
     /** The Dirac operator to use for smoothing */
-    DiracMatrix &matSmooth;
+    DiracMatrix *matSmooth;
 
     /** The sloppy Dirac operator to use for smoothing */
-    DiracMatrix &matSmoothSloppy;
+    DiracMatrix *matSmoothSloppy;
 
     /** What type of smoother to use */
     QudaInverterType smoother;
@@ -90,25 +93,28 @@ namespace quda {
     /** Where to compute this level of multigrid */
     QudaFieldLocation location;
 
+    /** Where to compute this level of the multigrid setup*/
+    QudaFieldLocation setup_location;
+
     /** Filename for where to load/store the null space */
     char filename[100];
+
+    /** Whether or not this is a staggered solve or not */
+    bool is_staggered;
 
     /**
        This is top level instantiation done when we start creating the multigrid operator.
      */
-    MGParam(QudaMultigridParam &param,
-	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix &matResidual, 
-	    DiracMatrix &matSmooth,
-	    DiracMatrix &matSmoothSloppy,
-	    int level=0) :
-      SolverParam(*(param.invert_param)), 
-      mg_global(param), 
+    MGParam(QudaMultigridParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual,
+            DiracMatrix *matSmooth, DiracMatrix *matSmoothSloppy, int level = 0) :
+      SolverParam(*(param.invert_param)),
+      mg_global(param),
       level(level),
       Nlevel(param.n_level),
       spinBlockSize(param.spin_block_size[level]),
       Nvec(param.n_vec[level]),
-      B(B), 
+      NblockOrtho(param.n_block_ortho[level]),
+      B(B),
       nu_pre(param.nu_pre[level]),
       nu_post(param.nu_post[level]),
       smoother_tol(param.smoother_tol[level]),
@@ -120,27 +126,26 @@ namespace quda {
       smoother(param.smoother[level]),
       coarse_grid_solution_type(param.coarse_grid_solution_type[level]),
       smoother_solve_type(param.smoother_solve_type[level]),
-      location(param.location[level])
-      { 
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
+      location(param.location[level]),
+      setup_location(param.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.omega[level];
-      }
+      // set the smoother relaxation factor
+      omega = param.omega[level];
+    }
 
-    MGParam(const MGParam &param, 
-	    std::vector<ColorSpinorField*> &B,
-	    DiracMatrix &matResidual, 
-	    DiracMatrix &matSmooth,
-	    DiracMatrix &matSmoothSloppy,
-	    int level=0) :
+    MGParam(const MGParam &param, std::vector<ColorSpinorField *> &B, DiracMatrix *matResidual, DiracMatrix *matSmooth,
+            DiracMatrix *matSmoothSloppy, int level = 0) :
       SolverParam(param),
       mg_global(param.mg_global),
       level(level),
       Nlevel(param.Nlevel),
       spinBlockSize(param.mg_global.spin_block_size[level]),
       Nvec(param.mg_global.n_vec[level]),
+      NblockOrtho(param.mg_global.n_block_ortho[level]),
       coarse(param.coarse),
       fine(param.fine),
       B(B),
@@ -155,15 +160,16 @@ namespace quda {
       smoother(param.mg_global.smoother[level]),
       coarse_grid_solution_type(param.mg_global.coarse_grid_solution_type[level]),
       smoother_solve_type(param.mg_global.smoother_solve_type[level]),
-      location(param.mg_global.location[level])
-      {
-	// set the block size
-	for (int i=0; i<QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
+      location(param.mg_global.location[level]),
+      setup_location(param.mg_global.setup_location[level]),
+      is_staggered(param.is_staggered == QUDA_BOOLEAN_YES)
+    {
+      // set the block size
+      for (int i = 0; i < QUDA_MAX_DIM; i++) geoBlockSize[i] = param.mg_global.geo_block_size[level][i];
 
-	// set the smoother relaxation factor
-	omega = param.mg_global.omega[level];
-      }
-
+      // set the smoother relaxation factor
+      omega = param.mg_global.omega[level];
+    }
   };
 
   /**
@@ -177,6 +183,9 @@ namespace quda {
 
     /** This is the transfer operator that defines the prolongation and restriction operators */
     Transfer *transfer;
+
+    /** This tell to reset() if transfer needs to be rebuilt */
+    bool resetTransfer;
 
     /** This is the smoother used */
     Solver *presmoother, *postsmoother;
@@ -196,9 +205,6 @@ namespace quda {
     /** This is the next lower level */
     MG *coarse;
 
-    /** This is the next coarser level */
-    MG *fine;
-
     /** The coarse grid solver - this either points at "coarse" or a solver preconditioned by "coarse" */
     Solver *coarse_solver;
 
@@ -214,16 +220,13 @@ namespace quda {
     /** Storage for the parameter struct for the coarse solver */
     SolverParam *param_coarse_solver;
 
-    /** The fine-grid representation of the null space vectors */
-    std::vector<ColorSpinorField*> *B;
-
     /** The coarse-grid representation of the null space vectors */
     std::vector<ColorSpinorField*> *B_coarse;
 
     /** Residual vector */
     ColorSpinorField *r;
 
-    /** Projected source vector for preconditioned syste, else just points to source */
+    /** Projected source vector for preconditioned system, else just points to source */
     ColorSpinorField *b_tilde;
 
     /** Coarse residual vector */
@@ -234,6 +237,18 @@ namespace quda {
 
     /** Coarse temporary vector */
     ColorSpinorField *tmp_coarse;
+
+    /** Coarse temporary vector */
+    ColorSpinorField *tmp2_coarse;
+
+    /** The fine operator used for computing inter-grid residuals */
+    const Dirac *diracResidual;
+
+    /** The fine operator used for doing smoothing */
+    const Dirac *diracSmoother;
+
+    /** The fine operator used for doing sloppy smoothing */
+    const Dirac *diracSmootherSloppy;
 
     /** The coarse operator used for computing inter-grid residuals */
     Dirac *diracCoarseResidual;
@@ -253,11 +268,26 @@ namespace quda {
     /** Wrapper for the sloppy smoothing coarse grid operator */
     DiracMatrix *matCoarseSmootherSloppy;
 
-  public:
-    /** 
-      Constructor for MG class
-      @param param MGParam struct that defines all meta data
-      @param profile Timeprofile instance used to profile
+    /** Parallel hyper-cubic random number generator for generating null-space vectors */
+    RNG *rng;
+
+    /**
+       @brief Helper function called on entry to each MG function
+       @param[in] level The level we working on
+    */
+    void pushLevel(int level) const;
+
+    /**
+       @brief Helper function called on exit to each MG member function
+       @param[in] level The level we working on
+    */
+    void popLevel(int level) const;
+
+public:
+    /**
+       Constructor for MG class
+       @param param MGParam struct that defines all meta data
+       @param profile Timeprofile instance used to profile
     */
     MG(MGParam &param, TimeProfile &profile);
 
@@ -268,21 +298,58 @@ namespace quda {
     virtual ~MG();
 
     /**
-       This method is a placeholder for reseting the solver, e.g.,
-       when a parameter has changed such as the mass.  For now, all it
-       does is call Transfer::setSiteSubset to resize the on-GPU
-       null-space components to single-parity if we're doing a
-       single-parity solve (memory saving technique).
+       @return MG can solve non-Hermitian systems
      */
-    void reset();
+    bool hermitian() { return false; };
 
     /**
-       This method verifies the correctness of the MG method.  It checks:
+       @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
+       @param Whether we are refreshing the null-space components or just updating the operators
+     */
+    void reset(bool refresh=false);
+
+    /**
+       @brief Dump the null-space vectors to disk.  Will recurse dumping all levels.
+    */
+    void dumpNullVectors() const;
+
+    /**
+       @brief Create the smoothers
+    */
+    void createSmoother();
+
+    /**
+       @brief Destroy the smoothers
+    */
+    void destroySmoother();
+
+    /**
+       @brief Create the coarse dirac operator
+    */
+    void createCoarseDirac();
+
+    /**
+       @brief Create the solver wrapper
+    */
+    void createCoarseSolver();
+
+    /**
+       @brief Destroy the solver wrapper
+    */
+    void destroyCoarseSolver();
+
+    /**
+       @brief Verify the correctness of the MG method, optionally recursively
+       starting from the top down.
+       @details This method verifies the correctness of the MG method.  It checks:
        1. Null-space vectors are exactly preserved: v_k = P R v_k
        2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c
        3. The emulated coarse Dirac operator matches the native one: D_c = R D P
+       4. The preconditioned operator was correctly formulated: \hat{D}_c - X^{-1} D_c
+       5. The normal operator is indeed normal: im(<x|D^\dag D|x>) < epsilon
+       @param recursively[in] Whether or not to recursively verify coarser levels, default false
      */
-    void verify();
+    void verify(bool recursively = false);
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector
@@ -295,19 +362,31 @@ namespace quda {
        @brief Load the null space vectors in from file
        @param B Loaded null-space vectors (pre-allocated)
     */
-    void loadVectors(std::vector<ColorSpinorField*> &B);
+    void loadVectors(std::vector<ColorSpinorField *> &B);
 
     /**
        @brief Save the null space vectors in from file
        @param B Save null-space vectors from here
     */
-    void saveVectors(std::vector<ColorSpinorField*> &B);
+    void saveVectors(const std::vector<ColorSpinorField *> &B) const;
 
     /**
        @brief Generate the null-space vectors
        @param B Generated null-space vectors
-     */
-    void generateNullVectors(std::vector<ColorSpinorField*> B);
+       @param refresh Whether we refreshing pre-exising vectors or starting afresh
+    */
+    void generateNullVectors(std::vector<ColorSpinorField*> &B, bool refresh=false);
+
+    /**
+       @brief Generate lowest eigenvectors
+    */
+    void generateEigenVectors();
+
+    /**
+       @brief Build free-field null-space vectors
+       @param B Free-field null-space vectors
+    */
+    void buildFreeVectors(std::vector<ColorSpinorField*> &B);
 
     /**
        @brief Return the total flops done on this and all coarser levels.
@@ -316,50 +395,92 @@ namespace quda {
 
   };
 
+  /**
+     @brief Apply the coarse dslash stencil.  This single driver
+     accounts for all variations with and without the clover field,
+     with and without dslash, and both single and full parity fields
+     @param[out] out The result vector
+     @param[in] inA The first input vector
+     @param[in] inB The second input vector
+     @param[in] Y Coarse link field
+     @param[in] X Coarse clover field
+     @param[in] kappa Scaling parameter
+     @param[in] parity Parity of the field (if single parity)
+     @param[in] dslash Are we applying dslash?
+     @param[in] clover Are we applying clover?
+     @param[in] dagger Apply dagger operator?
+     @param[in] commDim Which dimensions are partitioned?
+     @param[in] halo_precision What precision to use for the halos (if QUDA_INVALID_PRECISION, use field precision)
+   */
   void ApplyCoarse(ColorSpinorField &out, const ColorSpinorField &inA, const ColorSpinorField &inB,
 		   const GaugeField &Y, const GaugeField &X, double kappa, int parity = QUDA_INVALID_PARITY,
-		   bool dslash=true, bool clover=true);
+		   bool dslash=true, bool clover=true, bool dagger=false, const int *commDim=0,
+                   QudaPrecision halo_precision=QUDA_INVALID_PRECISION);
 
   /**
      @brief Coarse operator construction from a fine-grid operator (Wilson / Clover)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
-     @param Yhat[out] Preconditioned coarse link field
      @param T[in] Transfer operator that defines the coarse space
      @param gauge[in] Gauge field from fine grid
      @param clover[in] Clover field on fine grid (optional)
      @param kappa[in] Kappa parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
    */
-  void CoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
+  void CoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 		const cudaGaugeField &gauge, const cudaCloverField *clover,
-		double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
+		double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+
+  /**
+     @brief Coarse operator construction from a fine-grid operator (Staggered)
+     @param Y[out] Coarse link field
+     @param X[out] Coarse clover field
+     @param T[in] Transfer operator that defines the coarse space
+     @param gauge[in] Gauge field from fine grid, needs to be generalized for long link.
+     @param mass[in] Mass parameter
+     @param matpc[in] The type of even-odd preconditioned fine-grid
+     operator we are constructing the coarse grid operator from.
+     For staggered, should always be QUDA_MATPC_INVALID.
+   */
+  void StaggeredCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const cudaGaugeField &gauge, double mass,
+                         QudaDiracType dirac, QudaMatPCType matpc);
 
   /**
      @brief Coarse operator construction from an intermediate-grid operator (Coarse)
      @param Y[out] Coarse link field
      @param X[out] Coarse clover field
-     @param Xinv[out] Coarse clover inverse field
-     @param Y[out] Preconditioned coarse link field
      @param T[in] Transfer operator that defines the new coarse space
      @param gauge[in] Link field from fine grid
      @param clover[in] Clover field on fine grid
      @param cloverInv[in] Clover inverse field on fine grid
      @param kappa[in] Kappa parameter
      @param mu[in] Mu parameter (set to non-zero for twisted-mass/twisted-clover)
+     @param mu_factor[in] Multiplicative factor for the mu parameter
      @param matpc[in] The type of even-odd preconditioned fine-grid
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
+     @param need_bidirectional[in] Whether or not we need to force a bi-directional
+     build, even if the given level isn't preconditioned---if any previous level is
+     preconditioned, we've violated that symmetry.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, GaugeField &Xinv, GaugeField &Yhat, const Transfer &T,
-		      const cpuGaugeField &gauge, const cpuGaugeField &clover, const cpuGaugeField &cloverInv,
-		      double kappa, double mu, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+
+  /**
+     @brief Calculate preconditioned coarse links and coarse clover inverse field
+     @param Yhat[out] Preconditioned coarse link field
+     @param Xinv[out] Coarse clover inverse field
+     @param Y[in] Coarse link field
+     @param X[in] Coarse clover field
+   */
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
 
   /**
      This is an object that captures an entire MG preconditioner
@@ -406,5 +527,3 @@ namespace quda {
   };
 
 } // namespace quda
-
-#endif // _MG_QUDA_H

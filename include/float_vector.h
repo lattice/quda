@@ -21,31 +21,40 @@ namespace quda {
   __device__ __host__ inline void zero(float3 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; }
   __device__ __host__ inline void zero(float4 &a) { a.x = 0.0; a.y = 0.0; a.z = 0.0; a.w = 0.0; }
 
-  __host__ __device__ inline double2 operator+(const double2& x, const double2 &y) {
+  __host__ __device__ inline double2 operator+(const double2 &x, const double2 &y) {
     return make_double2(x.x + y.x, x.y + y.y);
   }
 
-  __host__ __device__ inline double2 operator-(const double2& x, const double2 &y) {
+  __host__ __device__ inline double2 operator-(const double2 &x, const double2 &y) {
     return make_double2(x.x - y.x, x.y - y.y);
   }
 
-  __host__ __device__ inline float2 operator-(const float2& x, const float2 &y) {
+  __host__ __device__ inline float2 operator-(const float2 &x, const float2 &y) {
     return make_float2(x.x - y.x, x.y - y.y);
   }
 
-  __host__ __device__ inline float4 operator-(const float4& x, const float4 &y) {
+  __host__ __device__ inline float4 operator-(const float4 &x, const float4 &y) {
     return make_float4(x.x - y.x, x.y - y.y, x.z - y.z, x.w - y.w);
   }
 
-  __host__ __device__ inline double3 operator+(const double3& x, const double3 &y) {
+  __host__ __device__ inline float8 operator-(const float8 &x, const float8 &y)
+  {
+    float8 z;
+    z.x = x.x - y.x;
+    z.y = x.y - y.y;
+    return z;
+  }
+
+  __host__ __device__ inline double3 operator+(const double3 &x, const double3 &y) {
     return make_double3(x.x + y.x, x.y + y.y, x.z + y.z);
   }
 
-  __host__ __device__ inline double4 operator+(const double4& x, const double4 &y) {
+  __host__ __device__ inline double4 operator+(const double4 &x, const double4 &y) {
     return make_double4(x.x + y.x, x.y + y.y, x.z + y.z, x.w + y.w);
   }
 
-  __host__ __device__ inline float4 operator*(const float a, const float4 x) {
+  __host__ __device__ inline float4 operator*(const float &a, const float4 &x)
+  {
     float4 y;
     y.x = a*x.x;
     y.y = a*x.y;
@@ -54,21 +63,24 @@ namespace quda {
     return y;
   }
 
-  __host__ __device__ inline float2 operator*(const float a, const float2 x) {
+  __host__ __device__ inline float2 operator*(const float &a, const float2 &x)
+  {
     float2 y;
     y.x = a*x.x;
     y.y = a*x.y;
     return y;
   }
 
-  __host__ __device__ inline double2 operator*(const double a, const double2 x) {
+  __host__ __device__ inline double2 operator*(const double &a, const double2 &x)
+  {
     double2 y;
     y.x = a*x.x;
     y.y = a*x.y;
     return y;
   }
 
-  __host__ __device__ inline double4 operator*(const double a, const double4 x) {
+  __host__ __device__ inline double4 operator*(const double &a, const double4 &x)
+  {
     double4 y;
     y.x = a*x.x;
     y.y = a*x.y;
@@ -77,14 +89,24 @@ namespace quda {
     return y;
   }
 
-  __host__ __device__ inline float2 operator+(const float2 x, const float2 y) {
+  __host__ __device__ inline float8 operator*(const float &a, const float8 &x)
+  {
+    float8 y;
+    y.x = a * x.x;
+    y.y = a * x.y;
+    return y;
+  }
+
+  __host__ __device__ inline float2 operator+(const float2 &x, const float2 &y)
+  {
     float2 z;
     z.x = x.x + y.x;
     z.y = x.y + y.y;
     return z;
   }
 
-  __host__ __device__ inline float4 operator+(const float4 x, const float4 y) {
+  __host__ __device__ inline float4 operator+(const float4 &x, const float4 &y)
+  {
     float4 z;
     z.x = x.x + y.x;
     z.y = x.y + y.y;
@@ -93,7 +115,16 @@ namespace quda {
     return z;
   }
 
-  __host__ __device__ inline float4 operator+=(float4 &x, const float4 y) {
+  __host__ __device__ inline float8 operator+(const float8 &x, const float8 &y)
+  {
+    float8 z;
+    z.x = x.x + y.x;
+    z.y = x.y + y.y;
+    return z;
+  }
+
+  __host__ __device__ inline float4 operator+=(float4 &x, const float4 &y)
+  {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
@@ -101,26 +132,37 @@ namespace quda {
     return x;
   }
 
-  __host__ __device__ inline float2 operator+=(float2 &x, const float2 y) {
+  __host__ __device__ inline float2 operator+=(float2 &x, const float2 &y)
+  {
     x.x += y.x;
     x.y += y.y;
     return x;
   }
 
-  __host__ __device__  inline double2 operator+=(double2 &x, const double2 y) {
+  __host__ __device__ inline float8 operator+=(float8 &x, const float8 &y)
+  {
     x.x += y.x;
     x.y += y.y;
     return x;
   }
 
-  __host__ __device__ inline double3 operator+=(double3 &x, const double3 y) {
+  __host__ __device__ inline double2 operator+=(double2 &x, const double2 &y)
+  {
+    x.x += y.x;
+    x.y += y.y;
+    return x;
+  }
+
+  __host__ __device__ inline double3 operator+=(double3 &x, const double3 &y)
+  {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
     return x;
   }
 
-  __host__ __device__ inline double4 operator+=(double4 &x, const double4 y) {
+  __host__ __device__ inline double4 operator+=(double4 &x, const double4 &y)
+  {
     x.x += y.x;
     x.y += y.y;
     x.z += y.z;
@@ -128,7 +170,8 @@ namespace quda {
     return x;
   }
 
-  __host__ __device__ inline float4 operator-=(float4 &x, const float4 y) {
+  __host__ __device__ inline float4 operator-=(float4 &x, const float4 &y)
+  {
     x.x -= y.x;
     x.y -= y.y;
     x.z -= y.z;
@@ -136,25 +179,36 @@ namespace quda {
     return x;
   }
 
-  __host__ __device__ inline float2 operator-=(float2 &x, const float2 y) {
+  __host__ __device__ inline float2 operator-=(float2 &x, const float2 &y)
+  {
     x.x -= y.x;
     x.y -= y.y;
     return x;
   }
 
-  __host__ __device__ inline double2 operator-=(double2 &x, const double2 y) {
+  __host__ __device__ inline float8 operator-=(float8 &x, const float8 &y)
+  {
     x.x -= y.x;
     x.y -= y.y;
     return x;
   }
 
-  __host__ __device__ inline float2 operator*=(float2 &x, const float a) {
+  __host__ __device__ inline double2 operator-=(double2 &x, const double2 &y)
+  {
+    x.x -= y.x;
+    x.y -= y.y;
+    return x;
+  }
+
+  __host__ __device__ inline float2 operator*=(float2 &x, const float &a)
+  {
     x.x *= a;
     x.y *= a;
     return x;
   }
 
-  __host__ __device__ inline double2 operator*=(double2 &x, const float a) {
+  __host__ __device__ inline double2 operator*=(double2 &x, const float &a)
+  {
     x.x *= a;
     x.y *= a;
     return x;
@@ -165,6 +219,13 @@ namespace quda {
     a.y *= b;
     a.z *= b;
     a.w *= b;
+    return a;
+  }
+
+  __host__ __device__ inline float8 operator*=(float8 &a, const float &b)
+  {
+    a.x *= b;
+    a.y *= b;
     return a;
   }
 
@@ -201,6 +262,13 @@ namespace quda {
     return fmaxf(a, b);
   };
 
+  __forceinline__ __host__ __device__ float max_fabs(const float8 &c)
+  {
+    float a = max_fabs(c.x);
+    float b = max_fabs(c.y);
+    return fmaxf(a, b);
+  };
+
   __forceinline__ __host__ __device__ float max_fabs(const float2 &b) {
     return fmaxf(fabsf(b.x), fabsf(b.y));
   };
@@ -214,6 +282,7 @@ namespace quda {
   __forceinline__ __host__ __device__ double max_fabs(const double2 &b) {
     return fmax(fabs(b.x), fabs(b.y));
   };
+
 
   /*
     Precision conversion routines for vector types
@@ -235,6 +304,14 @@ namespace quda {
     return make_double4(a.x, a.y, a.z, a.w);
   }
 
+  __forceinline__ __host__ __device__ short4 make_shortN(const char4 &a) {
+    return make_short4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ short2 make_shortN(const char2 &a) {
+    return make_short2(a.x, a.y);
+  }
+
   __forceinline__ __host__ __device__ short4 make_shortN(const float4 &a) {
     return make_short4(a.x, a.y, a.z, a.w);
   }
@@ -251,7 +328,29 @@ namespace quda {
     return make_short2(a.x, a.y);
   }
 
+  __forceinline__ __host__ __device__ char4 make_charN(const short4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
 
+  __forceinline__ __host__ __device__ char2 make_charN(const short2 &a) {
+    return make_char2(a.x, a.y);
+  }
+
+  __forceinline__ __host__ __device__ char4 make_charN(const float4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ char2 make_charN(const float2 &a) {
+    return make_char2(a.x, a.y);
+  }
+
+  __forceinline__ __host__ __device__ char4 make_charN(const double4 &a) {
+    return make_char4(a.x, a.y, a.z, a.w);
+  }
+
+  __forceinline__ __host__ __device__ char2 make_charN(const double2 &a) {
+    return make_char2(a.x, a.y);
+  }
   /* Helper functions for converting between float2/double2 and complex */
   template<typename Float2, typename Complex>
     inline Float2 make_Float2(const Complex &a) { return (Float2)0; }
@@ -290,5 +389,9 @@ namespace quda {
   template<> struct RealType<short2> { typedef short type; };
   template<> struct RealType<complex<short> > { typedef short type; };
   template<> struct RealType<short4> { typedef short type; };
+  template<> struct RealType<char> { typedef char type; };
+  template<> struct RealType<char2> { typedef char type; };
+  template<> struct RealType<complex<char> > { typedef char type; };
+  template<> struct RealType<char4> { typedef char type; };
 
 }

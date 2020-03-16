@@ -8,7 +8,7 @@
 #include <unitarization_links.h>
 #include <pgauge_monte.h>
 #include <random_quda.h>
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 #include <index_helper.cuh>
 
 
@@ -35,9 +35,6 @@ namespace quda {
     }
   };
 
-
-
-
   template<typename Float, typename Gauge, int NCOLORS>
   __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -49,8 +46,7 @@ namespace quda {
     }
     Matrix<complex<Float>,NCOLORS> U;
     setIdentity(&U);
-    for ( int d = 0; d < 4; d++ )
-      arg.dataOr.save((Float*)(U.data),idx, d, parity);
+    for ( int d = 0; d < 4; d++ ) arg.dataOr(d, idx, parity) = U;
   }
 
 
@@ -82,7 +78,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //cudaDeviceSynchronize();
     }
 
@@ -343,7 +339,7 @@ namespace quda {
       for ( int d = 0; d < 4; d++ ) {
         Matrix<complex<Float>,NCOLORS> U;
         U = randomize<Float, NCOLORS>(localState);
-        arg.dataOr.save((Float*)(U.data),idx, d, parity);
+        arg.dataOr(d, idx, parity) = U;
       }
     }
   #ifdef MULTI_GPU
@@ -386,7 +382,7 @@ namespace quda {
 
     void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //cudaDeviceSynchronize();
     }
 
@@ -413,45 +409,16 @@ namespace quda {
   };
 
 
-
-
-
   template<typename Float, int NCOLORS, typename Gauge>
   void InitGaugeField( Gauge dataOr,  cudaGaugeField& data, RNG &rngstate) {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);
-    /*cudaDeviceSynchronize();
-       const double unitarize_eps = 1e-14;
-       const double max_error = 1e-10;
-       const int reunit_allow_svd = 1;
-       const int reunit_svd_only  = 0;
-       const double svd_rel_error = 1e-6;
-       const double svd_abs_error = 1e-6;
-       setUnitarizeLinksConstants(unitarize_eps, max_error,
-        reunit_allow_svd, reunit_svd_only,
-        svd_rel_error, svd_abs_error);
-       int num_failures=0;
-       int* num_failures_dev;
-       cudaMalloc((void**)&num_failures_dev, sizeof(int));
-       cudaMemset(num_failures_dev, 0, sizeof(int));
-       if(num_failures_dev == NULL) errorQuda("cudaMalloc failed for dev_pointer\n");
-
-       unitarizeLinksQuda(data, num_failures_dev);
-       cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
-       if(num_failures>0){
-       cudaFree(num_failures_dev);
-       errorQuda("Error in the unitarization\n");
-       exit(1);
-       }
-       cudaFree(num_failures_dev);*/
   }
-
-
 
   template<typename Float>
   void InitGaugeField( cudaGaugeField& data, RNG &rngstate) {

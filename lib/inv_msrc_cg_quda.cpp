@@ -9,9 +9,6 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
-
-#include <face_quda.h>
-
 #include <iostream>
 
 namespace quda {
@@ -338,7 +335,7 @@ namespace quda {
     param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
     param.true_res_hq = sqrt(blas::HeavyQuarkResidualNorm(x,r).z);
 
-    PrintSummary("CG", k, r2, b2);
+    PrintSummary("CG", k, r2, b2, stop, inv.tol_hq);
 
     // reset the flops counters
     blas::flops = 0;

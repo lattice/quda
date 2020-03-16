@@ -7,9 +7,6 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-
-#include<face_quda.h>
-
 #include <color_spinor_field.h>
 
 namespace quda {
@@ -17,8 +14,8 @@ namespace quda {
   // set the required parameters for the inner solver
   void fillInnerSolveParam(SolverParam &inner, const SolverParam &outer);
 
-  BiCGstab::BiCGstab(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), init(false) {
+  BiCGstab::BiCGstab(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile), init(false) {
 
   }
 
@@ -319,7 +316,7 @@ namespace quda {
       param.true_res = sqrt(blas::xmyNorm(b, r) / b2);
       param.true_res_hq = use_heavy_quark_res ? sqrt(blas::HeavyQuarkResidualNorm(x,r).z) : 0.0;
  
-      PrintSummary("BiCGstab", k, r2, b2);      
+      PrintSummary("BiCGstab", k, r2, b2, stop, param.tol_hq);
     }
 
     // reset the flops counters

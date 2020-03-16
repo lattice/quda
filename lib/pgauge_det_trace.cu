@@ -46,7 +46,7 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   int parity = threadIdx.y;
 
   complex<double> val(0.0, 0.0);
-  if(idx < arg.threads) {
+  while (idx < arg.threads) {
     int X[4]; 
     #pragma unroll
     for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
@@ -63,11 +63,12 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<complex<Float>,NCOLORS> U;
-      arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+      Matrix<complex<Float>,NCOLORS> U = arg.dataOr(mu, idx, parity);
       if(functiontype == 0) val += getDeterminant(U);
       if(functiontype == 1) val += getTrace(U);
     }
+
+    idx += blockDim.x*gridDim.x;
   }
 
   double2 sum = make_double2(val.real(), val.imag());
@@ -82,7 +83,7 @@ class CalcFunc : TunableLocalParity {
   TuneParam tp;
   mutable char aux_string[128]; // used as a label in the autotuner
   private:
-  unsigned int minThreads() const { return arg.threads; }
+  bool tuneGridDim() const { return true; }
 
   public:
   CalcFunc(KernelArg<Gauge> &arg) : arg(arg) {}
@@ -91,8 +92,8 @@ class CalcFunc : TunableLocalParity {
   void apply(const cudaStream_t &stream){
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
-    LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
-    cudaDeviceSynchronize();
+    LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, (*this), tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
+    qudaDeviceSynchronize();
 
     comm_allreduce_array((double*)arg.result_h, 2);
     arg.result_h[0].x  /= (double)(4*2*arg.threads*comm_size());
@@ -130,7 +131,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   checkCudaError();
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);
     double secs = profileGenericFunc.Last(QUDA_PROFILE_COMPUTE);

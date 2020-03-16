@@ -18,6 +18,18 @@ extern "C" {
 #endif
 
   /**
+   * Parameters related to MILC site struct
+   */
+  typedef struct {
+    void *site; /** Pointer to beginning of site array */
+    void *link; /** Pointer to link field (only used if site is not set) */
+    size_t link_offset; /** Offset to link entry in site struct (bytes) */
+    void *mom; /** Pointer to link field (only used if site is not set) */
+    size_t mom_offset; /** Offset to mom entry in site struct (bytes) */
+    size_t size; /** Size of site struct (bytes) */
+  } QudaMILCSiteArg_t;
+
+  /**
    * Parameters related to linear solvers.
    */
   typedef struct {
@@ -28,7 +40,38 @@ extern "C" {
     int make_resident_solution; /** Make the solution resident and don't copy back */
     int use_resident_solution; /** Use the resident solution */
     QudaInverterType solver_type; /** Type of solver to use */
+    double tadpole; /** Tadpole improvement factor - set to 1.0 for
+                        HISQ fermions since the tadpole factor is
+                        baked into the links during their construction */
+    double naik_epsilon; /** Naik epsilon parameter (HISQ fermions only).*/
   } QudaInvertArgs_t;
+
+  /**
+   * Parameters related to deflated solvers.
+   */
+
+  typedef struct {
+    QudaPrecision  prec_ritz;
+    int nev;
+    int max_search_dim;
+    int deflation_grid;
+    double tol_restart;
+
+    int eigcg_max_restarts;
+    int max_restart_num;
+    double inc_tol;
+    double eigenval_tol;
+
+    QudaExtLibType   solver_ext_lib;
+    QudaExtLibType   deflation_ext_lib;
+
+    QudaFieldLocation location_ritz;
+    QudaMemoryType    mem_type_ritz;
+
+    char *vec_infile;
+    char *vec_outfile;
+
+  } QudaEigArgs_t;
 
 
   /**
@@ -69,6 +112,13 @@ extern "C" {
     int su3_source;          /** is the incoming gauge field SU(3) */
     int use_pinned_memory;   /** use page-locked memory in QUDA    */
   } QudaFatLinkArgs_t;
+
+  /**
+   * Optional: Set the MPI Comm Handle if it is not MPI_COMM_WORLD
+   *
+   * @param input Pointer to an MPI_Comm handle, static cast as a void *
+   */
+  void qudaSetMPICommHandle(void *mycomm);
 
   /**
    * Initialize the QUDA context.
@@ -150,6 +200,27 @@ extern "C" {
 
 
   /**
+   * Apply the improved staggered operator to a field. All fields
+   * passed and returned are host (CPU) field in MILC order.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param inv_args Struct setting some solver metadata
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param source Right-hand side source field
+   * @param solution Solution spinor field
+   */
+  void qudaDslash(int external_precision,
+		  int quda_precision,
+		  QudaInvertArgs_t inv_args,
+		  const void* const milc_fatlink,
+		  const void* const milc_longlink,
+		  void* source,
+		  void* solution,
+		  int* num_iters);
+
+  /**
    * Solve Ax=b using an improved staggered operator with a
    * domain-decomposition preconditioner.  All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
@@ -159,7 +230,7 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
    * @param domain_overlap Array specifying the overlap of the domains in each dimension
@@ -189,8 +260,7 @@ extern "C" {
 
 
   /**
-   * Solve Ax=b using an improved staggered operator with a
-   * domain-decomposition preconditioner.  All fields are fields
+   * Solve Ax=b for an improved staggered operator. All fields are fields
    * passed and returned are host (CPU) field in MILC order.  This
    * function requires that persistent gauge and clover fields have
    * been created prior.  This interface is experimental.
@@ -198,13 +268,11 @@ extern "C" {
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param mass Fermion mass parameter
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement facter
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    * @param final_residual True residual
@@ -219,67 +287,47 @@ extern "C" {
 		  double target_fermilab_residual,
 		  const void* const milc_fatlink,
 		  const void* const milc_longlink,
-		  const double tadpole,
 		  void* source,
 		  void* solution,
 		  double* const final_resid,
 		  double* const final_rel_resid,
 		  int* num_iters);
 
-      void qudaInvertMsrc(int external_precision,
-          int quda_precision,
-          double mass,
-          QudaInvertArgs_t inv_args,
-          double target_residual,
-          double target_fermilab_residual,
-          const void* const fatlink,
-          const void* const longlink,
-          const double tadpole,
-          void** sourceArray,
-          void** solutionArray,
-          double* const final_residual,
-          double* const final_fermilab_residual,
-          int* num_iters,
-          int num_src);
-
- /**
-   * Solve  using an improved
-   * staggered operator with a domain-decomposition preconditioner.
-   * All fields are fields passed and returned are host (CPU) field in
-   * MILC order.  This function requires that persistent gauge and
-   * clover fields have been created prior.  When a pure
-   * double-precision solver is requested no reliable updates are
-   * used, else reliable updates are used with a reliable_delta
-   * parameter of 0.1.  This interface is experimental.
+  /**
+   * Solve Ax=b for an improved staggered operator with many right hand sides. 
+   * All fields are fields passed and returned are host (CPU) field in MILC order.
+   * This function requires that persistent gauge and clover fields have
+   * been created prior.  This interface is experimental.
    *
    * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
-   * @param precision Precision for QUDA to use (2 - double, 1 - single)
-   * @param inv_args Struct setting some solver metedata
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param target_relative_residual Target Fermilab residual
-   * @param domain_overlap Array specifying the overlap of the domains in each dimension
-   * @param fatlink Fat-link field on the host
-   * @param longlink Long-link field on the host
-   * @param source Right-hand side source field
-   * @param solution Solution spinor field
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param source array of right-hand side source fields
+   * @param solution array of solution spinor fields
    * @param final_residual True residual
    * @param final_relative_residual True Fermilab residual
    * @param num_iters Number of iterations taken
+   * @param num_src Number of source fields
    */
-  void qudaDDInvert(int external_precision,
-		    int quda_precision,
-		    double mass,
-		    QudaInvertArgs_t inv_args,
-		    double target_residual,
-		    double target_fermilab_residual,
-		    const int * const domain_overlap,
-		    const void* const fatlink,
-		    const void* const longlink,
-		    void* source,
-		    void* solution,
-		    double* const final_residual,
-		    double* const final_fermilab_residual,
-		    int* num_iters);
+  void qudaInvertMsrc(int external_precision,
+                      int quda_precision,
+                      double mass,
+                      QudaInvertArgs_t inv_args,
+                      double target_residual,
+                      double target_fermilab_residual,
+                      const void* const fatlink,
+                      const void* const longlink,
+                      void** sourceArray,
+                      void** solutionArray,
+                      double* const final_residual,
+                      double* const final_fermilab_residual,
+                      int* num_iters,
+                      int num_src);
 
   /**
    * Solve for multiple shifts (e.g., masses) using an improved
@@ -294,12 +342,11 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solutionArray Array of solution spinor fields
    * @param final_residual Array of true residuals
@@ -316,7 +363,6 @@ extern "C" {
       const double* target_fermilab_residual,
       const void* const milc_fatlink,
       const void* const milc_longlink,
-      const double tadpole,
       void* source,
       void** solutionArray,
       double* const final_residual,
@@ -337,28 +383,20 @@ extern "C" {
    * @param precision Precision for QUDA to use (2 - double, 1 - single)
    * @param num_offsets Number of shifts to solve for
    * @param offset Array of shift offset values
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param target_relative_residual Array of target Fermilab residuals per shift
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param tadpole Tadpole improvement factor
    * @param source Right-hand side source field
    * @param solution Array of solution spinor fields
-   * @param ritzVects Array of ritz vectors (may be input or output, depending on a computation phase)
-   * @param ritzVals Array of ritz values (may be input or output, depending on a computation phase)
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
   void qudaEigCGInvert(
       int external_precision,
       int quda_precision,
@@ -368,22 +406,14 @@ extern "C" {
       double target_fermilab_residual,
       const void* const fatlink,
       const void* const longlink,
-      const double tadpole,
       void* source,
       void* solution,
-      void* ritzVects,//array of ritz vectors
-      double* ritzVals,//array of ritz values
-      int ritz_prec,
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
       double* const final_fermilab_residual,
       int *num_iters);
-
 
   /**
    * Solve Ax=b using a Wilson-Clover operator.  All fields are fields
@@ -395,7 +425,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -436,7 +466,7 @@ extern "C" {
    * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Target residual
    * @param milc_link Gauge field on the host
    * @param milc_clover Clover field on the host
@@ -444,21 +474,13 @@ extern "C" {
    * @param clover_coeff Clover coefficient
    * @param source Right-hand side source field
    * @param solution Solution spinor field
-   * @param ritzVects Array of ritz vectors (may be input or output, depending on a computation phase)
-   * @param ritzVals Array of ritz values (may be input or output, depending on a computation phase)
-   * @param ritz_prec Precision of the ritz vectors (2 - double, 1 - single)
-   * @param max_search_dim eigCG parameter: search space dimention
-   * @param nev eigCG parameter: how many eigenpairs to compute within one eigCG call
-   * @param deflation_grid eigCG parameter : how many eigenpairs to compute within the incremental phase (# of eigenpairs = nev*deflation_grid)
-   * @param tol_restart initCG parameter : at what tolerance value to restart initCG solver
+   * @param eig_args contains info about deflation space
    * @param rhs_idx  bookkeep current rhs
    * @param last_rhs_flag  is this the last rhs to solve?
    * @param final_residual Array of true residuals
    * @param final_relative_residual Array of true Fermilab residuals
    * @param num_iters Number of iterations taken
    */
-
-
   void qudaEigCGCloverInvert(
       int external_precision,
       int quda_precision,
@@ -472,18 +494,13 @@ extern "C" {
       void* milc_clover_inv,
       void* source,
       void* solution,
-      void* ritzVects,//array of ritz vectors
-      double* ritzVals,//array of ritz values
-      int ritz_prec,
-      const int max_search_dim,
-      const int nev,
-      const int deflation_grid,
-      double tol_restart,//e.g.: 5e+3*target_residual
+      QudaEigArgs_t eig_args,
       const int rhs_idx,//current rhs
       const int last_rhs_flag,//is this the last rhs to solve?
       double* const final_residual,
       double* const final_fermilab_residual,
       int *num_iters);
+
 
   /**
    * Load the gauge field from the host.
@@ -552,7 +569,7 @@ extern "C" {
    * @param offset Array of shift offset values
    * @param kappa Kappa value
    * @param clover_coeff Clover coefficient
-   * @param inv_args Struct setting some solver metedata
+   * @param inv_args Struct setting some solver metadata
    * @param target_residual Array of target residuals per shift
    * @param milc_link Ignored
    * @param milc_clover Ignored
@@ -586,47 +603,30 @@ extern "C" {
    * must match.
    *
    * @param precision       The precision of the fields
+   * @param num_terms The number of quark fields
+   * @param num_naik_terms The number of naik contributions
+   * @param dt Integrating step size
+   * @param coeff The coefficients multiplying the fermion fields in the outer product
+   * @param quark_field The input fermion field.
    * @param level2_coeff    The coefficients for the second level of smearing in the quark action.
    * @param fat7_coeff      The coefficients for the first level of smearing (fat7) in the quark action.
-   * @param staple_src      Quark outer-product for the staple.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
    * @param w_link          Unitarized link variables obtained by applying fat7 smearing and unitarization to the original links.
    * @param v_link          Fat7 link variables.
    * @param u_link          SU(3) think link variables.
    * @param milc_momentum        The momentum contribution from the quark action.
    */
   void qudaHisqForce(int precision,
+                     int num_terms,
+                     int num_naik_terms,
+                     double dt,
+                     double** coeff,
+                     void** quark_field,
 		     const double level2_coeff[6],
 		     const double fat7_coeff[6],
-		     const void* const staple_src[4],
-		     const void* const one_link_src[4],
-		     const void* const naik_src[4],
 		     const void* const w_link,
 		     const void* const v_link,
 		     const void* const u_link,
 		     void* const milc_momentum);
-
-
-  /**
-   * Compute the fermion force for the Asqtad quark action.  All fields
-   * are host fields in MILC order, and the precision of these fields
-   * must match.
-   *
-   * @param precision       The precision of the fields
-   * @param act_path_coeff    The coefficients that define the asqtad action.
-   * @param one_link_src    Quark outer-product for the one-link term in the action.
-   * @param naik_src        Quark outer-product for the three-hop term in the action.
-   * @param link            The gauge field
-   * @param milc_momentum   The momentum contribution from the quark action.
-   */
-  void qudaAsqtadForce(int precision,
-		       const double act_path_coeff[6],
-		       const void* const one_link_src[4],
-		       const void* const naik_src[4],
-		       const void* const link,
-		       void* const milc_momentum);
-
 
   /**
    * Compute the gauge force and update the mometum field.  All fields
@@ -634,34 +634,16 @@ extern "C" {
    * match.
    *
    * @param precision The precision of the field (2 - double, 1 - single)
-   * @param dummy Not presently used
+   * @param num_loop_types 1, 2 or 3
    * @param milc_loop_coeff Coefficients of the different loops in the Symanzik action
    * @param eb3 The integration step size (for MILC this is dt*beta/3)
-   * @param milc_sitelink The gauge field from which we compute the force
-   * @param milc_momentum The momentum field to be updated
+   * @param arg Metadata for MILC's internal site struct array
    */
   void qudaGaugeForce(int precision,
-		      int dummy,
+		      int num_loop_types,
 		      double milc_loop_coeff[3],
 		      double eb3,
-		      void* milc_sitelink,
-		      void* milc_momentum);
-
-  /**
-   * Compute the staggered quark-field outer product needed for gauge generation
-   *
-   * @param precision The precision of the field (2 - double, 1 - single)
-   * @param num_terms The number of quak fields
-   * @param coeff The coefficient multiplying the fermion fields in the outer product
-   * @param quark_field The input fermion field.
-   * @param oprod The outer product to be computed.
-   */
-  void qudaComputeOprod(int precision,
-			int num_terms,
-			double** coeff,
-			void** quark_field,
-			void* oprod[2]);
-
+		      QudaMILCSiteArg_t *arg);
 
   /**
    * Evolve the gauge field by step size dt, using the momentum field
@@ -669,13 +651,11 @@ extern "C" {
    *
    * @param precision Precision of the field (2 - double, 1 - single)
    * @param dt The integration step size step
-   * @param momentum The momentum field
-   * @param The gauge field to be updated
+   * @param arg Metadata for MILC's internal site struct array
    */
   void qudaUpdateU(int precision,
 		   double eps,
-		   void* momentum,
-		   void* link);
+		   QudaMILCSiteArg_t *arg);
 
   /**
    * Evaluate the momentum contribution to the Hybrid Monte Carlo
@@ -708,10 +688,10 @@ extern "C" {
    * tolerance is not met, this routine will give a runtime error.
    *
    * @param prec Precision of the gauge field
-   * @param gauge_h The gauge field to be updated
    * @param tol The tolerance to which we iterate
+   * @param arg Metadata for MILC's internal site struct array
    */
-  void qudaUnitarizeSU3(int prec, void *gauge, double tol);
+  void qudaUnitarizeSU3(int prec, double tol, QudaMILCSiteArg_t *arg);
 
   /**
    * Compute the clover force contributions in each dimension mu given
@@ -880,6 +860,30 @@ extern "C" {
     void* milc_sitelink
     );
 
+  /* The below declarations are for removed functions from prior versions of QUDA. */
+
+  /**
+   * Note this interface function has been removed.  This stub remains
+   * for compatibility only.
+   */
+  void qudaAsqtadForce(int precision,
+		       const double act_path_coeff[6],
+		       const void* const one_link_src[4],
+		       const void* const naik_src[4],
+		       const void* const link,
+		       void* const milc_momentum);
+
+  /**
+   * Note this interface function has been removed.  This stub remains
+   * for compatibility only.
+   */
+  void qudaComputeOprod(int precision,
+			int num_terms,
+			int num_naik_terms,
+			double** coeff,
+                        double scale,
+			void** quark_field,
+			void* oprod[3]);
 
 #ifdef __cplusplus
 }

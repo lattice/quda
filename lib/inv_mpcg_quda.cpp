@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -9,10 +10,6 @@
 #include <invert_quda.h>
 #include <util_quda.h>
 #include <sys/time.h>
-
-#include <face_quda.h>
-
-#include <iostream>
 
 namespace quda {
 
@@ -93,8 +90,8 @@ namespace quda {
 
 
 
-  MPCG::MPCG(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat)
+  MPCG::MPCG(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, mat, mat, param, profile)
   {
 
   }
@@ -381,7 +378,7 @@ namespace quda {
     param.true_res = sqrt(blas::xmyNorm(b, R[0]) / b2);
 
 
-    PrintSummary("MPCG", it, r2, b2);
+    PrintSummary("MPCG", it, r2, b2, stop, param.tol_hq);
 
     delete[] d;
     delete[] d_p1;

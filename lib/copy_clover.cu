@@ -46,21 +46,21 @@ namespace quda {
     typedef typename mapper<FloatIn>::type RegTypeIn;
     typedef typename mapper<FloatOut>::type RegTypeOut;
 
-    for (int parity=0; parity<2; parity++) {
-      int x = blockIdx.x * blockDim.x + threadIdx.x;
-      if (x >= arg.volumeCB) return;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x >= arg.volumeCB) return;
+    int parity = blockIdx.y * blockDim.y + threadIdx.y;
 
-      RegTypeIn in[length];
-      RegTypeOut out[length];
-      arg.in.load(in, x, parity);
-      for (int i=0; i<length; i++) out[i] = in[i];
-      arg.out.save(out, x, parity);
-    }
+    RegTypeIn in[length];
+    RegTypeOut out[length];
+    arg.in.load(in, x, parity);
+#pragma unroll
+    for (int i=0; i<length; i++) out[i] = in[i];
+    arg.out.save(out, x, parity);
 
   }  
 
   template <typename FloatOut, typename FloatIn, int length, typename Out, typename In>
-    class CopyClover : Tunable {
+    class CopyClover : TunableVectorY {
     CopyCloverArg<Out,In> arg;
     const CloverField &meta;
 
@@ -72,7 +72,8 @@ namespace quda {
     unsigned int minThreads() const { return arg.volumeCB; }
 
   public:
-    CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta) : arg(arg), meta(meta) { 
+    CopyClover(CopyCloverArg<Out,In> &arg, const CloverField &meta)
+      : TunableVectorY(2), arg(arg), meta(meta) {
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyClover() { ; }
@@ -109,8 +110,9 @@ namespace quda {
  void copyClover(const InOrder &inOrder, CloverField &out, bool inverse, QudaFieldLocation location, FloatOut *Out, float *outNorm) {
 
     if (out.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatOut>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm), inOrder, out, location);
+      copyClover<FloatOut,FloatIn,length>(C(out, inverse, Out, outNorm, override), inOrder, out, location);
     } else if (out.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatOut,length>(out, inverse, Out), inOrder, out, location);
@@ -137,8 +139,9 @@ namespace quda {
 
     // reconstruction only supported on FloatN fields currently
    if (in.isNative()) {
+      const bool override = true;
       typedef typename clover_mapper<FloatIn>::type C;
-      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm), out, inverse, location, Out, outNorm);
+      copyClover<FloatOut,FloatIn,length>(C(in, inverse, In, inNorm, override), out, inverse, location, Out, outNorm);
     } else if (in.Order() == QUDA_PACKED_CLOVER_ORDER) {
       copyClover<FloatOut,FloatIn,length>
 	(QDPOrder<FloatIn,length>(in, inverse, In), out, inverse, location, Out, outNorm);
@@ -184,6 +187,11 @@ namespace quda {
 	copyClover<double,float,72>(out, in, inverse, location, (double*)Out, (float*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<double,short,72>(out, in, inverse, location, (double*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
+      } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+        copyClover<double, char, 72>(
+            out, in, inverse, location, (double *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
+      } else {
+        errorQuda("Unknown precision %d", in.Precision());
       }
     } else if (out.Precision() == QUDA_SINGLE_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION) {
@@ -192,6 +200,11 @@ namespace quda {
 	copyClover<float,float,72>(out, in, inverse, location, (float*)Out, (float*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<float,short,72>(out, in, inverse, location, (float*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
+      } else if (in.Precision() == QUDA_HALF_PRECISION) {
+        copyClover<float, char, 72>(
+            out, in, inverse, location, (float *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
+      } else {
+        errorQuda("Unknown precision %d", in.Precision());
       }
     } else if (out.Precision() == QUDA_HALF_PRECISION) {
       if (in.Precision() == QUDA_DOUBLE_PRECISION){
@@ -200,8 +213,31 @@ namespace quda {
 	copyClover<short,float,72>(out, in, inverse, location, (short*)Out, (float*)In, (float*)outNorm, (float*)inNorm);
       } else if (in.Precision() == QUDA_HALF_PRECISION) {
 	copyClover<short,short,72>(out, in, inverse, location, (short*)Out, (short*)In, (float*)outNorm, (float*)inNorm);
+      } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+        copyClover<short, char, 72>(
+            out, in, inverse, location, (short *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
+      } else {
+        errorQuda("Unknown precision %d", in.Precision());
       }
-    } 
+    } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+      if (in.Precision() == QUDA_DOUBLE_PRECISION) {
+        copyClover<char, double, 72>(
+            out, in, inverse, location, (char *)Out, (double *)In, (float *)outNorm, (float *)inNorm);
+      } else if (in.Precision() == QUDA_SINGLE_PRECISION) {
+        copyClover<char, float, 72>(
+            out, in, inverse, location, (char *)Out, (float *)In, (float *)outNorm, (float *)inNorm);
+      } else if (in.Precision() == QUDA_HALF_PRECISION) {
+        copyClover<char, short, 72>(
+            out, in, inverse, location, (char *)Out, (short *)In, (float *)outNorm, (float *)inNorm);
+      } else if (in.Precision() == QUDA_QUARTER_PRECISION) {
+        copyClover<char, char, 72>(
+            out, in, inverse, location, (char *)Out, (char *)In, (float *)outNorm, (float *)inNorm);
+      } else {
+        errorQuda("Unknown precision %d", in.Precision());
+      }
+    } else {
+      errorQuda("Unknown precision %d", out.Precision());
+    }
 #else
     errorQuda("Clover has not been built");
 #endif

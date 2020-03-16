@@ -7,6 +7,7 @@
 #include <comm_quda.h>
 #include <tune_key.h>
 
+
 /**
    @brief Query whether autotuning is enabled or not.  Default is enabled but can be overridden by setting QUDA_ENABLE_TUNING=0.
    @return If autotuning is enabled
@@ -17,15 +18,52 @@ QudaVerbosity getVerbosity();
 char *getOutputPrefix();
 FILE *getOutputFile();
 
-void setVerbosity(const QudaVerbosity verbosity);
+void setVerbosity(QudaVerbosity verbosity);
 void setOutputPrefix(const char *prefix);
 void setOutputFile(FILE *outfile);
 
+/**
+   @brief Push a new verbosity onto the stack
+*/
 void pushVerbosity(QudaVerbosity verbosity);
+
+/**
+   @brief Pop the verbosity restoring the prior one on the stack
+*/
 void popVerbosity();
+
+/**
+   @brief Push a new output prefix onto the stack
+*/
+void pushOutputPrefix(const char *prefix);
+
+/**
+   @brief Pop the output prefix restoring the prior one on the stack
+*/
+void popOutputPrefix();
+
+/**
+   @brief This function returns true if the calling rank is enabled
+   for verbosity (e.g., whether printQuda and warningQuda will print
+   out from this rank).
+   @return Return whether this rank will print
+ */
+bool getRankVerbosity();
 
 char *getPrintBuffer();
 
+/**
+   @brief Returns a string of the form
+   ",omp_threads=$OMP_NUM_THREADS", which can be used for storing the
+   number of OMP threads for CPU functions recorded in the tune cache.
+   @return Returns the string
+*/
+char* getOmpThreadStr();
+
+namespace quda {
+  // forward declaration
+  void saveTuneCache(bool error);
+}
 
 #define zeroThread (threadIdx.x + blockDim.x*blockIdx.x==0 &&		\
 		    threadIdx.y + blockDim.y*blockIdx.y==0 &&		\
@@ -35,12 +73,11 @@ char *getPrintBuffer();
     if (zeroThread) printf(__VA_ARGS__);				\
   } while (0)
 
-
 #ifdef MULTI_GPU
 
 #define printfQuda(...) do {                           \
   sprintf(getPrintBuffer(), __VA_ARGS__);	       \
-  if (comm_rank() == 0) {	                       \
+  if (getRankVerbosity()) {			       \
     fprintf(getOutputFile(), "%s", getOutputPrefix()); \
     fprintf(getOutputFile(), "%s", getPrintBuffer());  \
     fflush(getOutputFile());                           \
@@ -56,13 +93,14 @@ char *getPrintBuffer();
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);	             \
   fflush(getOutputFile());                                                   \
+  quda::saveTuneCache(true);						\
   comm_abort(1);                                                             \
 } while (0)
 
 #define warningQuda(...) do {                                   \
   if (getVerbosity() > QUDA_SILENT) {				\
     sprintf(getPrintBuffer(), __VA_ARGS__);			\
-    if (comm_rank() == 0) {					\
+    if (getRankVerbosity()) {						\
       fprintf(getOutputFile(), "%sWARNING: ", getOutputPrefix());	\
       fprintf(getOutputFile(), "%s", getPrintBuffer());			\
       fprintf(getOutputFile(), "\n");					\
@@ -87,7 +125,8 @@ char *getPrintBuffer();
   fprintf(getOutputFile(), "%s       last kernel called was (name=%s,volume=%s,aux=%s)\n", \
 	  getOutputPrefix(), getLastTuneKey().name,			     \
 	  getLastTuneKey().volume, getLastTuneKey().aux);		     \
-  comm_abort(1);								     \
+  quda::saveTuneCache(true);						\
+  comm_abort(1);							     \
 } while (0)
 
 #define warningQuda(...) do {                                 \
@@ -122,5 +161,11 @@ char *getPrintBuffer();
 
 #endif // HOST_DEBUG
 
+#ifdef __CUDA_ARCH__
+// hide from device code
+#undef errorQuda
+#define errorQuda(...)
+
+#endif
 
 #endif // _UTIL_QUDA_H

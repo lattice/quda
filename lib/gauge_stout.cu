@@ -1,374 +1,138 @@
 #include <quda_internal.h>
-#include <quda_matrix.h>
-#include <su3_project.cuh>
 #include <tune_quda.h>
 #include <gauge_field.h>
-#include <gauge_field_order.h>
-#include <index_helper.cuh>
 
-#define  DOUBLE_TOL	1e-15
-#define  SINGLE_TOL	2e-6
+#include <jitify_helper.cuh>
+#include <kernels/gauge_stout.cuh>
+#include <instantiate.h>
 
 namespace quda {
 
-#ifdef GPU_GAUGE_TOOLS
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeSTOUT : TunableVectorYZ
+  {
+    static constexpr int stoutDim = 3; // apply stouting in space only
+    GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
+    const GaugeField &meta;
 
-  template <typename Float, typename GaugeOr, typename GaugeDs>
-  struct GaugeSTOUTArg {
-    int threads; // number of active threads required
-    int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4]; 
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return arg.threads; }
+
+public:
+    // (2,3): 2 for parity in the y thread dim, 3 corresponds to mapping direction to the z thread dim
+    GaugeSTOUT(GaugeField &out, const GaugeField &in, double rho) :
+      TunableVectorYZ(2, stoutDim),
+      arg(out, in, rho),
+      meta(in)
+    {
+      strcpy(aux, meta.AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+#ifdef JITIFY
+      create_jitify_program("kernels/gauge_stout.cuh");
 #endif
-    GaugeOr origin;
-    const Float rho;
-    const Float tolerance;
-    
-    GaugeDs dest;
+      apply(0);
+      qudaDeviceSynchronize();
+    }
 
-    GaugeSTOUTArg(GaugeOr &origin, GaugeDs &dest, const GaugeField &data, const Float rho, const Float tolerance) 
-      : origin(origin), dest(dest), rho(rho), tolerance(tolerance) {
-#ifdef MULTI_GPU
-      for ( int dir = 0; dir < 4; ++dir ) {
-        border[dir] = data.R()[dir];
-        X[dir] = data.X()[dir] - border[dir] * 2;
-      } 
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef JITIFY
+      using namespace jitify::reflection;
+      jitify_error = program->kernel("quda::computeSTOUTStep").instantiate(Type<decltype(arg)>())
+        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
 #else
-        for(int dir=0; dir<4; ++dir) X[dir] = data.X()[dir];
+      computeSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
-	threads = X[0]*X[1]*X[2]*X[3];
     }
-  };
 
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
 
-  template <typename Float, typename GaugeOr, typename GaugeDs, typename Float2>
-  __host__ __device__ void computeStaple(GaugeSTOUTArg<Float,GaugeOr,GaugeDs>& arg, int idx, int parity, int dir, Matrix<Float2,3> &staple) {
+    void preTune() { arg.out.save(); } // defensive measure in case they alias
+    void postTune() { arg.out.load(); }
 
-    typedef Matrix<complex<Float>,3> Link;
-      // compute spacetime dimensions and parity
-
-    int X[4]; 
-    for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-
-    int x[4];
-    getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-    for(int dr=0; dr<4; ++dr) {
-         x[dr] += arg.border[dr];
-         X[dr] += 2*arg.border[dr];
-    }
-#endif
-
-    setZero(&staple);
-
-    // I believe most users won't want to include time staples in smearing
-    for (int mu=0; mu<3; mu++) {
-
-      //identify directions orthogonal to the link.
-      if (mu != dir) {
-	
-	int nu = dir;	
-	{
-	  int dx[4] = {0, 0, 0, 0};
-	  Link U1, U2, U3, U4, tmpS;
-	  
-	  //Get link U_{\mu}(x)
-	  arg.origin.load((Float*)(U1.data),
-			  linkIndexShift(x,dx,X), mu, parity); 
-	  
-	  dx[mu]++;
-	  //Get link U_{\nu}(x+\mu)
-	  arg.origin.load((Float*)(U2.data),
-			  linkIndexShift(x,dx,X), nu, 1-parity); 
-	  
-	  dx[mu]--;
-	  dx[nu]++;
-	  //Get link U_{\mu}(x+\nu)
-	  arg.origin.load((Float*)(U3.data),
-			  linkIndexShift(x,dx,X), mu, 1-parity); 
-	  
-	  //tmpS = U_{\mu}(x) * U_{\nu}(x+\mu) * U^\dag_{\mu}(x+\nu)
-	  tmpS	= U1 * U2;
-	  tmpS	= tmpS * conj(U3);
-	  
-	  //Add to staple sum
-	  staple = staple + tmpS;
-	  
-	  dx[mu]--;
-	  dx[nu]--;
-	  //Get link U_{\mu}(x-\mu)
-	  arg.origin.load((Float*)(U1.data),
-			  linkIndexShift(x,dx,X), mu, 1-parity); 
-	  //Get link U_{\nu}(x-\mu)
-	  arg.origin.load((Float*)(U2.data),
-			  linkIndexShift(x,dx,X), nu, 1-parity); 
-	  
-	  dx[nu]++;
-	  //Get link U_{\mu}(x-\mu+\nu)
-	  arg.origin.load((Float*)(U3.data),
-			  linkIndexShift(x,dx,X), mu, parity); 
-	  
-	  //tmpS = U^\dag_{\mu}(x-\mu) * U_{\nu}(x-\mu) * U_{\mu}(x-\mu+\nu)
-	  tmpS	= conj(U1);
-	  tmpS	= tmpS * U2;
-	  tmpS	= tmpS * U3;
-	  
-	  //Add to staple sum
-	  staple = staple + tmpS;
-	}
-      }
-    }
-  }
+    long long flops() const { return 3 * (2 + 2 * 4) * 198ll * arg.threads; } // just counts matrix multiplication
+    long long bytes() const { return ((1 + stoutDim * 6) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } // 6 links per dim, 1 in, 1 out.
+  }; // GaugeSTOUT
   
-  template<typename Float, typename GaugeOr, typename GaugeDs>
-    __global__ void computeSTOUTStep(GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg){
-      int idx = threadIdx.x + blockIdx.x*blockDim.x;
-      if(idx >= arg.threads) return;
-      typedef complex<Float> Complex;
-      typedef Matrix<complex<Float>,3> Link;
-
-      int parity = 0;
-      if(idx >= arg.threads/2) {
-        parity = 1;
-        idx -= arg.threads/2;
-      }
-
-      int X[4]; 
-      for(int dr=0; dr<4; ++dr) X[dr] = arg.X[dr];
-
-      int x[4];
-      getCoords(x, idx, X, parity);
-#ifdef MULTI_GPU
-      for(int dr=0; dr<4; ++dr) {
-           x[dr] += arg.border[dr];
-           X[dr] += 2*arg.border[dr];
-      }
-#endif
-
-      int dx[4] = {0, 0, 0, 0};
-      //Only spatial dimensions are smeared
-      for (int dir=0; dir < 3; dir++) {
-        Link U, UDag, Stap, Omega, OmegaDag, OmegaDiff, ODT, Q, exp_iQ, tmp1;
-	Complex OmegaDiffTr;
-	Complex i_2(0,0.5);
-
-	//This function gets stap = S_{mu,nu} i.e., the staple of length 3,
-        computeStaple<Float,GaugeOr,GaugeDs,Complex>(arg,idx,parity,dir,Stap);
-	//
-	// |- > -|                /- > -/                /- > -
-	// ^     v               ^     v                ^
-	// |     |              /     /                /- < -
-	//         + |     |  +         +  /     /  +         +  - > -/
-	//           v     ^              v     ^                    v 
-	//           |- > -|             /- > -/                - < -/
-
-	// Get link U
-        arg.origin.load((Float*)(U.data),linkIndexShift(x,dx,X),dir,parity);
-
-	//Compute Omega_{mu}=[Sum_{mu neq nu}rho_{mu,nu}C_{mu,nu}]*U_{mu}^dag
-
-	//Get U^{\dagger}
-	computeMatrixInverse(U,&UDag);
-	
-	//Compute \Omega = \rho * S * U^{\dagger}
-	tmp1 = arg.rho * Stap;
-	Omega = tmp1 * UDag;
-
-	//Compute \Q_{mu} = i/2[Omega_{mu}^dag - Omega_{mu} 
-	//                      - 1/3 Tr(Omega_{mu}^dag - Omega_{mu})]
-
-	OmegaDag = conj(Omega);
-	OmegaDiff = OmegaDag - Omega;
-
-	Q = OmegaDiff;
-	OmegaDiffTr = getTrace(OmegaDiff);
-	OmegaDiffTr =  1.0/3.0 * OmegaDiffTr;
-
-	//Matrix proportional to OmegaDiffTr
-	setIdentity(&ODT);
-	tmp1 = OmegaDiffTr * ODT;
-
-	Q = Q - tmp1;
-	Q = i_2 * Q;
-	//Q is now defined.
-
-#ifdef HOST_DEBUG
-	//Test for Tracless:
-	//reuse OmegaDiffTr
-	OmegaDiffTr = getTrace(Q);
-	double error;
-	error = OmegaDiffTr.real();
-	printf("Trace test %d %d %.15e\n", idx, dir, error);	
-
-	//Test for hemiticity:
-	Link Q_diff = conj(Q);
-	Q_diff -= Q; //This should be the zero matrix. Test by ReTr(Q_diff^2);
-	Q_diff *= Q_diff;
-	//reuse OmegaDiffTr
-	OmegaDiffTr = getTrace(Q_diff);
-	error = OmegaDiffTr.real();
-	printf("Herm test %d %d %.15e\n", idx, dir, error);
-#endif
-
-	exponentiate_iQ(Q,&exp_iQ);
-
-#ifdef HOST_DEBUG
-	//Test for expiQ unitarity:
-	error = ErrorSU3(exp_iQ);	
-	printf("expiQ test %d %d %.15e\n", idx, dir, error);
-#endif
-
-	U = exp_iQ * U;
-#ifdef HOST_DEBUG
-	//Test for expiQ*U unitarity:
-	error = ErrorSU3(U);	
-	printf("expiQ*u test %d %d %.15e\n", idx, dir, error);
-#endif
-
-        arg.dest.save((Float*)(U.data),linkIndexShift(x,dx,X), dir, parity); 
-    }
-  }
-
-  template<typename Float, typename GaugeOr, typename GaugeDs>
-    class GaugeSTOUT : Tunable {
-      GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg;
-      const QudaFieldLocation location;
-
-      private:
-      unsigned int sharedBytesPerThread() const { return 0; }
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
-
-      bool tuneSharedBytes() const { return false; } // Don't tune shared memory
-      bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-      unsigned int minThreads() const { return arg.threads; }
-
-      public:
-      GaugeSTOUT(GaugeSTOUTArg<Float,GaugeOr, GaugeDs> &arg, QudaFieldLocation location)
-        : arg(arg), location(location) {}
-      virtual ~GaugeSTOUT () {}
-
-      void apply(const cudaStream_t &stream){
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-          computeSTOUTStep<<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-        } else {
-          errorQuda("CPU not supported yet\n");
-          //computeSTOUTStepCPU(arg);
-        }
-      }
-
-      TuneKey tuneKey() const {
-        std::stringstream vol, aux;
-        vol << arg.X[0] << "x";
-        vol << arg.X[1] << "x";
-        vol << arg.X[2] << "x";
-        vol << arg.X[3];
-        aux << "threads=" << arg.threads << ",prec="  << sizeof(Float);
-        return TuneKey(vol.str().c_str(), typeid(*this).name(), aux.str().c_str());
-      }
-
-      long long flops() const { return (1)*6*arg.threads; }
-      long long bytes() const { return (1)*6*arg.threads*sizeof(Float); } // Only correct if there is no link reconstruction
-
-    }; // GaugeSTOUT
-
-  template<typename Float,typename GaugeOr, typename GaugeDs>
-    void STOUTStep(GaugeOr origin, GaugeDs dest, const GaugeField& dataOr, Float rho, QudaFieldLocation location) {
-      if (dataOr.Precision() == QUDA_DOUBLE_PRECISION) {
-        GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, DOUBLE_TOL);
-        GaugeSTOUT<Float,GaugeOr,GaugeDs> gaugeSTOUT(arg, location);
-        gaugeSTOUT.apply(0);
-      } else {
-        GaugeSTOUTArg<Float,GaugeOr,GaugeDs> arg(origin, dest, dataOr, rho, SINGLE_TOL);
-        GaugeSTOUT<Float,GaugeOr,GaugeDs> gaugeSTOUT(arg, location);
-        gaugeSTOUT.apply(0);
-      }
-      cudaDeviceSynchronize();
-    }
-
-  template<typename Float>
-    void STOUTStep(GaugeField &dataDs, const GaugeField& dataOr, Float rho, QudaFieldLocation location) {
-
-    if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GDs;
-
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO) {
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_12){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-      }
-    } else if(dataDs.Reconstruct() == QUDA_RECONSTRUCT_8){
-      typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GDs;
-      if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_NO){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_NO>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_12){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_12>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else if(dataOr.Reconstruct() == QUDA_RECONSTRUCT_8){
-	typedef typename gauge_mapper<Float,QUDA_RECONSTRUCT_8>::type GOr;
-	STOUTStep(GOr(dataOr), GDs(dataDs), dataOr, rho, location);
-      }else{
-	errorQuda("Reconstruction type %d of origin gauge field not supported", dataOr.Reconstruct());
-            }
-    } else {
-      errorQuda("Reconstruction type %d of destination gauge field not supported", dataDs.Reconstruct());
-    }
-
-  }
-
-#endif
-
-  void STOUTStep(GaugeField &dataDs, const GaugeField& dataOr, double rho, QudaFieldLocation location) {
-
+  void STOUTStep(GaugeField &out, GaugeField &in, double rho)
+  {
 #ifdef GPU_GAUGE_TOOLS
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
 
-    if(dataOr.Precision() != dataDs.Precision()) {
-      errorQuda("Oriign and destination fields must have the same precision\n");
-    }
+    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
+    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
 
-    if(dataDs.Precision() == QUDA_HALF_PRECISION){
-      errorQuda("Half precision not supported\n");
-    }
-
-    if (!dataOr.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataOr.Order(), dataOr.Reconstruct());
-
-    if (!dataDs.isNative())
-      errorQuda("Order %d with %d reconstruct not supported", dataDs.Order(), dataDs.Reconstruct());
-
-    if (dataDs.Precision() == QUDA_SINGLE_PRECISION){
-      STOUTStep<float>(dataDs, dataOr, (float) rho, location);
-    } else if(dataDs.Precision() == QUDA_DOUBLE_PRECISION) {
-      STOUTStep<double>(dataDs, dataOr, rho, location);
-    } else {
-      errorQuda("Precision %d not supported", dataDs.Precision());
-    }
-    return;
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
+    instantiate<GaugeSTOUT>(out, in, rho);
+    out.exchangeExtendedGhost(out.R(), false);    
 #else
-  errorQuda("Gauge tools are not build");
+    errorQuda("Gauge tools are not built");
 #endif
   }
 
+  template <typename Float, int nColor, QudaReconstructType recon> class GaugeOvrImpSTOUT : TunableVectorYZ
+  {
+    static constexpr int stoutDim = 4; // apply stouting in all dims
+    GaugeSTOUTArg<Float, nColor, recon, stoutDim> arg;
+    const GaugeField &meta;
+
+    bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
+    unsigned int minThreads() const { return arg.threads; }
+
+public:
+    GaugeOvrImpSTOUT(GaugeField &out, const GaugeField &in, double rho, double epsilon) :
+      TunableVectorYZ(2, stoutDim),
+      arg(out, in, rho, epsilon),
+      meta(in)
+    {
+      strcpy(aux, meta.AuxString());
+      strcat(aux, comm_dim_partitioned_string());
+#ifdef JITIFY
+      create_jitify_program("kernels/gauge_stout.cuh");
+#endif
+      apply(0);
+      qudaDeviceSynchronize();
+    }
+
+    void apply(const cudaStream_t &stream)
+    {
+      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+#ifdef JITIFY
+      using namespace jitify::reflection;
+      jitify_error = program->kernel("quda::computeOvrImpSTOUTStep").instantiate(Type<decltype(arg)>())
+        .configure(tp.grid, tp.block, tp.shared_bytes, stream).launch(arg);
+#else
+      computeOvrImpSTOUTStep<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+#endif
+    }
+
+    TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
+
+    void preTune() { arg.out.save(); } // defensive measure in case they alias
+    void postTune() { arg.out.load(); }
+
+    long long flops() const { return 4*(18+2+2*4)*198ll*arg.threads; } // just counts matrix multiplication
+    long long bytes() const { return ((1 + stoutDim * 24) * arg.in.Bytes() + arg.out.Bytes()) * arg.threads; } //24 links per dim, 1 in, 1 out
+  }; // GaugeOvrImpSTOUT
+
+  void OvrImpSTOUTStep(GaugeField &out, GaugeField& in, double rho, double epsilon)
+  {
+#ifdef GPU_GAUGE_TOOLS
+    checkPrecision(out, in);
+    checkReconstruct(out, in);
+
+    if (!out.isNative()) errorQuda("Order %d with %d reconstruct not supported", in.Order(), in.Reconstruct());
+    if (!in.isNative()) errorQuda("Order %d with %d reconstruct not supported", out.Order(), out.Reconstruct());
+
+    copyExtendedGauge(in, out, QUDA_CUDA_FIELD_LOCATION);
+    in.exchangeExtendedGhost(in.R(), false);
+    instantiate<GaugeOvrImpSTOUT>(out, in, rho, epsilon);
+    out.exchangeExtendedGhost(out.R(), false);
+    
+#else
+    errorQuda("Gauge tools are not built");
+#endif
+  }
 }

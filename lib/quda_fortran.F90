@@ -37,6 +37,8 @@ module quda_fortran
      QudaReconstructType :: reconstruct
      QudaPrecision :: cuda_prec_sloppy
      QudaReconstructType :: reconstruct_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
+     QudaReconstructType :: reconstruct_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
      QudaReconstructType :: reconstruct_precondition
      QudaGaugeFixed :: gauge_fix
@@ -48,7 +50,6 @@ module quda_fortran
      integer(4) :: staple_pad   ! Used by link fattening
      integer(4) :: llfat_ga_pad ! Used by link fattening
      integer(4) :: mom_ga_pad   ! Used by the gauge and fermion forces
-     real(8) :: gauge_gib
 
      ! Set the staggered phase type of the links
      QudaStaggeredPhase :: staggered_phase_type
@@ -71,6 +72,10 @@ module quda_fortran
      integer(4) :: return_result_gauge ! Return the result gauge field
      integer(4) :: return_result_mom   ! Return the result momentum field
 
+     integer(8) :: gauge_offset ! Offset into MILC site struct to the gauge field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: mom_offset   ! Offset into MILC site struct to the momentum field (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+     integer(8) :: site_size    ! Size of MILC site struct (only if gauge_order=MILC_SITE_GAUGE_ORDER)
+
   end type quda_gauge_param
 
   ! This module corresponds to the QudaInvertParam struct in quda.h
@@ -88,13 +93,15 @@ module quda_fortran
      real(8) :: m5    ! Domain wall height
      integer(4) :: Ls       ! Extent of the 5th dimension (for domain wall)
 
-     real(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
-     real(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! will be used only for the mobius type of Fermion
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: b_5 ! MDWF coefficients
+     complex(8), dimension(QUDA_MAX_DWF_LS) :: c_5 ! MDWF coefficients
 
      real(8) :: mu    ! Twisted mass parameter
      real(8) :: epsilon ! Twisted mass parameter
      QudaTwistFlavorType :: twist_flavor  ! Twisted mass flavor
 
+     integer(4) :: laplace3D    ! direction to omit in Laplace
+     
      real(8) :: tol ! Requested L2 residual norm
      real(8) :: tol_restart ! Solver tolerance in the L2 residual norm (used to restart InitCG)
      real(8) :: tol_hq ! Requested heavy quark residual norm
@@ -103,13 +110,18 @@ module quda_fortran
      real(8) :: true_res_hq ! Actual heavy quark residual norm achieved in solver
      integer(4) :: maxiter
      real(8) :: reliable_delta ! Reliable update tolerance
+     real(8) :: reliable_delta_refinement ! Reliable update tolerance used in post multi-shift solver refinement
+     integer(4) :: use_alternative_reliable ! Whether to use alternative reliable updates
      integer(4) :: use_sloppy_partial_accumulator ! Whether to keep the partial solution accumuator in sloppy precision
+     integer(4) :: solution_accumulator_pipeline ! How many direction vectors we accumulate into the solution vector at once
      integer(4) :: max_res_increase ! How many residual increases we tolerate when doing reliable updates
      integer(4) :: max_res_increase_total ! Total number of residual increases we tolerate
+     integer(4) :: max_hq_res_increase ! How many heavy-quark residual increases we tolerate when doing heavy-quark restarts
+     integer(4) :: max_hq_res_increase_total ! Total number of heavy-quark residual restarts we tolerate
      integer(4) :: heavy_quark_check ! After how many iterations shall the heavy quark residual be updated
      integer(4) :: pipeline ! Whether to enable pipeline solver option
      integer(4) :: num_offset ! Number of offsets in the multi-shift solver
-
+     integer(4) :: num_src ! Number of sources in the multiple source solver
      integer(4) :: overlap ! width of domain overlaps
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: offset ! Offsets for multi-shift solver
      real(8), dimension(QUDA_MAX_MULTI_SHIFT) :: tol_offset ! Solver tolerance for each offset
@@ -149,6 +161,7 @@ module quda_fortran
      QudaPrecision :: cpu_prec
      QudaPrecision :: cuda_prec
      QudaPrecision :: cuda_prec_sloppy
+     QudaPrecision :: cuda_prec_refinement_sloppy
      QudaPrecision :: cuda_prec_precondition
 
      QudaDiracFieldOrder :: dirac_order
@@ -160,28 +173,28 @@ module quda_fortran
      QudaPrecision :: clover_cpu_prec
      QudaPrecision :: clover_cuda_prec
      QudaPrecision :: clover_cuda_prec_sloppy
+     QudaPrecision :: clover_cuda_prec_refinement_sloppy
      QudaPrecision :: clover_cuda_prec_precondition
 
      QudaCloverFieldOrder :: clover_order
      QudaUseInitGuess :: use_init_guess
 
      real(8) :: clover_coeff ! Coefficient of the clover term
+     real(8) :: clover_rho   ! Real number added to the clover diagonal (not to inverse)
      integer(4) :: compute_clover_trlog ! Whether to compute the trace log of the clover term
      real(8), dimension(2) :: trlogA    ! The trace log of the clover term (even/odd computed separately)
 
-     integer(4) :: compute_clover;                    ! Whether to compute the clover field
-     integer(4) :: compute_clover_inverse;            ! Whether to compute the clover inverse field
-     integer(4) :: return_clover;                     ! Whether to copy back the clover matrix field
-     integer(4) :: return_clover_inverse;             ! Whether to copy back the inverted clover matrix field
+     integer(4) :: compute_clover                    ! Whether to compute the clover field
+     integer(4) :: compute_clover_inverse            ! Whether to compute the clover inverse field
+     integer(4) :: return_clover                     ! Whether to copy back the clover matrix field
+     integer(4) :: return_clover_inverse             ! Whether to copy back the inverted clover matrix field
 
-     QudaVerbosity :: verbosity;                      ! The verbosity setting to use in the solver
+     QudaVerbosity :: verbosity                      ! The verbosity setting to use in the solver
 
      integer(4) :: sp_pad
      integer(4) :: cl_pad
 
      integer(4) :: iter
-     real(8) :: spinor_gib
-     real(8) :: clover_gib
      real(8) :: gflops
      real(8) :: secs
 
@@ -200,7 +213,17 @@ module quda_fortran
      ! QUDA_INVALID_INVERTER to disable the preconditioner entirely.
      QudaInverterType :: inv_type_precondition
 
-     integer(8) :: preconditioner ! pointer to preconditioner instance
+     ! pointer to preconditioner instance
+     integer(8) :: preconditioner
+
+     ! pointer to deflation instance
+     integer(8) :: deflation_op
+
+     ! pointer to QudaEigParam that defines any deflation
+     integer(8) :: eig_param
+
+     ! If true, deflate the initial guess
+     QudaBoolean :: deflate
 
      ! Dslash used in the inner Krylov solver
      QudaDslashType :: dslash_type_precondition
@@ -217,6 +240,15 @@ module quda_fortran
      ! Relaxation parameter used in GCR-DD (default = 1.0)
      real(8) :: omega
 
+     ! Basis for CA algorithms
+     QudaCABasis :: ca_basis
+
+     ! Minimum eigenvalue for Chebyshev CA basis
+     real(8) :: ca_lambda_min
+
+     ! Maximum eigenvalue for Chebyshev CA basis
+     real(8) :: ca_lambda_max
+
      ! Number of preconditioner cycles to perform per iteration
      integer(4) :: precondition_cycle
 
@@ -232,10 +264,7 @@ module quda_fortran
      integer(4)::max_search_dim ! for magma library this parameter must be multiple 16?
      integer(4)::rhs_idx
      integer(4)::deflation_grid !total deflation space is nev*deflation_grid
-     integer(4)::use_reduced_vector_set ! eigCG: specifies whether to use reduced eigenvector set
      real(8):: eigenval_tol ! eigCG: selection criterion for the reduced eigenvector set
-     integer(4)::use_cg_updates ! mixed precision eigCG:whether to use cg refinement corrections in the incremental stage
-     real(8)::cg_iterref_tol ! mixed precision eigCG:  tolerance for cg refinement corrections in the incremental stage
      integer(4)::eigcg_max_restarts ! mixed precision eigCG tuning parameter:  minimum search vector space restarts
      integer(4)::max_restart_num     ! initCG tuning parameter:  maximum restarts
      real(8)::inc_tol     ! initCG tuning parameter:  decrease in absolute value of the residual within each restart cycle
@@ -245,16 +274,25 @@ module quda_fortran
      integer(4)::use_resident_solution  ! Whether to use the resident solution vector(s)
 
      ! Whether to use the solution vector to augment the chronological forecast
-     integer(4)::make_resident_chrono
+     integer(4)::chrono_make_resident
+
+     !Whether the solution should replace the last entry in the chronology */
+     integer(4)::chrono_replace_last
 
      ! Whether to use the resident chronological basis
-     integer(4)::use_resident_chrono
+     integer(4)::chrono_use_resident
 
      ! The maximum length of the chronological history to store
-     integer(4)::max_chrono_dim
+     integer(4)::chrono_max_dim
 
      ! The index to indeicate which chrono history we are augmenting */
-     integer(4)::chrono_index;
+     integer(4)::chrono_index
+
+     ! Precision to store the chronological basis in
+     integer(4)::chrono_precision;
+
+    ! Which external library to use in the linear solvers (MAGMA or Eigen) */
+     QudaExtLibType::extlib_type
 
   end type quda_invert_param
 

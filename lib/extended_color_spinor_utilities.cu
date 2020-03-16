@@ -4,7 +4,6 @@
 
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
-#include <face_quda.h>
 #include <tune_quda.h>
 
 #define PRESERVE_SPINOR_NORM
@@ -43,10 +42,10 @@ namespace quda {
       if(!commDim(dim)) continue;
 
       spinor->packExtended(nFace, R, parity, dagger, dim, stream_p); // packing in the dim dimension complete
-      cudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
+      qudaDeviceSynchronize(); // Need this since packing is performed in stream[Nstream-1]
       for(int dir=1; dir<=0; dir--){
         spinor->gather(nFace, dagger, 2*dim + dir);
-        cudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
+        qudaEventRecord(gatherEnd[dir], streams[2*dim+dir]); // gatherEnd[1], gatherEnd[0]
       } 
 
       int completeSum = 0;
@@ -74,7 +73,7 @@ namespace quda {
         }
       } 
       commsCompleted[0] = commsCompleted[1] = 0;
-      cudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
+      qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
     for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
@@ -83,19 +82,16 @@ namespace quda {
   }
 
 
-
   /** Straight copy with no basis change */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
     class PreserveBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
       public:
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = in[(s*Nc+c)*2+z];
-            }
+            out(s,c) = in(s,c);
           }
         }
       }
@@ -106,7 +102,7 @@ namespace quda {
     struct NonRelBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
         RegTypeOut K1[4] = {static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(-kP),
@@ -115,21 +111,19 @@ namespace quda {
 			    static_cast<RegTypeOut>(kP), static_cast<RegTypeOut>(kP)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
-            }
+            out(s,c).real(K1[s]*in(s1[s],c).real() + K2[s]*in(s2[s],c).real());
+            out(s,c).imag(K1[s]*in(s1[s],c).imag() + K2[s]*in(s2[s],c).imag());
           }
         }
       }
     };
-
 
   /** Transform from non-relativistic into relavisitic basis */
   template <typename FloatOut, typename FloatIn, int Ns, int Nc>
     struct RelBasis {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
-      __device__ __host__ inline void operator()(RegTypeOut out[Ns*Nc*2], const RegTypeIn in[Ns*Nc*2]) {
+      __device__ __host__ inline void operator()(ColorSpinor<RegTypeOut,Nc,Ns> &out, const ColorSpinor<RegTypeIn,Nc,Ns> &in) {
         int s1[4] = {1, 2, 3, 0};
         int s2[4] = {3, 0, 1, 2};
         RegTypeOut K1[4] = {static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(kU),
@@ -138,16 +132,12 @@ namespace quda {
 			    static_cast<RegTypeOut>(-kU), static_cast<RegTypeOut>(-kU)};
         for (int s=0; s<Ns; s++) {
           for (int c=0; c<Nc; c++) {
-            for (int z=0; z<2; z++) {
-              out[(s*Nc+c)*2+z] = K1[s]*in[(s1[s]*Nc+c)*2+z] + K2[s]*in[(s2[s]*Nc+c)*2+z];
-            }
+            out(s,c).real(K1[s]*in(s1[s],c).real() + K2[s]*in(s2[s],c).real());
+            out(s,c).imag(K1[s]*in(s1[s],c).imag() + K2[s]*in(s2[s],c).imag());
           }
         }
       }
     };
-
-
-
 
   template<typename OutOrder, typename InOrder, typename Basis>
     struct CopySpinorExArg{
@@ -193,17 +183,18 @@ namespace quda {
       typedef typename mapper<FloatIn>::type RegTypeIn;
       typedef typename mapper<FloatOut>::type RegTypeOut;
 
-      RegTypeIn   in[Ns*Nc*2];
-      RegTypeOut  out[Ns*Nc*2];
+      ColorSpinor<RegTypeIn,Nc,Ns> in;
+      ColorSpinor<RegTypeOut,Nc,Ns> out;
+      int parity = 0;
 
       if(extend){
-        arg.in.load(in, X);
+        in = arg.in(X, parity);
         arg.basis(out, in);
-        arg.out.save(out, Y);
+        arg.out(Y, parity) = out;
       }else{
-        arg.in.load(in, Y);
-        arg.basis(out,in);
-        arg.out.save(out, Y);
+        in = arg.in(Y, parity);
+        arg.basis(out, in);
+        arg.out(Y, parity) = out;
       }
     }
 
@@ -325,7 +316,7 @@ namespace quda {
 
     if (out.isNative()) {
       typedef typename colorspinor_mapper<FloatOut,Ns,Nc>::type ColorSpinor;
-      ColorSpinor outOrder(out, Out, outNorm);
+      ColorSpinor outOrder(out, 1, Out, outNorm);
       copySpinorEx<FloatOut,FloatIn,Ns,Nc>
 	(outOrder, inOrder, out.GammaBasis(), inBasis, E, X, parity, extend, out, location);
     } else {
@@ -357,7 +348,7 @@ namespace quda {
 
     if (in.isNative()) {
       typedef typename colorspinor_mapper<FloatIn,Ns,Nc>::type ColorSpinor;
-      ColorSpinor inOrder(in, In, inNorm);
+      ColorSpinor inOrder(in, 1, In, inNorm);
       extendedCopyColorSpinor<FloatOut,FloatIn,Ns,Nc>(inOrder, out, in.GammaBasis(), E, X, parity, extend, location, Out, outNorm);
     } else {
       errorQuda("Order not defined");
@@ -442,13 +433,13 @@ namespace quda {
         errorQuda("source and destination spins must match");
 
       if(dst.Nspin() == 4){
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#ifdef NSPIN4
         copyExtendedColorSpinor<4>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields",dst.Nspin());
 #endif
       }else if(dst.Nspin() == 1){
-#ifdef GPU_STAGGERED_DIRAC
+#ifdef NSPIN1
         copyExtendedColorSpinor<1>(dst, src, parity, location, Dst, Src, dstNorm, srcNorm);
 #else
 	errorQuda("Extended copy has not been built for Nspin=%d fields", dst.Nspin());
@@ -464,6 +455,7 @@ namespace quda {
       QudaFieldLocation location, const int parity, void *Dst, void *Src, 
       void *dstNorm, void *srcNorm){
 
+#if 0
     if(dst.Precision() == QUDA_DOUBLE_PRECISION){
       if(src.Precision() == QUDA_DOUBLE_PRECISION){
         CopyExtendedColorSpinor(dst, src, parity, location, static_cast<double*>(Dst), static_cast<double*>(Src));
@@ -497,6 +489,9 @@ namespace quda {
     }else{
       errorQuda("Unsupported Precision %d", dst.Precision());
     }
+#else
+    errorQuda("Disabled");
+#endif
   }
 
 } // quda

@@ -5,11 +5,14 @@ namespace quda {
   void copyGenericGaugeDoubleOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
       void *Out, void *In, void **ghostOut, void **ghostIn, int type);
 
+  void copyGenericGaugeSingleOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out, void *In,
+      void **ghostOut, void **ghostIn, int type);
+
   void copyGenericGaugeHalfOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
       void *Out, void *In, void **ghostOut, void **ghostIn, int type);
 
-  void copyGenericGaugeSingleOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location,
-      void *Out, void *In, void **ghostOut, void **ghostIn, int type);
+  void copyGenericGaugeQuarterOut(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out,
+      void *In, void **ghostOut, void **ghostIn, int type);
 
   // specialized variation where we restrict different field orders supported but instantiate different colors
   // this, as with all of the above are hacks until JIT is supported
@@ -24,6 +27,9 @@ namespace quda {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_NO)
 	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else if (u.Order() == QUDA_MILC_GAUGE_ORDER) {
+      if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
+	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
+    } else if (u.Order() == QUDA_MILC_SITE_GAUGE_ORDER) {
       if (u.Reconstruct() != QUDA_RECONSTRUCT_10)
 	errorQuda("Unsuported order %d and reconstruct %d combination", u.Order(), u.Reconstruct());
     } else {
@@ -52,6 +58,10 @@ namespace quda {
       copyGenericGaugeSingleOut(out, in, location, Out, In, ghostOut, ghostIn, type);
     } else if (out.Precision() == QUDA_HALF_PRECISION) {
       copyGenericGaugeHalfOut(out, in, location, Out, In, ghostOut, ghostIn, type);
+    } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
+      copyGenericGaugeQuarterOut(out, in, location, Out, In, ghostOut, ghostIn, type);
+    } else {
+      errorQuda("Unknown precision %d", out.Precision());
     }
   } 
  

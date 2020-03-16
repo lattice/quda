@@ -3,24 +3,25 @@
  */
 
 #include <stdlib.h>
-#include <csignal>
+#include <string.h>
 #include <comm_quda.h>
 
 void comm_init(int ndim, const int *dims, QudaCommsMap rank_from_coords, void *map_data)
 {
-  Topology *topo = comm_create_topology(ndim, dims, rank_from_coords, map_data);
-  comm_set_default_topology(topo);
+  comm_init_common(ndim, dims, rank_from_coords, map_data);
 }
-
-void comm_peer2peer_init(const char *hostname_buf) {}
-
-bool comm_peer2peer_enabled(int die, int dim) { return false; }
 
 int comm_rank(void) { return 0; }
 
 int comm_size(void) { return 1; }
 
-int comm_gpuid(void) { return 0; }
+void comm_gather_hostname(char *hostname_recv_buf) {
+  strncpy(hostname_recv_buf, comm_hostname(), 128);
+}
+
+void comm_gather_gpuid(int *gpuid_recv_buf) {
+  gpuid_recv_buf[0] = comm_gpuid();
+}
 
 MsgHandle *comm_declare_send_displaced(void *buffer, const int displacement[], size_t nbytes)
 { return NULL; }
@@ -36,7 +37,7 @@ MsgHandle *comm_declare_strided_receive_displaced(void *buffer, const int displa
 						  size_t blksize, int nblocks, size_t stride)
 { return NULL; }
 
-void comm_free(MsgHandle *mh) {}
+void comm_free(MsgHandle *&mh) {}
 
 void comm_start(MsgHandle *mh) {}
 
@@ -48,17 +49,20 @@ void comm_allreduce(double* data) {}
 
 void comm_allreduce_max(double* data) {}
 
+void comm_allreduce_min(double* data) {}
+
 void comm_allreduce_array(double* data, size_t size) {}
 
+void comm_allreduce_max_array(double* data, size_t size) {}
+
 void comm_allreduce_int(int* data) {}
+
+void comm_allreduce_xor(uint64_t *data) {}
 
 void comm_broadcast(void *data, size_t nbytes) {}
 
 void comm_barrier(void) {}
 
-void comm_abort(int status) {
-  #ifdef HOST_DEBUG
-  raise(SIGINT);
-  #endif
+void comm_abort_(int status) {
   exit(status);
 }

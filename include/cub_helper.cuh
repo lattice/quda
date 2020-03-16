@@ -1,8 +1,22 @@
 #pragma once
+#include <quda_constants.h>
 #include <float_vector.h>
+#include <comm_quda.h>
+#include <blas_quda.h>
 
 using namespace quda;
-#include <cub/cub.cuh>
+
+// ensures we use shfl_sync and not shfl when compiling with clang
+#if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
+#define CUB_USE_COOPERATIVE_GROUPS
+#endif
+
+#ifdef __CUDACC_RTC__
+// WAR for CUDA < 11 which prevents the use of cuda_fp16.h in cub with nvrtc
+struct __half { };
+#endif
+
+#include <cub/block/block_reduce.cuh>
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
@@ -19,44 +33,42 @@ using namespace quda;
 namespace quda {
 
   /**
-     Helper functor for generic addition reduction.
-  */
-  template <typename T>
-  struct Summ {
-    __host__ __device__ __forceinline__ T operator() (const T &a, const T &b){
-      return a + b;
+     struct which acts as a wrapper to a vector of data.
+   */
+  template <typename scalar, int n>
+  struct vector_type {
+    scalar data[n];
+    __device__ __host__ inline scalar& operator[](int i) { return data[i]; }
+    __device__ __host__ inline const scalar& operator[](int i) const { return data[i]; }
+    __device__ __host__ inline static constexpr int size() { return n; }
+    __device__ __host__ inline void operator+=(const vector_type &a) {
+#pragma unroll
+      for (int i=0; i<n; i++) data[i] += a[i];
+    }
+    __device__ __host__ inline void operator=(const vector_type &a) {
+#pragma unroll
+      for (int i=0; i<n; i++) data[i] = a[i];
+    }
+    __device__ __host__ vector_type() {
+#pragma unroll
+      for (int i=0; i<n; i++) zero(data[i]);
     }
   };
 
-  /**
-     Helper functor for double2 addition reduction.
-  */
-  template <>
-  struct Summ<double2>{
-    __host__ __device__ __forceinline__ double2 operator() (const double2 &a, const double2 &b){
-      return make_double2(a.x + b.x, a.y + b.y);
-    }
-  };
+  template<typename scalar, int n>
+  __device__ __host__ inline void zero(vector_type<scalar,n> &v) {
+#pragma unroll
+    for (int i=0; i<n; i++) zero(v.data[i]);
+  }
 
-  /**
-     Helper functor for double3 addition reduction.
-  */
-  template <>
-  struct Summ<double3>{
-    __host__ __device__ __forceinline__ double3 operator() (const double3 &a, const double3 &b){
-      return make_double3(a.x + b.x, a.y + b.y, a.z + b.z);
-    }
-  };
+  template<typename scalar, int n>
+  __device__ __host__ inline vector_type<scalar,n> operator+(const vector_type<scalar,n> &a, const vector_type<scalar,n> &b) {
+    vector_type<scalar,n> c;
+#pragma unroll
+    for (int i=0; i<n; i++) c[i] = a[i] + b[i];
+    return c;
+  }
 
-  /**
-     Helper functor for doubledouble4 addition reduction.
-  */
-  template <>
-  struct Summ<double4>{
-    __host__ __device__ __forceinline__ double4 operator() (const double4 &a, const double4 &b){
-      return make_double4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
-    }
-  };
 
   template <typename T>
   struct ReduceArg {
@@ -83,13 +95,14 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
-  template <int block_size_x, int block_size_y, typename T>
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
   __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
     typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
 
-    T aggregate = BlockReduce(cub_tmp).Sum(in);
+    Reducer r;
+    T aggregate = (do_sum ? BlockReduce(cub_tmp).Sum(in) : BlockReduce(cub_tmp).Reduce(in, r));
 
     if (threadIdx.x == 0 && threadIdx.y == 0) {
       arg.partial[idx*gridDim.x + blockIdx.x] = aggregate;
@@ -110,11 +123,12 @@ namespace quda {
       T sum;
       zero(sum);
       while (i<gridDim.x) {
-	sum += arg.partial[idx*gridDim.x + i];
+        sum = r(sum, arg.partial[idx*gridDim.x + i]);
+	//sum += arg.partial[idx*gridDim.x + i];
 	i += block_size_x*block_size_y;
       }
 
-      sum = BlockReduce(cub_tmp).Sum(sum);
+      sum = (do_sum ? BlockReduce(cub_tmp).Sum(sum) : BlockReduce(cub_tmp).Reduce(sum,r));
 
       // write out the final reduced value
       if (threadIdx.y*block_size_x + threadIdx.x == 0) {
@@ -124,8 +138,8 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename T>
-  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T>(arg, in, idx); }
+  template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
+  __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
   __shared__ volatile bool isLastWarpDone[16];
@@ -181,19 +195,6 @@ namespace quda {
     }
   }
 #endif // __COMPUTE_CAPABILITY__ >= 300
-
-  /**
-     struct which acts as a wrapper to a vector of data.
-   */
-  template <typename scalar, int n>
-  struct vector_type {
-    scalar data[n];
-    __device__ __host__ inline scalar& operator[](int i) { return data[i]; }
-    __device__ __host__ inline const scalar& operator[](int i) const { return data[i]; }
-    __device__ __host__ inline static constexpr int size() { return n; }
-    __device__ __host__ inline void operator+=(const vector_type &a) { for (int i=0; i<n; i++) data[i] += a[i]; }
-    __device__ __host__ vector_type() { for (int i=0; i<n; i++) zero(data[i]); }
-  };
 
   /**
      functor that defines how to do a row-wise vector reduction

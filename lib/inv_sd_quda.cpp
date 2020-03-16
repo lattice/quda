@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <iostream>
 
 #include <quda_internal.h>
 #include <color_spinor_field.h>
@@ -8,18 +9,13 @@
 #include <dslash_quda.h>
 #include <invert_quda.h>
 #include <util_quda.h>
-#include <sys/time.h>
-
-#include <face_quda.h>
-#include <iostream>
-
 
 namespace quda {
 
   using namespace blas;
   
-  SD::SD(DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
-    Solver(param,profile), mat(mat), init(false)
+  SD::SD(const DiracMatrix &mat, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, mat, mat, param, profile), init(false)
   {
 
   }
@@ -51,14 +47,14 @@ namespace quda {
     zero(*r), zero(x);
     double r2 = xmyNorm(b,*r);
     double alpha=0.; 
-    double2 rAr;
+    double3 rAr;
 
     int k=0;
     while(k < param.maxiter-1){
 
       mat(*Ar, *r, *y);
-      rAr = reDotProductNormA(*r, *Ar);
-      alpha = rAr.y/rAr.x;
+      rAr = cDotProductNormA(*r, *Ar);
+      alpha = rAr.z/rAr.x;
       axpy(alpha, *r, x);
       axpy(-alpha, *Ar, *r);
 
@@ -71,8 +67,8 @@ namespace quda {
     }
 
 
-    rAr = reDotProductNormA(*r, *Ar);
-    alpha = rAr.y/rAr.x;
+    rAr = cDotProductNormA(*r, *Ar);
+    alpha = rAr.z/rAr.x;
     axpy(alpha, *r, x);
     if(getVerbosity() >= QUDA_VERBOSE){
       axpy(-alpha, *Ar, *r);

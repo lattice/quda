@@ -14,11 +14,8 @@ namespace quda {
      @param u[in] The input gauge field
      @param coeff[in] Array of path coefficients
   */
-  void fatLongKSLink(cudaGaugeField* fat,
-		     cudaGaugeField* lng,
-		     const cudaGaugeField& gauge,
-		     const double* coeff);
-  
+  void fatLongKSLink(GaugeField *fat, GaugeField *lng, const GaugeField &u, const double *coeff);
+
 } // namespace quda
 
 #endif // _LLFAT_QUDA_H

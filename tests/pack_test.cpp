@@ -7,6 +7,7 @@
 #include <util_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 
 #include <color_spinor_field.h>
@@ -23,19 +24,8 @@ cpuColorSpinorField *spinor, *spinor2;
 
 ColorSpinorParam csParam;
 
-float kappa = 1.0;
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern char latfile[];
-extern int gridsize_from_cmdline[];
     
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
@@ -72,11 +62,11 @@ void init() {
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = param.X[d];
-  csParam.precision = prec_cpu;
+  csParam.setPrecision(prec_cpu);
   csParam.pad = 0;
   csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
   csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_COLOR_SPIN_FIELD_ORDER;
+  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.create = QUDA_NULL_FIELD_CREATE;
 
@@ -89,7 +79,8 @@ void init() {
 
   setVerbosityQuda(QUDA_VERBOSE, "", stdout);
 
-  csParam.setPrecision(prec);
+  csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
+  csParam.setPrecision(QUDA_DOUBLE_PRECISION);
   csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   csParam.pad = param.X[0] * param.X[1] * param.X[2];
 
@@ -109,25 +100,18 @@ void end() {
 
 void packTest() {
 
-  float spinorGiB = (float)Vh*spinorSiteSize*param.cuda_prec / (1 << 30);
-  printf("\nSpinor mem: %.3f GiB\n", spinorGiB);
-  printf("Gauge mem: %.3f GiB\n", param.gaugeGiB);
-
   printf("Sending fields to GPU...\n"); fflush(stdout);
   
 #ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
-    
+
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
-    cpsParam.precision = param.cuda_prec;
     cpsParam.reconstruct = param.reconstruct;
+    cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cpsParam.order = (cpsParam.precision == QUDA_DOUBLE_PRECISION || 
-		      cpsParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
@@ -145,16 +129,13 @@ void packTest() {
 #ifdef BUILD_QDP_INTERFACE
   {
     param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-    
+
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
-    qdpParam.precision = param.cuda_prec;
     qdpParam.reconstruct = param.reconstruct;
+    qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    qdpParam.order = (qdpParam.precision == QUDA_DOUBLE_PRECISION || 
-		      qdpParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
@@ -191,16 +172,16 @@ void packTest() {
 
 }
 
-extern void usage(char**);
-
 int main(int argc, char **argv) {
-  for (int i=1; i<argc; i++){    
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

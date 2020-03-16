@@ -243,10 +243,10 @@ namespace quda {
 #ifdef MULTI_GPU
         if(commDimPartitioned(dim) && dim!=3){
           face->pack(src, 1-parity, dagger, dim, dir, streams); // pack in stream[1]
-          cudaEventRecord(packEnd, streams[1]);
-          cudaStreamWaitEvent(streams[1], packEnd, 0); // wait for pack to end in stream[1]
+          qudaEventRecord(packEnd, streams[1]);
+          qudaStreamWaitEvent(streams[1], packEnd, 0); // wait for pack to end in stream[1]
           face->gather(src, dagger, 2*dim+offset, 1); // copy packed data from device buffer to host and do this in stream[1] 
-          cudaEventRecord(gatherEnd, streams[1]); // record the completion of face->gather
+          qudaEventRecord(gatherEnd, streams[1]); // record the completion of face->gather
         }
 #endif
 
@@ -270,8 +270,8 @@ namespace quda {
               break;
             }
           } // while(1) 
-          cudaEventRecord(scatterEnd, streams[1]);
-          cudaStreamWaitEvent(streams[1], scatterEnd, 0);
+          qudaEventRecord(scatterEnd, streams[1]);
+          qudaStreamWaitEvent(streams[1], scatterEnd, 0);
           shiftColorSpinor.apply(1);
         }
 #endif

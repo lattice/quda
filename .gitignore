@@ -13,3 +13,10 @@ profile.tsv
 config.log
 CMakeCache.txt
 CMakeFiles
+externals
+!include/externals
+include/quda_define.h
+include/jitify_options.hpp
+.tags*
+autom4te.cache/*
+.vscode

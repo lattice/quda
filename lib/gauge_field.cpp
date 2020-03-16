@@ -4,8 +4,10 @@
 
 namespace quda {
 
-  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) : LatticeFieldParam(u),
-    nColor(3),
+  GaugeFieldParam::GaugeFieldParam(const GaugeField &u) :
+    LatticeFieldParam(u),
+    location(u.Location()),
+    nColor(u.Ncolor()),
     nFace(u.Nface()),
     reconstruct(u.Reconstruct()),
     order(u.Order()),
@@ -14,25 +16,44 @@ namespace quda {
     t_boundary(u.TBoundary()),
     anisotropy(u.Anisotropy()),
     tadpole(u.Tadpole()),
-    scale(u.Scale()),
     gauge(NULL),
     create(QUDA_NULL_FIELD_CREATE),
     geometry(u.Geometry()),
     compute_fat_link_max(false),
     staggeredPhaseType(u.StaggeredPhase()),
     staggeredPhaseApplied(u.StaggeredPhaseApplied()),
-    i_mu(u.iMu()) { }
-
+    i_mu(u.iMu()),
+    site_offset(u.SiteOffset()),
+    site_size(u.SiteSize())
+  { }
 
   GaugeField::GaugeField(const GaugeFieldParam &param) :
-    LatticeField(param), bytes(0), phase_offset(0), phase_bytes(0), nColor(param.nColor), nFace(param.nFace),
-    geometry(param.geometry), reconstruct(param.reconstruct), 
+    LatticeField(param),
+    bytes(0),
+    phase_offset(0),
+    phase_bytes(0),
+    nColor(param.nColor),
+    nFace(param.nFace),
+    geometry(param.geometry),
+    reconstruct(param.reconstruct),
     nInternal(reconstruct != QUDA_RECONSTRUCT_NO ? reconstruct : nColor * nColor * 2),
-    order(param.order), fixed(param.fixed), link_type(param.link_type), t_boundary(param.t_boundary), 
-    anisotropy(param.anisotropy), tadpole(param.tadpole), fat_link_max(0.0), scale(param.scale),  
+    order(param.order),
+    fixed(param.fixed),
+    link_type(param.link_type),
+    t_boundary(param.t_boundary),
+    anisotropy(param.anisotropy),
+    tadpole(param.tadpole),
+    fat_link_max(link_type == QUDA_ASQTAD_FAT_LINKS ? 0.0 : 1.0),
     create(param.create),
-    staggeredPhaseType(param.staggeredPhaseType), staggeredPhaseApplied(param.staggeredPhaseApplied), i_mu(param.i_mu)
+    staggeredPhaseType(param.staggeredPhaseType),
+    staggeredPhaseApplied(param.staggeredPhaseApplied),
+    i_mu(param.i_mu),
+    site_offset(param.site_offset),
+    site_size(param.site_size)
   {
+    if (order == QUDA_NATIVE_GAUGE_ORDER) errorQuda("Invalid gauge order %d", order);
+    if (ghost_precision != precision) ghost_precision = precision; // gauge fields require matching precision
+
     if (link_type != QUDA_COARSE_LINKS && nColor != 3)
       errorQuda("nColor must be 3, not %d for this link type", nColor);
     if (nDim != 4)
@@ -41,30 +62,30 @@ namespace quda {
       errorQuda("Anisotropy only supported for Wilson links");
     if (link_type != QUDA_WILSON_LINKS && fixed == QUDA_GAUGE_FIXED_YES)
       errorQuda("Temporal gauge fixing only supported for Wilson links");
-
-    if(link_type != QUDA_ASQTAD_LONG_LINKS && (reconstruct ==  QUDA_RECONSTRUCT_13 || reconstruct == QUDA_RECONSTRUCT_9))
-      errorQuda("reconstruct %d only supported for staggered long links\n", reconstruct);
-       
-    if (link_type == QUDA_ASQTAD_MOM_LINKS) scale = 1.0;
-
-    if(geometry == QUDA_SCALAR_GEOMETRY) {
+    if (geometry == QUDA_SCALAR_GEOMETRY) {
       real_length = volume*nInternal;
       length = 2*stride*nInternal; // two comes from being full lattice
     } else if (geometry == QUDA_VECTOR_GEOMETRY) {
       real_length = nDim*volume*nInternal;
       length = 2*nDim*stride*nInternal; // two comes from being full lattice
-    } else if(geometry == QUDA_TENSOR_GEOMETRY){
+    } else if (geometry == QUDA_TENSOR_GEOMETRY) {
       real_length = (nDim*(nDim-1)/2)*volume*nInternal;
       length = 2*(nDim*(nDim-1)/2)*stride*nInternal; // two comes from being full lattice
-    } else if(geometry == QUDA_COARSE_GEOMETRY){
+    } else if (geometry == QUDA_COARSE_GEOMETRY) {
       real_length = 2*nDim*volume*nInternal;
       length = 2*2*nDim*stride*nInternal;  //two comes from being full lattice
     }
 
+    if ((reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_8) && link_type != QUDA_SU3_LINKS) {
+      errorQuda("Cannot request a 12/8 reconstruct type without SU(3) link type");
+    }
+
     if (reconstruct == QUDA_RECONSTRUCT_9 || reconstruct == QUDA_RECONSTRUCT_13) {
-      // Need to adjust the phase alignment as well.  
-      int half_phase_bytes = ((size_t)length/(2*reconstruct))*precision; // number of bytes needed to store phases for a single parity
-      int half_gauge_bytes = ((size_t)length/2)*precision - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
+      // Need to adjust the phase alignment as well.
+      int half_phase_bytes
+        = (length / (2 * reconstruct)) * precision; // number of bytes needed to store phases for a single parity
+      int half_gauge_bytes = (length / 2) * precision
+        - half_phase_bytes; // number of bytes needed to store the gauge field for a single parity excluding the phases
       // Adjust the alignments for the gauge and phase separately
       half_phase_bytes = ((half_phase_bytes + (512-1))/512)*512;
       half_gauge_bytes = ((half_gauge_bytes + (512-1))/512)*512;
@@ -73,18 +94,57 @@ namespace quda {
       phase_bytes = half_phase_bytes*2;
       bytes = (half_gauge_bytes + half_phase_bytes)*2;      
     } else {
-      bytes = (size_t)length*precision;
+      bytes = length * precision;
       if (isNative()) bytes = 2*ALIGNMENT_ADJUST(bytes/2);
     }
     total_bytes = bytes;
+
+    setTuningString();
   }
 
   GaugeField::~GaugeField() {
 
   }
 
-  void GaugeField::applyStaggeredPhase() {
+  void GaugeField::setTuningString() {
+    LatticeField::setTuningString();
+    int aux_string_n = TuneKey::aux_n / 2;
+    int check = snprintf(aux_string, aux_string_n, "vol=%lu,stride=%lu,precision=%d,geometry=%d,Nc=%d", volume, stride,
+                         precision, geometry, nColor);
+    if (check < 0 || check >= aux_string_n) errorQuda("Error writing aux string");
+  }
+
+  void GaugeField::createGhostZone(const int *R, bool no_comms_fill, bool bidir) const
+  {
+    if (typeid(*this) == typeid(cpuGaugeField)) return;
+
+    // if this is not a bidirectional exchange then we are doing a
+    // scalar exchange, e.g., only the link matrix in the direcion we
+    // are exchanging is exchanged, and none of the orthogonal links
+    QudaFieldGeometry geometry_comms = bidir ? (geometry == QUDA_COARSE_GEOMETRY ? QUDA_VECTOR_GEOMETRY : geometry) : QUDA_SCALAR_GEOMETRY;
+
+    // calculate size of ghost zone required
+    ghost_bytes_old = ghost_bytes; // save for subsequent resize checking
+    ghost_bytes = 0;
+    for (int i=0; i<nDim; i++) {
+      ghost_face_bytes[i] = 0;
+      if ( !(comm_dim_partitioned(i) || (no_comms_fill && R[i])) ) ghostFace[i] = 0;
+      else ghostFace[i] = surface[i] * R[i]; // includes the radius (unlike ColorSpinorField)
+
+      ghostOffset[i][0] = (i == 0) ? 0 : ghostOffset[i-1][1] + ghostFace[i-1]*geometry_comms*nInternal;
+      ghostOffset[i][1] = (bidir ? ghostOffset[i][0] + ghostFace[i]*geometry_comms*nInternal : ghostOffset[i][0]);
+
+      ghost_face_bytes[i] = ghostFace[i] * geometry_comms * nInternal * ghost_precision;
+      ghost_bytes += (bidir ? 2 : 1 ) * ghost_face_bytes[i]; // factor of two from direction
+    }
+
+    if (isNative()) ghost_bytes = ALIGNMENT_ADJUST(ghost_bytes);
+  } // createGhostZone
+
+  void GaugeField::applyStaggeredPhase(QudaStaggeredPhase phase) {
     if (staggeredPhaseApplied) errorQuda("Staggered phases already applied");
+
+    if (phase != QUDA_STAGGERED_PHASE_INVALID) staggeredPhaseType = phase;
     applyGaugePhase(*this);
     if (ghostExchange==QUDA_GHOST_EXCHANGE_PAD) {
       if (typeid(*this)==typeid(cudaGaugeField)) {
@@ -109,23 +169,7 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
-  bool GaugeField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || 
-	       precision == QUDA_HALF_PRECISION) {
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      }
-    }
-    return false;
-  }
+  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
@@ -218,7 +262,6 @@ namespace quda {
       if (g.t_boundary != t_boundary) errorQuda("t_boundary does not match %d %d", t_boundary, g.t_boundary);
       if (g.anisotropy != anisotropy) errorQuda("anisotropy does not match %e %e", anisotropy, g.anisotropy);
       if (g.tadpole != tadpole) errorQuda("tadpole does not match %e %e", tadpole, g.tadpole);
-      //if (a.scale != scale) errorQuda("scale does not match %e %e", scale, a.scale);
     }
     catch(std::bad_cast &e) {
       errorQuda("Failed to cast reference to GaugeField");
@@ -239,7 +282,6 @@ namespace quda {
     output << "t_boundary = " << param.t_boundary << std::endl;
     output << "anisotropy = " << param.anisotropy << std::endl;
     output << "tadpole = " << param.tadpole << std::endl;
-    output << "scale = " << param.scale << std::endl;
     output << "create = " << param.create << std::endl;
     output << "geometry = " << param.geometry << std::endl;
     output << "staggeredPhaseType = " << param.staggeredPhaseType << std::endl;
@@ -255,15 +297,15 @@ namespace quda {
     if (a.LinkType() == QUDA_COARSE_LINKS) errorQuda("Not implemented for coarse-link type");
     if (a.Ncolor() != 3) errorQuda("Not implemented for Ncolor = %d", a.Ncolor());
 
-    if (a.Precision() == QUDA_HALF_PRECISION)
-      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half precision");
+    if (a.Precision() == QUDA_HALF_PRECISION || a.Precision() == QUDA_QUARTER_PRECISION)
+      errorQuda("Casting a GaugeField into ColorSpinorField not possible in half or quarter precision");
 
     ColorSpinorParam spinor_param;
     spinor_param.nColor = (a.Geometry()*a.Reconstruct())/2;
     spinor_param.nSpin = 1;
     spinor_param.nDim = a.Ndim();
     for (int d=0; d<a.Ndim(); d++) spinor_param.x[d] = a.X()[d];
-    spinor_param.precision = a.Precision();
+    spinor_param.setPrecision(a.Precision());
     spinor_param.pad = a.Pad();
     spinor_param.siteSubset = QUDA_FULL_SITE_SUBSET;
     spinor_param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
@@ -290,6 +332,31 @@ namespace quda {
     double nrm1 = blas::norm1(*b);
     delete b;
     return nrm1;
+  }
+
+  // Scale the gauge field by the constant a
+  void ax(const double &a, GaugeField &u) {
+    ColorSpinorField *b = ColorSpinorField::Create(colorSpinorParam(u));
+    blas::ax(a, *b);
+    delete b;
+  }
+
+  uint64_t GaugeField::checksum(bool mini) const {
+    return Checksum(*this, mini);
+  }
+
+  GaugeField* GaugeField::Create(const GaugeFieldParam &param) {
+
+    GaugeField *field = nullptr;
+    if (param.location == QUDA_CPU_FIELD_LOCATION) {
+      field = new cpuGaugeField(param);
+    } else if (param.location== QUDA_CUDA_FIELD_LOCATION) {
+      field = new cudaGaugeField(param);
+    } else {
+      errorQuda("Invalid field location %d", param.location);
+    }
+
+    return field;
   }
 
 } // namespace quda

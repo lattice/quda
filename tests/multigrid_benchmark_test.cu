@@ -6,32 +6,15 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
-#include <face_quda.h>
+#include <test_params.h>
 #include <misc.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
 #include <dirac_quda.h>
-#include <algorithm>
 
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
-extern int Nsrc; // number of spinors to apply to simultaneously
-
-extern bool verify_results;
-
-extern int test_type;
-
-extern QudaPrecision prec;
 
 extern void usage(char** );
 
@@ -45,6 +28,8 @@ cudaGaugeField *Y_d, *X_d, *Xinv_d, *Yhat_d;
 
 int Nspin;
 int Ncolor;
+
+#define MAX(a,b) ((a)>(b)?(a):(b))
 
 void
 display_test_info()
@@ -75,11 +60,11 @@ void initFields(QudaPrecision prec)
   param.x[2] = zdim;
   param.x[3] = tdim;
   param.x[4] = Nsrc;
-  param.PCtype = QUDA_4D_PC;
+  param.pc_type = QUDA_4D_PC;
 
   param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
   param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  param.precision = QUDA_DOUBLE_PRECISION;
+  param.setPrecision(QUDA_DOUBLE_PRECISION);
   param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
 
   param.create = QUDA_ZERO_FIELD_CREATE;
@@ -95,7 +80,7 @@ void initFields(QudaPrecision prec)
 
   if (param.nSpin == 4) param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   param.create = QUDA_ZERO_FIELD_CREATE;
-  param.precision = prec;
+  param.setPrecision(prec);
   param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
 
   xD = new cudaColorSpinorField(param);
@@ -118,7 +103,7 @@ void initFields(QudaPrecision prec)
   gParam.link_type = QUDA_COARSE_LINKS;
   gParam.t_boundary = QUDA_PERIODIC_T;
   gParam.create = QUDA_ZERO_FIELD_CREATE;
-  gParam.precision = param.precision;
+  gParam.setPrecision(param.Precision());
   gParam.nDim = 4;
   gParam.siteSubset = QUDA_FULL_SITE_SUBSET;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
@@ -129,16 +114,25 @@ void initFields(QudaPrecision prec)
   Yhat_h = new cpuGaugeField(gParam);
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
+  gParam.nFace = 0;
   X_h = new cpuGaugeField(gParam);
   Xinv_h = new cpuGaugeField(gParam);
 
   gParam.order = QUDA_FLOAT2_GAUGE_ORDER;
   gParam.geometry = QUDA_COARSE_GEOMETRY;
-  int pad = std::max( { (gParam.x[0]*gParam.x[1]*gParam.x[2])/2,
-	(gParam.x[1]*gParam.x[2]*gParam.x[3])/2,
-	(gParam.x[0]*gParam.x[2]*gParam.x[3])/2,
-	(gParam.x[0]*gParam.x[1]*gParam.x[3])/2 } );
-  gParam.pad = gParam.nFace * pad;
+  gParam.nFace = 1;
+
+  int x_face_size = gParam.x[1]*gParam.x[2]*gParam.x[3]/2;
+  int y_face_size = gParam.x[0]*gParam.x[2]*gParam.x[3]/2;
+  int z_face_size = gParam.x[0]*gParam.x[1]*gParam.x[3]/2;
+  int t_face_size = gParam.x[0]*gParam.x[1]*gParam.x[2]/2;
+  int pad = MAX(x_face_size, y_face_size);
+  pad = MAX(pad, z_face_size);
+  pad = MAX(pad, t_face_size);
+  gParam.pad = gParam.nFace * pad * 2;
+
+  gParam.setPrecision(prec_sloppy);
+
   Y_d = new cudaGaugeField(gParam);
   Yhat_d = new cudaGaugeField(gParam);
   Y_d->copy(*Y_h);
@@ -146,6 +140,7 @@ void initFields(QudaPrecision prec)
 
   gParam.geometry = QUDA_SCALAR_GEOMETRY;
   gParam.ghostExchange = QUDA_GHOST_EXCHANGE_NO;
+  gParam.nFace = 0;
   X_d = new cudaGaugeField(gParam);
   Xinv_d = new cudaGaugeField(gParam);
   X_d->copy(*X_h);
@@ -215,13 +210,24 @@ const char *names[] = {
 
 int main(int argc, char** argv)
 {
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // Set some defaults that lets the benchmark fit in memory if you run it
+  // with default parameters.
+  xdim = ydim = zdim = tdim = 8;
+
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  add_multigrid_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"Dslash", 0}, {"Mat", 1}, {"Clover", 2}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
+  if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
 
   initComms(argc, argv, gridsize_from_cmdline);
   display_test_info();
@@ -233,12 +239,13 @@ int main(int argc, char** argv)
   Nspin = 2;
 
   printfQuda("\nBenchmarking %s precision with %d iterations...\n\n", get_prec_str(prec), niter);
-  for (int c=4; c<=32; c+=4) {
+  for (int c=24; c<=32; c+=8) {
     Ncolor = c;
 
     initFields(prec);
 
     DiracParam param;
+    param.halo_precision = smoother_halo_prec;
     dirac = new DiracCoarse(param, Y_h, X_h, Xinv_h, Yhat_h, Y_d, X_d, Xinv_d, Yhat_d);
 
     // do the initial tune

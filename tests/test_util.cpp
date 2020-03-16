@@ -4,16 +4,15 @@
 #include <string.h>
 #include <short.h>
 
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
+#include <comm_quda.h>
+
+// This contains the appropriate ifdef guards already
+#include <mpi_comm_handle.h>
 
 #include <wilson_dslash_reference.h>
 #include <test_util.h>
+#include <test_params.h>
 
-#include <face_quda.h>
 #include <dslash_quda.h>
 #include "misc.h"
 
@@ -33,7 +32,7 @@ int Vsh_x, Vsh_y, Vsh_z, Vsh_t;
 int faceVolume[4];
 
 //extended volume, +4
-int E1, E1h, E2, E3, E4; 
+int E1, E1h, E2, E3, E4;
 int E[4];
 int V_ex, Vh_ex;
 
@@ -45,28 +44,98 @@ int mySpinorSiteSize;
 
 extern float fat_link_max;
 
-void initComms(int argc, char **argv, const int *commDims)
+extern "C" {
+  /**
+     @brief Set the default ASAN options.  This ensures that QUDA just
+     works when SANITIZE is enabled without requiring ASAN_OPTIONS to
+     be set.
+   */
+  const char *__asan_default_options()
+  {
+    return "protect_shadow_gap=0";
+  }
+}
+
+/**
+ * For MPI, the default node mapping is lexicographical with t varying fastest.
+ */
+
+void get_gridsize_from_env(int *const dims)
 {
+  char *grid_size_env = getenv("QUDA_TEST_GRID_SIZE");
+  if (grid_size_env) {
+    std::stringstream grid_list(grid_size_env);
+
+    int dim;
+    int i = 0;
+    while (grid_list >> dim) {
+      if (i >= 4) errorQuda("Unexpected grid size array length");
+      dims[i] = dim;
+      if (grid_list.peek() == ',') grid_list.ignore();
+      i++;
+    }
+  }
+}
+
+static int lex_rank_from_coords_t(const int *coords, void *fdata)
+{
+  int rank = coords[0];
+  for (int i = 1; i < 4; i++) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+static int lex_rank_from_coords_x(const int *coords, void *fdata)
+{
+  int rank = coords[3];
+  for (int i = 2; i >= 0; i--) {
+    rank = gridsize_from_cmdline[i] * rank + coords[i];
+  }
+  return rank;
+}
+
+void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
+
+void initComms(int argc, char **argv, int *const commDims)
+{
+  if (getenv("QUDA_TEST_GRID_SIZE")) get_gridsize_from_env(commDims);
+
 #if defined(QMP_COMMS)
   QMP_thread_level_t tl;
   QMP_init_msg_passing(&argc, &argv, QMP_THREAD_SINGLE, &tl);
 
-  // FIXME? - tests crash without this
-  QMP_declare_logical_topology(commDims, 4);
-
+  // make sure the QMP logical ordering matches QUDA's
+  if (rank_order == 0) {
+    int map[] = {3, 2, 1, 0};
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  } else {
+    int map[] = { 0, 1, 2, 3 };
+    QMP_declare_logical_topology_map(commDims, 4, map, 4);
+  }
 #elif defined(MPI_COMMS)
-#ifdef PTHREADS
-  int provided;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
-#else
   MPI_Init(&argc, &argv);
 #endif
 
-#endif
-  initCommsGridQuda(4, commDims, NULL, NULL);
+  QudaCommsMap func = rank_order == 0 ? lex_rank_from_coords_t : lex_rank_from_coords_x;
+
+  initCommsGridQuda(4, commDims, func, NULL);
   initRand();
+
+  printfQuda("Rank order is %s major (%s running fastest)\n",
+	     rank_order == 0 ? "column" : "row", rank_order == 0 ? "t" : "x");
+
 }
 
+bool last_node_in_t()
+{
+  // only apply T-boundary at edge nodes
+#ifdef MULTI_GPU
+  return commCoords(3) == commDim(3) - 1;
+#else
+  return true;
+#endif
+}
 
 void finalizeComms()
 {
@@ -109,7 +178,7 @@ void setDims(int *X) {
   Vs_y = X[0]*X[2]*X[3];
   Vs_z = X[0]*X[1]*X[3];
   Vs_t = X[0]*X[1]*X[2];
-  
+
   Vsh_x = Vs_x/2;
   Vsh_y = Vs_y/2;
   Vsh_z = Vs_z/2;
@@ -127,12 +196,10 @@ void setDims(int *X) {
 
 }
 
-
-void dw_setDims(int *X, const int L5) 
+void dw_setDims(int *X, const int L5)
 {
   V = 1;
-  for (int d=0; d< 4; d++) 
-  {
+  for (int d = 0; d < 4; d++) {
     V *= X[d];
     Z[d] = X[d];
 
@@ -143,7 +210,7 @@ void dw_setDims(int *X, const int L5)
     }
   }
   Vh = V/2;
-  
+
   Ls = L5;
   V5 = V*Ls;
   V5h = Vh*Ls;
@@ -179,7 +246,7 @@ void printGaugeElement(void *gauge, int X, QudaPrecision precision) {
       for (int m=0; m<3; m++) printVector((double*)gauge +(X/2)*gaugeSiteSize + m*3*2);
     else
       for (int m=0; m<3; m++) printVector((float*)gauge +(X/2)*gaugeSiteSize + m*3*2);
-      
+
   } else {
     if (precision == QUDA_DOUBLE_PRECISION)
       for (int m = 0; m < 3; m++) printVector((double*)gauge + (X/2+Vh)*gaugeSiteSize + m*3*2);
@@ -276,7 +343,7 @@ void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision pre
 
 // given first two rows (u,v) of SU(3) matrix mat, reconstruct the third row
 // as the cross product of the conjugate vectors: w = u* x v*
-// 
+//
 // 48 flops
 template <typename Float>
 static void su3Reconstruct12(Float *mat, int dir, int ga_idx, QudaGaugeParam *param) {
@@ -364,28 +431,6 @@ void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconst
   }
 }
 
-/*
-  void su3_construct_8_half(float *mat, short *mat_half) {
-  su3Construct8(mat);
-
-  mat_half[0] = floatToShort(mat[0] / M_PI);
-  mat_half[1] = floatToShort(mat[1] / M_PI);
-  for (int i=2; i<18; i++) {
-  mat_half[i] = floatToShort(mat[i]);
-  }
-  }
-
-  void su3_reconstruct_8_half(float *mat, short *mat_half, int dir, int ga_idx, QudaGaugeParam *param) {
-
-  for (int i=0; i<18; i++) {
-  mat[i] = shortToFloat(mat_half[i]);
-  }
-  mat[0] *= M_PI;
-  mat[1] *= M_PI;
-
-  su3Reconstruct8(mat, dir, ga_idx, param);
-  }*/
-
 template <typename Float>
 static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   for (int i = 0; i < len; i++) {
@@ -410,7 +455,7 @@ int fullLatticeIndex(int dim[4], int index, int oddBit){
   int x2 = za - zb*dim[1];
   int x4 = zb/dim[2];
   int x3 = zb - x4*dim[2];
-  
+
   return  2*index + ((x2 + x3 + x4 + oddBit) & 1);
 }
 
@@ -422,7 +467,7 @@ int fullLatticeIndex(int i, int oddBit) {
     return 2*i + (boundaryCrossings + oddBit) % 2;
   */
 
-  int X1 = Z[0];  
+  int X1 = Z[0];
   int X2 = Z[1];
   int X3 = Z[2];
   //int X4 = Z[3];
@@ -437,16 +482,15 @@ int fullLatticeIndex(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd; 
+  int X = 2 * sid + x1odd;
 
   return X;
 }
 
-
 // i represents a "half index" into an even or odd "half lattice".
 // when oddBit={0,1} the half lattice is {even,odd}.
-// 
-// the displacements, such as dx, refer to the full lattice coordinates. 
+//
+// the displacements, such as dx, refer to the full lattice coordinates.
 //
 // neighborIndex() takes a "half index", displaces it, and returns the
 // new "half index", which can be an index into either the even or odd lattices.
@@ -459,14 +503,14 @@ int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
   int x3 = (Y/(Z[1]*Z[0])) % Z[2];
   int x2 = (Y/Z[0]) % Z[1];
   int x1 = Y % Z[0];
-  
+
   // assert (oddBit == (x+y+z+t)%2);
-  
+
   x4 = (x4+dx4+Z[3]) % Z[3];
   x3 = (x3+dx3+Z[2]) % Z[2];
   x2 = (x2+dx2+Z[1]) % Z[1];
   x1 = (x1+dx1+Z[0]) % Z[0];
-  
+
   return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
 }
 
@@ -491,40 +535,37 @@ int
 neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
-  
+
   int Y = fullLatticeIndex(i, oddBit);
   int x4 = Y/(Z[2]*Z[1]*Z[0]);
   int x3 = (Y/(Z[1]*Z[0])) % Z[2];
   int x2 = (Y/Z[0]) % Z[1];
   int x1 = Y % Z[0];
-  
+
   int ghost_x4 = x4+ dx4;
-  
+
   // assert (oddBit == (x+y+z+t)%2);
-  
+
   x4 = (x4+dx4+Z[3]) % Z[3];
   x3 = (x3+dx3+Z[2]) % Z[2];
   x2 = (x2+dx2+Z[1]) % Z[1];
   x1 = (x1+dx1+Z[0]) % Z[0];
-  
+
   if ( (ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;    
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   }
 
-  
   return ret;
 }
 
-
-/*  
+/*
  * This is a computation of neighbor using the full index and the displacement in each direction
  *
  */
 
-int
-neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1) 
+int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -532,7 +573,7 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
     oddBit =1;
     half_idx = i - Vh;
   }
-    
+
   int nbr_half_idx = neighborIndex(half_idx, oddBit, dx4,dx3,dx2,dx1);
   int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
   if (oddBitChanged){
@@ -542,7 +583,7 @@ neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
   if (oddBit){
     ret = Vh + nbr_half_idx;
   }
-    
+
   return ret;
 }
 
@@ -569,10 +610,7 @@ neighborIndexFullLattice(int dim[4], int index, int dx[4])
   return neighborHalfIndex + oddBit*halfVolume;
 }
 
-
-
-int
-neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1) 
+int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
   int oddBit = 0;
@@ -581,14 +619,14 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
     oddBit =1;
     half_idx = i - Vh;
   }
-    
+
   int Y = fullLatticeIndex(half_idx, oddBit);
   int x4 = Y/(Z[2]*Z[1]*Z[0]);
   int x3 = (Y/(Z[1]*Z[0])) % Z[2];
   int x2 = (Y/Z[0]) % Z[1];
   int x1 = Y % Z[0];
   int ghost_x4 = x4+ dx4;
-    
+
   x4 = (x4+dx4+Z[3]) % Z[3];
   x3 = (x3+dx3+Z[2]) % Z[2];
   x2 = (x2+dx2+Z[1]) % Z[1];
@@ -597,7 +635,7 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
   if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
     ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
   }else{
-    ret = (x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;    
+    ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
     return ret;
   }
 
@@ -605,11 +643,11 @@ neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
   if (oddBitChanged){
     oddBit = 1 - oddBit;
   }
-    
+
   if (oddBit){
     ret += Vh;
   }
-    
+
   return ret;
 }
 
@@ -626,7 +664,7 @@ int fullLatticeIndex_4d(int i, int oddBit) {
     return 2*i + (boundaryCrossings + oddBit) % 2;
   */
 
-  int X1 = Z[0];  
+  int X1 = Z[0];
   int X2 = Z[1];
   int X3 = Z[2];
   //int X4 = Z[3];
@@ -641,7 +679,7 @@ int fullLatticeIndex_4d(int i, int oddBit) {
   int x3 = zb - x4*X3;
   int x1odd = (x2 + x3 + x4 + oddBit) & 1;
   //int x1 = 2*x1h + x1odd;
-  int X = 2*sid + x1odd; 
+  int X = 2 * sid + x1odd;
 
   return X;
 }
@@ -663,8 +701,7 @@ int fullLatticeIndex_5d_4dpc(int i, int oddBit) {
   return 2*i + (boundaryCrossings + oddBit) % 2;
 }
 
-int 
-x4_from_full_index(int i)
+int x4_from_full_index(int i)
 {
   int oddBit = 0;
   int half_idx = i;
@@ -672,10 +709,10 @@ x4_from_full_index(int i)
     oddBit =1;
     half_idx = i - Vh;
   }
-  
+
   int Y = fullLatticeIndex(half_idx, oddBit);
   int x4 = Y/(Z[2]*Z[1]*Z[0]);
-  
+
   return x4;
 }
 
@@ -687,16 +724,9 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
       gauge[d][i] /= param->anisotropy;
     }
   }
-    
-  // only apply T-boundary at edge nodes
-#ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
-#else
-  bool last_node_in_t = true;
-#endif
 
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1); j < Vh; j++) {
       for (int i = 0; i < gaugeSiteSize; i++) {
 	gauge[3][j*gaugeSiteSize+i] *= -1.0;
@@ -704,11 +734,11 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
       }
     }
   }
-    
+
   if (param->gauge_fix) {
     // set all gauge links (except for the last Z[0]*Z[1]*Z[2]/2) to the identity,
     // to simulate fixing to the temporal gauge.
-    int iMax = ( last_node_in_t ? (Z[0]/2)*Z[1]*Z[2]*(Z[3]-1) : Vh );
+    int iMax = (last_node_in_t() ? (Z[0] / 2) * Z[1] * Z[2] * (Z[3] - 1) : Vh);
     int dir = 3; // time direction only
     Float *even = gauge[dir];
     Float *odd  = gauge[dir]+Vh*gaugeSiteSize;
@@ -728,7 +758,6 @@ static void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
 template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
-
   int X1h=param->X[0]/2;
   int X1 =param->X[0];
   int X2 =param->X[1];
@@ -812,9 +841,9 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   }
 
   // Apply boundary conditions to temporal links
-  if (param->t_boundary == QUDA_ANTI_PERIODIC_T) {
+  if (param->t_boundary == QUDA_ANTI_PERIODIC_T && last_node_in_t()) {
     for (int j = 0; j < Vh; j++) {
-      int sign =1;
+      int sign = 1;
       if (dslash_type == QUDA_ASQTAD_DSLASH) {
 	if (j >= (X4-3)*X1h*X2*X3 ){
 	  sign = -1;
@@ -831,19 +860,26 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
       }
     }
   }
-
 }
 
-
+void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type, QudaPrecision local_prec) {
+  if (local_prec == QUDA_DOUBLE_PRECISION) {
+    applyGaugeFieldScaling_long((double**)gauge, Vh, param, dslash_type);
+  } else if (local_prec == QUDA_SINGLE_PRECISION) {
+    applyGaugeFieldScaling_long((float**)gauge, Vh, param, dslash_type);
+  } else {
+    errorQuda("Invalid type %d for applyGaugeFieldScaling_long\n", local_prec);
+  }
+}
 
 template <typename Float>
 static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
   Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {  
+  for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
     resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
-    
+
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 0; m < 3; m++) {
@@ -856,7 +892,7 @@ static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
       }
     }
   }
-    
+
   applyGaugeFieldScaling(res, Vh, param);
 }
 
@@ -876,14 +912,15 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
   for (int i=0; i<len; i++) b[i] -= (complex<Float>)dot*a[i];
 }
 
-template <typename Float> 
-static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type=QUDA_WILSON_DSLASH) {
+template <typename Float>
+static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH)
+{
   Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {  
+  for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
     resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
-    
+
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
@@ -891,13 +928,13 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
 	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;                    
-	}
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+        }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
       normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
-      
+
       normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
       normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
@@ -906,8 +943,8 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
 	Float *w = resEven[dir]+(i*3+0)*3*2;
 	Float *u = resEven[dir]+(i*3+1)*3*2;
 	Float *v = resEven[dir]+(i*3+2)*3*2;
-	
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -920,8 +957,8 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
 	Float *w = resOdd[dir]+(i*3+0)*3*2;
 	Float *u = resOdd[dir]+(i*3+1)*3*2;
 	Float *v = resOdd[dir]+(i*3+2)*3*2;
-	
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -933,12 +970,12 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
     }
   }
 
-  if (param->type == QUDA_WILSON_LINKS){  
+  if (param->type == QUDA_WILSON_LINKS) {
     applyGaugeFieldScaling(res, Vh, param);
-  } else if (param->type == QUDA_ASQTAD_LONG_LINKS){
+  } else if (param->type == QUDA_ASQTAD_LONG_LINKS) {
     applyGaugeFieldScaling_long(res, Vh, param, dslash_type);
-  } else if (param->type == QUDA_ASQTAD_FAT_LINKS){
-    for (int dir = 0; dir < 4; dir++){ 
+  } else if (param->type == QUDA_ASQTAD_FAT_LINKS) {
+    for (int dir = 0; dir < 4; dir++) {
       for (int i = 0; i < Vh; i++) {
 	for (int m = 0; m < 3; m++) { // last 2 rows
 	  for (int n = 0; n < 3; n++) { // 3 columns
@@ -950,20 +987,17 @@ static void constructGaugeField(Float **res, QudaGaugeParam *param, QudaDslashTy
 	}
       }
     }
-    
   }
-
 }
 
-template <typename Float> 
-void constructUnitaryGaugeField(Float **res) 
+template <typename Float> void constructUnitaryGaugeField(Float **res)
 {
   Float *resOdd[4], *resEven[4];
-  for (int dir = 0; dir < 4; dir++) {  
+  for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
     resOdd[dir]  = res[dir]+Vh*gaugeSiteSize;
   }
-  
+
   for (int dir = 0; dir < 4; dir++) {
     for (int i = 0; i < Vh; i++) {
       for (int m = 1; m < 3; m++) { // last 2 rows
@@ -971,13 +1005,13 @@ void constructUnitaryGaugeField(Float **res)
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
 	  resEven[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;
 	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 0] = rand() / (Float)RAND_MAX;
-	  resOdd[dir][i*(3*3*2) + m*(3*2) + n*(2) + 1] = rand() / (Float)RAND_MAX;                    
-	}
+          resOdd[dir][i * (3 * 3 * 2) + m * (3 * 2) + n * (2) + 1] = rand() / (Float)RAND_MAX;
+        }
       }
       normalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resEven[dir] + (i*3+1)*3*2), (complex<Float>*)(resEven[dir] + (i*3+2)*3*2), 3);
       normalize((complex<Float>*)(resEven[dir] + (i*3 + 2)*3*2), 3);
-      
+
       normalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), 3);
       orthogonalize((complex<Float>*)(resOdd[dir] + (i*3+1)*3*2), (complex<Float>*)(resOdd[dir] + (i*3+2)*3*2), 3);
       normalize((complex<Float>*)(resOdd[dir] + (i*3 + 2)*3*2), 3);
@@ -986,8 +1020,8 @@ void constructUnitaryGaugeField(Float **res)
 	Float *w = resEven[dir]+(i*3+0)*3*2;
 	Float *u = resEven[dir]+(i*3+1)*3*2;
 	Float *v = resEven[dir]+(i*3+2)*3*2;
-	
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -995,13 +1029,13 @@ void constructUnitaryGaugeField(Float **res)
 	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
 	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
-      
+
       {
 	Float *w = resOdd[dir]+(i*3+0)*3*2;
 	Float *u = resOdd[dir]+(i*3+1)*3*2;
 	Float *v = resOdd[dir]+(i*3+2)*3*2;
-	
-	for (int n = 0; n < 6; n++) w[n] = 0.0;
+
+        for (int n = 0; n < 6; n++) w[n] = 0.0;
 	accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
 	accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
 	accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
@@ -1009,11 +1043,17 @@ void constructUnitaryGaugeField(Float **res)
 	accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
 	accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
       }
-      
     }
   }
 }
 
+template <typename Float> static void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type)
+{
+
+  if(type == 3)  applyGaugeFieldScaling_long((Float**)res, Vh, param, QUDA_STAGGERED_DSLASH);
+
+  return;
+}
 
 void construct_gauge_field(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param) {
   if (type == 0) {
@@ -1024,15 +1064,14 @@ void construct_gauge_field(void **gauge, int type, QudaPrecision precision, Quda
     else constructGaugeField((float**)gauge, param);
   } else {
     if (precision == QUDA_DOUBLE_PRECISION) applyGaugeFieldScaling((double**)gauge, Vh, param);
-    else applyGaugeFieldScaling((float**)gauge, Vh, param);    
+    else
+      applyGaugeFieldScaling((float **)gauge, Vh, param);
   }
 
 }
 
-void
-construct_fat_long_gauge_field(void **fatlink, void** longlink, int type, 
-			       QudaPrecision precision, QudaGaugeParam* param,
-			       QudaDslashType dslash_type)
+void construct_fat_long_gauge_field(void **fatlink, void **longlink, int type, QudaPrecision precision,
+    QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   if (type == 0) {
     if (precision == QUDA_DOUBLE_PRECISION) {
@@ -1046,56 +1085,65 @@ construct_fat_long_gauge_field(void **fatlink, void** longlink, int type,
     if (precision == QUDA_DOUBLE_PRECISION) {
       // if doing naive staggered then set to long links so that the staggered phase is applied
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((double**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((double**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((double**)fatlink, param, type);
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((double**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH)
+      {
+        if(type != 3) constructGaugeField((double**)longlink, param, dslash_type);
+        else applyStaggeredScaling((double**)longlink, param, type);
+      }
     }else {
       param->type = dslash_type == QUDA_ASQTAD_DSLASH ? QUDA_ASQTAD_FAT_LINKS : QUDA_ASQTAD_LONG_LINKS;
-      constructGaugeField((float**)fatlink, param, dslash_type);
+      if(type != 3) constructGaugeField((float**)fatlink, param, dslash_type);
+      else applyStaggeredScaling((float**)fatlink, param, type);
+
       param->type = QUDA_ASQTAD_LONG_LINKS;
-      if (dslash_type == QUDA_ASQTAD_DSLASH) constructGaugeField((float**)longlink, param, dslash_type);
+      if (dslash_type == QUDA_ASQTAD_DSLASH) {
+        if(type != 3) constructGaugeField((float**)longlink, param, dslash_type);
+        else applyStaggeredScaling((float**)longlink, param, type);
+      }
     }
-  }
 
-  if (param->reconstruct == QUDA_RECONSTRUCT_9 || param->reconstruct == QUDA_RECONSTRUCT_13) {
-    // incorporate non-trivial phase into long links
-
-    const double phase = (M_PI * rand())/RAND_MAX;
-    const complex<double> z = polar(1.0, phase);
-    for (int dir=0; dir<4; ++dir) {
-      for (int i=0; i<V; ++i) {
-        for (int j=0; j<gaugeSiteSize; j+=2) {
-          if (precision == QUDA_DOUBLE_PRECISION) {
-            complex<double> *l = (complex<double>*)( &(((double*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
-          } else {
-            complex<float> *l = (complex<float>*)( &(((float*)longlink[dir])[i*gaugeSiteSize + j]) );
-	    *l *= z;
+    if (dslash_type == QUDA_ASQTAD_DSLASH) {
+      // incorporate non-trivial phase into long links
+      const double phase = (M_PI * rand()) / RAND_MAX;
+      const complex<double> z = polar(1.0, phase);
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              complex<double> *l = (complex<double> *)(&(((double *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            } else {
+              complex<float> *l = (complex<float> *)(&(((float *)longlink[dir])[i * gaugeSiteSize + j]));
+              *l *= z;
+            }
           }
-        } 
+        }
+      }
+    }
+
+    if (type == 3) return;
+
+    // set all links to zero to emulate the 1-link operator (needed for host comparison)
+    if (dslash_type == QUDA_STAGGERED_DSLASH) {
+      for (int dir = 0; dir < 4; ++dir) {
+        for (int i = 0; i < V; ++i) {
+          for (int j = 0; j < gaugeSiteSize; j += 2) {
+            if (precision == QUDA_DOUBLE_PRECISION) {
+              ((double *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((double *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            } else {
+              ((float *)longlink[dir])[i * gaugeSiteSize + j] = 0.0;
+              ((float *)longlink[dir])[i * gaugeSiteSize + j + 1] = 0.0;
+            }
+          }
+        }
       }
     }
   }
-
-  // set all links to zero to emulate the 1-link operator (needed for host comparison)
-  if (dslash_type == QUDA_STAGGERED_DSLASH) { 
-    for(int dir=0; dir<4; ++dir){
-      for(int i=0; i<V; ++i){
-	for(int j=0; j<gaugeSiteSize; j+=2){
-	  if(precision == QUDA_DOUBLE_PRECISION){
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((double*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }else{
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j] = 0.0;
-	    ((float*)longlink[dir])[i*gaugeSiteSize + j + 1] = 0.0;
-	  }
-	} 
-      }
-    }
-  }
-
 }
-
 
 template <typename Float>
 static void constructCloverField(Float *res, double norm, double diag) {
@@ -1106,7 +1154,21 @@ static void constructCloverField(Float *res, double norm, double diag) {
     for (int j = 0; j < 72; j++) {
       res[i*72 + j] = c*rand() - norm;
     }
-    for (int j = 0; j< 6; j++) {
+
+    //impose clover symmetry on each chiral block
+    for (int ch=0; ch<2; ch++) {
+      res[i*72 + 3 + 36*ch] = -res[i*72 + 0 + 36*ch];
+      res[i*72 + 4 + 36*ch] = -res[i*72 + 1 + 36*ch];
+      res[i*72 + 5 + 36*ch] = -res[i*72 + 2 + 36*ch];
+      res[i*72 + 30 + 36*ch] = -res[i*72 + 6 + 36*ch];
+      res[i*72 + 31 + 36*ch] = -res[i*72 + 7 + 36*ch];
+      res[i*72 + 32 + 36*ch] = -res[i*72 + 8 + 36*ch];
+      res[i*72 + 33 + 36*ch] = -res[i*72 + 9 + 36*ch];
+      res[i*72 + 34 + 36*ch] = -res[i*72 + 16 + 36*ch];
+      res[i*72 + 35 + 36*ch] = -res[i*72 + 17 + 36*ch];
+    }
+
+    for (int j = 0; j<6; j++) {
       res[i*72 + j] += diag;
       res[i*72 + j+36] += diag;
     }
@@ -1122,8 +1184,8 @@ void construct_clover_field(void *clover, double norm, double diag, QudaPrecisio
 /*void strong_check(void *spinorRef, void *spinorGPU, int len, QudaPrecision prec) {
   printf("Reference:\n");
   printSpinorElement(spinorRef, 0, prec); printf("...\n");
-  printSpinorElement(spinorRef, len-1, prec); printf("\n");    
-    
+  printSpinorElement(spinorRef, len-1, prec); printf("\n");
+
   printf("\nCUDA:\n");
   printSpinorElement(spinorGPU, 0, prec); printf("...\n");
   printSpinorElement(spinorGPU, len-1, prec); printf("\n");
@@ -1159,41 +1221,31 @@ static void checkGauge(Float **oldG, Float **newG, double epsilon) {
 
   printf("\nDeviation Failures = (X, Y, Z, T)\n");
   for (int f=0; f<fail_check; f++) {
-    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0,-(f+1)), 
-	   fail[0][f], fail[1][f], fail[2][f], fail[3][f],
-	   fail[0][f]/(double)(V*18), fail[1][f]/(double)(V*18), fail[2][f]/(double)(V*18), fail[3][f]/(double)(V*18));
+    printf("%e Failures = (%9d, %9d, %9d, %9d) = (%6.5f, %6.5f, %6.5f, %6.5f)\n", pow(10.0, -(f + 1)), fail[0][f],
+           fail[1][f], fail[2][f], fail[3][f], fail[0][f] / (double)(V * 18), fail[1][f] / (double)(V * 18),
+           fail[2][f] / (double)(V * 18), fail[3][f] / (double)(V * 18));
   }
 
 }
 
 void check_gauge(void **oldG, void **newG, double epsilon, QudaPrecision precision) {
-  if (precision == QUDA_DOUBLE_PRECISION) 
+  if (precision == QUDA_DOUBLE_PRECISION)
     checkGauge((double**)oldG, (double**)newG, epsilon);
-  else 
+  else
     checkGauge((float**)oldG, (float**)newG, epsilon);
 }
 
-
-
-void 
-createSiteLinkCPU(void** link,  QudaPrecision precision, int phase) 
+void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
 {
-    
+
   if (precision == QUDA_DOUBLE_PRECISION) {
     constructUnitaryGaugeField((double**)link);
   }else {
     constructUnitaryGaugeField((float**)link);
   }
 
-  // only apply temporal boundary condition if I'm the last node in T
-#ifdef MULTI_GPU
-  bool last_node_in_t = (commCoords(3) == commDim(3)-1) ? true : false;
-#else
-  bool last_node_in_t = true;
-#endif
-
   if(phase){
-	
+
     for(int i=0;i < V;i++){
       for(int dir =XUP; dir <= TUP; dir++){
 	int idx = i;
@@ -1212,9 +1264,9 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	int i4 = full_idx /(X3*X2*X1);
 	int i3 = (full_idx - i4*(X3*X2*X1))/(X2*X1);
 	int i2 = (full_idx - i4*(X3*X2*X1) - i3*(X2*X1))/X1;
-	int i1 = full_idx - i4*(X3*X2*X1) - i3*(X2*X1) - i2*X1;	    
+        int i1 = full_idx - i4 * (X3 * X2 * X1) - i3 * (X2 * X1) - i2 * X1;
 
-	double coeff= 1.0;
+        double coeff= 1.0;
 	switch(dir){
 	case XUP:
 	  if ( (i4 & 1) != 0){
@@ -1233,19 +1285,17 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	    coeff *= -1;
 	  }
 	  break;
-		
-	case TUP:
-	  if (last_node_in_t && i4 == (X4-1)){
-	    coeff *= -1;
-	  }
-	  break;
+
+        case TUP:
+          if (last_node_in_t() && i4 == (X4 - 1)) { coeff *= -1; }
+          break;
 
 	default:
 	  printf("ERROR: wrong dir(%d)\n", dir);
 	  exit(1);
 	}
-	
-	if (precision == QUDA_DOUBLE_PRECISION){
+
+        if (precision == QUDA_DOUBLE_PRECISION){
 	  //double* mylink = (double*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
 	  double* mylink = (double*)link[dir];
@@ -1257,26 +1307,24 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  mylink[15] *= coeff;
 	  mylink[16] *= coeff;
 	  mylink[17] *= coeff;
-		
-	}else{
+
+        }else{
 	  //float* mylink = (float*)link;
 	  //mylink = mylink + (4*i + dir)*gaugeSiteSize;
 	  float* mylink = (float*)link[dir];
 	  mylink = mylink + i*gaugeSiteSize;
-		  
-	  mylink[12] *= coeff;
+
+          mylink[12] *= coeff;
 	  mylink[13] *= coeff;
 	  mylink[14] *= coeff;
 	  mylink[15] *= coeff;
 	  mylink[16] *= coeff;
 	  mylink[17] *= coeff;
-		
-	}
+        }
       }
     }
-  }    
+  }
 
-    
 #if 1
   for(int dir= 0;dir < 4;dir++){
     for(int i=0;i< V*gaugeSiteSize;i++){
@@ -1292,9 +1340,7 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
 	  fprintf(stderr, "ERROR:  %dth: bad number(%f) in function %s \n",i, f[i], __FUNCTION__);
 	  exit(1);
 	}
-	  
       }
-	
     }
   }
 #endif
@@ -1302,8 +1348,23 @@ createSiteLinkCPU(void** link,  QudaPrecision precision, int phase)
   return;
 }
 
+void construct_spinor_source(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x, quda::RNG &rng)
+{
+  quda::ColorSpinorParam param;
+  param.v = v;
+  param.nColor = nColor;
+  param.nSpin = nSpin;
+  param.setPrecision(precision);
+  param.create = QUDA_REFERENCE_FIELD_CREATE;
+  param.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
+  param.nDim = 4;
+  param.siteSubset = QUDA_FULL_SITE_SUBSET;
+  param.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
+  for (int d = 0; d < 4; d++) param.x[d] = x[d];
+  quda::cpuColorSpinorField spinor_in(param);
 
-
+  quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
+}
 
 template <typename Float>
 int compareLink(Float **linkA, Float **linkB, int len) {
@@ -1313,7 +1374,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
 
   int iter[18];
   for (int i=0; i<18; i++) iter[i] = 0;
-  
+
   for(int dir=0;dir < 4; dir++){
     for (int i=0; i<len; i++) {
       for (int j=0; j<18; j++) {
@@ -1326,9 +1387,9 @@ int compareLink(Float **linkA, Float **linkB, int len) {
       }
     }
   }
-  
+
   for (int i=0; i<18; i++) printfQuda("%d fails = %d\n", i, iter[i]);
-  
+
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
     if(fail[f] == 0){
@@ -1339,7 +1400,7 @@ int compareLink(Float **linkA, Float **linkB, int len) {
   for (int f=0; f<fail_check; f++) {
     printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], 4*len*18, fail[f] / (double)(4*len*18));
   }
-  
+
   return accuracy_level;
 }
 
@@ -1348,25 +1409,24 @@ compare_link(void **linkA, void **linkB, int len, QudaPrecision precision)
 {
   int ret;
 
-  if (precision == QUDA_DOUBLE_PRECISION){    
+  if (precision == QUDA_DOUBLE_PRECISION) {
     ret = compareLink((double**)linkA, (double**)linkB, len);
-  }else {
+  } else {
     ret = compareLink((float**)linkA, (float**)linkB, len);
-  }    
+  }
 
   return ret;
 }
 
 
 // X indexes the lattice site
-static void 
-printLinkElement(void *link, int X, QudaPrecision precision) 
+static void printLinkElement(void *link, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     for(int i=0; i < 3;i++){
       printVector((double*)link+ X*gaugeSiteSize + i*6);
     }
-	
+
   }
   else{
     for(int i=0;i < 3;i++){
@@ -1375,65 +1435,59 @@ printLinkElement(void *link, int X, QudaPrecision precision)
   }
 }
 
-int strong_check_link(void** linkA, const char* msgA, 
-		      void **linkB, const char* msgB, 
-		      int len, QudaPrecision prec) 
+int strong_check_link(void **linkA, const char *msgA, void **linkB, const char *msgB, int len, QudaPrecision prec)
 {
   printfQuda("%s\n", msgA);
-  printLinkElement(linkA[0], 0, prec); 
+  printLinkElement(linkA[0], 0, prec);
   printfQuda("\n");
-  printLinkElement(linkA[0], 1, prec); 
+  printLinkElement(linkA[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkA[3], len-1, prec); 
-  printfQuda("\n");    
-    
+  printLinkElement(linkA[3], len - 1, prec);
+  printfQuda("\n");
+
   printfQuda("\n%s\n", msgB);
-  printLinkElement(linkB[0], 0, prec); 
+  printLinkElement(linkB[0], 0, prec);
   printfQuda("\n");
-  printLinkElement(linkB[0], 1, prec); 
+  printLinkElement(linkB[0], 1, prec);
   printfQuda("...\n");
-  printLinkElement(linkB[3], len-1, prec); 
+  printLinkElement(linkB[3], len - 1, prec);
   printfQuda("\n");
-    
+
   int ret = compare_link(linkA, linkB, len, prec);
   return ret;
 }
 
-
-void 
-createMomCPU(void* mom,  QudaPrecision precision) 
+void createMomCPU(void *mom, QudaPrecision precision)
 {
   void* temp;
-    
+
   size_t gSize = (precision == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   temp = malloc(4*V*gaugeSiteSize*gSize);
   if (temp == NULL){
     fprintf(stderr, "Error: malloc failed for temp in function %s\n", __FUNCTION__);
     exit(1);
   }
-    
-    
-    
+
   for(int i=0;i < V;i++){
     if (precision == QUDA_DOUBLE_PRECISION){
       for(int dir=0;dir < 4;dir++){
-	double* thismom = (double*)mom;	    
-	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;				
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}	    
-      }	    
+        double *thismom = (double *)mom;
+        for(int k=0; k < momSiteSize; k++){
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
+      }
     }else{
       for(int dir=0;dir < 4;dir++){
 	float* thismom=(float*)mom;
 	for(int k=0; k < momSiteSize; k++){
-	  thismom[ (4*i+dir)*momSiteSize + k ]= 1.0* rand() /RAND_MAX;		
-	  if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
-	}	    
+          thismom[(4 * i + dir) * momSiteSize + k] = 1.0 * rand() / RAND_MAX;
+          if (k==momSiteSize-1) thismom[ (4*i+dir)*momSiteSize + k ]= 0.0;
+        }
       }
     }
   }
-    
+
   free(temp);
   return;
 }
@@ -1471,7 +1525,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
 
   int iter[momSiteSize];
   for (int i=0; i<momSiteSize; i++) iter[i] = 0;
-  
+
   for (int i=0; i<len; i++) {
     for (int j=0; j<momSiteSize-1; j++) {
       int is = i*momSiteSize+j;
@@ -1482,7 +1536,7 @@ int compare_mom(Float *momA, Float *momB, int len) {
       if (diff > 1e-3) iter[j]++;
     }
   }
-  
+
   int accuracy_level = 0;
   for(int f =0; f < fail_check; f++){
     if(fail[f] == 0){
@@ -1491,16 +1545,15 @@ int compare_mom(Float *momA, Float *momB, int len) {
   }
 
   for (int i=0; i<momSiteSize; i++) printfQuda("%d fails = %d\n", i, iter[i]);
-  
+
   for (int f=0; f<fail_check; f++) {
     printfQuda("%e Failures: %d / %d  = %e\n", pow(10.0,-(f+1)), fail[f], len*9, fail[f]/(double)(len*9));
   }
-  
+
   return accuracy_level;
 }
 
-static void 
-printMomElement(void *mom, int X, QudaPrecision precision) 
+static void printMomElement(void *mom, int X, QudaPrecision precision)
 {
   if (precision == QUDA_DOUBLE_PRECISION){
     double* thismom = ((double*)mom)+ X*momSiteSize;
@@ -1509,1063 +1562,47 @@ printMomElement(void *mom, int X, QudaPrecision precision)
   }else{
     float* thismom = ((float*)mom)+ X*momSiteSize;
     printVector(thismom);
-    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);	
+    printfQuda("(%9f,%9f) (%9f,%9f)\n", thismom[6], thismom[7], thismom[8], thismom[9]);
   }
 }
-int strong_check_mom(void * momA, void *momB, int len, QudaPrecision prec) 
-{    
+int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
+{
   printfQuda("mom:\n");
-  printMomElement(momA, 0, prec); 
+  printMomElement(momA, 0, prec);
   printfQuda("\n");
-  printMomElement(momA, 1, prec); 
+  printMomElement(momA, 1, prec);
   printfQuda("\n");
-  printMomElement(momA, 2, prec); 
+  printMomElement(momA, 2, prec);
   printfQuda("\n");
-  printMomElement(momA, 3, prec); 
+  printMomElement(momA, 3, prec);
   printfQuda("...\n");
-  
+
   printfQuda("\nreference mom:\n");
-  printMomElement(momB, 0, prec); 
+  printMomElement(momB, 0, prec);
   printfQuda("\n");
-  printMomElement(momB, 1, prec); 
+  printMomElement(momB, 1, prec);
   printfQuda("\n");
-  printMomElement(momB, 2, prec); 
+  printMomElement(momB, 2, prec);
   printfQuda("\n");
-  printMomElement(momB, 3, prec); 
+  printMomElement(momB, 3, prec);
   printfQuda("\n");
-  
+
   int ret;
   if (prec == QUDA_DOUBLE_PRECISION){
     ret = compare_mom((double*)momA, (double*)momB, len);
   }else{
     ret = compare_mom((float*)momA, (float*)momB, len);
   }
-  
+
   return ret;
 }
 
-
-/************
- * return value
- *
- * 0: command line option matched and processed sucessfully
- * non-zero: command line option does not match
- *
- */
-
-#ifdef MULTI_GPU
-int device = -1;
-#else
-int device = 0;
-#endif
-
-QudaReconstructType link_recon = QUDA_RECONSTRUCT_NO;
-QudaReconstructType link_recon_sloppy = QUDA_RECONSTRUCT_INVALID;
-QudaReconstructType link_recon_precondition = QUDA_RECONSTRUCT_INVALID;
-QudaPrecision prec = QUDA_SINGLE_PRECISION;
-QudaPrecision  prec_sloppy = QUDA_INVALID_PRECISION;
-QudaPrecision  prec_precondition = QUDA_INVALID_PRECISION;
-int xdim = 24;
-int ydim = 24;
-int zdim = 24;
-int tdim = 24;
-int Lsdim = 16;
-QudaDagType dagger = QUDA_DAG_NO;
-int gridsize_from_cmdline[4] = {1,1,1,1};
-QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
-char latfile[256] = "";
-int Nsrc = 1;
-int Msrc = 1;
-int niter = 100;
-int gcrNkrylov = 10;
-int pipeline = 0; 
-int test_type = 0;
-int nvec[QUDA_MAX_MG_LEVEL] = { };
-char vec_infile[256] = "";
-char vec_outfile[256] = "";
-QudaInverterType inv_type;
-QudaInverterType precon_type = QUDA_INVALID_INVERTER;
-int multishift = 0;
-bool verify_results = true;
-double mass = 0.1;
-double mu = 0.1;
-double anisotropy = 1.0;
-double clover_coeff = 0.1;
-bool compute_clover = false;
-double tol = 1e-7;
-double tol_hq = 0.;
-QudaTwistFlavorType twist_flavor = QUDA_TWIST_SINGLET;
-bool kernel_pack_t = false;
-QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
-QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
-QudaSolveType solve_type = QUDA_DIRECT_PC_SOLVE;
-
-int mg_levels = 2;
-
-int nu_pre = 2;
-int nu_post = 2;
-QudaInverterType smoother_type = QUDA_MR_INVERTER;
-bool generate_nullspace = true;
-bool generate_all_levels = true;
-
-int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM] = { };
-
-int FMRiter = 1;
-double rb_omega = 1.0;
-
-static int dim_partitioned[4] = {0,0,0,0};
-
-int dimPartitioned(int dim)
-{
-  return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]);
-}
-
-void __attribute__((weak)) usage_extra(char** argv){};
-
-void usage(char** argv )
-{
-  printf("Usage: %s [options]\n", argv[0]);
-  printf("Common options: \n");
-#ifndef MULTI_GPU
-  printf("    --device <n>                              # Set the CUDA device to use (default 0, single GPU only)\n");     
-#endif
-  printf("    --prec <double/single/half>               # Precision in GPU\n");
-  printf("    --prec-sloppy <double/single/half>        # Sloppy precision in GPU\n");
-  printf("    --prec-precondition <double/single/half>  # Preconditioner precision in GPU\n");
-  printf("    --recon <8/9/12/13/18>                    # Link reconstruction type\n");
-  printf("    --recon-sloppy <8/9/12/13/18>             # Sloppy link reconstruction type\n");
-  printf("    --recon-precondition <8/9/12/13/18>       # Preconditioner link reconstruction type\n");
-  printf("    --dagger                                  # Set the dagger to 1 (default 0)\n"); 
-  printf("    --dim <n>                                 # Set space-time dimension (X Y Z T)\n"); 
-  printf("    --sdim <n>                                # Set space dimension(X/Y/Z) size\n"); 
-  printf("    --xdim <n>                                # Set X dimension size(default 24)\n");     
-  printf("    --ydim <n>                                # Set X dimension size(default 24)\n");     
-  printf("    --zdim <n>                                # Set X dimension size(default 24)\n");     
-  printf("    --tdim <n>                                # Set T dimension size(default 24)\n");  
-  printf("    --Lsdim <n>                               # Set Ls dimension size(default 16)\n");  
-  printf("    --gridsize <x y z t>                      # Set the grid size in all four dimension (default 1 1 1 1)\n");
-  printf("    --xgridsize <n>                           # Set grid size in X dimension (default 1)\n");
-  printf("    --ygridsize <n>                           # Set grid size in Y dimension (default 1)\n");
-  printf("    --zgridsize <n>                           # Set grid size in Z dimension (default 1)\n");
-  printf("    --tgridsize <n>                           # Set grid size in T dimension (default 1)\n");
-  printf("    --partition <mask>                        # Set the communication topology (X=1, Y=2, Z=4, T=8, and combinations of these)\n");
-  printf("    --kernel-pack-t                           # Set T dimension kernel packing to be true (default false)\n");
-  printf("    --dslash-type <type>                      # Set the dslash type, the following values are valid\n"
-	 "                                                  wilson/clover/twisted-mass/twisted-clover/staggered\n"
-         "                                                  /asqtad/domain-wall/domain-wall-4d/mobius\n");
-  printf("    --flavor <type>                           # Set the twisted mass flavor type (singlet (default), deg-doublet, nondeg-doublet)\n");
-  printf("    --load-gauge file                         # Load gauge field \"file\" for the test (requires QIO)\n");
-  printf("    --niter <n>                               # The number of iterations to perform (default 10)\n");
-  printf("    --ngcrkrylov <n>                          # The number of inner iterations to use for GCR, BiCGstab-l (default 10)\n");
-  printf("    --pipeline <n>                            # The pipeline length for fused operations in GCR, BiCGstab-l (default 0, no pipelining)\n"); 
-  printf("    --inv-type <cg/bicgstab/gcr>              # The type of solver to use (default cg)\n");
-  printf("    --precon-type <mr/ (unspecified)>         # The type of solver to use (default none (=unspecified)).\n"
-	 "                                                  For multigrid this sets the smoother type.\n");
-  printf("    --multishift <true/false>                 # Whether to do a multi-shift solver test or not (default false)\n");     
-  printf("    --mass                                    # Mass of Dirac operator (default 0.1)\n");
-  printf("    --mu                                      # Twisted-Mass of Dirac operator (default 0.1)\n");
-  printf("    --compute-clover                          # Compute the clover field or use random numbers (default false)\n");
-  printf("    --clover-coeff                            # Clover coefficient (default 1.0)\n");
-  printf("    --anisotropy                              # Temporal anisotropy factor (default 1.0)\n");
-  printf("    --mass-normalization                      # Mass normalization (kappa (default) / mass / asym-mass)\n");
-  printf("    --matpc                                   # Matrix preconditioning type (even-even, odd-odd, even-even-asym, odd-odd-asym) \n");
-  printf("    --solve-type                              # The type of solve to do (direct, direct-pc, normop, normop-pc, normerr, normerr-pc) \n");
-  printf("    --tol  <resid_tol>                        # Set L2 residual tolerance\n");
-  printf("    --tolhq  <resid_hq_tol>                   # Set heavy-quark residual tolerance\n");
-  printf("    --test                                    # Test method (different for each test)\n");
-  printf("    --verify <true/false>                     # Verify the GPU results using CPU results (default true)\n");
-  printf("    --mg-nvec <level nvec>                    # Number of null-space vectors to define the multigrid transfer operator on a given level\n");
-  printf("    --mg-gpu-prolongate <true/false>          # Whether to do the multigrid transfer operators on the GPU (default false)\n");
-  printf("    --mg-levels <2+>                          # The number of multigrid levels to do (default 2)\n");
-  printf("    --mg-nu-pre  <1-20>                       # The number of pre-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-nu-post <1-20>                       # The number of post-smoother applications to do at each multigrid level (default 2)\n");
-  printf("    --mg-smoother                             # The smoother to use for multigrid (default mr)\n");
-  printf("    --mg-block-size <level x y z t>           # Set the geometric block size for the each multigrid level's transfer operator (default 4 4 4 4)\n");
-  printf("    --mg-generate-nullspace <true/false>      # Generate the null-space vector dynamically (default true)\n");
-  printf("    --mg-generate-all-levels <true/talse>     # true=generate nul space on all levels, false=generate on level 0 and create other levels from that (default true)\n");
-  printf("    --mg-load-vec file                        # Load the vectors \"file\" for the multigrid_test (requires QIO)\n");
-  printf("    --mg-save-vec file                        # Save the generated null-space vectors \"file\" from the multigrid_test (requires QIO)\n");
-  printf("    --nsrc <n>                                # How many spinors to apply the dslash to simultaneusly (experimental for staggered only)\n");
-  printf("    --msrc <n>                                # Used for testing non-square block blas routines where nsrc defines the other dimension\n");
-  printf("    --FMRiter <n>                             # How many gauge fixing iterations to attempt (set to 1 for single gauge fix)\n");  
-  printf("    --rb-omega <n>                            # The relaxation boost parameter for OVR gauge fixing (default 1.0)\n");  
-  printf("    --help                                    # Print out this message\n");
-
-  usage_extra(argv); 
-#ifdef MULTI_GPU
-  char msg[]="multi";
-#else
-  char msg[]="single";
-#endif  
-  printf("Note: this program is %s GPU build\n", msg);
-  exit(1);
-  return ;
-}
-
-int process_command_line_option(int argc, char** argv, int* idx)
-{
-#ifdef MULTI_GPU
-  char msg[]="multi";
-#else
-  char msg[]="single";
-#endif
-
-  int ret = -1;
-  
-  int i = *idx;
-
-  if( strcmp(argv[i], "--help")== 0){
-    usage(argv);
-  }
-
-  if( strcmp(argv[i], "--verify") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-
-    if (strcmp(argv[i+1], "true") == 0){
-      verify_results = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      verify_results = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid verify type\n");	
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--device") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    device = atoi(argv[i+1]);
-    if (device < 0 || device > 16){
-      printf("ERROR: Invalid CUDA device number (%d)\n", device);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--prec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    prec =  get_prec(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--prec-sloppy") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    prec_sloppy =  get_prec(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--prec-precondition") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    prec_precondition =  get_prec(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--recon") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    link_recon =  get_recon(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--recon-sloppy") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    link_recon_sloppy =  get_recon(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--recon-precondition") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    link_recon_precondition =  get_recon(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--dim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    xdim= atoi(argv[i+1]);
-    if (xdim < 0 || xdim > 512){
-      printf("ERROR: invalid X dimension (%d)\n", xdim);
-      usage(argv);
-    }
-    i++;
-
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    ydim= atoi(argv[i+1]);
-    if (ydim < 0 || ydim > 512){
-      printf("ERROR: invalid Y dimension (%d)\n", ydim);
-      usage(argv);
-    }
-    i++;
-
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    zdim= atoi(argv[i+1]);
-    if (zdim < 0 || zdim > 512){
-      printf("ERROR: invalid Z dimension (%d)\n", zdim);
-      usage(argv);
-    }
-    i++;
-
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    tdim= atoi(argv[i+1]);
-    if (tdim < 0 || tdim > 512){
-      printf("ERROR: invalid T dimension (%d)\n", tdim);
-      usage(argv);
-    }
-    i++;
-
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--xdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    xdim= atoi(argv[i+1]);
-    if (xdim < 0 || xdim > 512){
-      printf("ERROR: invalid X dimension (%d)\n", xdim);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--ydim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    ydim= atoi(argv[i+1]);
-    if (ydim < 0 || ydim > 512){
-      printf("ERROR: invalid T dimension (%d)\n", ydim);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-
-  if( strcmp(argv[i], "--zdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    zdim= atoi(argv[i+1]);
-    if (zdim < 0 || zdim > 512){
-      printf("ERROR: invalid T dimension (%d)\n", zdim);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--tdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    tdim =  atoi(argv[i+1]);
-    if (tdim < 0 || tdim > 512){
-      printf("Error: invalid t dimension");
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--sdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    int sdim =  atoi(argv[i+1]);
-    if (sdim < 0 || sdim > 512){
-      printf("ERROR: invalid S dimension\n");
-      usage(argv);
-    }
-    xdim=ydim=zdim=sdim;
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--Lsdim") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    int Ls =  atoi(argv[i+1]);
-    if (Ls < 0 || Ls > 128){
-      printf("ERROR: invalid Ls dimension\n");
-      usage(argv);
-    }
-    Lsdim=Ls;
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--dagger") == 0){
-    dagger = QUDA_DAG_YES;
-    ret = 0;
-    goto out;
-  }	
-  
-  if( strcmp(argv[i], "--partition") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-#ifdef MULTI_GPU
-    int value  =  atoi(argv[i+1]);
-    for(int j=0; j < 4;j++){
-      if (value &  (1 << j)){
-	commDimPartitionedSet(j);
-	dim_partitioned[j] = 1;
-      }
-    }
-#else
-    printfQuda("WARNING: Ignoring --partition option since this is a single-GPU build.\n");
-#endif
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--kernel-pack-t") == 0){
-    kernel_pack_t = true;
-    ret= 0;
-    goto out;
-  }
-
-
-  if( strcmp(argv[i], "--multishift") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-
-    if (strcmp(argv[i+1], "true") == 0){
-      multishift = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      multishift = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid multishift boolean\n");	
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--gridsize") == 0){
-    if (i+1 >= argc){ 
-      usage(argv);
-    }     
-    int xsize =  atoi(argv[i+1]);
-    if (xsize <= 0 ){
-      printf("ERROR: invalid X grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[0] = xsize;
-    i++;
-
-    int ysize =  atoi(argv[i+1]);
-    if (ysize <= 0 ){
-      printf("ERROR: invalid Y grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[1] = ysize;
-    i++;
-
-    int zsize =  atoi(argv[i+1]);
-    if (zsize <= 0 ){
-      printf("ERROR: invalid Z grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[2] = zsize;
-    i++;
-
-    int tsize =  atoi(argv[i+1]);
-    if (tsize <= 0 ){
-      printf("ERROR: invalid T grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[3] = tsize;
-    i++;
-
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--xgridsize") == 0){
-    if (i+1 >= argc){ 
-      usage(argv);
-    }     
-    int xsize =  atoi(argv[i+1]);
-    if (xsize <= 0 ){
-      printf("ERROR: invalid X grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[0] = xsize;
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--ygridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    int ysize =  atoi(argv[i+1]);
-    if (ysize <= 0 ){
-      printf("ERROR: invalid Y grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[1] = ysize;
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--zgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    int zsize =  atoi(argv[i+1]);
-    if (zsize <= 0 ){
-      printf("ERROR: invalid Z grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[2] = zsize;
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--tgridsize") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    int tsize =  atoi(argv[i+1]);
-    if (tsize <= 0 ){
-      printf("ERROR: invalid T grid size");
-      usage(argv);
-    }
-    gridsize_from_cmdline[3] = tsize;
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--dslash-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    dslash_type =  get_dslash_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--flavor") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    twist_flavor =  get_flavor_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--inv-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    inv_type = get_solver_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--precon-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    precon_type = get_solver_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mass") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mass = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--compute-clover") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    if (strcmp(argv[i+1], "true") == 0){
-      compute_clover = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      compute_clover = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid compute_clover type\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--clover-coeff") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    clover_coeff = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mu") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mu = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--anisotropy") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    anisotropy = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--tol") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    tol= atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--tolhq") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    tol_hq= atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mass-normalization") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    normalization = get_mass_normalization_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--matpc") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    matpc_type = get_matpc_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--solve-type") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    solve_type = get_solve_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--load-gauge") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }     
-    strcpy(latfile, argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--nsrc") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    Nsrc = atoi(argv[i+1]);
-    if (Nsrc < 1 || Nsrc > 128){
-      printf("ERROR: invalid number of sources (Nsrc=%d)\n", Nsrc);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--msrc") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    Msrc = atoi(argv[i+1]);
-    if (Msrc < 1 || Msrc > 128){
-      printf("ERROR: invalid number of sources (Msrc=%d)\n", Msrc);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--test") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }	    
-    test_type = atoi(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;	    
-  }
-    
-  if( strcmp(argv[i], "--mg-nvec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    nvec[level] = atoi(argv[i+1]);
-    if (nvec[level] < 0 || nvec[level] > 128){
-      printf("ERROR: invalid number of vectors (%d)\n", nvec[level]);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-levels") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mg_levels= atoi(argv[i+1]);
-    if (mg_levels < 2 || mg_levels > QUDA_MAX_MG_LEVEL){
-      printf("ERROR: invalid number of multigrid levels (%d)\n", mg_levels);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-nu-pre") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    nu_pre= atoi(argv[i+1]);
-    if (nu_pre < 0 || nu_pre > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pre=%d)\n", nu_pre);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-nu-post") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    nu_post= atoi(argv[i+1]);
-    if (nu_post < 0 || nu_post > 20){
-      printf("ERROR: invalid pre-smoother applications value (nu_pist=%d)\n", nu_post);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-smoother") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    smoother_type = get_solver_type(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-block-size") == 0){
-    if (i+1 >= argc){ 
-      usage(argv);
-    }     
-    int level = atoi(argv[i+1]);
-    if (level < 0 || level >= QUDA_MAX_MG_LEVEL) {
-      printf("ERROR: invalid multigrid level %d", level);
-      usage(argv);
-    }
-    i++;
-
-    int xsize =  atoi(argv[i+1]);
-    if (xsize <= 0 ){
-      printf("ERROR: invalid X block size");
-      usage(argv);
-    }
-    geo_block_size[level][0] = xsize;
-    i++;
-
-    int ysize =  atoi(argv[i+1]);
-    if (ysize <= 0 ){
-      printf("ERROR: invalid Y block size");
-      usage(argv);
-    }
-    geo_block_size[level][1] = ysize;
-    i++;
-
-    int zsize =  atoi(argv[i+1]);
-    if (zsize <= 0 ){
-      printf("ERROR: invalid Z block size");
-      usage(argv);
-    }
-    geo_block_size[level][2] = zsize;
-    i++;
-
-    int tsize =  atoi(argv[i+1]);
-    if (tsize <= 0 ){
-      printf("ERROR: invalid T block size");
-      usage(argv);
-    }
-    geo_block_size[level][3] = tsize;
-    i++;
-
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mass") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    mass= atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-generate-nullspace") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      generate_nullspace = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      generate_nullspace = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid generate nullspace type\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-generate-all-levels") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-
-    if (strcmp(argv[i+1], "true") == 0){
-      generate_all_levels = true;
-    }else if (strcmp(argv[i+1], "false") == 0){
-      generate_all_levels = false;
-    }else{
-      fprintf(stderr, "ERROR: invalid value for generate_all_levels type\n");
-      exit(1);
-    }
-
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-load-vec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    strcpy(vec_infile, argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--mg-save-vec") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    strcpy(vec_outfile, argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--niter") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    niter= atoi(argv[i+1]);
-    if (niter < 1 || niter > 1e6){
-      printf("ERROR: invalid number of iterations (%d)\n", niter);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--ngcrkrylov") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    gcrNkrylov = atoi(argv[i+1]);
-    if (gcrNkrylov < 1 || gcrNkrylov > 1e6){
-      printf("ERROR: invalid number of gcrkrylov iterations (%d)\n", gcrNkrylov);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-  
-  if( strcmp(argv[i], "--pipeline") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    pipeline = atoi(argv[i+1]);
-    if (pipeline < 0 || pipeline > 8){
-      printf("ERROR: invalid pipeline length (%d)\n", pipeline);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--version") == 0){
-    printf("This program is linked with QUDA library, version %s,", 
-	   get_quda_ver_str());
-    printf(" %s GPU build\n", msg);
-    exit(0);
-  }
-
-  if( strcmp(argv[i], "--FMRiter") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    FMRiter = atoi(argv[i+1]);
-    if (FMRiter < 1 || FMRiter > 1e6){
-      printf("ERROR: invalid number of FMR iterations (%d)\n", FMRiter);
-      usage(argv);
-    }
-    i++;
-    ret = 0;
-    goto out;
-  }
-
-  if( strcmp(argv[i], "--rb-omega") == 0){
-    if (i+1 >= argc){
-      usage(argv);
-    }
-    rb_omega = atof(argv[i+1]);
-    i++;
-    ret = 0;
-    goto out;
-  }
-
- out:
-  *idx = i;
-  return ret ;
-  
-}
-
-
 static struct timeval startTime;
 
-void stopwatchStart() {
-  gettimeofday(&startTime, NULL);
-}
+void stopwatchStart() { gettimeofday(&startTime, NULL); }
 
-double stopwatchReadSeconds() {
+double stopwatchReadSeconds()
+{
   struct timeval endTime;
   gettimeofday(&endTime, NULL);
 
@@ -2574,4 +1611,4 @@ double stopwatchReadSeconds() {
   return ds + 0.000001*dus;
 }
 
-
+int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }

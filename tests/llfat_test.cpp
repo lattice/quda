@@ -7,28 +7,17 @@
 
 #include "quda.h"
 #include "test_util.h"
+#include <test_params.h>
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
 #include "malloc_quda.h"
 
 #ifdef MULTI_GPU
-#include "face_quda.h"
 #include "comm_quda.h"
 #endif
 
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
-
-extern void usage(char** argv);
-extern bool verify_results;
-
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern int niter;
 
 static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 //static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
@@ -293,7 +282,7 @@ static void llfat_test()
   }
 
   int volume = qudaGaugeParam.X[0]*qudaGaugeParam.X[1]*qudaGaugeParam.X[2]*qudaGaugeParam.X[3];
-  long long flops= 61632 * niter;
+  long long flops= 61632 * (long long)niter;
   flops += (252*4)*(long long)niter; // long-link contribution
 
   double perf = flops*volume/(secs*1024*1024*1024);
@@ -354,12 +343,6 @@ static void display_test_info()
 
 }
 
-void usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --gauge-order <qdp/milc>		   # ordering of the input gauge-field\n");
-  return ;
-}
 
 int main(int argc, char **argv)
 {
@@ -369,31 +352,18 @@ int main(int argc, char **argv)
   xdim=ydim=zdim=tdim=8;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
-  for (int i = 1; i < argc; i++){
-
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-
-    if( strcmp(argv[i], "--gauge-order") == 0){
-      if(i+1 >= argc){
-        usage(argv);
-      }
-
-      if(strcmp(argv[i+1], "milc") == 0){
-        gauge_order = QUDA_MILC_GAUGE_ORDER;
-      }else if(strcmp(argv[i+1], "qdp") == 0){
-        gauge_order = QUDA_QDP_GAUGE_ORDER;
-      }else{
-        fprintf(stderr, "Error: unsupported gauge-field order\n");
-        exit(1);
-      }
-      i++;	
-      continue;
-    }
-
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  CLI::TransformPairs<QudaGaugeFieldOrder> gauge_order_map {{"milc", QUDA_MILC_GAUGE_ORDER},
+                                                            {"qdp", QUDA_QDP_GAUGE_ORDER}};
+  app->add_option("--gauge-order", gauge_order, "")->transform(CLI::QUDACheckedTransformer(gauge_order_map));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

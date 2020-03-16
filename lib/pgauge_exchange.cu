@@ -3,11 +3,8 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-#include <cub/cub.cuh>
+#include <cub_helper.cuh>
 #include <launch_kernel.cuh>
-
-#include <device_functions.h>
-
 #include <comm_quda.h>
 
 
@@ -20,19 +17,19 @@ namespace quda {
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<0, 32,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 512:                \
       kernel<0, 64,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 768:                \
       kernel<0, 96,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 1024:               \
       kernel<0, 128,__VA_ARGS__>            \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     default:                \
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
@@ -42,19 +39,19 @@ namespace quda {
     switch ( tp.block.x ) {             \
     case 256:                \
       kernel<1, 32,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 512:                \
       kernel<1, 64,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 768:                \
       kernel<1, 96,__VA_ARGS__>           \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     case 1024:               \
       kernel<1, 128,__VA_ARGS__>            \
-      << < tp.grid.x, tp.block.x, tp.shared_bytes, stream >> > (arg, parity);   \
+      <<< tp.grid.x, tp.block.x, tp.shared_bytes, stream >>> (arg, parity);   \
       break;                \
     default:                \
       errorQuda("%s not implemented for %d threads", # kernel, tp.block.x); \
@@ -65,9 +62,6 @@ namespace quda {
   template <typename Gauge>
   struct GaugeFixUnPackArg {
     int X[4]; // grid dimensions
-#ifdef MULTI_GPU
-    int border[4];
-#endif
     Gauge dataOr;
     GaugeFixUnPackArg(Gauge & dataOr, cudaGaugeField & data)
       : dataOr(dataOr) {
@@ -123,14 +117,17 @@ namespace quda {
     typedef complex<Float> Complex;
     typedef typename mapper<Float>::type RegType;
     RegType tmp[NElems];
-    RegType data[18];
+    Complex data[9];
     if ( pack ) {
       arg.dataOr.load(data, id, dir, parity);
       arg.dataOr.reconstruct.Pack(tmp, data, id);
-      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = ((Complex*)tmp)[i];
+      for ( int i = 0; i < NElems / 2; ++i ) array[idx + size * i] = Complex(tmp[2*i+0], tmp[2*i+1]);
     }
     else{
-      for ( int i = 0; i < NElems / 2; ++i ) ((Complex*)tmp)[i] = array[idx + size * i];
+      for ( int i = 0; i < NElems / 2; ++i ) {
+        tmp[2*i+0] = array[idx + size * i].real();
+        tmp[2*i+1] = array[idx + size * i].imag();
+      }
       arg.dataOr.reconstruct.Unpack(data, tmp, id, dir, 0, arg.dataOr.X, arg.dataOr.R);
       arg.dataOr.save(data, id, dir, parity);
     }
@@ -267,20 +264,20 @@ namespace quda {
       comm_start(mh_recv_fwd[d]);
 
       //extract top face
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[0] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[0] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(send_d[d]), parity, d, dir, X[d] -  data.R()[d] - 1);
       //extract bottom
-      Kernel_UnPack<NElems, Float, Gauge, true><< < grid[d], block[d], 0, GFStream[1] >> >
+      Kernel_UnPack<NElems, Float, Gauge, true> <<< grid[d], block[d], 0, GFStream[1] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
       cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
       cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
     #endif
-      cudaStreamSynchronize(GFStream[0]);
+      qudaStreamSynchronize(GFStream[0]);
       comm_start(mh_send_fwd[d]);
 
-      cudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronize(GFStream[1]);
       comm_start(mh_send_back[d]);
 
     #ifndef GPU_COMMS
@@ -290,7 +287,7 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[0] >> >
+      Kernel_UnPack<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[0] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recv_d[d]), parity, d, dir, data.R()[d] - 1);
 
     #ifndef GPU_COMMS
@@ -301,16 +298,16 @@ namespace quda {
       #ifdef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
       #endif
-      Kernel_UnPack<NElems, Float, Gauge, false><< < grid[d], block[d], 0, GFStream[1] >> >
+      Kernel_UnPack<NElems, Float, Gauge, false> <<< grid[d], block[d], 0, GFStream[1] >>>
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(recvg_d[d]), parity, d, dir, X[d] - data.R()[d]);
 
       comm_wait(mh_send_back[d]);
       comm_wait(mh_send_fwd[d]);
-      cudaStreamSynchronize(GFStream[0]);
-      cudaStreamSynchronize(GFStream[1]);
+      qudaStreamSynchronize(GFStream[0]);
+      qudaStreamSynchronize(GFStream[1]);
     }
     checkCudaError();
-    cudaDeviceSynchronize();
+    qudaDeviceSynchronize();
   #endif
 
   }
