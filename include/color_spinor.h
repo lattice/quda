@@ -959,16 +959,16 @@ namespace quda {
   }
 
   /**
-     @brief Compute the inner product over color at spin s between a
-     color spinor  and a color spinor
+     @brief Compute the inner product over color at spin sa and sb between a
+     color spinors a and b of different spin length
      dot = \sum_c conj(a(c)) * b(s,c)
-     @param a Left-hand side ColorVector
+     @param a Left-hand side ColorSpinor
      @param b Right-hand side ColorSpinor
      @return The inner product
   */
   template <typename Float, int Nc, int Nsa, int Nsb>
-  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
-                                                         const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
+    __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
+							   const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
   {
     complex<Float> dot = 0;
 #pragma unroll
