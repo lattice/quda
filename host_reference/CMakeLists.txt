@@ -22,8 +22,6 @@ if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_reference QMP)
 endif()
 
-set(REFERENCE_LIBS quda quda_utils quda_reference)
-
 macro(QUDA_CHECKBUILDREFERENCE mytarget qudabuildreference)
   if(NOT ${qudabuildreference})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
@@ -43,3 +41,5 @@ if(QUDA_ARPACK)
     list(APPEND REFERENCE_LIBS ${PARPACK})
   endif()
 endif()
+
+set(REFERENCE_LIBS quda quda_utils quda_reference)

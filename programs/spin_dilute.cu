@@ -4,7 +4,6 @@
 #include <blas_quda.h>
 
 #include <kernels/spin_dilute.cuh>
-//#include <stoch_laph_quark_smear.h>
 #include <jitify_helper.cuh>
 
 

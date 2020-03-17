@@ -25,9 +25,9 @@ namespace quda
 
     F4 x;
     F1 y;
-    matrix_field<complex<real>, nSpinX> s;
+    //matrix_field<complex<real>, nSpinX> s;
     // Why can't I declare this as a complex<real>?
-    //complex<real> *s;
+    complex<real> s[nSpinX];
     
     EvecProjectArg(const ColorSpinorField &x, const ColorSpinorField &y, complex<real> *s) :
       threads(x.VolumeCB()),
@@ -58,9 +58,8 @@ namespace quda
     
 #pragma unroll
     for (int mu = 0; mu < nSpinX; mu++) {
-      //A[mu] = innerProduct(y, x, 0, mu);
-      A[mu] = 0.0;
+      A[mu] = innerProduct(y, x, 0, mu);      
     }
     arg.s.save(A, x_cb, parity);
-  }  
+  }
 } // namespace quda
