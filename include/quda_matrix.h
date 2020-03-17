@@ -376,7 +376,7 @@ namespace quda {
 
       /**
          @brief Compute the absolute max element of the Hermitian matrix
-         @return Abosolue Max element
+         @return Absolute Max element
       */
       __device__ __host__ inline T max() const
       {
@@ -759,7 +759,22 @@ namespace quda {
     m = 0.5*am;
   }
 
+  template <typename Complex, int N> __device__ __host__ inline void makeHerm(Matrix<Complex, N> &m)
+  {
+    typedef typename Complex::value_type real;
+    // first make the matrix anti-hermitian
+    Matrix<Complex, N> am = conj(m) - m;
 
+    // second make it traceless
+    real imag_trace = 0.0;
+#pragma unroll
+    for (int i = 0; i < N; i++) imag_trace += am(i, i).y;
+#pragma unroll
+    for (int i = 0; i < N; i++) { am(i, i).y -= imag_trace / N; }
+    // third scale out anti hermitian part
+    Complex i_2(0.0, 0.5);
+    m = i_2 * am;
+  }
 
   // Matrix and array are very similar
   // Maybe I should factor out the similar
@@ -1186,9 +1201,7 @@ namespace quda {
       return error;
     }
 
-  template<class T>
-    __device__  __host__ inline
-    void exponentiate_iQ(const Matrix<T,3>& Q, Matrix<T,3>* exp_iQ)
+    template <class T> __device__ __host__ inline auto exponentiate_iQ(const Matrix<T, 3> &Q)
     {
       // Use Cayley-Hamilton Theorem for SU(3) exp{iQ}.
       // This algorithm is outlined in
@@ -1196,13 +1209,13 @@ namespace quda {
       // Equation numbers in the paper are referenced by [eq_no].
 
       //Declarations
-      typedef decltype(Q(0,0).x) undMatType;
+      typedef decltype(Q(0, 0).x) matType;
 
-      undMatType inv3 = 1.0/3.0;
-      undMatType c0, c1, c0_max, Tr_re;
-      undMatType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
-      undMatType theta;
-      undMatType u_p, w_p;  //u, w parameters.
+      matType inv3 = 1.0 / 3.0;
+      matType c0, c1, c0_max, Tr_re;
+      matType f0_re, f0_im, f1_re, f1_im, f2_re, f2_im;
+      matType theta;
+      matType u_p, w_p; // u, w parameters.
       Matrix<T,3> temp1;
       Matrix<T,3> temp2;
       //[14] c0 = det(Q) = 1/3Tr(Q^3)
@@ -1220,28 +1233,31 @@ namespace quda {
       //      where       fj = fj(c0,c1), j=0,1,2.
 
       //[17]
-      c0_max = 2*pow(c1*inv3,1.5);
+      auto sqrt_c1_inv3 = sqrt(c1 * inv3);
+      c0_max = 2 * (c1 * inv3 * sqrt_c1_inv3); // reuse the sqrt factor for a fast 1.5 power
 
       //[25]
       theta  = acos(c0/c0_max);
+
+      sincos(theta * inv3, &w_p, &u_p);
       //[23]
-      u_p = sqrt(c1*inv3)*cos(theta*inv3);
+      u_p *= sqrt_c1_inv3;
 
       //[24]
-      w_p = sqrt(c1)*sin(theta*inv3);
+      w_p *= sqrt(c1);
 
       //[29] Construct objects for fj = hj/(9u^2 - w^2).
-      undMatType u_sq = u_p*u_p;
-      undMatType w_sq = w_p*w_p;
-      undMatType denom_inv = 1.0/(9*u_sq - w_sq);
-      undMatType exp_iu_re = cos(u_p);
-      undMatType exp_iu_im = sin(u_p);
-      undMatType exp_2iu_re = exp_iu_re*exp_iu_re - exp_iu_im*exp_iu_im;
-      undMatType exp_2iu_im = 2*exp_iu_re*exp_iu_im;
-      undMatType cos_w = cos(w_p);
-      undMatType sinc_w;
-      undMatType hj_re = 0.0;
-      undMatType hj_im = 0.0;
+      matType u_sq = u_p * u_p;
+      matType w_sq = w_p * w_p;
+      matType denom_inv = 1.0 / (9 * u_sq - w_sq);
+      matType exp_iu_re, exp_iu_im;
+      sincos(u_p, &exp_iu_im, &exp_iu_re);
+      matType exp_2iu_re = exp_iu_re * exp_iu_re - exp_iu_im * exp_iu_im;
+      matType exp_2iu_im = 2 * exp_iu_re * exp_iu_im;
+      matType cos_w = cos(w_p);
+      matType sinc_w;
+      matType hj_re = 0.0;
+      matType hj_im = 0.0;
 
       //[33] Added one more term to the series given in the paper.
       if (w_p < 0.05 && w_p > -0.05) {
@@ -1249,7 +1265,6 @@ namespace quda {
 	sinc_w = 1.0 - (w_sq/6.0)*(1 - (w_sq*0.05)*(1 - (w_sq/42.0)*(1 - (w_sq/72.0))));
       }
       else sinc_w = sin(w_p)/w_p;
-
 
       //[34] Test for c0 < 0.
       int parity = 0;
@@ -1299,24 +1314,25 @@ namespace quda {
       f2_c.y = f2_im;
 
       //[19] Construct exp{iQ}
-      setZero(exp_iQ);
+      Matrix<T, 3> exp_iQ;
+      setZero(&exp_iQ);
       Matrix<T,3> UnitM;
       setIdentity(&UnitM);
       // +f0*I
       temp1 = f0_c * UnitM;
-      *exp_iQ = temp1;
+      exp_iQ = temp1;
 
       // +f1*Q
       temp1 = f1_c * Q;
-      *exp_iQ += temp1;
+      exp_iQ += temp1;
 
       // +f2*Q^2
       temp1 = Q * Q;
       temp2 = f2_c * temp1;
-      *exp_iQ += temp2;
+      exp_iQ += temp2;
 
       //exp(iQ) is now defined.
-      return;
+      return exp_iQ;
     }
 
     /**

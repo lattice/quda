@@ -112,15 +112,11 @@ namespace quda {
     extern Worker* aux_worker;
   }  
 
-  MultiShiftCG::MultiShiftCG(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param,
-			     TimeProfile &profile) 
-    : MultiShiftSolver(param, profile), mat(mat), matSloppy(matSloppy) {
+  MultiShiftCG::MultiShiftCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param,
+			     TimeProfile &profile) :
+    MultiShiftSolver(mat, matSloppy, param, profile) { }
 
-  }
-
-  MultiShiftCG::~MultiShiftCG() {
-
-  }
+  MultiShiftCG::~MultiShiftCG() { }
 
   /**
      Compute the new values of alpha and zeta

@@ -6,7 +6,7 @@
 #include <multi_blas_helper.cuh>
 #include <float_vector.h>
 
-#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300)
+#if (__COMPUTE_CAPABILITY__ >= 300 || __CUDA_ARCH__ >= 300) && !defined(QUDA_FAST_COMPILE_REDUCE)
 #define WARP_SPLIT
 #include <generics/shfl.h>
 #endif

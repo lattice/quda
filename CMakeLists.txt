@@ -159,6 +159,7 @@ endif()
 set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
+set(QUDA_FLOAT8 OFF CACHE BOOL "enable float-8 ordered fixed-point fields?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity")
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
@@ -174,7 +175,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
-set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+set(QUDA_FAST_COMPILE_REDUCE OFF CACHE BOOL "enable fast compilation in blas and reduction kernels (single warp per reduction)")
+set(QUDA_FAST_COMPILE_DSLASH OFF CACHE BOOL "enable fast compilation in dslash kernels (~20% perf impact)")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
@@ -203,7 +205,9 @@ set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
-mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
+mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
+mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -420,7 +424,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
@@ -648,8 +652,12 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
-if(QUDA_REDUCE_SINGLE_WARP)
-add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+if(QUDA_FAST_COMPILE_REDUCE)
+add_definitions(-DQUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+add_definitions(-DQUDA_FAST_COMPILE_DSLASH)
 endif()
 
 # set which precisions to enable
@@ -731,7 +739,6 @@ if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
-  list(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_MPI_NVTX)
@@ -748,8 +755,6 @@ if(QUDA_NVTX)
   find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
   if(NVTX3)
     add_definitions(-DQUDA_NVTX_VERSION=3)
-  else(NVTX)
-    list(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
   endif(NVTX3)
 endif(QUDA_NVTX)
 

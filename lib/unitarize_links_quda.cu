@@ -457,14 +457,14 @@ namespace {
   };
 
   void projectSU3(GaugeField &u, double tol, int *fails) {
-#ifdef GPU_UNITARIZE
+#ifdef GPU_GAUGE_TOOLS
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructNone>(u, tol, fails);
+    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
 #else
-    errorQuda("Unitarization has not been built");
+    errorQuda("Gauge tools have not been built");
 #endif
   }
 

@@ -13,10 +13,10 @@ namespace quda
 
   class EigenSolver
   {
-
-protected:
     using range = std::pair<int, int>;
 
+protected:
+    const DiracMatrix &mat;
     QudaEigParam *eig_param;
     TimeProfile &profile;
 
@@ -61,12 +61,17 @@ public:
        @param eig_param MGParam struct that defines all meta data
        @param profile Timeprofile instance used to profile
     */
-    EigenSolver(QudaEigParam *eig_param, TimeProfile &profile);
+    EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     /**
        Destructor for EigenSolver class.
     */
     virtual ~EigenSolver();
+
+    /**
+       @return Whether the solver is only for Hermitian systems
+     */
+    virtual bool hermitian() = 0;
 
     /**
        @brief Computes the eigen decomposition for the operator passed to create.
@@ -281,19 +286,20 @@ public:
   {
 
 public:
-    const DiracMatrix &mat;
     /**
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
        @param mat The operator to solve
        @param profile Time Profile
     */
-    TRLM(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+    TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     /**
        @brief Destructor for Thick Restarted Eigensolver class
     */
     virtual ~TRLM();
+
+    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
 
     // Variable size matrix
     std::vector<double> ritz_mat;
