@@ -472,57 +472,7 @@ void setInvertParamL(QudaInvertParam &inv_param)
 
 int main(int argc, char **argv)
 {
-  // We give here the default values to some of the array
-  for (int i = 0; i < QUDA_MAX_MG_LEVEL; i++) {
-    mg_verbosity[i] = QUDA_SUMMARIZE;
-    setup_inv[i] = QUDA_BICGSTAB_INVERTER;
-    num_setup_iter[i] = 1;
-    setup_tol[i] = 5e-6;
-    setup_maxiter[i] = 500;
-    mu_factor[i] = 1.;
-    coarse_solve_type[i] = QUDA_INVALID_SOLVE;
-    smoother_solve_type[i] = QUDA_INVALID_SOLVE;
-    schwarz_type[i] = QUDA_INVALID_SCHWARZ;
-    schwarz_cycle[i] = 1;
-    smoother_type[i] = QUDA_GCR_INVERTER;
-    smoother_tol[i] = 0.25;
-    coarse_solver[i] = QUDA_GCR_INVERTER;
-    coarse_solver_tol[i] = 0.25;
-    coarse_solver_maxiter[i] = 100;
-    solver_location[i] = QUDA_CUDA_FIELD_LOCATION;
-    setup_location[i] = QUDA_CUDA_FIELD_LOCATION;
-    nu_pre[i] = 2;
-    nu_post[i] = 2;
-    n_block_ortho[i] = 1;
-
-    // Default eigensolver params
-    mg_eig[i] = false;
-    mg_eig_tol[i] = 1e-3;
-    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
-    mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
-    mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
-    mg_eig_check_interval[i] = 5;
-    mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
-    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
-    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
-    mg_eig_poly_deg[i] = 100;
-    mg_eig_amin[i] = 1.0;
-    mg_eig_amax[i] = -1.0; // use power iterations
-
-    setup_ca_basis[i] = QUDA_POWER_BASIS;
-    setup_ca_basis_size[i] = 4;
-    setup_ca_lambda_min[i] = 0.0;
-    setup_ca_lambda_max[i] = -1.0; // use power iterations
-
-    coarse_solver_ca_basis[i] = QUDA_POWER_BASIS;
-    coarse_solver_ca_basis_size[i] = 4;
-    coarse_solver_ca_lambda_min[i] = 0.0;
-    coarse_solver_ca_lambda_max[i] = -1.0;
-
-    strcpy(mg_vec_infile[i], "");
-    strcpy(mg_vec_outfile[i], "");
-  }
+  setQudaDefaultMgTestParams();
   reliable_delta = 1e-4;
 
   // Give the dslash type a reasonable default.
@@ -592,9 +542,13 @@ int main(int argc, char **argv)
   initQuda(device);
 
   setDims(gauge_param.X);
-  dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
+  // Hack: use the domain wall dimensions so we may use the 5th dim for multi indexing
+  dw_setDims(gauge_param.X, 1);
   setSpinorSiteSize(6);
 
+  // Staggered Gauge construct START
+  //-----------------------------------------------------------------------------------
+  // Allocate host staggered gauge fields
   void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -635,28 +589,11 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-  // Staggered vector construct START
-  //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *ref;
-  ColorSpinorField *tmp;
-  ColorSpinorParam cs_param;
-  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
-  in = quda::ColorSpinorField::Create(cs_param);
-  out = quda::ColorSpinorField::Create(cs_param);
-  ref = quda::ColorSpinorField::Create(cs_param);
-  tmp = quda::ColorSpinorField::Create(cs_param);
-  // Staggered vector construct END
-  //-----------------------------------------------------------------------------------
-  
+  int pad_value = 0;
 #ifdef MULTI_GPU
-  int tmp_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
-  tmp_value = MAX(tmp_value, xdim * ydim * tdim / 2);
-  tmp_value = MAX(tmp_value, xdim * ydim * zdim / 2);
-
-  int fat_pad = tmp_value;
-  int link_pad = 3 * tmp_value;
+  pad_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
+  pad_value = MAX(pad_value, xdim * ydim * tdim / 2);
+  pad_value = MAX(pad_value, xdim * ydim * zdim / 2);
 
   // Create ghost gauge fields in case of multi GPU builds.
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -673,29 +610,10 @@ int main(int argc, char **argv)
   cpuLong = GaugeField::Create(cpuLongParam);
   ghost_longlink = (void**)cpuLong->Ghost();
 
-  /*  
-  // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
-    QUDA_ASQTAD_FAT_LINKS;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
-  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuGaugeField *cpuFat = new cpuGaugeField(cpuFatParam);
-  ghost_fatlink = (void **)cpuFat->Ghost();
-
-  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
-  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
-  cpuGaugeField *cpuLong = new cpuGaugeField(cpuLongParam);
-  ghost_longlink = (void **)cpuLong->Ghost();
-  */
-  
-#else
-  int fat_pad = 0;
-  int link_pad = 0;
 #endif
-
+  int fat_pad = pad_value;
+  int link_pad = 3 * pad_value;
+  
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   
   gauge_param.ga_pad = fat_pad;
@@ -722,21 +640,35 @@ int main(int argc, char **argv)
     gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
+  // Staggered Gauge construct END
+  //-----------------------------------------------------------------------------------
   
   inv_param.solve_type = solve_type; 
   
-  // setup the multigrid solver
-  printQudaInvertParam(&inv_param);
-  printQudaGaugeParam(&gauge_param);
-  printQudaMultigridParam(&mg_param);
+  // Setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
 
-  // Test: create a dummy invert param just to make sure
-  // we're setting up gauge fields and such correctly.
-
+  // Staggered vector construct START
+  //-----------------------------------------------------------------------------------
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *ref;
+  ColorSpinorField *tmp;
+  ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  in = quda::ColorSpinorField::Create(cs_param);
+  out = quda::ColorSpinorField::Create(cs_param);
+  ref = quda::ColorSpinorField::Create(cs_param);
+  tmp = quda::ColorSpinorField::Create(cs_param);
+  // Staggered vector construct END
+  //-----------------------------------------------------------------------------------
+  
+  // Prepare rng
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
+
+  // Performance measuring
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
 
@@ -749,119 +681,23 @@ int main(int argc, char **argv)
     gflops[k] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
+    if(verify_results) verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+					gauge_param, inv_param, 0);
   }
-
-  rng->Release();
-  delete rng;
-
-  double nrm2 = 0;
-  double src2 = 0;
-
-  int len = 0;
-  if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
-    len = V;
-  } else {
-    len = Vh;
-  }
-
-  // Check solution
-  if (inv_param.solution_type == QUDA_MAT_SOLUTION) {
-
-    // In QUDA, the full staggered operator has the sign convention
-    //{{m, -D_eo},{-D_oe,m}}, while the CPU verify function does not
-    // have the minus sign. Passing in QUDA_DAG_YES solves this
-    // discrepancy
-    staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&ref->Even()), qdp_fatlink, qdp_longlink, ghost_fatlink,
-                     ghost_longlink, reinterpret_cast<cpuColorSpinorField *>(&out->Odd()), QUDA_EVEN_PARITY,
-                     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-    staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&ref->Odd()), qdp_fatlink, qdp_longlink, ghost_fatlink,
-                     ghost_longlink, reinterpret_cast<cpuColorSpinorField *>(&out->Even()), QUDA_ODD_PARITY,
-                     QUDA_DAG_YES, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
-    // if (dslash_type == QUDA_LAPLACE_DSLASH) {
-    //  xpay(out->V(), kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
-    //  ax(0.5/kappa, ref->V(), ref->Length(), gauge_param.cpu_prec);
-    //} else {
-    axpy(2 * mass, out->V(), ref->V(), ref->Length(), gauge_param.cpu_prec);
-    //}
-
-    // Reference debugging code: print the first component
-    // of the even and odd partities within a solution vector.
-    /*
-    printfQuda("\nLength: %lu\n", ref->Length());
-
-    // for verification
-    printfQuda("\n\nEven:\n");
-    printfQuda("CUDA: %f\n", ((double*)(in->Even().V()))[0]);
-    printfQuda("Soln: %f\n", ((double*)(out->Even().V()))[0]);
-    printfQuda("CPU:  %f\n", ((double*)(ref->Even().V()))[0]);
-
-    printfQuda("\n\nOdd:\n");
-    printfQuda("CUDA: %f\n", ((double*)(in->Odd().V()))[0]);
-    printfQuda("Soln: %f\n", ((double*)(out->Odd().V()))[0]);
-    printfQuda("CPU:  %f\n", ((double*)(ref->Odd().V()))[0]);
-    printfQuda("\n\n");
-    */
-
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-
-  } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
-
-    staggeredMatDagMat(ref, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink, out, mass, 0, inv_param.cpu_prec,
-              gauge_param.cpu_prec, tmp, QUDA_EVEN_PARITY, dslash_type);
-
-    if (inv_param.cpu_prec == QUDA_SINGLE_PRECISION) {
-      printfQuda("%f %f\n", ((float *)in->V())[12], ((float *)ref->V())[12]);
-    } else {
-      printfQuda("%f %f\n", ((double *)in->V())[12], ((double *)ref->V())[12]);
-    }
-
-    mxpy(in->V(), ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    nrm2 = norm_2(ref->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-    src2 = norm_2(in->V(), len * mySpinorSiteSize, inv_param.cpu_prec);
-  }
-
-  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*out, *ref).z);
-  double l2r = sqrt(nrm2 / src2);
-
-  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-             inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq, hqr);
-
+    
   // Compute timings
-  if (Nsrc > 1) {
-    auto mean_time = 0.0;
-    auto mean_time2 = 0.0;
-    auto mean_gflops = 0.0;
-    auto mean_gflops2 = 0.0;
-    // skip first solve due to allocations, potential UVM swapping overhead
-    for (int i = 1; i < Nsrc; i++) {
-      mean_time += time[i];
-      mean_time2 += time[i] * time[i];
-      mean_gflops += gflops[i];
-      mean_gflops2 += gflops[i] * gflops[i];
-    }
-
-    auto NsrcM1 = Nsrc - 1;
-
-    mean_time /= NsrcM1;
-    mean_time2 /= NsrcM1;
-    auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
-                                    std::numeric_limits<double>::infinity();
-    mean_gflops /= NsrcM1;
-    mean_gflops2 /= NsrcM1;
-    auto stddev_gflops = NsrcM1 > 1 ?
-      sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
-      std::numeric_limits<double>::infinity();
-    printfQuda(
-      "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
-      mean_time, stddev_time, mean_gflops, stddev_gflops);
-  }
-
+  if (Nsrc > 1) performanceStats(time, gflops);
   delete[] time;
   delete[] gflops;
 
-  // Clean up gauge fields, at least
+  // Free RNG
+  rng->Release();
+  delete rng;
+
+  // Free the multigrid solver
+  destroyMultigridQuda(mg_preconditioner);
+  
+  // Clean up gauge fields
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] != nullptr) {
       free(qdp_inlink[dir]);
@@ -876,24 +712,13 @@ int main(int argc, char **argv)
       qdp_longlink[dir] = nullptr;
     }
   }
-  if (milc_fatlink != nullptr) {
-    free(milc_fatlink);
-    milc_fatlink = nullptr;
-  }
-  if (milc_longlink != nullptr) {
-    free(milc_longlink);
-    milc_longlink = nullptr;
-  }
+
+  if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
+  if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
 
 #ifdef MULTI_GPU
-  if (cpuFat != nullptr) {
-    delete cpuFat;
-    cpuFat = nullptr;
-  }
-  if (cpuLong != nullptr) {
-    delete cpuLong;
-    cpuLong = nullptr;
-  }
+  if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
+  if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
 #endif
 
   delete in;
@@ -901,13 +726,10 @@ int main(int argc, char **argv)
   delete ref;
   delete tmp;
 
-  // free the multigrid solver
-  destroyMultigridQuda(mg_preconditioner);
-
-  // finalize the QUDA library
+  // Finalize the QUDA library
   endQuda();
 
-  // finalize the communications layer
+  // Finalize the communications layer
   finalizeComms();
 
   return 0;

@@ -155,7 +155,6 @@ int main(int argc, char **argv)
     }
     
     setStaggeredMultigridParam(mg_param);
-    //printQudaMultigridParam(&mg_param);
   }
   
   QudaEigParam eig_param = newQudaEigParam();
@@ -234,6 +233,7 @@ int main(int argc, char **argv)
   //constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, ghost_fatlink, ghost_longlink, gauge_param);
 #endif
 
+  // Specific gauge parameters for MILC
   int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
@@ -244,20 +244,34 @@ int main(int argc, char **argv)
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
 #endif  
+
+  int fat_pad = pad_size;
+  int link_pad = 3 * pad_size;
   
-  // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
-    QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
   
-  // Set MILC specific params and load the gauge fields
+  gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param, pad_size);
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+  } else {
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
   }
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+  
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param, pad_size);
+    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+    gauge_param.ga_pad = link_pad;
+    gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
   // Staggered Gauge construct END
@@ -271,9 +285,6 @@ int main(int argc, char **argv)
   // setup the multigrid solver
   void *mg_preconditioner = nullptr;
   if(inv_multigrid) {
-    printQudaInvertParam(&inv_param);
-    printQudaGaugeParam(&gauge_param);
-    printQudaMultigridParam(&mg_param);
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
@@ -333,10 +344,10 @@ int main(int argc, char **argv)
       gflops[k] = inv_param.gflops / inv_param.secs;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
-      verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-                               gauge_param, inv_param, 0);
+      if(verify_results) verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+					  gauge_param, inv_param, 0);
     }
-
+    
     // Compute timings
     if (Nsrc > 1) performanceStats(time, gflops);
     break;
@@ -392,7 +403,7 @@ int main(int argc, char **argv)
   // Free the multigrid solver
   if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   
-  // Clean up gauge fields, at least
+  // Clean up gauge fields
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] != nullptr) {
       free(qdp_inlink[dir]);
@@ -420,8 +431,12 @@ int main(int argc, char **argv)
   delete ref;
   delete tmp;
   free(outArray);
- 
+
+  // Finalize the QUDA library
   endQuda();
+
+  // Finalize the communications layer
   finalizeComms();
+
   return 0;
 }
