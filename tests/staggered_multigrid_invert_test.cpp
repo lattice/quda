@@ -129,12 +129,13 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
 
   gauge_param.ga_pad = 0;
 
+  int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;
@@ -179,7 +180,7 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
-void setMultigridParam(QudaMultigridParam &mg_param)
+void setMultigridParamL(QudaMultigridParam &mg_param)
 {
   QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
 
@@ -398,7 +399,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.verbosity_precondition = verbosity;
 }
 
-void setInvertParam(QudaInvertParam &inv_param)
+void setInvertParamL(QudaInvertParam &inv_param)
 {
   // Solver params
   inv_param.verbosity = QUDA_VERBOSE;
@@ -529,8 +530,6 @@ int main(int argc, char **argv)
 
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
   add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
@@ -557,8 +556,6 @@ int main(int argc, char **argv)
 
   display_test_info();
 
-  // *** QUDA parameters begin here.
-
   // Need to add support for LAPLACE
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
@@ -581,7 +578,7 @@ int main(int argc, char **argv)
   }
 
   setGaugeParam(gauge_param);
-  setInvertParam(inv_param);
+  setInvertParamL(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
@@ -589,20 +586,14 @@ int main(int argc, char **argv)
   mg_param.invert_param = &mg_inv_param;
   for (int i = 0; i < mg_levels; i++) { mg_param.eig_param[i] = &mg_eig_param[i]; }
 
-  setMultigridParam(mg_param);
+  setMultigridParamL(mg_param);
 
   // this must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
-  // *** Everything between here and the call to initQuda() is
-  // *** application-specific.
-
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, 1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
-
-  /* Taken from staggered_invert_test to load gauge fields */
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
@@ -611,21 +602,22 @@ int main(int argc, char **argv)
   void *milc_longlink = nullptr;
   void **ghost_fatlink = nullptr;
   void **ghost_longlink = nullptr;
-
+  GaugeField *cpuFat = nullptr;
+  GaugeField *cpuLong = nullptr;
+  
   for (int dir = 0; dir < 4; dir++) {
-    qdp_inlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_fatlink[dir] = malloc(V * gauge_site_size * gSize);
-    qdp_longlink[dir] = malloc(V * gauge_site_size * gSize);
+    qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
-  milc_fatlink = malloc(4 * V * gauge_site_size * gSize);
-  milc_longlink = malloc(4 * V * gauge_site_size * gSize);
+  milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
-  
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);  
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
@@ -657,34 +649,6 @@ int main(int argc, char **argv)
   tmp = quda::ColorSpinorField::Create(cs_param);
   // Staggered vector construct END
   //-----------------------------------------------------------------------------------
-
-  /*  
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *ref;
-  ColorSpinorField *tmp;
-
-  ColorSpinorParam csParam;
-  csParam.nColor = 3;
-  csParam.nSpin = 1;
-  csParam.nDim = 5;
-  for (int d = 0; d < 4; d++) csParam.x[d] = gauge_param.X[d];
-  bool pc = (inv_param.solution_type == QUDA_MATPC_SOLUTION || inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-  if (pc) csParam.x[0] /= 2;
-  csParam.x[4] = 1;
-
-  csParam.setPrecision(inv_param.cpu_prec);
-  csParam.pad = 0;
-  csParam.siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-  csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-  csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-  csParam.gammaBasis = inv_param.gamma_basis;
-  csParam.create = QUDA_ZERO_FIELD_CREATE;
-  in = new cpuColorSpinorField(csParam);
-  out = new cpuColorSpinorField(csParam);
-  ref = new cpuColorSpinorField(csParam);
-  tmp = new cpuColorSpinorField(csParam);
-  */
   
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
@@ -694,6 +658,22 @@ int main(int argc, char **argv)
   int fat_pad = tmp_value;
   int link_pad = 3 * tmp_value;
 
+  // Create ghost gauge fields in case of multi GPU builds.
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  gauge_param.location = QUDA_CPU_FIELD_LOCATION;
+  
+  GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
+  cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuFat = GaugeField::Create(cpuFatParam);
+  ghost_fatlink = (void**)cpuFat->Ghost();
+
+  gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+  GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
+  cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
+  cpuLong = GaugeField::Create(cpuLongParam);
+  ghost_longlink = (void**)cpuLong->Ghost();
+
+  /*  
   // FIXME: currently assume staggered is SU(3)
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
@@ -709,26 +689,27 @@ int main(int argc, char **argv)
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuGaugeField *cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink = (void **)cpuLong->Ghost();
-
+  */
+  
 #else
   int fat_pad = 0;
   int link_pad = 0;
 #endif
 
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
-    QUDA_ASQTAD_FAT_LINKS;
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+  
   gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
     gauge_param.reconstruct_sloppy = link_recon_sloppy;
     gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   } else {
-    gauge_param.reconstruct = gauge_param.reconstruct_sloppy = gauge_param.reconstruct_refinement_sloppy
-      = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
   }
   gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-
+  
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -741,15 +722,9 @@ int main(int argc, char **argv)
     gauge_param.reconstruct_precondition = link_recon_precondition;
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
-
-  /* end stuff stolen from staggered_invert_test */
-
-  // if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
-  // inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  inv_param.solve_type = solve_type; // restore actual solve_type we want to do
-
-  /* ESW HACK: comment this out to do a non-MG solve. */
-
+  
+  inv_param.solve_type = solve_type; 
+  
   // setup the multigrid solver
   printQudaInvertParam(&inv_param);
   printQudaGaugeParam(&gauge_param);

@@ -249,7 +249,7 @@ int main(int argc, char **argv)
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
-
+  
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     setStaggeredMILCGaugeParam(gauge_param, pad_size);
