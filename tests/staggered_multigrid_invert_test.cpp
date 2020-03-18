@@ -29,23 +29,7 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// Various CPU fields lifted from
-// staggered_invert_test.cpp
-
 #define mySpinorSiteSize 6
-
-
-void **ghost_fatlink, **ghost_longlink;
-
-cpuColorSpinorField *in;
-cpuColorSpinorField *out;
-cpuColorSpinorField *ref;
-cpuColorSpinorField *tmp;
-
-//QudaPrecision &cpu_prec = prec;
-//QudaPrecision &cuda_prec = prec;
-//QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-//QudaPrecision &cuda_prec_precondition = prec_precondition;
 
 namespace quda
 {
@@ -581,12 +565,6 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  // ESW HACK: needs to be addressed
-  /*if (solve_type == QUDA_DIRECT_PC_SOLVE || coarse_solve_type[0] == QUDA_DIRECT_PC_SOLVE || smoother_solve_type[0] ==
-  QUDA_DIRECT_PC_SOLVE) { printfQuda("staggered_multigtid_invert_test doesn't support preconditioned outer solve
-  yet.\n"); exit(0);
-  }*/
-
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
@@ -631,6 +609,8 @@ int main(int argc, char **argv)
   void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
+  void **ghost_fatlink = nullptr;
+  void **ghost_longlink = nullptr;
 
   for (int dir = 0; dir < 4; dir++) {
     qdp_inlink[dir] = malloc(V * gauge_site_size * gSize);
@@ -646,50 +626,6 @@ int main(int argc, char **argv)
 
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
   
-  /*
-  // load a field WITHOUT PHASES
-  if (strcmp(latfile, "")) {
-    read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    }
-  } else {
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_fatlink, 1, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink, 1, gauge_param.cpu_prec, &gauge_param,
-                                     compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
-    // createSiteLinkCPU(inlink, gauge_param.cpu_prec, 0); // 0 for no phases
-  }
-
-  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-  double plaq[3];
-  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
-  // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize);
-      memset(qdp_longlink[dir], 0, V * gauge_site_size * gSize);
-    }
-  } else { // QUDA_ASQTAD_DSLASH
-
-    if (compute_fatlong) {
-      computeFatLongGPU(qdp_fatlink, qdp_longlink, qdp_inlink, gauge_param, gSize, n_naiks, eps_naik);
-    } else { //
-
-      for (int dir = 0; dir < 4; dir++) { memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * gSize); }
-    }
-
-    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }
-  */
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
@@ -706,6 +642,27 @@ int main(int argc, char **argv)
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
+
+  // Staggered vector construct START
+  //-----------------------------------------------------------------------------------
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *ref;
+  ColorSpinorField *tmp;
+  ColorSpinorParam cs_param;
+  constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
+  in = quda::ColorSpinorField::Create(cs_param);
+  out = quda::ColorSpinorField::Create(cs_param);
+  ref = quda::ColorSpinorField::Create(cs_param);
+  tmp = quda::ColorSpinorField::Create(cs_param);
+  // Staggered vector construct END
+  //-----------------------------------------------------------------------------------
+
+  /*  
+  ColorSpinorField *in;
+  ColorSpinorField *out;
+  ColorSpinorField *ref;
+  ColorSpinorField *tmp;
 
   ColorSpinorParam csParam;
   csParam.nColor = 3;
@@ -727,7 +684,8 @@ int main(int argc, char **argv)
   out = new cpuColorSpinorField(csParam);
   ref = new cpuColorSpinorField(csParam);
   tmp = new cpuColorSpinorField(csParam);
-
+  */
+  
 #ifdef MULTI_GPU
   int tmp_value = MAX(ydim * zdim * tdim / 2, xdim * zdim * tdim / 2);
   tmp_value = MAX(tmp_value, xdim * ydim * tdim / 2);
@@ -809,7 +767,7 @@ int main(int argc, char **argv)
 
   for (int k = 0; k < Nsrc; k++) {
 
-    constructRandomSpinorSource(in->V(), 1, 3, inv_param.cpu_prec, csParam.x, *rng);
+    constructRandomSpinorSource(in->V(), 1, 3, inv_param.cpu_prec, cs_param.x, *rng);
     invertQuda(out->V(), in->V(), &inv_param);
 
     time[k] = inv_param.secs;
