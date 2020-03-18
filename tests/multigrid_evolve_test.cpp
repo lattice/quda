@@ -7,8 +7,8 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
-#include <blas_reference.h>
+#include <dslash_reference.h>
+//#include <blas_reference.h>
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
@@ -236,36 +236,34 @@ int main(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  void *gauge[4], *clover=0, *clover_inv=0;
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
+  void *gauge[4];
+  // Allocate space on the host (always best to allocate and free in the same scope)
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
 
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
+  // Allocate host side memory for clover terms if needed.
+  //----------------------------------------------------------------------------
+  void *clover = nullptr;
+  void *clover_inv = nullptr;
+  // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V * clover_site_size * cSize);
-    clover_inv = malloc(V * clover_site_size * cSize);
-    if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
-
-    inv_param.compute_clover = compute_clover;
-    if (compute_clover) inv_param.return_clover = 1;
-    inv_param.compute_clover_inverse = 1;
-    inv_param.return_clover_inverse = 1;
+    clover = malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    constructHostCloverField(clover, clover_inv, inv_param);
+    // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
+    if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+      inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+    }    
+    // Load the clover terms to the device
+    loadCloverQuda(clover, clover_inv, &inv_param);
+    // Restore actual solve_type we want to do
+    inv_param.solve_type = solve_type;
   }
-
+  
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
@@ -393,9 +391,9 @@ int main(int argc, char **argv)
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // Recompute Gauge Observables
-      gaugeObservablesQuda(&gauge_obs_param);
+      gaugeObservablesQuda(&obs_param);
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
-                 gauge_obs_param.plaquette[0], gauge_obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+		 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // Reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);

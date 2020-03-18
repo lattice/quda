@@ -7,7 +7,7 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <contract_reference.h>
 #include "misc.h"
 

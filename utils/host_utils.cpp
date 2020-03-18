@@ -127,7 +127,6 @@ void setQudaDefaultMgTestParams()
     strcpy(mg_vec_infile[i], "");
     strcpy(mg_vec_outfile[i], "");
   }
-  reliable_delta = 1e-4;
 }
 
 void setQudaDefaultMgSolveTypes()
@@ -2268,12 +2267,11 @@ void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::Gauge
   
 }
 
-
-  
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
                                       QudaGaugeParam &gauge_param, int argc, char **argv)
 {
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO; 
+
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
@@ -2303,6 +2301,55 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
     } else {
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+  }
+}
+
+void constructStaggeredHostDeviceGaugeField(void **qdp_inlink,
+					    void **qdp_longlink_cpu, void **qdp_longlink_gpu,
+					    void **qdp_fatlink_cpu, void **qdp_fatlink_gpu,
+					    QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded)
+{
+  
+  // load a field WITHOUT PHASES
+  if (strcmp(latfile,"")) {
+    if (!gauge_loaded) {
+      read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
+      if (dslash_type != QUDA_LAPLACE_DSLASH) {
+        applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+      }
+      gauge_loaded = true;
+    } // else it's already been loaded
+  } else {
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
+                                     compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+    }
+  }
+
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+    }
+  } else { // QUDA_ASQTAD_DSLASH
+
+    if (compute_fatlong) {
+      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
+                              gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+    } else { //
+
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+        memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
       }
     }
   }

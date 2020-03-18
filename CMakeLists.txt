@@ -151,7 +151,6 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_BUILD_ALL_PROGRAMS OFF CACHE BOOL "do not build programs by default")
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
@@ -204,7 +203,6 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_ALL_PROGRAMS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
@@ -948,10 +946,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-# add tests, programs, and quda library
+# add tests, utils, reference, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(utils)
 add_subdirectory(host_reference)
-add_subdirectory(programs)
 add_subdirectory(doc)

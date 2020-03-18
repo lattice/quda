@@ -25,6 +25,8 @@
 #include <llfat_utils.h>
 #include <qio_field.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -85,7 +87,6 @@ int main(int argc, char **argv)
   }
   
   if(!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
-  //if(inv_multigrid) 
   
   if(inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
@@ -99,11 +100,14 @@ int main(int argc, char **argv)
   setQudaDefaultPrecs();
   if(inv_multigrid) {
     setQudaDefaultMgSolveTypes();
+    reliable_delta = 1e-4;
   }
   
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
+  initRand();
+  
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
@@ -127,10 +131,11 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   setStaggeredQDPGaugeParam(gauge_param);
-  gauge_param.type = QUDA_WILSON_LINKS;
-  if(inv_multigrid) setStaggeredMGInvertParam(inv_param);
+  if(inv_multigrid) {
+    setStaggeredMGInvertParam(inv_param);
+  }
   else setStaggeredInvertParam(inv_param);
-
+  
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
 
@@ -147,7 +152,6 @@ int main(int argc, char **argv)
       mg_param.eig_param[i] = &mg_eig_param[i];
       mg_eig_param[i] = newQudaEigParam();
       setMultigridEigParam(mg_eig_param[i], i);
-      //printfQuda("setup_inv = %d\n", setup_inv[i]);
     }
     
     setStaggeredMultigridParam(mg_param);
@@ -211,11 +215,6 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-
-  //gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-  //QUDA_SU3_LINKS :
-  //QUDA_ASQTAD_FAT_LINKS;
-  
   // Create ghost gauge fields in case of multi GPU builds.
 #ifdef MULTI_GPU
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
@@ -234,6 +233,18 @@ int main(int argc, char **argv)
   
   //constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, ghost_fatlink, ghost_longlink, gauge_param);
 #endif
+
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+#endif  
+  
   // FIXME: currently assume staggered is SU(3)
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
@@ -241,20 +252,28 @@ int main(int argc, char **argv)
 
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
+    setStaggeredMILCGaugeParam(gauge_param, pad_size);
   }
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
+    setStaggeredMILCGaugeParam(gauge_param, pad_size);
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 
+  if(inv_multigrid) {
+    // restore actual solve_type we want to do     
+    inv_param.solve_type = solve_type;
+  }
+  
   // setup the multigrid solver
   void *mg_preconditioner = nullptr;
   if(inv_multigrid) {
+    printQudaInvertParam(&inv_param);
+    printQudaGaugeParam(&gauge_param);
+    printQudaMultigridParam(&mg_param);
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
@@ -307,6 +326,7 @@ int main(int argc, char **argv)
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
       if(inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      printQudaInvertParam(&inv_param);
       invertQuda(out->V(), in->V(), &inv_param);
       
       time[k] = inv_param.secs;

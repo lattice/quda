@@ -659,7 +659,8 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
+  gauge_param.type = QUDA_WILSON_LINKS;
+  
   int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
@@ -673,8 +674,9 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = pad_size;
 }
 
-void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
+void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, int pad_size)
 {
+  /*
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
@@ -719,8 +721,10 @@ void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
 #endif
+  */
   gauge_param.ga_pad = pad_size;
 
+  
   // Specific parameter settings for MILC
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.type = QUDA_SU3_LINKS;
@@ -896,7 +900,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   tmpint = MAX(tmpint, xdim * ydim * tdim);
   tmpint = MAX(tmpint, xdim * ydim * zdim);
 
-  inv_param.sp_pad = tmpint;
+  //inv_param.sp_pad = tmpint;
+  inv_param.sp_pad = 0;
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)

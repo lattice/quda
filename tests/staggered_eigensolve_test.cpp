@@ -23,6 +23,7 @@
 #include <llfat_utils.h>
 #include <qio_field.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
@@ -160,18 +161,29 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+#endif  
+  
   // FIXME: currently assume staggered is SU(3)
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :
     QUDA_ASQTAD_FAT_LINKS;
   // Set MILC specific params and load the gauge fields
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
+    setStaggeredMILCGaugeParam(gauge_param, pad_size);
   }
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
+    setStaggeredMILCGaugeParam(gauge_param, pad_size);
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
   // Staggered Gauge construct END

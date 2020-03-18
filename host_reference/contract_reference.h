@@ -1,9 +1,10 @@
 #pragma once
 
-#include <blas_reference.h>
+#include <host_utils.h>
+//#include <blas_reference.h>
 #include <quda_internal.h>
 #include "color_spinor_field.h"
-#include <host_utils.h>
+
 
 extern int Z[4];
 extern int Vh;
