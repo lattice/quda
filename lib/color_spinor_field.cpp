@@ -193,13 +193,13 @@ namespace quda {
 
     precision = Prec;
     // Copy all data in X
-    for (int d=0; d<QUDA_MAX_DIM; d++) x[d] = X[d];
+    for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = X[d];
     volume = 1;
     for (int d=0; d<nDim; d++) {
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
-    
+
    if((twistFlavor == QUDA_TWIST_NONDEG_DOUBLET || twistFlavor == QUDA_TWIST_DEG_DOUBLET) && x[4] != 2)
      errorQuda("Must be two flavors for non-degenerate twisted mass spinor (while provided with %d number of components)\n", x[4]);//two flavors
 
