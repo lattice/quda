@@ -129,9 +129,9 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
         Float *odd_src = cpuStaple + volumeCB * gauge_site_size;
 
         Float *even_dst;
-        Float* odd_dst;
+        Float *odd_dst;
 
-	//switching odd and even ghost cpuLink when that dimension size is odd
+        //switching odd and even ghost cpuLink when that dimension size is odd
 	//only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
 	if((X[dir] % 2 ==0) || (comm_dim(dir) == 1)){
 	  even_dst = dst[dir];
@@ -142,7 +142,7 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
         }
 
         int even_dst_index = 0;
-	int odd_dst_index = 0;
+        int odd_dst_index = 0;
 	int startd;
 	int endd;
 	if(ite == 0){ //back

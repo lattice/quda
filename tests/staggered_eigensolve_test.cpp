@@ -162,7 +162,7 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
-  
+
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 

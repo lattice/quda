@@ -347,7 +347,7 @@ int main(int argc, char **argv)
       for (int i = 0; i < inv_param.Ls * V; i++)
         ((double *)spinorIn[j])[i * spinor_site_size + j] = rand() / (double)RAND_MAX;
     }
-    }
+  }
   // start the timer
   double time0 = -((double)clock());
 
