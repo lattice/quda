@@ -676,54 +676,6 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
 
 void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, int pad_size)
 {
-  /*
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_sloppy = prec_sloppy;
-  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  gauge_param.cuda_prec_precondition = prec_precondition;
-
-  gauge_param.anisotropy = 1.0;
-
-  // For HISQ, this must always be set to 1.0, since the tadpole
-  // correction is baked into the coefficients for the first fattening.
-  // The tadpole doesn't mean anything for the second fattening
-  // since the input fields are unitarized.
-  gauge_param.tadpole_coeff = 1.0;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0 / 24.0;
-    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
-  } else {
-    gauge_param.scale = 1.0;
-  }
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_LINKS;
-
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-#endif
-  */
-  gauge_param.ga_pad = pad_size;
-
   
   // Specific parameter settings for MILC
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {

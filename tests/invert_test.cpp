@@ -16,10 +16,6 @@
 #include <unitarization_links.h>
 #include <random_quda.h>
 
-#include <random_quda.h>
-#include <quda.h>
-#include <quda_internal.h>
-
 // External headers
 #include <misc.h>
 #include <host_utils.h>
@@ -28,22 +24,12 @@
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
 #include <llfat_utils.h>
-#include <qio_field.h>
 
-#include <host_utils.h>
-#include <command_line_params.h>
-#include <misc.h>
-#include <dslash_reference.h>
-
-namespace quda
-{
-  extern void setTransferGPU(bool);
-}
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-    
   printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
   printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
              get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
@@ -123,6 +109,7 @@ void display_test_info()
 
 int main(int argc, char **argv)
 {
+  setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);

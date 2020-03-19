@@ -23,6 +23,8 @@
 #include <misc.h>
 #include <qio_field.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 using namespace std;
 
 #define XUP 0
@@ -2229,6 +2231,52 @@ double stopwatchReadSeconds()
 
 int dimPartitioned(int dim) { return ((gridsize_from_cmdline[dim] > 1) || dim_partitioned[dim]); }
 
+void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param)
+{
+  // Specific gauge parameters for MILC
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+#endif  
+
+  int fat_pad = pad_size;
+  int link_pad = 3 * pad_size;
+  
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
+  
+  gauge_param.ga_pad = fat_pad;
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+  } else {
+    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
+    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
+  }
+  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
+  
+  loadGaugeQuda(milc_fatlink, &gauge_param);
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
+    gauge_param.ga_pad = link_pad;
+    gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+    gauge_param.reconstruct_precondition = link_recon_precondition;
+    loadGaugeQuda(milc_longlink, &gauge_param);
+  }
+}
+
+
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
 
@@ -2249,7 +2297,7 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, void **ghost_fatlink, void **ghost_longlink, QudaGaugeParam &gauge_param) {
+void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param) {
   
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
@@ -2257,14 +2305,11 @@ void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::Gauge
   GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
-  ghost_fatlink = (void**)cpuFat->Ghost();
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
-  ghost_longlink = (void**)cpuLong->Ghost();
-  
 }
 
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
