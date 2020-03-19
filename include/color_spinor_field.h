@@ -196,6 +196,8 @@ namespace quda {
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
+      } else {
+	x[4] = 1;
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
@@ -225,7 +227,8 @@ namespace quda {
     // normally used to create cuda param from a cpu param
     ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
                      QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
-      LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
+	//LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
       location(location),
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),
@@ -245,6 +248,7 @@ namespace quda {
     {
       siteSubset = cpuParam.siteSubset;
       fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+      for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
     }
 
     /**

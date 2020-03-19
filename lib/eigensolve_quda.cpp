@@ -548,7 +548,7 @@ namespace quda
       }
 
       read_spinor_field(vec_infile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
-                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
+                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), tmp[0]->X()[4], Nvec, 0, (char **)0);
 
       host_free(V);
       if (eig_vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -685,7 +685,7 @@ namespace quda
     }
 
     write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(),
-                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
+                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), tmp[0]->X()[4], Nvec, 0, (char **)0);
 
     host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
@@ -762,6 +762,7 @@ namespace quda
   {
     // In case we are deflating an operator, save the tunechache from the inverter
     saveTuneCache();
+
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
       printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);

@@ -2335,7 +2335,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     cpuParam.v = host_evecs[i];
     host_evecs_.push_back(ColorSpinorField::Create(cpuParam));
   }
-
+  
   ColorSpinorParam cudaParam(cpuParam);
   cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   cudaParam.create = QUDA_ZERO_FIELD_CREATE;
