@@ -49,8 +49,11 @@ void setQudaStaggeredInvTestParams();
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param);
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param);
-void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu, void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded);
+void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
+                                           void *milc_longlink, QudaGaugeParam &gauge_param);
+void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
+                                            void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
+                                            int argc, char **argv, bool &gauge_loaded);
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
                                       QudaGaugeParam &gauge_param, int argc, char **argv);
 
@@ -62,18 +65,16 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 
-
 // Spinor utils
 // Merge these two with argument passing to discriminate
 //------------------------------------------------------
 void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
                                        const QudaGaugeParam *gauge_param);
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *csParam, const QudaInvertParam *inv_param,
-				    const QudaGaugeParam *gauge_param);
+                                    const QudaGaugeParam *gauge_param);
 void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision precision, const int *const x,
                                  quda::RNG &rng);
 //------------------------------------------------------
-
 
 void computeLongLinkCPU(void **longlink, void **sitelink, QudaPrecision prec, void *act_path_coeff);
 

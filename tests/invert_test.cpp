@@ -37,40 +37,40 @@ void display_test_info()
              get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
              get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     printfQuda("MG parameters\n");
     printfQuda(" - number of levels %d\n", mg_levels);
-    for (int i=0; i<mg_levels-1; i++) {
-      printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-      printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
-      printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+    for (int i = 0; i < mg_levels - 1; i++) {
+      printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
+      printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
     }
 
     printfQuda("MG Eigensolver parameters\n");
     for (int i = 0; i < mg_levels; i++) {
       if (low_mode_check || mg_eig[i]) {
-	printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
-	printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-	printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-	printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-	printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
-	printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-	printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
-	printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
-		   mg_eig_use_normop[i] ? "true" : "false");
-	if (mg_eig_use_poly_acc[i]) {
-	  printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
-	  printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-	  if (mg_eig_amax[i] <= 0)
-	    printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
-	  else
-	    printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
-	}
-	printfQuda("\n");
+        printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
+        printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
+        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
+        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+        printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+        printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
+        printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
+                   mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
+        if (mg_eig_use_poly_acc[i]) {
+          printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+          printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+          if (mg_eig_amax[i] <= 0)
+            printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+          else
+            printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        }
+        printfQuda("\n");
       }
     }
   }
-  
+
   if (inv_deflate) {
     printfQuda("\n   Eigensolver parameters\n");
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
@@ -100,8 +100,6 @@ void display_test_info()
     }
   }
 
-  
-  
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -121,11 +119,11 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  if(inv_deflate && inv_multigrid) {
+  if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
     exit(0);
   }
-  
+
   // Move these
   if (multishift > 1) {
     // set a correct default for the multi-shift solver
@@ -135,11 +133,11 @@ int main(int argc, char **argv)
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  if(inv_multigrid) {
-    setQudaDefaultMgTestParams();    
+  if (inv_multigrid) {
+    setQudaDefaultMgTestParams();
     setQudaDefaultMgSolveTypes();
   }
-  
+
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
@@ -152,19 +150,18 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     // Only these fermions are supported with MG
-    if (dslash_type != QUDA_WILSON_DSLASH &&
-	dslash_type != QUDA_CLOVER_WILSON_DSLASH &&
-	dslash_type != QUDA_TWISTED_MASS_DSLASH &&
-	dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
+    if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
+        && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH) {
       printfQuda("dslash_type %d not supported for MG\n", dslash_type);
       exit(0);
     }
 
     // Only these solve types are supported with MG
     if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
-      printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n", solve_type);
+      printfQuda("Solve_type %d not supported with MG. Please use QUDA_DIRECT_SOLVE or QUDA_DIRECT_PC_SOLVE\n\n",
+                 solve_type);
       exit(0);
     }
   }
@@ -177,33 +174,32 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   QudaEigParam eig_param = newQudaEigParam();
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     setMultigridInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
-	mg_eig_param[i] = newQudaEigParam();
-	setMultigridEigParam(mg_eig_param[i], i);
-	mg_param.eig_param[i] = &mg_eig_param[i];
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
       } else {
-	mg_param.eig_param[i] = nullptr;
+        mg_param.eig_param[i] = nullptr;
       }
     }
     // Set MG
-    setMultigridParam(mg_param);  
-  }
-  else {
+    setMultigridParam(mg_param);
+  } else {
     setInvertParam(inv_param);
   }
-  
-  if(inv_deflate) {
+
+  if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
   }
-  
+
   // All parameters have been set. Display the parameters via stdout
   display_test_info();
 
@@ -238,15 +234,15 @@ int main(int argc, char **argv)
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
-    if(inv_multigrid) {
+    if (inv_multigrid) {
       // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
       if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-	inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
       }
     }
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
-    if(inv_multigrid) {
+    if (inv_multigrid) {
       // Restore actual solve_type we want to do
       inv_param.solve_type = solve_type;
     }
@@ -254,11 +250,11 @@ int main(int argc, char **argv)
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
-  
+
   // Compute plaquette as a sanity check
   double plaq[3];
   plaqQuda(plaq);
@@ -283,7 +279,7 @@ int main(int argc, char **argv)
 
   // Quark masses
   std::vector<double> masses(multishift);
-  
+
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
   if (multishift > 1) {
@@ -301,7 +297,7 @@ int main(int argc, char **argv)
       outMulti[i] = qudaOutMulti[i]->V();
     }
   }
-  
+
   double *time = new double[Nsrc];
   double *gflops = new double[Nsrc];
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
@@ -312,14 +308,14 @@ int main(int argc, char **argv)
     // Populate the host spinor with random numbers.
     constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
     // If deflating, preserve the deflation space between solves
-    if(inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     // Perform QUDA inversions
     if (multishift > 1) {
       invertMultiShiftQuda((void **)outMulti, in->V(), &inv_param);
     } else {
       invertQuda(out->V(), in->V(), &inv_param);
     }
-    
+
     time[i] = inv_param.secs;
     gflops[i] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
@@ -332,8 +328,8 @@ int main(int argc, char **argv)
   delete rng;
 
   // free the multigrid solver
-  if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
-  
+  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+
   // Compute performance statistics
   if (Nsrc > 1) performanceStats(time, gflops);
   delete[] time;
@@ -341,7 +337,7 @@ int main(int argc, char **argv)
 
   // Perform host side verification of inversion if requested
   if (verify_results) {
-    verifyInversion(out->V(), (void**)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
+    verifyInversion(out->V(), (void **)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
   }
 
   // Clean up memory allocations
@@ -349,10 +345,10 @@ int main(int argc, char **argv)
   delete out;
   delete check;
   free(outMulti);
-  if(multishift > 1) {
-    for (int i = 0; i < multishift; i++) delete qudaOutMulti[i];    
+  if (multishift > 1) {
+    for (int i = 0; i < multishift; i++) delete qudaOutMulti[i];
   }
-  
+
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 

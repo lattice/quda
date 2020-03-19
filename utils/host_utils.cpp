@@ -211,14 +211,13 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *cs_param, const Q
 }
 
 void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const QudaInvertParam *inv_param,
-				    const QudaGaugeParam *gauge_param)
+                                    const QudaGaugeParam *gauge_param)
 {
   // Lattice vector spacetime/colour/spin/parity properties
   cs_param->nColor = 3;
   cs_param->nSpin = 4;
-  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {    
+  if (inv_param->dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param->dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || inv_param->dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     cs_param->nDim = 5;
     cs_param->x[4] = inv_param->Ls;
   } else {
@@ -228,7 +227,7 @@ void constructWilsonTestSpinorParam(quda::ColorSpinorParam *cs_param, const Quda
   bool pc = (inv_param->solution_type == QUDA_MATPC_SOLUTION || inv_param->solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
   if (pc) cs_param->x[0] /= 2;
   cs_param->siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-  
+
   // Lattice vector data properties
   cs_param->setPrecision(inv_param->cpu_prec);
   cs_param->pad = 0;
@@ -1433,7 +1432,7 @@ void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, Q
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     for(int d=0; d<4; d++){
       for (int i = 0; i < V * gauge_site_size; i++) {
-        gauge[d][i] /= (-24*param->tadpole_coeff*param->tadpole_coeff);
+        gauge[d][i] /= (-24 * param->tadpole_coeff * param->tadpole_coeff);
       }
     }
   }
@@ -1941,11 +1940,11 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
         if (precision == QUDA_DOUBLE_PRECISION){
           // double* mylink = (double*)link;
           // mylink = mylink + (4*i + dir)*gauge_site_size;
-          double* mylink = (double*)link[dir];
+          double *mylink = (double *)link[dir];
           mylink = mylink + i * gauge_site_size;
 
           mylink[12] *= coeff;
-	  mylink[13] *= coeff;
+          mylink[13] *= coeff;
 	  mylink[14] *= coeff;
 	  mylink[15] *= coeff;
 	  mylink[16] *= coeff;
@@ -1954,7 +1953,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
         }else{
           // float* mylink = (float*)link;
           // mylink = mylink + (4*i + dir)*gauge_site_size;
-          float* mylink = (float*)link[dir];
+          float *mylink = (float *)link[dir];
           mylink = mylink + i * gauge_site_size;
 
           mylink[12] *= coeff;
@@ -2243,13 +2242,15 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
   pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-#endif  
+#endif
 
   int fat_pad = pad_size;
   int link_pad = 3 * pad_size;
-  
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
-  
+
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
+
   gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
@@ -2261,7 +2262,7 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
     gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
   }
   gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-  
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -2275,7 +2276,6 @@ void loadFatLongGaugeQuda(void *milc_fatlink, void *milc_longlink, QudaGaugePara
     loadGaugeQuda(milc_longlink, &gauge_param);
   }
 }
-
 
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv)
 {
@@ -2297,11 +2297,13 @@ void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc
   constructQudaGaugeField(gauge, construct_type, gauge_param.cpu_prec, &gauge_param);
 }
 
-void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink, void *milc_longlink, QudaGaugeParam &gauge_param) {
-  
+void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::GaugeField *cpuLong, void *milc_fatlink,
+                                           void *milc_longlink, QudaGaugeParam &gauge_param)
+{
+
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-  
+
   GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
@@ -2315,7 +2317,7 @@ void constructStaggeredHostGhostGaugeField(quda::GaugeField *cpuFat, quda::Gauge
 void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, void **qdp_fatlink,
                                       QudaGaugeParam &gauge_param, int argc, char **argv)
 {
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO; 
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   if (strcmp(latfile, "")) {
     // load in the command line supplied gauge field using QIO and LIME
@@ -2351,14 +2353,13 @@ void constructStaggeredHostGaugeField(void **qdp_inlink, void **qdp_longlink, vo
   }
 }
 
-void constructStaggeredHostDeviceGaugeField(void **qdp_inlink,
-					    void **qdp_longlink_cpu, void **qdp_longlink_gpu,
-					    void **qdp_fatlink_cpu, void **qdp_fatlink_gpu,
-					    QudaGaugeParam &gauge_param, int argc, char **argv, bool &gauge_loaded)
+void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longlink_cpu, void **qdp_longlink_gpu,
+                                            void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
+                                            int argc, char **argv, bool &gauge_loaded)
 {
-  
+
   // load a field WITHOUT PHASES
-  if (strcmp(latfile,"")) {
+  if (strcmp(latfile, "")) {
     if (!gauge_loaded) {
       read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc, argv);
       if (dslash_type != QUDA_LAPLACE_DSLASH) {
@@ -2371,7 +2372,7 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink,
       constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
       constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
-                                     compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
 

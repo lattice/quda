@@ -257,13 +257,13 @@ int main(int argc, char **argv)
     // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
       inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-    }    
+    }
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
     // Restore actual solve_type we want to do
     inv_param.solve_type = solve_type;
   }
-  
+
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorOut = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
@@ -393,7 +393,7 @@ int main(int argc, char **argv)
       // Recompute Gauge Observables
       gaugeObservablesQuda(&obs_param);
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
-		 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // Reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);

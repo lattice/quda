@@ -154,8 +154,7 @@ int main(int argc, char **argv)
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
-  
-  
+
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
   void *spinorCheck = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
 

@@ -128,20 +128,20 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
 	Float* even_src = cpuStaple;
         Float *odd_src = cpuStaple + volumeCB * gauge_site_size;
 
-        Float* even_dst;
-	Float* odd_dst;
+        Float *even_dst;
+        Float* odd_dst;
 
 	//switching odd and even ghost cpuLink when that dimension size is odd
 	//only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
 	if((X[dir] % 2 ==0) || (comm_dim(dir) == 1)){
 	  even_dst = dst[dir];
           odd_dst = even_dst + nFace * faceVolumeCB[dir] * gauge_site_size;
-        }else{
-	  odd_dst = dst[dir];
+        } else {
+          odd_dst = dst[dir];
           even_dst = dst[dir] + nFace * faceVolumeCB[dir] * gauge_site_size;
         }
 
-	int even_dst_index = 0;
+        int even_dst_index = 0;
 	int odd_dst_index = 0;
 	int startd;
 	int endd;
@@ -227,12 +227,12 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
       int oddness = ( (X[nu]-1) + 0 + i + j) %2;
       if(oddness==0){
         for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
-          memcpy(&dst_even[(18*even_dst_idx+tmpidx)*prec], &src_even[(18*src_idx + tmpidx)*prec], prec);
+          memcpy(&dst_even[(18 * even_dst_idx + tmpidx) * prec], &src_even[(18 * src_idx + tmpidx) * prec], prec);
         }
         even_dst_idx++;
       }else{
         for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
-          memcpy(&dst_odd[(18*odd_dst_idx+tmpidx)*prec], &src_odd[(18*src_idx + tmpidx)*prec], prec);
+          memcpy(&dst_odd[(18 * odd_dst_idx + tmpidx) * prec], &src_odd[(18 * src_idx + tmpidx) * prec], prec);
         }
         odd_dst_idx++;
       }//if

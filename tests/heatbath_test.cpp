@@ -111,7 +111,7 @@ int main(int argc, char **argv)
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
-  
+
   // start the timer
   double time0 = -((double)clock());
 

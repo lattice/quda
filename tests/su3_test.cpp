@@ -141,7 +141,7 @@ int main(int argc, char **argv)
   // Load the gauge field to the device
   loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
-  
+
   double plaq[3];
   plaqQuda(plaq);
   printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],

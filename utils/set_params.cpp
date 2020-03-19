@@ -277,7 +277,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; 
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -310,7 +310,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set 
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
@@ -431,7 +431,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2; 
+  mg_param.spin_block_size[0] = 2;
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -660,7 +660,7 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
-  
+
   int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
@@ -676,7 +676,7 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
 
 void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, int pad_size)
 {
-  
+
   // Specific parameter settings for MILC
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.type = QUDA_SU3_LINKS;
@@ -773,7 +773,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.omega = 1.0;
 }
 
-
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
@@ -852,7 +851,7 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   tmpint = MAX(tmpint, xdim * ydim * tdim);
   tmpint = MAX(tmpint, xdim * ydim * zdim);
 
-  //inv_param.sp_pad = tmpint;
+  // inv_param.sp_pad = tmpint;
   inv_param.sp_pad = 0;
 }
 
@@ -880,9 +879,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
-  
+
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION; 
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -1015,9 +1014,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       } else {
         errorQuda("Unexpected solve_type = %d\n", solve_type);
       }
-      
+
     } else {
-      
+
       if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
@@ -1031,15 +1030,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
-    nu_pre[i] = 2;  
-    nu_post[i] = 2; 
+    nu_pre[i] = 2;
+    nu_post[i] = 2;
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
-  mg_param.spin_block_size[0] = 0; 
+  mg_param.spin_block_size[0] = 0;
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

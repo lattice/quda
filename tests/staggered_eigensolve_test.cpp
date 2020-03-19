@@ -170,8 +170,8 @@ int main(int argc, char **argv)
   pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-#endif  
-  
+#endif
+
   // FIXME: currently assume staggered is SU(3)
   gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
     QUDA_SU3_LINKS :

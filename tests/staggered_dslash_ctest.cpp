@@ -63,8 +63,7 @@ bool global_skip = true; // hack to skip tests
 
 QudaParity parity = QUDA_EVEN_PARITY;
 
-//static int n_naiks = 1; // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
-
+// static int n_naiks = 1; // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
 
 int X[4];
 
@@ -203,9 +202,10 @@ void init(int precision, QudaReconstructType link_recon, int partition)
 
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  
-  constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);  
-  
+
+  constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
+                                         qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
+
   /*
   // load a field WITHOUT PHASES
   if (strcmp(latfile,"")) {
@@ -249,7 +249,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
     }
   }
 
-  */  
+  */
 
   // Alright, we've created all the void** links.
   // Create the void* pointers
@@ -492,21 +492,21 @@ void staggeredDslashRef()
   switch (dtest_type) {
     case dslash_test_type::Dslash:
       staggeredDslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
-                       parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+                      parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       break;
     case dslash_test_type::MatPC:
-      staggeredMatDagMat(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor, mass, 0,
-                inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
+      staggeredMatDagMat(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
+                         mass, 0, inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
       break;
     case dslash_test_type::Mat:
       // The !dagger is to compensate for the convention of actually
       // applying -D_eo and -D_oe.
       staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu,
-                       ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Odd()),
-                       QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+                      ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Odd()),
+                      QUDA_EVEN_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       staggeredDslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Odd()), qdp_fatlink_cpu, qdp_longlink_cpu,
-                       ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Even()),
-                       QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
+                      ghost_fatlink_cpu, ghost_longlink_cpu, reinterpret_cast<cpuColorSpinorField *>(&spinor->Even()),
+                      QUDA_ODD_PARITY, !dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       if (dslash_type == QUDA_LAPLACE_DSLASH) {
         xpay(spinor->V(), kappa, spinorRef->V(), spinor->Length(), gauge_param.cpu_prec);
       } else {

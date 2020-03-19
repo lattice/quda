@@ -558,7 +558,7 @@ int main(int argc, char **argv)
   void **ghost_longlink = nullptr;
   GaugeField *cpuFat = nullptr;
   GaugeField *cpuLong = nullptr;
-  
+
   for (int dir = 0; dir < 4; dir++) {
     qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -571,7 +571,7 @@ int main(int argc, char **argv)
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
-  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);  
+  constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
 
   // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
   double plaq[3];
@@ -583,7 +583,7 @@ int main(int argc, char **argv)
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
   }
-  
+
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
@@ -598,24 +598,26 @@ int main(int argc, char **argv)
   // Create ghost gauge fields in case of multi GPU builds.
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-  
+
   GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
-  ghost_fatlink = (void**)cpuFat->Ghost();
+  ghost_fatlink = (void **)cpuFat->Ghost();
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
-  ghost_longlink = (void**)cpuLong->Ghost();
+  ghost_longlink = (void **)cpuLong->Ghost();
 
 #endif
   int fat_pad = pad_value;
   int link_pad = 3 * pad_value;
-  
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ? QUDA_SU3_LINKS : QUDA_ASQTAD_FAT_LINKS;
-  
+
+  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
+    QUDA_SU3_LINKS :
+    QUDA_ASQTAD_FAT_LINKS;
+
   gauge_param.ga_pad = fat_pad;
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
     gauge_param.reconstruct = link_recon;
@@ -627,7 +629,7 @@ int main(int argc, char **argv)
     gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
   }
   gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-  
+
   loadGaugeQuda(milc_fatlink, &gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -642,9 +644,9 @@ int main(int argc, char **argv)
   }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-  
-  inv_param.solve_type = solve_type; 
-  
+
+  inv_param.solve_type = solve_type;
+
   // Setup the multigrid solver
   void *mg_preconditioner = newMultigridQuda(&mg_param);
   inv_param.preconditioner = mg_preconditioner;
@@ -663,7 +665,7 @@ int main(int argc, char **argv)
   tmp = quda::ColorSpinorField::Create(cs_param);
   // Staggered vector construct END
   //-----------------------------------------------------------------------------------
-  
+
   // Prepare rng
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
@@ -681,10 +683,11 @@ int main(int argc, char **argv)
     gflops[k] = inv_param.gflops / inv_param.secs;
     printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                inv_param.gflops / inv_param.secs);
-    if(verify_results) verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
-					gauge_param, inv_param, 0);
+    if (verify_results)
+      verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, ghost_fatlink, ghost_longlink,
+                               gauge_param, inv_param, 0);
   }
-    
+
   // Compute timings
   if (Nsrc > 1) performanceStats(time, gflops);
   delete[] time;
@@ -696,7 +699,7 @@ int main(int argc, char **argv)
 
   // Free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
-  
+
   // Clean up gauge fields
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] != nullptr) {
@@ -713,12 +716,24 @@ int main(int argc, char **argv)
     }
   }
 
-  if (milc_fatlink != nullptr) { free(milc_fatlink); milc_fatlink = nullptr; }
-  if (milc_longlink != nullptr) { free(milc_longlink); milc_longlink = nullptr; }
+  if (milc_fatlink != nullptr) {
+    free(milc_fatlink);
+    milc_fatlink = nullptr;
+  }
+  if (milc_longlink != nullptr) {
+    free(milc_longlink);
+    milc_longlink = nullptr;
+  }
 
 #ifdef MULTI_GPU
-  if (cpuFat != nullptr) { delete cpuFat; cpuFat = nullptr; }
-  if (cpuLong != nullptr) { delete cpuLong; cpuLong = nullptr; }
+  if (cpuFat != nullptr) {
+    delete cpuFat;
+    cpuFat = nullptr;
+  }
+  if (cpuLong != nullptr) {
+    delete cpuLong;
+    cpuLong = nullptr;
+  }
 #endif
 
   delete in;

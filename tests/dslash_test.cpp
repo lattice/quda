@@ -43,7 +43,7 @@ QudaDagType not_dagger;
 
 // For loading the gauge fields
 int argc_copy;
-char** argv_copy;
+char **argv_copy;
 
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
@@ -278,7 +278,7 @@ void init(int argc, char **argv) {
   printfQuda("done.\n"); fflush(stdout);
   
   initQuda(device);
-  
+
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
   inv_param.verbosity = verbosity;

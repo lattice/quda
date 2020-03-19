@@ -111,7 +111,6 @@ void init(int argc, char **argv)
   tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
   tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
 
-
   gauge_param.ga_pad = tmpint;
   inv_param.sp_pad = tmpint;
 
@@ -119,10 +118,8 @@ void init(int argc, char **argv)
   csParam.nColor=nColor;
   csParam.nSpin=4;
   csParam.nDim=4;
-  for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gauge_param.X[d];
-  }
-//  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
+  //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -145,11 +142,10 @@ void init(int argc, char **argv)
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
-
   // Allocate host side memory for the gauge field.
-  //----------------------------------------------------------------------------  
+  //----------------------------------------------------------------------------
   for (int dir = 0; dir < 4; dir++) {
-    links[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);    
+    links[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
     if (links[dir] == NULL) {
       errorQuda("ERROR: malloc failed for gauge links");
     }  
@@ -157,7 +153,6 @@ void init(int argc, char **argv)
   constructHostGaugeField(links, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)links, &gauge_param);
-
 
 #ifdef MULTI_GPU
   gauge_param.type = QUDA_SU3_LINKS;
@@ -174,13 +169,13 @@ void init(int argc, char **argv)
   int pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 
   gauge_param.type = QUDA_SU3_LINKS;
   gauge_param.reconstruct = gauge_param.reconstruct_sloppy = link_recon;
-  
-  printfQuda("Links sending..."); 
+
+  printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);
   printfQuda("Links sent\n"); 
 

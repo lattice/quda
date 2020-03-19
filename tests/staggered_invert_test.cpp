@@ -30,47 +30,48 @@
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
-             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
+             "Ls_dimension   dslash_type  normalization\n");
+  printfQuda(
+    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
+    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     printfQuda("MG parameters\n");
     printfQuda(" - number of levels %d\n", mg_levels);
-    for (int i=0; i<mg_levels-1; i++) {
-      printfQuda(" - level %d number of null-space vectors %d\n", i+1, nvec[i]);
-      printfQuda(" - level %d number of pre-smoother applications %d\n", i+1, nu_pre[i]);
-      printfQuda(" - level %d number of post-smoother applications %d\n", i+1, nu_post[i]);
+    for (int i = 0; i < mg_levels - 1; i++) {
+      printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
+      printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
+      printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
     }
 
     printfQuda("MG Eigensolver parameters\n");
     for (int i = 0; i < mg_levels; i++) {
       if (low_mode_check || mg_eig[i]) {
-	printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
-	printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-	printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-	printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-	printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
-	printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-	printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
-	printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1, mg_eig_use_dagger[i] ? "true" : "false",
-		   mg_eig_use_normop[i] ? "true" : "false");
-	if (mg_eig_use_poly_acc[i]) {
-	  printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
-	  printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-	  if (mg_eig_amax[i] <= 0)
-	    printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
-	  else
-	    printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
-	}
-	printfQuda("\n");
+        printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
+        printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
+        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
+        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
+        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
+        printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
+        printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
+        printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
+                   mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
+        if (mg_eig_use_poly_acc[i]) {
+          printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
+          printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
+          if (mg_eig_amax[i] <= 0)
+            printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+          else
+            printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        }
+        printfQuda("\n");
       }
     }
   }
-  
+
   if (inv_deflate) {
     printfQuda("\n   Eigensolver parameters\n");
     printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
@@ -100,8 +101,6 @@ void display_test_info()
     }
   }
 
-  
-  
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -123,29 +122,29 @@ int main(int argc, char **argv)
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
-  
-  if(!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
-  
-  if(inv_deflate && inv_multigrid) {
+
+  if (!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
+
+  if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
     exit(0);
   }
-  
+
   if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
 
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     setQudaDefaultMgSolveTypes();
     reliable_delta = 1e-4;
   }
-  
+
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   initRand();
-  
+
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
     printfQuda("dslash_type %d not supported\n", dslash_type);
@@ -159,25 +158,25 @@ int main(int argc, char **argv)
       exit(0);
     }
   }
-  
+
   // Deduce operator, solution, and operator preconditioning types
-  if(!inv_multigrid) setQudaStaggeredInvTestParams();
-  
+  if (!inv_multigrid) setQudaStaggeredInvTestParams();
+
   display_test_info();
 
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   setStaggeredQDPGaugeParam(gauge_param);
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     setStaggeredMGInvertParam(inv_param);
-  }
-  else setStaggeredInvertParam(inv_param);
-  
+  } else
+    setStaggeredInvertParam(inv_param);
+
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
 
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     mg_param.invert_param = &mg_inv_param;
     QudaEigParam mg_eig_param[mg_levels];
     // Since the top level is just a unitary rotation, we manually
@@ -185,24 +184,24 @@ int main(int argc, char **argv)
     if (mg_eig[0] && inv_multigrid) {
       printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
       mg_eig[0] = false;
-    }    
+    }
     for (int i = 0; i < mg_levels; i++) {
       mg_param.eig_param[i] = &mg_eig_param[i];
       mg_eig_param[i] = newQudaEigParam();
       setMultigridEigParam(mg_eig_param[i], i);
     }
-    
+
     setStaggeredMultigridParam(mg_param);
   }
-  
+
   QudaEigParam eig_param = newQudaEigParam();
-  if(inv_deflate) {
+  if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
   }
-  
+
   // This must be before the FaceBuffer is created (this is because it allocates pinned memory - FIXME)
   initQuda(device);
 
@@ -230,10 +229,9 @@ int main(int argc, char **argv)
   milc_fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
   milc_longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
-
   // For load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  
+
   constructStaggeredHostGaugeField(qdp_inlink, qdp_longlink, qdp_fatlink, gauge_param, argc, argv);
   // Reorder gauge fields to MILC order
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
@@ -244,7 +242,7 @@ int main(int argc, char **argv)
 
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   gauge_param.location = QUDA_CPU_FIELD_LOCATION;
-  
+
   GaugeFieldParam cpuFatParam(milc_fatlink, gauge_param);
   cpuFatParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuFat = GaugeField::Create(cpuFatParam);
@@ -253,7 +251,7 @@ int main(int argc, char **argv)
   GaugeFieldParam cpuLongParam(milc_longlink, gauge_param);
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = GaugeField::Create(cpuLongParam);
-  //constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, gauge_param);
+  // constructStaggeredHostGhostGaugeField(cpuFat, cpuLong, milc_fatlink, milc_longlink, gauge_param);
 #endif
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
@@ -262,22 +260,22 @@ int main(int argc, char **argv)
   double plaq[3];
   computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
   printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  
+
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
     // Compute fat link plaquette
     computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
     printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }  
+  }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
-  
+
   // Setup the multigrid preconditioner
   void *mg_preconditioner = nullptr;
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
-  
+
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
   ColorSpinorField *in;
@@ -325,18 +323,19 @@ int main(int argc, char **argv)
 
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-      if(inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       printQudaInvertParam(&inv_param);
       invertQuda(out->V(), in->V(), &inv_param);
-      
+
       time[k] = inv_param.secs;
       gflops[k] = inv_param.gflops / inv_param.secs;
       printfQuda("Done: %i iter / %g secs = %g Gflops\n\n", inv_param.iter, inv_param.secs,
                  inv_param.gflops / inv_param.secs);
-      if(verify_results) verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(),
-					  gauge_param, inv_param, 0);
+      if (verify_results)
+        verifyStaggeredInversion(tmp, ref, in, out, mass, qdp_fatlink, qdp_longlink, (void **)cpuFat->Ghost(),
+                                 (void **)cpuLong->Ghost(), gauge_param, inv_param, 0);
     }
-    
+
     // Compute timings
     if (Nsrc > 1) performanceStats(time, gflops);
     break;
@@ -371,10 +370,11 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < multishift; i++) {
       printfQuda("%dth solution: mass=%f, ", i, masses[i]);
-      verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink, (void**)cpuFat->Ghost(), (void**)cpuLong->Ghost(),  gauge_param, inv_param, i);
+      verifyStaggeredInversion(tmp, ref, in, qudaOutArray[i], masses[i], qdp_fatlink, qdp_longlink,
+                               (void **)cpuFat->Ghost(), (void **)cpuLong->Ghost(), gauge_param, inv_param, i);
     }
-    
-    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];   
+
+    for (int i = 0; i < multishift; i++) delete qudaOutArray[i];
     break;
 
   default: errorQuda("Unsupported test type");
@@ -389,8 +389,8 @@ int main(int argc, char **argv)
   delete rng;
 
   // Free the multigrid solver
-  if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
-  
+  if (inv_multigrid) destroyMultigridQuda(mg_preconditioner);
+
   // Clean up gauge fields
   for (int dir = 0; dir < 4; dir++) {
     if (qdp_inlink[dir] != nullptr) {
