@@ -674,34 +674,6 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.ga_pad = pad_size;
 }
 
-void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, int pad_size)
-{
-
-  // Specific parameter settings for MILC
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    gauge_param.type = QUDA_SU3_LINKS;
-    gauge_param.reconstruct = link_recon;
-    gauge_param.reconstruct_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  } else {
-    gauge_param.type = QUDA_ASQTAD_FAT_LINKS;
-    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
-  }
-  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param.ga_pad = 3 * pad_size;
-    gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct = link_recon;
-    gauge_param.reconstruct_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_precondition = link_recon_precondition;
-  }
-}
-
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
