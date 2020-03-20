@@ -374,13 +374,21 @@ namespace quda {
       }
     } else if (out.Precision() == QUDA_HALF_PRECISION) {
       if (in.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
         copyGaugeEx(out, in, location, (short *)Out, (short *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("Precision %d not instantiated", in.Precision());
       }
     } else if (out.Precision() == QUDA_QUARTER_PRECISION) {
       if (in.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
         copyGaugeEx(out, in, location, (char *)Out, (char *)In);
+#else
+        errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
       } else {
         errorQuda("Precision %d not instantiated", in.Precision());
       }

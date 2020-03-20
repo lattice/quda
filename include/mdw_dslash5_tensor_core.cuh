@@ -43,16 +43,16 @@ namespace quda
   // one(spin).
   // x by y
   // For now, assuming it's trivial in spin
-  template <int block_dim_x, int Ls_, int M_sm, class compute_type>
+  template <int block_dim_x, int Ls, int M_sm, class compute_type>
   __device__ inline void construct_matrix_a_generic(half *sm_a, compute_type *generic)
   {
 
     int offset_k = threadIdx.y * 4;
     int x = threadIdx.x;
 
-    while (x < Ls_) {
+    while (x < Ls) {
       int offset_m = x * 4;
-      float value = generic[x * Ls_ + threadIdx.y]; // Assuming the input matrix is row major
+      float value = generic[x * Ls + threadIdx.y]; // Assuming the input matrix is row major
 
       // exp = 0 means we are on the diagonal.
       sm_a[(offset_k + 0) * (M_sm) + (offset_m + 0)] = value;
@@ -88,7 +88,7 @@ namespace quda
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
   // one(spin).
   // x by y
-  template <int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
+  template <int block_dim_x, int Ls, int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_m5inv(Arg &arg, half *sm_a, const float *mp = nullptr,
                                                   const float *mm = nullptr)
   {
@@ -102,33 +102,33 @@ namespace quda
     int offset_k = threadIdx.y * 4;
     int x = threadIdx.x;
 
-    while (x < Ls_) {
+    while (x < Ls) {
       int offset_m = x * 2;
       float factorR, factorL;
 
       if (mp && mm) {
         if (dagger) {
-          factorR = mp[x * Ls_ + threadIdx.y];
-          factorL = mm[x * Ls_ + threadIdx.y];
+          factorR = mp[x * Ls + threadIdx.y];
+          factorL = mm[x * Ls + threadIdx.y];
         } else {
-          factorR = mp[threadIdx.y * Ls_ + x];
-          factorL = mm[threadIdx.y * Ls_ + x];
+          factorR = mp[threadIdx.y * Ls + x];
+          factorL = mm[threadIdx.y * Ls + x];
         }
       } else {
         int exp;
         if (dagger) {
-          exp = x > threadIdx.y ? Ls_ - x + threadIdx.y : threadIdx.y - x;
+          exp = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
           factorR = inv * powf(k, __int2float_rn(exp)) * (x > threadIdx.y ? -arg.m_f : 1.f);
         } else {
-          exp = x < threadIdx.y ? Ls_ - threadIdx.y + x : x - threadIdx.y;
+          exp = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
           factorR = inv * powf(k, __int2float_rn(exp)) * (x < threadIdx.y ? -arg.m_f : 1.f);
         }
 
         if (dagger) {
-          exp = x < threadIdx.y ? Ls_ - threadIdx.y + x : x - threadIdx.y;
+          exp = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
           factorL = inv * powf(k, __int2float_rn(exp)) * (x < threadIdx.y ? -arg.m_f : 1.f);
         } else {
-          exp = x > threadIdx.y ? Ls_ - x + threadIdx.y : threadIdx.y - x;
+          exp = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
           factorL = inv * powf(k, __int2float_rn(exp)) * (x > threadIdx.y ? -arg.m_f : 1.f);
         }
       }
@@ -158,7 +158,7 @@ namespace quda
   // (spin,Ls) by (spin,Ls), where left most index is the fastest changing
   // one(spin).
   // x by y
-  template <int block_dim_x, int Ls_, int M_sm, bool dagger, class Arg>
+  template <int block_dim_x, int Ls, int M_sm, bool dagger, class Arg>
   __device__ inline void construct_matrix_a_d5(Arg &arg, half *sm_a)
   {
     // if we rescale, then the actual matrix is alpha*m5inv+beta.
@@ -168,21 +168,21 @@ namespace quda
     int offset_k = threadIdx.y * 4;
     int x = threadIdx.x;
 
-    while (x < Ls_) {
+    while (x < Ls) {
       int offset_m = x * 2;
       int exp = x - threadIdx.y;
       float factorR, factorL;
 
       if (dagger) {
-        factorR = (exp == -1 ? 1.f : (exp == +Ls_ - 1 ? -arg.m_f : 0.f));
+        factorR = (exp == -1 ? 1.f : (exp == +Ls - 1 ? -arg.m_f : 0.f));
       } else {
-        factorR = (exp == +1 ? 1.f : (exp == -Ls_ + 1 ? -arg.m_f : 0.f));
+        factorR = (exp == +1 ? 1.f : (exp == -Ls + 1 ? -arg.m_f : 0.f));
       }
 
       if (dagger) {
-        factorL = (exp == +1 ? 1.f : (exp == -Ls_ + 1 ? -arg.m_f : 0.f));
+        factorL = (exp == +1 ? 1.f : (exp == -Ls + 1 ? -arg.m_f : 0.f));
       } else {
-        factorL = (exp == -1 ? 1.f : (exp == +Ls_ - 1 ? -arg.m_f : 0.f));
+        factorL = (exp == -1 ? 1.f : (exp == +Ls - 1 ? -arg.m_f : 0.f));
       }
 
       // exp = 0 means we are on the diagonal.
