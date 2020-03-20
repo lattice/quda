@@ -1154,7 +1154,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
   int padded_Vh = padded_V / 2;
   int padded_V5h = padded_Vh * Ls;
 
-  static_assert(sizeof(char) == 1);
+  static_assert(sizeof(char) == 1, "This code assumes sizeof(char) == 1.");
 
   char *padded_in = (char *)malloc(padded_V5h * spinorSiteSize * precision);
   memset(padded_in, 0, padded_V5h * spinorSiteSize * precision);
