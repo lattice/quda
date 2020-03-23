@@ -1,11 +1,13 @@
-#if (__COMPUTE_CAPABILITY__ >= 700)
+#pragma once
+
+#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MINOR__ > 10)
+
 #include <mma.h>
-#endif
+
+#define USE_FP16_MMA_ACCUMULATE
 
 namespace quda
 {
-
-#if (__COMPUTE_CAPABILITY__ >= 700)
 
   struct WarpRegisterMapping {
 
@@ -186,10 +188,6 @@ namespace quda
     }
   };
 
-#ifdef USE_MMA_SYNC
-
-#define USE_FP16_MMA_ACCUMULATE
-
   template <int BlockDimX, int Ls, int M, int N, int M_PAD, int N_PAD, bool reload, class T>
   __device__ inline void mma_sync_gemm(T op_a[], half *sm_a, half *sm_b, half *sm_c, const WarpRegisterMapping &wrm)
   {
@@ -284,8 +282,6 @@ namespace quda
     }
   }
 
-#endif // USE_MMA_SYNC
-
-#endif // defined (__COMPUTE_CAPABILITY__ == 700)
+#endif // #if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || __CUDACC_VER_MINOR__ > 10
 
 } // namespace quda

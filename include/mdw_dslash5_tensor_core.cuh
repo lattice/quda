@@ -8,16 +8,15 @@
 #include <math_helper.cuh>
 #include <shared_memory_cache_helper.cuh>
 
-#if (__COMPUTE_CAPABILITY__ >= 700)
+#if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
-#endif
 
 // The `mma.sync` PTX is only available with or after CUDA 10.1
-#if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1)
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10)) && (__COMPUTE_CAPABILITY__ <= 750)
 #define USE_MMA_SYNC // rather than using wmma
+#include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 #endif
 
-#include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 
 namespace quda
 {
@@ -402,6 +401,8 @@ namespace quda
 #endif
   }
 
-#endif // (__COMPUTE_CAPABILITY__ >= 700)
+#endif // #if (__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10)
 
 } // namespace quda
+
+#endif // #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
