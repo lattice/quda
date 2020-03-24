@@ -33,6 +33,17 @@ namespace quda {
       return tile[i*n+j];
     }
 
+    template <typename T_> inline __device__ __host__ void operator*=(const T_ &a)
+    {
+#pragma unroll
+      for (int i=0; i<m; i++) {
+#pragma unroll
+        for (int j=0; j<n; j++) {
+          tile[i*n+j] *= a;
+        }
+      }
+    }
+
     template <int k, bool ghost_a, bool ghost_b>
     inline __device__ __host__ void mma_nn(const MatrixTile<T, m, k, ghost_a> &a, const MatrixTile<T, k, n, ghost_b> &b)
     {
@@ -58,6 +69,21 @@ namespace quda {
 #pragma unroll
           for (int l = 0; l < k; l++) {
             tile[i*n+j] = cmac(a.tile[i*k+l], conj(b.tile[j*k+l]), tile[i*n+j]);
+          }
+        }
+      }
+    }
+
+    template <int k, bool ghost_a, bool ghost_b>
+    inline __device__ __host__ void mma_tn(const MatrixTile<T, k, m, ghost_a> &a, const MatrixTile<T, k, n, ghost_b> &b)
+    {
+#pragma unroll
+      for (int i = 0; i < m; i++) {
+#pragma unroll
+        for (int j = 0; j < n; j++) {
+#pragma unroll
+          for (int l = 0; l < k; l++) {
+            tile[i*n+j] = cmac(conj(a.tile[l*m+i]), b.tile[l*n+j], tile[i*n+j]);
           }
         }
       }
@@ -157,7 +183,7 @@ namespace quda {
           maxTile[i*n+j] = fmax(fabs(tile[i*n+j].real()), fabs(tile[i*n+j].imag()));
         }
       }
-        
+
       real max = 0.0;
 #pragma unroll
       for (int i = 0; i < m; i++) {
@@ -168,6 +194,35 @@ namespace quda {
       }
       return max;
     }
+
   };
+
+  template <int m_, int n_, int k_, int M_, int N_, int K_> struct TileSize {
+    static constexpr int m = m_;
+    static constexpr int n = n_;
+    static constexpr int k = k_;
+    static constexpr int M = M_;
+    static constexpr int N = N_;
+    static constexpr int K = K_;
+    static constexpr int M_tiles = m / M;
+    static constexpr int N_tiles = n / N;
+    static constexpr int K_tiles = k / K;
+
+    static_assert(M > m == 0, "tile height must not be larger than matrix height");
+    static_assert(N > n == 0, "tile width must not be larger than matrix width");
+    static_assert(K > n == 0, "tile depth must not be larger than matrix depth");
+    static_assert(m % M == 0, "tile height must be an integer divisor of the matrix height");
+    static_assert(n % N == 0, "tile width must be an integer divisor of the matrix width");
+    static_assert(k % K == 0, "tile depth must be an integer divisor of the matrix depth");
+  };
+
+  template <int m_, int n_, int k_, int M_, int N_, int K_>
+  std::ostream& operator<<(std::ostream &out, const TileSize<m_,n_,k_,M_,N_,K_> &tile)
+  {
+    out << "Matrix size = (" << tile.m << ", " << tile.n << ", " << tile.k << ")" << std::endl;
+    out << "Tile size = (" << tile.M << ", " << tile.N << ", " << tile.K << ")" << std::endl;
+    out << "Number of tiles = (" << tile.M_tiles << ", " << tile.N_tiles << ", " << tile.K_tiles << ")" << std::endl;
+    return out;
+  }
 
 }

@@ -95,15 +95,15 @@ namespace quda {
 
       } else if (type == COMPUTE_VUV) {
         if (arg.dir == QUDA_BACKWARDS) {
-          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin>(arg);
         } else if (arg.dir == QUDA_FORWARDS) {
-          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
-          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor>(arg);
+          if      (arg.dim==0) ComputeVUVCPU<from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==1) ComputeVUVCPU<from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==2) ComputeVUVCPU<from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
+          else if (arg.dim==3) ComputeVUVCPU<from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin>(arg);
         } else {
           errorQuda("Undefined direction %d", arg.dir);
         }
@@ -256,15 +256,15 @@ namespace quda {
 
         // need to resize the grid since we don't tune over the entire coarseColor dimension
         // factor of two comes from parity onto different blocks (e.g. in the grid)
-        tp.grid.y = (2*coarseColor + tp.block.y - 1) / tp.block.y;
-        tp.grid.z = (coarseColor + tp.block.z - 1) / tp.block.z;
+        tp.grid.y = (2*arg.vuvTile.M_tiles + tp.block.y - 1) / tp.block.y;
+        tp.grid.z = (arg.vuvTile.N_tiles + tp.block.z - 1) / tp.block.z;
 
         arg.shared_atomic = tp.aux.y;
         arg.parity_flip = tp.aux.z;
 
         if (arg.shared_atomic) {
           // check we have a valid problem size for shared atomics
-          // constrint is due to how shared memory initialization and global store are done
+          // constraint is due to how shared memory initialization and global store are done
           int block_size = arg.fineVolumeCB/arg.coarseVolumeCB;
           if (block_size/2 < coarseSpin*coarseSpin)
             errorQuda("Block size %d not supported in shared-memory atomic coarsening", block_size);
@@ -279,14 +279,14 @@ namespace quda {
           std::swap(tp.grid.y,tp.grid.x);
           // augment x grid with coarseColor row grid (z grid)
           arg.grid_z = tp.grid.z;
-          arg.coarse_color_grid_z = coarseColor*tp.grid.z;
+          arg.coarse_color_grid_z = arg.vuvTile.M_tiles*tp.grid.z;
           tp.grid.x *= tp.grid.z;
           tp.grid.z = 1;
         }
 
 #ifdef JITIFY
         error = program->kernel("quda::ComputeVUVGPU")
-          .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .instantiate(arg.shared_atomic,arg.parity_flip,from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.shared_atomic) {
@@ -294,15 +294,15 @@ namespace quda {
           constexpr bool parity_flip = true;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) ComputeVUVGPU<true,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<true,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<true,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<true,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -311,15 +311,15 @@ namespace quda {
           constexpr bool parity_flip = false;
 
           if (arg.dir == QUDA_BACKWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_BACKWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           } else if (arg.dir == QUDA_FORWARDS) {
-            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
-            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,fineColor,coarseSpin,coarseColor><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            if      (arg.dim==0) ComputeVUVGPU<false,parity_flip,from_coarse,Float,0,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==1) ComputeVUVGPU<false,parity_flip,from_coarse,Float,1,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==2) ComputeVUVGPU<false,parity_flip,from_coarse,Float,2,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
+            else if (arg.dim==3) ComputeVUVGPU<false,parity_flip,from_coarse,Float,3,QUDA_FORWARDS,fineSpin,coarseSpin><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
           } else {
             errorQuda("Undefined direction %d", arg.dir);
           }
@@ -546,7 +546,8 @@ namespace quda {
     bool tuneAuxDim() const { return type != COMPUTE_VUV ? false : true; }
 
     unsigned int sharedBytesPerBlock(const TuneParam &param) const {
-      if (arg.shared_atomic && type == COMPUTE_VUV) return 4*sizeof(storeType)*max_color_per_block*max_color_per_block*4*coarseSpin*coarseSpin;
+      if (arg.shared_atomic && type == COMPUTE_VUV)
+        return 4*sizeof(storeType)*arg.max_color_height_per_block*arg.max_color_width_per_block*4*coarseSpin*coarseSpin;
       return TunableVectorYZ::sharedBytesPerBlock(param);
     }
 
@@ -599,9 +600,9 @@ namespace quda {
         arg.parity_flip = false;
         if (arg.shared_atomic) {
           // if not parity flip then we need to force parity within the block (hence factor of 2)
-          resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
+          resizeVector((arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
         } else {
-          resizeVector(2*max_color_per_block,max_color_per_block);
+          resizeVector(2 * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
         }
 	break;
       case COMPUTE_COARSE_CLOVER: // no shared atomic version so keep separate from above
@@ -642,7 +643,7 @@ namespace quda {
         arg.shared_atomic = true;
         arg.parity_flip = true; // this is usually optimal for shared atomics
 
-        resizeVector( (arg.parity_flip ? 1 : 2) * max_color_per_block,max_color_per_block);
+        resizeVector( (arg.parity_flip ? 1 : 2) * arg.max_height_tiles_per_block, arg.max_width_tiles_per_block);
         if (!arg.parity_flip) resizeStep(2,1);
 
         // need to reset since we're switching to shared-memory atomics
@@ -737,14 +738,17 @@ namespace quda {
           type == COMPUTE_TMCAV || type == COMPUTE_TWISTED_CLOVER_INV_MAX)
         strcat(Aux, ",Dynamic");
 #endif
-      if (type == COMPUTE_UV) {
+      if (type == COMPUTE_UV || type == COMPUTE_VUV) {
         strcat(Aux, ",tile_size=");
-        char uvTile[16];
-        u32toa(uvTile, arg.uvTile.M);
-        strcat(Aux, uvTile);
+        char tile[16];
+        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.M : arg.vuvTile.M);
+        strcat(Aux, tile);
         strcat(Aux,"x");
-        u32toa(uvTile, arg.uvTile.N);
-        strcat(Aux, uvTile);
+        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.N : arg.vuvTile.N);
+        strcat(Aux, tile);
+        strcat(Aux,"x");
+        u32toa(tile, type == COMPUTE_UV ? arg.uvTile.K : arg.vuvTile.K);
+        strcat(Aux, tile);
       }
 
       if (type == COMPUTE_UV || type == COMPUTE_VUV) {

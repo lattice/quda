@@ -61,9 +61,9 @@ namespace quda {
   class CalculateYhat : public TunableVectorYZ {
 
     using Float = typename Arg::Float;
-    static constexpr int n = Arg::n;
     Arg &arg;
     const LatticeField &meta;
+    const int n;
 
     bool compute_max_only;
 
@@ -79,22 +79,23 @@ namespace quda {
     unsigned int maxBlockSize(const TuneParam &param) const { return 8u; }
 
   public:
-      CalculateYhat(Arg &arg, const LatticeField &meta) :
-        TunableVectorYZ(2 * Arg::M_tiles, 4 * Arg::N_tiles),
-        arg(arg),
-        meta(meta),
-        compute_max_only(false)
-      {
-        if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
+    CalculateYhat(Arg &arg, const LatticeField &meta) :
+      TunableVectorYZ(2 * arg.tile.M_tiles, 4 * arg.tile.N_tiles),
+      arg(arg),
+      meta(meta),
+      n(arg.tile.n),
+      compute_max_only(false)
+    {
+      if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-          create_jitify_program("kernels/coarse_op_preconditioned.cuh");
+        create_jitify_program("kernels/coarse_op_preconditioned.cuh");
 #endif
-          arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
-        }
-        arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
+        arg.max_d = static_cast<Float*>(pool_device_malloc(sizeof(Float)));
+      }
+      arg.max_h = static_cast<Float*>(pool_pinned_malloc(sizeof(Float)));
       strcpy(aux, compile_type_str(meta));
       strcat(aux, comm_dim_partitioned_string());
-      }
+    }
 
     virtual ~CalculateYhat() {
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {

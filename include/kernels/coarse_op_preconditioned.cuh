@@ -6,13 +6,7 @@ namespace quda {
 
   template <typename Float_, typename PreconditionedGauge, typename Gauge, int n_, int M_, int N_> struct CalculateYhatArg {
     using Float = Float_;
-    static constexpr int n = n_; // matrix size
-    static constexpr int M = M_; // tile width
-    static constexpr int N = N_; // tile height
-    static constexpr int M_tiles = n / M; // number of horizontal tiles
-    static constexpr int N_tiles = n / N; // number of vertical tiles
-    static_assert(n % M == 0, "tile size must be an integer divisor of the matrix");
-    static_assert(n % N == 0, "tile size must be an integer divisor of the matrix");
+    TileSize<n_, n_, n_, M_, N_, 1> tile;
 
     PreconditionedGauge Yhat;
     const Gauge Y;
@@ -45,8 +39,9 @@ namespace quda {
   {
     using real = typename Arg::Float;
     using complex = complex<real>;
-    constexpr int M = Arg::M;
-    constexpr int N = Arg::N;
+    constexpr int M = arg.tile.M;
+    constexpr int N = arg.tile.N;
+    constexpr int K = arg.tile.K;
 
     constexpr int nDim = 4;
     int coord[nDim];
@@ -62,11 +57,11 @@ namespace quda {
       MatrixTile<complex,M,N,true> yHat;
 
 #pragma unroll
-      for (int k = 0; k<Arg::n; k++) {
-        MatrixTile<complex,M,1,true> Ytile;
+      for (int k = 0; k<arg.tile.k; k+=K) {
+        MatrixTile<complex,M,K,true> Ytile;
         Ytile.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
 
-        MatrixTile<complex,N,1,false> Xtile;
+        MatrixTile<complex,N,K,false> Xtile;
         Xtile.load(arg.Xinv, 0, parity, x_cb, j0, k);
 
         yHat.mma_nt(Ytile, Xtile);
@@ -84,11 +79,11 @@ namespace quda {
       MatrixTile<complex,M,N,false> yHat;
 
 #pragma unroll
-      for (int k = 0; k<Arg::n; k++) {
-        MatrixTile<complex,M,1,false> Ytile;
+      for (int k = 0; k<arg.tile.k; k+=K) {
+        MatrixTile<complex,M,K,false> Ytile;
         Ytile.load(arg.Y, d, 1-parity, back_idx, i0, k);
 
-        MatrixTile<complex,N,1,false> Xtile;
+        MatrixTile<complex,N,K,false> Xtile;
         Xtile.load(arg.Xinv, 0, parity, x_cb, j0, k);
 
         yHat.mma_nt(Ytile, Xtile);
@@ -104,11 +99,11 @@ namespace quda {
     MatrixTile<complex,M,N,false> yHat;
 
 #pragma unroll
-    for (int k = 0; k<Arg::n; k++) {
-      MatrixTile<complex,M,1,false> Xtile;
+    for (int k = 0; k<arg.tile.k; k+=K) {
+      MatrixTile<complex,M,K,false> Xtile;
       Xtile.load(arg.Xinv, 0, parity, x_cb, i0, k);
 
-      MatrixTile<complex,1,N,false> Ytile;
+      MatrixTile<complex,K,N,false> Ytile;
       Ytile.load(arg.Y, d + 4, parity, x_cb, k, j0);
 
       yHat.mma_nn(Xtile, Ytile);
@@ -128,8 +123,8 @@ namespace quda {
       for (int parity=0; parity<2; parity++) {
 #pragma omp parallel for
         for (int x_cb = 0; x_cb < arg.Y.VolumeCB(); x_cb++) {
-          for (int i = 0; i < Arg::n; i+=Arg::M)
-            for (int j = 0; j < Arg::n; j+=Arg::N) {
+          for (int i = 0; i < arg.tile.m; i+=arg.tile.M)
+            for (int j = 0; j < arg.tile.n; j+=arg.tile.N) {
               typename Arg::Float max_x = computeYhat<compute_max_only>(arg, d, x_cb, parity, i, j);
               if (compute_max_only) max = max > max_x ? max : max_x;
             }
@@ -144,16 +139,16 @@ namespace quda {
     int x_cb = blockDim.x*blockIdx.x + threadIdx.x;
     if (x_cb >= arg.Y.VolumeCB()) return;
     int i_parity = blockDim.y*blockIdx.y + threadIdx.y;
-    if (i_parity >= 2*Arg::M_tiles) return;
+    if (i_parity >= 2*arg.tile.M_tiles) return;
     int j_d = blockDim.z*blockIdx.z + threadIdx.z;
-    if (j_d >= 4*Arg::N_tiles) return;
+    if (j_d >= 4*arg.tile.N_tiles) return;
 
-    int i = i_parity % Arg::M_tiles;
-    int parity = i_parity / Arg::M_tiles;
-    int j = j_d % Arg::N_tiles;
-    int d = j_d / Arg::N_tiles;
+    int i = i_parity % arg.tile.M_tiles;
+    int parity = i_parity / arg.tile.M_tiles;
+    int j = j_d % arg.tile.N_tiles;
+    int d = j_d / arg.tile.N_tiles;
 
-    typename Arg::Float max = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * Arg::M, j * Arg::N);
+    typename Arg::Float max = computeYhat<compute_max_only>(arg, d, x_cb, parity, i * arg.tile.M, j * arg.tile.N);
     if (compute_max_only) atomicAbsMax(arg.max_d, max);
   }
 
