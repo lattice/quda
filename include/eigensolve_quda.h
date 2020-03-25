@@ -390,9 +390,17 @@ protected:
     std::vector<ColorSpinorField *> t;
     std::vector<ColorSpinorField *> r_tilde;
     std::vector<ColorSpinorField*> Qhat;
+    std::vector<ColorSpinorField*> u;
+    std::vector<ColorSpinorField*> u_A;
+    std::vector<ColorSpinorField*> V;
+    std::vector<ColorSpinorField*> V_A;
+    std::vector<ColorSpinorField*> tmpV;
+    std::vector<ColorSpinorField*> tmpAV;
 
     Dirac *d;
+    //Dirac *dSloppy;
     DiracPrecProjCorr *mmPP;
+    //DiracPrecProjCorr *mmPPSloppy;
 
 public:
     const DiracMatrix &mat;
@@ -429,7 +437,16 @@ public:
        @param[in] x Output spinor
        @param[in] b Input spinor
     */
-    void cgWrapper(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x, ColorSpinorField &b);
+    void K(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x, ColorSpinorField &b);
+
+    /**
+       @brief Some more initializations in the JD eigensolver
+       @param[in] csParam Information about the spinors
+       @param[in] k_max Number of eigenpairs requested
+       @param[in] m_max Maximum size of the search subspace
+       @param[in] initVec Spinor assigned to t before the main loop starts
+    */
+    void moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec);
 
     /**
        @brief Destructor for JD Eigensolver class
