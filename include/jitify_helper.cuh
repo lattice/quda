@@ -24,7 +24,11 @@
 // hide debugging info
 #define JITIFY_PRINT_INSTANTIATION 0
 #define JITIFY_PRINT_SOURCE        0
+#ifdef DEVEL
+#define JITIFY_PRINT_LOG           1
+#else
 #define JITIFY_PRINT_LOG           0
+#endif
 #define JITIFY_PRINT_PTX           0
 #define JITIFY_PRINT_LAUNCH        0
 
