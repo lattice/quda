@@ -438,10 +438,14 @@ namespace quda
       int x_cb = (blockIdx.x - dslash_block_offset) * blockDim.x + threadIdx.x;
       if (x_cb >= arg.threads) return;
 
+#ifdef QUDA_DSLASH_FAST_COMPILE
+      dslash(x_cb, s, parity);
+#else
       switch (parity) {
       case 0: dslash(x_cb, s, 0); break;
       case 1: dslash(x_cb, s, 1); break;
       }
+#endif
     }
   }
 

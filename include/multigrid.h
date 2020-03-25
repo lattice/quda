@@ -298,6 +298,11 @@ public:
     virtual ~MG();
 
     /**
+       @return MG can solve non-Hermitian systems
+     */
+    bool hermitian() { return false; };
+
+    /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
        @param Whether we are refreshing the null-space components or just updating the operators
      */
