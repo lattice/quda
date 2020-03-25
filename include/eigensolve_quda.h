@@ -449,6 +449,14 @@ public:
     void moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec);
 
     /**
+       @brief Some more initializations in the JD eigensolver
+       @param[in] ortDotProd Resulting dot products
+       @param[in] vectr The spinor to be orthogonalized
+       @param[in] ortSpace The subspace against which vectr will be orthogonalized
+    */
+    void orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace);
+
+    /**
        @brief Destructor for JD Eigensolver class
     */
     virtual ~JD();

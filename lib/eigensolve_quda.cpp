@@ -1408,6 +1408,8 @@ namespace quda
     // Some more memory pre-allocations
     moreInits(csParam, k_max, m_max, *eigSpace[0]);
 
+    Complex* ortDotProd = (Complex*) safe_malloc( std::max(m_max,k_max)*1 * sizeof(Complex) );
+
     std::vector<ColorSpinorField *> X_tilde;
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -1469,50 +1471,10 @@ namespace quda
     while (restart_iter<max_restarts) {
 
       // Locking
-      {
-        int tmpSize = (int)X_tilde.size();
-
-        // normalize before the next orthogonalization
-        norm = sqrt(blas::norm2(*t[0]));
-        blas::ax(1.0 / norm, *t[0]);
-
-        // double reorthogonalization
-        for (int i=0; i<tmpSize; i++) {
-          Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
-          blas::caxpy(-gamma, *X_tilde[i], *t[0]);
-        }
-
-        // normalize before the next orthogonalization
-        norm = sqrt(blas::norm2(*t[0]));
-        blas::ax(1.0 / norm, *t[0]);
-
-        for (int i=0; i<tmpSize; i++) {
-          Complex gamma = blas::cDotProduct(*X_tilde[i], *t[0]);
-          blas::caxpy(-gamma, *X_tilde[i], *t[0]);
-        }
-      }
+      orth(ortDotProd, t, X_tilde);
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
-      {
-        // normalize before the next orthogonalization
-        norm = sqrt(blas::norm2(*t[0]));
-        blas::ax(1.0 / norm, *t[0]);
-
-        // double reorthogonalization
-        for (int i=0; i<m; i++) {
-          Complex gamma = blas::cDotProduct(*V[i], *t[0]);
-          blas::caxpy(-gamma, *V[i], *t[0]);
-        }
-
-        // normalize before the next orthogonalization
-        norm = sqrt(blas::norm2(*t[0]));
-        blas::ax(1.0 / norm, *t[0]);
-
-        for (int i=0; i<m; i++) {
-          Complex gamma = blas::cDotProduct(*V[i], *t[0]);
-          blas::caxpy(-gamma, *V[i], *t[0]);
-        }
-      }
+      orth(ortDotProd, t, V);
 
       m++;
 
@@ -1814,6 +1776,7 @@ namespace quda
     for (auto p : tmpAV) { delete p; }
     for (auto p : X_tilde) { delete p; }
     for (auto p : Qhat) { delete p; }
+    host_free(ortDotProd);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -1997,10 +1960,13 @@ namespace quda
     // Init a zero residual
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
+
     r_tilde.push_back(ColorSpinorField::Create(csParam));
     mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
+
     Qhat.reserve(k_max+1);
     for (int i=0; i<(k_max+1); i++) {Qhat.push_back(ColorSpinorField::Create(csParam));}
+
     csParam.create = QUDA_COPY_FIELD_CREATE;
     t.push_back(ColorSpinorField::Create(initVec, csParam));
 
@@ -2009,13 +1975,41 @@ namespace quda
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     u.push_back(ColorSpinorField::Create(csParam));
     u_A.push_back(ColorSpinorField::Create(csParam));
+
     for (int i=0; i<m_max; i++) {
       V.push_back(ColorSpinorField::Create(csParam));
       V_A.push_back(ColorSpinorField::Create(csParam));
     }
+
     for (int i=0; i<m_max; i++) {
       tmpV.push_back(ColorSpinorField::Create(csParam));
       tmpAV.push_back(ColorSpinorField::Create(csParam));
+    }
+  }
+
+  void JD::orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace){
+    int tmpSize = (int)ortSpace.size();
+
+    if (tmpSize==0) {return;}
+
+    // normalize before the orthogonalization
+    double norm = sqrt(blas::norm2(*vectr[0]));
+    blas::ax(1.0 / norm, *vectr[0]);
+
+    blas::cDotProduct(ortDotProd, ortSpace, vectr);
+    // double reorthogonalization
+    for (int i=0; i<tmpSize; i++) {
+      blas::caxpy(-ortDotProd[i], *ortSpace[i], *vectr[0]);
+    }
+
+    // normalize before the re-orthogonalization
+    norm = sqrt(blas::norm2(*vectr[0]));
+    blas::ax(1.0 / norm, *vectr[0]);
+
+    blas::cDotProduct(ortDotProd, ortSpace, vectr);
+    // double reorthogonalization
+    for (int i=0; i<tmpSize; i++) {
+      blas::caxpy(-ortDotProd[i], *ortSpace[i], *vectr[0]);
     }
   }
 
