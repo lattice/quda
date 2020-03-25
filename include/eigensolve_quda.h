@@ -457,6 +457,23 @@ public:
     void orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace);
 
     /**
+       @brief Check if one or more eigenpairs have been found
+       @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
+       @param[in] X_tilde The converged eigenvectors
+       @param[in] csParam Information about the spinors
+       @param[in] evals The converged eigenvalues
+       @param[in] norm How close we are to the next eigenpair
+       @param[in] theta The JD shift
+       @param[in] loopr Counter indicating upcoming eigenpair from subspace
+       @param[in] k Number of converged eigenpairs
+       @param[in] m Size of the subspace
+       @param[in] k_max Requested amount of eigenpairs
+    */
+    void checkIfConverged(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, std::vector<ColorSpinorField *> &X_tilde,
+                          ColorSpinorParam &csParam, std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
+                          const int k_max);
+
+    /**
        @brief Destructor for JD Eigensolver class
     */
     virtual ~JD();

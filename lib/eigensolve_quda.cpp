@@ -1539,89 +1539,10 @@ namespace quda
         printfQuda("Iteration = %d, m = %d, loopr = %d, residual = %.12f, converged eigenpairs = %d\n", iter, m, loopr, norm, k);
       }
 
-      while(norm < eig_param->tol){
-        evals.push_back(eigenpairs[loopr].first);
-        csParam.create = QUDA_COPY_FIELD_CREATE;
-        X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
-        k++;
-
-        // Check for convergence
-        if (k >= k_max) {
-          converged = true;
-          break;
-        }
-
-        // Shrinking the subspace
-        /*
-        {
-          MatrixXcd tmpH = MatrixXcd::Zero(m-1,m-1);
-
-          csParam.create = QUDA_ZERO_FIELD_CREATE;
-          // the new subspace is of size m-1
-          for(int i=0; i<(m-1); i++){
-            blas::zero(*tmpV[i]);
-            // project-up with a subspace still of size m
-            for( int j=0; j<m; j++ ){
-              blas::caxpy( (*(eigenpairs[i+1].second))[j], *V[j], *tmpV[i] );
-              tmpH(i,i) = eigenpairs[i+1].first;
-            }
-            matVec(mat, *tmpAV[i], *tmpV[i]);
-          }
-
-          // pop first element of eigenpairs
-          eigenpairs.erase(eigenpairs.begin());
-
-          for(int i=0; i<(m-1); i++){
-            for(int j=0; j<m; j++){
-             //eigensolver.eigenvectors().col(i)[j] = 0;
-             (*(eigenpairs[i].second))[j] = 0;
-            }
-            //eigensolver.eigenvectors().col(i)[i] = 1;
-            (*(eigenpairs[i].second))[i] = 1;
-          }
-
-          // Assign new values of H
-          // TODO: skip this resize() ?
-          H.resize(m-1,m-1);
-          H = tmpH;
-
-          // Assign new values of V and W
-
-          for (int i=0; i<(m-1); i++) {
-            ColorSpinorField *tmpf = V[i];
-            V[i] = tmpV[i];
-            tmpV[i] = tmpf;
-            tmpf = V_A[i];
-            V_A[i] = tmpAV[i];
-            tmpAV[i] = tmpf;
-          }
-        }
-        */
-
-        //m--;
-
-        blas::zero(*u[0]);
-        // project-up with a subspace still of size m
-        for( int j=0; j<m; j++ ){
-          blas::caxpy( (*(eigenpairs[loopr+1].second))[j], *V[j], *u[0] );
-          //tmpH(i,i) = eigenpairs[i+1].first;
-        }
-        matVec(mat, *u_A[0], *u[0]);
-
-        //*u[0] = *V[0];
-        //*u_A[0] = *V_A[0];
-
-        // and then compute the residual
-        theta = eigenpairs[loopr+1].first;
-        blas::copy(*r[0], *u_A[0]);
-        blas::caxpy(-theta, *u[0], *r[0]);
-
-        norm = sqrt(blas::norm2(*r[0]));
-
-        loopr++;
-      }
-
       // Check for convergence
+      checkIfConverged(eigenpairs, X_tilde, csParam, evals, norm, theta, loopr, k, m, k_max);
+
+      // Check if end has been reached
       if (k >= k_max) {
         break;
       }
@@ -1678,48 +1599,13 @@ namespace quda
       X_tilde.push_back( u[0] );
 
       blas::copy(*t[0], *r[0]);
-      //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1);
-
       {
-        //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, k+1, X_tilde);
         invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, 1, u);
-
-        //DiracMatrix& matUnconst = const_cast<DiracMatrix&>(mat);
-
-        // Switching to the appropriate shift for JD
-        //double bareShift = matUnconst.shift;
-        //matUnconst.shift = bareShift - theta;
-
-        //blas::copy(*t[0], *r[0]);
-        //blas::zero(*t[0]);
-        //cgWrapper(*cg, corrEqTol, corrEqMaxiter, QUDA_SILENT, *solverParam, *t[0], *r[0]);
-
-        // and, switching back the shift parameters
-        //matUnconst.shift = bareShift;
-
-        //blas::ax(-1.0, *t[0]);
-
-        {
-          //{
-          //  Complex gamma = blas::cDotProduct(*u[0], *t[0]);
-          //  blas::caxpy(-gamma, *u[0], *t[0]);
-          //}
-
-          //// normalize before the next orthogonalization
-          //double normx = sqrt(blas::norm2(*t[0]));
-          //blas::ax(1.0 / normx, *t[0]);
-
-          //{
-          //  Complex gamma = blas::cDotProduct(*u[0], *t[0]);
-          //  blas::caxpy(-gamma, *u[0], *t[0]);
-          //}
-        }
       }
-
-      //invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, ( (k+1)>=1?1:k+1 ));
 
       X_tilde.pop_back();
 
+      // Some local clean-up
       for (auto p : eigenpairs) { delete p.second; }
 
       iter++;
@@ -2011,6 +1897,42 @@ namespace quda
     for (int i=0; i<tmpSize; i++) {
       blas::caxpy(-ortDotProd[i], *ortSpace[i], *vectr[0]);
     }
+  }
+
+  void JD::checkIfConverged(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, std::vector<ColorSpinorField *> &X_tilde,
+                            ColorSpinorParam &csParam, std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
+                            const int k_max){
+
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
+    while(norm < eig_param->tol){
+      evals.push_back(eigenpairs[loopr].first);
+      X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
+      k++;
+
+      // Check for convergence
+      if (k >= k_max) {
+        converged = true;
+        break;
+      }
+
+      blas::zero(*u[0]);
+      // project-up with a subspace still of size m
+      for( int j=0; j<m; j++ ){
+        blas::caxpy( (*(eigenpairs[loopr+1].second))[j], *V[j], *u[0] );
+      }
+      matVec(mat, *u_A[0], *u[0]);
+
+      // and then compute the residual
+      theta = eigenpairs[loopr+1].first;
+      blas::copy(*r[0], *u_A[0]);
+      blas::caxpy(-theta, *u[0], *r[0]);
+
+      norm = sqrt(blas::norm2(*r[0]));
+
+      loopr++;
+    }
+
   }
 
   // Projection matrix used in the solution of the correction equation
