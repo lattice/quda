@@ -1420,24 +1420,23 @@ namespace quda
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
 
-    // Convergence and locking criteria
-    double epsilon = DBL_EPSILON;
+    //double epsilon = DBL_EPSILON;
     QudaPrecision prec = eigSpace[0]->Precision();
     switch (prec) {
     case QUDA_DOUBLE_PRECISION:
-      epsilon = DBL_EPSILON;
+      //epsilon = DBL_EPSILON;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
       break;
     case QUDA_SINGLE_PRECISION:
-      epsilon = FLT_EPSILON;
+      //epsilon = FLT_EPSILON;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
       break;
     case QUDA_HALF_PRECISION:
-      epsilon = 2e-3;
+      //epsilon = 2e-3;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
       break;
     case QUDA_QUARTER_PRECISION:
-      epsilon = 5e-2;
+      //epsilon = 5e-2;
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
       break;
     default: errorQuda("Invalid precision %d", prec);
