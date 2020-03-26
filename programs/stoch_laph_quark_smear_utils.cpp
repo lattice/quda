@@ -100,8 +100,8 @@ void display_driver_info() {
              dimPartitioned(3));
 }
 
-void laphSourceConstruct(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs,
-			 const Complex *noise, const int dil_scheme)
+void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vector<quda::ColorSpinorField*> &evecs,
+			 const std::complex<double> *noise, const int dil_scheme)
 {  
   int n_dil_vecs = evecs.size()/dil_scheme;
   printfQuda("evecs.size() = %d\n", (int)evecs.size());

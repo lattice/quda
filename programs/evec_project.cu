@@ -3,25 +3,26 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
+#include <launch_kernel.cuh>
 #include <kernels/evec_project.cuh>
 #include <jitify_helper.cuh>
-
+#include <instantiate.h>
 
 namespace quda {
 
-  template <typename real, typename Arg> class EvecProject : TunableVectorY
-  {
-protected:
+  template <typename Float, typename Arg> class EvecProjectCompute : TunableVectorY
+  {    
     Arg &arg;
     const ColorSpinorField &x;
     const ColorSpinorField &y;
 
-private:
+  private:
+    bool tuneSharedBytes() const { return false; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
-
+    
 public:
-    EvecProject(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
+    EvecProjectCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
       TunableVectorY(2),
       arg(arg),
       x(x),
@@ -33,8 +34,8 @@ public:
       create_jitify_program("kernels/evec_project.cuh");
 #endif
     }
-    virtual ~EvecProject() {}
-
+    virtual ~EvecProjectCompute() {}
+    
     void apply(const cudaStream_t &stream)
     {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
@@ -44,11 +45,12 @@ public:
 	
         using namespace jitify::reflection;
         jitify_error = program->kernel(function_name)
-	  .instantiate(Type<real>(), Type<Arg>())
+	  .instantiate(Type<Float>(), Type<Arg>())
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
-	computeEvecProject<real><<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	//LAUNCH_KERNEL_LOCAL_PARITY(computeEvecProject, (*this), tp, stream, arg, Arg);
+	computeEvecProject<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
       } else {
         errorQuda("CPU not supported yet\n");
@@ -68,16 +70,15 @@ public:
 
     long long bytes() const
     {
-      return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(complex<real>);
+      return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(complex<Float>);
     }
   };
   
-  template <typename real>
-  void evec_project_quda(const ColorSpinorField &x, const ColorSpinorField &y,
-			 complex<real> *result)
+  template <typename Float, int nColor>
+  void evecProject(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
   {
-    EvecProjectArg<real> arg(x, y, result);
-    EvecProject<real, EvecProjectArg<real>> evec_project(arg, x, y);
+    EvecProjectArg<Float, nColor> arg(x, y, (Float*)result);
+    EvecProjectCompute<Float, EvecProjectArg<Float, nColor>> evec_project(arg, x, y);
     evec_project.apply(0);
     qudaDeviceSynchronize();
   }
@@ -88,13 +89,18 @@ public:
     
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
+
     
-    if (x.Precision() == QUDA_SINGLE_PRECISION) {
-      evec_project_quda<float>(x, y, (complex<float>*)result);
-    } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-      evec_project_quda<double>(x, y, (complex<double>*)result);
+    if(x.Ncolor() == 3) {
+      if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	evecProject<float, 3>(x, y, (float*)result);
+      } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	evecProject<double, 3>(x, y, (double*)result);
+      } else {
+	errorQuda("Precision %d not supported", x.Precision());
+      }
     } else {
-      errorQuda("Precision %d not supported", x.Precision());
+      errorQuda("nColors = %d is not supported", x.Ncolor());
     }
   }
 } // namespace quda

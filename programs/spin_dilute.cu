@@ -4,8 +4,9 @@
 #include <blas_quda.h>
 
 #include <kernels/spin_dilute.cuh>
+#include <launch_kernel.cuh>
 #include <jitify_helper.cuh>
-
+#include <instantiate.h>
 
 namespace quda {
 
