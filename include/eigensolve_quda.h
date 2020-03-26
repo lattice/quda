@@ -408,14 +408,13 @@ protected:
     //DiracPrecProjCorr *mmPPSloppy;
 
 public:
-    const DiracMatrix &mat;
     /**
        @brief Constructor for JD Eigensolver class
-       @param eig_param The eigensolver parameters
        @param mat The operator to solve
+       @param eig_param The eigensolver parameters
        @param profile Time Profile
     */
-    JD(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
+    JD(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     /**
        @brief Compute eigenpairs
@@ -506,6 +505,8 @@ public:
        @brief Destructor for JD Eigensolver class
     */
     virtual ~JD();
+
+    virtual bool hermitian() { return true; } /** The current implementation of JD is only for Hermitian systems */
 
   };
 
