@@ -70,7 +70,6 @@ namespace quda
       if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d\n", nConv, nEv);
       if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver\n");
       if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
-      if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");
     } else {
       if (mmax <= mmin) errorQuda("mmax=%d is less than or equal to mmin=%d\n", mmax, mmin);
       if (mmin == 0) errorQuda("mmin=0 passed to Eigensolver\n");
@@ -83,8 +82,8 @@ namespace quda
       residua = (double *)safe_malloc(nKr * sizeof(double));
       for (int i = 0; i < nKr; i++) { residua[i] = 0.0; }
     } else {
-      residua = (double *)safe_malloc(mmax * sizeof(double));
-      for (int i = 0; i < mmax; i++) { residua[i] = 0.0; }
+      residua = (double *)safe_malloc(nConv * sizeof(double));
+      for (int i = 0; i < nConv; i++) { residua[i] = 0.0; }
     }
 
     if (eig_param->eig_type != QUDA_EIG_DAV) {
