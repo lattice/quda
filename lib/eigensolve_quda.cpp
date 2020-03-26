@@ -1416,8 +1416,6 @@ namespace quda
 
     Complex* ortDotProd = (Complex*) safe_malloc( std::max(m_max,k_max)*1 * sizeof(Complex) );
 
-    std::vector<ColorSpinorField *> X_tilde;
-
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
 
     //double epsilon = DBL_EPSILON;
@@ -1463,9 +1461,6 @@ namespace quda
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
-    // TODO: remove this line, after the overall use of <evals> if fixed
-    evals.resize(0);
-
     // Matrix with the compressed sub-space information to extract the eigenpairs
     MatrixXcd H;
     SelfAdjointEigenSolver<MatrixXcd> eigensolver;
@@ -1476,7 +1471,7 @@ namespace quda
     while (restart_iter<max_restarts) {
 
       // Locking
-      orth(ortDotProd, t, X_tilde, k);
+      orth(ortDotProd, t, eigSpace, k);
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
       orth(ortDotProd, t, V, m);
@@ -1515,7 +1510,7 @@ namespace quda
       }
 
       // Check for convergence
-      checkIfConverged(eigenpairs, X_tilde, csParam, evals, norm, theta, loopr, k, m, k_max);
+      checkIfConverged(eigenpairs, eigSpace, csParam, evals, norm, theta, loopr, k, m, k_max);
 
       // Check if end has been reached
       if (k >= k_max) {
@@ -1545,12 +1540,6 @@ namespace quda
 
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("eigSpace size at convergence/max restarts = %d\n", (int)eigSpace.size());
-    // Prune the Krylov space back to size when passed to eigensolver
-    //for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
-
-    // FIXME ?
-    //kSpace.resize(nConv);
-    //evals.resize(nConv);
 
     // Post computation report
     //---------------------------------------------------------------------------
@@ -1571,7 +1560,7 @@ namespace quda
       }
 
       // Compute eigenvalues
-      computeEvals(mat, X_tilde, evals);
+      computeEvals(mat, eigSpace, evals);
     }
 
     // Local clean-up
@@ -1585,7 +1574,6 @@ namespace quda
     for (auto p : V_A) { delete p; }
     for (auto p : tmpV) { delete p; }
     for (auto p : tmpAV) { delete p; }
-    for (auto p : X_tilde) { delete p; }
     for (auto p : Qhat) { delete p; }
     host_free(ortDotProd);
 
@@ -1776,8 +1764,10 @@ namespace quda
     r_tilde.push_back(ColorSpinorField::Create(csParam));
     mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
 
-    Qhat.reserve(k_max+1);
-    for (int i=0; i<(k_max+1); i++) {Qhat.push_back(ColorSpinorField::Create(csParam));}
+    // We're only using one vector to project in the correction equation
+    //Qhat.reserve(k_max+1);
+    //for (int i=0; i<(k_max+1); i++) {Qhat.push_back(ColorSpinorField::Create(csParam));}
+    Qhat.push_back(ColorSpinorField::Create(csParam));
 
     csParam.create = QUDA_COPY_FIELD_CREATE;
     t.push_back(ColorSpinorField::Create(initVec, csParam));
@@ -1835,8 +1825,9 @@ namespace quda
     csParam.create = QUDA_COPY_FIELD_CREATE;
 
     while (norm < eig_param->tol) {
-      evals.push_back(eigenpairs[loopr].first);
-      X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
+      //evals.push_back(eigenpairs[loopr].first);
+      evals[k] = eigenpairs[loopr].first;
+      blas::copy(*X_tilde[k], *u[0]);
       k++;
 
       // Check for convergence
