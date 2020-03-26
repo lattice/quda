@@ -73,16 +73,6 @@ namespace quda
                         TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     instantiate<TwistedMassApply>(out, in, U, a, b, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Twisted-mass dslash has not been built");

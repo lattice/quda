@@ -269,6 +269,9 @@ namespace quda {
     /** Flips value of daggered */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
+    /** @return is operator hermitian */
+    virtual bool hermitian() const { return false; }
+
     /**
      * @brief Create the coarse operator (virtual parent)
      *
@@ -1031,6 +1034,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   // Full staggered
@@ -1114,6 +1119,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1372,6 +1379,7 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1392,6 +1400,7 @@ public:
 		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1468,6 +1477,8 @@ public:
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
 
+    virtual bool hermitian() const { return dirac->hermitian(); }
+
     const Dirac *Expose() const { return dirac; }
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
@@ -1534,8 +1545,6 @@ public:
     DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
     DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
 
-    
-
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
@@ -1565,6 +1574,8 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
   /* Gloms onto a DiracMatrix and provides an operator() forward to its MMdag method */
@@ -1603,6 +1614,8 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
   class DiracPrecProjCorr : public DiracMatrix {

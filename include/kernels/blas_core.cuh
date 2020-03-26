@@ -127,6 +127,12 @@ namespace quda
       y.y += a.x * x.y;
     }
 
+    __device__ __host__ void _caxpy(const float2 &a, const float8 &x, float8 &y)
+    {
+      _caxpy(a, x.x, y.x);
+      _caxpy(a, x.y, y.y);
+    }
+
     __device__ __host__ void _caxpy(const double2 &a, const double2 &x, double2 &y)
     {
       y.x += a.x * x.x;
@@ -181,6 +187,12 @@ namespace quda
       yy.y += b.y * y.x;
       yy.y += b.x * y.y;
       y = yy;
+    }
+
+    __device__ __host__ void _caxpby(const float2 &a, const float8 &x, const float2 &b, float8 &y)
+    {
+      _caxpby(a, x.x, b, y.x);
+      _caxpby(a, x.y, b, y.y);
     }
 
     __device__ __host__ void _caxpby(const double2 &a, const double2 &x, const double2 &b, double2 &y)
