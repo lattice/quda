@@ -1368,7 +1368,13 @@ namespace quda
 
     // TODO: general pendings:
 
-    //	       1. switch from X_tilde to eigSpace
+    //		1. fix profiling !
+    //		2. extend whole code to address any <target>
+    //		3. avoid calls to <new> within JD::eigsolveInSubspace(...)
+    //		4. optimize the eigendecomposition of the subspace, and in particular the use of Eigen
+    //		   for this (this within JD::eigsolveInSubspace(...))
+    //		5. avoid the mess being done for sorting Ritz eigenpairs after the eigendecomposition
+    //		   (this within JD::eigsolveInSubspace(...))
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -1380,7 +1386,7 @@ namespace quda
     // Setting some initial parameters of the eigensolver
     int k=0, k_max=eig_param->nConv, m=0;
     int m_max=eig_param->mmax, m_min=eig_param->mmin;
-    // 'theta' is the <target> for the eigensolver
+    // 'theta' is the <shift> for the eigensolver
     double theta=0.0;
     max_restarts = eig_param->max_restarts;
 
@@ -1471,10 +1477,10 @@ namespace quda
     while (restart_iter<max_restarts) {
 
       // Locking
-      orth(ortDotProd, t, X_tilde);
+      orth(ortDotProd, t, X_tilde, k);
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
-      orth(ortDotProd, t, V);
+      orth(ortDotProd, t, V, m);
 
       m++;
 
@@ -1485,49 +1491,19 @@ namespace quda
       // and then apply A to that newly added vector
       matVec(mat, *V_A[m-1], *V[m-1]);
 
-      // Construction of H = Vdag . V_A
-      H.conservativeResize(m,m);
-      for (int i=0; i<(m-1); i++) {
-        H(i,m-1) = blas::cDotProduct(*V[i], *V_A[m-1]);
-        // TODO: is the next line necessary ?
-        H(m-1,i) = conj(H(i,m-1));
-      }
-      // this next line ensures the case m=1
-      H(m-1,m-1) = blas::cDotProduct(*V[m-1], *V_A[m-1]);
-
-      // ith eigenvalue: eigensolver.eigenvalues()[i], ith eigenvector: eigensolver.eigenvectors().col(i)
-      eigensolver.compute(H);
-
-      // Moving the eigenpairs to a vector of std::pair to sort by eigenvalue
-      // TODO: switch this whole treatment of eigenpairs to a (much) more efficient way ..
+      // Perform the eigendecomposition in the acceleration subspace
       std::vector< std::pair < double, std::vector<Complex>* > > eigenpairs;
-      std::vector<Complex>* buffVec = 0;
-      for (int i=0; i<m; i++) {
-        // TODO: switch to safe_malloc
-        buffVec = new std::vector<Complex>(eigensolver.eigenvectors().col(i).data(),
-                                           eigensolver.eigenvectors().col(i).data() + eigensolver.eigenvectors().col(i).size());
-        eigenpairs.push_back( std::make_pair( eigensolver.eigenvalues()[i], buffVec ) );
-      }
-      // Order the eigeninformation extracted from H in descending order of eigenvalues
-      // TODO: switch to using a sort-function, due to general values of <tau>. Descending
-      //       order is only applicable to the case tau=0 i.e. smallest eigenvalues
-      std::sort(eigenpairs.begin(), eigenpairs.end());
+      eigsolveInSubspace(eigenpairs, &eigensolver, &H, m);
 
       // Computing the residual
       // u = V * s_1 -- lifting the first Ritz vector through V
       blas::zero(*u[0]);
       for (int i=0; i<m; i++) {
-        //blas::caxpy( (*(eigenpairs[0].second))[i], *V[i], *u[0] );
         // use this due to frequent-shrinking-avoiding
         blas::caxpy( (*(eigenpairs[loopr].second))[i], *V[i], *u[0] );
       }
-      // and the same for u_A
-      blas::zero(*u_A[0]);
-      for (int i=0; i<m; i++) {
-        //blas::caxpy( (*(eigenpairs[0].second))[i], *V_A[i], *u_A[0] );
-        // use this due to frequent-shrinking-avoiding
-        blas::caxpy( (*(eigenpairs[loopr].second))[i], *V_A[i], *u_A[0] );
-      }
+      // FIXME :  change this matmul for the superposition ?
+      matVec(mat, *u_A[0], *u[0]);
       // and then compute the residual
       theta = eigenpairs[loopr].first;
       blas::copy(*r[0], *u_A[0]);
@@ -1548,62 +1524,15 @@ namespace quda
       }
 
       // Restart: shrink the acceleration subspace
-      // FIXME: add exceptions for case: (loopr+m_min) > m_max
       if(m == m_max){
-        MatrixXcd tmpH = MatrixXcd::Zero(m_min,m_min);
-
-        // 0-th element of the new (smaller) subspace
-        csParam.create = QUDA_COPY_FIELD_CREATE;
-        blas::copy(*tmpV[0], *u[0]);
-        blas::copy(*tmpAV[0], *u_A[0]);
-        tmpH(0,0) = eigenpairs[loopr].first;
-
-        csParam.create = QUDA_ZERO_FIELD_CREATE;
-        for(int i=1; i<m_min; i++){
-          blas::zero(*tmpV[i]);
-          for( int j=0; j<m; j++ ){
-            blas::caxpy( (*(eigenpairs[loopr+i].second))[j], *V[j], *tmpV[i] );
-            tmpH(i,i) = eigenpairs[loopr+i].first;
-          }
-          matVec(mat, *tmpAV[i], *tmpV[i]);
-        }
-
-        m = m_min;
-
-        // Assign new values of H
-        // TODO: skip this resize() ?
-        H.resize(m_min,m_min);
-        H = tmpH;
-
-        // Assign new values of V and W
-        for (int i=0; i<m; i++) {
-          ColorSpinorField *tmpf = V[i];
-          V[i] = tmpV[i];
-          tmpV[i] = tmpf;
-          tmpf = V_A[i];
-          V_A[i] = tmpAV[i];
-          tmpAV[i] = tmpf;
-        }
-
-        restart_iter++;
-
-        if (getVerbosity() >= QUDA_SUMMARIZE) {
-          printfQuda("RESTART (#%d)\n", restart_iter);
-        }
-
-        loopr=0;
+        shrinkSubspace(eigenpairs, csParam, &H, theta, m, restart_iter, loopr, m_min);
       }
 
-      // Preparing for solving the correction equation
-      theta = eigenpairs[loopr].first;
-      X_tilde.push_back( u[0] );
-
+      // Solving the correction equation
       blas::copy(*t[0], *r[0]);
       {
         invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
-
-      X_tilde.pop_back();
 
       // Some local clean-up
       for (auto p : eigenpairs) { delete p.second; }
@@ -1628,12 +1557,9 @@ namespace quda
     //---------------------------------------------------------------------------
     if (!converged) {
       if (eig_param->require_convergence) {
-        //errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
-        //          "restart steps. Exiting.",
-        //          nConv, m_min, m_min, max_restarts);
-        printfQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
-                   "restart steps. Exiting.",
-                   nConv, m_min, m_min, max_restarts);
+        errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
+                  "restart steps. Exiting.",
+                  nConv, m_min, m_min, max_restarts);
       } else {
         warningQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                   "restart steps.",
@@ -1729,7 +1655,7 @@ namespace quda
     matUnconst.shift = bareShift - theta;
 
     if (sizePS>1) {
-      for(int i=0; i<sizePS; i++){
+      for (int i=0; i<sizePS; i++) {
         blas::copy(*Qhat[i], *qSpace[i]);
         K(*cg, corrEqTol, corrEqMaxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
       }
@@ -1756,8 +1682,8 @@ namespace quda
       // 3. LU decomposition of M -- TODO: move the application of .fullPivLu() to this sub-section ?
 
       // Init eigen object
-      for(int i=0; i<sizePS; i++){
-        for(int j=0; j<sizePS; j++){
+      for (int i=0; i<sizePS; i++) {
+        for (int j=0; j<sizePS; j++) {
           M(i,j) = resultDotProd[i*sizePS + j];
         }
       }
@@ -1787,11 +1713,11 @@ namespace quda
 
     if (sizePS>1) {
       MatrixXcd gamma(sizePS,1);
-      for(int i=0; i<sizePS; i++){
+      for (int i=0; i<sizePS; i++) {
         gamma(i,0) = blas::cDotProduct(*qSpace[i], *r_tilde[0]);
       }
       MatrixXcd alpha = M.fullPivLu().solve(gamma);
-      for(int i=0; i<sizePS; i++){
+      for (int i=0; i<sizePS; i++) {
         blas::caxpy(-alpha(i), *Qhat[i], *r_tilde[0]);
       }
     } else {
@@ -1842,7 +1768,8 @@ namespace quda
     setVerbosity(verbTmp);
   }
 
-  void JD::moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec){
+  void JD::moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec)
+  {
     // Init a zero residual
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     r.push_back(ColorSpinorField::Create(csParam));
@@ -1873,39 +1800,42 @@ namespace quda
     }
   }
 
-  void JD::orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace){
-    int tmpSize = (int)ortSpace.size();
+  void JD::orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace, const int m)
+  {
+    int tmpSize = m;
 
     if (tmpSize==0) {return;}
+
+    std::vector<ColorSpinorField *> tmpOrtSpace(ortSpace.begin(), ortSpace.begin()+tmpSize);
 
     // normalize before the orthogonalization
     double norm = sqrt(blas::norm2(*vectr[0]));
     blas::ax(1.0 / norm, *vectr[0]);
 
-    blas::cDotProduct(ortDotProd, ortSpace, vectr);
+    blas::cDotProduct(ortDotProd, tmpOrtSpace, vectr);
     // double reorthogonalization
     for (int i=0; i<tmpSize; i++) {
-      blas::caxpy(-ortDotProd[i], *ortSpace[i], *vectr[0]);
+      blas::caxpy(-ortDotProd[i], *tmpOrtSpace[i], *vectr[0]);
     }
 
     // normalize before the re-orthogonalization
     norm = sqrt(blas::norm2(*vectr[0]));
     blas::ax(1.0 / norm, *vectr[0]);
 
-    blas::cDotProduct(ortDotProd, ortSpace, vectr);
+    blas::cDotProduct(ortDotProd, tmpOrtSpace, vectr);
     // double reorthogonalization
     for (int i=0; i<tmpSize; i++) {
-      blas::caxpy(-ortDotProd[i], *ortSpace[i], *vectr[0]);
+      blas::caxpy(-ortDotProd[i], *tmpOrtSpace[i], *vectr[0]);
     }
   }
 
   void JD::checkIfConverged(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, std::vector<ColorSpinorField *> &X_tilde,
                             ColorSpinorParam &csParam, std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
-                            const int k_max){
-
+                            const int k_max)
+  {
     csParam.create = QUDA_COPY_FIELD_CREATE;
 
-    while(norm < eig_param->tol){
+    while (norm < eig_param->tol) {
       evals.push_back(eigenpairs[loopr].first);
       X_tilde.push_back(ColorSpinorField::Create(*u[0], csParam));
       k++;
@@ -1918,9 +1848,10 @@ namespace quda
 
       blas::zero(*u[0]);
       // project-up with a subspace still of size m
-      for( int j=0; j<m; j++ ){
+      for (int j=0; j<m; j++) {
         blas::caxpy( (*(eigenpairs[loopr+1].second))[j], *V[j], *u[0] );
       }
+      // FIXME :  change this matmul for the superposition ?
       matVec(mat, *u_A[0], *u[0]);
 
       // and then compute the residual
@@ -1932,7 +1863,91 @@ namespace quda
 
       loopr++;
     }
+  }
 
+  void JD::shrinkSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, ColorSpinorParam &csParam,
+                          void *H_, double &theta, int &m, int &restart_iter, int &loopr, const int m_min)
+  {
+    // TODO:
+    //		1. add exceptions for case: (loopr+m_min) > m_max
+    //		2. is it possible to avoid resizing H?
+
+    MatrixXcd &H = *( (MatrixXcd*)H_ );
+
+    H.resize(m_min,m_min);
+    H.setZero();
+
+    // 0-th element of the new (smaller) subspace
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+    blas::copy(*tmpV[0], *u[0]);
+    blas::copy(*tmpAV[0], *u_A[0]);
+    H(0,0) = eigenpairs[loopr].first;
+
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    for (int i=1; i<m_min; i++) {
+      blas::zero(*tmpV[i]);
+      for( int j=0; j<m; j++ ){
+        blas::caxpy( (*(eigenpairs[loopr+i].second))[j], *V[j], *tmpV[i] );
+        //H(i,i) = eigenpairs[loopr+i].first;
+      }
+      H(i,i) = eigenpairs[loopr+i].first;
+      // FIXME :  change this matmul for the superposition ?
+      matVec(mat, *tmpAV[i], *tmpV[i]);
+    }
+
+    m = m_min;
+
+    // Assign new values of V and W
+    for (int i=0; i<m; i++) {
+      ColorSpinorField *tmpf = V[i];
+      V[i] = tmpV[i];
+      tmpV[i] = tmpf;
+      tmpf = V_A[i];
+      V_A[i] = tmpAV[i];
+      tmpAV[i] = tmpf;
+    }
+
+    restart_iter++;
+
+    if (getVerbosity() >= QUDA_SUMMARIZE) {
+      printfQuda("RESTART (#%d)\n", restart_iter);
+    }
+
+    loopr=0;
+
+    theta = H(0,0).real();
+  }
+
+  void JD::eigsolveInSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, void *eigensolver_, void *H_, const int m)
+  {
+    SelfAdjointEigenSolver<MatrixXcd> &eigensolver = *( (SelfAdjointEigenSolver<MatrixXcd>*)(eigensolver_) );
+    MatrixXcd &H = *( (MatrixXcd*)H_ );
+
+    // Construction of H = Vdag . V_A
+    H.conservativeResize(m,m);
+    for (int i=0; i<(m-1); i++) {
+      H(i,m-1) = blas::cDotProduct(*V[i], *V_A[m-1]);
+      // is the next line necessary ?
+      H(m-1,i) = conj(H(i,m-1));
+    }
+    // this next line ensures the case m=1
+    H(m-1,m-1) = blas::cDotProduct(*V[m-1], *V_A[m-1]);
+
+    // ith eigenvalue: eigensolver.eigenvalues()[i], ith eigenvector: eigensolver.eigenvectors().col(i)
+    eigensolver.compute(H);
+
+    // Moving the eigenpairs to a vector of std::pair to sort by eigenvalue
+    std::vector<Complex>* buffVec = 0;
+    for (int i=0; i<m; i++) {
+      buffVec = new std::vector<Complex>(eigensolver.eigenvectors().col(i).data(),
+                                         eigensolver.eigenvectors().col(i).data() + eigensolver.eigenvectors().col(i).size());
+      eigenpairs.push_back( std::make_pair( eigensolver.eigenvalues()[i], buffVec ) );
+    }
+
+    // Order the eigeninformation extracted from H in descending order of eigenvalues
+    // TODO: switch to using a sort-function, due to general values of <tau>. Descending
+    //       order is only applicable to the case tau=0 i.e. smallest eigenvalues
+    std::sort(eigenpairs.begin(), eigenpairs.end());
   }
 
   // Projection matrix used in the solution of the correction equation
@@ -1942,7 +1957,7 @@ namespace quda
   {
     double norm_bf = sqrt(blas::norm2(in));
 
-    if( norm_bf==0 ){
+    if (norm_bf==0) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
         warningQuda("Received a zero spinor in DiracPrecProjCorr::operator() within JD");
       blas::zero(out);
@@ -1999,7 +2014,7 @@ namespace quda
   {
     double norm_bf = sqrt(blas::norm2(in));
 
-    if( norm_bf==0 ){
+    if (norm_bf==0) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
         warningQuda("Received a zero spinor in DiracPrecProjCorr::operator() within JD");
       blas::zero(out);
@@ -2061,7 +2076,7 @@ namespace quda
   {
     double norm_bf = sqrt(blas::norm2(in));
 
-    if( norm_bf==0 ){
+    if (norm_bf==0) {
       if (getVerbosity() >= QUDA_SUMMARIZE)
         warningQuda("Received a zero spinor in DiracPrecProjCorr::operator() within JD");
       blas::zero(out);

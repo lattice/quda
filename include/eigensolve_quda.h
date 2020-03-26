@@ -7,7 +7,6 @@
 
 namespace quda
 {
-
   // Forward declarations for the JD eigensolver
   class GCR;
 
@@ -453,8 +452,9 @@ public:
        @param[in] ortDotProd Resulting dot products
        @param[in] vectr The spinor to be orthogonalized
        @param[in] ortSpace The subspace against which vectr will be orthogonalized
+       @param[in] m Number of dot products to perform
     */
-    void orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace);
+    void orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace, const int m);
 
     /**
        @brief Check if one or more eigenpairs have been found
@@ -472,6 +472,29 @@ public:
     void checkIfConverged(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, std::vector<ColorSpinorField *> &X_tilde,
                           ColorSpinorParam &csParam, std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
                           const int k_max);
+
+    /**
+       @brief When reached the max allowed size of the subspace, resize
+       @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
+       @param[in] csParam Information about the spinors
+       @param[in] theta The JD shift
+       @param[in] H_ The matrix encoding information about the subspace
+       @param[in] m Size of the subspace
+       @param[in] restart_iter Number of restarts (i.e. resizings) of the subspace so far
+       @param[in] loopr Counter indicating upcoming eigenpair from subspace
+       @param[in] m_min Minimum size of the search subspace
+    */
+    void shrinkSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, ColorSpinorParam &csParam, \
+                        void *H_, double &theta, int &m, int &restart_iter, int &loopr, const int m_min);
+
+    /**
+       @brief Perform an eigendecomposition through the acceleration subspace
+       @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
+       @param[in] eigensolver_ Eigen object used for the eigendecomposition
+       @param[in] H_ The matrix encoding information about the subspace
+       @param[in] m Size of the subspace
+    */
+    void eigsolveInSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, void *eigensolver_, void *H_, const int m);
 
     /**
        @brief Destructor for JD Eigensolver class
