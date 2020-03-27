@@ -2353,7 +2353,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
   }
-
+  
+  if(eig_param->eig_type == QUDA_EIG_DAV && eig_param->use_poly_acc) {
+    errorQuda("Jacobi-Davidson solver and Chebyshev accleration not supported.");
+  }
+  
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
