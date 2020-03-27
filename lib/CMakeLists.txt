@@ -5,8 +5,9 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eigensolve_quda.cpp quda_arpack_interface.cpp
-  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
+  eigensolve_quda.cpp eig_trlm_quda.cpp eig_jacdav_quda.cpp
+  quda_arpack_interface.cpp multigrid.cpp transfer.cpp
+  block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
