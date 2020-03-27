@@ -49,7 +49,6 @@ public:
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
-	//LAUNCH_KERNEL_LOCAL_PARITY(computeEvecProject, (*this), tp, stream, arg, Arg);
 	computeEvecProject<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #endif
       } else {
@@ -75,9 +74,9 @@ public:
   };
   
   template <typename Float, int nColor>
-  void evecProject(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
+  void evecProject(const ColorSpinorField &x, const ColorSpinorField &y, Float *result)
   {
-    EvecProjectArg<Float, nColor> arg(x, y, (Float*)result);
+    EvecProjectArg<Float, nColor> arg(x, y, result);
     EvecProjectCompute<Float, EvecProjectArg<Float, nColor>> evec_project(arg, x, y);
     evec_project.apply(0);
     qudaDeviceSynchronize();

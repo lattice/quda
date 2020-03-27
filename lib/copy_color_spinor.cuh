@@ -175,7 +175,7 @@ namespace quda {
     CopyColorSpinor(Arg &arg, const ColorSpinorField &out, const ColorSpinorField &in,
 		    QudaFieldLocation location)
       : TunableVectorY(arg.nParity), arg(arg), meta(in), location(location) {
-      if (out.GammaBasis()!=in.GammaBasis()) errorQuda("Cannot change gamma basis for nSpin=%d\n", Ns);
+      if (out.GammaBasis() != in.GammaBasis()) errorQuda("Cannot change gamma bases (%d, %d) for nSpin=%d\n", out.GammaBasis(), in.GammaBasis(), Ns);
       writeAuxString("out_stride=%d,in_stride=%d", arg.out.stride, arg.in.stride);
     }
     virtual ~CopyColorSpinor() { ; }

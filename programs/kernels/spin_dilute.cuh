@@ -15,16 +15,16 @@ namespace quda
     static constexpr int nColor = 3;
     static constexpr bool spin_project = true;
     static constexpr bool spinor_direct_load = false; // false means texture load
-
-    // Create a typename F for the ColorSpinorFields (F4 for spin 4 fermion, F1 for spin 1)
-    typedef typename colorspinor_mapper<real, nSpinX, nColor, spin_project, spinor_direct_load>::type F4;
-    typedef typename colorspinor_mapper<real, nSpinX, nColor, spin_project, spinor_direct_load>::type F1;
-
-    F4 x;
-    F1 y;
-    int alpha;
     
-    SpinDiluteArg(const ColorSpinorField &x, const ColorSpinorField &y, const int alpha) :
+    // Create a typename F for the ColorSpinorFields (F4 for spin 4, F1 for spin 1)
+    typedef typename colorspinor_mapper<real, nSpinX, nColor, spin_project, spinor_direct_load>::type F4;
+    typedef typename colorspinor_mapper<real, nSpinY, nColor, false, false>::type F1;
+    
+    F4 x;      // output vector
+    F1 y;      // input vector
+    int alpha; // spin elem to populate
+    
+    SpinDiluteArg(ColorSpinorField &x, const ColorSpinorField &y, const int alpha) :
       threads(x.VolumeCB()),
       x(x),
       y(y),
@@ -33,7 +33,7 @@ namespace quda
       for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
-
+  
   template <typename real, typename Arg> __global__ void computeSpinDilute(Arg arg)
   {
     int x_cb = threadIdx.x + blockIdx.x * blockDim.x;
@@ -46,16 +46,15 @@ namespace quda
     typedef ColorSpinor<real, nColor, nSpinX> Vector4;
     typedef ColorSpinor<real, nColor, nSpinY> Vector1;
 
-    Vector4 x = arg.x(x_cb, parity);
-    Vector1 y = arg.y(x_cb, parity);
-    int alpha = arg.alpha;
-#pragma unroll
+    Vector4 xlcl;
+    Vector1 ylcl = arg.y(x_cb, parity);
+    
     for (int mu = 0; mu < nSpinX; mu++) {
-#pragma unroll
       for (int a = 0; a < nColor; a++) {
-	if(mu == alpha) x.data[nColor*mu + a] = y.data[a];
-	else x.data[nColor*mu + a] = 0.0;
+	if(mu == arg.alpha) xlcl.data[nColor*mu + a] = ylcl.data[a];
+	else xlcl.data[nColor*mu + a] = 0.0;
       }
     }
+    arg.x.save(xlcl.data, x_cb, parity);;
   }  
 } // namespace quda

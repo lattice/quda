@@ -105,9 +105,13 @@ void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vect
 {  
   int n_dil_vecs = evecs.size()/dil_scheme;
   printfQuda("evecs.size() = %d\n", (int)evecs.size());
+  printfQuda("quarks.size() = %d\n", (int)quarks.size());
+  printfQuda("dil_scheme = %d\n", dil_scheme);
+  printfQuda("n_dil_vecs = %d\n", n_dil_vecs);
   // Construct 4 vectors to hold the 4 spin sources
   
   ColorSpinorParam csp_evecs(*evecs[0]);
+  csp_evecs.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField*> sources;
   sources.reserve(4);
   for (int i = 0; i < 4; i++) {
@@ -116,12 +120,13 @@ void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vect
 
   // Construct 4 vectors to hold the 4 spin DILUTED sources
   ColorSpinorParam csp_quarks(*quarks[0]);
+  //csp_quarks.create = QUDA_ZERO_FIELD_CREATE;
   std::vector<ColorSpinorField*> dil_sources;
   dil_sources.reserve(4);
   for (int i = 0; i < 4; i++) {
     dil_sources.push_back(ColorSpinorField::Create(csp_quarks));
   }
-  
+
   // Loop over dilutions
   for(int i = 0; i<dil_scheme; i++) {
     
@@ -129,19 +134,62 @@ void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vect
     std::vector<ColorSpinorField *> dil_evecs_ptr;
     dil_evecs_ptr.reserve(n_dil_vecs);
     for (int j = 0; j < n_dil_vecs; j++) {
-      dil_evecs_ptr.push_back(evecs[i + j*dil_scheme]);
+      dil_evecs_ptr.push_back(evecs[i + j * dil_scheme]);
     }
+
+#ifdef DEBUG_LOCAL
+    // Check evecs
+    for (int ev = 0; ev < n_dil_vecs; ev++) {
+      for(int j=0; j<V; j++) {	
+	printfQuda("EVECS i = %d, ev = %d ", i, ev);
+	dil_evecs_ptr[ev]->PrintVector(j);
+      }
+    }
+    
+    // Check noise
+    if(i == 0) {
+      for (int ev = 0; ev < n_dil_vecs; ev++) {
+	printfQuda("SPIN ev = %d : (%e,%e) (%e,%e) (%e,%e) (%e,%e)\n",
+		   ev,
+		   noise[ev*4 + 0].real(),noise[ev*4 + 0].imag(),
+		   noise[ev*4 + 1].real(),noise[ev*4 + 1].imag(),
+		   noise[ev*4 + 2].real(),noise[ev*4 + 2].imag(),
+		   noise[ev*4 + 3].real(),noise[ev*4 + 3].imag());
+      }
+    }
+#endif
     
     // Construct source
     blas::caxpy(noise, dil_evecs_ptr, sources);
+
+#ifdef DEBUG_LOCAL
+    // Check sources
+    for (int spin = 0; spin < 4; spin++) {
+      for(int j=0; j<V; j++) {	
+	printfQuda("SOURCE i = %d, spin = %d ", i, spin);
+	sources[spin]->PrintVector(j);
+      }
+    }
+#endif
     
     for (int spin = 0; spin < 4; spin++) {
       spinDiluteQuda(*dil_sources[spin], *sources[spin], spin);
       // Copy spin diluted sources into quark array
       *quarks[4 * i + spin] = *dil_sources[spin];
+#ifdef DEBUG_LOCAL
+      // Check quarks
+      for(int j=0; j<V; j++) {
+	printfQuda("QUARK i = %d, spin = %d\n", i, spin);
+	quarks[4 * i + spin]->PrintVector(j);
+      }
+#endif
     }
   }
-  // All 4 * dil_scheme sources constructed  
+  printfQuda("All nSpin * dil_scheme sources constructed\n");
+  for (int spin = 0; spin < 4; spin++) {
+    delete dil_sources[spin];
+    delete sources[spin];
+  }
 }
 
 void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
@@ -168,6 +216,8 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
   ColorSpinorField *x = nullptr;
   ColorSpinorField *b = nullptr;
 
+  
+  
   ColorSpinorParam cuda_param(*quarks[0]);
   b = ColorSpinorField::Create(cuda_param);  
   x = ColorSpinorField::Create(cuda_param);
@@ -184,10 +234,12 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
     *b = *quarks[i];
     dirac.prepare(in, out, *x, *b, inv_param->solution_type);  
     DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    SolverParam solverParam(*inv_param);  
+    SolverParam solverParam(*inv_param);    
     Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileLaphInvert);
-    (*solve)(*out, *in);    
-    *quarks[i] = *out;    
+    
+    (*solve)(*out, *in);
+
+    *quarks[i] = *x;
     solverParam.updateInvertParam(*inv_param);
 
     // Accumulate Solver stats
@@ -200,17 +252,21 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
     inv_param->iter = 0;
     delete solve;
   }
-
-  delete out;
+  
+  delete x;
+  delete b;
   delete d;
   delete dSloppy;
   delete dPre;
+
+  
+  //for(int j=0; j<V; j++) quarks[0]->PrintVector(j);
 }
 
 // There will be nSpin * dil_scheme quark sinks, and n_evecs eigenvectors. We will produce
-// n_evecs * dil_scheme smeared sinks, each of which has a lattice and spin index 
+// n_evecs * dil_scheme smeared sinks, each of which has a spin index 
 void laphSinkProject(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSpinorField*> &evecs,
-		     void **host_sinks, const int dil_scheme)
+		     void *host_sinks, const int dil_scheme)
 {
   int n_evecs = (int)(evecs.size());
   int n_quarks = (int)(quarks.size());
@@ -218,7 +274,8 @@ void laphSinkProject(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSp
   for(int i=0; i<n_evecs; i++) {
     for(int k=0; k<n_quarks; k++) {
       //FIXME Indexing....
-      evecProjectQuda(*quarks[k], *evecs[i], host_sinks[k * n_evecs  + i]);
+      //printfQuda("i=%d k=%d\n", i, k); 
+      evecProjectQuda(*quarks[k], *evecs[i], (double*)host_sinks);
     }
   }
 }

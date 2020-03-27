@@ -59,12 +59,12 @@ namespace quda
     Vector4 x = arg.x(x_cb, parity);
     Vector1 y = arg.y(x_cb, parity);
 
-    complex<real> result;
+    complex<real> res;
 #pragma unroll
     for (int mu = 0; mu < nSpinX; mu++) {
-      //result = 
-      arg.s[x_cb + parity * arg.threads + mu + 0] = innerProduct(y, x, 0, mu).real();
-      arg.s[x_cb + parity * arg.threads + mu + 1] = innerProduct(y, x, 0, mu).imag();
+      res = innerProduct(y, x, 0, mu);
+      //arg.s[x_cb + parity * arg.threads + mu + 0] = res.real();
+      //arg.s[x_cb + parity * arg.threads + mu + 1] = res.imag();
     }
   }
 } // namespace quda

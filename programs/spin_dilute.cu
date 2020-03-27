@@ -14,16 +14,16 @@ namespace quda {
   {
 protected:
     Arg &arg;
-    const ColorSpinorField &x;
+    ColorSpinorField &x;
     const ColorSpinorField &y;
     const int alpha;
-
+    
 private:
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
 
 public:
-    SpinDilute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y, const int alpha) :
+    SpinDilute(Arg &arg, ColorSpinorField &x, const ColorSpinorField &y, const int alpha) :
       TunableVectorY(2),
       arg(arg),
       x(x),
@@ -63,11 +63,8 @@ public:
     void preTune() {}
     void postTune() {}
 
-    long long flops() const
-    {
-      return 0;
-    }
-
+    long long flops() const { return 0; }
+    
     long long bytes() const
     {
       return x.Bytes() + y.Bytes() + x.Nspin() * x.Nspin() * x.Volume() * sizeof(complex<real>);
@@ -75,15 +72,20 @@ public:
   };
   
   template <typename real>
-  void spin_dilute_quda(const ColorSpinorField &x, const ColorSpinorField &y, const int alpha)
+  void spin_dilute_quda(ColorSpinorField &x, const ColorSpinorField &y, const int alpha)
   {
     SpinDiluteArg<real> arg(x, y, alpha);
     SpinDilute<real, SpinDiluteArg<real>> spin_dilute(arg, x, y, alpha);
     spin_dilute.apply(0);
     qudaDeviceSynchronize();
+    // Check quarks
+    for(int j=0; j<256; j++) {
+      //printfQuda("QUARK CU spin = %d\n", alpha);
+      //x.PrintVector(j);
+    }      
   }
   
-  void spinDiluteQuda(const ColorSpinorField &x, const ColorSpinorField &y, const int alpha)
+  void spinDiluteQuda(ColorSpinorField &x, const ColorSpinorField &y, const int alpha)
   {
     checkPrecision(x, y);
 
