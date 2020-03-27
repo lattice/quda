@@ -61,24 +61,8 @@ namespace quda
     }
 
     // Test for an initial guess
-    double norm = sqrt(blas::norm2(*kSpace[0]));
-    if (norm == 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
-      if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-	kSpace[0]->Source(QUDA_RANDOM_SOURCE);
-      } else {
-	RNG *rng = new RNG(*kSpace[0], 1234);
-	rng->Init();
-	spinorNoise(*kSpace[0], *rng, QUDA_NOISE_UNIFORM);
-	rng->Release();
-	delete rng;
-      }
-    }
-
-    // Normalise initial guess
-    norm = sqrt(blas::norm2(*kSpace[0]));
-    blas::ax(1.0 / norm, *kSpace[0]);
-
+    testInitGuess(kSpace[0]);
+    
     // Check for Chebyshev maximum estimation
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
       eig_param->a_max = estimateChebyOpMax(mat, *kSpace[2], *kSpace[1]);

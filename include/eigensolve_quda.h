@@ -161,6 +161,12 @@ public:
     void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
 
     /**
+       @brief Test for an initial guess
+       @param[in/out] in Initial vector
+    */
+    void testInitGuess(ColorSpinorField* &in);
+    
+    /**
        @brief Deflate a set of source vectors with a given eigenspace
        @param[in] sol The resulting deflated vector set
        @param[in] src The source vector set we are deflating

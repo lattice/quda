@@ -384,6 +384,26 @@ namespace quda
     }
   }
 
+  void EigenSolver::testInitGuess(ColorSpinorField* &in) {
+    double norm = sqrt(blas::norm2(*in));
+    if (norm == 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
+      if (in->Location() == QUDA_CPU_FIELD_LOCATION) {
+	in->Source(QUDA_RANDOM_SOURCE);
+      } else {
+	RNG *rng = new RNG(*in, 1234);
+	rng->Init();
+	spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
+	rng->Release();
+	delete rng;
+      }
+    }
+
+    // Normalise initial guess
+    norm = sqrt(blas::norm2(*in));
+    blas::ax(1.0 / norm, *in);
+  }
+  
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");

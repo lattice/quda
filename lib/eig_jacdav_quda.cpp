@@ -17,6 +17,11 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
+//DMHJD: Fantastic work! I've left some relevant comments in the code, just grep the
+//       library for DMHJD. One comment on code conventions: it is preferable,
+//       but not mandatory, to use camelCase for functions and underscore_case for
+//       variables. If you can fix the camelCase variables I'd be very happy!
+
 namespace quda
 {
 
@@ -35,6 +40,8 @@ namespace quda
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
+    // DMHJD: Can you use the corr_eq_tol and corr_eq_maxiter you defined in
+    //        eigensolve_quda.h?
     corrEqTol = eig_param->corr_eq_tol;
     corrEqMaxiter = eig_param->corr_eq_maxiter;
 
@@ -61,36 +68,35 @@ namespace quda
     // Create the dirac operator
     // IMPORTANT: cannot call createDirac(...) as in interface_quda.cpp
     {
-      bool pc_solve = (eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || \
-	(eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE) || \
-	(eig_param->invert_param->solve_type == QUDA_NORMERR_PC_SOLVE);
-
+      bool pc_solve = ((eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE) || 
+		       (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE) || 
+		       (eig_param->invert_param->solve_type == QUDA_NORMERR_PC_SOLVE));
+      
       DiracParam diracParam;
       //DiracParam diracSloppyParam;
-
+      
       quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
       //quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
       d = Dirac::create(diracParam);
       //dSloppy = Dirac::create(diracSloppyParam);
     }
-
+    
     Dirac &dirac = *d;
     //Dirac &diracSloppy = *dSloppy;
-
+    
     mmPP = new DiracPrecProjCorr(dirac);
     //mmPPSloppy = new DiracPrecProjCorr(diracSloppy);
 
     // Solvers used in the correction equation
-    cg = new CG(const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), \
-                *solverParam, *profileMatCorrEqInvs);
+    cg = new CG(const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), const_cast<DiracMatrix&>(mat), *solverParam, *profileMatCorrEqInvs);
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profileCorrEqInvs);
-
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
   void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
   {
-
+    
     // TODO: general pendings:
 
     //		1. fix profiling !
@@ -109,26 +115,18 @@ namespace quda
     }
 
     // Setting some initial parameters of the eigensolver
+    //DMHJD: Don't declare these here, declare in the class definition.
+    //       That way you don't have to keep passing them around as arguments to functions 
     int k=0, k_max=eig_param->nConv, m=0;
     int m_max=eig_param->mmax, m_min=eig_param->mmin;
     // 'theta' is the <shift> for the eigensolver
     double theta=0.0;
+
+    // DMHJD: This is set in the base eigesolver class.
     max_restarts = eig_param->max_restarts;
 
     // Test for an initial guess
-    double norm = sqrt(blas::norm2(*eigSpace[0]));
-    if (norm == 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
-      if (eigSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-        eigSpace[0]->Source(QUDA_RANDOM_SOURCE);
-      } else {
-        RNG *rng = new RNG(*eigSpace[0], 1234);
-        rng->Init();
-        spinorNoise(*eigSpace[0], *rng, QUDA_NOISE_UNIFORM);
-        rng->Release();
-        delete rng;
-      }
-    }
+    testInitGuess(eigSpace[0]);
 
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
@@ -205,7 +203,7 @@ namespace quda
 
       // Push: V[m-1] = t, and then normalize it
       blas::copy(*V[m-1], *t[0]);
-      norm = sqrt(blas::norm2(*V[m-1]));
+      double norm = sqrt(blas::norm2(*V[m-1]));
       blas::ax(1.0 / norm, *V[m-1]);
       // and then apply A to that newly added vector
       matVec(mat, *V_A[m-1], *V[m-1]);
@@ -526,6 +524,14 @@ namespace quda
     double norm = sqrt(blas::norm2(*vectr[0]));
     blas::ax(1.0 / norm, *vectr[0]);
 
+    // DMHJD: see blockOrthogonalization in the base eigensolver class. You can negate
+    //        the dot products on the host, then pass the array to a MULTI blas
+    //        version:
+    //        for (int i=0; i<tmpSize; i++) ortDotProd[i] *= -1.0;
+    //        blas::caxpy(ortDotProd[i], tmpOrtSpace, *vectr[0]);
+    //        Also, you seem to be orthogonalising twice. Is this intended?
+    //        This routine souble likely be replaced by the blockOrthogonalise 
+    
     blas::cDotProduct(ortDotProd, tmpOrtSpace, vectr);
     // double reorthogonalization
     for (int i=0; i<tmpSize; i++) {
@@ -667,7 +673,23 @@ namespace quda
 
   // Projection matrix used in the solution of the correction equation
   //---------------------------------------------------------------------------
-
+  
+  // DMHJD: The reason the base Dirac class has three versions of the (virtual)
+  //        versions of the operator is that the matrix operator routines have
+  //        different optimisation code path depending on whether you pass tmps.
+  //        They use the temp vectors rather than allocate their own.
+  //        If you look in DiracMMdag, you see how the different operator versions
+  //        (no temp, one temp, teo temps) are defined. You should create a function
+  //        that does the actual thing you want to do, then wrap these three diferent
+  //        operators around that function. for example:
+  //        void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
+  //  {
+  //   dirac->tmp1 = &tmp;
+  //   yourFunction(out, in);
+  //   dirac->tmp1 = NULL;
+  //  }
+  //  That way you don't have to repeat code.
+  
   void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     double norm_bf = sqrt(blas::norm2(in));
