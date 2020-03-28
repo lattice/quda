@@ -38,8 +38,11 @@ using namespace quda;
 // 4. We then repopulate the eigenvector array and stochastic noise coefficents with the next set of 
 // LapH dilution data and repeat steps 1,2,3.
 
-int main(int argc, char **argv) {
-
+int main(int argc, char **argv)
+{
+  // Set up QUDA
+  //----------------------------------------------------------------------------------
+  setQudaDefaultMgTestParams();
   // Parse command line options
   auto app = make_app();
   add_eigen_option_group(app);
@@ -118,7 +121,7 @@ int main(int argc, char **argv) {
   display_driver_info();
 
   // Allocate host side memory for the gauge field.
-  //----------------------------------------------------------------------------
+  //-----------------------------------------------
   void *gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
@@ -127,7 +130,7 @@ int main(int argc, char **argv) {
   loadGaugeQuda((void *)gauge, &gauge_param);
 
   // Allocate host side memory for clover terms if needed.
-  //----------------------------------------------------------------------------
+  //------------------------------------------------------
   void *clover = nullptr;
   void *clover_inv = nullptr;
   // Allocate space on the host (always best to allocate and free in the same scope)
@@ -155,124 +158,52 @@ int main(int argc, char **argv) {
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
+  //----------------------------------------------------------------------------------
+
+
+  // We now emulate an external application interfacing with QUDA
+  //----------------------------------------------------------------------------------
   
-  // Make up some junk data
+  // Make up some junk data  
   int dil_scheme = 16;
   int n_evecs = 400;
   // Deduce the number of eigenvectors to be used per dilution.
   if (n_evecs%dil_scheme != 0) {
     errorQuda("Number of eigen vectors passed %d is not a multiple of the dilution scheme %d", n_evecs, dil_scheme);
   }
-  int n_dil_vecs = n_evecs/dil_scheme;
   int n_sources = 4 * dil_scheme;
 
   // Host side data for sources/quarks
   void **host_quarks = (void **)malloc(n_sources * sizeof(void *));
   for (int i = 0; i < n_sources; i++) {
-    host_quarks[i] = (void *)malloc(V * 24 * inv_param.cpu_prec);
+    host_quarks[i] = (void *)malloc(V * 24 * sizeof(double));
+    for(int j=0; j< V*24; j++) ((double*)host_quarks[i])[j] = rand()/(double)RAND_MAX;
   }
-  // Parameter object describing the sources and smeared quarks
-  ColorSpinorParam cpu_quark_param(host_quarks[0], inv_param, gauge_param.X, false, QUDA_CPU_FIELD_LOCATION);
-  cpu_quark_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
-  // QUDA style wrappers around the host data
-  std::vector<ColorSpinorField*> quarks;
-  quarks.reserve(n_sources);
-  for (int i = 0; i < n_sources; i++) {
-    cpu_quark_param.v = host_quarks[i];
-    quarks.push_back(ColorSpinorField::Create(cpu_quark_param));
-  }  
 
-  // Host side data for eigenvecs
+  // Host side data for eigenvectors
   void **host_evecs = (void **)malloc(n_evecs * sizeof(void *));
   for (int i = 0; i < n_evecs; i++) {
-    host_evecs[i] = (void *)malloc(V * 6 * inv_param.cpu_prec);
+    host_evecs[i] = (void *)malloc(V * 6 * sizeof(double));
+    for(int j=0; j< V*6; j++) ((double*)host_evecs[i])[j] = rand()/(double)RAND_MAX;
   }
-  // Parameter object describing evecs
-  ColorSpinorParam cpu_evec_param(host_evecs[0], inv_param, gauge_param.X, false, QUDA_CPU_FIELD_LOCATION);
-  // Switch to spin 1
-  cpu_evec_param.nSpin = 1;
-  // QUDA style wrappers around the host data
-  std::vector<ColorSpinorField*> evecs;
-  evecs.reserve(n_evecs);
-  for (int i = 0; i < n_evecs; i++) {
-    cpu_evec_param.v = host_evecs[i];
-    evecs.push_back(ColorSpinorField::Create(cpu_evec_param));
-  }  
 
-  // In the real application, the QUDA ColorSpinorField objects would alias real host data. In the
-  // meantime, we fill the arrays with junk  
-  auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 7253);
-  rng->Init();
-  for (int i = 0; i < n_sources; i++) {
-    constructRandomSpinorSource(host_quarks[i], 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-  }
-  for (int i = 0; i < n_evecs; i++) {
-    constructRandomSpinorSource(host_evecs[i], 1, 3, inv_param.cpu_prec, gauge_param.X, *rng);
+  // Host side stochastic noise (junk for now)
+  void *host_noise = (void *)malloc(4 * 2 * n_evecs * sizeof(double));
+  for(int i=0; i < 4 * 2 * n_evecs; i++) {
+    ((double*)host_noise)[i] = rand()/(double)RAND_MAX;
   }
   
-  // Create device vectors for quarks
-  ColorSpinorParam cuda_quark_param(cpu_quark_param);
-  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_quark_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
-  std::vector<ColorSpinorField *> quda_quarks;
-  quda_quarks.reserve(n_sources);
-  for (int i = 0; i < n_sources; i++) {
-    quda_quarks.push_back(ColorSpinorField::Create(cuda_quark_param));
-    // Copy data from host to device
-    *quda_quarks[i] = *quarks[i];
-  }
-
-  // Create device vectors for evecs
-  ColorSpinorParam cuda_evec_param(cpu_evec_param);
-  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
-  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_evec_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
-  cuda_evec_param.nSpin = 1;
-  std::vector<ColorSpinorField *> quda_evecs;
-  quda_evecs.reserve(n_evecs);
-  for (int i = 0; i < n_evecs; i++) {
-    quda_evecs.push_back(ColorSpinorField::Create(cuda_evec_param));
-    // Copy data from host to device
-    *quda_evecs[i] = *evecs[i];
-  }
-
-  // Finally, construct an array of stochastic noise (junk for now)
-  Complex noise[4 * n_dil_vecs];
-  for(int i=0; i < 4 * n_dil_vecs; i++) {
-    //noise[i].real(rand() / (double)RAND_MAX);
-    //noise[i].imag(rand() / (double)RAND_MAX);
-
-    noise[i].real(1.0);
-    noise[i].imag(0.0);
-  }
-
   // Host side data for sinks
-  void *host_sinks = (void *)malloc(n_evecs * dil_scheme * 4 * sizeof(double));
-
-  // Use the dilution scheme and stochstic noise to construct quark sources
-  double time_lsc = -clock();
-  laphSourceConstruct(quda_quarks, quda_evecs, noise, dil_scheme);
-  time_lsc += clock();
-
-  // The quarks sources are located in quda_quarks. We invert using those
-  // sources and place the propagator back into quda_quarks
-  double time_lsi = -clock();
-  laphSourceInvert(quda_quarks, &inv_param, gauge_param.X);
-  time_lsi += clock();
+  void *host_sinks = (void *)malloc(n_evecs * dil_scheme * 4 * 2 * sizeof(double));
+  for(int i=0; i < n_evecs * dil_scheme * 4 * 2; i++) ((double*)host_sinks)[i] = 0.0;
   
-  // We now perfrom the projection back onto the eigenspace. The data
-  // is placed in host_sinks in i, X, Y, Z, T, spin order
-  double time_lsp = -clock();
-  laphSinkProject(quda_quarks, quda_evecs, host_sinks, dil_scheme);
-  time_lsp += clock();
+  // local lattice dims
+  int X[4];
+  for (int i=0; i<4; i++) X[i] = gauge_param.X[i];
 
-  printfQuda("LSC time = %e\n", time_lsc/CLOCKS_PER_SEC);
-  printfQuda("LSI time = %e\n", time_lsi/CLOCKS_PER_SEC);
-  printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);
-
-  rng->Release();
-  delete rng;
+  // All the information needed to compute the smeared quarlks is now passed to QUDA
+  stochLaphSmearQuda(host_quarks, host_evecs, host_noise, host_sinks,
+		     dil_scheme, n_evecs, inv_param, X);
 
   // free the multigrid solver
   if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
@@ -280,17 +211,14 @@ int main(int argc, char **argv) {
   // Clean up memory allocations
   for (int i = 0; i < n_sources; i++) {
     free(host_quarks[i]);
-    delete quarks[i];
-    delete quda_quarks[i];
   }
   free(host_quarks);
   for (int i = 0; i < n_evecs; i++) {
     free(host_evecs[i]);
-    delete evecs[i];
-    delete quda_evecs[i];
   }
-  
+  free(host_evecs);
   free(host_sinks);
+  free(host_noise);
   
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
@@ -304,6 +232,9 @@ int main(int argc, char **argv) {
   // finalize the QUDA library
   endQuda();
   finalizeComms();
+  
+  return 0;
+
   
   return 0;
 }

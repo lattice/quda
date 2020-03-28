@@ -100,8 +100,7 @@ void display_driver_info() {
              dimPartitioned(3));
 }
 
-void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vector<quda::ColorSpinorField*> &evecs,
-			 const std::complex<double> *noise, const int dil_scheme)
+void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vector<quda::ColorSpinorField*> &evecs, const Complex noise_array[], const int dil_scheme)
 {  
   int n_dil_vecs = evecs.size()/dil_scheme;
   printfQuda("evecs.size() = %d\n", (int)evecs.size());
@@ -137,63 +136,32 @@ void laphSourceConstruct(std::vector<quda::ColorSpinorField*> &quarks, std::vect
       dil_evecs_ptr.push_back(evecs[i + j * dil_scheme]);
     }
 
-#ifdef DEBUG_LOCAL
-    // Check evecs
-    for (int ev = 0; ev < n_dil_vecs; ev++) {
-      for(int j=0; j<V; j++) {	
-	printfQuda("EVECS i = %d, ev = %d ", i, ev);
-	dil_evecs_ptr[ev]->PrintVector(j);
+    // Collect the relevant noise values
+    Complex noise[4 * n_dil_vecs];
+    for (int j = 0; j < n_dil_vecs; j++) {
+      for (int spin = 0; spin < 4; spin++) {
+	noise[4 * j + spin] = noise_array[4 * (j * dil_scheme + i) + spin];
       }
     }
-    
-    // Check noise
-    if(i == 0) {
-      for (int ev = 0; ev < n_dil_vecs; ev++) {
-	printfQuda("SPIN ev = %d : (%e,%e) (%e,%e) (%e,%e) (%e,%e)\n",
-		   ev,
-		   noise[ev*4 + 0].real(),noise[ev*4 + 0].imag(),
-		   noise[ev*4 + 1].real(),noise[ev*4 + 1].imag(),
-		   noise[ev*4 + 2].real(),noise[ev*4 + 2].imag(),
-		   noise[ev*4 + 3].real(),noise[ev*4 + 3].imag());
-      }
-    }
-#endif
     
     // Construct source
     blas::caxpy(noise, dil_evecs_ptr, sources);
-
-#ifdef DEBUG_LOCAL
-    // Check sources
-    for (int spin = 0; spin < 4; spin++) {
-      for(int j=0; j<V; j++) {	
-	printfQuda("SOURCE i = %d, spin = %d ", i, spin);
-	sources[spin]->PrintVector(j);
-      }
-    }
-#endif
     
     for (int spin = 0; spin < 4; spin++) {
       spinDiluteQuda(*dil_sources[spin], *sources[spin], spin);
       // Copy spin diluted sources into quark array
       *quarks[4 * i + spin] = *dil_sources[spin];
-#ifdef DEBUG_LOCAL
-      // Check quarks
-      for(int j=0; j<V; j++) {
-	printfQuda("QUARK i = %d, spin = %d\n", i, spin);
-	quarks[4 * i + spin]->PrintVector(j);
-      }
-#endif
     }
   }
   printfQuda("All nSpin * dil_scheme sources constructed\n");
+  
   for (int spin = 0; spin < 4; spin++) {
     delete dil_sources[spin];
     delete sources[spin];
   }
 }
 
-void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
-		      QudaInvertParam *inv_param, const int *X)
+void laphSourceInvert(std::vector<ColorSpinorField*> &quarks, QudaInvertParam *inv_param)
 {  
   bool pc_solve = (inv_param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (inv_param->solve_type == QUDA_NORMOP_PC_SOLVE) || (inv_param->solve_type == QUDA_NORMERR_PC_SOLVE);
@@ -215,9 +183,7 @@ void laphSourceInvert(std::vector<ColorSpinorField*> &quarks,
   ColorSpinorField *out = nullptr;
   ColorSpinorField *x = nullptr;
   ColorSpinorField *b = nullptr;
-
-  
-  
+   
   ColorSpinorParam cuda_param(*quarks[0]);
   b = ColorSpinorField::Create(cuda_param);  
   x = ColorSpinorField::Create(cuda_param);
@@ -279,3 +245,105 @@ void laphSinkProject(std::vector<ColorSpinorField*> &quarks, std::vector<ColorSp
     }
   }
 }
+
+void stochLaphSmearQuda(void **host_quarks, void **host_evecs,
+			void *host_noise, void *host_sinks,
+			const int dil_scheme, const int n_evecs, 
+			QudaInvertParam inv_param, const int X[4])
+{
+  int n_sources = 4 * dil_scheme;
+  
+  // Parameter object describing the sources and smeared quarks
+  ColorSpinorParam cpu_quark_param(host_quarks[0], inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_quark_param.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
+  // QUDA style wrappers around the host data
+  std::vector<ColorSpinorField*> quarks;
+  quarks.reserve(n_sources);
+  for (int i = 0; i < n_sources; i++) {
+    cpu_quark_param.v = host_quarks[i];
+    quarks.push_back(ColorSpinorField::Create(cpu_quark_param));
+  }  
+  
+  // Host side data for eigenvecs
+  // Parameter object describing evecs
+  ColorSpinorParam cpu_evec_param(host_evecs[0], inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  // Switch to spin 1
+  cpu_evec_param.nSpin = 1;
+  // QUDA style wrappers around the host data
+  std::vector<ColorSpinorField*> evecs;
+  evecs.reserve(n_evecs);
+  for (int i = 0; i < n_evecs; i++) {
+    cpu_evec_param.v = host_evecs[i];
+    evecs.push_back(ColorSpinorField::Create(cpu_evec_param));
+  }  
+
+  // Create device vectors for quarks
+  ColorSpinorParam cuda_quark_param(cpu_quark_param);
+  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_quark_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  std::vector<ColorSpinorField *> quda_quarks;
+  quda_quarks.reserve(n_sources);
+  for (int i = 0; i < n_sources; i++) {
+    quda_quarks.push_back(ColorSpinorField::Create(cuda_quark_param));
+    // Copy data from host to device
+    *quda_quarks[i] = *quarks[i];
+  }
+
+  // Create device vectors for evecs
+  ColorSpinorParam cuda_evec_param(cpu_evec_param);
+  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_evec_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  cuda_evec_param.nSpin = 1;
+  std::vector<ColorSpinorField *> quda_evecs;
+  quda_evecs.reserve(n_evecs);
+  for (int i = 0; i < n_evecs; i++) {
+    quda_evecs.push_back(ColorSpinorField::Create(cuda_evec_param));
+    // Copy data from host to device
+    *quda_evecs[i] = *evecs[i];
+  }
+
+  // Recast the noise as complex double
+  Complex *host_noise_ = &((Complex*)host_noise)[0];
+  // Use the dilution scheme and stochstic noise to construct quark sources
+  double time_lsc = -clock();
+  laphSourceConstruct(quda_quarks, quda_evecs, host_noise_, dil_scheme);
+  time_lsc += clock();
+
+  // The quarks sources are located in quda_quarks. We invert using those
+  // sources and place the propagator from that solve back into quda_quarks
+  double time_lsi = -clock();
+  laphSourceInvert(quda_quarks, &inv_param);
+  time_lsi += clock();
+  
+  // We now perfrom the projection back onto the eigenspace. The data
+  // is placed in host_sinks in i, X, Y, Z, T, spin order
+  double time_lsp = -clock();
+  laphSinkProject(quda_quarks, quda_evecs, host_sinks, dil_scheme);
+  time_lsp += clock();
+
+  printfQuda("LSC time = %e\n", time_lsc/CLOCKS_PER_SEC);
+  printfQuda("LSI time = %e\n", time_lsi/CLOCKS_PER_SEC);
+  printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);
+
+  // Clean up memory allocations
+  for (int i = 0; i < n_sources; i++) {
+    delete quarks[i];
+    delete quda_quarks[i];
+  }
+
+  for (int i = 0; i < n_evecs; i++) {
+    delete evecs[i];
+    delete quda_evecs[i];
+  }  
+}
+
+
+
+
+
+
+
+
+
