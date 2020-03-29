@@ -21,7 +21,7 @@ namespace quda
     bool tuneSharedBytes() const { return false; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
-    unsigned int tuneBlockDimFactors() const { return x.X()[0]*x.X()[1]*x.X()[0]/2; } // Only tune multiples 32 that are factors of this number
+    unsigned int tuneBlockDimMultiple() const { return x.X()[0]*x.X()[1]*x.X()[2]/2; } // Only tune multiples 32 that are factors of this number
     
   public:
     EvecProjectCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
