@@ -106,13 +106,11 @@ int main(int argc, char **argv)
   size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
   void *load_gauge[4];
-
+  // Allocate space on the host (always best to allocate and free in the same scope)
   for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gSize); }
-
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, load_gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(load_gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  }
+  constructHostGaugeField(load_gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)load_gauge, &gauge_param);
 
   // start the timer
   double time0 = -((double)clock());

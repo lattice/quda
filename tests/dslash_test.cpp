@@ -19,7 +19,6 @@
 #include "misc.h"
 #include "dslash_test_helpers.h"
 
-#include <qio_field.h>
 // google test frame work
 #include <gtest/gtest.h>
 
@@ -41,6 +40,10 @@ void *hostGauge[4], *hostClover, *hostCloverInv;
 Dirac *dirac = NULL;
 
 QudaDagType not_dagger;
+
+// For loading the gauge fields
+int argc_copy;
+char **argv_copy;
 
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
@@ -262,27 +265,14 @@ void init(int argc, char **argv) {
   
   printfQuda("Randomizing fields... ");
 
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, hostGauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(hostGauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(hostGauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(hostGauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
-
-  spinor->Source(QUDA_RANDOM_SOURCE, 0);
+  constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
+  loadGaugeQuda(hostGauge, &gauge_param);
 
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-    construct_clover_field(hostClover, norm, diag, inv_param.clover_cpu_prec);
-    memcpy(hostCloverInv, hostClover, (size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+    constructHostCloverField(hostClover, hostCloverInv, inv_param);
+    // Load the clover terms to the device
+    loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
 
   printfQuda("done.\n"); fflush(stdout);

@@ -11,7 +11,7 @@ namespace quda
 
   template <typename real> struct ContractionArg {
     int threads; // number of active threads required
-    int X[4];    // grid dimensions
+    //int X[4];    // grid dimensions
 
     static constexpr int nSpin = 4;
     static constexpr int nColor = 3;
@@ -31,7 +31,7 @@ namespace quda
       y(y),
       s(s, x.VolumeCB())
     {
-      for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
+      //for (int dir = 0; dir < 4; dir++) X[dir] = x.X()[dir];
     }
   };
 

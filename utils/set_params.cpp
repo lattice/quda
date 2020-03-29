@@ -277,7 +277,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION; 
+  inv_param.mass_normalization = QUDA_KAPPA_NORMALIZATION;
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -310,7 +310,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.setup_ca_lambda_max[i] = setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
-    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set 
+    mg_param.n_vec[i] = nvec[i] == 0 ? 24 : nvec[i];          // default to 24 vectors if not set
     mg_param.n_block_ortho[i] = n_block_ortho[i];             // number of times to Gram-Schmidt
     mg_param.precision_null[i] = prec_null;                   // precision to store the null-space basis
     mg_param.smoother_halo_precision[i] = smoother_halo_prec; // precision of the halo exchange in the smoother
@@ -431,7 +431,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
-  mg_param.spin_block_size[0] = 2; 
+  mg_param.spin_block_size[0] = 2;
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -659,54 +659,6 @@ void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-#endif
-  gauge_param.ga_pad = pad_size;
-}
-
-void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
-{
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_sloppy = prec_sloppy;
-  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  gauge_param.cuda_prec_precondition = prec_precondition;
-
-  gauge_param.anisotropy = 1.0;
-
-  // For HISQ, this must always be set to 1.0, since the tadpole
-  // correction is baked into the coefficients for the first fattening.
-  // The tadpole doesn't mean anything for the second fattening
-  // since the input fields are unitarized.
-  gauge_param.tadpole_coeff = 1.0;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0 / 24.0;
-    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
-  } else {
-    gauge_param.scale = 1.0;
-  }
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
   gauge_param.type = QUDA_WILSON_LINKS;
 
   int pad_size = 0;
@@ -720,30 +672,6 @@ void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = MAX(pad_size, t_face_size);
 #endif
   gauge_param.ga_pad = pad_size;
-
-  // Specific parameter settings for MILC
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    gauge_param.type = QUDA_SU3_LINKS;
-    gauge_param.reconstruct = link_recon;
-    gauge_param.reconstruct_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  } else {
-    gauge_param.type = QUDA_ASQTAD_FAT_LINKS;
-    gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-    gauge_param.reconstruct_sloppy = QUDA_RECONSTRUCT_NO;
-    gauge_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
-  }
-  gauge_param.reconstruct_precondition = QUDA_RECONSTRUCT_NO;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
-    gauge_param.ga_pad = 3 * pad_size;
-    gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct = link_recon;
-    gauge_param.reconstruct_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-    gauge_param.reconstruct_precondition = link_recon_precondition;
-  }
 }
 
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
@@ -816,7 +744,6 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter_precondition = 1;
   inv_param.omega = 1.0;
 }
-
 
 void setStaggeredInvertParam(QudaInvertParam &inv_param)
 {
@@ -896,7 +823,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   tmpint = MAX(tmpint, xdim * ydim * tdim);
   tmpint = MAX(tmpint, xdim * ydim * zdim);
 
-  inv_param.sp_pad = tmpint;
+  // inv_param.sp_pad = tmpint;
+  inv_param.sp_pad = 0;
 }
 
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
@@ -923,9 +851,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
   inv_param.mass = mass;
   inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
-  
+
   inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION; 
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
   inv_param.matpc_type = matpc_type;
   inv_param.solution_type = QUDA_MAT_SOLUTION;
@@ -1058,9 +986,9 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       } else {
         errorQuda("Unexpected solve_type = %d\n", solve_type);
       }
-      
+
     } else {
-      
+
       if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
@@ -1074,15 +1002,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     mg_param.location[i] = solver_location[i];
     mg_param.setup_location[i] = setup_location[i];
-    nu_pre[i] = 2;  
-    nu_post[i] = 2; 
+    nu_pre[i] = 2;
+    nu_post[i] = 2;
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
   mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // coarsening the spin on the first restriction is undefined for staggered fields.
-  mg_param.spin_block_size[0] = 0; 
+  mg_param.spin_block_size[0] = 0;
 
   mg_param.setup_type = setup_type;
   mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

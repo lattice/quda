@@ -357,10 +357,10 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 	sFloat *spinor = spinorNeighbor_5d_mgpu<type>(sp_idx, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
 
         sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
-        int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-	multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
-      
-	for (int s = 0; s < 4; s++) 
+        int projIdx = 2 * (dir / 2) + (dir + daggerBit) % 2;
+        multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
+
+        for (int s = 0; s < 4; s++) 
 	{
 	  if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
 	  else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);

@@ -10,7 +10,7 @@
 #include <misc.h>
 
 // include because of nasty globals used in the tests
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <dirac_quda.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))

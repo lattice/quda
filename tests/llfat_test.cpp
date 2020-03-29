@@ -7,8 +7,8 @@
 
 #include "quda.h"
 #include "host_utils.h"
+#include "llfat_utils.h"
 #include <command_line_params.h>
-#include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
 #include "malloc_quda.h"

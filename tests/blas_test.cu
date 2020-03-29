@@ -9,7 +9,7 @@
 #include <command_line_params.h>
 
 // include because of nasty globals used in the tests
-#include <dslash_util.h>
+#include <dslash_reference.h>
 
 // google test
 #include <gtest/gtest.h>

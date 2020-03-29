@@ -75,10 +75,11 @@ namespace quda {
 
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
+    virtual unsigned int tuneBlockDimMultiple() const { return 0; }
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
     virtual bool tuneSharedBytes() const { return true; }
-
+    
     virtual bool advanceGridDim(TuneParam &param) const
     {
       if (tuneGridDim()) {
@@ -127,23 +128,24 @@ namespace quda {
 
     virtual bool advanceBlockDim(TuneParam &param) const
     {
+
       const unsigned int max_threads = maxBlockSize(param);
       const unsigned int max_shared = maxSharedBytesPerBlock();
       bool ret;
-
+      
       param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
       if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
-          || sharedBytesPerBlock(param) > max_shared) {
-        resetBlockDim(param);
+	  || sharedBytesPerBlock(param) > max_shared || tuneBlockDimMultiple()%param.block.x != 0) {
+	resetBlockDim(param);
 	ret = false;
       } else {
-        ret = true;
+	ret = true;
       }
-
+      
       if (!tuneGridDim()) 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
-
+      
       return ret;
     }
 

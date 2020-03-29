@@ -372,7 +372,7 @@ gauge_force_reference_dir(void* refMom, int dir, double eb3, void** sitelink, vo
     int i;
     
     void* staple;
-    int gSize =  prec;
+    int gSize = prec;
 
     staple = malloc(V * gauge_site_size * gSize);
     if (staple == NULL){

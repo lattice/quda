@@ -14,7 +14,7 @@
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
+#include <dslash_reference.h>
 #include <covdev_reference.h>
 #include <gauge_field.h>
 
@@ -28,7 +28,7 @@ using namespace quda;
 // QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 // QudaPrecision cuda_prec;
 
-QudaGaugeParam gaugeParam;
+QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
 cpuGaugeField *cpuLink = NULL;
@@ -38,7 +38,6 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
 
 cudaColorSpinorField* tmp;
 
-void *hostGauge[4];
 void *links[4];
 
 #ifdef MULTI_GPU
@@ -61,17 +60,17 @@ void init(int argc, char **argv)
 
   setVerbosity(QUDA_VERBOSE);
 
-  gaugeParam = newQudaGaugeParam();
+  gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
   cuda_prec = prec;
 
-  gaugeParam.X[0] = X[0] = xdim;
-  gaugeParam.X[1] = X[1] = ydim;
-  gaugeParam.X[2] = X[2] = zdim;
-  gaugeParam.X[3] = X[3] = tdim;
+  gauge_param.X[0] = X[0] = xdim;
+  gauge_param.X[1] = X[1] = ydim;
+  gauge_param.X[2] = X[2] = zdim;
+  gauge_param.X[3] = X[3] = tdim;
 
-  setDims(gaugeParam.X);
+  setDims(gauge_param.X);
   Ls = 1;
 
   if (Nsrc != 1)
@@ -79,22 +78,22 @@ void init(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  gaugeParam.cpu_prec = cpu_prec;
-  gaugeParam.cuda_prec = cuda_prec;
-  gaugeParam.reconstruct = link_recon;
-  gaugeParam.reconstruct_sloppy = gaugeParam.reconstruct;
-  gaugeParam.cuda_prec_sloppy = gaugeParam.cuda_prec;
+  gauge_param.cpu_prec = cpu_prec;
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
+  gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
 
   // ensure we use the correct dslash
   dslash_type = QUDA_COVDEV_DSLASH;
 
-  gaugeParam.anisotropy = 1.0;
-  gaugeParam.tadpole_coeff = 0.8;
-  gaugeParam.scale = 1.0;
-  gaugeParam.type = QUDA_WILSON_LINKS;
-  gaugeParam.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gaugeParam.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gaugeParam.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.anisotropy = 1.0;
+  gauge_param.tadpole_coeff = 0.8;
+  gauge_param.scale = 1.0;
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   inv_param.cpu_prec = cpu_prec;
   inv_param.cuda_prec = cuda_prec;
@@ -112,18 +111,15 @@ void init(int argc, char **argv)
   tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
   tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
 
-
-  gaugeParam.ga_pad = tmpint;
+  gauge_param.ga_pad = tmpint;
   inv_param.sp_pad = tmpint;
 
   ColorSpinorParam csParam;
   csParam.nColor=nColor;
   csParam.nSpin=4;
   csParam.nDim=4;
-  for(int d = 0; d < 4; d++) {
-    csParam.x[d] = gaugeParam.X[d];
-  }
-//  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
+  for (int d = 0; d < 4; d++) { csParam.x[d] = gauge_param.X[d]; }
+  //  csParam.x[4] = Nsrc; // number of sources becomes the fifth dimension
 
   csParam.setPrecision(inv_param.cpu_prec);
   csParam.pad = 0;
@@ -140,26 +136,26 @@ void init(int argc, char **argv)
   spinorRef = new cpuColorSpinorField(csParam);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
-  csParam.x[0] = gaugeParam.X[0];
+  csParam.x[0] = gauge_param.X[0];
 
   printfQuda("Randomizing fields ...\n");
 
   spinor->Source(QUDA_RANDOM_SOURCE);
 
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
   for (int dir = 0; dir < 4; dir++) {
     links[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
-
-    if (links[dir] == NULL) {
-      errorQuda("ERROR: malloc failed for gauge links");
-    }  
+    if (links[dir] == NULL) { errorQuda("ERROR: malloc failed for gauge links"); }
   }
-
-  construct_gauge_field(links, 1, gaugeParam.cpu_prec, &gaugeParam);
+  constructHostGaugeField(links, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)links, &gauge_param);
 
 #ifdef MULTI_GPU
-  gaugeParam.type = QUDA_SU3_LINKS;
-  gaugeParam.reconstruct = QUDA_RECONSTRUCT_NO;
-  GaugeFieldParam cpuParam(links, gaugeParam);
+  gauge_param.type = QUDA_SU3_LINKS;
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  GaugeFieldParam cpuParam(links, gauge_param);
   cpuParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLink   = new cpuGaugeField(cpuParam);
   ghostLink = cpuLink->Ghost();
@@ -171,14 +167,14 @@ void init(int argc, char **argv)
   int pad_size = MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gaugeParam.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 
-  gaugeParam.type = QUDA_SU3_LINKS;
-  gaugeParam.reconstruct = gaugeParam.reconstruct_sloppy = link_recon;
-  
-  printfQuda("Links sending..."); 
-  loadGaugeQuda(links, &gaugeParam);
+  gauge_param.type = QUDA_SU3_LINKS;
+  gauge_param.reconstruct = gauge_param.reconstruct_sloppy = link_recon;
+
+  printfQuda("Links sending...");
+  loadGaugeQuda(links, &gauge_param);
   printfQuda("Links sent\n"); 
 
   printfQuda("Sending fields to GPU..."); 
@@ -289,9 +285,9 @@ void covdevRef(int mu)
   printfQuda("Calculating reference implementation...");
   fflush(stdout);
 #ifdef MULTI_GPU
-  mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gaugeParam.cpu_prec);
+  mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else
-  mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gaugeParam.cpu_prec);
+  mat(spinorRef->V(), links, spinor->V(), dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #endif    
   printfQuda("done.\n");
 

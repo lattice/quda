@@ -3745,8 +3745,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  const int nRefine = param->num_offset - i + 1;
 #endif
 
-          std::vector<ColorSpinorField*> q;
-	  q.resize(nRefine);
+          std::vector<ColorSpinorField *> q;
+          q.resize(nRefine);
 	  std::vector<ColorSpinorField*> z;
 	  z.resize(nRefine);
 	  cudaParam.create = QUDA_NULL_FIELD_CREATE;
@@ -3765,7 +3765,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 #endif
 
           bool orthogonal = true;
-	  bool apply_mat = true;
+          bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);

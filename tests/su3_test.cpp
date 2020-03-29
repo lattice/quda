@@ -7,10 +7,8 @@
 #include <util_quda.h>
 #include <host_utils.h>
 #include <command_line_params.h>
-#include <dslash_util.h>
-#include "misc.h"
-
-#include <qio_field.h>
+#include <dslash_reference.h>
+#include <misc.h>
 
 #include <comm_quda.h>
 
@@ -139,21 +137,9 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
 
-  // load in the command line supplied gauge field
-  if (strcmp(latfile, "")) {
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
-
-  loadGaugeQuda(gauge, &gauge_param);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
   double plaq[3];

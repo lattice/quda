@@ -19,25 +19,6 @@
 
 using namespace quda;
 
-// Experimental routine for LAPH quark smearing.
-// This routine accepts the noise data from a single stochastic noise vector in noise array, the T 3D
-// eigenvectors in eigen_vecs, and returns the smeared quarks in quark. Below is a description
-// of the workflow.
-//
-// 1. The eigenvector array we use is a matrix with nColor * L^3 * T rows and 
-// nEigenVec/dilution_scheme columns. This is right multiplied by a matrix of stochastic noise coefficents
-// with nEigenVec/dilution_scheme rows and nSpin columns. The result is a matrix with nSpin columns and 
-// nColor * L^3 * T rows. Each column contains the data for one source.
-//
-// 2. We copy the data in each column to a QUDA ColorSpinorField object of length nSpin * nColor * L^3 * T, 
-// with the spin elements populated/zeroed out as dictated by the dilution scheme.
-// 
-// 3. We pass each of these sources to the inverter, and then populated the apprpriate quark 
-// array with the solution.
-// 
-// 4. We then repopulate the eigenvector array and stochastic noise coefficents with the next set of 
-// LapH dilution data and repeat steps 1,2,3.
-
 int main(int argc, char **argv)
 {
   // Set up QUDA
@@ -52,13 +33,13 @@ int main(int argc, char **argv)
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
-  }  
+  }
 
-  if(inv_deflate && inv_multigrid) {
+  if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
     exit(0);
   }
-  
+
   // Move these
   if (multishift > 1) {
     // set a correct default for the multi-shift solver
@@ -68,14 +49,14 @@ int main(int argc, char **argv)
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  if(inv_multigrid) {
-    setQudaDefaultMgTestParams();    
+  if (inv_multigrid) {
+    setQudaDefaultMgTestParams();
     setQudaDefaultMgSolveTypes();
   }
-  
+
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-  
+
   // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
@@ -84,27 +65,26 @@ int main(int argc, char **argv)
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaEigParam mg_eig_param[mg_levels];
   QudaEigParam eig_param = newQudaEigParam();
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     setMultigridInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
     for (int i = 0; i < mg_levels; i++) {
       if (mg_eig[i]) {
-	mg_eig_param[i] = newQudaEigParam();
-	setMultigridEigParam(mg_eig_param[i], i);
-	mg_param.eig_param[i] = &mg_eig_param[i];
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
       } else {
-	mg_param.eig_param[i] = nullptr;
+        mg_param.eig_param[i] = nullptr;
       }
     }
     // Set MG
-    setMultigridParam(mg_param);  
-  }
-  else {
+    setMultigridParam(mg_param);
+  } else {
     setInvertParam(inv_param);
   }
-  
-  if(inv_deflate) {
+
+  if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
   } else {
@@ -138,15 +118,15 @@ int main(int argc, char **argv)
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
-    if(inv_multigrid) {
+    if (inv_multigrid) {
       // This line ensures that if we need to construct the clover inverse (in either the smoother or the solver) we do so
       if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
-	inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
       }
     }
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
-    if(inv_multigrid) {
+    if (inv_multigrid) {
       // Restore actual solve_type we want to do
       inv_param.solve_type = solve_type;
     }
@@ -154,21 +134,19 @@ int main(int argc, char **argv)
 
   // Now QUDA is initialised and the fields are loaded, we may setup the preconditioner
   void *mg_preconditioner = nullptr;
-  if(inv_multigrid) {
+  if (inv_multigrid) {
     mg_preconditioner = newMultigridQuda(&mg_param);
     inv_param.preconditioner = mg_preconditioner;
   }
   //----------------------------------------------------------------------------------
 
-
   // We now emulate an external application interfacing with QUDA
   //----------------------------------------------------------------------------------
-  
-  // Make up some junk data  
+  // Make up some junk data
   int dil_scheme = 16;
   int n_evecs = 400;
   // Deduce the number of eigenvectors to be used per dilution.
-  if (n_evecs%dil_scheme != 0) {
+  if (n_evecs % dil_scheme != 0) {
     errorQuda("Number of eigen vectors passed %d is not a multiple of the dilution scheme %d", n_evecs, dil_scheme);
   }
   int n_sources = 4 * dil_scheme;
@@ -177,34 +155,55 @@ int main(int argc, char **argv)
   void **host_quarks = (void **)malloc(n_sources * sizeof(void *));
   for (int i = 0; i < n_sources; i++) {
     host_quarks[i] = (void *)malloc(V * 24 * sizeof(double));
-    for(int j=0; j< V*24; j++) ((double*)host_quarks[i])[j] = rand()/(double)RAND_MAX;
+    for (int j = 0; j < V * 24; j++) ((double *)host_quarks[i])[j] = rand() / (double)RAND_MAX;
   }
 
   // Host side data for eigenvectors
   void **host_evecs = (void **)malloc(n_evecs * sizeof(void *));
   for (int i = 0; i < n_evecs; i++) {
     host_evecs[i] = (void *)malloc(V * 6 * sizeof(double));
-    for(int j=0; j< V*6; j++) ((double*)host_evecs[i])[j] = rand()/(double)RAND_MAX;
+    for (int j = 0; j < V * 6; j++) ((double *)host_evecs[i])[j] = rand() / (double)RAND_MAX;
   }
 
   // Host side stochastic noise (junk for now)
   void *host_noise = (void *)malloc(4 * 2 * n_evecs * sizeof(double));
-  for(int i=0; i < 4 * 2 * n_evecs; i++) {
-    ((double*)host_noise)[i] = rand()/(double)RAND_MAX;
-  }
-  
+  for (int i = 0; i < 4 * 2 * n_evecs; i++) { ((double *)host_noise)[i] = rand() / (double)RAND_MAX; }
+
   // Host side data for sinks
-  void *host_sinks = (void *)malloc(n_evecs * dil_scheme * 4 * 2 * sizeof(double));
-  for(int i=0; i < n_evecs * dil_scheme * 4 * 2; i++) ((double*)host_sinks)[i] = 0.0;
+  int t_size = comm_dim(3) * tdim;
+  int sink_size = 4 * dil_scheme * n_evecs * t_size * 4 * 2;
+  void *host_sinks = (void *)malloc(sink_size * sizeof(double));
+  for(int i=0; i < sink_size; i++) ((double*)host_sinks)[i] = 0.0;
   
   // local lattice dims
   int X[4];
   for (int i=0; i<4; i++) X[i] = gauge_param.X[i];
 
-  // All the information needed to compute the smeared quarlks is now passed to QUDA
+  // Experimental routine for LAPH quark smearing.
+  // This routine accepts the noise data from a single stochastic noise vector in noise array, the T 3D
+  // eigenvectors in eigen_vecs, and returns the smeared quarks in quark. Below is a description
+  // of the workflow.
+  //
+  // 1. The eigenvector array we use is a matrix with nColor * L^3 * T rows and 
+  // nEigenVec/dilution_scheme columns. This is right multiplied by a matrix of stochastic noise coefficents
+  // with nEigenVec/dilution_scheme rows and nSpin columns. The result is a matrix with nSpin columns and 
+  // nColor * L^3 * T rows. Each column contains the data for one source.
+  //
+  // 2. We copy the data in each column to a QUDA ColorSpinorField object of length nSpin * nColor * L^3 * T, 
+  // with the spin elements populated/zeroed out as dictated by the dilution scheme.
+  // 
+  // 3. We pass each of these sources to the inverter, and then populated the apprpriate quark 
+  // array with the solution.
+  // 
+  // 4. We then repopulate the eigenvector array and stochastic noise coefficents with the next set of 
+  // LapH dilution data and repeat steps 1,2,3.
+  
+  // All the information needed to compute the smeared quarks is now passed to QUDA
+  // This function will populate the host_sinks array with the desired data.
   stochLaphSmearQuda(host_quarks, host_evecs, host_noise, host_sinks,
 		     dil_scheme, n_evecs, inv_param, X);
-
+  //----------------------------------------------------------------------------------  
+  
   // free the multigrid solver
   if(inv_multigrid) destroyMultigridQuda(mg_preconditioner);
   
@@ -232,9 +231,6 @@ int main(int argc, char **argv)
   // finalize the QUDA library
   endQuda();
   finalizeComms();
-  
-  return 0;
-
   
   return 0;
 }

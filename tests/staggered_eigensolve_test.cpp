@@ -23,6 +23,7 @@
 #include <llfat_utils.h>
 #include <qio_field.h>
 
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
@@ -160,20 +161,8 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
-  // FIXME: currently assume staggered is SU(3)
-  gauge_param.type = (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) ?
-    QUDA_SU3_LINKS :
-    QUDA_ASQTAD_FAT_LINKS;
-  // Set MILC specific params and load the gauge fields
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
-  }
-  loadGaugeQuda(milc_fatlink, &gauge_param);
+  loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    setStaggeredMILCGaugeParam(gauge_param);
-    loadGaugeQuda(milc_longlink, &gauge_param);
-  }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 

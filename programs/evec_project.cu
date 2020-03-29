@@ -8,10 +8,11 @@
 #include <jitify_helper.cuh>
 #include <instantiate.h>
 
-namespace quda {
+namespace quda
+{
 
-  template <typename Float, typename Arg> class EvecProjectCompute : TunableVectorY
-  {    
+  template <typename Float, typename Arg> class EvecProjectCompute : TunableLocalParity
+  {
     Arg &arg;
     const ColorSpinorField &x;
     const ColorSpinorField &y;
@@ -20,10 +21,11 @@ namespace quda {
     bool tuneSharedBytes() const { return false; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
     unsigned int minThreads() const { return arg.threads; }
+    unsigned int tuneBlockDimFactors() const { return x.X()[0]*x.X()[1]*x.X()[0]/2; } // Only tune multiples 32 that are factors of this number
     
-public:
+  public:
     EvecProjectCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
-      TunableVectorY(2),
+      TunableLocalParity(),
       arg(arg),
       x(x),
       y(y)
@@ -34,12 +36,13 @@ public:
       create_jitify_program("kernels/evec_project.cuh");
 #endif
     }
-    virtual ~EvecProjectCompute() {}
     
     void apply(const cudaStream_t &stream)
     {
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
+	for (int i=0; i<Arg::t; i++) ((double*)arg.result_h)[i] = 0.0; 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+	
 #ifdef JITIFY
         std::string function_name = "quda::spin";
 	
@@ -49,7 +52,8 @@ public:
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
-	computeEvecProject<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+	//computeEvecProject<64,arg><<<tp.grid, 64, tp.shared_bytes>>>(arg);
+	LAUNCH_KERNEL_LOCAL_PARITY(computeEvecProject, (*this), tp, stream, arg, Arg);
 #endif
       } else {
         errorQuda("CPU not supported yet\n");
@@ -73,16 +77,20 @@ public:
     }
   };
   
-  template <typename Float, int nColor>
+  template <typename Float, int nColor, int tx2>
   void evecProject(const ColorSpinorField &x, const ColorSpinorField &y, Float *result)
   {
-    EvecProjectArg<Float, nColor> arg(x, y, result);
-    EvecProjectCompute<Float, EvecProjectArg<Float, nColor>> evec_project(arg, x, y);
+    EvecProjectArg<Float, nColor, tx2> arg(x, y);
+    EvecProjectCompute<Float, EvecProjectArg<Float, nColor, tx2>> evec_project(arg, x, y);
+    
     evec_project.apply(0);
     qudaDeviceSynchronize();
+    
+    comm_allreduce_array((double*)arg.result_h, 4*tx2);
+    for(int i=0; i<4*tx2; i++) result[i] = ((double*)arg.result_h)[i];
   }
   
-  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
+  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, const int t_dim_size, void *result)
   {
     checkPrecision(x, y);
     
@@ -91,12 +99,74 @@ public:
 
     
     if(x.Ncolor() == 3) {
-      if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	evecProject<float, 3>(x, y, (float*)result);
-      } else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	evecProject<double, 3>(x, y, (double*)result);
-      } else {
-	errorQuda("Precision %d not supported", x.Precision());
+      // Here we switch on the T dim size, but pass 2*T to account for the complex
+      // nature of the values we will reduce.
+      // We use a double4 in the kernels for reduction, one for the real values of
+      // the four spins, and the other for the imaginary.
+      switch(t_dim_size) {
+      case 8 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 16>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 16>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
+      case 16 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 32>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 32>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
+      case 32 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 64>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 64>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
+      case 64 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 128>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 128>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
+      case 96 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 192>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 192>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
+      case 128 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 256>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 256>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+	
+      default :
+	errorQuda("Uninstantiated T dim %d", t_dim_size);
+	
       }
     } else {
       errorQuda("nColors = %d is not supported", x.Ncolor());

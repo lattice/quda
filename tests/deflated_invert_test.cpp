@@ -133,36 +133,26 @@ int main(int argc, char **argv)
 
   setSpinorSiteSize(24);
 
-  void *gauge[4], *clover=0, *clover_inv=0;
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
+  void *gauge[4];
+  // Allocate space on the host (always best to allocate and free in the same scope)
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
 
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
-
-  if (strcmp(latfile,"")) {  // load in the command line supplied gauge field
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
-
+  // Allocate host side memory for clover terms if needed.
+  //----------------------------------------------------------------------------
+  void *clover = nullptr;
+  void *clover_inv = nullptr;
+  // Allocate space on the host (always best to allocate and free in the same scope)
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    double norm = 0.1; // clover components are random numbers in the range (-norm, norm)
-    double diag = 1.0; // constant added to the diagonal
-
-    size_t cSize = inv_param.clover_cpu_prec;
-    clover = malloc(V * clover_site_size * cSize);
-    clover_inv = malloc(V * clover_site_size * cSize);
-    if (!compute_clover) construct_clover_field(clover, norm, diag, inv_param.clover_cpu_prec);
-
-    inv_param.compute_clover = compute_clover;
-    if (compute_clover) inv_param.return_clover = 1;
-    inv_param.compute_clover_inverse = 1;
-    inv_param.return_clover_inverse = 1;
+    clover = malloc(V * clover_site_size * host_clover_data_type_size);
+    clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
+    constructHostCloverField(clover, clover_inv, inv_param);
+    // Load the clover terms to the device
+    loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
   void *spinorIn = malloc(V * spinor_site_size * host_spinor_data_type_size * inv_param.Ls);
@@ -176,9 +166,6 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device);
-
-  // load the gauge field
-  loadGaugeQuda((void*)gauge, &gauge_param);
 
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);
@@ -306,9 +293,8 @@ int main(int argc, char **argv)
   double src2 = norm_2(spinorIn, vol * spinor_site_size * inv_param.Ls, inv_param.cpu_prec);
   double l2r = sqrt(nrm2 / src2);
 
-  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
-	     inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
-
+  printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n", inv_param.tol,
+             inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();

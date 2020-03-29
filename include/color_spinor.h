@@ -967,8 +967,8 @@ namespace quda {
      @return The inner product
   */
   template <typename Float, int Nc, int Nsa, int Nsb>
-    __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
-							   const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
+  __device__ __host__ inline complex<Float> innerProduct(const ColorSpinor<Float, Nc, Nsa> &a,
+                                                         const ColorSpinor<Float, Nc, Nsb> &b, int sa, int sb)
   {
     complex<Float> dot = 0;
 #pragma unroll

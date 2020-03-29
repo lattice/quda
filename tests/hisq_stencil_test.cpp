@@ -9,7 +9,7 @@
 #include "gauge_field.h"
 #include "host_utils.h"
 #include <command_line_params.h>
-#include "llfat_reference.h"
+//#include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
 #include "malloc_quda.h"
@@ -27,7 +27,6 @@ using namespace quda;
 
 // Number of naiks. If eps_naik is 0.0, we only need
 // to construct one naik.
-static int n_naiks = 1;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 // The file "generic_ks/fermion_links_hisq_load_milc.c" 
@@ -172,7 +171,7 @@ static void hisq_test()
       char* src = (char*)sitelink[dir];
       memcpy((char *)milc_sitelink + (i * 4 + dir) * gauge_site_size * host_gauge_data_type_size,
              src + i * gauge_site_size * host_gauge_data_type_size, gauge_site_size * host_gauge_data_type_size);
-    }	
+    }
   }
 
   //////////////////////
@@ -194,7 +193,7 @@ static void hisq_test()
     fatlink_eps = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size);  // epsilon fat links
     longlink_eps = pinned_malloc(4 * V * gauge_site_size * host_gauge_data_type_size); // epsilon long naiks
   }
-  
+
   // Tuning run...
   {
     printfQuda("Tuning...\n");
@@ -321,7 +320,7 @@ static void hisq_test()
     for(int dir=0; dir<4; dir++){
       res &= compare_floats(fat_reflink[dir], myfatlink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
-    
+
     strong_check_link(myfatlink , "GPU results: ",
 		      fat_reflink, "CPU reference results:",
 		      V, qudaGaugeParam.cpu_prec);
@@ -335,7 +334,7 @@ static void hisq_test()
     for(int dir=0; dir<4; ++dir){
       res &= compare_floats(long_reflink[dir], mylonglink[dir], V * gauge_site_size, 1e-3, qudaGaugeParam.cpu_prec);
     }
-      
+
     strong_check_link(mylonglink, "GPU results: ",
 		      long_reflink, "CPU reference results:",
 		      V, qudaGaugeParam.cpu_prec);
@@ -350,7 +349,7 @@ static void hisq_test()
         res &= compare_floats(fat_reflink_eps[dir], myfatlink_eps[dir], V * gauge_site_size, 1e-3,
                               qudaGaugeParam.cpu_prec);
       }
-      
+
       strong_check_link(myfatlink_eps , "GPU results: ",
             fat_reflink_eps, "CPU reference results:",
             V, qudaGaugeParam.cpu_prec);
@@ -364,7 +363,7 @@ static void hisq_test()
         res &= compare_floats(long_reflink_eps[dir], mylonglink_eps[dir], V * gauge_site_size, 1e-3,
                               qudaGaugeParam.cpu_prec);
       }
-        
+
       strong_check_link(mylonglink_eps, "GPU results: ",
             long_reflink_eps, "CPU reference results:",
             V, qudaGaugeParam.cpu_prec);
