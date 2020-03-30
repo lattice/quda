@@ -13,7 +13,7 @@
 namespace quda {
 
 #define MAX_MATRIX_SIZE 4096
-  static __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
+  __constant__ signed char B_array_d[MAX_MATRIX_SIZE];
 
   // to avoid overflowing the parameter space we put the B array into a separate constant memory buffer
   static signed char B_array_h[MAX_MATRIX_SIZE];
@@ -261,8 +261,7 @@ namespace quda {
     sumFloat *nrm_ = (sumFloat *)&dot_storage;
 
     // cast the constant memory buffer to a Vector array
-    typedef typename std::remove_reference<decltype(*arg.B)>::type Vector;
-    const Vector *B = reinterpret_cast<const Vector *>(B_array_d);
+    const auto *B = reinterpret_cast<decltype(arg.B)>(B_array_d);
 
     // loop over number of block orthos
     for (int n = 0; n < arg.nBlockOrtho; n++) {

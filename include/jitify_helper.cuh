@@ -17,7 +17,9 @@
 #define JITIFY_PRINT_SOURCE        1
 #define JITIFY_PRINT_LOG           1
 #define JITIFY_PRINT_PTX           1
+#define JITIFY_PRINT_LINKER_LOG    1
 #define JITIFY_PRINT_LAUNCH        1
+#define JITIFY_PRINT_HEADER_PATHS  1
 
 #else // !HOST_DEBUG
 
@@ -30,7 +32,9 @@
 #define JITIFY_PRINT_LOG           0
 #endif
 #define JITIFY_PRINT_PTX           0
+#define JITIFY_PRINT_LINKER_LOG    0
 #define JITIFY_PRINT_LAUNCH        0
+#define JITIFY_PRINT_HEADER_PATHS  0
 
 #endif // !HOST_DEBUG
 

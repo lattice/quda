@@ -140,7 +140,7 @@ namespace quda {
         if (arg.dir != QUDA_BACKWARDS && arg.dir != QUDA_FORWARDS) errorQuda("Undefined direction %d", arg.dir);
 #ifdef JITIFY
         error = program->kernel("quda::ComputeUVGPU")
-          .instantiate(from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,fineColor,coarseSpin,coarseColor,Type<Arg>())
+          .instantiate(from_coarse,Type<Float>(),arg.dim,arg.dir,fineSpin,coarseSpin,Type<Arg>())
           .configure(tp.grid,tp.block,tp.shared_bytes,stream).launch(arg);
 #else
         if (arg.dir == QUDA_BACKWARDS) {
