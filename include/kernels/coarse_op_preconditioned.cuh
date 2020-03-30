@@ -39,10 +39,6 @@ namespace quda {
   {
     using real = typename Arg::Float;
     using complex = complex<real>;
-    constexpr int M = arg.tile.M;
-    constexpr int N = arg.tile.N;
-    constexpr int K = arg.tile.K;
-
     constexpr int nDim = 4;
     int coord[nDim];
     getCoords(coord, x_cb, arg.dim, parity);
@@ -54,17 +50,17 @@ namespace quda {
     // first do the backwards links Y^{+\mu} * X^{-\dagger}
     if ( arg.comm_dim[d] && (coord[d] - arg.nFace < 0) ) {
 
-      MatrixTile<complex,M,N,true> yHat;
+      auto yHat = make_tile_C<complex,true>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<arg.tile.k; k+=K) {
-        MatrixTile<complex,M,K,true> Ytile;
-        Ytile.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
+      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+        auto Y = make_tile_A<complex, true>(arg.tile);
+        Y.load(arg.Y, d, 1-parity, ghost_idx, i0, k);
 
-        MatrixTile<complex,N,K,false> Xtile;
-        Xtile.load(arg.Xinv, 0, parity, x_cb, j0, k);
+        auto X = make_tile_Bt<complex, false>(arg.tile);
+        X.load(arg.Xinv, 0, parity, x_cb, j0, k);
 
-        yHat.mma_nt(Ytile, Xtile);
+        yHat.mma_nt(Y, X);
       }
 
       if (compute_max_only) {
@@ -76,17 +72,17 @@ namespace quda {
     } else {
       const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-      MatrixTile<complex,M,N,false> yHat;
+      auto yHat = make_tile_C<complex,false>(arg.tile);
 
 #pragma unroll
-      for (int k = 0; k<arg.tile.k; k+=K) {
-        MatrixTile<complex,M,K,false> Ytile;
-        Ytile.load(arg.Y, d, 1-parity, back_idx, i0, k);
+      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+        auto Y = make_tile_A<complex, false>(arg.tile);
+        Y.load(arg.Y, d, 1-parity, back_idx, i0, k);
 
-        MatrixTile<complex,N,K,false> Xtile;
-        Xtile.load(arg.Xinv, 0, parity, x_cb, j0, k);
+        auto X = make_tile_Bt<complex, false>(arg.tile);
+        X.load(arg.Xinv, 0, parity, x_cb, j0, k);
 
-        yHat.mma_nt(Ytile, Xtile);
+        yHat.mma_nt(Y, X);
       }
       if (compute_max_only) {
         yHatMax = yHat.abs_max();
@@ -95,24 +91,26 @@ namespace quda {
       }
     }
 
-    // now do the forwards links X^{-1} * Y^{-\mu}
-    MatrixTile<complex,M,N,false> yHat;
+    { // now do the forwards links X^{-1} * Y^{-\mu}
+      auto yHat = make_tile_C<complex, false>(arg.tile);
 
 #pragma unroll
-    for (int k = 0; k<arg.tile.k; k+=K) {
-      MatrixTile<complex,M,K,false> Xtile;
-      Xtile.load(arg.Xinv, 0, parity, x_cb, i0, k);
+      for (int k = 0; k<arg.tile.k; k+=arg.tile.K) {
+        auto X = make_tile_A<complex, false>(arg.tile);
+        X.load(arg.Xinv, 0, parity, x_cb, i0, k);
 
-      MatrixTile<complex,K,N,false> Ytile;
-      Ytile.load(arg.Y, d + 4, parity, x_cb, k, j0);
+        auto Y = make_tile_B<complex, false>(arg.tile);
+        Y.load(arg.Y, d + 4, parity, x_cb, k, j0);
 
-      yHat.mma_nn(Xtile, Ytile);
+        yHat.mma_nn(X, Y);
+      }
+      if (compute_max_only) {
+        yHatMax = fmax(yHatMax, yHat.abs_max());
+      } else {
+        yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
+      }
     }
-    if (compute_max_only) {
-      yHatMax = fmax(yHatMax, yHat.abs_max());
-    } else {
-      yHat.save(arg.Yhat, d + 4, parity, x_cb, i0, j0);
-    }
+
     return yHatMax;
   }
 

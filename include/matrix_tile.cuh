@@ -225,4 +225,40 @@ namespace quda {
     return out;
   }
 
+  /** @brief Helper for creating an A tile (MxK) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_A(const Tile tile)
+  {
+    return MatrixTile<T, tile.M, tile.K, ghost>();
+  }
+
+  /** @brief Helper for creating an A transpose tile (KxM) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_At(const Tile tile)
+  {
+    return MatrixTile<T, tile.K, tile.M, ghost>();
+  }
+
+  /** @brief Helper for creating a B tile (KxN) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_B(const Tile tile)
+  {
+    return MatrixTile<T, tile.K, tile.N, ghost>();
+  }
+
+  /** @brief Helper for creating a B transpose tile (NxK) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_Bt(const Tile tile)
+  {
+    return MatrixTile<T, tile.N, tile.K, ghost>();
+  }
+
+  /** @brief Helper for creating a C tile (MxN) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_C(const Tile tile)
+  {
+    return MatrixTile<T, tile.M, tile.N, ghost>();
+  }
+
+  /** @brief Helper for creating a C transpose tile (NxM) */
+  template <typename T, bool ghost, typename Tile> __device__ __host__  inline auto make_tile_Ct(const Tile tile)
+  {
+    return MatrixTile<T, tile.N, tile.M, ghost>();
+  }
+
 }
