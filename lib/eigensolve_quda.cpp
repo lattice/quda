@@ -800,7 +800,6 @@ namespace quda
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
     host_free(residua);
-    if (eig_param->eig_type != QUDA_EIG_DAV) { host_free(Qmat); }
   }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------

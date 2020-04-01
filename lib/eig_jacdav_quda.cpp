@@ -247,7 +247,7 @@ namespace quda
       // Solving the correction equation
       blas::copy(*t[0], *r[0]);
       {
-        invertProjMat(theta, mat, *t[0], *r[0], QUDA_SILENT, 1, u);
+        invertProjMat(theta, matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
 
       // Some local clean-up
@@ -340,7 +340,7 @@ namespace quda
   // JD Member functions
   //---------------------------------------------------------------------------
 
-  void JD::invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b,
+  void JD::invertProjMat(const double theta, const DiracMatrix &matPrecon, ColorSpinorField &x, ColorSpinorField &b,
                          QudaVerbosity verb, int k, std::vector<ColorSpinorField *> &eigSpace)
   {
     std::vector<ColorSpinorField *> &qSpace = eigSpace;
@@ -356,7 +356,7 @@ namespace quda
     int sizePS = k;
 
     // Casting away contractual constness
-    DiracMatrix &matUnconst = const_cast<DiracMatrix &>(mat);
+    DiracMatrix &matUnconst = const_cast<DiracMatrix &>(matPrecon);
 
     csParam.create = QUDA_COPY_FIELD_CREATE;
     //---------------------------------------------
