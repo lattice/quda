@@ -145,13 +145,13 @@ public:
   Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
   /**
-     @brief Swap the precision of the Krylov space
+     @brief Change the precision of the Krylov space
      @param[in] vecs The Krylov space to be copied
      @param[in] vecs_new The Krylov Space of new precision
      @param[in] prec_new The new precision
   */
-  void precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
-                      QudaPrecision prec_new);
+  void precChangeKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
+                        QudaPrecision prec_new);
 
   /**
      @brief Permute the vector space using the permutation matrix.
@@ -223,7 +223,7 @@ public:
     std::vector<ColorSpinorField *> src_ {src_tmp};
     std::vector<ColorSpinorField *> sol_ {&sol};
     deflate(sol_, src_, evecs, evals, accumulate);
-    }
+  }
 
     /**
        @brief Deflate a set of source vectors with a set of left and
@@ -389,7 +389,6 @@ public:
      @param[in] nKspace current Krylov space
   */
   void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
-
   };
 
   /**

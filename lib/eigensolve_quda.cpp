@@ -281,12 +281,11 @@ namespace quda
     saveTuneCache();
   }
 
-  void EigenSolver::precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
-                                   QudaPrecision prec_new)
+  void EigenSolver::precChangeKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
+                                     QudaPrecision prec_new)
   {
     ColorSpinorParam csParamNew(*vecs[0]);
     csParamNew.setPrecision(prec_new);
-    // csParamNew.print();
 
     int size = (int)vecs.size();
     vecs_new.reserve(size);
@@ -311,22 +310,18 @@ namespace quda
     vecs_ptr.reserve(j + 1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
-    // printfQuda("CDOT fail?\n");
     blas::cDotProduct(s, vecs_ptr, rvec);
-    // printfQuda("CDOT pass\n");
     // Block orthogonalise
     for (int i = 0; i < j + 1; i++) {
       sum += s[i];
       s[i] *= -1.0;
     }
-    // printfQuda("CAXPY fail?\n");
     blas::caxpy(s, vecs_ptr, rvec);
-    // printfQuda("CAXPY pass\n");
     host_free(s);
 
     // Save orthonormalisation tuning
     saveTuneCache();
-    
+
     return sum;
   }
 
@@ -483,7 +478,7 @@ namespace quda
     // Save SVD tuning
     saveTuneCache();
   }
-  
+
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
                                const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
@@ -820,7 +815,5 @@ namespace quda
   }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------
-
-
 
 } // namespace quda
