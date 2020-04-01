@@ -11,11 +11,11 @@ namespace quda
     {
       switch (Ls) {
 #ifdef USE_MMA_SYNC
-        case 16: return 10; break;
+      case 16: return 10; break;
 #else
-        case 16: return 16; break;
+      case 16: return 16; break;
 #endif
-        default: return 0;
+      default: return 0;
       }
     };
 #ifdef USE_MMA_SYNC
@@ -342,7 +342,6 @@ namespace quda
 
       constexpr int warp_cycle = total_tile / total_warp;
       const int warp_m = this_warp * warp_cycle / tn_dim;
-
 
 #ifdef USE_MMA_SYNC
       WarpRegisterMapping wrm(threadIdx.y * blockDim.x + threadIdx.x);
@@ -700,18 +699,18 @@ namespace quda
       {
         // switch for Ls
         switch (in.X(4)) {
-#if 0
         case 4: {
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
-          FusedDslash<decltype(arg)> dslash(arg, in); dslash.apply(streams[Nstream - 1]);
+          FusedDslash<decltype(arg)> dslash(arg, in);
+          dslash.apply(streams[Nstream - 1]);
         } break;
         case 8: {
           FusedDslashArg<storage_type, recon, 8> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                      halo_shift, type);
-          FusedDslash<decltype(arg)> dslash(arg, in); dslash.apply(streams[Nstream - 1]);
+          FusedDslash<decltype(arg)> dslash(arg, in);
+          dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         case 12: {
           FusedDslashArg<storage_type, recon, 12> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
                                                       halo_shift, type);
@@ -724,13 +723,12 @@ namespace quda
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#if 0
         case 20: {
-          FusedDslashArg<storage_type, recon, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+          FusedDslashArg<storage_type, recon, 20> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,
+                                                      halo_shift, type);
           FusedDslash<decltype(arg)> dslash(arg, in);
           dslash.apply(streams[Nstream - 1]);
         } break;
-#endif
         default: errorQuda("Ls = %d is NOT supported.\n", in.X(4));
         }
       }
@@ -743,7 +741,8 @@ namespace quda
     {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
       checkLocation(out, in); // check all locations match
-      instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift, type);
+      instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
+                                            type);
 #else
       errorQuda("Domain wall dslash WITH tensor cores has not been built");
 #endif
