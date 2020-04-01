@@ -24,8 +24,10 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+  EigenSolver::EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile) :
     mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
@@ -124,7 +126,7 @@ namespace quda
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
   // eigensolver.
-  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
+  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, TimeProfile &profile)
   {
     EigenSolver *eig_solver = nullptr;
 
@@ -133,11 +135,11 @@ namespace quda
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
-      eig_solver = new TRLM(mat, eig_param, profile);
+      eig_solver = new TRLM(mat, matSloppy, matPrecon, eig_param, profile);
       break;
     case QUDA_EIG_DAV:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Jacobi-Davidson eigensolver\n");
-      eig_solver = new JD(mat, eig_param, profile);
+      eig_solver = new JD(mat, matSloppy, matPrecon, eig_param, profile);
       break;
     default: errorQuda("Invalid eig solver type");
     }
@@ -157,6 +159,7 @@ namespace quda
       if (!tmp2) tmp2 = ColorSpinorField::Create(param);
     }
     mat(out, in, *tmp1, *tmp2);
+    //mat(out, in);
 
     // Save mattrix * vector tuning
     saveTuneCache();
@@ -186,7 +189,9 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     matVec(mat, out, in);
+    //printfQuda("CAXPBY fail?\n");
     blas::caxpby(d2, const_cast<ColorSpinorField &>(in), d1, out);
+    //printfQuda("CAXPBY pass\n");
     if (eig_param->poly_deg == 1) return;
 
     // C_0 is the current 'in'  vector.
@@ -196,9 +201,11 @@ namespace quda
     ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
 
+    //printfQuda("COPY fail?\n");
     blas::copy(*tmp1, in);
     blas::copy(*tmp2, out);
-
+    //printfQuda("COPY pass\n");
+    
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
@@ -219,7 +226,9 @@ namespace quda
       Complex d1c(d1, 0.0);
       Complex d2c(d2, 0.0);
       Complex d3c(d3, 0.0);
+      //printfQuda("caxpbypczw fail?\n");
       blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
+      //printfQuda("caxpbypczw pass\n");
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;
@@ -270,6 +279,25 @@ namespace quda
     saveTuneCache();
   }
 
+  void EigenSolver::precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new, QudaPrecision prec_new)
+  {
+    ColorSpinorParam csParamNew(*vecs[0]);    
+    csParamNew.setPrecision(prec_new);
+    //csParamNew.print();
+    
+    int size = (int)vecs.size();
+    vecs_new.reserve(size);
+    for(int i=0; i<size; i++) {
+      // Create new vector
+      vecs_new.push_back(ColorSpinorField::Create(csParamNew));
+      // Copy from old prec to new prec
+      *vecs_new[i] = *vecs[i];
+      // delete old vector
+      delete vecs[i];
+    }
+    vecs.resize(0);
+  }
+    
   // Orthogonalise r against V_[j]
   Complex EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
                                           int j)
@@ -280,15 +308,17 @@ namespace quda
     vecs_ptr.reserve(j + 1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
+    //printfQuda("CDOT fail?\n");
     blas::cDotProduct(s, vecs_ptr, rvec);
-
+    //printfQuda("CDOT pass\n");
     // Block orthogonalise
     for (int i = 0; i < j + 1; i++) {
       sum += s[i];
       s[i] *= -1.0;
     }
+    //printfQuda("CAXPY fail?\n");
     blas::caxpy(s, vecs_ptr, rvec);
-
+    //printfQuda("CAXPY pass\n");
     host_free(s);
 
     // Save orthonormalisation tuning
@@ -497,9 +527,9 @@ namespace quda
     if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
     if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
-    ColorSpinorParam csParam(*evecs[0]);
+    ColorSpinorParam csClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
-    temp.push_back(ColorSpinorField::Create(csParam));
+    temp.push_back(ColorSpinorField::Create(csClone));
 
     for (int i = 0; i < size; i++) {
       // r = A * v_i

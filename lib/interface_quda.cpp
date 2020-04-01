@@ -1669,9 +1669,10 @@ namespace quda {
     diracParam.mass = inv_param->mass;
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
-
+    diracParam.op_precision = diracParam.gauge->Precision();
+    
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
-
+    
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec);
@@ -1686,7 +1687,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatSloppy;
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
-
+    diracParam.op_precision = diracParam.gauge->Precision();
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1704,7 +1706,8 @@ namespace quda {
     diracParam.fatGauge = gaugeFatRefinement;
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
-
+    diracParam.op_precision = diracParam.gauge->Precision();
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1729,7 +1732,7 @@ namespace quda {
       diracParam.longGauge = gaugeLongPrecondition;
     }
     diracParam.clover = cloverPrecondition;
-
+    
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = comms ? 1 : 0;
     }
@@ -1740,7 +1743,8 @@ namespace quda {
        diracParam.type = pc ? QUDA_STAGGEREDPC_DIRAC : QUDA_STAGGERED_DIRAC;
        diracParam.gauge = gaugeFatPrecondition;
     }
-
+    diracParam.op_precision = diracParam.gauge->Precision();
+    
     if (diracParam.gauge->Precision() != inv_param->cuda_prec_precondition)
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec_precondition);
@@ -2318,12 +2322,14 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   //------------------------------------------------------
   Dirac *d = nullptr;
   Dirac *dSloppy = nullptr;
-  Dirac *dPre = nullptr;
+  Dirac *dPrecon = nullptr;
 
   // create the dirac operator
-  createDirac(d, dSloppy, dPre, *inv_param, pc_solve);
+  createDirac(d, dSloppy, dPrecon, *inv_param, pc_solve);
   Dirac &dirac = *d;
-
+  Dirac &diracSloppy = *dSloppy;
+  Dirac &diracPrecon = *dPrecon;
+  
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
@@ -2361,38 +2367,38 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracM m(dirac);
+    DiracM m(dirac), mSloppy(diracSloppy), mPrecon(diracPrecon);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (!eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMdag m(dirac);
+    DiracMdag m(dirac), mSloppy(diracSloppy), mPrecon(diracPrecon);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (eig_param->use_norm_op && !eig_param->use_dagger) {
-    DiracMdagM m(dirac);
+    DiracMdagM m(dirac), mSloppy(diracSloppy), mPrecon(diracPrecon);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
   } else if (eig_param->use_norm_op && eig_param->use_dagger) {
-    DiracMMdag m(dirac);
+    DiracMMdag m(dirac), mSloppy(diracSloppy), mPrecon(diracPrecon);
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
@@ -2414,7 +2420,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   for (int i = 0; i < eig_param->nConv; i++) delete host_evecs_[i];
   delete d;
   delete dSloppy;
-  delete dPre;
+  delete dPrecon;
   for (int i = 0; i < eig_param->nConv; i++) delete kSpace[i];
   profileEigensolve.TPSTOP(QUDA_PROFILE_FREE);
 

@@ -22,7 +22,7 @@ namespace quda {
   // Forward declare: MG Transfer Class
   class Transfer;
 
-  // Forward declar: Dirac Op Base Class
+  // Forward declare: Dirac Op Base Class
   class Dirac;
 
   // Params for Dirac operator
@@ -54,7 +54,8 @@ namespace quda {
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
-
+    QudaPrecision op_precision; // precision of the operator
+    
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
@@ -75,6 +76,7 @@ namespace quda {
       tmp1(0),
       tmp2(0),
       halo_precision(QUDA_INVALID_PRECISION),
+      op_precision(QUDA_INVALID_PRECISION),
       need_bidirectional(false)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
@@ -94,6 +96,7 @@ namespace quda {
       printfQuda("mu = %g\n", mu);
       printfQuda("epsilon = %g\n", epsilon);
       printfQuda("halo_precision = %d\n", halo_precision);
+      printfQuda("op_precision = %d\n", op_precision);
       for (int i=0; i<QUDA_MAX_DIM; i++) printfQuda("commDim[%d] = %d\n", i, commDim[i]);
       for (int i = 0; i < Ls; i++)
         printfQuda(
@@ -143,6 +146,7 @@ namespace quda {
     mutable ColorSpinorField *tmp2; // temporary hack
     QudaDiracType type; 
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
+    QudaPrecision op_precision; // precision of the operator
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
@@ -288,6 +292,7 @@ namespace quda {
     {errorQuda("Not implemented");}
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
+    QudaPrecision OpPrecision() const { return op_precision; }
     void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
 
     /**

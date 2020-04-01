@@ -21,6 +21,7 @@ namespace quda {
     tmp2(param.tmp2),
     type(param.type),
     halo_precision(param.halo_precision),
+    op_precision(param.op_precision),
     profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = param.commDim[i];
@@ -37,6 +38,7 @@ namespace quda {
     tmp2(dirac.tmp2),
     type(dirac.type),
     halo_precision(dirac.halo_precision),
+    op_precision(dirac.op_precision),
     profile("Dirac", false)
   {
     for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
@@ -59,7 +61,9 @@ namespace quda {
       flops = 0;
       tmp1 = dirac.tmp1;
       tmp2 = dirac.tmp2;
-
+      halo_precision = dirac.halo_precision;
+      op_precision = dirac.op_precision;
+      
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
       profile = dirac.profile;

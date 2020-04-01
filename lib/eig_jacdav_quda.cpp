@@ -31,8 +31,8 @@ namespace quda
   // Davidson-type eigensolver class
   
   // Jacobi-Davidson Method constructor
-  JD::JD(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
-    EigenSolver(mat, eig_param, profile)
+  JD::JD(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile) :
+    EigenSolver(mat, matSloppy, matPrecon, eig_param, profile)
   {
     if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG)
       errorQuda("Only smallest real spectrum type (SR) can be passed to the JD solver");
