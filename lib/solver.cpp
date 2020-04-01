@@ -10,7 +10,11 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) :
+  Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 SolverParam &param, TimeProfile &profile) :
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
     param(param),
     profile(profile),
     node_parity(0),
@@ -33,8 +37,8 @@ namespace quda {
   }
 
   // solver factory
-  Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
-			 DiracMatrix &matPrecon, TimeProfile &profile)
+  Solver* Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+			 const DiracMatrix &matPrecon, TimeProfile &profile)
   {
     Solver *solver = nullptr;
 
@@ -157,6 +161,7 @@ namespace quda {
       errorQuda("Invalid solver type %d", param.inv_type);
     }
 
+    if (!mat.hermitian() && solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian solver");
     return solver;
   }
 
