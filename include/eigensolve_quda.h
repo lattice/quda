@@ -65,8 +65,6 @@ protected:
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
 
-    Complex *Qmat;
-
 public:
   /**
      @brief Constructor for base Eigensolver class
@@ -345,9 +343,6 @@ public:
   // Tridiagonal/Arrow matrix, fixed size.
   double *alpha;
   double *beta;
-
-  // Used to clone vectors and resize arrays.
-  ColorSpinorParam csParam;
 
   /**
      @brief Compute eigenpairs

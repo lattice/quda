@@ -89,11 +89,6 @@ namespace quda
       for (int i = 0; i < nConv; i++) { residua[i] = 0.0; }
     }
 
-    if (eig_param->eig_type != QUDA_EIG_DAV) {
-      // Quda MultiBLAS friendly array
-      Qmat = (Complex *)safe_malloc(nEv * nKr * sizeof(Complex));
-    }
-
     // Part of the spectrum to be computed.
     switch (eig_param->spectrum) {
     case QUDA_SPECTRUM_SR_EIG: strcpy(spectrum, "SR"); break;
@@ -125,8 +120,8 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  // We bake the matrix operator 'mat' and the eigensolver parameters into the
-  // eigensolver.
+  // We bake the matrix operators mat, matSloppy, and matPrecon, and the eigensolver
+  // parameters into the eigensolver.
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
                                    const DiracMatrix &matPrecon, TimeProfile &profile)
   {
@@ -163,7 +158,7 @@ namespace quda
     mat(out, in, *tmp1, *tmp2);
     // mat(out, in);
 
-    // Save mattrix * vector tuning
+    // Save matrix * vector tuning
     saveTuneCache();
   }
 
@@ -191,9 +186,7 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     matVec(mat, out, in);
-    // printfQuda("CAXPBY fail?\n");
     blas::caxpby(d2, const_cast<ColorSpinorField &>(in), d1, out);
-    // printfQuda("CAXPBY pass\n");
     if (eig_param->poly_deg == 1) return;
 
     // C_0 is the current 'in'  vector.
@@ -203,10 +196,8 @@ namespace quda
     ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
 
-    // printfQuda("COPY fail?\n");
     blas::copy(*tmp1, in);
     blas::copy(*tmp2, out);
-    // printfQuda("COPY pass\n");
 
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
@@ -228,9 +219,7 @@ namespace quda
       Complex d1c(d1, 0.0);
       Complex d2c(d2, 0.0);
       Complex d3c(d3, 0.0);
-      // printfQuda("caxpbypczw fail?\n");
       blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
-      // printfQuda("caxpbypczw pass\n");
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;
@@ -382,7 +371,7 @@ namespace quda
     }
 
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
-    // Populate batch array (COLUM major -> ROW major)
+    // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
       for (int i = i_range.first; i < i_range.second; i++) {
         int j_arr = j - j_range.first;
