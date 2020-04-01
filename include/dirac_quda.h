@@ -54,8 +54,8 @@ namespace quda {
     int commDim[QUDA_MAX_DIM]; // whether to do comms or not
 
     QudaPrecision halo_precision; // only does something for DiracCoarse at present
-    QudaPrecision op_precision; // precision of the operator
-    
+    QudaPrecision op_precision;   // precision of the operator
+
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
@@ -146,7 +146,7 @@ namespace quda {
     mutable ColorSpinorField *tmp2; // temporary hack
     QudaDiracType type; 
     mutable QudaPrecision halo_precision; // only does something for DiracCoarse at present
-    QudaPrecision op_precision; // precision of the operator
+    QudaPrecision op_precision;           // precision of the operator
 
     bool newTmp(ColorSpinorField **, const ColorSpinorField &) const;
     void deleteTmp(ColorSpinorField **, const bool &reset) const;
@@ -1623,41 +1623,41 @@ public:
     virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
-  class DiracPrecProjCorr : public DiracMatrix {
+  class DiracPrecProjCorr : public DiracMatrix
+  {
 
   public:
     // Orthonormal set used in the projection of MMdag
-    std::vector<ColorSpinorField*> projSpace;
+    std::vector<ColorSpinorField *> projSpace;
     double theta;
     Eigen::MatrixXcd Mproj;
-    std::vector<ColorSpinorField*> Qhat;
+    std::vector<ColorSpinorField *> Qhat;
     SolverParam *solverParam_;
     CG *cg_;
     DiracMatrix *matUnconst_;
-    std::vector<ColorSpinorField*> y_hat;
+    std::vector<ColorSpinorField *> y_hat;
     JD *eigSlvr;
     double tol;
     int maxiter;
     int k;
 
-    DiracPrecProjCorr(const Dirac &d) : DiracMatrix(d) { }
-    DiracPrecProjCorr(const Dirac *d) : DiracMatrix(d) { }
+    DiracPrecProjCorr(const Dirac &d) : DiracMatrix(d) {}
+    DiracPrecProjCorr(const Dirac *d) : DiracMatrix(d) {}
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const;
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const;
 
-    void operator()(ColorSpinorField &out, const ColorSpinorField &in,
-			   ColorSpinorField &Tmp1, ColorSpinorField &Tmp2) const;
+    void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1,
+                    ColorSpinorField &Tmp2) const;
 
     int getStencilSteps() const
     {
       // FIXME ? ---> in JD we're trying to solve a shifted-and-projected-preconditioned version of MMdag
       // DMHJD: if the operator is an MMdag type, this is correct.
-      return 2*dirac->getStencilSteps(); // 2 for M and M dagger
+      return 2 * dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
-
 
   /* Gloms onto a DiracMatrix and provides an  operator() for its Mdag method */
   class DiracMdag : public DiracMatrix {

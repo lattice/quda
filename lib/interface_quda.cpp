@@ -1670,9 +1670,9 @@ namespace quda {
     diracParam.m5 = inv_param->m5;
     diracParam.mu = inv_param->mu;
     diracParam.op_precision = diracParam.gauge->Precision();
-    
+
     for (int i=0; i<4; i++) diracParam.commDim[i] = 1;   // comms are always on
-    
+
     if (diracParam.gauge->Precision() != inv_param->cuda_prec)
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec);
@@ -1688,7 +1688,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongSloppy;
     diracParam.clover = cloverSloppy;
     diracParam.op_precision = diracParam.gauge->Precision();
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1707,7 +1707,7 @@ namespace quda {
     diracParam.longGauge = gaugeLongRefinement;
     diracParam.clover = cloverRefinement;
     diracParam.op_precision = diracParam.gauge->Precision();
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = 1;   // comms are always on
     }
@@ -1732,7 +1732,7 @@ namespace quda {
       diracParam.longGauge = gaugeLongPrecondition;
     }
     diracParam.clover = cloverPrecondition;
-    
+
     for (int i=0; i<4; i++) {
       diracParam.commDim[i] = comms ? 1 : 0;
     }
@@ -1744,7 +1744,7 @@ namespace quda {
        diracParam.gauge = gaugeFatPrecondition;
     }
     diracParam.op_precision = diracParam.gauge->Precision();
-    
+
     if (diracParam.gauge->Precision() != inv_param->cuda_prec_precondition)
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec_precondition);
@@ -2329,7 +2329,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   Dirac &dirac = *d;
   Dirac &diracSloppy = *dSloppy;
   Dirac &diracPrecon = *dPrecon;
-  
+
   // Create device side ColorSpinorField vector space and to pass to the
   // compute function.
   const int *X = cudaGauge->X();
@@ -2359,11 +2359,11 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
       errorQuda("Polynomial acceleration with non-symmetric matrices not supported");
     }
   }
-  
-  if(eig_param->eig_type == QUDA_EIG_DAV && eig_param->use_poly_acc) {
+
+  if (eig_param->eig_type == QUDA_EIG_DAV && eig_param->use_poly_acc) {
     errorQuda("Jacobi-Davidson solver and Chebyshev accleration not supported.");
   }
-  
+
   profileEigensolve.TPSTOP(QUDA_PROFILE_INIT);
 
   if (!eig_param->use_norm_op && !eig_param->use_dagger) {

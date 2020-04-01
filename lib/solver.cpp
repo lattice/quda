@@ -165,16 +165,16 @@ namespace quda {
   }
 
   void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat,
-				       const DiracMatrix &matSloppy, const DiracMatrix &matPrecon)
+                                       const DiracMatrix &matSloppy, const DiracMatrix &matPrecon)
   {
     if (deflate_init) return;
-    
+
     // Deflation requested + first instance of solver
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
     eig_solve = EigenSolver::create(&param.eig_param, mat, matSloppy, matPrecon, profile);
-    
+
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;

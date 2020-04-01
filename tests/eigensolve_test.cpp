@@ -77,7 +77,7 @@ void display_test_info()
     else
       printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
   }
-  
+
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -278,7 +278,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
   eig_param.a_max = eig_amax;
-  
+
   eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
@@ -327,17 +327,16 @@ int main(int argc, char **argv)
   setEigParam(eig_param);
 
   // Sanity checks
-  if(eig_param.eig_type == QUDA_EIG_DAV && eig_param.use_poly_acc) {
+  if (eig_param.eig_type == QUDA_EIG_DAV && eig_param.use_poly_acc) {
     errorQuda("Jacobi-Davidson solver and Chebyshev accleration not supported.");
   }
-     
+
   // All user inputs now defined
   display_test_info();
 
   // set parameters for the reference Dslash, and prepare fields to be loaded
-  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-      dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-      dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
+      || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     dw_setDims(gauge_param.X, eig_inv_param.Ls);
   } else {
     setDims(gauge_param.X);

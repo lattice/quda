@@ -24,7 +24,8 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile) :
+  EigenSolver::EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                           QudaEigParam *eig_param, TimeProfile &profile) :
     mat(mat),
     matSloppy(matSloppy),
     matPrecon(matPrecon),
@@ -104,7 +105,7 @@ namespace quda
     default: errorQuda("Unexpected spectrum type %d", eig_param->spectrum);
     }
 
-    if(eig_param->eig_type==QUDA_EIG_DAV && strcmp(spectrum, "SR")){
+    if (eig_param->eig_type == QUDA_EIG_DAV && strcmp(spectrum, "SR")) {
       errorQuda("Jacobi-Davidson eigensolver only supports SR spectrum");
     }
 
@@ -126,7 +127,8 @@ namespace quda
 
   // We bake the matrix operator 'mat' and the eigensolver parameters into the
   // eigensolver.
-  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, TimeProfile &profile)
+  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                                   const DiracMatrix &matPrecon, TimeProfile &profile)
   {
     EigenSolver *eig_solver = nullptr;
 
@@ -159,7 +161,7 @@ namespace quda
       if (!tmp2) tmp2 = ColorSpinorField::Create(param);
     }
     mat(out, in, *tmp1, *tmp2);
-    //mat(out, in);
+    // mat(out, in);
 
     // Save mattrix * vector tuning
     saveTuneCache();
@@ -189,9 +191,9 @@ namespace quda
     // out = d2 * in + d1 * out
     // C_1(x) = x
     matVec(mat, out, in);
-    //printfQuda("CAXPBY fail?\n");
+    // printfQuda("CAXPBY fail?\n");
     blas::caxpby(d2, const_cast<ColorSpinorField &>(in), d1, out);
-    //printfQuda("CAXPBY pass\n");
+    // printfQuda("CAXPBY pass\n");
     if (eig_param->poly_deg == 1) return;
 
     // C_0 is the current 'in'  vector.
@@ -201,11 +203,11 @@ namespace quda
     ColorSpinorField *tmp1 = ColorSpinorField::Create(in);
     ColorSpinorField *tmp2 = ColorSpinorField::Create(in);
 
-    //printfQuda("COPY fail?\n");
+    // printfQuda("COPY fail?\n");
     blas::copy(*tmp1, in);
     blas::copy(*tmp2, out);
-    //printfQuda("COPY pass\n");
-    
+    // printfQuda("COPY pass\n");
+
     // Using Chebyshev polynomial recursion relation,
     // C_{m+1}(x) = 2*x*C_{m} - C_{m-1}
 
@@ -226,9 +228,9 @@ namespace quda
       Complex d1c(d1, 0.0);
       Complex d2c(d2, 0.0);
       Complex d3c(d3, 0.0);
-      //printfQuda("caxpbypczw fail?\n");
+      // printfQuda("caxpbypczw fail?\n");
       blas::caxpbypczw(d3c, *tmp1, d2c, *tmp2, d1c, out, *tmp1);
-      //printfQuda("caxpbypczw pass\n");
+      // printfQuda("caxpbypczw pass\n");
       std::swap(tmp1, tmp2);
 
       sigma_old = sigma;
@@ -279,15 +281,16 @@ namespace quda
     saveTuneCache();
   }
 
-  void EigenSolver::precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new, QudaPrecision prec_new)
+  void EigenSolver::precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
+                                   QudaPrecision prec_new)
   {
-    ColorSpinorParam csParamNew(*vecs[0]);    
+    ColorSpinorParam csParamNew(*vecs[0]);
     csParamNew.setPrecision(prec_new);
-    //csParamNew.print();
-    
+    // csParamNew.print();
+
     int size = (int)vecs.size();
     vecs_new.reserve(size);
-    for(int i=0; i<size; i++) {
+    for (int i = 0; i < size; i++) {
       // Create new vector
       vecs_new.push_back(ColorSpinorField::Create(csParamNew));
       // Copy from old prec to new prec
@@ -297,7 +300,7 @@ namespace quda
     }
     vecs.resize(0);
   }
-    
+
   // Orthogonalise r against V_[j]
   Complex EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> rvec,
                                           int j)
@@ -308,17 +311,17 @@ namespace quda
     vecs_ptr.reserve(j + 1);
     for (int i = 0; i < j + 1; i++) { vecs_ptr.push_back(vecs[i]); }
     // Block dot products stored in s.
-    //printfQuda("CDOT fail?\n");
+    // printfQuda("CDOT fail?\n");
     blas::cDotProduct(s, vecs_ptr, rvec);
-    //printfQuda("CDOT pass\n");
+    // printfQuda("CDOT pass\n");
     // Block orthogonalise
     for (int i = 0; i < j + 1; i++) {
       sum += s[i];
       s[i] *= -1.0;
     }
-    //printfQuda("CAXPY fail?\n");
+    // printfQuda("CAXPY fail?\n");
     blas::caxpy(s, vecs_ptr, rvec);
-    //printfQuda("CAXPY pass\n");
+    // printfQuda("CAXPY pass\n");
     host_free(s);
 
     // Save orthonormalisation tuning
@@ -414,18 +417,19 @@ namespace quda
     }
   }
 
-  void EigenSolver::testInitGuess(ColorSpinorField* &in) {
+  void EigenSolver::testInitGuess(ColorSpinorField *&in)
+  {
     double norm = sqrt(blas::norm2(*in));
     if (norm == 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
       if (in->Location() == QUDA_CPU_FIELD_LOCATION) {
-	in->Source(QUDA_RANDOM_SOURCE);
+        in->Source(QUDA_RANDOM_SOURCE);
       } else {
-	RNG *rng = new RNG(*in, 1234);
-	rng->Init();
-	spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
-	rng->Release();
-	delete rng;
+        RNG *rng = new RNG(*in, 1234);
+        rng->Init();
+        spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
+        rng->Release();
+        delete rng;
       }
     }
 
@@ -433,7 +437,7 @@ namespace quda
     norm = sqrt(blas::norm2(*in));
     blas::ax(1.0 / norm, *in);
   }
-  
+
   void EigenSolver::computeSVD(const DiracMatrix &mat, std::vector<ColorSpinorField *> &evecs, std::vector<Complex> &evals)
   {
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing SVD of M\n");
@@ -525,7 +529,8 @@ namespace quda
                                  std::vector<Complex> &evals, int size)
   {
     if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evals.size())
+      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;
@@ -811,9 +816,7 @@ namespace quda
     if (tmp1) delete tmp1;
     if (tmp2) delete tmp2;
     host_free(residua);
-    if (eig_param->eig_type != QUDA_EIG_DAV) {
-      host_free(Qmat);
-    }
+    if (eig_param->eig_type != QUDA_EIG_DAV) { host_free(Qmat); }
   }
   //-----------------------------------------------------------------------------
   //-----------------------------------------------------------------------------

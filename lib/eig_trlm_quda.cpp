@@ -17,13 +17,13 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-
 namespace quda
 {
 
   using namespace Eigen;
   // Thick Restarted Lanczos Method constructor
-  TRLM::TRLM(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile) :
+  TRLM::TRLM(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+             QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, matSloppy, matPrecon, eig_param, profile)
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
@@ -119,11 +119,11 @@ namespace quda
     }
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
-    computeLanczosSolution(mat, kSpace);    
+    computeLanczosSolution(mat, kSpace);
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    if(converged) reorder(kSpace);
-    
+    if (converged) reorder(kSpace);
+
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("kSpace size at convergence/max restarts = %d\n", (int)kSpace.size());
     // Prune the Krylov space back to size when passed to eigensolver
@@ -158,7 +158,6 @@ namespace quda
       computeEvals(mat, kSpace, evals);
     }
 
-
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
@@ -180,10 +179,10 @@ namespace quda
     }
 
     delete r[0];
-    
+
     // Save TRLM tuning
     saveTuneCache();
-    
+
     mat.flops();
   }
 
@@ -199,8 +198,9 @@ namespace quda
 
   // Thick Restart Member functions
   //---------------------------------------------------------------------------
-  void TRLM::computeLanczosSolution(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace) {
-    
+  void TRLM::computeLanczosSolution(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace)
+  {
+
     // Convergence and locking criteria
     double mat_norm = 0.0;
     double epsilon = DBL_EPSILON;
@@ -224,11 +224,11 @@ namespace quda
       break;
     default: errorQuda("Invalid precision %d", prec);
     }
-    
+
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < nKr; step++) lanczosStep(mat, kSpace, step);	
+      for (int step = num_keep; step < nKr; step++) lanczosStep(mat, kSpace, step);
       iter += (nKr - num_keep);
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter + 1);
 
@@ -247,30 +247,30 @@ namespace quda
       for (int i = 1; i < (nKr - num_locked); i++) {
         if (residua[i + num_locked] < epsilon * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	    printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
-		       epsilon * mat_norm);
+            printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+                       epsilon * mat_norm);
           iter_locked = i;
         } else {
           // Unlikely to find new locked pairs
           break;
         }
       }
-      
+
       // Convergence check
       iter_converged = iter_locked;
       for (int i = iter_locked + 1; i < nKr - num_locked; i++) {
         if (residua[i + num_locked] < tol * mat_norm) {
           if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-	    printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
+            printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
           iter_converged = i;
         } else {
           // Unlikely to find new converged pairs
           break;
         }
       }
-      
+
       iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked - 12);
-      
+
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
       computeKeptRitz(kSpace);
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -282,7 +282,7 @@ namespace quda
       if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
-      
+
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
@@ -297,14 +297,14 @@ namespace quda
 
       // Check for convergence
       if (num_converged >= nConv) {
-	reorder(kSpace);
+        reorder(kSpace);
         converged = true;
       }
-      
+
       restart_iter++;
     }
   }
-  
+
   void TRLM::lanczosStep(const DiracMatrix &mat, std::vector<ColorSpinorField *> &v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
@@ -349,7 +349,7 @@ namespace quda
     // Save Lanczos step tuning
     saveTuneCache();
   }
-  
+
   void TRLM::reorder(std::vector<ColorSpinorField *> &kSpace)
   {
     int i = 0;
@@ -455,7 +455,7 @@ namespace quda
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep);
         kSpace.reserve(offset + iter_keep);
         for (int i = kSpace.size(); i < offset + iter_keep; i++) {
-	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
 
@@ -491,12 +491,12 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
-	  kSpace.push_back(ColorSpinorField::Create(csParamClone));
+          kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
 
@@ -599,4 +599,4 @@ namespace quda
     saveTuneCache();
   }
 
-} // END namespace QUDA
+} // namespace quda

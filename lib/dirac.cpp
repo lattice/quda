@@ -63,7 +63,7 @@ namespace quda {
       tmp2 = dirac.tmp2;
       halo_precision = dirac.halo_precision;
       op_precision = dirac.op_precision;
-      
+
       for (int i=0; i<4; i++) commDim[i] = dirac.commDim[i];
 
       profile = dirac.profile;

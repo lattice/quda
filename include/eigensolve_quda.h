@@ -26,16 +26,16 @@ protected:
 
     // Problem parameters
     //------------------
-    int nEv;              /** Size of initial factorisation */
-    int nKr;              /** Size of Krylov space after extension */
-    int mmin;             /** Minimim size of subspace for Jacobi-Davidson */
-    int mmax;             /** Maximum size of subspace for Jacobi-Davidson */
-    int corr_eq_maxiter;  /** Maximum number of iterations for the correction equation */
-    double corr_eq_tol;   /** Tolerance for the correction equation */
-    int nConv;            /** Number of converged eigenvalues requested */
-    double tol;           /** Tolerance on eigenvalues */
-    bool reverse;         /** True if using polynomial acceleration */
-    char spectrum[3];     /** Part of the spectrum to be computed */
+    int nEv;             /** Size of initial factorisation */
+    int nKr;             /** Size of Krylov space after extension */
+    int mmin;            /** Minimim size of subspace for Jacobi-Davidson */
+    int mmax;            /** Maximum size of subspace for Jacobi-Davidson */
+    int corr_eq_maxiter; /** Maximum number of iterations for the correction equation */
+    double corr_eq_tol;  /** Tolerance for the correction equation */
+    int nConv;           /** Number of converged eigenvalues requested */
+    double tol;          /** Tolerance on eigenvalues */
+    bool reverse;        /** True if using polynomial acceleration */
+    char spectrum[3];    /** Part of the spectrum to be computed */
 
     // Algorithm variables
     //--------------------
@@ -61,164 +61,168 @@ protected:
     std::vector<ColorSpinorField *> kSpaceSloppy;
     std::vector<ColorSpinorField *> kSpacePrecon;
     std::vector<ColorSpinorField *> d_vecs_tmp;
-    
+
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
 
     Complex *Qmat;
 
 public:
-    /**
-       @brief Constructor for base Eigensolver class
-       @param mat Operator of desired precision
-       @param matSloppy Operator of sloppy precision
-       @param matPrecon Operator of preconditioner precision
-       @param eig_param MGParam struct that defines all meta data
-       @param profile Timeprofile instance used to profile
-    */
-    EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile);
+  /**
+     @brief Constructor for base Eigensolver class
+     @param mat Operator of desired precision
+     @param matSloppy Operator of sloppy precision
+     @param matPrecon Operator of preconditioner precision
+     @param eig_param MGParam struct that defines all meta data
+     @param profile Timeprofile instance used to profile
+  */
+  EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+              QudaEigParam *eig_param, TimeProfile &profile);
 
-    /**
-       Destructor for EigenSolver class.
-    */
-    virtual ~EigenSolver();
+  /**
+     Destructor for EigenSolver class.
+  */
+  virtual ~EigenSolver();
 
-    /**
-       @return Whether the solver is only for Hermitian systems
-     */
-    virtual bool hermitian() = 0;
+  /**
+     @return Whether the solver is only for Hermitian systems
+   */
+  virtual bool hermitian() = 0;
 
-    /**
-       @brief Computes the eigen decomposition for the operator passed to create.
-       @param kSpace The converged eigenvectors
-       @param evals The converged eigenvalues
-     */
-    virtual void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals) = 0;
+  /**
+     @brief Computes the eigen decomposition for the operator passed to create.
+     @param kSpace The converged eigenvectors
+     @param evals The converged eigenvalues
+   */
+  virtual void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals) = 0;
 
-    /**
-       @brief Creates the eigensolver using the parameters given and the matrix.
-       @param eig_param The eigensolver parameters
-       @param mat The operator of desired precision to solve
-       @param matSloppy The operator of sloppy precision
-       @param matPrecon The operator of precondionter precision
-       @param profile Time Profile
-    */
-    static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, TimeProfile &profile);
-        
-    /**
-       @brief Applies the specified matVec operation:
-       M, Mdag, MMdag, MdagM
-       @param[in] mat Matrix operator
-       @param[in] out Output spinor
-       @param[in] in Input spinor
-    */
-    void matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
+  /**
+     @brief Creates the eigensolver using the parameters given and the matrix.
+     @param eig_param The eigensolver parameters
+     @param mat The operator of desired precision to solve
+     @param matSloppy The operator of sloppy precision
+     @param matPrecon The operator of precondionter precision
+     @param profile Time Profile
+  */
+  static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+                             const DiracMatrix &matPrecon, TimeProfile &profile);
 
-    /**
-       @brief Promotes the specified matVec operation:
-       M, Mdag, MMdag, MdagM to a Chebyshev polynomial
-       @param[in] mat Matrix operator
-       @param[in] out Output spinor
-       @param[in] in Input spinor
-    */
-    void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
+  /**
+     @brief Applies the specified matVec operation:
+     M, Mdag, MMdag, MdagM
+     @param[in] mat Matrix operator
+     @param[in] out Output spinor
+     @param[in] in Input spinor
+  */
+  void matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
-    /**
-       @brief Estimate the spectral radius of the operator for the max value of the
-       Chebyshev polynomial
-       @param[in] mat Matrix operator
-       @param[in] out Output spinor
-       @param[in] in Input spinor
-    */
-    double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
+  /**
+     @brief Promotes the specified matVec operation:
+     M, Mdag, MMdag, MdagM to a Chebyshev polynomial
+     @param[in] mat Matrix operator
+     @param[in] out Output spinor
+     @param[in] in Input spinor
+  */
+  void chebyOp(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in);
 
-    /**
-       @brief Orthogonalise input vector r against
-       vector space v using block-BLAS
-       @param[out] Sum of inner products
-       @param[in] v Vector space
-       @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
-    */
-    Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+  /**
+     @brief Estimate the spectral radius of the operator for the max value of the
+     Chebyshev polynomial
+     @param[in] mat Matrix operator
+     @param[in] out Output spinor
+     @param[in] in Input spinor
+  */
+  double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
 
-    /**
-       @brief Swap the precision of the Krylov space
-       @param[in] vecs The Krylov space to be copied
-       @param[in] vecs_new The Krylov Space of new precision
-       @param[in] prec_new The new precision
-    */
-    void precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new, QudaPrecision prec_new);
-    
-    /**
-       @brief Permute the vector space using the permutation matrix.
-       @param[in/out] kSpace The current Krylov space
-       @param[in] mat Eigen object storing the pivots
-       @param[in] size The size of the (square) permutation matrix
-    */
-    void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
+  /**
+     @brief Orthogonalise input vector r against
+     vector space v using block-BLAS
+     @param[out] Sum of inner products
+     @param[in] v Vector space
+     @param[in] r Vector to be orthogonalised
+     @param[in] j Number of vectors in v to orthogonalise against
+  */
+  Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
 
-    /**
-       @brief Rotate part of kSpace
-       @param[in/out] kSpace The current Krylov space
-       @param[in] array The rotation matrix
-       @param[in] rank row rank of array
-       @param[in] is Start of i index
-       @param[in] ie End of i index
-       @param[in] js Start of j index
-       @param[in] je End of j index
-       @param[in] blockType Type of caxpy(_U/L) to perform
-    */
-    void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
+  /**
+     @brief Swap the precision of the Krylov space
+     @param[in] vecs The Krylov space to be copied
+     @param[in] vecs_new The Krylov Space of new precision
+     @param[in] prec_new The new precision
+  */
+  void precSwapKrylov(std::vector<ColorSpinorField *> &vecs, std::vector<ColorSpinorField *> &vecs_new,
+                      QudaPrecision prec_new);
 
-    /**
-       @brief Copy temp part of kSpace, zero out for next use
-       @param[in/out] kSpace The current Krylov space
-       @param[in] js Start of j index
-       @param[in] je End of j index
-    */
-    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
+  /**
+     @brief Permute the vector space using the permutation matrix.
+     @param[in/out] kSpace The current Krylov space
+     @param[in] mat Eigen object storing the pivots
+     @param[in] size The size of the (square) permutation matrix
+  */
+  void permuteVecs(std::vector<ColorSpinorField *> &kSpace, int *mat, int size);
 
-    /**
-       @brief Test for an initial guess
-       @param[in/out] in Initial vector
-    */
-    void testInitGuess(ColorSpinorField* &in);
-    
-    /**
-       @brief Deflate a set of source vectors with a given eigenspace
-       @param[in] sol The resulting deflated vector set
-       @param[in] src The source vector set we are deflating
-       @param[in] evecs The eigenvectors to use in deflation
-       @param[in] evals The eigenvalues to use in deflation
-       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
-    */
-    void deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
-                 const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
-                 bool accumulate = false) const;
+  /**
+     @brief Rotate part of kSpace
+     @param[in/out] kSpace The current Krylov space
+     @param[in] array The rotation matrix
+     @param[in] rank row rank of array
+     @param[in] is Start of i index
+     @param[in] ie End of i index
+     @param[in] js Start of j index
+     @param[in] je End of j index
+     @param[in] blockType Type of caxpy(_U/L) to perform
+  */
+  void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j,
+                   blockType b_type);
 
-    /**
-       @brief Deflate a given source vector with a given eigenspace.
-       This is a wrapper variant for a single source vector.
-       @param[in] sol The resulting deflated vector
-       @param[in] src The source vector we are deflating
-       @param[in] evecs The eigenvectors to use in deflation
-       @param[in] evals The eigenvalues to use in deflation
-       @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
-    */
-    void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
-                 const std::vector<Complex> &evals, bool accumulate = false)
-    {
-      // FIXME add support for mixed-precison dot product to avoid this copy
-      if (src.Precision() != evecs[0]->Precision() && !tmp1) {
-        ColorSpinorParam param(*evecs[0]);
-        tmp1 = ColorSpinorField::Create(param);
-      }
-      ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
-      blas::copy(*src_tmp, src); // no-op if these alias
-      std::vector<ColorSpinorField *> src_ {src_tmp};
-      std::vector<ColorSpinorField *> sol_ {&sol};
-      deflate(sol_, src_, evecs, evals, accumulate);
+  /**
+     @brief Copy temp part of kSpace, zero out for next use
+     @param[in/out] kSpace The current Krylov space
+     @param[in] js Start of j index
+     @param[in] je End of j index
+  */
+  void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
+
+  /**
+     @brief Test for an initial guess
+     @param[in/out] in Initial vector
+  */
+  void testInitGuess(ColorSpinorField *&in);
+
+  /**
+     @brief Deflate a set of source vectors with a given eigenspace
+     @param[in] sol The resulting deflated vector set
+     @param[in] src The source vector set we are deflating
+     @param[in] evecs The eigenvectors to use in deflation
+     @param[in] evals The eigenvalues to use in deflation
+     @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+  */
+  void deflate(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
+               const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
+               bool accumulate = false) const;
+
+  /**
+     @brief Deflate a given source vector with a given eigenspace.
+     This is a wrapper variant for a single source vector.
+     @param[in] sol The resulting deflated vector
+     @param[in] src The source vector we are deflating
+     @param[in] evecs The eigenvectors to use in deflation
+     @param[in] evals The eigenvalues to use in deflation
+     @param[in] accumulate Whether to preserve the sol vector content prior to accumulating
+  */
+  void deflate(ColorSpinorField &sol, const ColorSpinorField &src, const std::vector<ColorSpinorField *> &evecs,
+               const std::vector<Complex> &evals, bool accumulate = false)
+  {
+    // FIXME add support for mixed-precison dot product to avoid this copy
+    if (src.Precision() != evecs[0]->Precision() && !tmp1) {
+      ColorSpinorParam param(*evecs[0]);
+      tmp1 = ColorSpinorField::Create(param);
+    }
+    ColorSpinorField *src_tmp = src.Precision() != evecs[0]->Precision() ? tmp1 : const_cast<ColorSpinorField *>(&src);
+    blas::copy(*src_tmp, src); // no-op if these alias
+    std::vector<ColorSpinorField *> src_ {src_tmp};
+    std::vector<ColorSpinorField *> sol_ {&sol};
+    deflate(sol_, src_, evecs, evals, accumulate);
     }
 
     /**
@@ -317,73 +321,74 @@ public:
   {
 
 public:
-    /**
-       @brief Constructor for Thick Restarted Eigensolver class
-       @param eig_param The eigensolver parameters
-       @param mat The operator to solve
-       @param matSloppy The operator of sloppy precision
-       @param matPrecon The operator to precondition precision
-       @param profile Time Profile
-    */
-    TRLM(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile);
+  /**
+     @brief Constructor for Thick Restarted Eigensolver class
+     @param eig_param The eigensolver parameters
+     @param mat The operator to solve
+     @param matSloppy The operator of sloppy precision
+     @param matPrecon The operator to precondition precision
+     @param profile Time Profile
+  */
+  TRLM(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param,
+       TimeProfile &profile);
 
-    /**
-       @brief Destructor for Thick Restarted Eigensolver class
-    */
-    virtual ~TRLM();
+  /**
+     @brief Destructor for Thick Restarted Eigensolver class
+  */
+  virtual ~TRLM();
 
-    virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
+  virtual bool hermitian() { return true; } /** TRLM is only for Hermitian systems */
 
-    // Variable size matrix
-    std::vector<double> ritz_mat;
+  // Variable size matrix
+  std::vector<double> ritz_mat;
 
-    // Tridiagonal/Arrow matrix, fixed size.
-    double *alpha;
-    double *beta;
+  // Tridiagonal/Arrow matrix, fixed size.
+  double *alpha;
+  double *beta;
 
-    // Used to clone vectors and resize arrays.
-    ColorSpinorParam csParam;
+  // Used to clone vectors and resize arrays.
+  ColorSpinorParam csParam;
 
-    /**
-       @brief Compute eigenpairs
-       @param[in] kSpace Krylov vector space
-       @param[in] evals Computed eigenvalues
-    */
-    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+  /**
+     @brief Compute eigenpairs
+     @param[in] kSpace Krylov vector space
+     @param[in] evals Computed eigenvalues
+  */
+  void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
 
-    /**
-       @brief Applies the TRLM algorithm using the mat operator.
-       @param[in] mat Matrix operator
-       @param[in] kSpace The Krylov space
-    */
-    void computeLanczosSolution(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
-    
-    /**
-       @brief Lanczos step: extends the Kylov space.
-       @param[in] m The operator to use
-       @param[in] v Vector space
-       @param[in] j Index of vector being computed
-    */
-    void lanczosStep(const DiracMatrix &mat, std::vector<ColorSpinorField *> &v, int j);
+  /**
+     @brief Applies the TRLM algorithm using the mat operator.
+     @param[in] mat Matrix operator
+     @param[in] kSpace The Krylov space
+  */
+  void computeLanczosSolution(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
 
-    /**
-       @brief Reorder the Krylov space by eigenvalue
-       @param[in] kSpace the Krylov space
-    */
-    void reorder(std::vector<ColorSpinorField *> &kSpace);
+  /**
+     @brief Lanczos step: extends the Kylov space.
+     @param[in] m The operator to use
+     @param[in] v Vector space
+     @param[in] j Index of vector being computed
+  */
+  void lanczosStep(const DiracMatrix &mat, std::vector<ColorSpinorField *> &v, int j);
 
-    /**
-       @brief Get the eigendecomposition from the arrow matrix
-       @param[in] nLocked Number of locked eigenvectors
-       @param[in] arrow_pos position of arrowhead
-    */
-    void eigensolveFromArrowMat(int nLocked, int arror_pos);
+  /**
+     @brief Reorder the Krylov space by eigenvalue
+     @param[in] kSpace the Krylov space
+  */
+  void reorder(std::vector<ColorSpinorField *> &kSpace);
 
-    /**
-       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
-       @param[in] nKspace current Krylov space
-    */
-    void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
+  /**
+     @brief Get the eigendecomposition from the arrow matrix
+     @param[in] nLocked Number of locked eigenvectors
+     @param[in] arrow_pos position of arrowhead
+  */
+  void eigensolveFromArrowMat(int nLocked, int arror_pos);
+
+  /**
+     @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+     @param[in] nKspace current Krylov space
+  */
+  void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
   };
 
@@ -411,13 +416,12 @@ public:
   class JD : public EigenSolver
   {
 
-protected:
-
+  protected:
     TimeProfile *profileCorrEqInvs;
     TimeProfile *profileMatCorrEqInvs;
 
     double corrEqTol;
-    int    corrEqMaxiter;
+    int corrEqMaxiter;
 
     SolverParam *solverParam;
     SolverParam *solverParamMat;
@@ -429,20 +433,20 @@ protected:
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
     std::vector<ColorSpinorField *> r_tilde;
-    std::vector<ColorSpinorField*> Qhat;
-    std::vector<ColorSpinorField*> u;
-    std::vector<ColorSpinorField*> u_A;
-    std::vector<ColorSpinorField*> V;
-    std::vector<ColorSpinorField*> V_A;
-    std::vector<ColorSpinorField*> tmpV;
-    std::vector<ColorSpinorField*> tmpAV;
+    std::vector<ColorSpinorField *> Qhat;
+    std::vector<ColorSpinorField *> u;
+    std::vector<ColorSpinorField *> u_A;
+    std::vector<ColorSpinorField *> V;
+    std::vector<ColorSpinorField *> V_A;
+    std::vector<ColorSpinorField *> tmpV;
+    std::vector<ColorSpinorField *> tmpAV;
 
     Dirac *d;
-    //Dirac *dSloppy;
+    // Dirac *dSloppy;
     DiracPrecProjCorr *mmPP;
-    //DiracPrecProjCorr *mmPPSloppy;
+    // DiracPrecProjCorr *mmPPSloppy;
 
-public:
+  public:
     /**
        @brief Constructor for JD Eigensolver class
        @param mat Operator of desired precision
@@ -451,7 +455,8 @@ public:
        @param eig_param The eigensolver parameters
        @param profile Time Profile
     */
-    JD(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param, TimeProfile &profile);
+    JD(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param,
+       TimeProfile &profile);
 
     /**
        @brief Compute eigenpairs
@@ -467,7 +472,8 @@ public:
        @param[in] x Ouput spinor
        @param[in] b Input spinor
     */
-    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb, int k, std::vector<ColorSpinorField*> &eigSpace);
+    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b,
+                       QudaVerbosity verb, int k, std::vector<ColorSpinorField *> &eigSpace);
 
     /**
        @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD
@@ -478,7 +484,8 @@ public:
        @param[in] x Output spinor
        @param[in] b Input spinor
     */
-    void K(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x, ColorSpinorField &b);
+    void K(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x,
+           ColorSpinorField &b);
 
     /**
        @brief Some more initializations in the JD eigensolver
@@ -496,7 +503,8 @@ public:
        @param[in] ortSpace The subspace against which vectr will be orthogonalized
        @param[in] m Number of dot products to perform
     */
-    void orth(Complex* ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace, const int m);
+    void orth(Complex *ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace,
+              const int m);
 
     /**
        @brief Check if one or more eigenpairs have been found
@@ -511,8 +519,9 @@ public:
        @param[in] m Size of the subspace
        @param[in] k_max Requested amount of eigenpairs
     */
-    void checkIfConverged(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, std::vector<ColorSpinorField *> &X_tilde,
-                          ColorSpinorParam &csParam, std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
+    void checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,
+                          std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
+                          std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
                           const int k_max);
 
     /**
@@ -526,7 +535,7 @@ public:
        @param[in] loopr Counter indicating upcoming eigenpair from subspace
        @param[in] m_min Minimum size of the search subspace
     */
-    void shrinkSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, ColorSpinorParam &csParam, \
+    void shrinkSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, ColorSpinorParam &csParam,
                         void *H_, double &theta, int &m, int &restart_iter, int &loopr, const int m_min);
 
     /**
@@ -536,7 +545,8 @@ public:
        @param[in] H_ The matrix encoding information about the subspace
        @param[in] m Size of the subspace
     */
-    void eigsolveInSubspace(std::vector<std::pair<double,std::vector<Complex>*>> &eigenpairs, void *eigensolver_, void *H_, const int m);
+    void eigsolveInSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, void *eigensolver_,
+                            void *H_, const int m);
 
     /**
        @brief Destructor for JD Eigensolver class
@@ -544,7 +554,6 @@ public:
     virtual ~JD();
 
     virtual bool hermitian() { return true; } /** The current implementation of JD is only for Hermitian systems */
-
   };
 
 } // namespace quda
