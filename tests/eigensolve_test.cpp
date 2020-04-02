@@ -46,6 +46,7 @@ void display_test_info()
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+  printfQuda(" - eigenvector block size %d\n", eig_block_size);
   printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
   printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
   printfQuda(" - size of Krylov space %d\n", eig_nKr);
@@ -225,11 +226,13 @@ void setEigParam(QudaEigParam &eig_param)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
+  if ((eig_type == QUDA_EIG_TR_LANCZOS ||
+       eig_type == QUDA_EIG_IR_LANCZOS ||
+       eig_type == QUDA_EIG_BLK_TR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
   }
-
+  
   // The solver will exit when nConv extremal eigenpairs have converged
   if (eig_nConv < 0) {
     eig_param.nConv = eig_nEv;
@@ -238,6 +241,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  eig_param.block_size = eig_block_size;
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;

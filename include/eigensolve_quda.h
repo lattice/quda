@@ -36,6 +36,7 @@ protected:
     int max_restarts;
     int check_interval;
     int batched_rotate;
+    int block_size;
     int iter;
     int iter_converged;
     int iter_locked;
@@ -52,8 +53,6 @@ protected:
 
     ColorSpinorField *tmp1;
     ColorSpinorField *tmp2;
-
-    Complex *Qmat;
 
 public:
     /**
@@ -123,7 +122,17 @@ public:
        @param[in] r Vector to be orthogonalised
        @param[in] j Number of vectors in v to orthogonalise against
     */
-    Complex blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+
+    /**
+       @brief Orthogonalise input vectors r against
+       vector space v using block-BLAS
+       @param[in] v Vector space
+       @param[in] r Vectors to be orthogonalised
+       @param[in] j Number of vectors in v to orthogonalise against
+    */
+    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+
 
     /**
        @brief Permute the vector space using the permutation matrix.
@@ -285,7 +294,7 @@ public:
   class TRLM : public EigenSolver
   {
 
-public:
+  public:
     /**
        @brief Constructor for Thick Restarted Eigensolver class
        @param eig_param The eigensolver parameters
@@ -346,6 +355,54 @@ public:
 
   };
 
+  /**
+     @brief Block Thick Restarted Lanczos Method.
+  */
+  class BLKTRLM : public TRLM
+  {
+
+  public:
+    /**
+       @brief Constructor for Thick Restarted Eigensolver class
+       @param eig_param The eigensolver parameters
+       @param mat The operator to solve
+       @param profile Time Profile
+    */
+    BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
+    
+    /**
+       @brief Destructor for Thick Restarted Eigensolver class
+    */
+    virtual ~BLKTRLM();
+    
+    virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
+    
+    // Variable size matrix
+    std::vector<double> block_ritz_mat;
+
+    // Tridiagonal/Arrow matrix, fixed size.
+    double *block_alpha;
+    double *block_beta;
+    
+    int n_blocks;
+    int block_data_length;
+    
+    /**
+       @brief Compute eigenpairs
+       @param[in] kSpace Krylov vector space
+       @param[in] evals Computed eigenvalues
+    */
+    void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief block lanczos step: extends the Kylov space in block step
+       @param[in] v Vector space
+       @param[in] j Index of block of vectors being computed
+    */
+    void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);    
+    
+  };
+  
   /**
      arpack_solve()
 

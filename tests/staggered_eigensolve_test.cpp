@@ -214,6 +214,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  eig_param.block_size = eig_block_size;
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
