@@ -643,9 +643,9 @@ namespace quda {
 	    //Off-diagonal Spin (forward link / negative projector applied)
             auto gammaAV = make_tile_A<complex, false>(tile);
 
-            for (int i=0; i<tile.K; i++) for (int j=0; j<tile.M; j++) { gammaAV(j,i) = -gamma.apply(s, AV(i,j)); }
+            for (int i=0; i<tile.K; i++) for (int j=0; j<tile.M; j++) { gammaAV(j,i) = -gamma.apply(s, conj(AV(i,j))); }
             UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
-            vuv[s_c_row*coarseSpin+s_c_row].mma_nn(gammaAV, UV);
+            vuv[s_c_row*coarseSpin+s_c_col].mma_nn(gammaAV, UV);
 	  }
 	} //Fine color
       }
