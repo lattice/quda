@@ -28,8 +28,9 @@ protected:
     //------------------
     int nEv;             /** Size of initial factorisation */
     int nKr;             /** Size of Krylov space after extension */
-    int mmin;            /** Minimim size of subspace for Jacobi-Davidson */
-    int mmax;            /** Maximum size of subspace for Jacobi-Davidson */
+    int m_min;            /** Minimim size of subspace for Jacobi-Davidson */
+    int m_max;            /** Maximum size of subspace for Jacobi-Davidson */
+    int k_max;            /** NUmber of requested eigenpairs for Jacobi-Davidson */
     int corr_eq_maxiter; /** Maximum number of iterations for the correction equation */
     double corr_eq_tol;  /** Tolerance for the correction equation */
     int nConv;           /** Number of converged eigenvalues requested */
@@ -411,11 +412,8 @@ public:
   {
 
   protected:
-    TimeProfile *profileCorrEqInvs;
-    TimeProfile *profileMatCorrEqInvs;
-
-    double corrEqTol;
-    int corrEqMaxiter;
+    TimeProfile *profile_corr_eq_invs;
+    TimeProfile *profile_mat_corr_eq_invs;
 
     SolverParam *solverParam;
     SolverParam *solverParamMat;
@@ -440,6 +438,12 @@ public:
     DiracPrecProjCorr *mmPP;
     // DiracPrecProjCorr *mmPPSloppy;
 
+    int k;
+    int m;
+    double theta;
+    int loopr;
+    double norm;
+
   public:
     /**
        @brief Constructor for JD Eigensolver class
@@ -461,13 +465,15 @@ public:
 
     /**
        @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
-       @param[in] theta Shift parameter
        @param[in] mat The original matrix to be inverted after shift-and-project
        @param[in] x Ouput spinor
        @param[in] b Input spinor
+       @param[in] verb Local verbosity of the JD proj-eq solve
+       @param[in] kp Number of vectors to project against
+       @param[in] projSpace Space to project against
     */
-    void invertProjMat(const double theta, const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b,
-                       QudaVerbosity verb, int k, std::vector<ColorSpinorField *> &eigSpace);
+    void invertProjMat(const DiracMatrix &mat, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb,
+                       int kp, std::vector<ColorSpinorField *> &projSpace);
 
     /**
        @brief Wrapper for CG to allow flexible solver params throughout the correction equation in JD
@@ -484,21 +490,19 @@ public:
     /**
        @brief Some more initializations in the JD eigensolver
        @param[in] csParam Information about the spinors
-       @param[in] k_max Number of eigenpairs requested
-       @param[in] m_max Maximum size of the search subspace
        @param[in] initVec Spinor assigned to t before the main loop starts
     */
-    void moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec);
+    void moreInits(ColorSpinorParam &csParam, ColorSpinorField &initVec);
 
     /**
        @brief Some more initializations in the JD eigensolver
-       @param[in] ortDotProd Resulting dot products
+       @param[in] ort_dot_prod Resulting dot products
        @param[in] vectr The spinor to be orthogonalized
-       @param[in] ortSpace The subspace against which vectr will be orthogonalized
-       @param[in] m Number of dot products to perform
+       @param[in] ort_space The subspace against which vectr will be orthogonalized
+       @param[in] size_os Number of dot products to perform
     */
-    void orth(Complex *ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace,
-              const int m);
+    void orth(Complex *ort_dot_prod, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ort_space,
+              const int size_os);
 
     /**
        @brief Check if one or more eigenpairs have been found
@@ -506,41 +510,28 @@ public:
        @param[in] X_tilde The converged eigenvectors
        @param[in] csParam Information about the spinors
        @param[in] evals The converged eigenvalues
-       @param[in] norm How close we are to the next eigenpair
-       @param[in] theta The JD shift
-       @param[in] loopr Counter indicating upcoming eigenpair from subspace
-       @param[in] k Number of converged eigenpairs
-       @param[in] m Size of the subspace
-       @param[in] k_max Requested amount of eigenpairs
     */
     void checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,
                           std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
-                          std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
-                          const int k_max);
+                          std::vector<Complex> &evals);
 
     /**
        @brief When reached the max allowed size of the subspace, resize
        @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
        @param[in] csParam Information about the spinors
-       @param[in] theta The JD shift
        @param[in] H_ The matrix encoding information about the subspace
-       @param[in] m Size of the subspace
-       @param[in] restart_iter Number of restarts (i.e. resizings) of the subspace so far
-       @param[in] loopr Counter indicating upcoming eigenpair from subspace
-       @param[in] m_min Minimum size of the search subspace
     */
     void shrinkSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, ColorSpinorParam &csParam,
-                        void *H_, double &theta, int &m, int &restart_iter, int &loopr, const int m_min);
+                        void *H_);
 
     /**
        @brief Perform an eigendecomposition through the acceleration subspace
        @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
        @param[in] eigensolver_ Eigen object used for the eigendecomposition
        @param[in] H_ The matrix encoding information about the subspace
-       @param[in] m Size of the subspace
     */
     void eigsolveInSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, void *eigensolver_,
-                            void *H_, const int m);
+                            void *H_);
 
     /**
        @brief Destructor for JD Eigensolver class

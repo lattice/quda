@@ -402,8 +402,7 @@ int main(int argc, char **argv)
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
   double _Complex *host_evals;
-  int num_evals = eig_param.eig_type == QUDA_EIG_DAV ? eig_param.nEv : eig_param.nConv;
-  host_evals = (double _Complex *)malloc(num_evals * sizeof(double _Complex));
+  host_evals = (double _Complex *)malloc(eig_param.nConv * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the

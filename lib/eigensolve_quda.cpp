@@ -40,18 +40,19 @@ namespace quda
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printQudaEigParam(eig_param);
 
     // Problem parameters
+    nConv = eig_param->nConv;
+    tol = eig_param->tol;
+    reverse = false;
     if (eig_param->eig_type != QUDA_EIG_DAV) {
       nEv = eig_param->nEv;
       nKr = eig_param->nKr;
     } else {
-      mmin = eig_param->mmin;
-      mmax = eig_param->mmax;
+      m_min = eig_param->mmin;
+      m_max = eig_param->mmax;
       corr_eq_tol = eig_param->corr_eq_tol;
       corr_eq_maxiter = eig_param->corr_eq_maxiter;
+      k_max = nConv;
     }
-    nConv = eig_param->nConv;
-    tol = eig_param->tol;
-    reverse = false;
 
     // Algorithm variables
     converged = false;
@@ -74,9 +75,9 @@ namespace quda
       if (nEv == 0) errorQuda("nEv=0 passed to Eigensolver\n");
       if (nKr == 0) errorQuda("nKr=0 passed to Eigensolver\n");
     } else {
-      if (mmax <= mmin) errorQuda("mmax=%d is less than or equal to mmin=%d\n", mmax, mmin);
-      if (mmin == 0) errorQuda("mmin=0 passed to Eigensolver\n");
-      if (mmax == 0) errorQuda("mmax=0 passed to Eigensolver\n");
+      if (m_max <= m_min) errorQuda("mmax=%d is less than or equal to mmin=%d\n", m_max, m_min);
+      if (m_min == 0) errorQuda("mmin=0 passed to Eigensolver\n");
+      if (m_max == 0) errorQuda("mmax=0 passed to Eigensolver\n");
       if (corr_eq_maxiter == 0) errorQuda("corr_eq_maxiter=0 passed to Eigensolver\n");
     }
     if (nConv == 0) errorQuda("nConv=0 passed to Eigensolver\n");

@@ -17,11 +17,6 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-// DMHJD: Fantastic work! I've left some relevant comments in the code, just grep the
-//       library for DMHJD. One comment on code conventions: it is preferable,
-//       but not mandatory, to use camelCase for functions and underscore_case for
-//       variables. If you can fix the camelCase variables I'd be very happy!
-
 namespace quda
 {
 
@@ -41,20 +36,18 @@ namespace quda
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    // DMHJD: Can you use the corr_eq_tol and corr_eq_maxiter you defined in
-    //        eigensolve_quda.h?
-    corrEqTol = eig_param->corr_eq_tol;
-    corrEqMaxiter = eig_param->corr_eq_maxiter;
+    corr_eq_tol = eig_param->corr_eq_tol;
+    corr_eq_maxiter = eig_param->corr_eq_maxiter;
 
     // Additional auxiliar profilers used in the solvers for the correction equation
-    profileCorrEqInvs = new TimeProfile("profileCorrEqInvs");
-    profileMatCorrEqInvs = new TimeProfile("profileMatCorrEqInvs");
+    profile_corr_eq_invs = new TimeProfile("profile_corr_eq_invs");
+    profile_mat_corr_eq_invs = new TimeProfile("profile_mat_corr_eq_invs");
 
     QudaInvertParam refineparam = *eig_param->invert_param;
     refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
     solverParam = new SolverParam(refineparam);
-    solverParam->tol = corrEqTol;
-    solverParam->maxiter = corrEqMaxiter;
+    solverParam->tol = corr_eq_tol;
+    solverParam->maxiter = corr_eq_maxiter;
     solverParam->use_init_guess = QUDA_USE_INIT_GUESS_YES;
     solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
     // disable preconditioning on solvers used in the correction equation
@@ -90,8 +83,8 @@ namespace quda
 
     // Solvers used in the correction equation
     cg = new CG(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
-                *solverParam, *profileMatCorrEqInvs);
-    gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profileCorrEqInvs);
+                *solverParam, *profile_mat_corr_eq_invs);
+    gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -108,6 +101,11 @@ namespace quda
     //		   for this (this within JD::eigsolveInSubspace(...))
     //		5. avoid the mess being done for sorting Ritz eigenpairs after the eigendecomposition
     //		   (this within JD::eigsolveInSubspace(...))
+    //		6. any more changes from camelCase ---> underscore_case needed ?
+    //		7. see blockOrthogonalization in the base eigensolver class. You can negate the dot products on the host,
+    //		   then pass the array to a MULTI blas version: for (int i=0; i<tmpSize; i++) ortDotProd[i] *= -1.0;
+    //								blas::caxpy(ortDotProd[i], tmpOrtSpace, *vectr[0]);
+    //		8. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -117,15 +115,13 @@ namespace quda
     }
 
     // Setting some initial parameters of the eigensolver
-    // DMHJD: Don't declare these here, declare in the class definition.
-    //       That way you don't have to keep passing them around as arguments to functions
-    int k = 0, k_max = eig_param->nConv, m = 0;
-    int m_max = eig_param->mmax, m_min = eig_param->mmin;
-    // 'theta' is the <shift> for the eigensolver
-    double theta = 0.0;
 
-    // DMHJD: This is set in the base eigesolver class.
-    max_restarts = eig_param->max_restarts;
+    k = 0;
+    k_max = eig_param->nConv;
+    m = 0;
+    m_max = eig_param->mmax;
+    m_min = eig_param->mmin;
+    theta = 0.0;
 
     // Test for an initial guess
     testInitGuess(eigSpace[0]);
@@ -137,9 +133,9 @@ namespace quda
     ColorSpinorParam csParam(*eigSpace[0]);
 
     // Some more memory pre-allocations
-    moreInits(csParam, k_max, m_max, *eigSpace[0]);
+    moreInits(csParam, *eigSpace[0]);
 
-    Complex *ortDotProd = (Complex *)safe_malloc(std::max(m_max, k_max) * 1 * sizeof(Complex));
+    Complex *ort_dot_prod = (Complex *)safe_malloc(std::max(m_max, k_max) * 1 * sizeof(Complex));
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
 
@@ -180,8 +176,8 @@ namespace quda
       printfQuda("nConv %d\n", nConv);
       printfQuda("mmin %d\n", m_min);
       printfQuda("mmax %d\n", m_max);
-      printfQuda("corr-eq-maxiter %d\n", corrEqMaxiter);
-      printfQuda("corr-eq-tol %f\n", corrEqTol);
+      printfQuda("corr-eq-maxiter %d\n", corr_eq_maxiter);
+      printfQuda("corr-eq-tol %f\n", corr_eq_tol);
     }
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
@@ -190,29 +186,29 @@ namespace quda
     MatrixXcd H;
     SelfAdjointEigenSolver<MatrixXcd> eigensolver;
 
-    int loopr = 0;
+    loopr = 0;
 
     // Main loop
     while (restart_iter < max_restarts) {
 
       // Locking
-      orth(ortDotProd, t, eigSpace, k);
+      orth(ort_dot_prod, t, eigSpace, k);
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
-      orth(ortDotProd, t, V, m);
+      orth(ort_dot_prod, t, V, m);
 
       m++;
 
       // Push: V[m-1] = t, and then normalize it
       blas::copy(*V[m - 1], *t[0]);
-      double norm = sqrt(blas::norm2(*V[m - 1]));
+      norm = sqrt(blas::norm2(*V[m - 1]));
       blas::ax(1.0 / norm, *V[m - 1]);
       // and then apply A to that newly added vector
       matVec(mat, *V_A[m - 1], *V[m - 1]);
 
       // Perform the eigendecomposition in the acceleration subspace
       std::vector<std::pair<double, std::vector<Complex> *>> eigenpairs;
-      eigsolveInSubspace(eigenpairs, &eigensolver, &H, m);
+      eigsolveInSubspace(eigenpairs, &eigensolver, &H);
 
       // Computing the residual
       // u = V * s_1 -- lifting the first Ritz vector through V
@@ -236,18 +232,18 @@ namespace quda
       }
 
       // Check for convergence
-      checkIfConverged(eigenpairs, eigSpace, csParam, evals, norm, theta, loopr, k, m, k_max);
+      checkIfConverged(eigenpairs, eigSpace, csParam, evals);
 
       // Check if end has been reached
       if (k >= k_max) { break; }
 
       // Restart: shrink the acceleration subspace
-      if (m == m_max) { shrinkSubspace(eigenpairs, csParam, &H, theta, m, restart_iter, loopr, m_min); }
+      if (m == m_max) { shrinkSubspace(eigenpairs, csParam, &H); }
 
       // Solving the correction equation
       blas::copy(*t[0], *r[0]);
       {
-        invertProjMat(theta, matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
+        invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
 
       // Some local clean-up
@@ -269,11 +265,11 @@ namespace quda
       if (eig_param->require_convergence) {
         errorQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                   "restart steps. Exiting.",
-                  nConv, m_min, m_min, max_restarts);
+                  nConv, m_min, m_max, max_restarts);
       } else {
         warningQuda("JD failed to compute the requested %d vectors with a search space of size between %d and %d in %d "
                     "restart steps.",
-                    nConv, m_min, m_min, max_restarts);
+                    nConv, m_min, m_max, max_restarts);
       }
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
@@ -297,7 +293,7 @@ namespace quda
     for (auto p : tmpV) { delete p; }
     for (auto p : tmpAV) { delete p; }
     for (auto p : Qhat) { delete p; }
-    host_free(ortDotProd);
+    host_free(ort_dot_prod);
 
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
@@ -325,8 +321,8 @@ namespace quda
   // Jacobi-Davidson destructor
   JD::~JD()
   {
-    delete profileCorrEqInvs;
-    delete profileMatCorrEqInvs;
+    delete profile_corr_eq_invs;
+    delete profile_mat_corr_eq_invs;
 
     delete solverParam;
     delete solverParamPrec;
@@ -340,90 +336,90 @@ namespace quda
   // JD Member functions
   //---------------------------------------------------------------------------
 
-  void JD::invertProjMat(const double theta, const DiracMatrix &matPrecon, ColorSpinorField &x, ColorSpinorField &b,
-                         QudaVerbosity verb, int k, std::vector<ColorSpinorField *> &eigSpace)
+  void JD::invertProjMat(const DiracMatrix &matPrecon, ColorSpinorField &x, ColorSpinorField &b, QudaVerbosity verb,
+                         const int kp, std::vector<ColorSpinorField *> &projSpace)
   {
-    std::vector<ColorSpinorField *> &qSpace = eigSpace;
+    std::vector<ColorSpinorField *> &qSpace = projSpace;
 
     // Clone x's CSF params
     ColorSpinorParam csParam(x);
 
     // Buffers for the shifts of the matrix operators
-    double bareShift;
+    double bare_shift;
 
     // 1. solve for Qhat in K * Qhat = qSpace, with K a good (but 'cheap') preconditioner
 
-    int sizePS = k;
+    int size_ps = kp;
 
     // Casting away contractual constness
-    DiracMatrix &matUnconst = const_cast<DiracMatrix &>(matPrecon);
+    DiracMatrix &mat_unconst = const_cast<DiracMatrix &>(matPrecon);
 
     csParam.create = QUDA_COPY_FIELD_CREATE;
     //---------------------------------------------
     // Switching to the appropriate shift for JD
-    bareShift = matUnconst.shift;
-    matUnconst.shift = bareShift - theta;
+    bare_shift = mat_unconst.shift;
+    mat_unconst.shift = bare_shift - theta;
 
-    if (sizePS > 1) {
-      for (int i = 0; i < sizePS; i++) {
+    if (size_ps > 1) {
+      for (int i = 0; i < size_ps; i++) {
         blas::copy(*Qhat[i], *qSpace[i]);
-        K(*cg, corrEqTol, corrEqMaxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
+        K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
       }
     } else {
       blas::copy(*Qhat[0], *qSpace[0]);
-      K(*cg, corrEqTol, corrEqMaxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
+      K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
     }
 
     // and, switching back the shift parameters
-    matUnconst.shift = bareShift;
+    mat_unconst.shift = bare_shift;
     //---------------------------------------------
 
     // 2. M = qSpacedag * Qhat
 
-    MatrixXcd M = MatrixXcd::Zero(sizePS, sizePS);
-    if (sizePS > 1) {
-      std::vector<ColorSpinorField *> tmpQhat(Qhat.begin(), Qhat.begin() + sizePS);
-      std::vector<ColorSpinorField *> tmpQSpace(qSpace.begin(), qSpace.begin() + sizePS);
+    MatrixXcd M = MatrixXcd::Zero(size_ps, size_ps);
+    if (size_ps > 1) {
+      std::vector<ColorSpinorField *> tmpQhat(Qhat.begin(), Qhat.begin() + size_ps);
+      std::vector<ColorSpinorField *> tmpQSpace(qSpace.begin(), qSpace.begin() + size_ps);
 
-      Complex *resultDotProd = (Complex *)safe_malloc(sizePS * sizePS * sizeof(Complex));
-      blas::cDotProduct(resultDotProd, const_cast<std::vector<ColorSpinorField *> &>(tmpQSpace),
+      Complex *result_dot_prod = (Complex *)safe_malloc(size_ps * size_ps * sizeof(Complex));
+      blas::cDotProduct(result_dot_prod, const_cast<std::vector<ColorSpinorField *> &>(tmpQSpace),
                         const_cast<std::vector<ColorSpinorField *> &>(tmpQhat));
 
       // 3. LU decomposition of M -- TODO: move the application of .fullPivLu() to this sub-section ?
 
       // Init eigen object
-      for (int i = 0; i < sizePS; i++) {
-        for (int j = 0; j < sizePS; j++) { M(i, j) = resultDotProd[i * sizePS + j]; }
+      for (int i = 0; i < size_ps; i++) {
+        for (int j = 0; j < size_ps; j++) { M(i, j) = result_dot_prod[i * size_ps + j]; }
       }
 
       // Local clean-up
-      host_free(resultDotProd);
+      host_free(result_dot_prod);
     } else {
-      Complex resultDotProd = blas::cDotProduct(*qSpace[0], *Qhat[0]);
-      M(0, 0) = resultDotProd;
+      Complex result_dot_prod = blas::cDotProduct(*qSpace[0], *Qhat[0]);
+      M(0, 0) = result_dot_prod;
     }
 
     // 4. r_tilde = Ktilde^-1 * r
 
     //---------------------------------------------
     // Switching to the appropriate shift for JD
-    bareShift = matUnconst.shift;
-    matUnconst.shift = bareShift - theta;
+    bare_shift = mat_unconst.shift;
+    mat_unconst.shift = bare_shift - theta;
 
     // <r_tilde> is "r-hat" for a few of the upcoming lines
 
     blas::copy(*r_tilde[0], b);
-    K(*cg, corrEqTol, corrEqMaxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
+    K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
 
     // and, switching back the shift parameters
-    matUnconst.shift = bareShift;
+    mat_unconst.shift = bare_shift;
     //---------------------------------------------
 
-    if (sizePS > 1) {
-      MatrixXcd gamma(sizePS, 1);
-      for (int i = 0; i < sizePS; i++) { gamma(i, 0) = blas::cDotProduct(*qSpace[i], *r_tilde[0]); }
+    if (size_ps > 1) {
+      MatrixXcd gamma(size_ps, 1);
+      for (int i = 0; i < size_ps; i++) { gamma(i, 0) = blas::cDotProduct(*qSpace[i], *r_tilde[0]); }
       MatrixXcd alpha = M.fullPivLu().solve(gamma);
-      for (int i = 0; i < sizePS; i++) { blas::caxpy(-alpha(i), *Qhat[i], *r_tilde[0]); }
+      for (int i = 0; i < size_ps; i++) { blas::caxpy(-alpha(i), *Qhat[i], *r_tilde[0]); }
     } else {
       Complex gamma = blas::cDotProduct(*qSpace[0], *r_tilde[0]);
       Complex alpha = gamma / M(0, 0);
@@ -440,12 +436,12 @@ namespace quda
     mmPP->Mproj = M;
     mmPP->Qhat = Qhat;
     mmPP->solverParam_ = solverParam;
-    mmPP->matUnconst_ = &matUnconst;
+    mmPP->matUnconst_ = &mat_unconst;
     mmPP->cg_ = cg;
     mmPP->eigSlvr = this;
-    mmPP->k = k;
-    mmPP->tol = corrEqTol;
-    mmPP->maxiter = corrEqMaxiter;
+    mmPP->k = size_ps;
+    mmPP->tol = corr_eq_tol;
+    mmPP->maxiter = corr_eq_maxiter;
 
     blas::zero(x);
     QudaVerbosity verbTmp = getVerbosity();
@@ -473,7 +469,7 @@ namespace quda
     setVerbosity(verbTmp);
   }
 
-  void JD::moreInits(ColorSpinorParam &csParam, int k_max, int m_max, ColorSpinorField &initVec)
+  void JD::moreInits(ColorSpinorParam &csParam, ColorSpinorField &initVec)
   {
     // Init a zero residual
     csParam.create = QUDA_ZERO_FIELD_CREATE;
@@ -507,44 +503,35 @@ namespace quda
     }
   }
 
-  void JD::orth(Complex *ortDotProd, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ortSpace,
-                const int m)
+  void JD::orth(Complex *ort_dot_prod, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ort_space,
+                const int size_os)
   {
-    int tmpSize = m;
+    int tmp_size = size_os;
 
-    if (tmpSize == 0) { return; }
+    if (tmp_size == 0) { return; }
 
-    std::vector<ColorSpinorField *> tmpOrtSpace(ortSpace.begin(), ortSpace.begin() + tmpSize);
+    std::vector<ColorSpinorField *> tmp_ort_space(ort_space.begin(), ort_space.begin() + tmp_size);
 
     // normalize before the orthogonalization
-    double norm = sqrt(blas::norm2(*vectr[0]));
+    norm = sqrt(blas::norm2(*vectr[0]));
     blas::ax(1.0 / norm, *vectr[0]);
 
-    // DMHJD: see blockOrthogonalization in the base eigensolver class. You can negate
-    //        the dot products on the host, then pass the array to a MULTI blas
-    //        version:
-    //        for (int i=0; i<tmpSize; i++) ortDotProd[i] *= -1.0;
-    //        blas::caxpy(ortDotProd[i], tmpOrtSpace, *vectr[0]);
-    //        Also, you seem to be orthogonalising twice. Is this intended?
-    //        This routine souble likely be replaced by the blockOrthogonalise
-
-    blas::cDotProduct(ortDotProd, tmpOrtSpace, vectr);
+    blas::cDotProduct(ort_dot_prod, tmp_ort_space, vectr);
     // double reorthogonalization
-    for (int i = 0; i < tmpSize; i++) { blas::caxpy(-ortDotProd[i], *tmpOrtSpace[i], *vectr[0]); }
+    for (int i = 0; i < tmp_size; i++) { blas::caxpy(-ort_dot_prod[i], *tmp_ort_space[i], *vectr[0]); }
 
     // normalize before the re-orthogonalization
     norm = sqrt(blas::norm2(*vectr[0]));
     blas::ax(1.0 / norm, *vectr[0]);
 
-    blas::cDotProduct(ortDotProd, tmpOrtSpace, vectr);
+    blas::cDotProduct(ort_dot_prod, tmp_ort_space, vectr);
     // double reorthogonalization
-    for (int i = 0; i < tmpSize; i++) { blas::caxpy(-ortDotProd[i], *tmpOrtSpace[i], *vectr[0]); }
+    for (int i = 0; i < tmp_size; i++) { blas::caxpy(-ort_dot_prod[i], *tmp_ort_space[i], *vectr[0]); }
   }
 
   void JD::checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,
                             std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
-                            std::vector<Complex> &evals, double &norm, double &theta, int &loopr, int &k, int &m,
-                            const int k_max)
+                            std::vector<Complex> &evals)
   {
     csParam.create = QUDA_COPY_FIELD_CREATE;
 
@@ -578,7 +565,7 @@ namespace quda
   }
 
   void JD::shrinkSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, ColorSpinorParam &csParam,
-                          void *H_, double &theta, int &m, int &restart_iter, int &loopr, const int m_min)
+                          void *H_)
   {
     // TODO:
     //		1. add exceptions for case: (loopr+m_min) > m_max
@@ -629,7 +616,7 @@ namespace quda
   }
 
   void JD::eigsolveInSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, void *eigensolver_,
-                              void *H_, const int m)
+                              void *H_)
   {
     SelfAdjointEigenSolver<MatrixXcd> &eigensolver = *((SelfAdjointEigenSolver<MatrixXcd> *)(eigensolver_));
     MatrixXcd &H = *((MatrixXcd *)H_);
@@ -665,23 +652,7 @@ namespace quda
   // Projection matrix used in the solution of the correction equation
   //---------------------------------------------------------------------------
 
-  // DMHJD: The reason the base Dirac class has three versions of the (virtual)
-  //        versions of the operator is that the matrix operator routines have
-  //        different optimisation code path depending on whether you pass tmps.
-  //        They use the temp vectors rather than allocate their own.
-  //        If you look in DiracMMdag, you see how the different operator versions
-  //        (no temp, one temp, teo temps) are defined. You should create a function
-  //        that does the actual thing you want to do, then wrap these three diferent
-  //        operators around that function. for example:
-  //        void operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
-  //  {
-  //   dirac->tmp1 = &tmp;
-  //   yourFunction(out, in);
-  //   dirac->tmp1 = NULL;
-  //  }
-  //  That way you don't have to repeat code.
-
-  void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+  void matCorrEq(ColorSpinorField &out, const ColorSpinorField &in, const DiracPrecProjCorr &mmPP)
   {
     double norm_bf = sqrt(blas::norm2(in));
 
@@ -693,160 +664,65 @@ namespace quda
     }
 
     // unpacking some attributes
-    SolverParam &solverParam = *solverParam_;
-    DiracMatrix &matUnconst = *matUnconst_;
-    CG &cgx = *cg_;
+    SolverParam &solverParam = *(mmPP.solverParam_);
+    DiracMatrix &matUnconst = *(mmPP.matUnconst_);
+    CG &cgx = *(mmPP.cg_);
 
     // 1. y = (A - \theta I)v
 
     matUnconst(out, in);
-    blas::caxpy(-theta, const_cast<ColorSpinorField &>(in), out);
+    blas::caxpy(-mmPP.theta, const_cast<ColorSpinorField &>(in), out);
 
     // 2. y_hat = K^-1 * y
 
-    blas::copy(*y_hat[0], out);
+    blas::copy(*(mmPP.y_hat[0]), out);
 
     //---------------------------------------------
     // Switching to the appropriate shift for JD
-    double bareShift = matUnconst.shift;
-    matUnconst.shift = bareShift - theta;
+    double bare_shift = matUnconst.shift;
+    matUnconst.shift = bare_shift - mmPP.theta;
 
-    eigSlvr->K(cgx, tol, maxiter, QUDA_SILENT, solverParam, *y_hat[0], out);
+    (mmPP.eigSlvr)->K(cgx, mmPP.tol, mmPP.maxiter, QUDA_SILENT, solverParam, *(mmPP.y_hat[0]), out);
 
     // Switching back the shift parameters
-    matUnconst.shift = bareShift;
+    matUnconst.shift = bare_shift;
     //---------------------------------------------
 
-    int sizePS = k;
+    int size_ps = mmPP.k;
 
-    if (sizePS > 1) {
-      Eigen::MatrixXcd gamma(sizePS, 1);
-      for (int i = 0; i < sizePS; i++) { gamma(i, 0) = blas::cDotProduct(*projSpace[i], *y_hat[0]); }
-      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
-      for (int i = 0; i < sizePS; i++) { blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]); }
+    if (size_ps > 1) {
+      Eigen::MatrixXcd gamma(size_ps, 1);
+      for (int i = 0; i < size_ps; i++) { gamma(i, 0) = blas::cDotProduct(*(mmPP.projSpace[i]), *(mmPP.y_hat[0])); }
+      Eigen::MatrixXcd alpha = (mmPP.Mproj).fullPivLu().solve(gamma);
+      for (int i = 0; i < size_ps; i++) { blas::caxpy(-alpha(i), *(mmPP.Qhat[i]), *(mmPP.y_hat[0])); }
     } else {
-      Complex gamma = blas::cDotProduct(*projSpace[0], *y_hat[0]);
-      Complex alpha = gamma / Mproj(0, 0);
-      blas::caxpy(-alpha, *Qhat[0], *y_hat[0]);
+      Complex gamma = blas::cDotProduct(*(mmPP.projSpace[0]), *(mmPP.y_hat[0]));
+      Complex alpha = gamma / (mmPP.Mproj(0, 0));
+      blas::caxpy(-alpha, *(mmPP.Qhat[0]), *(mmPP.y_hat[0]));
     }
 
     // out = *y_hat[0];
-    blas::copy(out, *y_hat[0]);
+    blas::copy(out, *(mmPP.y_hat[0]));
+  }
+
+  void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
+    matCorrEq(out, in, *this);
   }
 
   void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &tmp) const
   {
-    double norm_bf = sqrt(blas::norm2(in));
-
-    if (norm_bf == 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        warningQuda("Received a zero spinor in DiracPrecProjCorr::operator() within JD");
-      blas::zero(out);
-      return;
-    }
-
     dirac->tmp1 = &tmp;
-
-    // unpacking some attributes
-    SolverParam &solverParam = *solverParam_;
-    DiracMatrix &matUnconst = *matUnconst_;
-    CG &cgx = *cg_;
-
-    // 1. y = (A - \theta I)v
-
-    matUnconst(out, in);
-    blas::caxpy(-theta, const_cast<ColorSpinorField &>(in), out);
-
-    // 2. y_hat = K^-1 * y
-
-    blas::copy(*y_hat[0], out);
-
-    //---------------------------------------------
-    // Switching to the appropriate shift for JD
-    double bareShift = matUnconst.shift;
-    matUnconst.shift = bareShift - theta;
-
-    eigSlvr->K(cgx, tol, maxiter, QUDA_SILENT, solverParam, *y_hat[0], out);
-
-    // Switching back the shift parameters
-    matUnconst.shift = bareShift;
-    //---------------------------------------------
-
-    int sizePS = k;
-
-    if (sizePS > 1) {
-      Eigen::MatrixXcd gamma(sizePS, 1);
-      for (int i = 0; i < sizePS; i++) { gamma(i, 0) = blas::cDotProduct(*projSpace[i], *y_hat[0]); }
-      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
-      for (int i = 0; i < sizePS; i++) { blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]); }
-    } else {
-      Complex gamma = blas::cDotProduct(*projSpace[0], *y_hat[0]);
-      Complex alpha = gamma / Mproj(0, 0);
-      blas::caxpy(-alpha, *Qhat[0], *y_hat[0]);
-    }
-
-    // out = *y_hat[0];
-    blas::copy(out, *y_hat[0]);
-
+    matCorrEq(out, in, *this);
     dirac->tmp1 = NULL;
   }
 
   void DiracPrecProjCorr::operator()(ColorSpinorField &out, const ColorSpinorField &in, ColorSpinorField &Tmp1,
                                      ColorSpinorField &Tmp2) const
   {
-    double norm_bf = sqrt(blas::norm2(in));
-
-    if (norm_bf == 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE)
-        warningQuda("Received a zero spinor in DiracPrecProjCorr::operator() within JD");
-      blas::zero(out);
-      return;
-    }
-
     dirac->tmp1 = &Tmp1;
     dirac->tmp2 = &Tmp2;
-
-    // unpacking some attributes
-    SolverParam &solverParam = *solverParam_;
-    DiracMatrix &matUnconst = *matUnconst_;
-    CG &cgx = *cg_;
-
-    // 1. y = (A - \theta I)v
-
-    matUnconst(out, in);
-    blas::caxpy(-theta, const_cast<ColorSpinorField &>(in), out);
-
-    // 2. y_hat = K^-1 * y
-
-    blas::copy(*y_hat[0], out);
-
-    //---------------------------------------------
-    // Switching to the appropriate shift for JD
-    double bareShift = matUnconst.shift;
-    matUnconst.shift = bareShift - theta;
-
-    eigSlvr->K(cgx, tol, maxiter, QUDA_SILENT, solverParam, *y_hat[0], out);
-
-    // Switching back the shift parameters
-    matUnconst.shift = bareShift;
-    //---------------------------------------------
-
-    int sizePS = k;
-
-    if (sizePS > 1) {
-      Eigen::MatrixXcd gamma(sizePS, 1);
-      for (int i = 0; i < sizePS; i++) { gamma(i, 0) = blas::cDotProduct(*projSpace[i], *y_hat[0]); }
-      Eigen::MatrixXcd alpha = Mproj.fullPivLu().solve(gamma);
-      for (int i = 0; i < sizePS; i++) { blas::caxpy(-alpha(i), *Qhat[i], *y_hat[0]); }
-    } else {
-      Complex gamma = blas::cDotProduct(*projSpace[0], *y_hat[0]);
-      Complex alpha = gamma / Mproj(0, 0);
-      blas::caxpy(-alpha, *Qhat[0], *y_hat[0]);
-    }
-
-    // out = *y_hat[0];
-    blas::copy(out, *y_hat[0]);
-
+    matCorrEq(out, in, *this);
     dirac->tmp2 = NULL;
     dirac->tmp1 = NULL;
   }
