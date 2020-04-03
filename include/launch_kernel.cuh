@@ -1,4 +1,51 @@
-#define LAUNCH_KERNEL(kernel, tp, stream, arg, ...)			\
+#ifdef QUDA_FAST_COMPILE_REDUCE
+// only compile block size with a single warp
+#define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
+  switch (tp.block.x) {							\
+  case 32:								\
+    kernel<32,__VA_ARGS__>						\
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
+    break;								\
+  case 64:								\
+  case 96:								\
+  case 128:								\
+  case 160:								\
+  case 192:								\
+  case 224:								\
+  case 256:								\
+  case 288:								\
+  case 320:								\
+  case 352:								\
+  case 384:								\
+  case 416:								\
+  case 448:								\
+  case 480:								\
+  case 512:								\
+  case 544:								\
+  case 576:								\
+  case 608:								\
+  case 640:								\
+  case 672:								\
+  case 704:								\
+  case 736:								\
+  case 768:								\
+  case 800:								\
+  case 832:								\
+  case 864:								\
+  case 896:								\
+  case 928:								\
+  case 960:								\
+  case 992:								\
+  case 1024:								\
+    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
+    break;                                                              \
+default:								\
+    errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
+  }
+
+#else
+
+#define LAUNCH_KERNEL(kernel, tunable, tp, stream, arg, ...)            \
   switch (tp.block.x) {							\
   case 32:								\
     kernel<32,__VA_ARGS__>						\
@@ -132,7 +179,41 @@
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }
 
-#define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tp, stream, arg, ...)	\
+#endif // QUDA_FAST_COMPILE_REDUCE
+
+#ifdef QUDA_FAST_COMPILE_REDUCE
+
+// only compile block size with a single warp
+#define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tunable, tp, stream, arg, ...) \
+  switch (tp.block.x) {							\
+  case 32:								\
+    kernel<32,__VA_ARGS__>						\
+      <<< tp.grid, tp.block, tp.shared_bytes, stream >>>(arg);		\
+    break;								\
+  case 64:								\
+  case 96:								\
+  case 128:								\
+  case 160:								\
+  case 192:								\
+  case 224:								\
+  case 256:								\
+  case 288:								\
+  case 320:								\
+  case 352:								\
+  case 384:								\
+  case 416:								\
+  case 448:								\
+  case 480:								\
+  case 512:								\
+    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                   \
+    break;                                                              \
+  default:								\
+    errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
+    }
+
+#else
+
+#define LAUNCH_KERNEL_LOCAL_PARITY(kernel, tunable, tp, stream, arg, ...) \
   switch (tp.block.x) {							\
   case 32:								\
     kernel<32,__VA_ARGS__>						\
@@ -202,15 +283,21 @@
     errorQuda("%s not implemented for %d threads", #kernel, tp.block.x); \
     }
 
+#endif
+
 #define LAUNCH_KERNEL_MG_BLOCK_SIZE(kernel, tp, stream, arg, ...)                                                      \
   switch (tp.block.x) {                                                                                                \
   case 4: kernel<4, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
   case 8: kernel<8, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
+  case 9: kernel<9, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                          \
   case 12: kernel<12, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 16: kernel<16, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 18: kernel<18, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 24: kernel<24, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 27: kernel<27, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 32: kernel<32, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 36: kernel<36, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 48: kernel<48, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 54: kernel<54, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 64: kernel<64, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 72: kernel<72, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
@@ -230,7 +317,23 @@
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }
 
-#define LAUNCH_KERNEL_REDUCE(kernel, tp, stream, arg, ...)                                                             \
+#ifdef QUDA_FAST_COMPILE_REDUCE
+
+ // only compile block size with a single warp
+#define LAUNCH_KERNEL_REDUCE(kernel, tunable, tp, stream, arg, ...)                                                    \
+  switch (tp.block.x) {                                                                                                \
+  case 32: kernel<32, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
+  case 64:                                                                                                             \
+  case 96:                                                                                                             \
+  case 128:                                                                                                            \
+    tunable.jitifyError() = CUDA_ERROR_INVALID_VALUE;                                                                  \
+    break;                                                                                                             \
+  default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
+  }
+
+#else
+
+#define LAUNCH_KERNEL_REDUCE(kernel, tunable, tp, stream, arg, ...)                                                    \
   switch (tp.block.x) {                                                                                                \
   case 32: kernel<32, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
   case 64: kernel<64, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                        \
@@ -238,3 +341,5 @@
   case 128: kernel<128, __VA_ARGS__><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg); break;                      \
   default: errorQuda("%s block size %d not instantiated", #kernel, tp.block.x);                                        \
   }
+
+#endif

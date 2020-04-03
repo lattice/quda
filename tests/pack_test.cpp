@@ -7,6 +7,7 @@
 #include <util_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 
 #include <color_spinor_field.h>
@@ -25,16 +26,6 @@ ColorSpinorParam csParam;
 
 int ODD_BIT = 0;
 int DAGGER_BIT = 0;
-
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern char latfile[];
-extern int gridsize_from_cmdline[];
     
 QudaPrecision prec_cpu = QUDA_DOUBLE_PRECISION;
 
@@ -118,12 +109,9 @@ void packTest() {
     GaugeFieldParam cpsParam(cpsCpuGauge_p, param);
     cpuGaugeField cpsCpuGauge(cpsParam);
     cpsParam.create = QUDA_NULL_FIELD_CREATE;
-    cpsParam.setPrecision(param.cuda_prec);
     cpsParam.reconstruct = param.reconstruct;
+    cpsParam.setPrecision(param.cuda_prec, true);
     cpsParam.pad = param.ga_pad;
-    cpsParam.order = (cpsParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      cpsParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaCpsGauge(cpsParam);
 
     stopwatchStart();
@@ -145,12 +133,9 @@ void packTest() {
     GaugeFieldParam qdpParam(qdpCpuGauge_p, param);
     cpuGaugeField qdpCpuGauge(qdpParam);
     qdpParam.create = QUDA_NULL_FIELD_CREATE;
-    qdpParam.setPrecision(param.cuda_prec);
     qdpParam.reconstruct = param.reconstruct;
+    qdpParam.setPrecision(param.cuda_prec, true);
     qdpParam.pad = param.ga_pad;
-    qdpParam.order = (qdpParam.Precision() == QUDA_DOUBLE_PRECISION ||
-		      qdpParam.reconstruct == QUDA_RECONSTRUCT_NO ) ?
-      QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
     cudaGaugeField cudaQdpGauge(qdpParam);
 
     stopwatchStart();
@@ -187,16 +172,16 @@ void packTest() {
 
 }
 
-extern void usage(char**);
-
 int main(int argc, char **argv) {
-  for (int i=1; i<argc; i++){    
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }  
-    
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   initComms(argc, argv, gridsize_from_cmdline);

@@ -13,6 +13,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_dslash_reference.h>
 #include <staggered_gauge_utils.h>
@@ -28,6 +29,7 @@
 
 #include <qio_field.h>
 
+#include "dslash_test_helpers.h"
 #include <assert.h>
 #include <gtest/gtest.h>
 
@@ -35,10 +37,6 @@ using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define staggeredSpinorSiteSize 6
-// What test are we doing (0 = dslash, 1 = MatPC, 2 = Mat)
-extern int test_type;
-
-extern void usage(char** argv );
 
 // Only load the gauge from a file once.
 bool gauge_loaded = false;
@@ -73,28 +71,11 @@ bool global_skip = true; // hack to skip tests
 
 
 QudaParity parity = QUDA_EVEN_PARITY;
-extern QudaDagType dagger;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int device;
-extern bool verify_results;
-extern int niter;
-extern double mass; // the mass of the Dirac operator
-extern double kappa; // will get overriden
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-extern QudaDslashType dslash_type;
 
-// extern double tadpole_factor;
-extern double eps_naik; // relativistic correction for naik term
 static int n_naiks = 1; // Number of naiks. If eps_naik is 0.0, we only need to construct one naik.
 
-extern char latfile[];
 
 int X[4];
-extern int Nsrc; // number of spinors to apply to simultaneously
 
 Dirac* dirac;
 
@@ -104,6 +85,18 @@ const char *recon_str[] = {"r18", "r13", "r9"};
 // For loading the gauge fields
 int argc_copy;
 char** argv_copy;
+
+dslash_test_type dtest_type = dslash_test_type::Dslash;
+CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
+                                                      {"MatPC", dslash_test_type::MatPC},
+                                                      {"Mat", dslash_test_type::Mat}
+                                                      // left here for completeness but not support in staggered dslash test
+                                                      // {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
+                                                      // {"MatDagMat", dslash_test_type::MatDagMat},
+                                                      // {"M5", dslash_test_type::M5},
+                                                      // {"M5inv", dslash_test_type::M5inv},
+                                                      // {"Dslash4pre", dslash_test_type::Dslash4pre}
+                                                    };
 
 double getTolerance(QudaPrecision prec)
 {
@@ -333,7 +326,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   csParam.setPrecision(inv_param.cpu_prec);
   inv_param.solution_type = QUDA_MAT_SOLUTION;
   csParam.pad = 0;
-  if (test_type < 2 && dslash_type != QUDA_LAPLACE_DSLASH) {
+  if (dtest_type != dslash_test_type::Mat && dslash_type != QUDA_LAPLACE_DSLASH) {
     csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
     csParam.x[0] /= 2;
   } else {
@@ -372,7 +365,7 @@ void init(int precision, QudaReconstructType link_recon, int partition)
 
   tmp = new cudaColorSpinorField(csParam);
 
-  bool pc = (test_type == 1); // For test_type 0, can use either pc or not pc
+  bool pc = (dtest_type == dslash_test_type::MatPC);  // For test_type 0, can use either pc or not pc
                               // because both call the same "Dslash" directly.
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, pc);
@@ -457,10 +450,11 @@ DslashTime dslashCUDA(int niter) {
 
     gettimeofday(&tstart, NULL);
 
-    switch (test_type) {
-    case 0: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
-    case 1: dirac->M(*cudaSpinorOut, *cudaSpinor); break;
-    case 2: dirac->M(*cudaSpinorOut, *cudaSpinor); break;
+    switch (dtest_type) {
+    case dslash_test_type::Dslash: dirac->Dslash(*cudaSpinorOut, *cudaSpinor, parity); break;
+    case dslash_test_type::MatPC: dirac->M(*cudaSpinorOut, *cudaSpinor); break;
+    case dslash_test_type::Mat: dirac->M(*cudaSpinorOut, *cudaSpinor); break;
+    default: errorQuda("Test type %d not defined on staggered dslash.\n", static_cast<int>(dtest_type));
     }
 
     gettimeofday(&tstop, NULL);
@@ -500,16 +494,16 @@ void staggeredDslashRef()
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
   fflush(stdout);
-  switch (test_type) {
-    case 0:
+  switch (dtest_type) {
+    case dslash_test_type::Dslash:
       staggered_dslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
                        parity, dagger, inv_param.cpu_prec, gauge_param.cpu_prec, dslash_type);
       break;
-    case 1:
+    case dslash_test_type::MatPC:
       matdagmat(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor, mass, 0,
                 inv_param.cpu_prec, gauge_param.cpu_prec, tmpCpu, parity, dslash_type);
       break;
-    case 2:
+    case dslash_test_type::Mat:
       // The !dagger is to compensate for the convention of actually
       // applying -D_eo and -D_oe.
       staggered_dslash(reinterpret_cast<cpuColorSpinorField *>(&spinorRef->Even()), qdp_fatlink_cpu, qdp_longlink_cpu,
@@ -535,8 +529,8 @@ void display_test_info(int precision, QudaReconstructType link_recon)
   auto prec = precision == 2 ? QUDA_DOUBLE_PRECISION : precision  == 1 ? QUDA_SINGLE_PRECISION : QUDA_HALF_PRECISION;
 
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
-  printfQuda("%s   %s       %d           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
-             test_type, dagger, xdim, ydim, zdim, tdim);
+  printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
+             get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
   return ;
 
 }
@@ -546,17 +540,6 @@ using ::testing::Bool;
 using ::testing::Values;
 using ::testing::Range;
 using ::testing::Combine;
-
-
-void usage_extra(char** argv )
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/1>                             # Test method\n");
-  printfQuda("                                                0: Even destination spinor\n");
-  printfQuda("                                                1: Odd destination spinor\n");
-  return ;
-}
-
 using ::testing::TestWithParam;
 using ::testing::Bool;
 using ::testing::Values;
@@ -739,14 +722,16 @@ TEST_P(StaggeredDslashTest, benchmark) {
 
     // initalize google test
     ::testing::InitGoogleTest(&argc, argv);
-    for (int i = 1; i < argc; i++) {
-
-      if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-      fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-      usage(argv);
+    auto app = make_app();
+    app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
+    // add_eigen_option_group(app);
+    // add_deflation_option_group(app);
+    // add_multigrid_option_group(app);
+    try {
+      app->parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+      return app->exit(e);
     }
-
     initComms(argc, argv, gridsize_from_cmdline);
 
     // Ensure that the default is improved staggered
@@ -779,9 +764,11 @@ TEST_P(StaggeredDslashTest, benchmark) {
       }
     }
 
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      if (test_type != 2) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }
+  if (dslash_type == QUDA_LAPLACE_DSLASH) {
+    if (dtest_type != dslash_test_type::Mat) {
+      errorQuda("Test type %s is not supported for the Laplace operator.\n", get_string(dtest_type_map, dtest_type).c_str());
     }
+  }
 
     // return result of RUN_ALL_TESTS
     int test_rc = RUN_ALL_TESTS();

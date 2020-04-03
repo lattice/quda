@@ -2,19 +2,22 @@
 # cmake-format: off
 set (QUDA_OBJS
   # cmake-format: sortable
-  dirac_coarse.cpp dslash_coarse.cu coarse_op.cu coarsecoarse_op.cu
-  coarse_op_preconditioned.cu
+  dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
+  coarse_op.cu coarsecoarse_op.cu
+  coarse_op_preconditioned.cu staggered_coarse_op.cu
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
-  prolongator.cu restrictor.cu gauge_phase.cu timer.cpp malloc.cpp
+  prolongator.cu restrictor.cu staggered_prolong_restrict.cu
+  gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
-  gauge_stout.cu gauge_plaq.cu laplace.cu gauge_laplace.cpp
+  gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
+  laplace.cu gauge_laplace.cpp gauge_observable.cpp
   inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
-  color_spinor_wuppertal.cu covDev.cu gauge_covdev.cpp 
+  covDev.cu gauge_covdev.cpp
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp dirac.cpp
   clover_field.cpp lattice_field.cpp gauge_field.cpp
   cpu_gauge_field.cpp cuda_gauge_field.cpp extract_gauge_ghost.cu
@@ -36,7 +39,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
   dslash_pack2.cu
-  blas_quda.cu multi_blas_quda.cu copy_quda.cu reduce_quda.cu
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   clover_deriv_quda.cu clover_invert.cu copy_gauge_extended.cu
@@ -68,7 +71,8 @@ set (QUDA_OBJS
   gauge_fix_ovr_extra.cu gauge_fix_fft.cu gauge_fix_ovr.cu
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
-  quda_cuda_api.cpp deflation.cpp checksum.cu version.cpp )
+  quda_cuda_api.cpp deflation.cpp checksum.cu
+  instantiate.cpp version.cpp )
 # cmake-format: on
 
 # split source into cu and cpp files
@@ -135,7 +139,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
                                 $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
-# some clang warnings shouds be warning even when turning warnings into errors
+# some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp
                          PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
@@ -151,15 +155,39 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_MULTIGRID)
+  target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+endif(QUDA_MULTIGRID)
+
+if(QUDA_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_TOOLS)
+  add_definitions(-DGPU_UNITARIZE)
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif(QUDA_GAUGE_ALG)
+
+if(QUDA_JITIFY)
+  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
+  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
+endif()
+
+if(QUDA_NVTX)
+  if(NOT NVTX3)
+    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
+  endif()
+endif(QUDA_NVTX)
+
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
   set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
   target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
 endif()
 
 if(QUDA_QIO)
-  if(QUDA_DOWNLOAD_USQCD)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
   endif()
@@ -173,7 +201,7 @@ if(QUDA_QDPJIT)
 endif()
 
 if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
   endif()

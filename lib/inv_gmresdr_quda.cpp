@@ -208,14 +208,14 @@ namespace quda {
     }
 
 
- GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
+ GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+   Solver(mat, matSloppy, matPrecon, param, profile), K(nullptr), Kparam(param),
+   Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
-     if (param.inv_type_precondition == QUDA_CG_INVERTER) 
-       K = new CG(matPrecon, matPrecon, Kparam, profile);
+     if (param.inv_type_precondition == QUDA_CG_INVERTER)
+       K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
      else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) 
        K = new BiCGstab(matPrecon, matPrecon, matPrecon, Kparam, profile);
      else if (param.inv_type_precondition == QUDA_MR_INVERTER) 
@@ -226,21 +226,17 @@ namespace quda {
        K = nullptr;
      else
        errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
-
-
-     return;
  }
 
- GMResDR::GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
+  GMResDR::GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+   Solver(mat, matSloppy, matPrecon, param, profile), K(&K), Kparam(param),
     Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false) { }
 
 
  GMResDR::~GMResDR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    if(init)
-    {
+    if (init) {
       delete Vm;
       Vm = nullptr;
 
@@ -432,13 +428,13 @@ int GMResDR::FlexArnoldiProcedure(const int start_idx, const bool do_givens = fa
    {
      Map<MatrixXcd, Unaligned, DynamicStride> givensH_(givensH.get(), args.m, args.m, DynamicStride(args.m+1,1) );
      memcpy(args.eta.data(),  args.c, args.m*sizeof(Complex));
-     memset(args.c, 0, (args.m+1)*sizeof(Complex));
+     memset((void *)args.c, 0, (args.m + 1) * sizeof(Complex));
      args.c[0] = c0;
 
      givensH_.triangularView<Upper>().solveInPlace<OnTheLeft>(args.eta);
 
    } else {
-     memset(args.c, 0, (args.m+1)*sizeof(Complex));
+     memset((void *)args.c, 0, (args.m + 1) * sizeof(Complex));
 
      std::vector<ColorSpinorField*> v_(Vm->Components().begin(), Vm->Components().begin()+args.k+1);
      std::vector<ColorSpinorField*> r_;

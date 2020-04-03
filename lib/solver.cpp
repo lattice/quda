@@ -10,11 +10,18 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) :
+  Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 SolverParam &param, TimeProfile &profile) :
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
     param(param),
     profile(profile),
     node_parity(0),
-    eig_solve(nullptr)
+    eig_solve(nullptr),
+    deflate_init(false),
+    deflate_compute(true),
+    recompute_evals(!param.eig_param.preserve_evals)
   {
     // compute parity of the node
     for (int i=0; i<4; i++) node_parity += commCoords(i);
@@ -30,8 +37,8 @@ namespace quda {
   }
 
   // solver factory
-  Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
-			 DiracMatrix &matPrecon, TimeProfile &profile)
+  Solver* Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+			 const DiracMatrix &matPrecon, TimeProfile &profile)
   {
     Solver *solver = nullptr;
 
@@ -44,7 +51,7 @@ namespace quda {
     switch (param.inv_type) {
     case QUDA_CG_INVERTER:
       report("CG");
-      solver = new CG(mat, matSloppy, param, profile);
+      solver = new CG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_BICGSTAB_INVERTER:
       report("BiCGstab");
@@ -63,19 +70,19 @@ namespace quda {
       break;
     case QUDA_CA_CG_INVERTER:
       report("CA-CG");
-      solver = new CACG(mat, matSloppy, param, profile);
+      solver = new CACG(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_CGNE_INVERTER:
       report("CA-CGNE");
-      solver = new CACGNE(mat, matSloppy, param, profile);
+      solver = new CACGNE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_CGNR_INVERTER:
       report("CA-CGNR");
-      solver = new CACGNR(mat, matSloppy, param, profile);
+      solver = new CACGNR(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CA_GCR_INVERTER:
       report("CA-GCR");
-      solver = new CAGCR(mat, matSloppy, param, profile);
+      solver = new CAGCR(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_MR_INVERTER:
       report("MR");
@@ -130,11 +137,11 @@ namespace quda {
       break;
     case QUDA_CGNE_INVERTER:
       report("CGNE");
-      solver = new CGNE(mat, matSloppy, param, profile);
+      solver = new CGNE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CGNR_INVERTER:
       report("CGNR");
-      solver = new CGNR(mat, matSloppy, param, profile);
+      solver = new CGNR(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
@@ -153,49 +160,145 @@ namespace quda {
       errorQuda("Invalid solver type %d", param.inv_type);
     }
 
+    if (!mat.hermitian() && solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian solver");
     return solver;
   }
 
-  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, bool svd)
+  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
   {
     if (deflate_init) return;
 
     // Deflation requested + first instance of solver
-    profile.TPSTOP(QUDA_PROFILE_INIT);
+    bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
+    if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
+
     eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
-    profile.TPSTART(QUDA_PROFILE_INIT);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
-    // This is the vector precision used by matResidual
-    csParam.setPrecision(param.precision_sloppy, QUDA_INVALID_PRECISION, true);
-    param.evecs.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evecs[i] = ColorSpinorField::Create(csParam);
+    // This is the vector precision used by matPrecon
+    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
 
-    // Construct vectors to hold deflated RHS
-    defl_tmp1.push_back(ColorSpinorField::Create(csParam));
-    defl_tmp2.push_back(ColorSpinorField::Create(csParam));
+    if (deflate_compute) {
+      evecs.reserve(param.eig_param.nConv);
+      evals.reserve(param.eig_param.nConv);
 
-    param.evals.resize(param.eig_param.nConv);
-    for (int i = 0; i < param.eig_param.nConv; i++) param.evals[i] = 0.0;
-    profile.TPSTOP(QUDA_PROFILE_INIT);
-    (*eig_solve)(param.evecs, param.evals);
-    profile.TPSTART(QUDA_PROFILE_INIT);
+      deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
 
-    if (svd) {
-      // Resize deflation space and compute left SV of M
-      for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++)
-        param.evecs.push_back(ColorSpinorField::Create(csParam));
+      if (space && space->evecs.size() != 0) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Restoring deflation space of size %lu\n", space->evecs.size());
 
-      // Populate latter half of the array with left SV
-      eig_solve->computeSVD(mat, param.evecs, param.evals);
+        if ((!space->svd && param.eig_param.nConv != (int)space->evecs.size())
+            || (space->svd && 2 * param.eig_param.nConv != (int)space->evecs.size()))
+          errorQuda("Preserved deflation space size %lu does not match expected %d", space->evecs.size(),
+                    param.eig_param.nConv);
+
+        // move vectors from preserved space to local space
+        for (auto &vec : space->evecs) evecs.push_back(vec);
+
+        if (param.eig_param.nConv != (int)space->evals.size())
+          errorQuda("Preserved eigenvalues %lu does not match expected %lu", space->evals.size(), evals.size());
+
+        // move vectors from preserved space to local space
+        for (auto &val : space->evals) evals.push_back(val);
+
+        space->evecs.resize(0);
+        space->evals.resize(0);
+
+        delete space;
+        param.eig_param.preserve_deflation_space = nullptr;
+
+        // we successfully got the deflation space so disable any subsequent recalculation
+        deflate_compute = false;
+      } else {
+        // Computing the deflation space, rather than transferring, so we create space.
+        for (int i = 0; i < param.eig_param.nConv; i++) evecs.push_back(ColorSpinorField::Create(csParam));
+
+        evals.resize(param.eig_param.nConv);
+        for (int i = 0; i < param.eig_param.nConv; i++) evals[i] = 0.0;
+      }
     }
 
     deflate_init = true;
+
+    if (!param.is_preconditioner && !profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in){
+  void Solver::destroyDeflationSpace()
+  {
+    if (deflate_init) {
+      if (param.eig_param.preserve_deflation) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Preserving deflation space of size %lu\n", evecs.size());
+
+        if (param.eig_param.preserve_deflation_space) {
+          deflation_space *space = reinterpret_cast<deflation_space *>(param.eig_param.preserve_deflation_space);
+          // first ensure that any existing space is freed
+          for (auto &vec : space->evecs)
+            if (vec) delete vec;
+          space->evecs.resize(0);
+          delete space;
+        }
+
+        deflation_space *space = new deflation_space;
+
+        // if evecs size = 2x evals size then we are doing an SVD deflation
+        space->svd = (evecs.size() == 2 * evals.size()) ? true : false;
+
+        space->evecs.reserve(evecs.size());
+        for (auto &vec : evecs) space->evecs.push_back(vec);
+
+        space->evals.reserve(evals.size());
+        for (auto &val : evals) space->evals.push_back(val);
+
+        param.eig_param.preserve_deflation_space = space;
+      } else {
+        for (auto &vec : evecs)
+          if (vec) delete vec;
+      }
+
+      evecs.resize(0);
+      deflate_init = false;
+    }
+  }
+
+  void Solver::injectDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!evecs.empty()) errorQuda("Solver deflation space should be empty, instead size=%lu\n", defl_space.size());
+    // Create space for the eigenvalues
+    evals.resize(defl_space.size());
+    // Create space for the eigenvectors, destroy defl_space
+    for (auto &e : defl_space) { evecs.push_back(e); }
+    defl_space.resize(0);
+  }
+
+  void Solver::extractDeflationSpace(std::vector<ColorSpinorField *> &defl_space)
+  {
+    if (!defl_space.empty()) errorQuda("Container deflation space should be empty, instead size=%lu\n", defl_space.size());
+    // We do not care about the eigenvalues, they will be recomputed.
+    evals.resize(0);
+    // Create space for the eigenvectors, destroy evecs
+    for (auto &e : evecs ) { defl_space.push_back(e); }
+    evecs.resize(0);
+  }
+
+  void Solver::extendSVDDeflationSpace()
+  {
+    if (!deflate_init) errorQuda("Deflation space for this solver not computed");
+
+    // Double the size deflation space to accomodate for the extra singular vectors
+    // Clone from an existing vector
+    ColorSpinorParam csParam(*evecs[0]);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    // This is the vector precision used by matResidual
+    csParam.setPrecision(param.precision_precondition, QUDA_INVALID_PRECISION, true);
+    for (int i = param.eig_param.nConv; i < 2 * param.eig_param.nConv; i++) {
+      evecs.push_back(ColorSpinorField::Create(csParam));
+    }
+  }
+
+  void Solver::blocksolve(ColorSpinorField& out, ColorSpinorField& in)
+  {
     for (int i = 0; i < param.num_src; i++) {
       (*this)(out.Component(i), in.Component(i));
       param.true_res_offset[i] = param.true_res;
@@ -203,8 +306,8 @@ namespace quda {
     }
   }
 
-  double Solver::stopping(double tol, double b2, QudaResidualType residual_type) {
-
+  double Solver::stopping(double tol, double b2, QudaResidualType residual_type)
+  {
     double stop=0.0;
     if ( (residual_type & QUDA_L2_ABSOLUTE_RESIDUAL) &&
 	 (residual_type & QUDA_L2_RELATIVE_RESIDUAL) ) {

@@ -7,6 +7,7 @@
 #include <dslash_quda.h>
 #include <dslash_helper.cuh>
 #include <jitify_helper.cuh>
+#include <instantiate.h>
 
 namespace quda
 {
@@ -37,7 +38,7 @@ namespace quda
 
     const int nDimComms;
 
-    char aux_base[TuneKey::aux_n];
+    char aux_base[TuneKey::aux_n - 32];
     char aux[8][TuneKey::aux_n];
     char aux_pack[TuneKey::aux_n];
 
@@ -73,7 +74,7 @@ namespace quda
     {
       strcpy(aux[kernel_type], kernel_str);
       if (kernel_type == INTERIOR_KERNEL) strcat(aux[kernel_type], comm_dim_partitioned_string());
-      strcat(aux[kernel_type], aux_base);
+      strncat(aux[kernel_type], aux_base, TuneKey::aux_n - 1);
     }
 
     virtual bool tuneGridDim() const { return false; }
@@ -506,18 +507,6 @@ namespace quda
     }
   };
 
-  struct WilsonReconstruct {
-    static constexpr QudaReconstructType recon0 = QUDA_RECONSTRUCT_NO;
-    static constexpr QudaReconstructType recon1 = QUDA_RECONSTRUCT_12;
-    static constexpr QudaReconstructType recon2 = QUDA_RECONSTRUCT_8;
-  };
-
-  struct StaggeredReconstruct {
-    static constexpr QudaReconstructType recon0 = QUDA_RECONSTRUCT_NO;
-    static constexpr QudaReconstructType recon1 = QUDA_RECONSTRUCT_13;
-    static constexpr QudaReconstructType recon2 = QUDA_RECONSTRUCT_9;
-  };
-
   /**
      @brief This instantiate function is used to instantiate the reconstruct types used
      @param[out] out Output result field
@@ -526,26 +515,26 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon, typename Float, int nColor,
-      typename... Args>
+            typename... Args>
   inline void instantiate(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
   {
-    if (U.Reconstruct() == Recon::recon0) {
+    if (U.Reconstruct() == Recon::recon[0]) {
 #if QUDA_RECONSTRUCT & 4
-      Apply<Float, nColor, Recon::recon0>(out, in, U, args...);
+      Apply<Float, nColor, Recon::recon[0]>(out, in, U, args...);
 #else
       errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-18", QUDA_RECONSTRUCT);
 #endif
-    } else if (U.Reconstruct() == Recon::recon1) {
+    } else if (U.Reconstruct() == Recon::recon[1]) {
 #if QUDA_RECONSTRUCT & 2
-      Apply<Float, nColor, Recon::recon1>(out, in, U, args...);
+      Apply<Float, nColor, Recon::recon[1]>(out, in, U, args...);
 #else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12/13", QUDA_RECONSTRUCT);
 #endif
-    } else if (U.Reconstruct() == Recon::recon2) {
+    } else if (U.Reconstruct() == Recon::recon[2]) {
 #if QUDA_RECONSTRUCT & 1
-      Apply<Float, nColor, Recon::recon2>(out, in, U, args...);
+      Apply<Float, nColor, Recon::recon[2]>(out, in, U, args...);
 #else
-      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-12", QUDA_RECONSTRUCT);
+      errorQuda("QUDA_RECONSTRUCT=%d does not enable reconstruct-8/9", QUDA_RECONSTRUCT);
 #endif
     } else {
       errorQuda("Unsupported reconstruct type %d\n", U.Reconstruct());

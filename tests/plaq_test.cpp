@@ -6,6 +6,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include "misc.h"
 
@@ -19,27 +20,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-extern bool tune;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern double anisotropy;
-extern double epsilon;
-
-extern bool verify_results;
-
-extern char latfile[];
-extern double gaussian_sigma;
-
-extern QudaVerbosity verbosity;
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -78,18 +58,22 @@ void setGaugeParam(QudaGaugeParam &gauge_param)
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
   gauge_param.ga_pad = pad_size;
+#else
+  gauge_param.ga_pad = 0;
 #endif
 }
 
-extern void usage(char **);
-
-void plaq_test(int argc, char **argv)
+int main(int argc, char **argv)
 {
 
-  for (int i = 1; i < argc; i++) {
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
@@ -137,12 +121,7 @@ void plaq_test(int argc, char **argv)
   for (int dir = 0; dir < 4; dir++) { free(gauge[dir]); }
 
   finalizeComms();
-}
-
-int main(int argc, char **argv)
-{
-
-  plaq_test(argc, argv);
-
   return 0;
 }
+
+

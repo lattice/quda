@@ -15,6 +15,8 @@ namespace quda {
     cudaStream_t* getStream();
     cudaEvent_t* getReduceEvent();
     bool getFastReduce();
+    void initFastReduce(int words);
+    void completeFastReduce(int32_t words);
 
     template <typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
     void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
@@ -23,14 +25,8 @@ namespace quda {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
 
-      if (getFastReduce() && !commAsyncReduction()) {
-        // initialize the reduction values in 32-bit increments to INT_MIN
-        constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
-        void *h_reduce = getHostReduceBuffer();
-        for (unsigned int i = 0; i < tp.grid.z * NXZ * arg.NYW * words; i++) {
-          reinterpret_cast<int32_t *>(h_reduce)[i] = std::numeric_limits<int32_t>::min();
-        }
-      }
+      const int32_t words = tp.grid.z * NXZ * arg.NYW * sizeof(ReduceType) / sizeof(int32_t);
+      if (getFastReduce() && !commAsyncReduction()) initFastReduce(words);
 
 #ifdef WARP_MULTI_REDUCE
 #error "Untested - should be reverified"
@@ -43,7 +39,7 @@ namespace quda {
                                   .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                                   .launch(arg);
 #else
-      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
+      LAUNCH_KERNEL_REDUCE(multiReduceKernel, tunable, tp, stream, arg, ReduceType, FloatN, M, NXZ, Arg);
 #endif
 #endif
 
@@ -51,18 +47,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64) || defined(__LP64__))
         if (deviceProp.canMapHostMemory) {
           if (getFastReduce()) {
-            constexpr int32_t words = sizeof(ReduceType) / sizeof(int32_t);
-            volatile int32_t *check = reinterpret_cast<int32_t *>(getHostReduceBuffer());
-            int count = 0;
-            for (unsigned int i = 0; i < tp.grid.z * NXZ * arg.NYW * words; i++) {
-              // spin-wait until all values have been updated
-              while (check[i] == std::numeric_limits<int32_t>::min()) {
-                if (count++ % 10000 == 0) { // check error every 10000 iterations
-                  // if there is an error in the kernel then we need to exit the spin-wait
-                  if (cudaSuccess != cudaPeekAtLastError()) break;
-                }
-              }
-            }
+            completeFastReduce(words);
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
             while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
@@ -144,6 +129,7 @@ namespace quda {
 
         strcpy(aux, "policy_kernel,");
         strcat(aux, x[0]->AuxString());
+        if (getFastReduce()) strcat(aux, ",fast_reduce");
 
         // since block dot product and block norm use the same functors, we need to distinguish them
         bool is_norm = false;
@@ -378,16 +364,16 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
         if (x[0]->Nspin() == 4 || x[0]->Nspin() == 2) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(NSPIN4) || defined(NSPIN2)
           const int M = siteUnroll ? 12 : 1; // determines how much work per thread to do
           if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
           multiReduce<doubleN, ReduceType, double2, double2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
           const int M = siteUnroll ? 3 : 1; // determines how much work per thread to do
           multiReduce<doubleN, ReduceType, double2, double2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
@@ -405,21 +391,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = siteUnroll ? 6 : 1; // determines how much work per thread to do
           multiReduce<doubleN, ReduceType, float4, float4, float4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (4 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
-#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(NSPIN1) || defined(NSPIN2)
           const int M = siteUnroll ? 3 : 1;
           if (x[0]->Nspin() == 2 && siteUnroll) errorQuda("siteUnroll not supported for nSpin==2");
           multiReduce<doubleN, ReduceType, float2, float2, float2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -432,20 +418,20 @@ namespace quda {
 
 #if QUDA_PRECISION & 2
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = 6;
           multiReduce<doubleN, ReduceType, float4, short4, short4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
           const int M = 3;
           multiReduce<doubleN, ReduceType, float2, short2, short2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -458,20 +444,20 @@ namespace quda {
 
 #if QUDA_PRECISION & 1
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = 6;
           multiReduce<doubleN, ReduceType, float4, char4, char4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
           const int M = 3;
           multiReduce<doubleN, ReduceType, float2, char2, char2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -503,15 +489,15 @@ namespace quda {
       if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
 
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = 12; // determines how much work per thread to do
           multiReduce<doubleN, ReduceType, double2, float4, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) {
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
           const int M = 3; // determines how much work per thread to do
           multiReduce<doubleN, ReduceType, double2, float2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
@@ -525,20 +511,20 @@ namespace quda {
       } else if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
 
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = 6; // determines how much work per thread to do
           multiReduce<doubleN, ReduceType, double2, short4, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (4 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1 || x[0]->Nspin() == 2) { // staggered
-#if defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN1)
           const int M = 3;
           multiReduce<doubleN, ReduceType, double2, short2, double2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, reduce_length / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());
@@ -547,20 +533,20 @@ namespace quda {
       } else if (y[0]->Precision() == QUDA_SINGLE_PRECISION && x[0]->Precision() == QUDA_HALF_PRECISION) {
 
         if (x[0]->Nspin() == 4) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
           const int M = 6;
           multiReduce<doubleN, ReduceType, float4, short4, float4, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else if (x[0]->Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
           const int M = 3;
           multiReduce<doubleN, ReduceType, float2, short2, float2, M, NXZ, Reducer, write>(
               result, a, b, c, x, y, z, w, x[0]->Volume());
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x[0]->Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
         } else {
           errorQuda("nSpin=%d is not supported\n", x[0]->Nspin());

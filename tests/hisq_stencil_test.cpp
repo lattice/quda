@@ -8,6 +8,7 @@
 #include "quda.h"
 #include "gauge_field.h"
 #include "test_util.h"
+#include <test_params.h>
 #include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
@@ -24,20 +25,7 @@
 
 using namespace quda;
 
-extern void usage(char** argv);
-extern bool verify_results;
 
-extern int device;
-extern int xdim, ydim, zdim, tdim;
-extern int gridsize_from_cmdline[];
-
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern int niter;
-
-extern double tadpole_factor;
-// relativistic correction for naik term
-extern double eps_naik;
 // Number of naiks. If eps_naik is 0.0, we only need
 // to construct one naik.
 static int n_naiks = 1;
@@ -456,9 +444,6 @@ static void display_test_info()
       dimPartitioned(3));
 
   printfQuda("Number of Naiks: %d\n", n_naiks);
-
-  return ;
-
 }
 
 
@@ -471,13 +456,15 @@ int main(int argc, char **argv)
   link_recon = QUDA_RECONSTRUCT_NO;
   cpu_prec = prec = QUDA_DOUBLE_PRECISION;
 
-  for (int i = 1; i < argc; i++){
-
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    fprintf(stderr, "ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (eps_naik != 0.0) { n_naiks = 2; }

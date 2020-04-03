@@ -5,7 +5,6 @@ template <typename Float, int writeX, int writeY, int writeZ, int writeW, int wr
     typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Functor>
 void genericBlas(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Functor f)
 {
-
   for (int parity = 0; parity < X.Nparity(); parity++) {
     for (int x = 0; x < X.VolumeCB(); x++) {
       for (int s = 0; s < X.Nspin(); s++) {
@@ -42,24 +41,27 @@ template <typename Float, typename yFloat, int nSpin, QudaFieldOrder order, int 
 void genericBlas(
     ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, Functor f)
 {
+  if (x.Ncolor() != 3 && x.Nspin() != 2) errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
   if (x.Ncolor() == 3) {
     genericBlas<Float, yFloat, nSpin, 3, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Ncolor() == 4) {
-    genericBlas<Float, yFloat, nSpin, 4, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#ifdef GPU_MULTIGRID
+#ifdef NSPIN4
   } else if (x.Ncolor() == 6) { // free field Wilson
-    genericBlas<Float, yFloat, nSpin, 6, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Ncolor() == 8) {
-    genericBlas<Float, yFloat, nSpin, 8, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Ncolor() == 12) {
-    genericBlas<Float, yFloat, nSpin, 12, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Ncolor() == 16) {
-    genericBlas<Float, yFloat, nSpin, 16, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Ncolor() == 20) {
-    genericBlas<Float, yFloat, nSpin, 20, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+    genericBlas<Float, yFloat, 2, 6, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif
   } else if (x.Ncolor() == 24) {
-    genericBlas<Float, yFloat, nSpin, 24, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+    genericBlas<Float, yFloat, 2, 24, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#ifdef NSPIN4
   } else if (x.Ncolor() == 32) {
-    genericBlas<Float, yFloat, nSpin, 32, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+    genericBlas<Float, yFloat, 2, 32, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif // NSPIN4
+#ifdef NSPIN1
+  } else if (x.Ncolor() == 64) {
+    genericBlas<Float, yFloat, 2, 64, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+  } else if (x.Ncolor() == 96) {
+    genericBlas<Float, yFloat, 2, 96, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#endif // NSPIN1
+#endif
   } else {
     errorQuda("nColor = %d not implemented", x.Ncolor());
   }
@@ -71,15 +73,23 @@ void genericBlas(
     ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, Functor f)
 {
   if (x.Nspin() == 4) {
+#ifdef NSPIN4
     genericBlas<Float, yFloat, 4, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-  } else if (x.Nspin() == 2) {
-    genericBlas<Float, yFloat, 2, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
-#ifdef GPU_STAGGERED_DIRAC
-  } else if (x.Nspin() == 1) {
-    genericBlas<Float, yFloat, 1, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
 #endif
-  } else {
-    errorQuda("nSpin = %d not implemented", x.Nspin());
+  } else if (x.Nspin() == 2) {
+#ifdef NSPIN2
+    genericBlas<Float, yFloat, 2, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
+  } else if (x.Nspin() == 1) {
+#ifdef NSPIN1
+    genericBlas<Float, yFloat, 1, order, writeX, writeY, writeZ, writeW, writeV, Functor>(x, y, z, w, v, f);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
   }
 }
 

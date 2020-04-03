@@ -160,15 +160,22 @@ namespace quda {
     delete []delta;
   }
 
-  GCR::GCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
-	   TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(0), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
+    matMdagM(DiracMdagM(matPrecon.Expose())),
+    K(0),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     fillInnerSolveParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) // inner CG solver
-      K = new CG(matSloppy, matPrecon, Kparam, profile);
+      K = new CG(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_BICGSTAB_INVERTER) // inner BiCGstab solver
       K = new BiCGstab(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_MR_INVERTER) // inner MR solver
@@ -176,7 +183,7 @@ namespace quda {
     else if (param.inv_type_precondition == QUDA_SD_INVERTER) // inner SD solver
       K = new SD(matSloppy, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_CA_GCR_INVERTER) // inner CA-GCR solver
-      K = new CAGCR(matSloppy, matPrecon, Kparam, profile);
+      K = new CAGCR(matSloppy, matPrecon, matPrecon, Kparam, profile);
     else if (param.inv_type_precondition == QUDA_INVALID_INVERTER) // unsupported
       K = NULL;
     else 
@@ -191,10 +198,18 @@ namespace quda {
     gamma = new double[nKrylov];
   }
 
-  GCR::GCR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, 
-	   SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
-    nKrylov(param.Nkrylov), init(false),  rp(nullptr), tmpp(nullptr), tmp_sloppy(nullptr), r_sloppy(nullptr)
+  GCR::GCR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
+    matMdagM(matPrecon.Expose()),
+    K(&K),
+    Kparam(param),
+    nKrylov(param.Nkrylov),
+    init(false),
+    rp(nullptr),
+    tmpp(nullptr),
+    tmp_sloppy(nullptr),
+    r_sloppy(nullptr)
   {
     p.resize(nKrylov+1);
     Ap.resize(nKrylov);
@@ -207,6 +222,7 @@ namespace quda {
 
   GCR::~GCR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
+
     delete []alpha;
     for (int i=0; i<nKrylov; i++) delete []beta[i];
     delete []beta;
@@ -225,12 +241,8 @@ namespace quda {
     if (tmpp) delete tmpp;
     if (rp) delete rp;
 
-    if (deflate_init) {
-      for (auto veci : param.evecs)
-        if (veci) delete veci;
-      delete defl_tmp1[0];
-      delete defl_tmp2[0];
-    }
+    destroyDeflationSpace();
+
     profile.TPSTOP(QUDA_PROFILE_FREE);
   }
 
@@ -274,9 +286,26 @@ namespace quda {
       init = true;
     }
 
-    // Once the GCR operator is called, we are able to construct an appropriate
-    // Krylov space for deflation
-    if (param.deflate && !deflate_init) { constructDeflationSpace(b, DiracMdagM(mat.Expose()), true); }
+    if (param.deflate) {
+      // Construct the eigensolver and deflation space if requested.
+      constructDeflationSpace(b, matMdagM);
+      if (deflate_compute) {
+        // compute the deflation space.
+        profile.TPSTOP(QUDA_PROFILE_INIT);
+        (*eig_solve)(evecs, evals);
+        // double the size of the Krylov space
+        extendSVDDeflationSpace();
+        // populate extra memory with L/R singular vectors
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        profile.TPSTART(QUDA_PROFILE_INIT);
+        deflate_compute = false;
+      }
+      if (recompute_evals) {
+        eig_solve->computeEvals(matMdagM, evecs, evals);
+        eig_solve->computeSVD(matMdagM, evecs, evals);
+        recompute_evals = false;
+      }
+    }
 
     ColorSpinorField &r = rp ? *rp : *p[0];
     ColorSpinorField &rSloppy = r_sloppy ? *r_sloppy : *p[0];
@@ -298,22 +327,13 @@ namespace quda {
       blas::zero(x);
     }
 
-    if (param.deflate == true) {
-      std::vector<ColorSpinorField *> rhs;
-      // Use residual from supplied guess r, or original
-      // rhs b. use `defl_tmp2` as a temp.
-      blas::copy(*defl_tmp2[0], r);
-      rhs.push_back(defl_tmp2[0]);
-
-      // Deflate: Hardcoded to SVD
-      eig_solve->deflateSVD(defl_tmp1, rhs, param.evecs, param.evals);
+    if (param.deflate && param.maxiter > 1) {
+      // Deflate: Hardcoded to SVD. If maxiter == 1, this is a dummy solve
+      eig_solve->deflateSVD(x, r, evecs, evals, true);
 
       // Compute r_defl = RHS - A * LHS
-      mat(r, *defl_tmp1[0]);
-      r2 = blas::xmyNorm(*rhs[0], r);
-
-      // defl_tmp must be added to the solution at the end
-      blas::axpy(1.0, *defl_tmp1[0], x);
+      mat(r, x, tmp);
+      r2 = blas::xmyNorm(b, r);
     }
 
     // Check to see that we're not trying to invert on a zero-field source
@@ -357,6 +377,7 @@ namespace quda {
     int total_iter = 0;
     int restart = 0;
     double r2_old = r2;
+    double maxr_deflate = sqrt(r2);
     bool l2_converge = false;
 
     int pipeline = param.pipeline;
@@ -420,7 +441,18 @@ namespace quda {
 
         if ( (r2 < stop || total_iter==param.maxiter) && param.sloppy_converge) break;
         mat(r, x, tmp);
-        r2 = blas::xmyNorm(b, r);  
+        r2 = blas::xmyNorm(b, r);
+
+        if (param.deflate && sqrt(r2) < maxr_deflate * param.tol_restart) {
+          // Deflate and accumulate to solution vector
+          eig_solve->deflateSVD(x, r, evecs, evals, true);
+
+          // Compute r_defl = RHS - A * LHS
+          mat(r, x, tmp);
+          r2 = blas::xmyNorm(b, r);
+
+          maxr_deflate = sqrt(r2);
+        }
 
         if (use_heavy_quark_res) heavy_quark_res = sqrt(blas::HeavyQuarkResidualNorm(x, r).z);
 
@@ -463,8 +495,8 @@ namespace quda {
     profile.TPSTART(QUDA_PROFILE_EPILOGUE);
 
     param.secs += profile.Last(QUDA_PROFILE_COMPUTE);
-  
-    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops())*1e-9;
+
+    double gflops = (blas::flops + mat.flops() + matSloppy.flops() + matPrecon.flops() + matMdagM.flops()) * 1e-9;
     if (K) gflops += K->flops()*1e-9;
 
     if (k>=param.maxiter && getVerbosity() >= QUDA_SUMMARIZE) 
@@ -495,6 +527,7 @@ namespace quda {
     mat.flops();
     matSloppy.flops();
     matPrecon.flops();
+    matMdagM.flops();
 
     profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     profile.TPSTART(QUDA_PROFILE_FREE);

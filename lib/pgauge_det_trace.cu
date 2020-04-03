@@ -63,8 +63,7 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<complex<Float>,NCOLORS> U;
-      arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+      Matrix<complex<Float>,NCOLORS> U = arg.dataOr(mu, idx, parity);
       if(functiontype == 0) val += getDeterminant(U);
       if(functiontype == 1) val += getTrace(U);
     }
@@ -93,7 +92,7 @@ class CalcFunc : TunableLocalParity {
   void apply(const cudaStream_t &stream){
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
-    LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
+    LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, (*this), tp, stream, arg, Float, Gauge, NCOLORS, functiontype);
     qudaDeviceSynchronize();
 
     comm_allreduce_array((double*)arg.result_h, 2);

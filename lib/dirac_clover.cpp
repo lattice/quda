@@ -40,17 +40,6 @@ namespace quda {
     flops += 1872ll*in.Volume();
   }
 
-  /** Applies the operator (A + k D) */
-  void DiracClover::DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-                               const ColorSpinorField &x, const double &k, const double &b) const
-  {
-    checkParitySpinor(in, out);
-    checkSpinorAlias(in, out);
-
-    ApplyTwistedClover(out, in, *gauge, clover, k, b, x, parity, dagger, commDim, profile);
-    flops += 1872ll * in.Volume();
-  }
-
   // Public method to apply the clover term only
   void DiracClover::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
   {
@@ -101,6 +90,12 @@ namespace quda {
 				   double kappa, double mass, double mu, double mu_factor) const {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, mu_factor, QUDA_CLOVER_DIRAC, QUDA_MATPC_INVALID);
+  }
+
+  void DiracClover::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE);
   }
 
   /*******
@@ -302,5 +297,20 @@ namespace quda {
     CoarseOp(Y, X, T, *gauge, &clover, kappa, a, -mu_factor, QUDA_CLOVERPC_DIRAC, matpcType);
   }
 
+  void DiracCloverPC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+
+    bool symmetric = (matpcType == QUDA_MATPC_EVEN_EVEN || matpcType == QUDA_MATPC_ODD_ODD) ? true : false;
+    int odd_bit = (matpcType == QUDA_MATPC_ODD_ODD || matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+    QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+    if (symmetric) {
+      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE);
+    } else {
+      clover.prefetch(mem_space, stream, CloverPrefetchType::INVERSE_CLOVER_PREFETCH_TYPE, parity[0]);
+      clover.prefetch(mem_space, stream, CloverPrefetchType::CLOVER_CLOVER_PREFETCH_TYPE, parity[1]);
+    }
+  }
 
 } // namespace quda

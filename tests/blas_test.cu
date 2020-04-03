@@ -6,6 +6,7 @@
 #include <blas_quda.h>
 
 #include <test_util.h>
+#include <test_params.h>
 
 // include because of nasty globals used in the tests
 #include <dslash_util.h>
@@ -13,27 +14,7 @@
 // google test
 #include <gtest/gtest.h>
 
-extern int test_type;
-extern QudaPrecision prec;
-extern QudaDslashType dslash_type;
-extern QudaInverterType inv_type;
-extern int nvec[QUDA_MAX_MG_LEVEL];
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern int niter;
-
-extern int Nsrc;
-extern int Msrc;
-extern QudaSolveType solve_type;
-extern QudaVerbosity verbosity;
-
-extern void usage(char** );
-
-const int Nkernels = 43;
+constexpr int Nkernels = 43;
 
 using namespace quda;
 
@@ -48,7 +29,9 @@ int Ncolor;
 void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
 {
   param.setPrecision(precision);
-  if (order == 1) {
+  if (order == 2) {
+    param.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+  } else if (order == 1) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -74,7 +57,7 @@ void display_test_info()
 int Nprec = 4;
 
 const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *order_str[] = {"default", "float2"};
+const char *order_str[] = {"default", "float2", "float8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -170,6 +153,23 @@ bool skip_kernel(int precision, int kernel, int order)
 #endif
   }
 
+  // this is for float-8 testing
+  if (order == 2) {
+#ifdef FLOAT8
+    // order == 2 represents the case of float-8 nspin-4 fields
+    // only run fixed-precision fields, skip all other cases
+    if (Nspin == 1 || Nspin == 2 || this_prec >= QUDA_HALF_PRECISION) {
+      return true;
+    } else if (Nspin == 4 && is_multi(kernel)) {
+      // we currently don't instantiate multi-blas kernels for float-8
+      // fields, so skip these
+      return true;
+    }
+#else
+    return true;
+#endif
+  }
+
   return false;
 }
 
@@ -217,7 +217,7 @@ void initFields(int prec, int order)
   mH = new cpuColorSpinorField(param);
   lH = new cpuColorSpinorField(param);
 
-// create composite fields
+  // create composite fields
 
   // xmH = new cpuColorSpinorField(param);
   // ymH = new cpuColorSpinorField(param);
@@ -228,7 +228,6 @@ void initFields(int prec, int order)
   for (int cid = 0; cid < Msrc; cid++) ymH.push_back(new cpuColorSpinorField(param));
   zmH.reserve(Nsrc);
   for (int cid = 0; cid < Nsrc; cid++) zmH.push_back(new cpuColorSpinorField(param));
-
 
   static_cast<cpuColorSpinorField*>(vH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
   static_cast<cpuColorSpinorField*>(wH)->Source(QUDA_RANDOM_SOURCE, 0, 0, 0);
@@ -278,6 +277,11 @@ void initFields(int prec, int order)
   default:
     errorQuda("Precision option not defined");
   }
+
+  // ensure we don't enable copying between precisions that are not compiled
+  if ( (high_aux_prec != QUDA_DOUBLE_PRECISION) && !(high_aux_prec & QUDA_PRECISION) ) high_aux_prec = getPrecision(prec);
+  if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
+  if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
   checkCudaError();
 
@@ -1044,19 +1048,23 @@ double test(int kernel) {
 
 int main(int argc, char** argv)
 {
-
   ::testing::InitGoogleTest(&argc, argv);
   int result = 0;
 
   prec = QUDA_INVALID_PRECISION;
   test_type = -1;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printfQuda("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+
+  app->add_option("--test", test_type, "Kernel to test (-1: -> all kernels)")->check(CLI::Range(0, Nkernels - 1));
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // override spin setting if mg solver is set to test coarse grids
@@ -1116,13 +1124,14 @@ public:
     order(::testing::get<2>(param))
   {
   }
-  virtual ~BlasTest() { }
   virtual void SetUp() {
     if (!skip_kernel(prec, kernel, order)) initFields(prec, order);
   }
   virtual void TearDown()
   {
-    if (!skip_kernel(prec, kernel, order)) freeFields();
+    if (!skip_kernel(prec, kernel, order)) {
+      freeFields();
+    }
   }
 };
 
@@ -1175,4 +1184,4 @@ std::string getblasname(testing::TestParamInfo<::testing::tuple<int, int, int>> 
 }
 
 // instantiate all test cases
-INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 2)), getblasname);
+INSTANTIATE_TEST_SUITE_P(QUDA, BlasTest, Combine(Range(0, Nprec), Range(0, Nkernels), Range(0, 3)), getblasname);

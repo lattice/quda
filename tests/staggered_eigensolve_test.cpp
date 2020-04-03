@@ -12,6 +12,7 @@
 
 #include <misc.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include <staggered_gauge_utils.h>
 #include <unitarization_links.h>
@@ -35,85 +36,16 @@
 
 #define mySpinorSiteSize 6
 
-extern void usage(char **argv);
-
 void **ghost_fatlink, **ghost_longlink;
-
-extern int device;
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 size_t gSize = sizeof(double);
 
-extern double reliable_delta;
-extern bool alternative_reliable;
-extern int test_type;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_refinement_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern double mass; // the mass of the Dirac operator
-extern double kappa;
-extern int laplace3D;
-extern double tol;    // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern char latfile[];
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov;
-extern int pipeline;                      // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int solution_accumulator_pipeline; // length of pipeline for fused solution update from the direction vectors
-extern QudaCABasis ca_basis;              // basis for CA-CG solves
-extern double ca_lambda_min;              // minimum eigenvalue for scaling Chebyshev CA-CG solves
-extern double ca_lambda_max;              // maximum eigenvalue for scaling Chebyshev CA-CG solves
-
-// Dirac operator type
-extern QudaDslashType dslash_type;
-extern QudaMatPCType matpc_type;       // preconditioning type
-extern QudaSolutionType solution_type; // solution type
-extern QudaSolveType solve_type;
-
-extern bool compute_fatlong; // build the true fat/long links or use random numbers
-// relativistic correction for naik term
-extern double eps_naik;
-// Number of naiks. If eps_naik is 0.0, we only need
-// to construct one naik.
 static int n_naiks = 1;
 
 // For loading the gauge fields
 int argc_copy;
 char **argv_copy;
-
-// eigensolver params
-extern int eig_nEv;
-extern int eig_nKr;
-extern int eig_nConv;
-extern bool eig_require_convergence;
-extern int eig_check_interval;
-extern int eig_max_restarts;
-extern double eig_tol;
-extern int eig_maxiter;
-extern bool eig_use_poly_acc;
-extern int eig_poly_deg;
-extern double eig_amin;
-extern double eig_amax;
-extern bool eig_use_normop;
-extern bool eig_use_dagger;
-extern bool eig_compute_svd;
-extern QudaEigSpectrumType eig_spectrum;
-extern QudaEigType eig_type;
-extern bool eig_arpack_check;
-extern char eig_arpack_logfile[];
-extern char eig_QUDA_logfile[];
-extern char eig_vec_infile[];
-extern char eig_vec_outfile[];
-
-extern bool verify_results;
 
 int X[4];
 
@@ -129,16 +61,6 @@ void display_test_info()
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
 
-  return;
-}
-
-void usage_extra(char **argv)
-{
-  printfQuda("Extra options:\n");
-  printfQuda("    --test <0/3/4>    # Test method\n");
-  printfQuda("                      0: Full parity inverter\n");
-  printfQuda("                      3: Even even spinor CG inverter\n");
-  printfQuda("                      4: Odd odd spinor CG inverter\n");
   return;
 }
 
@@ -295,25 +217,26 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.batched_rotate = eig_batched_rotate;
+  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
   eig_param.cuda_prec_ritz = prec;
 
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_NO;
-    eig_param.use_norm_op = QUDA_BOOLEAN_YES;
+    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
+    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
   }
 
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.poly_deg = eig_poly_deg;
   eig_param.a_min = eig_amin;
   eig_param.a_max = eig_amax;
 
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
   strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
 
@@ -360,6 +283,9 @@ void eigensolve_test()
   }
   milc_fatlink = malloc(4 * V * gaugeSiteSize * gSize);
   milc_longlink = malloc(4 * V * gaugeSiteSize * gSize);
+
+  // for load, etc
+  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
 
   // load a field WITHOUT PHASES
   if (strcmp(latfile, "")) {
@@ -453,11 +379,8 @@ void eigensolve_test()
     gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
     gauge_param.ga_pad = link_pad;
     gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_NO;
-    gauge_param.reconstruct
-      = (link_recon == QUDA_RECONSTRUCT_12 || link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 : link_recon;
-    gauge_param.reconstruct_sloppy
-      = (link_recon_sloppy == QUDA_RECONSTRUCT_12 || link_recon_sloppy == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_13 :
-                                                                                                link_recon_sloppy;
+    gauge_param.reconstruct = link_recon;
+    gauge_param.reconstruct_sloppy = link_recon_sloppy;
     gauge_param.cuda_prec_precondition = gauge_param.cuda_prec_sloppy;
     gauge_param.reconstruct_precondition = gauge_param.reconstruct_sloppy;
     loadGaugeQuda(milc_longlink, &gauge_param);
@@ -542,12 +465,16 @@ int main(int argc, char **argv)
   // Set a default
   solve_type = QUDA_INVALID_SOLVE;
 
-  for (int i = 1; i < argc; i++) {
-
-    if (process_command_line_option(argc, argv, &i) == 0) { continue; }
-
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  auto app = make_app();
+  CLI::TransformPairs<int> test_type_map {{"full", 0}, {"even", 3}, {"odd", 4}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
+  add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)

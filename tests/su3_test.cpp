@@ -6,6 +6,7 @@
 
 #include <util_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <dslash_util.h>
 #include "misc.h"
 
@@ -17,30 +18,56 @@
 #include <mpi.h>
 #endif
 
+#include <comm_quda.h>
+
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-extern bool tune;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern double anisotropy;
-
-extern bool verify_results;
-
-extern char latfile[];
-extern bool unit_gauge;
-
-extern QudaVerbosity verbosity;
-
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
+void display_test_info()
+{
+  printfQuda("running the following test:\n");
+
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim);
+  switch (test_type) {
+  case 0:
+    printfQuda("\nAPE smearing\n");
+    printfQuda(" - rho %f\n", ape_smear_rho);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 1:
+    printfQuda("\nStout smearing\n");
+    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 2:
+    printfQuda("\nOver-Improved Stout smearing\n");
+    printfQuda(" - rho %f\n", stout_smear_rho);
+    printfQuda(" - epsilon %f\n", stout_smear_epsilon);
+    printfQuda(" - smearing steps %d\n", smear_steps);
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  case 3:
+    printfQuda("\nWilson Flow\n");
+    printfQuda(" - epsilon %f\n", wflow_epsilon);
+    printfQuda(" - Wilson flow steps %d\n", wflow_steps);
+    printfQuda(" - Wilson flow type %s\n", wflow_type == QUDA_WFLOW_TYPE_WILSON ? "Wilson" : "Symanzik");
+    printfQuda(" - Measurement interval %d\n", measurement_interval);
+    break;
+  default: errorQuda("Undefined test type %d given", test_type);
+  }
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+  return;
+}
 
 QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 QudaPrecision &cuda_prec = prec;
@@ -57,7 +84,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -82,17 +109,18 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
 #endif
 }
 
+int main(int argc, char **argv)
+{
 
-extern void usage(char**);
+  auto app = make_app();
+  add_su3_option_group(app);
+  CLI::TransformPairs<int> test_type_map {{"APE", 0}, {"Stout", 1}, {"Over-Improved Stout", 2}, {"Wilson Flow", 3}};
+  app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
 
-void SU3test(int argc, char **argv) {
-
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
@@ -123,7 +151,7 @@ void SU3test(int argc, char **argv) {
   initRand();
 
   // load in the command line supplied gauge field
-  if (strcmp(latfile,"")) {  
+  if (strcmp(latfile, "")) {
     read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
     construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
   } else { // else generate an SU(3) field
@@ -141,79 +169,99 @@ void SU3test(int argc, char **argv) {
 
   double plaq[3];
   plaqQuda(plaq);
-  printfQuda("Computed plaquette gauge precise is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  printfQuda("Computed plaquette gauge precise is %.16e (spatial = %.16e, temporal = %.16e)\n", plaq[0], plaq[1],
+             plaq[2]);
 
 #ifdef GPU_GAUGE_TOOLS
 
-  // Topological charge
-  double qCharge = 0.0, qChargeCheck = 0.0;
-  // start the timer
-  double time0 = -((double)clock());
-  qCharge = qChargeQuda();
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Computed topological charge gauge precise is %.16e Done in %g secs\n", qCharge, time0);
+  // All user inputs now defined
+  display_test_info();
 
+  // Topological charge and gauge energy
+  double q_charge_check = 0.0;
   // Size of floating point data
   size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
   size_t array_size = V * sSize;
-  // Void array passed to the GPU. QUDA will allocate GPU memory and pass back a populated host array.
   void *qDensity = malloc(array_size);
-  qCharge = qChargeDensityQuda(qDensity);
+  // start the timer
+  double time0 = -((double)clock());
+  QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+  param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+  param.compute_qcharge_density = QUDA_BOOLEAN_TRUE;
+  param.qcharge_density = qDensity;
+
+  gaugeObservablesQuda(&param);
+
+  // stop the timer
+  time0 += clock();
+  time0 /= CLOCKS_PER_SEC;
+  printfQuda("Computed Etot, Es, Et, Q is\n%.16e %.16e, %.16e %.16e\nDone in %g secs\n", param.energy[0],
+             param.energy[1], param.energy[2], param.qcharge, time0);
 
   // Ensure host array sums to return value
   if (prec == QUDA_DOUBLE_PRECISION) {
-    for (int i = 0; i < V; i++) qChargeCheck += ((double *)qDensity)[i];
+    for (int i = 0; i < V; i++) q_charge_check += ((double *)qDensity)[i];
   } else {
-    for (int i = 0; i < V; i++) qChargeCheck += ((float *)qDensity)[i];
+    for (int i = 0; i < V; i++) q_charge_check += ((float *)qDensity)[i];
   }
-  printfQuda("Computed topological charge gauge precise from density function is %.16e\n", qCharge);
-  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", qCharge, qChargeCheck,
-             qCharge - qChargeCheck);
 
+  // Q charge Reduction and normalisation
+  comm_allreduce(&q_charge_check);
+
+  printfQuda("GPU value %e and host density sum %e. Q charge deviation: %e\n", param.qcharge, q_charge_check,
+             param.qcharge - q_charge_check);
+
+  // Gauge Smearing Routines
+  //---------------------------------------------------------------------------
   // Stout smearing should be equivalent to APE smearing
-  // on D dimensional lattices for rho = alpha/2*(D-1). 
+  // on D dimensional lattices for rho = alpha/2*(D-1).
   // Typical APE values are aplha=0.6, rho=0.1 for Stout.
-  unsigned int nSteps = 50;
-  double coeff_APE = 0.6;
-  double coeff_STOUT = coeff_APE/(2*(4-1));
-  
-  //STOUT
-  // start the timer
-  time0 = -((double)clock());
-  performSTOUTnStep(nSteps, coeff_STOUT);
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for STOUT = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printf("Computed topological charge after is %.16e \n", qCharge);
+  switch (test_type) {
+  case 0:
+    // APE
+    // start the timer
+    time0 = -((double)clock());
+    performAPEnStep(smear_steps, ape_smear_rho, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for APE = %g secs\n", time0);
+    break;
+  case 1:
+    // STOUT
+    // start the timer
+    time0 = -((double)clock());
+    performSTOUTnStep(smear_steps, stout_smear_rho, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for STOUT = %g secs\n", time0);
+    break;
 
-  //APE
-  // start the timer
-  time0 = -((double)clock());
-  performAPEnStep(nSteps, coeff_APE);  
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for APE = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
-
-  //Over Improved STOUT
-  double epsilon = -0.25;
-  coeff_STOUT = 0.06;
-  nSteps = 200;
-  // start the timer
-  time0 = -((double)clock());
-  performOvrImpSTOUTnStep(nSteps, coeff_STOUT, epsilon);  
-  // stop the timer
-  time0 += clock();
-  time0 /= CLOCKS_PER_SEC;
-  printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
-  qCharge = qChargeQuda();
-  printfQuda("Computed topological charge after smearing is %.16e \n", qCharge);
+    // Topological charge routines
+    //---------------------------------------------------------------------------
+  case 2:
+    // Over-Improved STOUT
+    // start the timer
+    time0 = -((double)clock());
+    performOvrImpSTOUTnStep(smear_steps, stout_smear_rho, stout_smear_epsilon, measurement_interval);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Over Improved STOUT = %g secs\n", time0);
+    break;
+  case 3:
+    // Wilson Flow
+    // Start the timer
+    time0 = -((double)clock());
+    performWFlownStep(wflow_steps, wflow_epsilon, measurement_interval, wflow_type);
+    // stop the timer
+    time0 += clock();
+    time0 /= CLOCKS_PER_SEC;
+    printfQuda("Total time for Wilson Flow = %g secs\n", time0);
+    break;
+  default: errorQuda("Undefined test type %d given", test_type);
+  }
 
 #else
   printfQuda("Skipping other gauge tests since gauge tools have not been compiled\n");
@@ -231,11 +279,5 @@ void SU3test(int argc, char **argv) {
   }
 
   finalizeComms();
-}
-
-int main(int argc, char **argv) {
-
-  SU3test(argc, argv);
-
   return 0;
 }

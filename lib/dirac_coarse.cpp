@@ -4,35 +4,84 @@
 
 namespace quda {
 
-  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped)
-    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
-      Y_h(nullptr), X_h(nullptr), Xinv_h(nullptr), Yhat_h(nullptr),
-      Y_d(nullptr), X_d(nullptr), Xinv_d(nullptr), Yhat_d(nullptr),
-      enable_gpu(false), enable_cpu(false), gpu_setup(gpu_setup),
-      init_gpu(gpu_setup), init_cpu(!gpu_setup), mapped(mapped)
+  DiracCoarse::DiracCoarse(const DiracParam &param, bool gpu_setup, bool mapped) :
+    Dirac(param),
+    mass(param.mass),
+    mu(param.mu),
+    mu_factor(param.mu_factor),
+    transfer(param.transfer),
+    dirac(param.dirac),
+    need_bidirectional(param.need_bidirectional),
+    Y_h(nullptr),
+    X_h(nullptr),
+    Xinv_h(nullptr),
+    Yhat_h(nullptr),
+    Y_d(nullptr),
+    X_d(nullptr),
+    Xinv_d(nullptr),
+    Yhat_d(nullptr),
+    enable_gpu(false),
+    enable_cpu(false),
+    gpu_setup(gpu_setup),
+    init_gpu(gpu_setup),
+    init_cpu(!gpu_setup),
+    mapped(mapped)
   {
     initializeCoarse();
   }
 
-  DiracCoarse::DiracCoarse(const DiracParam &param,
-			   cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h, cpuGaugeField *Yhat_h,   // cpu link fields
-			   cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d, cudaGaugeField *Yhat_d) // gpu link field
-    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(nullptr), dirac(nullptr),
-      Y_h(Y_h), X_h(X_h), Xinv_h(Xinv_h), Yhat_h(Yhat_h),
-      Y_d(Y_d), X_d(X_d), Xinv_d(Xinv_d), Yhat_d(Yhat_d),
-      enable_gpu( Y_d ? true : false), enable_cpu(Y_h ? true : false), gpu_setup(true),
-      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true), mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
+  DiracCoarse::DiracCoarse(const DiracParam &param, cpuGaugeField *Y_h, cpuGaugeField *X_h, cpuGaugeField *Xinv_h,
+                           cpuGaugeField *Yhat_h, // cpu link fields
+                           cudaGaugeField *Y_d, cudaGaugeField *X_d, cudaGaugeField *Xinv_d,
+                           cudaGaugeField *Yhat_d) // gpu link field
+    :
+    Dirac(param),
+    mass(param.mass),
+    mu(param.mu),
+    mu_factor(param.mu_factor),
+    transfer(nullptr),
+    dirac(nullptr),
+    need_bidirectional(false),
+    Y_h(Y_h),
+    X_h(X_h),
+    Xinv_h(Xinv_h),
+    Yhat_h(Yhat_h),
+    Y_d(Y_d),
+    X_d(X_d),
+    Xinv_d(Xinv_d),
+    Yhat_d(Yhat_d),
+    enable_gpu(Y_d ? true : false),
+    enable_cpu(Y_h ? true : false),
+    gpu_setup(true),
+    init_gpu(enable_gpu ? false : true),
+    init_cpu(enable_cpu ? false : true),
+    mapped(Y_d->MemType() == QUDA_MEMORY_MAPPED)
   {
 
   }
 
-  DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param)
-    : Dirac(param), mu(param.mu), mu_factor(param.mu_factor), transfer(param.transfer), dirac(param.dirac),
-      Y_h(dirac.Y_h), X_h(dirac.X_h), Xinv_h(dirac.Xinv_h), Yhat_h(dirac.Yhat_h),
-      Y_d(dirac.Y_d), X_d(dirac.X_d), Xinv_d(dirac.Xinv_d), Yhat_d(dirac.Yhat_d),
-      enable_gpu(dirac.enable_gpu), enable_cpu(dirac.enable_cpu), gpu_setup(dirac.gpu_setup),
-      init_gpu(enable_gpu ? false : true), init_cpu(enable_cpu ? false : true),
-      mapped(dirac.mapped)
+  DiracCoarse::DiracCoarse(const DiracCoarse &dirac, const DiracParam &param) :
+    Dirac(param),
+    mass(param.mass),
+    mu(param.mu),
+    mu_factor(param.mu_factor),
+    transfer(param.transfer),
+    dirac(param.dirac),
+    need_bidirectional(param.need_bidirectional),
+    Y_h(dirac.Y_h),
+    X_h(dirac.X_h),
+    Xinv_h(dirac.Xinv_h),
+    Yhat_h(dirac.Yhat_h),
+    Y_d(dirac.Y_d),
+    X_d(dirac.X_d),
+    Xinv_d(dirac.Xinv_d),
+    Yhat_d(dirac.Yhat_d),
+    enable_gpu(dirac.enable_gpu),
+    enable_cpu(dirac.enable_cpu),
+    gpu_setup(dirac.gpu_setup),
+    init_gpu(enable_gpu ? false : true),
+    init_cpu(enable_cpu ? false : true),
+    mapped(dirac.mapped)
   {
 
   }
@@ -56,11 +105,14 @@ namespace quda {
   void DiracCoarse::createY(bool gpu, bool mapped) const
   {
     int ndim = transfer->Vectors().Ndim();
+    // FIXME MRHS NDIM hack
+    if (ndim == 5 && transfer->Vectors().Nspin() != 4) ndim = 4; // forced case for staggered, coarsened staggered
     int x[QUDA_MAX_DIM];
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
-    int Nc_c = transfer->nvec();     // Coarse Color
-    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
+    int Nc_c = transfer->nvec(); // Coarse Color
+    // Coarse Spin
+    int Ns_c = (transfer->Spin_bs() == 0) ? 2 : transfer->Vectors().Nspin() / transfer->Spin_bs();
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
     gParam.nColor = Nc_c*Ns_c;
@@ -96,11 +148,12 @@ namespace quda {
   void DiracCoarse::createYhat(bool gpu) const
   {
     int ndim = transfer->Vectors().Ndim();
+    if (ndim == 5 && transfer->Vectors().Nspin() != 4) ndim = 4; // forced case for staggered, coarsened staggered
     int x[QUDA_MAX_DIM];
     const int *geo_bs = transfer->Geo_bs(); // Number of coarse sites.
     for (int i = 0; i < ndim; i++) x[i] = transfer->Vectors().X(i)/geo_bs[i];
     int Nc_c = transfer->nvec();     // Coarse Color
-    int Ns_c = transfer->Vectors().Nspin()/transfer->Spin_bs(); // Coarse Spin
+    int Ns_c = (transfer->Spin_bs() == 0) ? 2 : transfer->Vectors().Nspin() / transfer->Spin_bs();
 
     GaugeFieldParam gParam;
     memcpy(gParam.x, x, QUDA_MAX_DIM*sizeof(int));
@@ -141,10 +194,23 @@ namespace quda {
     if (gpu_setup) dirac->createCoarseOp(*Y_d,*X_d,*transfer,kappa,mass,Mu(),MuFactor());
     else dirac->createCoarseOp(*Y_h,*X_h,*transfer,kappa,mass,Mu(),MuFactor());
 
+    // save the intermediate tunecache after the UV and VUV tune
+    saveTuneCache();
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to build the preconditioned coarse clover\n");
+
     createYhat(gpu_setup);
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished building the preconditioned coarse clover\n");
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("About to create the preconditioned coarse op\n");
 
     if (gpu_setup) createPreconditionedCoarseOp(*Yhat_d,*Xinv_d,*Y_d,*X_d);
     else createPreconditionedCoarseOp(*Yhat_h,*Xinv_h,*Y_h,*X_h);
+
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Finished creating the preconditioned coarse op\n");
+
+    // save the intermediate tunecache after the Yhat tune
+    saveTuneCache();
 
     if (gpu_setup) {
       enable_gpu = true;
@@ -298,11 +364,20 @@ namespace quda {
     double a = 2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, T, *(this->Y_h), *(this->X_h), *(this->Xinv_h), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC, QUDA_MATPC_INVALID);
+      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional);
     }
+  }
+
+  void DiracCoarse::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    if (Y_d) Y_d->prefetch(mem_space, stream);
+    if (X_d) X_d->prefetch(mem_space, stream);
   }
 
   DiracCoarsePC::DiracCoarsePC(const DiracParam &param, bool gpu_setup) : DiracCoarse(param, gpu_setup)
@@ -402,18 +477,34 @@ namespace quda {
     if (matpcType == QUDA_MATPC_EVEN_EVEN) {
       // src = A_ee^-1 (b_e - D_eo A_oo^-1 b_o)
       src = &(x.Odd());
+#if 0
       CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
       DiracCoarse::Dslash(*tmp1, *src, QUDA_EVEN_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *tmp1);
       CloverInv(*src, *tmp1, QUDA_EVEN_PARITY);
+#endif
+      // src = A_ee^{-1} b_e - (A_ee^{-1} D_eo) A_oo^{-1} b_o
+      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
+      Dslash(*tmp1, *src, QUDA_EVEN_PARITY);
+      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
+      blas::axpy(-1.0, *tmp1, *src);
+
       sol = &(x.Even());
     } else if (matpcType == QUDA_MATPC_ODD_ODD) {
       // src = A_oo^-1 (b_o - D_oe A_ee^-1 b_e)
       src = &(x.Even());
+#if 0
       CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
       DiracCoarse::Dslash(*tmp1, *src, QUDA_ODD_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, *tmp1);
       CloverInv(*src, *tmp1, QUDA_ODD_PARITY);
+#endif
+      // src = A_oo^{-1} b_o - (A_oo^{-1} D_oe) A_ee^{-1} b_e
+      CloverInv(*src, b.Even(), QUDA_EVEN_PARITY);
+      Dslash(*tmp1, *src, QUDA_ODD_PARITY);
+      CloverInv(*src, b.Odd(), QUDA_ODD_PARITY);
+      blas::axpy(-1.0, *tmp1, *src);
+
       sol = &(x.Odd());
     } else if (matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
       // src = b_e - D_eo A_oo^-1 b_o
@@ -453,16 +544,30 @@ namespace quda {
 
     if (matpcType == QUDA_MATPC_EVEN_EVEN ||
 	matpcType == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
+#if 0
       // x_o = A_oo^-1 (b_o - D_oe x_e)
       DiracCoarse::Dslash(*tmp1, x.Even(), QUDA_ODD_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Odd()), -1.0, *tmp1);
       CloverInv(x.Odd(), *tmp1, QUDA_ODD_PARITY);
+#endif
+      // x_o = A_oo^{-1} b_o - (A_oo^{-1} D_oe) x_e
+      Dslash(*tmp1, x.Even(), QUDA_ODD_PARITY);
+      CloverInv(x.Odd(), b.Odd(), QUDA_ODD_PARITY);
+      blas::axpy(-1.0, const_cast<ColorSpinorField &>(*tmp1), x.Odd());
+
     } else if (matpcType == QUDA_MATPC_ODD_ODD ||
 	       matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
+#if 0
       // x_e = A_ee^-1 (b_e - D_eo x_o)
       DiracCoarse::Dslash(*tmp1, x.Odd(), QUDA_EVEN_PARITY);
       blas::xpay(const_cast<ColorSpinorField&>(b.Even()), -1.0, *tmp1);
       CloverInv(x.Even(), *tmp1, QUDA_EVEN_PARITY);
+#endif
+      // x_e = A_ee^{-1} b_e - (A_ee^{-1} D_eo) x_o
+      Dslash(*tmp1, x.Odd(), QUDA_EVEN_PARITY);
+      CloverInv(x.Even(), b.Even(), QUDA_EVEN_PARITY);
+      blas::axpy(-1.0, const_cast<ColorSpinorField &>(*tmp1), x.Even());
+
     } else {
       errorQuda("MatPCType %d not valid for DiracCoarsePC", matpcType);
     }
@@ -478,11 +583,19 @@ namespace quda {
     double a = -2.0 * kappa * mu * T.Vectors().TwistFlavor();
     if (checkLocation(Y, X) == QUDA_CPU_FIELD_LOCATION) {
       initializeLazy(QUDA_CPU_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_h), *(this->X_h), *(this->Xinv_h), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+                     matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC, matpcType);
+      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+                     matpcType, true);
     }
   }
 
+  void DiracCoarsePC::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  {
+    Dirac::prefetch(mem_space, stream);
+    if (Xinv_d) Xinv_d->prefetch(mem_space, stream);
+    if (Yhat_d) Yhat_d->prefetch(mem_space, stream);
+  }
 }

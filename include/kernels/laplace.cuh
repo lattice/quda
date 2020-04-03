@@ -14,10 +14,10 @@ namespace quda
   /**
      @brief Parameter structure for driving the covariatnt derivative operator
   */
-  template <typename Float, int nColor_, int nDim, QudaReconstructType reconstruct_>
+  template <typename Float, int nSpin_, int nColor_, int nDim, QudaReconstructType reconstruct_>
   struct LaplaceArg : DslashArg<Float, nDim> {
     static constexpr int nColor = nColor_;
-    static constexpr int nSpin = 1;
+    static constexpr int nSpin = nSpin_;
     static constexpr bool spin_project = false;
     static constexpr bool spinor_direct_load = false; // false means texture load
     typedef typename colorspinor_mapper<Float, nSpin, nColor, spin_project, spinor_direct_load>::type F;
@@ -34,9 +34,10 @@ namespace quda
     const F x;    /** input vector field for xpay*/
     const G U;    /** the gauge field */
     const real a; /** xpay scale factor - can be -kappa or -kappa^2 */
+    const real b; /** used by Wuppetal smearing kernel */
     int dir;      /** The direction from which to omit the derivative */
 
-    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a,
+    LaplaceArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int dir, double a, double b,
                const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
 
       DslashArg<Float, nDim>(in, U, parity, dagger, a != 0.0 ? true : false, 1, false, comm_override),
@@ -45,9 +46,14 @@ namespace quda
       U(U),
       dir(dir),
       x(x),
-      a(a)
+      a(a),
+      b(b)
     {
-      if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkPrecision(out, in, x, U); // check all precisions match
+      checkLocation(out, in, x, U);  // check all locations match
+      if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
       if (dir < 3 || dir > 4) errorQuda("Unsupported laplace direction %d (must be 3 or 4)", dir);
     }
@@ -59,18 +65,16 @@ namespace quda
      @param[out] out The out result field
      @param[in,out] arg Parameter struct
      @param[in] U The gauge field
-     @param[in] coord Site coordinate
-     @param[in] x_cb The checker-boarded site index. This is a 4-d index only
+     @param[in] coord Site coordinate struct
      @param[in] parity The site parity
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Arg, typename Vector>
-  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+  template <int nParity, bool dagger, KernelType kernel_type, int dir, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyLaplace(Vector &out, Arg &arg, Coord &coord, int parity,
                                                int idx, int thread_dim, bool &active)
   {
-
     typedef typename mapper<typename Arg::Float>::type real;
     typedef Matrix<complex<real>, Arg::nColor> Link;
     const int their_spinor_parity = (arg.nParity == 2) ? 1 - parity : 0;
@@ -86,14 +90,14 @@ namespace quda
 
             // const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
             const int ghost_idx = ghostFaceIndex<1>(coord, arg.dim, d, arg.nFace);
-            const Link U = arg.U(d, x_cb, parity);
+            const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
             out += U * in;
           } else if (doBulk<kernel_type>() && !ghost) {
 
             const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-            const Link U = arg.U(d, x_cb, parity);
+            const Link U = arg.U(d, coord.x_cb, parity);
             const Vector in = arg.in(fwd_idx, their_spinor_parity);
 
             out += U * in;
@@ -138,7 +142,7 @@ namespace quda
     __device__ __host__ inline void operator()(int idx, int s, int parity)
     {
       using real = typename mapper<typename Arg::Float>::type;
-      using Vector = ColorSpinor<real, Arg::nColor, 1>;
+      using Vector = ColorSpinor<real, Arg::nColor, Arg::nSpin>;
 
       // is thread active (non-trival for fused kernel only)
       bool active = kernel_type == EXTERIOR_KERNEL_ALL ? false : true;
@@ -146,8 +150,7 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
@@ -157,23 +160,23 @@ namespace quda
       // case 3 is a spatial operator only, the t dimension is omitted.
       switch (arg.dir) {
       case 3:
-        applyLaplace<nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyLaplace<nParity, dagger, kernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 4:
       default:
-        applyLaplace<nParity, dagger, kernel_type, -1>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyLaplace<nParity, dagger, kernel_type, -1>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       }
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(x_cb, my_spinor_parity);
-        out = x + arg.a * out;
+        Vector x = arg.x(coord.x_cb, my_spinor_parity);
+        out = arg.a * out + arg.b * x;
       } else if (kernel_type != INTERIOR_KERNEL) {
-        Vector x = arg.out(x_cb, my_spinor_parity);
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? arg.a * out : out);
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

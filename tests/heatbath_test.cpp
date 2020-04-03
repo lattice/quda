@@ -8,6 +8,7 @@
 
 #include <comm_quda.h>
 #include <test_util.h>
+#include <test_params.h>
 #include <gauge_tools.h>
 #include "misc.h"
 
@@ -28,31 +29,6 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
 
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaReconstructType link_recon_sloppy;
-extern double anisotropy;
-extern char latfile[];
-extern char gauge_outfile[];
-
-extern double heatbath_beta_value;
-extern int heatbath_warmup_steps;
-extern int heatbath_num_steps;
-extern int heatbath_num_heatbath_per_step;
-extern int heatbath_num_overrelax_per_step;
-extern bool heatbath_coldstart;
-
-extern void usage(char** );
-
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -62,22 +38,17 @@ void
 display_test_info()
 {
   printfQuda("running the following test:\n");
-    
-  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon), 
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);     
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3)); 
-  
+  printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
+
+  printfQuda("Grid partition info:     X  Y  Z  T\n");
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
+
   return ;
-  
 }
 
 QudaPrecision &cpu_prec = prec;
@@ -95,7 +66,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
+
   gauge_param.cpu_prec = cpu_prec;
 
   gauge_param.cuda_prec = cuda_prec;
@@ -116,7 +87,7 @@ void setGaugeParam(QudaGaugeParam &gauge_param) {
   int pad_size =MAX(x_face_size, y_face_size);
   pad_size = MAX(pad_size, z_face_size);
   pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
+  gauge_param.ga_pad = pad_size;
 #endif
 }
 
@@ -149,12 +120,16 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
 int main(int argc, char **argv)
 {
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // app->get_formatter()->column_width(40);
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  // add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -207,8 +182,7 @@ int main(int argc, char **argv)
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
-    gParam.order       = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
@@ -241,7 +215,7 @@ int main(int argc, char **argv)
     printfQuda("  %d Warmup steps\n", nwarm);
     printfQuda("  %d Measurement steps\n", nsteps);
 
-    if (strcmp(latfile,"")) { // Copy in loaded gauge field 
+    if (strcmp(latfile, "")) { // Copy in loaded gauge field
 
       printfQuda("Loading the gauge field in %s\n", latfile);
 
@@ -263,46 +237,43 @@ int main(int argc, char **argv)
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    double3 plaq = plaquette(*gaugeEx);
-    double charge = qChargeQuda();
-    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", plaq.x, charge);
+
+    QudaGaugeObservableParam param = newQudaGaugeObservableParam();
+    param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+    param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+
+    gaugeObservablesQuda(&param);
+    printfQuda("Initial gauge field plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette(*gaugeEx);
 
     // Do a warmup if requested
     if (nwarm > 0) {
       for (int step = 1; step <= nwarm; ++step) {
-        Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);  
+        Monte(*gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
         CallUnitarizeLinks(gaugeEx);
       }
     }
-      
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
 
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    plaq = plaquette(*gaugeEx);
-    charge = qChargeQuda();
-    printfQuda("step=0 plaquette = %e topological charge = %e\n", plaq.x, charge);
-
+    gaugeObservablesQuda(&param);
+    printfQuda("step=0 plaquette = %e topological charge = %e\n", param.plaquette[0], param.qcharge);
 
     freeGaugeQuda();
 
     for(int step=1; step<=nsteps; ++step){
-      printfQuda("Step %d\n", step);
       Monte( *gaugeEx, *randstates, beta_value, nhbsteps, novrsteps);
 
       //Reunitarize gauge links...
@@ -312,9 +283,8 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      plaq = plaquette(*gaugeEx);
-      charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, plaq.x, charge);
+      gaugeObservablesQuda(&param);
+      printfQuda("step=%d plaquette = %e topological charge = %e\n", step, param.plaquette[0], param.qcharge);
 
       freeGaugeQuda();
     }
@@ -350,7 +320,7 @@ int main(int argc, char **argv)
     delete gaugeEx;
     //Release all temporary memory used for data exchange between GPUs in multi-GPU mode
     PGaugeExchangeFree();
- 
+
     randstates->Release();
     delete randstates;
   }
@@ -358,14 +328,13 @@ int main(int argc, char **argv)
   // stop the timer
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
-    
-  //printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", 
-  //inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
-  printfQuda("\nDone, total time = %g secs\n", 
-	 time0);
+
+  // printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
+  // inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printfQuda("\nDone, total time = %g secs\n", time0);
 
   freeGaugeQuda();
-  
+
   // finalize the QUDA library
   endQuda();
 

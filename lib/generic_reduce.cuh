@@ -5,7 +5,6 @@ template <typename ReduceType, typename Float, int writeX, int writeY, int write
     typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW, typename SpinorV, typename Reducer>
 ReduceType genericReduce(SpinorX &X, SpinorY &Y, SpinorZ &Z, SpinorW &W, SpinorV &V, Reducer r)
 {
-
   ReduceType sum;
   ::quda::zero(sum);
 
@@ -49,40 +48,34 @@ template <typename ReduceType, typename Float, typename zFloat, int nSpin, QudaF
 ReduceType genericReduce(
     ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v, R r)
 {
+  if (x.Ncolor() != 3 && x.Nspin() != 2) errorQuda("Unsupported nSpin = %d and nColor = %d combination", x.Ncolor(), x.Nspin());
   ReduceType value;
   if (x.Ncolor() == 3) {
     value = genericReduce<ReduceType, Float, zFloat, nSpin, 3, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-  } else if (x.Ncolor() == 4) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 4, order, writeX, writeY, writeZ, writeW, writeV, R>(
-        x, y, z, w, v, r);
+#ifdef GPU_MULTIGRID
+#ifdef NSPIN4
   } else if (x.Ncolor() == 6) { // free field Wilson
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 6, order, writeX, writeY, writeZ, writeW, writeV, R>(
+    value = genericReduce<ReduceType, Float, zFloat, 2, 6, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-  } else if (x.Ncolor() == 8) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 8, order, writeX, writeY, writeZ, writeW, writeV, R>(
-        x, y, z, w, v, r);
-  } else if (x.Ncolor() == 12) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 12, order, writeX, writeY, writeZ, writeW, writeV, R>(
-        x, y, z, w, v, r);
-  } else if (x.Ncolor() == 16) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 16, order, writeX, writeY, writeZ, writeW, writeV, R>(
-        x, y, z, w, v, r);
-  } else if (x.Ncolor() == 20) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 20, order, writeX, writeY, writeZ, writeW, writeV, R>(
-        x, y, z, w, v, r);
+#endif
   } else if (x.Ncolor() == 24) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 24, order, writeX, writeY, writeZ, writeW, writeV, R>(
+    value = genericReduce<ReduceType, Float, zFloat, 2, 24, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
+#ifdef NSPIN4
   } else if (x.Ncolor() == 32) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 32, order, writeX, writeY, writeZ, writeW, writeV, R>(
+    value = genericReduce<ReduceType, Float, zFloat, 2, 32, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-  } else if (x.Ncolor() == 72) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 72, order, writeX, writeY, writeZ, writeW, writeV, R>(
+#endif // NSPIN4
+#ifdef NSPIN1
+  } else if (x.Ncolor() == 64) {
+    value = genericReduce<ReduceType, Float, zFloat, 2, 64, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-  } else if (x.Ncolor() == 576) {
-    value = genericReduce<ReduceType, Float, zFloat, nSpin, 576, order, writeX, writeY, writeZ, writeW, writeV, R>(
+  } else if (x.Ncolor() == 96) {
+    value = genericReduce<ReduceType, Float, zFloat, 2, 96, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
+#endif // NSPIN1
+#endif
   } else {
     ::quda::zero(value);
     errorQuda("nColor = %d not implemented", x.Ncolor());
@@ -98,15 +91,25 @@ ReduceType genericReduce(
   ReduceType value;
   ::quda::zero(value);
   if (x.Nspin() == 4) {
+#ifdef NSPIN4
     value = genericReduce<ReduceType, Float, zFloat, 4, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
   } else if (x.Nspin() == 2) {
+#ifdef NSPIN2
     value = genericReduce<ReduceType, Float, zFloat, 2, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
-#ifdef GPU_STAGGERED_DIRAC
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
+#endif
   } else if (x.Nspin() == 1) {
+#ifdef NSPIN1
     value = genericReduce<ReduceType, Float, zFloat, 1, order, writeX, writeY, writeZ, writeW, writeV, R>(
         x, y, z, w, v, r);
+#else
+    errorQuda("nSpin = %d not enabled", x.Nspin());
 #endif
   } else {
     errorQuda("nSpin = %d not implemented", x.Nspin());

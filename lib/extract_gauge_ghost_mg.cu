@@ -59,14 +59,20 @@ namespace quda {
     if (u.LinkType() != QUDA_COARSE_LINKS)
       errorQuda("Link type %d not supported", u.LinkType());
 
-    if (u.Ncolor() == 12) { // free field Wilson
-      extractGhostMG<Float, 12>(u, Ghost, extract, offset);
-    } else if (u.Ncolor() == 32) {
-      extractGhostMG<Float, 32>(u, Ghost, extract, offset);
-    } else if (u.Ncolor() == 48) {
+    if (u.Ncolor() == 48) {
       extractGhostMG<Float, 48>(u, Ghost, extract, offset);
+#ifdef NSPIN4
+    } else if (u.Ncolor() == 12) { // free field Wilson
+      extractGhostMG<Float, 12>(u, Ghost, extract, offset);
     } else if (u.Ncolor() == 64) {
       extractGhostMG<Float, 64>(u, Ghost, extract, offset);
+#endif // NSPIN4
+#ifdef NSPIN1
+    } else if (u.Ncolor() == 128) {
+      extractGhostMG<Float, 128>(u, Ghost, extract, offset);
+    } else if (u.Ncolor() == 192) {
+      extractGhostMG<Float, 192>(u, Ghost, extract, offset);
+#endif // NSPIN1
     } else {
       errorQuda("Ncolor = %d not supported", u.Ncolor());
     }
@@ -74,6 +80,7 @@ namespace quda {
 
   void extractGaugeGhostMG(const GaugeField &u, void **ghost, bool extract, int offset) {
 
+#ifdef GPU_MULTIGRID
 #ifndef FINE_GRAINED_ACCESS
     if (u.Precision() == QUDA_HALF_PRECISION) errorQuda("Precision format not supported");
 #endif
@@ -85,12 +92,23 @@ namespace quda {
       errorQuda("Double precision multigrid has not been enabled");
 #endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
+#if QUDA_PRECISION & 4
       extractGhostMG(u, (float**)ghost, extract, offset);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable single precision", QUDA_PRECISION);
+#endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
+#if QUDA_PRECISION & 2
       extractGhostMG(u, (short**)ghost, extract, offset);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
     } else {
       errorQuda("Unknown precision type %d", u.Precision());
     }
+#else
+    errorQuda("Multigrid has not been enabled");
+#endif
   }
 
 } // namespace quda

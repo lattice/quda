@@ -41,8 +41,13 @@ namespace quda
     const GL L; /** the long gauge field */
 
     const real a; /** xpay scale factor */
-    const real tboundary;
+    const real tboundary; /** temporal boundary condition */
+    const bool is_first_time_slice; /** are we on the first (global) time slice */
+    const bool is_last_time_slice; /** are we on the last (global) time slice */
     static constexpr bool improved = improved_;
+
+    const real dagger_scale;
+
     StaggeredArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, const GaugeField &L, double a,
                  const ColorSpinorField &x, int parity, bool dagger, const int *comm_override) :
       DslashArg<Float, nDim>(in, U, parity, dagger, a == 0.0 ? false : true, improved_ ? 3 : 1, spin_project,
@@ -51,11 +56,18 @@ namespace quda
       in(in, improved_ ? 3 : 1),
       U(U),
       L(L),
-      tboundary(U.TBoundary()),
       x(x),
-      a(a)
+      a(a),
+      tboundary(U.TBoundary()),
+      is_first_time_slice(comm_coord(3) == 0 ? true : false),
+      is_last_time_slice(comm_coord(3) == comm_dim(3) - 1 ? true : false),
+      dagger_scale(dagger ? static_cast<real>(-1.0) : static_cast<real>(1.0))
     {
-      if (!out.isNative() || !x.isNative() || !in.isNative() || !U.isNative())
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in, x);        // check all orders match
+      checkPrecision(out, in, x, U); // check all precisions match
+      checkLocation(out, in, x, U);  // check all locations match
+      if (!in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
     }
   };
@@ -70,8 +82,8 @@ namespace quda
      @param[in] parity The site parity
      @param[in] x_cb The checkerboarded site index
   */
-  template <int nParity, bool dagger, KernelType kernel_type, typename Arg, typename Vector>
-  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+  template <int nParity, KernelType kernel_type, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyStaggered(Vector &out, Arg &arg, Coord & coord, int parity,
                                                  int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
@@ -86,18 +98,12 @@ namespace quda
         const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, 1);
-          const Link U = arg.improved ?
-              arg.U(d, x_cb, parity) :
-              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += (U * in);
-
-          if (x_cb == 0 && parity == 0 && d == 0) printLink(U);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd_idx = linkIndexP1(coord, arg.dim, d);
-          const Link U = arg.improved ?
-              arg.U(d, x_cb, parity) :
-              arg.U(d, x_cb, parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, +1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, coord.x_cb, parity) : arg.U(d, coord.x_cb, parity, StaggeredPhase(coord, d, +1, arg));
           Vector in = arg.in(fwd_idx, their_spinor_parity);
           out += (U * in);
         }
@@ -108,12 +114,12 @@ namespace quda
         const bool ghost = (coord[d] + 3 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
         if (doHalo<kernel_type>(d) && ghost) {
           const int ghost_idx = ghostFaceIndexStaggered<1>(coord, arg.dim, d, arg.nFace);
-          const Link L = arg.L(d, x_cb, parity);
+          const Link L = arg.L(d, coord.x_cb, parity);
           const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
           out += L * in;
         } else if (doBulk<kernel_type>() && !ghost) {
           const int fwd3_idx = linkIndexP3(coord, arg.dim, d);
-          const Link L = arg.L(d, x_cb, parity);
+          const Link L = arg.L(d, coord.x_cb, parity);
           const Vector in = arg.in(fwd3_idx, their_spinor_parity);
           out += L * in;
         }
@@ -127,17 +133,15 @@ namespace quda
           const int ghost_idx2 = ghostFaceIndexStaggered<0>(coord, arg.dim, d, 1);
           const int ghost_idx = arg.improved ? ghostFaceIndexStaggered<0>(coord, arg.dim, d, 3) : ghost_idx2;
           const int back_idx = linkIndexM1(coord, arg.dim, d);
-          const Link U = arg.improved ?
-              arg.U.Ghost(d, ghost_idx2, 1 - parity) :
-              arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U.Ghost(d, ghost_idx2, 1 - parity) :
+            arg.U.Ghost(d, ghost_idx2, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in.Ghost(d, 0, ghost_idx, their_spinor_parity);
           out -= (conj(U) * in);
         } else if (doBulk<kernel_type>() && !ghost) {
           const int back_idx = linkIndexM1(coord, arg.dim, d);
           const int gauge_idx = back_idx;
-          const Link U = arg.improved ?
-              arg.U(d, gauge_idx, 1 - parity) :
-              arg.U(d, gauge_idx, 1 - parity, StaggeredPhase<Arg::phase>(coord, arg.dim, d, -1, arg.tboundary));
+          const Link U = arg.improved ? arg.U(d, gauge_idx, 1 - parity) :
+            arg.U(d, gauge_idx, 1 - parity, StaggeredPhase(coord, d, -1, arg));
           Vector in = arg.in(back_idx, their_spinor_parity);
           out -= (conj(U) * in);
         }
@@ -164,7 +168,7 @@ namespace quda
   }
 
   // out(x) = M*in = (-D + m) * in(x-mu)
-  template <int nParity, bool dagger, bool xpay, KernelType kernel_type, typename Arg>
+  template <int nParity, bool dummy, bool xpay, KernelType kernel_type, typename Arg>
   struct staggered : dslash_default {
 
     Arg &arg;
@@ -179,26 +183,25 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = arg.improved ? getCoords<QUDA_4D_PC, kernel_type, Arg, 3>(coord, arg, idx, parity, thread_dim) :
-                                getCoords<QUDA_4D_PC, kernel_type, Arg, 1>(coord, arg, idx, parity, thread_dim);
+      auto coord = arg.improved ? getCoords<QUDA_4D_PC, kernel_type, Arg, 3>(arg, idx, s, parity, thread_dim) :
+        getCoords<QUDA_4D_PC, kernel_type, Arg, 1>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
-      applyStaggered<nParity, dagger, kernel_type>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+      applyStaggered<nParity, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
-      if (dagger) { out = -out; }
+      out *= arg.dagger_scale;
 
       if (xpay && kernel_type == INTERIOR_KERNEL) {
-        Vector x = arg.x(x_cb, my_spinor_parity);
+        Vector x = arg.x(coord.x_cb, my_spinor_parity);
         out = arg.a * x - out;
       } else if (kernel_type != INTERIOR_KERNEL) {
-        Vector x = arg.out(x_cb, my_spinor_parity);
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out = x + (xpay ? -out : out);
       }
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

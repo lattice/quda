@@ -12,6 +12,7 @@
 #include <wilson_dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
+#include <test_params.h>
 
 #include <qio_field.h>
 #include <color_spinor_field.h>
@@ -20,123 +21,6 @@
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
-
-// Wilson, clover-improved Wilson, twisted mass, and domain wall are supported.
-extern QudaDslashType dslash_type;
-extern int device;
-extern int xdim;
-extern int ydim;
-extern int zdim;
-extern int tdim;
-extern int Lsdim;
-extern int gridsize_from_cmdline[];
-extern QudaReconstructType link_recon;
-extern QudaPrecision prec;
-extern QudaPrecision prec_sloppy;
-extern QudaPrecision prec_precondition;
-extern QudaPrecision prec_null;
-extern QudaReconstructType link_recon_sloppy;
-extern QudaReconstructType link_recon_precondition;
-extern double mass;
-extern double kappa; // kappa of Dirac operator
-extern double mu;
-extern double epsilon;
-extern double anisotropy;
-extern double tol; // tolerance for inverter
-extern double tol_hq; // heavy-quark tolerance for inverter
-extern double reliable_delta;
-extern char latfile[];
-extern bool unit_gauge;
-extern int Nsrc; // number of spinors to apply to simultaneously
-extern int niter;
-extern int gcrNkrylov; // number of inner iterations for GCR, or l for BiCGstab-l
-extern int pipeline; // length of pipeline for fused operations in GCR or BiCGstab-l
-extern int nvec[];
-extern int mg_levels;
-
-extern bool generate_nullspace;
-extern bool generate_all_levels;
-extern int nu_pre[QUDA_MAX_MG_LEVEL];
-extern int nu_post[QUDA_MAX_MG_LEVEL];
-extern int n_block_ortho[QUDA_MAX_MG_LEVEL];
-extern QudaSolveType coarse_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern QudaSolveType smoother_solve_type[QUDA_MAX_MG_LEVEL]; // type of solve to use in the smoothing on each level
-extern int geo_block_size[QUDA_MAX_MG_LEVEL][QUDA_MAX_DIM];
-extern double mu_factor[QUDA_MAX_MG_LEVEL];
-
-extern QudaVerbosity mg_verbosity[QUDA_MAX_MG_LEVEL];
-
-extern QudaFieldLocation solver_location[QUDA_MAX_MG_LEVEL];
-extern QudaFieldLocation setup_location[QUDA_MAX_MG_LEVEL];
-
-extern QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL];
-extern int num_setup_iter[QUDA_MAX_MG_LEVEL];
-extern double setup_tol[QUDA_MAX_MG_LEVEL];
-extern int setup_maxiter[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis setup_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int setup_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double setup_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-extern QudaSetupType setup_type;
-extern bool pre_orthonormalize;
-extern bool post_orthonormalize;
-extern double omega;
-extern QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL];
-extern QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_tol[QUDA_MAX_MG_LEVEL];
-extern QudaCABasis coarse_solver_ca_basis[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_ca_basis_size[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_min[QUDA_MAX_MG_LEVEL];
-extern double coarse_solver_ca_lambda_max[QUDA_MAX_MG_LEVEL];
-
-extern double smoother_tol[QUDA_MAX_MG_LEVEL];
-extern int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];
-
-extern QudaPrecision smoother_halo_prec;
-extern QudaSchwarzType schwarz_type[QUDA_MAX_MG_LEVEL];
-extern int schwarz_cycle[QUDA_MAX_MG_LEVEL];
-
-extern QudaMatPCType matpc_type;
-extern QudaSolveType solve_type;
-
-extern char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];
-extern char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];
-
-//Twisted mass flavor type
-extern QudaTwistFlavorType twist_flavor;
-
-extern void usage(char** );
-
-extern double clover_coeff;
-extern bool compute_clover;
-
-extern bool verify_results;
-
-// Eigensolver params for MG
-extern bool low_mode_check;
-extern bool oblique_proj_check;
-
-// The coarsest grid params are for deflation,
-// all others are for PR vectors.
-extern bool mg_eig[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_nEv[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_nKr[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_require_convergence[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_check_interval[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_max_restarts[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_tol[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_poly_acc[QUDA_MAX_MG_LEVEL];
-extern int mg_eig_poly_deg[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_amin[QUDA_MAX_MG_LEVEL];
-extern double mg_eig_amax[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_normop[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_use_dagger[QUDA_MAX_MG_LEVEL];
-extern QudaEigSpectrumType mg_eig_spectrum[QUDA_MAX_MG_LEVEL];
-extern QudaEigType mg_eig_type[QUDA_MAX_MG_LEVEL];
-extern bool mg_eig_coarse_guess;
-
-extern char eig_QUDA_logfile[];
 
 namespace quda {
   extern void setTransferGPU(bool);
@@ -178,10 +62,13 @@ display_test_info()
       if (mg_eig_use_poly_acc[i]) {
         printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
         printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-        printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
+        if (mg_eig_amax[i] <= 0)
+          printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
+        else
+          printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
       }
+      printfQuda("\n");
     }
-    printfQuda("\n");
   }
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
@@ -246,18 +133,19 @@ void setEigParam(QudaEigParam &mg_eig_param, int level)
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
-  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.batched_rotate = mg_eig_batched_rotate[level];
+  mg_eig_param.require_convergence = mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_eig_param.tol = mg_eig_tol[level];
   mg_eig_param.check_interval = mg_eig_check_interval[level];
   mg_eig_param.max_restarts = mg_eig_max_restarts[level];
   mg_eig_param.cuda_prec_ritz = cuda_prec;
 
-  mg_eig_param.compute_svd = QUDA_BOOLEAN_NO;
-  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_norm_op = mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.use_dagger = mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_eig_param.use_poly_acc = mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = mg_eig_poly_deg[level];
   mg_eig_param.a_min = mg_eig_amin[level];
   mg_eig_param.a_max = mg_eig_amax[level];
@@ -333,11 +221,12 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;
   for (int i=0; i<mg_param.n_level; i++) {
-    for (int j=0; j<QUDA_MAX_DIM; j++) {
+    for (int j = 0; j < 4; j++) {
       // if not defined use 4
       mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
     }
-    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    for (int j = 4; j < QUDA_MAX_DIM; j++) mg_param.geo_block_size[i][j] = 1;
+    mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
     mg_param.verbosity[i] = mg_verbosity[i];
     mg_param.setup_inv_type[i] = setup_inv[i];
     mg_param.num_setup_iter[i] = num_setup_iter[i];
@@ -393,7 +282,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_schwarz_type[i] = schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
@@ -473,33 +362,36 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-  mg_param.setup_minimize_memory = QUDA_BOOLEAN_NO;
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
 
   // only coarsen the spin on the first restriction
   mg_param.spin_block_size[0] = 2;
 
   mg_param.setup_type = setup_type;
-  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
-  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.pre_orthonormalize = pre_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
+  mg_param.post_orthonormalize = post_orthonormalize ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
   mg_param.compute_null_vector = generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES
     : QUDA_COMPUTE_NULL_VECTOR_NO;
 
-  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_YES :  QUDA_BOOLEAN_NO;
+  mg_param.generate_all_levels = generate_all_levels ? QUDA_BOOLEAN_TRUE :  QUDA_BOOLEAN_FALSE;
 
-  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
-  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.run_verify = verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_low_mode_check = low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_oblique_proj_check = oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // Is NOT a staggered solve
+  mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
     strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_YES;
-    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_YES;
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
 
-  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_YES : QUDA_BOOLEAN_NO;
+  mg_param.coarse_guess = mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   // these need to tbe set for now but are actually ignored by the MG setup
   // needed to make it pass the initialization test
@@ -509,8 +401,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   inv_param.reliable_delta = 1e-10;
   inv_param.gcrNkrylov = 10;
 
-  inv_param.verbosity = QUDA_SUMMARIZE;
-  inv_param.verbosity_precondition = QUDA_SUMMARIZE;
+  inv_param.verbosity = verbosity;
+  inv_param.verbosity_precondition = verbosity;
 }
 
 void setInvertParam(QudaInvertParam &inv_param) {
@@ -576,7 +468,7 @@ void setInvertParam(QudaInvertParam &inv_param) {
 
   inv_param.inv_type = QUDA_GCR_INVERTER;
 
-  inv_param.verbosity = QUDA_VERBOSE;
+  inv_param.verbosity = verbosity;
   inv_param.verbosity_precondition = mg_verbosity[0];
 
 
@@ -634,17 +526,17 @@ int main(int argc, char **argv)
     // Default eigensolver params
     mg_eig[i] = false;
     mg_eig_tol[i] = 1e-3;
-    mg_eig_require_convergence[i] = QUDA_BOOLEAN_YES;
+    mg_eig_require_convergence[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_type[i] = QUDA_EIG_TR_LANCZOS;
     mg_eig_spectrum[i] = QUDA_SPECTRUM_SR_EIG;
     mg_eig_check_interval[i] = 5;
     mg_eig_max_restarts[i] = 100;
-    mg_eig_use_normop[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_dagger[i] = QUDA_BOOLEAN_NO;
-    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_YES;
+    mg_eig_use_normop[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_dagger[i] = QUDA_BOOLEAN_FALSE;
+    mg_eig_use_poly_acc[i] = QUDA_BOOLEAN_TRUE;
     mg_eig_poly_deg[i] = 100;
     mg_eig_amin[i] = 1.0;
-    mg_eig_amax[i] = 5.0;
+    mg_eig_amax[i] = -1.0; // use power iterations
 
     setup_ca_basis[i] = QUDA_POWER_BASIS;
     setup_ca_basis_size[i] = 4;
@@ -661,12 +553,15 @@ int main(int argc, char **argv)
   }
   reliable_delta = 1e-4;
 
-  for (int i = 1; i < argc; i++){
-    if(process_command_line_option(argc, argv, &i) == 0){
-      continue;
-    }
-    printf("ERROR: Invalid option:%s\n", argv[i]);
-    usage(argv);
+  // command line options
+  auto app = make_app();
+  // add_eigen_option_group(app);
+  // add_deflation_option_group(app);
+  add_multigrid_option_group(app);
+  try {
+    app->parse(argc, argv);
+  } catch (const CLI::ParseError &e) {
+    return app->exit(e);
   }
 
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -811,25 +706,35 @@ int main(int argc, char **argv)
   // free the multigrid solver
   destroyMultigridQuda(mg_preconditioner);
 
-  auto mean_time = 0.0;
-  auto mean_time2 = 0.0;
-  auto mean_gflops = 0.0;
-  auto mean_gflops2 = 0.0;
-  for (int i = 0; i < Nsrc; i++) {
-    mean_time += time[i];
-    mean_time2 += time[i] * time[i];
-    mean_gflops += gflops[i];
-    mean_gflops2 += gflops[i] * gflops[i];
-  }
+  // Compute timings
+  if (Nsrc > 1) {
+    auto mean_time = 0.0;
+    auto mean_time2 = 0.0;
+    auto mean_gflops = 0.0;
+    auto mean_gflops2 = 0.0;
+    // skip first solve due to allocations, potential UVM swapping overhead
+    for (int i = 1; i < Nsrc; i++) {
+      mean_time += time[i];
+      mean_time2 += time[i] * time[i];
+      mean_gflops += gflops[i];
+      mean_gflops2 += gflops[i] * gflops[i];
+    }
 
-  mean_time /= Nsrc;
-  mean_time2 /= Nsrc;
-  auto stddev_time = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_time2 - mean_time * mean_time)) : std::numeric_limits<double>::infinity();
-  mean_gflops /= Nsrc;
-  mean_gflops2 /= Nsrc;
-  auto stddev_gflops = Nsrc > 1 ? sqrt((Nsrc / ((double)Nsrc - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) : std::numeric_limits<double>::infinity();
-  printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g)\n", Nsrc, mean_time,
-             stddev_time, mean_gflops, stddev_gflops);
+    auto NsrcM1 = Nsrc - 1;
+
+    mean_time /= NsrcM1;
+    mean_time2 /= NsrcM1;
+    auto stddev_time = NsrcM1 > 1 ? sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_time2 - mean_time * mean_time)) :
+                                    std::numeric_limits<double>::infinity();
+    mean_gflops /= NsrcM1;
+    mean_gflops2 /= NsrcM1;
+    auto stddev_gflops = NsrcM1 > 1 ?
+      sqrt((NsrcM1 / ((double)NsrcM1 - 1.0)) * (mean_gflops2 - mean_gflops * mean_gflops)) :
+      std::numeric_limits<double>::infinity();
+    printfQuda(
+      "%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n", Nsrc,
+      mean_time, stddev_time, mean_gflops, stddev_gflops);
+  }
 
   delete[] time;
   delete[] gflops;

@@ -179,12 +179,11 @@ namespace quda {
     void uni_blas(const double2 &a, const double2 &b, const double2 &c, ColorSpinorField &x, ColorSpinorField &y,
         ColorSpinorField &z, ColorSpinorField &w, ColorSpinorField &v)
     {
-
       checkPrecision(x, y, z, w, v);
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER) {
+        if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
           warningQuda("Device blas on non-native fields is not supported\n");
           return;
         }
@@ -192,12 +191,12 @@ namespace quda {
         if (x.Precision() == QUDA_DOUBLE_PRECISION) {
 
 #if QUDA_PRECISION & 8
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC) || defined(GPU_STAGGERED_DIRAC)
+#if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
           nativeBlas<double2, double2, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
               a, b, c, x, y, z, w, v, x.Length() / (2 * M));
 #else
-          errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+          errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
@@ -207,20 +206,20 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 1;
             nativeBlas<float4, float4, float4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Length() / (4 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1 || x.Nspin() == 2 || (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER)) {
-#if defined(GPU_STAGGERED_DIRAC) || defined(GPU_MULTIGRID)
+#if defined(NSPIN1) || defined(NSPIN2)
             const int M = 1;
             nativeBlas<float2, float2, float2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Length() / (2 * M));
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x.Nspin());
@@ -234,28 +233,36 @@ namespace quda {
 #if QUDA_PRECISION & 2
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 6;
             nativeBlas<float4, short4, short4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID)
+#if defined(GPU_MULTIGRID) // FIXME eventually we should get rid of this and use float4 ordering
             const int M = 12;
             nativeBlas<float2, short2, short2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(NSPIN4) && defined(FLOAT8)
+            const int M = 3;
+            nativeBlas<float8, short8, short8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
+                a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
             const int M = 3;
             nativeBlas<float2, short2, short2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x.Nspin());
@@ -269,28 +276,36 @@ namespace quda {
 #if QUDA_PRECISION & 1
           if (x.Ncolor() != 3) { errorQuda("nColor = %d is not supported", x.Ncolor()); }
           if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) { // wilson
-#if defined(GPU_WILSON_DIRAC) || defined(GPU_DOMAIN_WALL_DIRAC)
+#if defined(NSPIN4)
             const int M = 6;
             nativeBlas<float4, char4, char4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER) { // wilson
-#if defined(GPU_MULTIGRID)
+#if defined(GPU_MULTIGRID) // FIXME eventually we should get rid of this and use float4 ordering
             const int M = 12;
             nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
                                                                                                  x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
+          } else if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) { // wilson
+#if defined(NSPIN4) && defined(FLOAT8)
+            const int M = 3;
+            nativeBlas<float8, char8, char8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w, v,
+                                                                                                 x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else if (x.Nspin() == 1) { // staggered
-#ifdef GPU_STAGGERED_DIRAC
+#if defined(NSPIN1)
             const int M = 3;
             nativeBlas<float2, char2, char2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
 #else
-            errorQuda("blas has not been built for Nspin=%d fields", x.Nspin());
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
           } else {
             errorQuda("nSpin=%d is not supported\n", x.Nspin());
@@ -341,13 +356,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
           if (x.Nspin() == 4) {
+#if defined(NSPIN4)
             const int M = 12;
             nativeBlas<double2, float4, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
           } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
             const int M = 3;
             nativeBlas<double2, float2, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                 a, b, c, x, y, z, w, v, x.Volume());
+#else
+            errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
           }
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
@@ -360,13 +383,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
+#if defined(NSPIN4)
               const int M = 12;
               nativeBlas<double2, short4, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
               const int M = 3;
               nativeBlas<double2, short2, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             }
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
@@ -376,13 +407,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
             if (x.Nspin() == 4) {
+#if defined(NSPIN4)
               const int M = 6;
               nativeBlas<float4, short4, float4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
               const int M = 3;
               nativeBlas<float2, short2, float2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             }
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
@@ -403,13 +442,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 8
             if (x.Nspin() == 4) {
+#if defined(NSPIN4)
               const int M = 12;
               nativeBlas<double2, char4, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
               const int M = 3;
               nativeBlas<double2, char2, double2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             }
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
@@ -419,13 +466,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 4
             if (x.Nspin() == 4) {
+#if defined(NSPIN4)
               const int M = 6;
               nativeBlas<float4, char4, float4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
               const int M = 3;
               nativeBlas<float2, char2, float2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             }
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
@@ -435,13 +490,21 @@ namespace quda {
 
 #if QUDA_PRECISION & 2
             if (x.Nspin() == 4) {
+#if defined(NSPIN4)
               const int M = 6;
               nativeBlas<float4, char4, short4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             } else if (x.Nspin() == 1) {
+#if defined(NSPIN1)
               const int M = 3;
               nativeBlas<float2, char2, short2, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
             }
 #else
             errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, y.Precision());
