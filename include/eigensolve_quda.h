@@ -511,7 +511,7 @@ public:
        @param[in] csParam Information about the spinors
        @param[in] evals The converged eigenvalues
     */
-    void checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,
+    void checkIfConverged(std::vector<std::pair<double, Complex*>> &eigenpairs,
                           std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
                           std::vector<Complex> &evals);
 
@@ -521,7 +521,7 @@ public:
        @param[in] csParam Information about the spinors
        @param[in] H_ The matrix encoding information about the subspace
     */
-    void shrinkSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, ColorSpinorParam &csParam,
+    void shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, ColorSpinorParam &csParam,
                         void *H_);
 
     /**
@@ -529,9 +529,10 @@ public:
        @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
        @param[in] eigensolver_ Eigen object used for the eigendecomposition
        @param[in] H_ The matrix encoding information about the subspace
+       @param[in] ort_dot_prod Buffer to store some dot product results
     */
-    void eigsolveInSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, void *eigensolver_,
-                            void *H_);
+    void eigsolveInSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, void *eigensolver_,
+                            void *H_, Complex *ort_dot_prod);
 
     /**
        @brief Destructor for JD Eigensolver class

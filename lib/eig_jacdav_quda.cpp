@@ -102,14 +102,13 @@ namespace quda
     //		1. fix profiling !
     //		2. extend whole code to address any <target> (i.e. include LR, not only SR)
 
-    //		3. avoid calls to <new> within JD::eigsolveInSubspace(...)
-    //		4. optimize the eigendecomposition of the subspace, and in particular the use of Eigen
+    //		3. optimize the eigendecomposition of the subspace, and in particular the use of Eigen
     //		   for this (this within JD::eigsolveInSubspace(...))
-    //		5. avoid the mess being done for sorting Ritz eigenpairs after the eigendecomposition
-    //		   (this within JD::eigsolveInSubspace(...))
 
-    //		6. any more changes from camelCase ---> underscore_case needed ?
-    //		7. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
+    //		4. any more changes from camelCase ---> underscore_case needed ?
+    //		5. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
+    //		6. possible improvement: adjust the correction equation specs depending on the number of (overall) iterations
+    //		   it took to find the last eigenpair. This avoids the overhead of having to make more calls to JD::K(...)
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -119,7 +118,6 @@ namespace quda
     }
 
     // Setting some initial parameters of the eigensolver
-
     k = 0;
     k_max = eig_param->nConv;
     m = 0;
@@ -211,18 +209,18 @@ namespace quda
       matVec(mat, *V_A[m - 1], *V[m - 1]);
 
       // Perform the eigendecomposition in the acceleration subspace
-      std::vector<std::pair<double, std::vector<Complex> *>> eigenpairs;
-      eigsolveInSubspace(eigenpairs, &eigensolver, &H);
+      std::vector<std::pair<double, Complex*>> eigenpairs;
+      eigsolveInSubspace(eigenpairs, &eigensolver, &H, ort_dot_prod);
 
       // Computing the residual
       // u = V * s_1 -- lifting the first Ritz vector through V
       blas::zero(*u[0]);
-      for (int i = 0; i < m; i++) {
-        // use this due to frequent-shrinking-avoiding
-        blas::caxpy((*(eigenpairs[loopr].second))[i], *V[i], *u[0]);
-      }
+
+      std::vector<ColorSpinorField *> lifter(V.begin(), V.begin()+m);
+      blas::caxpy(eigenpairs[loopr].second, lifter, u);
       // FIXME :  change this matmul for the superposition ?
       matVec(mat, *u_A[0], *u[0]);
+
       // and then compute the residual
       theta = eigenpairs[loopr].first;
       blas::copy(*r[0], *u_A[0]);
@@ -249,9 +247,6 @@ namespace quda
       {
         invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
-
-      // Some local clean-up
-      for (auto p : eigenpairs) { delete p.second; }
 
       iter++;
     }
@@ -528,14 +523,13 @@ namespace quda
     }
   }
 
-  void JD::checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,
+  void JD::checkIfConverged(std::vector<std::pair<double, Complex*>> &eigenpairs,
                             std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
                             std::vector<Complex> &evals)
   {
     csParam.create = QUDA_COPY_FIELD_CREATE;
 
     while (norm < eig_param->tol) {
-      // evals.push_back(eigenpairs[loopr].first);
       evals[k] = eigenpairs[loopr].first;
       blas::copy(*X_tilde[k], *u[0]);
       k++;
@@ -548,12 +542,13 @@ namespace quda
 
       blas::zero(*u[0]);
       // project-up with a subspace still of size m
-      for (int j = 0; j < m; j++) { blas::caxpy((*(eigenpairs[loopr + 1].second))[j], *V[j], *u[0]); }
+      std::vector<ColorSpinorField *> lifter(V.begin(), V.begin()+m);
+      blas::caxpy(eigenpairs[loopr+1].second, lifter, u);
       // FIXME :  change this matmul for the superposition ?
       matVec(mat, *u_A[0], *u[0]);
 
       // and then compute the residual
-      theta = eigenpairs[loopr + 1].first;
+      theta = eigenpairs[loopr+1].first;
       blas::copy(*r[0], *u_A[0]);
       blas::caxpy(-theta, *u[0], *r[0]);
 
@@ -563,13 +558,9 @@ namespace quda
     }
   }
 
-  void JD::shrinkSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, ColorSpinorParam &csParam,
+  void JD::shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, ColorSpinorParam &csParam,
                           void *H_)
   {
-    // TODO:
-    //		1. add exceptions for case: (loopr+m_min) > m_max
-    //		2. is it possible to avoid resizing H?
-
     MatrixXcd &H = *((MatrixXcd *)H_);
 
     H.resize(m_min, m_min);
@@ -583,12 +574,13 @@ namespace quda
 
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     for (int i = 1; i < m_min; i++) {
+      // lift non-converged vectors from subspace (from <loopr> onwards)
       blas::zero(*tmpV[i]);
-      for (int j = 0; j < m; j++) {
-        blas::caxpy((*(eigenpairs[loopr + i].second))[j], *V[j], *tmpV[i]);
-        // H(i,i) = eigenpairs[loopr+i].first;
-      }
-      H(i, i) = eigenpairs[loopr + i].first;
+      std::vector<ColorSpinorField *> lifter(V.begin(), V.begin()+m);
+      std::vector<ColorSpinorField *> lift_output(tmpV.begin()+i, tmpV.begin()+i+1);
+      blas::caxpy(eigenpairs[loopr+i].second, lifter, lift_output);
+
+      H(i, i) = eigenpairs[loopr+i].first;
       // FIXME :  change this matmul for the superposition ?
       matVec(mat, *tmpAV[i], *tmpV[i]);
     }
@@ -614,32 +606,34 @@ namespace quda
     theta = H(0, 0).real();
   }
 
-  void JD::eigsolveInSubspace(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs, void *eigensolver_,
-                              void *H_)
+  void JD::eigsolveInSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, void *eigensolver_,
+                              void *H_, Complex *ort_dot_prod)
   {
     SelfAdjointEigenSolver<MatrixXcd> &eigensolver = *((SelfAdjointEigenSolver<MatrixXcd> *)(eigensolver_));
     MatrixXcd &H = *((MatrixXcd *)H_);
 
     // Construction of H = Vdag . V_A
     H.conservativeResize(m, m);
-    for (int i = 0; i < (m - 1); i++) {
-      H(i, m - 1) = blas::cDotProduct(*V[i], *V_A[m - 1]);
-      // is the next line necessary ?
-      H(m - 1, i) = conj(H(i, m - 1));
+    if (m == 1) {
+      H(0, 0) = blas::cDotProduct(*V[0], *V_A[0]);
+    } else {
+      std::vector<ColorSpinorField *> base_sp(V.begin(), V.begin()+m);
+      std::vector<ColorSpinorField *> multiplier(V_A.begin()+(m-1), V_A.begin()+(m-1)+1);
+      blas::cDotProduct(ort_dot_prod, base_sp, multiplier);
+      for (int i = 0; i < m; i++) {
+        H(i, m-1) = ort_dot_prod[i];
+        // is the next line necessary ?
+        H(m-1, i) = conj(H(i, m-1));
+      }
     }
-    // this next line ensures the case m=1
-    H(m - 1, m - 1) = blas::cDotProduct(*V[m - 1], *V_A[m - 1]);
 
     // ith eigenvalue: eigensolver.eigenvalues()[i], ith eigenvector: eigensolver.eigenvectors().col(i)
     eigensolver.compute(H);
 
     // Moving the eigenpairs to a vector of std::pair to sort by eigenvalue
-    std::vector<Complex> *buffVec = 0;
     for (int i = 0; i < m; i++) {
-      buffVec
-        = new std::vector<Complex>(eigensolver.eigenvectors().col(i).data(),
-                                   eigensolver.eigenvectors().col(i).data() + eigensolver.eigenvectors().col(i).size());
-      eigenpairs.push_back(std::make_pair(eigensolver.eigenvalues()[i], buffVec));
+      Complex *buff_vec = (Complex*)((void*) eigensolver.eigenvectors().col(i).data());
+      eigenpairs.push_back(std::make_pair(eigensolver.eigenvalues()[i], buff_vec));
     }
 
     // Order the eigeninformation extracted from H in descending order of eigenvalues
