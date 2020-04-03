@@ -379,13 +379,17 @@ public:
     
     // Variable size matrix
     std::vector<double> block_ritz_mat;
-
-    // Tridiagonal/Arrow matrix, fixed size.
-    double *block_alpha;
-    double *block_beta;
     
-    int n_blocks;
-    int block_data_length;
+    /** Block Tridiagonal/Arrow matrix, fixed size. */
+    Complex *block_alpha;
+    Complex *block_beta;
+
+    /** Temp storage used in blockLanczosStep */
+    Complex *alpha_jth_block;
+    double *beta_diag_inv;
+    
+    int n_blocks; //** Number of blocks in Krylov space */
+    int block_data_length; //** Size of blocks of data in alpha/beta */
     
     /**
        @brief Compute eigenpairs

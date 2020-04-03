@@ -1358,13 +1358,17 @@ namespace quda
     block_data_length = block_size * block_size;
     int arrow_mat_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha = (double *)safe_malloc(arrow_mat_size * sizeof(double));
-    block_beta = (double *)safe_malloc(arrow_mat_size * sizeof(double));
+    block_alpha = (Complex *)safe_malloc(arrow_mat_size * sizeof(Complex));
+    block_beta = (Complex *)safe_malloc(arrow_mat_size * sizeof(Complex));
     for (int i = 0; i < arrow_mat_size; i++) {
       block_alpha[i] = 0.0;
       block_beta[i] = 0.0;
     }    
 
+    // Temp storage used in blockLanczosStep
+    alpha_jth_block = (Complex *)safe_malloc(block_data_length * sizeof(Complex));
+    beta_diag_inv = (double *)safe_malloc(block_size * sizeof(double));      
+    
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
   
@@ -1500,8 +1504,9 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < nKr; step++) blockLanczosStep(kSpace, step);
+      for (int step = num_keep; step < nKr; step += block_size) blockLanczosStep(kSpace, step);
       iter += (nKr - num_keep);
+      
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Restart %d complete\n", restart_iter + 1);
 
       /*
@@ -1650,6 +1655,10 @@ namespace quda
   // Destructor
   BLKTRLM::~BLKTRLM()
   {
+    host_free(alpha_jth_block);
+    host_free(beta_diag_inv);
+    host_free(block_alpha);
+    host_free(block_beta);
   }
 
   // Block Thick Restart Member functions
@@ -1657,21 +1666,33 @@ namespace quda
   void BLKTRLM::blockLanczosStep(std::vector<ColorSpinorField *> v, int j)
   {
     // Compute r = A * v_j - b_{j-i} * v_{j-1}
-    // r = A * v_j
 
-    int block_offset = j*block_data_length;
-    for(int b=0; b<block_size; b++) chebyOp(mat, *r[b], *v[block_offset + b]);
+
+    // Offset for alpha, beta matrices
+    int arrow_offset = j * block_size;
+
+    // r = A * v_j
+    for(int b=0; b<block_size; b++) chebyOp(mat, *r[b], *v[j + b]);
     
     // a_j = v_j^dag * r
-    Complex *alpha = (Complex *)safe_malloc(block_data_length * sizeof(Complex));    
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(block_size);
-    for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[block_offset + b]); }
+    for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[j + b]); }
     // Block dot products stored in alpha_block.
-    printfQuda("v size = %d r size = %d\n", (int)vecs_ptr.size(), (int)r.size());
-    blas::cDotProduct(alpha, vecs_ptr, r);
+    blas::cDotProduct(block_alpha + arrow_offset, vecs_ptr, r);
 
+    // Use alpha_jth_block to negate alpha data and apply block BLAS.
+    // Data is in square hermitian form, no need to switch to ROW major
+    int idx = 0;
+    for(int b=0; b<block_size; b++) {
+      for(int c=0; c<block_size; c++) {
+	idx = b*block_size + c;
+	alpha_jth_block[idx] = -1.0 * block_alpha[arrow_offset + idx];
+      }
+    }
+        
     // Enforce hermiticity ?
+    /*
     for(int b=0; b<block_size; b++) {
       int offset = block_offset + b*block_size; 
       for(int c=b; c<block_size; c++) {
@@ -1684,23 +1705,44 @@ namespace quda
 	alpha[c*block_size + b] = alpha[b*block_size + c];
       }
     }    
+    */
+
+    // r = r - a_j * v_j
+    // Data is in square hermitian form, caxpy_R or caxpy_L will work
+    // and will be cheaper.
+    blas::caxpy_L(alpha_jth_block, vecs_ptr, r);
     
     // Orthogonalise R[0:block_size] against the Krylov space V[0:block_offset] 
-    if(j > 0) blockOrthogonalize(v, r, block_offset);
-    
-    
-    /*
-    // b_j = ||r||
-    beta[j] = sqrt(blas::norm2(*r[0]));
+    if(j > 0) blockOrthogonalize(v, r, j);
 
+    // b_j = ||r||
+    //https://en.wikipedia.org/wiki/QR_decomposition#Using_the_Gram–Schmidt_process
+    int idx_conj = 0;
+    for(int b=0; b<block_size; b++) {
+      for(int c=0; c<b; c++) {
+	idx      = b*block_size + c;
+	idx_conj = c*block_size + b;
+	Complex cnorm = blas::cDotProduct(*r[c], *r[b]);
+	blas::caxpy(-cnorm, *r[c], *r[b]);
+	block_beta[arrow_offset + idx     ] = cnorm;
+	block_beta[arrow_offset + idx_conj] = conj(cnorm);
+	if(b == c) {
+	  block_beta[arrow_offset + idx] = cnorm.real();
+	  beta_diag_inv[b] = 1.0/cnorm.real();
+	}
+      }
+    }
+    
     // Prepare next step.
-    // v_{j+1} = r / b_j
-    blas::zero(*v[j + 1]);
-    blas::axpy(1.0 / beta[j], *r[0], *v[j + 1]);
-    */
+    // v_{j+1} = r / b_j    
+    for(int b=0; b<block_size; b++) blas::zero(*v[j + block_size + b]);
+    vecs_ptr.resize(0);
+    vecs_ptr.reserve(block_size);
+    for (int b = 0; b < block_size; b++) { vecs_ptr.push_back(v[j + block_size + b]); }
+    blas::axpy(beta_diag_inv, r, vecs_ptr);    
+    
     // Save Lanczos step tuning
     saveTuneCache();
+    
   }
-
-  
 } // namespace quda
