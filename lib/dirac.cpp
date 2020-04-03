@@ -110,7 +110,7 @@ namespace quda {
     for (decltype(out.size()) i = 0; i < out.size(); i++) { M(*out[i], *in[i]); }
   }
 
-  void Dirac::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void Dirac::MdagM(std::vector<ColorSpinorField *> &out, std::vector<const ColorSpinorField *> &in) const
   {
     if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
     for (decltype(out.size()) i = 0; i < out.size(); i++) { MdagM(*out[i], *in[i]); }
@@ -123,23 +123,11 @@ namespace quda {
     flip(dagger);
   }
 
-  void Dirac::Mdag(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
-    for (decltype(out.size()) i = 0; i < out.size(); i++) { Mdag(*out[i], *in[i]); }
-  }
-
   void Dirac::MMdag(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     flip(dagger);
     MdagM(out, in);
     flip(dagger);
-  }
-
-  void Dirac::MMdagM(ColorSpinorField &out, const ColorSpinorField &in) const
-  {
-    if (out.size() != in.size()) errorQuda("in and out arryas do not have the same size in mrhs operator");
-    for (decltype(out.size()) i = 0; i < out.size(); i++) { MMdag(*out[i], *in[i]); }
   }
 
 #undef flip
