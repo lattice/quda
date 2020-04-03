@@ -79,6 +79,11 @@ namespace quda
     // Dirac &diracSloppy = *dSloppy;
 
     mmPP = new DiracPrecProjCorr(dirac);
+    // alternative: the following two (commented) lines will depend on whether getStencilSteps() is virtual or not
+    //Dirac *dirac_alt = (Dirac*)((void*) (&mat));
+    //mmPP = new DiracPrecProjCorr(dirac_alt);
+    mmPP = new DiracPrecProjCorr(dirac);
+
     // mmPPSloppy = new DiracPrecProjCorr(diracSloppy);
 
     // Solvers used in the correction equation
@@ -95,17 +100,16 @@ namespace quda
     // TODO: general pendings:
 
     //		1. fix profiling !
-    //		2. extend whole code to address any <target>
+    //		2. extend whole code to address any <target> (i.e. include LR, not only SR)
+
     //		3. avoid calls to <new> within JD::eigsolveInSubspace(...)
     //		4. optimize the eigendecomposition of the subspace, and in particular the use of Eigen
     //		   for this (this within JD::eigsolveInSubspace(...))
     //		5. avoid the mess being done for sorting Ritz eigenpairs after the eigendecomposition
     //		   (this within JD::eigsolveInSubspace(...))
+
     //		6. any more changes from camelCase ---> underscore_case needed ?
-    //		7. see blockOrthogonalization in the base eigensolver class. You can negate the dot products on the host,
-    //		   then pass the array to a MULTI blas version: for (int i=0; i<tmpSize; i++) ortDotProd[i] *= -1.0;
-    //								blas::caxpy(ortDotProd[i], tmpOrtSpace, *vectr[0]);
-    //		8. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
+    //		7. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -227,7 +231,7 @@ namespace quda
       norm = sqrt(blas::norm2(*r[0]));
       // Print the residual
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("Iteration = %d, m = %d, loopr = %d, residual = %.12f, converged eigenpairs = %d\n", iter, m, loopr,
+        printfQuda("Iteration = %5d, m = %3d, loopr = %d, residual = %.12f, converged eigenpairs = %4d\n", iter, m, loopr,
                    norm, k);
       }
 
@@ -512,21 +516,16 @@ namespace quda
 
     std::vector<ColorSpinorField *> tmp_ort_space(ort_space.begin(), ort_space.begin() + tmp_size);
 
-    // normalize before the orthogonalization
-    norm = sqrt(blas::norm2(*vectr[0]));
-    blas::ax(1.0 / norm, *vectr[0]);
+    // double orthogonalization
+    for (int j = 0; j < 2; j++) {
+      // normalize before the orthogonalization
+      norm = sqrt(blas::norm2(*vectr[0]));
+      blas::ax(1.0 / norm, *vectr[0]);
 
-    blas::cDotProduct(ort_dot_prod, tmp_ort_space, vectr);
-    // double reorthogonalization
-    for (int i = 0; i < tmp_size; i++) { blas::caxpy(-ort_dot_prod[i], *tmp_ort_space[i], *vectr[0]); }
-
-    // normalize before the re-orthogonalization
-    norm = sqrt(blas::norm2(*vectr[0]));
-    blas::ax(1.0 / norm, *vectr[0]);
-
-    blas::cDotProduct(ort_dot_prod, tmp_ort_space, vectr);
-    // double reorthogonalization
-    for (int i = 0; i < tmp_size; i++) { blas::caxpy(-ort_dot_prod[i], *tmp_ort_space[i], *vectr[0]); }
+      blas::cDotProduct(ort_dot_prod, tmp_ort_space, vectr);
+      for (int i = 0; i < tmp_size; i++) { ort_dot_prod[i] *= -1.0; }
+      blas::caxpy(ort_dot_prod, tmp_ort_space, vectr);
+    }
   }
 
   void JD::checkIfConverged(std::vector<std::pair<double, std::vector<Complex> *>> &eigenpairs,

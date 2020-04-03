@@ -1653,8 +1653,8 @@ public:
 
     int getStencilSteps() const
     {
-      // FIXME ? ---> in JD we're trying to solve a shifted-and-projected-preconditioned version of MMdag
-      // DMHJD: if the operator is an MMdag type, this is correct.
+      // TODO: set the factor of 2 to something depending on whether this ~(M) or ~(MMdag). For now,
+      //       it's ~(MMdag) (solving only-hermitian for now)
       return 2 * dirac->getStencilSteps(); // 2 for M and M dagger
     }
   };
