@@ -11,7 +11,8 @@
    wrappers also implementing thrust::reduce.
  */
 
-namespace quda {
+namespace quda
+{
 
   template <typename T> struct plus {
     __device__ __host__ T operator()(T a, T b) { return a + b; }
@@ -33,14 +34,14 @@ namespace quda {
   struct TransformReduceArg : public ReduceArg<reduce_t> {
     static constexpr int block_size = 512;
     static constexpr int n_batch_max = 4;
-    const T* v[n_batch_max];
+    const T *v[n_batch_max];
     count_t n_items;
     int n_batch;
     reduce_t init;
     reduce_t result[n_batch_max];
     transformer h;
     reducer r;
-    TransformReduceArg(const std::vector<T*> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
+    TransformReduceArg(const std::vector<T *> &v, count_t n_items, transformer h, reduce_t init, reducer r) :
       n_items(n_items),
       n_batch(v.size()),
       init(init),
@@ -50,7 +51,6 @@ namespace quda {
       if (n_batch > n_batch_max) errorQuda("Requested batch %d greater than max supported %d", n_batch, n_batch_max);
       for (size_t j = 0; j < v.size(); j++) this->v[j] = v[j];
     }
-
   };
 
   template <typename Arg> void transform_reduce(Arg &arg)
@@ -88,8 +88,8 @@ namespace quda {
     reduce<Arg::block_size, reduce_t, false, decltype(arg.r)>(arg, r_, j);
   }
 
-  template <typename Arg>
-  class TransformReduce : Tunable {
+  template <typename Arg> class TransformReduce : Tunable
+  {
     Arg &arg;
     QudaFieldLocation location;
 
@@ -99,10 +99,13 @@ namespace quda {
     int blockMin() const { return Arg::block_size; }
     unsigned int maxBlockSize(const TuneParam &param) const { return Arg::block_size; }
 
-    bool advanceTuneParam(TuneParam &param) const {
+    bool advanceTuneParam(TuneParam &param) const
+    {
       // only do autotuning if we have device fields
-      if (location == QUDA_CUDA_FIELD_LOCATION) return Tunable::advanceTuneParam(param);
-      else return false;
+      if (location == QUDA_CUDA_FIELD_LOCATION)
+        return Tunable::advanceTuneParam(param);
+      else
+        return false;
     }
 
     void initTuneParam(TuneParam &param) const
@@ -112,35 +115,35 @@ namespace quda {
     }
 
   public:
-    TransformReduce(Arg &arg, QudaFieldLocation location) :
-      arg(arg),
-      location(location)
-      {
-        strcpy(aux, "batch_size=");
-        u32toa(aux+11, arg.n_batch);
-        if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
-      }
+    TransformReduce(Arg &arg, QudaFieldLocation location) : arg(arg), location(location)
+    {
+      strcpy(aux, "batch_size=");
+      u32toa(aux + 11, arg.n_batch);
+      if (location == QUDA_CPU_FIELD_LOCATION) strcat(aux, ",cpu");
+    }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const cudaStream_t &stream)
+    {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
       if (location == QUDA_CUDA_FIELD_LOCATION) {
         transform_reduce_kernel<<<tp.grid, tp.block>>>(arg);
         qudaDeviceSynchronize();
         for (decltype(arg.n_batch) j = 0; j < arg.n_batch; j++) arg.result[j] = arg.result_h[j];
-      } else {        
+      } else {
         transform_reduce(arg);
       }
     }
 
-    TuneKey tuneKey() const {
+    TuneKey tuneKey() const
+    {
       char count[16];
       u32toa(count, arg.n_items);
       return TuneKey(count, typeid(*this).name(), aux);
     }
 
     long long flops() const { return 0; } // just care about bandwidth
-    long long bytes() const { return arg.n_batch * arg.n_items * sizeof(*arg.v); } 
+    long long bytes() const { return arg.n_batch * arg.n_items * sizeof(*arg.v); }
   };
 
   /**
@@ -160,11 +163,12 @@ namespace quda {
   void transform_reduce(QudaFieldLocation location, std::vector<reduce_t> &result, const std::vector<T *> &v, I n_items,
                         transformer h, reduce_t init, reducer r)
   {
-    if (result.size() != v.size()) errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
+    if (result.size() != v.size())
+      errorQuda("result %lu and input %lu set sizes do not match", result.size(), v.size());
     TransformReduceArg<reduce_t, T, I, transformer, reducer> arg(v, n_items, h, init, r);
     TransformReduce<decltype(arg)> reduce(arg, location);
     reduce.apply(0);
-    for (size_t j=0; j<result.size(); j++) result[j] = arg.result[j];
+    for (size_t j = 0; j < result.size(); j++) result[j] = arg.result[j];
   }
 
   /**
@@ -183,11 +187,11 @@ namespace quda {
   template <typename reduce_t, typename T, typename I, typename transformer, typename reducer>
   reduce_t transform_reduce(QudaFieldLocation location, const T *v, I n_items, transformer h, reduce_t init, reducer r)
   {
-    std::vector<reduce_t> result = { 0.0 };
-    std::vector<const T*> v_ = { v };
+    std::vector<reduce_t> result = {0.0};
+    std::vector<const T *> v_ = {v};
     transform_reduce(location, result, v_, n_items, h, init, r);
     return result[0];
-  }  
+  }
 
   /**
      @brief QUDA implementation providing thrust::reduce like
@@ -223,9 +227,9 @@ namespace quda {
   template <typename reduce_t, typename T, typename I, typename reducer>
   reduce_t reduce(QudaFieldLocation location, const T *v, I n_items, reduce_t init, reducer r)
   {
-    std::vector<reduce_t> result = { 0.0 };
-    std::vector<const T*> v_ = { v };
+    std::vector<reduce_t> result = {0.0};
+    std::vector<const T *> v_ = {v};
     transform_reduce(location, result, v_, n_items, identity<T>(), init, r);
     return result[0];
-  }  
-}
+  }
+} // namespace quda

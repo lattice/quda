@@ -745,10 +745,10 @@ namespace quda {
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
-      __host__ double norm2(bool global=true) const
+      __host__ double norm2(bool global = true) const
       {
-        double nrm2 = ::quda::transform_reduce(location, v, nParity*volumeCB*nSpin*nColor*nVec,
-                                               square_<double,storeFloat>(scale_inv), 0.0, plus<double>());
+        double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
         if (global) comm_allreduce(&nrm2);
         return nrm2;
       }
@@ -758,11 +758,11 @@ namespace quda {
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
       */
-      __host__ double abs_max(bool global=true) const
+      __host__ double abs_max(bool global = true) const
       {
-	double absmax = ::quda::transform_reduce(location, v, nParity*volumeCB*nSpin*nColor*nVec,
-                                                 abs_<double,storeFloat>(scale_inv), 0.0, maximum<double>());
-	if (global) comm_allreduce_max(&absmax);
+        double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        if (global) comm_allreduce_max(&absmax);
 	return absmax;
       }
 
