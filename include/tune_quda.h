@@ -348,7 +348,7 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
+      if (tuneGridDim()) param.grid.x = maxGridSize(); // don't set y and z in case derived initTuneParam has
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
