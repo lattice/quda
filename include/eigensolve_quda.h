@@ -122,18 +122,38 @@ public:
        @param[in] r Vector to be orthogonalised
        @param[in] j Number of vectors in v to orthogonalise against
     */
-    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
 
     /**
        @brief Orthogonalise input vectors r against
        vector space v using block-BLAS
        @param[in] v Vector space
        @param[in] r Vectors to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
+       @param[in] j Use vectors v[0:j]
     */
-    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> r, int j);
+    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
 
+    /**
+       @brief Orthogonalise input vector space v using Gram-Schmidt
+       @param[in] v Vector space
+       @param[in] j Use vectors v[0:j-1] 
+    */
+    void orthogonalizeGS(std::vector<ColorSpinorField *> &v, int j);
 
+    /**
+       @brief Orthonormalise input vector space v using Gram-Schmidt
+       @param[in] v Vector space
+       @param[in] j Use vectors v[0:j-1] 
+    */
+    void orthonormalizeGS(std::vector<ColorSpinorField *> &v, int j);
+
+    /**
+       @brief Check orthonormality of input vector space v
+       @param[in] v Vector space
+       @param[in] j Use vectors v[0:j-1] 
+    */
+    void orthoCheck(std::vector<ColorSpinorField *> v, int j);
+    
     /**
        @brief Permute the vector space using the permutation matrix.
        @param[in/out] kSpace The current Krylov space
@@ -378,14 +398,14 @@ public:
     virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
     
     // Variable size matrix
-    std::vector<double> block_ritz_mat;
+    std::vector<Complex> block_ritz_mat;
     
     /** Block Tridiagonal/Arrow matrix, fixed size. */
     Complex *block_alpha;
     Complex *block_beta;
 
     /** Temp storage used in blockLanczosStep */
-    Complex *alpha_jth_block;
+    Complex *jth_block;
     double *beta_diag_inv;
     
     int n_blocks; //** Number of blocks in Krylov space */
@@ -404,6 +424,20 @@ public:
        @param[in] j Index of block of vectors being computed
     */
     void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);    
+
+    /**
+       @brief Get the eigendecomposition from the block arrow matrix
+       @param[in] nLocked Number of locked eigenvectors
+       @param[in] arrow_pos position of arrowhead
+    */
+    void eigensolveFromBlockArrowMat(int nLocked, int arror_pos);
+
+    /**
+       @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
+       Uses a complex ritz matrix
+       @param[in] nKspace current Krylov space
+    */
+    void computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace);
     
   };
   
