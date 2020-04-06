@@ -587,9 +587,10 @@ namespace quda {
       {
         if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int start = dim == -1 ? 0 : dim;
-        int count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor;
+        int count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
         std::vector<double> result = {init, init};
-        std::vector<decltype(u)> v = {u + (0 * geometry + start) * count, u + (1 * geometry + start) * count};
+        std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
+                                      u + (1 * geometry + start) * volumeCB * nColor * nColor};
         ::quda::transform_reduce(location, result, v, count, h, init, r);
         return r(result[0], result[1]);
       }
