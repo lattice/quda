@@ -80,6 +80,9 @@ namespace quda {
 
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
         ComputeCloverInvMaxCPU<Float, false>(arg);
+        double max = arg.max_h;
+        comm_allreduce_max(&max);
+        arg.max_h = max;
 #else
         errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
 #endif
@@ -89,6 +92,9 @@ namespace quda {
 
 #if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
         ComputeCloverInvMaxCPU<Float, true>(arg);
+        double max = arg.max_h;
+        comm_allreduce_max(&max);
+        arg.max_h = max;
 #else
         errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
 #endif
@@ -219,11 +225,11 @@ namespace quda {
 #endif
 #endif
 
-        if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
-          thrust_allocator alloc;
-          thrust::device_ptr<Float> ptr(arg.max_d);
-          arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr + 2 * arg.fineVolumeCB,
-                                     static_cast<Float>(0.0), thrust::maximum<Float>());
+        if (!activeTuning()) { // only do reduction once tuning is done else we have nested tuning
+          double max = reduce(QUDA_CUDA_FIELD_LOCATION, arg.max_d, 2 * arg.fineVolumeCB,
+                             static_cast<Float>(0.0), maximum<Float>());
+          comm_allreduce_max(&max);
+          arg.max_h = max;
         }
         pool_device_free(arg.max_d);
 
@@ -245,10 +251,11 @@ namespace quda {
 #endif
 #endif
 
-        if (!activeTuning()) { // only do reduction once tuning is done else thrust will catch tuning failures
-          thrust_allocator alloc;
-          thrust::device_ptr<Float> ptr(arg.max_d);
-          arg.max_h = thrust::reduce(thrust::cuda::par(alloc), ptr, ptr+2*arg.fineVolumeCB, static_cast<Float>(0.0), thrust::maximum<Float>());
+        if (!activeTuning()) { // only do reduction once tuning is done else we have nested tuning
+          double max = reduce(QUDA_CUDA_FIELD_LOCATION, arg.max_d, 2 * arg.fineVolumeCB,
+                              static_cast<Float>(0.0), maximum<Float>());
+          comm_allreduce_max(&max);
+          arg.max_h = max;
         }
         pool_device_free(arg.max_d);
 
