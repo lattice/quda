@@ -191,10 +191,10 @@ namespace quda {
     } else if (param.type == QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracMobiusPC operator\n");
       return new DiracMobiusPC(param);
-    } else if (param.type == QUDA_OVERLAP_WILSONPC_DIRAC) {
+    } else if (param.type == QUDA_OVERLAP_WILSON_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracOverlapWilson operator\n");
       return new DiracOverlapWilson(param);
-    } else if (param.type == QUDA_STAGGERED_DIRAC) {
+    } else if (param.type == QUDA_OVERLAP_WILSONPC_DIRAC) {
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Creating a DiracOverlapWilsonPC operator\n");
       return new DiracOverlapWilsonPC(param);
     } else if (param.type == QUDA_STAGGERED_DIRAC) {
