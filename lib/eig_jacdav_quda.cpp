@@ -43,6 +43,9 @@ namespace quda
     profile_corr_eq_invs = new TimeProfile("profile_corr_eq_invs");
     profile_mat_corr_eq_invs = new TimeProfile("profile_mat_corr_eq_invs");
 
+    outer_prec_lab = mat.Expose()->OpPrecision();
+    inner_prec_lab = matPrecon.Expose()->OpPrecision();
+
     QudaInvertParam refineparam = *eig_param->invert_param;
     refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
     solverParam = new SolverParam(refineparam);
@@ -52,42 +55,18 @@ namespace quda
     solverParam->delta = eig_param->invert_param->reliable_delta_refinement;
     // disable preconditioning on solvers used in the correction equation
     solverParam->inv_type_precondition = QUDA_INVALID_INVERTER;
+    solverParam->precision = inner_prec_lab;
+    solverParam->precision_sloppy = inner_prec_lab;
+    solverParam->precision_precondition = inner_prec_lab;
 
     solverParamPrec = new SolverParam(*solverParam);
     solverParamPrec->maxiter = 5;
     solverParamPrec->tol = 1e-2;
 
-    d = nullptr;
-    // dSloppy = nullptr;
-    // Create the dirac operator
-    // IMPORTANT: cannot call createDirac(...) as in interface_quda.cpp
-    {
-      bool pc_solve = ((eig_param->invert_param->solve_type == QUDA_DIRECT_PC_SOLVE)
-                       || (eig_param->invert_param->solve_type == QUDA_NORMOP_PC_SOLVE)
-                       || (eig_param->invert_param->solve_type == QUDA_NORMERR_PC_SOLVE));
-
-      DiracParam diracParam;
-      // DiracParam diracSloppyParam;
-
-      quda::setDiracParam(diracParam, eig_param->invert_param, pc_solve);
-      // quda::setDiracSloppyParam(diracSloppyParam, eig_param->invert_param, pc_solve);
-      d = Dirac::create(diracParam);
-      // dSloppy = Dirac::create(diracSloppyParam);
-    }
-
-    Dirac &dirac = *d;
-    // Dirac &diracSloppy = *dSloppy;
-
-    mmPP = new DiracPrecProjCorr(dirac);
-    // alternative: the following two (commented) lines will depend on whether getStencilSteps() is virtual or not
-    //Dirac *dirac_alt = (Dirac*)((void*) (&mat));
-    //mmPP = new DiracPrecProjCorr(dirac_alt);
-    mmPP = new DiracPrecProjCorr(dirac);
-
-    // mmPPSloppy = new DiracPrecProjCorr(diracSloppy);
+    mmPP = new DiracPrecProjCorr(matPrecon.Expose());
 
     // Solvers used in the correction equation
-    cg = new CG(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
+    cg = new CG(const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon),
                 *solverParam, *profile_mat_corr_eq_invs);
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
 
@@ -106,9 +85,9 @@ namespace quda
     //		   for this (this within JD::eigsolveInSubspace(...))
 
     //		4. any more changes from camelCase ---> underscore_case needed ?
-    //		5. is TRLM::precChangeKrylov(...) of any use in the context of low tol in the correction equation?
-    //		6. possible improvement: adjust the correction equation specs depending on the number of (overall) iterations
+    //		5. possible improvement: adjust the correction equation specs depending on the number of (overall) iterations
     //		   it took to find the last eigenpair. This avoids the overhead of having to make more calls to JD::K(...)
+    //		6. switch correction equation to permanently use sizePS=1
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -134,34 +113,51 @@ namespace quda
     // Clone eigSpace's CSF params
     ColorSpinorParam csParam(*eigSpace[0]);
 
-    // Some more memory pre-allocations
-    moreInits(csParam, *eigSpace[0]);
-
     Complex *ort_dot_prod = (Complex *)safe_malloc(std::max(m_max, k_max) * 1 * sizeof(Complex));
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
 
-    // double epsilon = DBL_EPSILON;
-    QudaPrecision prec = eigSpace[0]->Precision();
-    switch (prec) {
+    switch (outer_prec_lab) {
     case QUDA_DOUBLE_PRECISION:
-      // epsilon = DBL_EPSILON;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
+      outer_prec = DBL_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision for outer parts\n");
       break;
     case QUDA_SINGLE_PRECISION:
-      // epsilon = FLT_EPSILON;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
+      outer_prec = FLT_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision for outer parts\n");
       break;
     case QUDA_HALF_PRECISION:
-      // epsilon = 2e-3;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
+      outer_prec = 2e-3;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision for outer parts\n");
       break;
     case QUDA_QUARTER_PRECISION:
-      // epsilon = 5e-2;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
+      outer_prec = 5e-2;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision for outer parts\n");
       break;
-    default: errorQuda("Invalid precision %d", prec);
+    default: errorQuda("Invalid precision %d", outer_prec_lab);
     }
+    switch (inner_prec_lab) {
+    case QUDA_DOUBLE_PRECISION:
+      inner_prec = DBL_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision for inner parts\n");
+      break;
+    case QUDA_SINGLE_PRECISION:
+      inner_prec = FLT_EPSILON;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision for inner parts\n");
+      break;
+    case QUDA_HALF_PRECISION:
+      inner_prec = 2e-3;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision for inner parts\n");
+      break;
+    case QUDA_QUARTER_PRECISION:
+      inner_prec = 5e-2;
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision for inner parts\n");
+      break;
+    default: errorQuda("Invalid precision %d", inner_prec_lab);
+    }
+
+    // Some more memory pre-allocations
+    moreInits(csParam, *eigSpace[0]);
 
     // Begin JD Eigensolver computation
     //---------------------------------------------------------------------------
@@ -229,23 +225,30 @@ namespace quda
       norm = sqrt(blas::norm2(*r[0]));
       // Print the residual
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-        printfQuda("Iteration = %5d, m = %3d, loopr = %d, residual = %.12f, converged eigenpairs = %4d\n", iter, m, loopr,
+        printfQuda("Iteration = %5d, m = %3d, loopr = %3d, residual = %.12f, converged eigenpairs = %4d\n", iter, m, loopr,
                    norm, k);
       }
 
       // Check for convergence
-      checkIfConverged(eigenpairs, eigSpace, csParam, evals);
+      checkIfConverged(eigenpairs, eigSpace, evals);
 
       // Check if end has been reached
       if (k >= k_max) { break; }
 
       // Restart: shrink the acceleration subspace
-      if (m == m_max) { shrinkSubspace(eigenpairs, csParam, &H); }
+      if (m == m_max) { shrinkSubspace(eigenpairs, &H); }
 
-      // Solving the correction equation
-      blas::copy(*t[0], *r[0]);
       {
-        invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
+        // move vectors to lower precision
+        *(r_lowprec[0]) = *(r[0]);
+        blas::copy(*t_lowprec[0], *r_lowprec[0]);
+        *(u_lowprec[0]) = *(u[0]);
+
+        // solving the correction equation
+        invertProjMat(matPrecon, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
+
+        // switch back to higher precision
+        *(t[0]) = *(t_lowprec[0]);
       }
 
       iter++;
@@ -285,13 +288,16 @@ namespace quda
     delete t[0];
     delete r_tilde[0];
     delete mmPP->y_hat[0];
-    for (auto p : u) { delete p; }
-    for (auto p : u_A) { delete p; }
+    delete u[0];
+    delete u_A[0];
     for (auto p : V) { delete p; }
     for (auto p : V_A) { delete p; }
     for (auto p : tmpV) { delete p; }
     for (auto p : tmpAV) { delete p; }
-    for (auto p : Qhat) { delete p; }
+    delete Qhat[0];
+    delete r_lowprec[0];
+    delete t_lowprec[0];
+    delete u_lowprec[0];
     host_free(ort_dot_prod);
 
     // Only save if outfile is defined
@@ -328,7 +334,6 @@ namespace quda
     delete gcrPrec;
     delete cg;
 
-    delete d;
     delete mmPP;
   }
 
@@ -340,9 +345,6 @@ namespace quda
   {
     std::vector<ColorSpinorField *> &qSpace = projSpace;
 
-    // Clone x's CSF params
-    ColorSpinorParam csParam(x);
-
     // Buffers for the shifts of the matrix operators
     double bare_shift;
 
@@ -353,7 +355,7 @@ namespace quda
     // Casting away contractual constness
     DiracMatrix &mat_unconst = const_cast<DiracMatrix &>(matPrecon);
 
-    csParam.create = QUDA_COPY_FIELD_CREATE;
+    //csParam.create = QUDA_COPY_FIELD_CREATE;
     //---------------------------------------------
     // Switching to the appropriate shift for JD
     bare_shift = mat_unconst.shift;
@@ -372,6 +374,8 @@ namespace quda
     // and, switching back the shift parameters
     mat_unconst.shift = bare_shift;
     //---------------------------------------------
+
+    //return;
 
     // 2. M = qSpacedag * Qhat
 
@@ -470,24 +474,15 @@ namespace quda
 
   void JD::moreInits(ColorSpinorParam &csParam, ColorSpinorField &initVec)
   {
-    // Init a zero residual
+    // outer vectors (high precision)
+
+    csParam.setPrecision(outer_prec_lab);
     csParam.create = QUDA_ZERO_FIELD_CREATE;
+
     r.push_back(ColorSpinorField::Create(csParam));
-
-    r_tilde.push_back(ColorSpinorField::Create(csParam));
-    mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
-
-    // We're only using one vector to project in the correction equation
-    // Qhat.reserve(k_max+1);
-    // for (int i=0; i<(k_max+1); i++) {Qhat.push_back(ColorSpinorField::Create(csParam));}
-    Qhat.push_back(ColorSpinorField::Create(csParam));
-
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-    t.push_back(ColorSpinorField::Create(initVec, csParam));
 
     // Create the vector subspaces used for the search of eigenpairs
     // buffer spinors
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
     u.push_back(ColorSpinorField::Create(csParam));
     u_A.push_back(ColorSpinorField::Create(csParam));
 
@@ -500,6 +495,32 @@ namespace quda
       tmpV.push_back(ColorSpinorField::Create(csParam));
       tmpAV.push_back(ColorSpinorField::Create(csParam));
     }
+
+    csParam.create = QUDA_COPY_FIELD_CREATE;
+
+    t.push_back(ColorSpinorField::Create(initVec, csParam));
+
+    // outer vectors to be used to pass to correction equation (low precision)
+
+    csParam.setPrecision(inner_prec_lab);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    r_lowprec.push_back(ColorSpinorField::Create(csParam));
+    t_lowprec.push_back(ColorSpinorField::Create(csParam));
+    u_lowprec.push_back(ColorSpinorField::Create(csParam));
+
+    // inner vectors (low precision)
+
+    csParam.setPrecision(inner_prec_lab);
+    csParam.create = QUDA_ZERO_FIELD_CREATE;
+
+    r_tilde.push_back(ColorSpinorField::Create(csParam));
+    mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
+
+    // We're only using one vector to project in the correction equation
+    // Qhat.reserve(k_max+1);
+    // for (int i=0; i<(k_max+1); i++) {Qhat.push_back(ColorSpinorField::Create(csParam));}
+    Qhat.push_back(ColorSpinorField::Create(csParam));
   }
 
   void JD::orth(Complex *ort_dot_prod, std::vector<ColorSpinorField *> &vectr, std::vector<ColorSpinorField *> &ort_space,
@@ -524,11 +545,8 @@ namespace quda
   }
 
   void JD::checkIfConverged(std::vector<std::pair<double, Complex*>> &eigenpairs,
-                            std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
-                            std::vector<Complex> &evals)
+                            std::vector<ColorSpinorField *> &X_tilde, std::vector<Complex> &evals)
   {
-    csParam.create = QUDA_COPY_FIELD_CREATE;
-
     while (norm < eig_param->tol) {
       evals[k] = eigenpairs[loopr].first;
       blas::copy(*X_tilde[k], *u[0]);
@@ -558,8 +576,7 @@ namespace quda
     }
   }
 
-  void JD::shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, ColorSpinorParam &csParam,
-                          void *H_)
+  void JD::shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, void *H_)
   {
     MatrixXcd &H = *((MatrixXcd *)H_);
 
@@ -567,12 +584,11 @@ namespace quda
     H.setZero();
 
     // 0-th element of the new (smaller) subspace
-    csParam.create = QUDA_COPY_FIELD_CREATE;
     blas::copy(*tmpV[0], *u[0]);
     blas::copy(*tmpAV[0], *u_A[0]);
     H(0, 0) = eigenpairs[loopr].first;
 
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    //csParam.create = QUDA_ZERO_FIELD_CREATE;
     for (int i = 1; i < m_min; i++) {
       // lift non-converged vectors from subspace (from <loopr> onwards)
       blas::zero(*tmpV[i]);

@@ -416,9 +416,7 @@ public:
     TimeProfile *profile_mat_corr_eq_invs;
 
     SolverParam *solverParam;
-    SolverParam *solverParamMat;
     SolverParam *solverParamPrec;
-    CG *cgMat;
     CG *cg;
     GCR *gcrPrec;
 
@@ -432,17 +430,22 @@ public:
     std::vector<ColorSpinorField *> V_A;
     std::vector<ColorSpinorField *> tmpV;
     std::vector<ColorSpinorField *> tmpAV;
+    std::vector<ColorSpinorField *> r_lowprec;
+    std::vector<ColorSpinorField *> t_lowprec;
+    std::vector<ColorSpinorField *> u_lowprec;
 
-    Dirac *d;
-    // Dirac *dSloppy;
     DiracPrecProjCorr *mmPP;
-    // DiracPrecProjCorr *mmPPSloppy;
 
     int k;
     int m;
-    double theta;
     int loopr;
+    double theta;
     double norm;
+
+    double outer_prec;
+    double inner_prec;
+    QudaPrecision outer_prec_lab;
+    QudaPrecision inner_prec_lab;
 
   public:
     /**
@@ -508,21 +511,17 @@ public:
        @brief Check if one or more eigenpairs have been found
        @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
        @param[in] X_tilde The converged eigenvectors
-       @param[in] csParam Information about the spinors
        @param[in] evals The converged eigenvalues
     */
     void checkIfConverged(std::vector<std::pair<double, Complex*>> &eigenpairs,
-                          std::vector<ColorSpinorField *> &X_tilde, ColorSpinorParam &csParam,
-                          std::vector<Complex> &evals);
+                          std::vector<ColorSpinorField *> &X_tilde, std::vector<Complex> &evals);
 
     /**
        @brief When reached the max allowed size of the subspace, resize
        @param[in] eigenpairs A vector of pairs, containing eigeninfo from the subspace
-       @param[in] csParam Information about the spinors
        @param[in] H_ The matrix encoding information about the subspace
     */
-    void shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, ColorSpinorParam &csParam,
-                        void *H_);
+    void shrinkSubspace(std::vector<std::pair<double, Complex*>> &eigenpairs, void *H_);
 
     /**
        @brief Perform an eigendecomposition through the acceleration subspace
