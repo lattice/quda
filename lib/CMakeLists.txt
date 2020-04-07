@@ -26,7 +26,7 @@ set (QUDA_OBJS
   dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp tune.cpp
+  dirac_twisted_mass.cpp dirac_overlap_wilson.cpp tune.cpp
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_staggered.cu dslash_improved_staggered.cu

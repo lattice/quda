@@ -743,6 +743,57 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
+  // Full OverlapWilson
+  class DiracOverlapWilson : public DiracWilson {
+
+  protected:
+    void initConstants();
+
+  public:
+    DiracOverlapWilson(const DiracParam &param);
+    DiracOverlapWilson(const DiracOverlapWilson &dirac);
+    DiracOverlapWilson(const DiracParam &param, const int nDims);//to correctly adjust face for DW and non-deg twisted mass   
+  
+    virtual ~DiracOverlapWilson();
+    DiracOverlapWilson& operator=(const DiracOverlapWilson &dirac);
+
+    virtual void Dslash(ColorSpinorField &out, const ColorSpinorField &in, 
+			const QudaParity parity) const;
+    virtual void DslashXpay(ColorSpinorField &out, const ColorSpinorField &in, 
+			    const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+			 ColorSpinorField &x, ColorSpinorField &b,
+			 const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+			     const QudaSolutionType) const;
+
+  };
+
+  // Even-odd preconditioned OverlapWilson
+  class DiracOverlapWilsonPC : public DiracOverlapWilson {
+
+  private:
+
+  public:
+    DiracOverlapWilsonPC(const DiracParam &param);
+    DiracOverlapWilsonPC(const DiracOverlapWilsonPC &dirac);
+    virtual ~DiracOverlapWilsonPC();
+    DiracOverlapWilsonPC& operator=(const DiracOverlapWilsonPC &dirac);
+
+    void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
+		 ColorSpinorField &x, ColorSpinorField &b,
+		 const QudaSolutionType) const;
+    void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
+		     const QudaSolutionType) const;
+  };
+
+
   // Full twisted mass
   class DiracTwistedMass : public DiracWilson {
 
