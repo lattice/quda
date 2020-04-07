@@ -608,7 +608,7 @@ int main(int argc, char **argv)
         }
       }
 
-    } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
+    } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
@@ -668,7 +668,6 @@ int main(int argc, char **argv)
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
       void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -735,6 +734,8 @@ int main(int argc, char **argv)
       }
 
       free(spinorTmp);
+    } else {
+      errorQuda("Solution type %d not implemented", inv_param.solution_type);
     }
 
 
