@@ -80,14 +80,12 @@ namespace quda
 
     //		1. fix profiling !
     //		2. extend whole code to address any <target> (i.e. include LR, not only SR)
-
     //		3. optimize the eigendecomposition of the subspace, and in particular the use of Eigen
-    //		   for this (this within JD::eigsolveInSubspace(...))
-
+    //		   for this (this within JD::eigsolveInSubspace(...)) ---> OpenMP ?
     //		4. any more changes from camelCase ---> underscore_case needed ?
     //		5. possible improvement: adjust the correction equation specs depending on the number of (overall) iterations
     //		   it took to find the last eigenpair. This avoids the overhead of having to make more calls to JD::K(...)
-    //		6. switch correction equation to permanently use sizePS=1
+    //		6. switch correction equation to permanently (and only) use sizePS=1
 
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
@@ -238,7 +236,7 @@ namespace quda
       // Restart: shrink the acceleration subspace
       if (m == m_max) { shrinkSubspace(eigenpairs, &H); }
 
-      {
+      if (outer_prec_lab != inner_prec_lab) {
         // move vectors to lower precision
         *(r_lowprec[0]) = *(r[0]);
         blas::copy(*t_lowprec[0], *r_lowprec[0]);
@@ -249,6 +247,9 @@ namespace quda
 
         // switch back to higher precision
         *(t[0]) = *(t_lowprec[0]);
+      } else {
+        // solving the correction equation
+        invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
 
       iter++;
@@ -295,9 +296,11 @@ namespace quda
     for (auto p : tmpV) { delete p; }
     for (auto p : tmpAV) { delete p; }
     delete Qhat[0];
-    delete r_lowprec[0];
-    delete t_lowprec[0];
-    delete u_lowprec[0];
+    if (outer_prec_lab != inner_prec_lab) {
+      delete r_lowprec[0];
+      delete t_lowprec[0];
+      delete u_lowprec[0];
+    }
     host_free(ort_dot_prod);
 
     // Only save if outfile is defined
@@ -502,17 +505,20 @@ namespace quda
 
     // outer vectors to be used to pass to correction equation (low precision)
 
-    csParam.setPrecision(inner_prec_lab);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    if (outer_prec_lab != inner_prec_lab) {
+      csParam.setPrecision(inner_prec_lab);
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
 
-    r_lowprec.push_back(ColorSpinorField::Create(csParam));
-    t_lowprec.push_back(ColorSpinorField::Create(csParam));
-    u_lowprec.push_back(ColorSpinorField::Create(csParam));
+      r_lowprec.push_back(ColorSpinorField::Create(csParam));
+      t_lowprec.push_back(ColorSpinorField::Create(csParam));
+      u_lowprec.push_back(ColorSpinorField::Create(csParam));
+    }
 
     // inner vectors (low precision)
 
-    csParam.setPrecision(inner_prec_lab);
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
+    if (outer_prec_lab == inner_prec_lab) {
+      csParam.create = QUDA_ZERO_FIELD_CREATE;
+    }
 
     r_tilde.push_back(ColorSpinorField::Create(csParam));
     mmPP->y_hat.push_back(ColorSpinorField::Create(csParam));
