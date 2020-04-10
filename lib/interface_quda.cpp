@@ -693,7 +693,7 @@ void initQuda(int dev)
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
 					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
 {
-  // profile.TPSTART(QUDA_PROFILE_INIT);
+  profile.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gParamEx(in);
   gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParamEx.pad = 0;
