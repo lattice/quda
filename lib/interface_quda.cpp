@@ -52,9 +52,6 @@
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-// Is this even used?
-//#define spinorSiteSize 24 // real numbers per spinor
-
 #define MAX_GPU_NUM_PER_NODE 16
 
 // define newQudaGaugeParam() and newQudaInvertParam()
