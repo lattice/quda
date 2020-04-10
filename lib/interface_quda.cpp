@@ -3620,7 +3620,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // grow resident solutions to be big enough
   for (int i=solutionResident.size(); i < param->num_offset; i++) {
-    if(getVerbosity() >= QUDA_DEBUG_VERBOSE ) printfQuda("Adding vector %d to solutionsResident\n", i);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding vector %d to solutionsResident\n", i);
     solutionResident.push_back(new cudaColorSpinorField(cudaParam));
   }
   for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
@@ -3739,8 +3739,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
           std::vector<ColorSpinorField *> q;
           q.resize(nRefine);
-          std::vector<ColorSpinorField*> z;
-	  z.resize(nRefine);
+          std::vector<ColorSpinorField *> z;
+          z.resize(nRefine);
 	  cudaParam.create = QUDA_NULL_FIELD_CREATE;
 	  cudaColorSpinorField tmp(cudaParam);
 
