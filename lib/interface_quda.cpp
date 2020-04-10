@@ -710,7 +710,7 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   // copy input field into the extended device gauge field
   copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
 
-  // profile.TPSTOP(QUDA_PROFILE_INIT);
+  profile.TPSTOP(QUDA_PROFILE_INIT);
 
   // now fill up the halos
   out->exchangeExtendedGhost(R,profile,redundant_comms);
