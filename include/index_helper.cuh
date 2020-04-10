@@ -827,7 +827,7 @@ namespace quda {
   /**
      @brief Swizzler for reordering the (x) thread block indices - use on
      conjunction with swizzle-factor autotuning to find the optimum
-     swizzle factor.  Specfically, the thread block id is remapped by
+     swizzle factor.  Specifically, the thread block id is remapped by
      transposing its coordinates: if the original order can be
      parametrized by
 
