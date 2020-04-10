@@ -6,7 +6,6 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
 #include <dirac_quda.h>
 #include <dslash_quda.h>
 #include <invert_quda.h>

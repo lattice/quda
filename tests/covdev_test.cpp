@@ -25,9 +25,6 @@ using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-// QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-// QudaPrecision cuda_prec;
-
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
