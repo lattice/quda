@@ -394,7 +394,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
   quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
-  quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
+  quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
+		       "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");

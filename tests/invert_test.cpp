@@ -123,12 +123,13 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  // Move these
+  // If a value greater than 1 is passed, heavier masses will be constructed
+  // and the multi-shift solver will be called
   if (multishift > 1) {
     // set a correct default for the multi-shift solver
     solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   }
-
+  
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
