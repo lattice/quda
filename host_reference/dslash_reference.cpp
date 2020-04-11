@@ -136,6 +136,8 @@ void verifyDomainWallTypeInversion(void *spinorOut, void **spinorOutMulti, void 
 
     printfQuda("Residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g\n",
                inv_param.tol, inv_param.true_res, l2r, inv_param.tol_hq, inv_param.true_res_hq);
+  } else {
+    errorQuda("Solution type %d not implemented", inv_param.solution_type);
   }
 }
 
@@ -330,6 +332,8 @@ void verifyWilsonTypeInversion(void *spinorOut, void **spinorOutMulti, void *spi
       if (inv_param.mass_normalization == QUDA_MASS_NORMALIZATION) { errorQuda("Mass normalization not implemented"); }
 
       free(spinorTmp);
+    } else {
+      errorQuda("Solution type %d not implemented", inv_param.solution_type);
     }
 
     int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
