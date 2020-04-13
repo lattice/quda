@@ -131,6 +131,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description = "QUDA internal t
 void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_deflation_option_group(std::shared_ptr<QUDAApp> quda_app);
 void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app);
+void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app);
 
 template <typename T> std::string inline get_string(CLI::TransformPairs<T> &map, T val)
 {
@@ -323,5 +324,14 @@ extern int heatbath_num_steps;
 extern int heatbath_num_heatbath_per_step;
 extern int heatbath_num_overrelax_per_step;
 extern bool heatbath_coldstart;
+
+extern double stout_smear_rho;
+extern double stout_smear_epsilon;
+extern double ape_smear_rho;
+extern int smear_steps;
+extern double wflow_epsilon;
+extern int wflow_steps;
+extern QudaWFlowType wflow_type;
+extern int measurement_interval;
 
 extern QudaContractType contract_type;

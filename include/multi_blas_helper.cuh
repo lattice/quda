@@ -13,9 +13,9 @@ namespace quda
     // storage for matrix coefficients
 #define MAX_MATRIX_SIZE 8192
 #define MAX_ARG_SIZE 4096
-    static __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
-    static __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
+    __constant__ signed char Amatrix_d[MAX_MATRIX_SIZE];
+    __constant__ signed char Bmatrix_d[MAX_MATRIX_SIZE];
+    __constant__ signed char Cmatrix_d[MAX_MATRIX_SIZE];
 
     static signed char *Amatrix_h;
     static signed char *Bmatrix_h;

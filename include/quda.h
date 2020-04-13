@@ -1,5 +1,4 @@
-#ifndef _QUDA_H
-#define _QUDA_H
+#pragma once
 
 /**
  * @file  quda.h
@@ -674,7 +673,16 @@ extern "C" {
 
   } QudaMultigridParam;
 
-
+  typedef struct QudaGaugeObservableParam_s {
+    QudaBoolean su_project;              /**< Whether to porject onto the manifold prior to measurement */
+    QudaBoolean compute_plaquette;       /**< Whether to compute the plaquette */
+    double plaquette[3];                 /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge;         /**< Whether to compute the topological charge and field energy */
+    double qcharge;                      /**< Computed topological charge */
+    double energy[3];                    /**< Total, spatial and temporal field energies, respectively */
+    QudaBoolean compute_qcharge_density; /**< Whether to compute the topological charge density */
+    void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
+  } QudaGaugeObservableParam;
 
   /*
    * Interface functions, found in interface_quda.cpp
@@ -835,6 +843,15 @@ extern "C" {
   QudaEigParam newQudaEigParam(void);
 
   /**
+   * A new QudaGaugeObservableParam should always be initialized
+   * immediately after it's defined (and prior to explicitly setting
+   * its members) using this function.  Typical usage is as follows:
+   *
+   *   QudaGaugeParam obs_param = newQudaGaugeObservableParam();
+   */
+  QudaGaugeObservableParam newQudaGaugeObservableParam(void);
+
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -857,6 +874,12 @@ extern "C" {
    * @param param The QudaEigParam whose elements we are to print.
    */
   void printQudaEigParam(QudaEigParam *param);
+
+  /**
+   * Print the members of QudaGaugeObservableParam.
+   * @param param The QudaGaugeObservableParam whose elements we are to print.
+   */
+  void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
 
   /**
    * Load the gauge field from the host.
@@ -1213,7 +1236,7 @@ extern "C" {
    */
   void plaqQuda(double plaq[3]);
 
-  /*
+  /**
    * Performs a deep copy from the internal extendedGaugeResident field.
    * @param Pointer to externalGaugeResident cudaGaugeField
    * @param Location of gauge field
@@ -1227,37 +1250,54 @@ extern "C" {
    * @param h_in   Input spinor field
    * @param param  Contains all metadata regarding host and device
    *               storage and operator which will be applied to the spinor
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for Wuppertal smearing.
    */
-  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int nSteps, double alpha);
+  void performWuppertalnStep(void *h_out, void *h_in, QudaInvertParam *param, unsigned int n_steps, double alpha);
 
   /**
    * Performs APE smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param alpha  Alpha coefficient for APE smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performAPEnStep(unsigned int nSteps, double alpha);
+  void performAPEnStep(unsigned int n_steps, double alpha, int meas_interval);
 
   /**
    * Performs STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performSTOUTnStep(unsigned int nSteps, double rho);
+  void performSTOUTnStep(unsigned int n_steps, double rho, int meas_interval);
 
   /**
    * Performs Over Imroved STOUT smearing on gaugePrecise and stores it in gaugeSmeared
-   * @param nSteps Number of steps to apply.
+   * @param n_steps Number of steps to apply.
    * @param rho    Rho coefficient for STOUT smearing.
    * @param epsilon Epsilon coefficient for Over Improved STOUT smearing.
+   * @param meas_interval Measure the Q charge every Nth step
    */
-  void performOvrImpSTOUTnStep(unsigned int nSteps, double rho, double epsilon);
+  void performOvrImpSTOUTnStep(unsigned int n_steps, double rho, double epsilon, int meas_interval);
 
   /**
-   * Calculates the topological charge from gaugeSmeared, if it exist, or from gaugePrecise if no smeared fields are present.
+   * Performs Wilson Flow on gaugePrecise and stores it in gaugeSmeared
+   * @param n_steps Number of steps to apply.
+   * @param step_size Size of Wilson Flow step
+   * @param meas_interval Measure the Q charge and field energy every Nth step
+   * @param wflow_type 1x1 Wilson or 2x1 Symanzik flow type
    */
-  double qChargeQuda();
+  void performWFlownStep(unsigned int n_steps, double step_size, int meas_interval, QudaWFlowType wflow_type);
+
+  /**
+   * @brief Calculates a variety of gauge-field observables.  If a
+   * smeared gauge field is presently loaded (in gaugeSmeared) the
+   * observables are computed on this, else the resident gauge field
+   * will be used.
+   * @param[in,out] param Parameter struct that defines which
+   * observables we are making and the resulting observables.
+   */
+  void gaugeObservablesQuda(QudaGaugeObservableParam *param);
 
   /**
    * Public function to perform color contractions of the host spinors x and y.
@@ -1270,13 +1310,6 @@ extern "C" {
    */
   void contractQuda(const void *x, const void *y, void *result, const QudaContractType cType, QudaInvertParam *param,
                     const int *X);
-
-  /**
-     @brief Calculates the topological charge from gaugeSmeared, if it exist,
-     or from gaugePrecise if no smeared fields are present.
-     @param[out] qDensity array holding Q charge density
-  */
-  double qChargeDensityQuda(void *qDensity);
 
   /**
    * @brief Gauge fixing with overrelaxation with support for single and multi GPU.
@@ -1363,4 +1396,3 @@ extern "C" {
 
 /* #include <quda_new_interface.h> */
 
-#endif /* _QUDA_H */

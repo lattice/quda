@@ -39,16 +39,11 @@ namespace quda
       inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
-  PreconCG::PreconCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
-                     TimeProfile &profile) :
-    Solver(param, profile),
-    mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
+  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
     K(0),
     Kparam(param)
   {
-
     fillInnerSolverParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {

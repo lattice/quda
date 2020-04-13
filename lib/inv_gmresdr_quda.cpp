@@ -208,9 +208,9 @@ namespace quda {
     }
 
 
- GMResDR::GMResDR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param),
-    Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
+ GMResDR::GMResDR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+   Solver(mat, matSloppy, matPrecon, param, profile), K(nullptr), Kparam(param),
+   Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false)
  {
      fillFGMResDRInnerSolveParam(Kparam, param);
 
@@ -226,21 +226,17 @@ namespace quda {
        K = nullptr;
      else
        errorQuda("Unsupported preconditioner %d\n", param.inv_type_precondition);
-
-
-     return;
  }
 
- GMResDR::GMResDR(DiracMatrix &mat, Solver &K, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(&K), Kparam(param),
+  GMResDR::GMResDR(const DiracMatrix &mat, Solver &K, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+   Solver(mat, matSloppy, matPrecon, param, profile), K(&K), Kparam(param),
     Vm(nullptr), Zm(nullptr), profile(profile), gmresdr_args(nullptr), init(false) { }
 
 
  GMResDR::~GMResDR() {
     profile.TPSTART(QUDA_PROFILE_FREE);
 
-    if(init)
-    {
+    if (init) {
       delete Vm;
       Vm = nullptr;
 

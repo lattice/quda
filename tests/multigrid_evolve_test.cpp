@@ -727,8 +727,7 @@ int main(int argc, char **argv)
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = gauge_param.type;
     gParam.reconstruct = gauge_param.reconstruct;
-    gParam.order       = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
     cudaGaugeField *gauge = new cudaGaugeField(gParam);
 
     int pad = 0;
@@ -745,6 +744,11 @@ int main(int argc, char **argv)
     gParamEx.nFace = 1;
     for(int dir=0; dir<4; ++dir) gParamEx.r[dir] = R[dir];
     cudaGaugeField *gaugeEx = new cudaGaugeField(gParamEx);
+
+    QudaGaugeObservableParam obs_param = newQudaGaugeObservableParam();
+    obs_param.compute_plaquette = QUDA_BOOLEAN_TRUE;
+    obs_param.compute_qcharge = QUDA_BOOLEAN_TRUE;
+
     // CURAND random generator initialization
     RNG *randstates = new RNG(*gauge, 1234);
     randstates->Init();
@@ -761,29 +765,23 @@ int main(int argc, char **argv)
     }
     // Reunitarization setup
     setReunitarizationConsts();
-    plaquette(*gaugeEx);
 
     Monte(*gaugeEx, *randstates, beta_value, 100 * nhbsteps, 100 * novrsteps);
 
     // copy into regular field
     copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
-
     // load the gauge field from gauge
-    gauge_param.gauge_order = (gauge_param.cuda_prec == QUDA_DOUBLE_PRECISION || gauge_param.reconstruct == QUDA_RECONSTRUCT_NO )
-      ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gauge_param.gauge_order = gauge->Order();
     gauge_param.location = QUDA_CUDA_FIELD_LOCATION;
-
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-    double3 plaq = plaquette(*gaugeEx);
-    double charge = qChargeQuda();
-
+    gaugeObservablesQuda(&obs_param);
     // Demonstrate MG evolution on an evolving gauge field
     //----------------------------------------------------
     printfQuda("\n======================================================\n");
     printfQuda("Running MG gauge evolution test at constant quark mass\n");
     printfQuda("======================================================\n");
-    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", 0, plaq.x, charge,
-               inv_param.mass, inv_param.kappa, inv_param.mu);
+    printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", 0,
+               obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
     // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
     if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE)
@@ -836,10 +834,9 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
 
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
-      plaq = plaquette(*gaugeEx);
-      charge = qChargeQuda();
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step, plaq.x,
-                 charge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      gaugeObservablesQuda(&obs_param);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);
@@ -893,8 +890,7 @@ int main(int argc, char **argv)
     loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
     for (int step = 1; step < nsteps; ++step) {
 
-      plaq = plaquette(*gaugeEx);
-      charge = qChargeQuda();
+      gaugeObservablesQuda(&obs_param);
 
       // Increment the mass/kappa and mu values to emulate heavy/light flavour updates
       if (kappa == -1.0) {
@@ -919,8 +915,8 @@ int main(int argc, char **argv)
         mg_param.invert_param->mu = inv_param.mu;
       }
 
-      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step, plaq.x,
-                 charge, inv_param.mass, inv_param.kappa, inv_param.mu);
+      printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
+                 obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // reference BiCGStab for comparison
       invertQuda(spinorOut, spinorIn, &inv_param2);

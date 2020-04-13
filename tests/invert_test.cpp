@@ -22,42 +22,44 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
     
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
-  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
+  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
              get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
-             get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim, tdim, Lsdim,
+             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
+             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
              get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
-  printfQuda("\n   Eigensolver parameters\n");
-  printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-  printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-  printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-  printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-  printfQuda(" - size of Krylov space %d\n", eig_nKr);
-  printfQuda(" - solver tolerance %e\n", eig_tol);
-  printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
-  if (eig_compute_svd) {
-    printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
-    printfQuda(" - ***********************************************************\n");
-    printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
-    printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
-    printfQuda(" - ***********************************************************\n");
-  } else {
-    printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
-               eig_use_normop ? "true" : "false");
-  }
-  if (eig_use_poly_acc) {
-    printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-    printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-    if (eig_amax <= 0)
-      printfQuda(" - Chebyshev polynomial maximum will be computed\n");
-    else
-      printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+  if (inv_deflate) {
+    printfQuda("\n   Eigensolver parameters\n");
+    printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
+    printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
+    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
+    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
+    printfQuda(" - size of Krylov space %d\n", eig_nKr);
+    printfQuda(" - solver tolerance %e\n", eig_tol);
+    printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
+    if (eig_compute_svd) {
+      printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
+      printfQuda(" - ***********************************************************\n");
+      printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
+      printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
+      printfQuda(" - ***********************************************************\n");
+    } else {
+      printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
+                 eig_use_normop ? "true" : "false");
+    }
+    if (eig_use_poly_acc) {
+      printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
+      printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
+      if (eig_amax <= 0)
+        printfQuda(" - Chebyshev polynomial maximum will be computed\n");
+      else
+        printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
+    }
   }
 
   printfQuda("Grid partition info:     X  Y  Z  T\n"); 
@@ -66,9 +68,6 @@ display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3)); 
-  
-  return ;
-  
 }
 
 // Parameters defining the eigensolver
@@ -590,7 +589,7 @@ int main(int argc, char **argv)
         }
       }
 
-    } else if(inv_param.solution_type == QUDA_MATPC_SOLUTION) {
+    } else if (inv_param.solution_type == QUDA_MATPC_SOLUTION) {
 
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
 	if (inv_param.twist_flavor != QUDA_TWIST_SINGLET) {
@@ -650,7 +649,6 @@ int main(int argc, char **argv)
     } else if (inv_param.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION) {
 
       void *spinorTmp = malloc(V*spinorSiteSize*sSize*inv_param.Ls);
-
       ax(0, spinorCheck, V*spinorSiteSize, inv_param.cpu_prec);
       
       if (dslash_type == QUDA_TWISTED_MASS_DSLASH) {
@@ -717,6 +715,8 @@ int main(int argc, char **argv)
       }
 
       free(spinorTmp);
+    } else {
+      errorQuda("Solution type %d not implemented", inv_param.solution_type);
     }
 
 

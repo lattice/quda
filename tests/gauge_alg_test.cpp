@@ -158,7 +158,7 @@ class GaugeAlgTest : public ::testing::Test {
     gParam.create      = QUDA_NULL_FIELD_CREATE;
     gParam.link_type   = param.type;
     gParam.reconstruct = param.reconstruct;
-    gParam.order       = (param.cuda_prec == QUDA_DOUBLE_PRECISION || param.reconstruct == QUDA_RECONSTRUCT_NO ) ? QUDA_FLOAT2_GAUGE_ORDER : QUDA_FLOAT4_GAUGE_ORDER;
+    gParam.setPrecision(gParam.Precision(), true);
 
 #ifdef MULTI_GPU
     int y[4];
