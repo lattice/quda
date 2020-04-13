@@ -13,8 +13,6 @@
 namespace quda
 {
 
-  static TimeProfile profileInvertPrecon("invertPreconQuda");
-
   using namespace blas;
 
   // set the required parameters for the inner solver
@@ -47,11 +45,11 @@ namespace quda
     fillInnerSolverParam(Kparam, param);
 
     if (param.inv_type_precondition == QUDA_CG_INVERTER) {
-      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profileInvertPrecon);
+      K = new CG(matPrecon, matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_MR_INVERTER) {
-      K = new MR(matPrecon, matPrecon, Kparam, profileInvertPrecon);
+      K = new MR(matPrecon, matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition == QUDA_SD_INVERTER) {
-      K = new SD(matPrecon, Kparam, profileInvertPrecon);
+      K = new SD(matPrecon, Kparam, profile);
     } else if (param.inv_type_precondition != QUDA_INVALID_INVERTER) { // unknown preconditioner
       errorQuda("Unknown inner solver %d", param.inv_type_precondition);
     }
