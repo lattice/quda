@@ -541,7 +541,6 @@ namespace quda {
       if ( !(updateR || updateX )) {
         beta = sigma / r2_old;  // use the alternative beta computation
 
-
         if (param.pipeline && !breakdown) {
 
 	  if (Np == 1) {

@@ -657,41 +657,6 @@ namespace quda {
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
 
-
-  class CG3 : public Solver {
-
-  private:
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
-    bool init;
-
-  public:
-    CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~CG3();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
-  };
-
-
-  class CG3NE : public Solver {
-
-  private:
-    DiracDagger matDagSloppy;
-    // pointers to fields to avoid multiple creation overhead
-    ColorSpinorField *yp, *rp, *AdagrSp, *AAdagrSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp;
-    bool init;
-
-  public:
-    CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile);
-    virtual ~CG3NE();
-
-    void operator()(ColorSpinorField &out, ColorSpinorField &in);
-
-    virtual bool hermitian() { return true; } /** CGNE is for any system */
-  };
-
   class CGNE : public CG {
 
   private:
@@ -727,6 +692,59 @@ namespace quda {
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
 
     virtual bool hermitian() { return false; } /** CGNR is for any system */
+  };
+
+  class CG3 : public Solver {
+
+  private:
+    // pointers to fields to avoid multiple creation overhead
+    ColorSpinorField *yp, *rp, *tmpp, *ArSp, *rSp, *xSp, *xS_oldp, *tmpSp, *rS_oldp, *tmp2Sp;
+    bool init;
+
+  public:
+    CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
+  };
+
+  class CG3NE : public CG3 {
+
+  private:
+    DiracMMdag mmdag;
+    DiracMMdag mmdagSloppy;
+    DiracMMdag mmdagPrecon;
+    ColorSpinorField *xp;
+    ColorSpinorField *yp;
+    bool init;
+
+  public:
+    CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3NE();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    virtual bool hermitian() { return false; } /** CG3NE is for any system */
+  };
+
+  class CG3NR : public CG3 {
+
+  private:
+    DiracMdagM mdagm;
+    DiracMdagM mdagmSloppy;
+    DiracMdagM mdagmPrecon;
+    ColorSpinorField *bp;
+    bool init;
+
+  public:
+    CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    virtual ~CG3NR();
+
+    void operator()(ColorSpinorField &out, ColorSpinorField &in);
+
+    virtual bool hermitian() { return false; } /** CG3NR is for any system */
   };
 
   class MPCG : public Solver {
