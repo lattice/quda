@@ -13,8 +13,10 @@
 
 namespace quda {
 
-  CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(mat, matSloppy, matPrecon, param, profile), init(false)
+  CG3::CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+           TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile),
+    init(false)
   {
   }
 
@@ -38,7 +40,8 @@ namespace quda {
     }
   }
 
-  CG3NE::CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  CG3NE::CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+               TimeProfile &profile) :
     CG3(mmdag, mmdagSloppy, mmdagPrecon, param, profile),
     mmdag(mat.Expose()),
     mmdagSloppy(matSloppy.Expose()),
@@ -49,8 +52,9 @@ namespace quda {
   {
   }
 
-  CG3NE::~CG3NE() {
-    if ( init ) {
+  CG3NE::~CG3NE()
+  {
+    if (init) {
       if (xp) delete xp;
       if (yp) delete yp;
       init = false;
@@ -58,7 +62,8 @@ namespace quda {
   }
 
   // CG3NE: M Mdag y = b is solved; x = Mdag y is returned as solution.
-  void CG3NE::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void CG3NE::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
@@ -80,23 +85,22 @@ namespace quda {
     if (param.use_init_guess == QUDA_USE_INIT_GUESS_YES) {
 
       // compute initial residual
-      mmdag.Expose()->M(*xp,x);
-      double r2 = blas::xmyNorm(b,*xp);
+      mmdag.Expose()->M(*xp, x);
+      double r2 = blas::xmyNorm(b, *xp);
       if (b2 == 0.0) b2 = r2;
 
       // compute solution to residual equation
-      CG3::operator()(*yp,*xp);
+      CG3::operator()(*yp, *xp);
 
-      mmdag.Expose()->Mdag(*xp,*yp);
+      mmdag.Expose()->Mdag(*xp, *yp);
 
       // compute full solution
       blas::xpy(*xp, x);
 
     } else {
 
-      CG3::operator()(*yp,b);
-      mmdag.Expose()->Mdag(x,*yp);
-
+      CG3::operator()(*yp, b);
+      mmdag.Expose()->Mdag(x, *yp);
     }
 
     // future optimization: with preserve_source == QUDA_PRESERVE_SOURCE_NO; b is already
@@ -123,10 +127,10 @@ namespace quda {
 
       PrintSummary("CG3NE", param.iter - iter0, r2, b2, stopping(param.tol, b2, param.residual_type), param.tol_hq);
     }
-
   }
 
-  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  CG3NR::CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+               TimeProfile &profile) :
     CG3(mdagm, mdagmSloppy, mdagmPrecon, param, profile),
     mdagm(mat.Expose()),
     mdagmSloppy(matSloppy.Expose()),
@@ -136,15 +140,17 @@ namespace quda {
   {
   }
 
-  CG3NR::~CG3NR() {
-    if ( init ) {
+  CG3NR::~CG3NR()
+  {
+    if (init) {
       if (bp) delete bp;
       init = false;
     }
   }
 
   // CG3NR: Mdag M x = Mdag b is solved.
-  void CG3NR::operator()(ColorSpinorField &x, ColorSpinorField &b) {
+  void CG3NR::operator()(ColorSpinorField &x, ColorSpinorField &b)
+  {
     if (param.maxiter == 0 || param.Nsteps == 0) {
       if (param.use_init_guess == QUDA_USE_INIT_GUESS_NO) blas::zero(x);
       return;
@@ -161,14 +167,14 @@ namespace quda {
 
     double b2 = blas::norm2(b);
     if (b2 == 0.0) { // compute initial residual vector
-      mdagm.Expose()->M(*bp,x);
+      mdagm.Expose()->M(*bp, x);
       b2 = blas::norm2(*bp);
     }
 
-    mdagm.Expose()->Mdag(*bp,b);
-    CG3::operator()(x,*bp);
+    mdagm.Expose()->Mdag(*bp, b);
+    CG3::operator()(x, *bp);
 
-    if ( param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO ) {
+    if (param.compute_true_res || param.preserve_source == QUDA_PRESERVE_SOURCE_NO) {
 
       // compute the true residual
       mdagm.Expose()->M(*bp, x);
@@ -192,7 +198,6 @@ namespace quda {
       mdagm.Expose()->M(*bp, x);
       blas::axpby(-1.0, *bp, 1.0, b);
     }
-
   }
 
   void CG3::operator()(ColorSpinorField &x, ColorSpinorField &b)
@@ -340,7 +345,7 @@ namespace quda {
       gamma = r2/rAr;
       
       // CG3 step
-      if (k==0 || restart) { // First iteration
+      if (k == 0 || restart) { // First iteration
         if (pipeline) {
           r2 = blas::quadrupleCG3InitNorm(gamma, xS, rS, xS_old, rS_old, ArS);
         } else {
@@ -430,8 +435,9 @@ namespace quda {
         if (sqrt(r2) > r0Norm) {
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), r0Norm, resIncreaseTotal);
+          warningQuda(
+            "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), r0Norm, resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
             if (use_heavy_quark_res) {
               L2breakdown = true;
@@ -478,8 +484,9 @@ namespace quda {
         if (sqrt(r2) > r0Norm) {
           resIncrease++;
           resIncreaseTotal++;
-          warningQuda("CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
-                      sqrt(r2), r0Norm, resIncreaseTotal);
+          warningQuda(
+            "CG3: new reliable residual norm %e is greater than previous reliable residual norm %e (total #inc %i)",
+            sqrt(r2), r0Norm, resIncreaseTotal);
           if (resIncrease > maxResIncrease or resIncreaseTotal > maxResIncreaseTotal) {
               warningQuda("CG3: solver exiting due to too many true residual norm increases");
               break;

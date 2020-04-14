@@ -657,7 +657,8 @@ namespace quda {
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
 
-  class CGNE : public CG {
+  class CGNE : public CG
+  {
 
   private:
     DiracMMdag mmdag;
@@ -668,7 +669,8 @@ namespace quda {
     bool init;
 
   public:
-    CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CGNE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+         TimeProfile &profile);
     virtual ~CGNE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -676,7 +678,8 @@ namespace quda {
     virtual bool hermitian() { return false; } /** CGNE is for any system */
   };
 
-  class CGNR : public CG {
+  class CGNR : public CG
+  {
 
   private:
     DiracMdagM mdagm;
@@ -686,7 +689,8 @@ namespace quda {
     bool init;
 
   public:
-    CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CGNR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+         TimeProfile &profile);
     virtual ~CGNR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -694,7 +698,8 @@ namespace quda {
     virtual bool hermitian() { return false; } /** CGNR is for any system */
   };
 
-  class CG3 : public Solver {
+  class CG3 : public Solver
+  {
 
   private:
     // pointers to fields to avoid multiple creation overhead
@@ -702,7 +707,8 @@ namespace quda {
     bool init;
 
   public:
-    CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CG3(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+        TimeProfile &profile);
     virtual ~CG3();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -710,7 +716,8 @@ namespace quda {
     virtual bool hermitian() { return true; } /** CG is only for Hermitian systems */
   };
 
-  class CG3NE : public CG3 {
+  class CG3NE : public CG3
+  {
 
   private:
     DiracMMdag mmdag;
@@ -721,7 +728,8 @@ namespace quda {
     bool init;
 
   public:
-    CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CG3NE(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+          TimeProfile &profile);
     virtual ~CG3NE();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);
@@ -729,7 +737,8 @@ namespace quda {
     virtual bool hermitian() { return false; } /** CG3NE is for any system */
   };
 
-  class CG3NR : public CG3 {
+  class CG3NR : public CG3
+  {
 
   private:
     DiracMdagM mdagm;
@@ -739,7 +748,8 @@ namespace quda {
     bool init;
 
   public:
-    CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile);
+    CG3NR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
+          TimeProfile &profile);
     virtual ~CG3NR();
 
     void operator()(ColorSpinorField &out, ColorSpinorField &in);

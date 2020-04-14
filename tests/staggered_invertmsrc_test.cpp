@@ -463,10 +463,8 @@ invert_test(void)
                      inv_param.true_res_hq_offset[i], hqr);
 
           // emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-          if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	    ret |=1;
-	  }
-	}
+          if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) { ret |= 1; }
+        }
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }

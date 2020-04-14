@@ -161,29 +161,31 @@ int main(int argc, char **argv)
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
   setStaggeredQDPGaugeParam(gauge_param);
-  if (inv_multigrid) {
-    setStaggeredMGInvertParam(inv_param);
-  } else
-    setStaggeredInvertParam(inv_param);
+  if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaEigParam mg_eig_param[mg_levels];
 
   if (inv_multigrid) {
+    setStaggeredMGInvertParam(inv_param);
+    // Set sub structures
     mg_param.invert_param = &mg_inv_param;
-    QudaEigParam mg_eig_param[mg_levels];
     // Since the top level is just a unitary rotation, we manually
     // set mg_eig[0] to false (and throw a warning if a user set it to true)
-    if (mg_eig[0] && inv_multigrid) {
+    if (mg_eig[0]) {
       printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
       mg_eig[0] = false;
     }
-    for (int i = 0; i < mg_levels; i++) {
-      mg_param.eig_param[i] = &mg_eig_param[i];
-      mg_eig_param[i] = newQudaEigParam();
-      setMultigridEigParam(mg_eig_param[i], i);
+    for (int i = 1; i < mg_levels; i++) {
+      if (mg_eig[i]) {
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
+      } else {
+        mg_param.eig_param[i] = nullptr;
+      }
     }
-
     setStaggeredMultigridParam(mg_param);
   }
 
@@ -209,8 +211,8 @@ int main(int argc, char **argv)
   void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
-  void* milc_fatlink = nullptr;
-  void* milc_longlink = nullptr;
+  void *milc_fatlink = nullptr;
+  void *milc_longlink = nullptr;
   GaugeField *cpuFat = nullptr;
   GaugeField *cpuLong = nullptr;
 

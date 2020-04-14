@@ -119,13 +119,11 @@ int main(int argc, char **argv)
     // set a correct default for the multi-shift solver
     solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   }
-  
+
   // Set some default values for precisions and solve types
   // if none are passed through the command line
   setQudaDefaultPrecs();
-  if (inv_multigrid) {
-    setQudaDefaultMgSolveTypes();
-  }
+  if (inv_multigrid) { setQudaDefaultMgSolveTypes(); }
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
