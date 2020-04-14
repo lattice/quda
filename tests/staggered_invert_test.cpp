@@ -6,15 +6,8 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
+#include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <unitarization_links.h>
-#include <random_quda.h>
 
 // External headers
 #include <misc.h>
@@ -278,11 +271,11 @@ int main(int argc, char **argv)
 
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *ref;
-  ColorSpinorField *tmp;
-  ColorSpinorParam cs_param;
+  quda::ColorSpinorField *in;
+  quda::ColorSpinorField *out;
+  quda::ColorSpinorField *ref;
+  quda::ColorSpinorField *tmp;
+  quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);

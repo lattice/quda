@@ -6,23 +6,13 @@
 
 // QUDA headers
 #include <quda.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
-#include <random_quda.h>
+#include <color_spinor_field.h> // convenient quark field container
 
 // External headers
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
-#include <staggered_dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -262,10 +252,10 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *check;
-  ColorSpinorParam cs_param;
+  quda::ColorSpinorField *in;
+  quda::ColorSpinorField *out;
+  quda::ColorSpinorField *check;
+  quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
@@ -273,7 +263,7 @@ int main(int argc, char **argv)
   // Host array for solutions
   void **outMulti = (void **)malloc(multishift * sizeof(void *));
   // QUDA host array for internal checks and malloc
-  std::vector<ColorSpinorField *> qudaOutMulti(multishift);
+  std::vector<quda::ColorSpinorField *> qudaOutMulti(multishift);
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
@@ -293,7 +283,7 @@ int main(int argc, char **argv)
       inv_param.tol_offset[i] = inv_param.tol;
       inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       // Allocate memory and set pointers
-      qudaOutMulti[i] = ColorSpinorField::Create(cs_param);
+      qudaOutMulti[i] = quda::ColorSpinorField::Create(cs_param);
       outMulti[i] = qudaOutMulti[i]->V();
     }
   }
