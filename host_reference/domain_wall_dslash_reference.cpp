@@ -363,7 +363,8 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
         for (int s = 0; s < 4; s++) {
           if (dir % 2 == 0)
             su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
-          else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
+          else
+            su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
         }
         sum(&res[sp_idx * (4 * 3 * 2)], &res[sp_idx * (4 * 3 * 2)], gaugedSpinor, 4 * 3 * 2);
       }

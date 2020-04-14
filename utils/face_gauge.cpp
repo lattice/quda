@@ -145,7 +145,7 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
         int odd_dst_index = 0;
         int startd;
         int endd;
-	if(ite == 0){ //back
+        if(ite == 0){ //back
 	  startd = 0;
 	  endd= nFace;
 	}else{//fwd

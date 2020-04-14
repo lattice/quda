@@ -3742,7 +3742,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           std::vector<ColorSpinorField *> z;
           z.resize(nRefine);
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
-	  cudaColorSpinorField tmp(cudaParam);
+          cudaColorSpinorField tmp(cudaParam);
 
 	  for(int j=0; j < nRefine; j++) {
 	    q[j] = new cudaColorSpinorField(cudaParam);

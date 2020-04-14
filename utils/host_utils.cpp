@@ -1948,7 +1948,7 @@ void createSiteLinkCPU(void **link, QudaPrecision precision, int phase)
           mylink[14] *= coeff;
           mylink[15] *= coeff;
           mylink[16] *= coeff;
-	  mylink[17] *= coeff;
+          mylink[17] *= coeff;
 
         }else{
           // float* mylink = (float*)link;
