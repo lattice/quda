@@ -124,7 +124,6 @@ int main(int argc, char **argv)
   // if none are passed through the command line
   setQudaDefaultPrecs();
   if (inv_multigrid) {
-    setQudaDefaultMgTestParams();
     setQudaDefaultMgSolveTypes();
   }
 
