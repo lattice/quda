@@ -49,7 +49,7 @@ namespace quda {
 
         if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-        create_jitify_program("kernels/block_orthogonalize.cuh");
+          create_jitify_program("kernels/block_orthogonalize.cuh");
 #endif
         }
       strcat(aux, compile_type_str(V));

@@ -483,7 +483,7 @@ namespace quda {
       checkPrecision(*x[0], *z[0]);
       checkPrecision(*y[0], *w[0]);
 
-      assert(siteUnroll == true);
+      static_assert(siteUnroll == true, "site unrolling must be enabled for mixed precision");
       int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 
       if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
