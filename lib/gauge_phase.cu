@@ -1,3 +1,4 @@
+#include <typeinfo>
 #include <gauge_field_order.h>
 #include <comm_quda.h>
 #include <complex_quda.h>

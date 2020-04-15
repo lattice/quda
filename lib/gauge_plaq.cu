@@ -1,3 +1,5 @@
+#include <typeinfo>
+
 #include <tune_quda.h>
 #include <gauge_field.h>
 #include <jitify_helper.cuh>

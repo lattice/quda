@@ -1,11 +1,12 @@
 #pragma once
 
+#include <typeinfo>
 #include <cub_helper.cuh>
 #include <uint_to_char.h>
 #include <tune_quda.h>
 
 /**
-   @file transform_reandom.h
+   @file transform_reduce.h
 
    @brief QUDA reimplementation of thrust::transform_reduce as well as
    wrappers also implementing thrust::reduce.

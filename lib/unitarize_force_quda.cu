@@ -1,11 +1,8 @@
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
-#include <iomanip>
-#include <cuda.h>
-#include <gauge_field.h>
-#include <tune_quda.h>
+#include <typeinfo>
 
+#include <gauge_field.h>
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <gauge_field_order.h>

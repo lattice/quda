@@ -1,3 +1,4 @@
+#include <typeinfo>
 #include <tune_quda.h>
 #include <clover_field.h>
 #include <launch_kernel.cuh>

@@ -1,3 +1,4 @@
+#include <typeinfo>
 #include <tune_quda.h>
 #include <quda_matrix.h>
 

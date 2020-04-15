@@ -1,10 +1,9 @@
 #include <cstdio>
 #include <cstdlib>
-#include <cuda.h>
+#include <typeinfo>
+
 #include <tune_quda.h>
 #include <gauge_field.h>
-#include <cassert>
-
 #include <jitify_helper.cuh>
 #include <kernels/clover_deriv.cuh>
 
