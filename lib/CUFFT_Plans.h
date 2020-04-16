@@ -4,7 +4,7 @@
 
 #include <quda_internal.h>
 #include <quda_matrix.h>
-#include <cufft.h>
+#include <quda_fft.h>
 
 /*-------------------------------------------------------------------------------*/
 #define CUFFT_SAFE_CALL( call) {                                      \

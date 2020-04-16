@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <cuda.h>
+#include <quda_backend.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 

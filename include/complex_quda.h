@@ -25,7 +25,7 @@
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <cuComplex.h>
+//#include <qudaComplex.h>
 
 namespace quda {
   namespace gauge {
