@@ -9,7 +9,7 @@ template <typename OutputType, typename InputType> class Texture
   typedef typename quda::mapper<InputType>::type RegType;
 
   private:
-  cudaTextureObject_t spinor;
+  qudaTextureObject_t spinor;
 
   public:
   Texture() : spinor(0) {}
@@ -155,7 +155,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   {
     if (norm_bytes > 0) {
       *norm_h = new char[norm_bytes];
-      cudaMemcpy(*norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
     checkCudaError();
   }
@@ -164,7 +164,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   void restore(char **norm_h, size_t norm_bytes)
   {
     if (norm_bytes > 0) {
-      cudaMemcpy(norm, *norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(norm, *norm_h, norm_bytes, qudaMemcpyHostToDevice);
       delete[] * norm_h;
       *norm_h = 0;
     }
@@ -451,7 +451,7 @@ public:
       StoreType *spinor = ST::tex.Spinor();
 #endif
       *spinor_h = new char[bytes];
-      cudaMemcpy(*spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
+      cudaMemcpy(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
       SN::backup(norm_h, norm_bytes);
       checkCudaError();
     }
@@ -464,7 +464,7 @@ public:
 #ifndef USE_TEXTURE_OBJECTS
       StoreType *spinor = ST::tex.Spinor();
 #endif
-      cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(spinor, *spinor_h, bytes, qudaMemcpyHostToDevice);
       SN::restore(norm_h, norm_bytes);
       delete[] * spinor_h;
       *spinor_h = 0;

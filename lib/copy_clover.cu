@@ -78,7 +78,7 @@ namespace quda {
     }
     virtual ~CopyClover() { ; }
   
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       copyCloverKernel<FloatOut, FloatIn, length, Out, In> 
 	<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);

@@ -389,7 +389,7 @@ double benchmark(int kernel, const int niter) {
   quda::Complex * A2 = new quda::Complex[Nsrc*Nsrc]; // for the block cDotProductNorm test
   double *Ar = new double[Nsrc * Msrc];
 
-  cudaEvent_t start, end;
+  qudaEvent_t start, end;
   cudaEventCreate(&start);
   cudaEventCreate(&end);
   cudaEventRecord(start, 0);

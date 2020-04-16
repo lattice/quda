@@ -15,8 +15,8 @@
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifdef __CUDACC_RTC__
-#define CUresult bool
-#define CUDA_SUCCESS true
+#define QUresult bool
+#define QUDA_SUCCESS true
 #endif
 
 namespace quda {
@@ -197,9 +197,9 @@ namespace quda {
     {
 #if CUDA_VERSION >= 9000
       qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout, (int)cudaSharedmemCarveoutMaxShared);
+          (const void *)func, qudaFuncAttributePreferredSharedMemoryCarveout, (int)qudaSharedmemCarveoutMaxShared);
       qudaFuncSetAttribute(
-          (const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
+          (const void *)func, qudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
 #endif
     }
 
@@ -291,7 +291,7 @@ namespace quda {
     }
 
     /** This is the return result from kernels launched using jitify */
-    CUresult jitify_error;
+    QUresult jitify_error;
 
     /**
        @brief Whether the present instance has already been tuned or not
@@ -313,10 +313,10 @@ namespace quda {
     }
 
   public:
-    Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
+    Tunable() : jitify_error(QUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
-    virtual void apply(const cudaStream_t &stream) = 0;
+    virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
@@ -411,8 +411,8 @@ namespace quda {
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
-    CUresult jitifyError() const { return jitify_error; }
-    CUresult& jitifyError() { return jitify_error; }
+    QUresult jitifyError() const { return jitify_error; }
+    QUresult& jitifyError() { return jitify_error; }
   };
 
   
@@ -623,8 +623,8 @@ namespace quda {
 
 // undo jit-safe modifications
 #ifdef __CUDACC_RTC__
-#undef CUresult
-#undef CUDA_SUCCESS
+#undef QUresult
+#undef QUDA_SUCCESS
 #endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

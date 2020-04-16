@@ -117,7 +117,7 @@ public:
     }
     virtual ~Dslash5() {}
 
-    template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+    template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
     {
       if (shared && (arg.type == M5_INV_DWF || arg.type == M5_INV_MOBIUS || arg.type == M5_INV_ZMOBIUS)) {
         // if inverse kernel uses shared memory then maximize total shared memory pool
@@ -127,7 +127,7 @@ public:
       qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
         errorQuda("CPU variant not instantiated");

@@ -156,7 +156,7 @@ namespace quda {
           : arg(arg), location(location)  {}
         virtual ~ShiftColorSpinorField() {}
 
-        void apply(const cudaStream_t &stream){
+        void apply(const qudaStream_t &stream){
           if(location == QUDA_CUDA_FIELD_LOCATION){
             TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
             shiftColorSpinorFieldKernel<Output,Input><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
@@ -255,8 +255,8 @@ namespace quda {
 #ifdef MULTI_GPU
         if(commDimPartitioned(dim) && dim!=3){
           while(1){
-            cudaError_t eventQuery = cudaEventQuery(gatherEnd);
-            if(eventQuery == cudaSuccess){
+            qudaError_t eventQuery = cudaEventQuery(gatherEnd);
+            if(eventQuery == qudaSuccess){
               face->commsStart(2*dim + offset); // if argument is even, send backwards, else send forwards
               break;
             }

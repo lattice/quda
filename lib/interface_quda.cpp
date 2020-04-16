@@ -153,8 +153,8 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
-cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+qudaDeviceProp deviceProp;
+qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -615,7 +615,7 @@ void initQudaDevice(int dev) {
 
 
 
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  cudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
   //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   // cudaGetDeviceProperties(&deviceProp, dev);
 
@@ -645,15 +645,15 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new qudaStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;
   cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
+    cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
+  cudaStreamCreateWithPriority(&streams[Nstream-1], qudaStreamDefault, leastPriority);
 
   checkCudaError();
   createDslashEvents();
@@ -1153,10 +1153,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
@@ -5083,7 +5083,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
 void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
+  cudaHostRegister(ptr, *bytes, qudaHostRegisterDefault);
   checkCudaError();
 }
 
@@ -5768,7 +5768,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
+  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);

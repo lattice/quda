@@ -32,7 +32,7 @@ namespace quda {
    */
   template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
             int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
+    Launch(Arg &arg, QUresult &error, TuneParam &tp, ComputeType type, const qudaStream_t &stream)
     {
       if (type == COMPUTE_UV) {
         if (arg.dir == QUDA_BACKWARDS) {
@@ -136,7 +136,7 @@ namespace quda {
   */
   template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
+    Launch(Arg &arg, QUresult &error, TuneParam &tp, ComputeType type, const qudaStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
@@ -574,7 +574,7 @@ namespace quda {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) strcat(aux, getOmpThreadStr());
     }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       arg.dim = dim;
