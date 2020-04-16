@@ -561,7 +561,7 @@ DslashTime dslashCUDA(int niter) {
       if (elapsed > dslash_time.cpu_max) dslash_time.cpu_max = elapsed;
     }
   }
-    
+
   qudaEventRecord(end, 0);
   qudaEventSynchronize(end);
   float runTime;
@@ -573,8 +573,7 @@ DslashTime dslashCUDA(int niter) {
 
   // check for errors
   qudaError_t stat = cudaGetLastError();
-  if (stat != qudaSuccess)
-    printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  if (stat != qudaSuccess) printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return dslash_time;
 }

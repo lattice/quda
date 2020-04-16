@@ -278,8 +278,7 @@ double dslashCUDA(int niter, int mu) {
 
   // check for errors
   qudaError_t stat = cudaGetLastError();
-  if (stat != qudaSuccess)
-    errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  if (stat != qudaSuccess) errorQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
   return secs;
 }

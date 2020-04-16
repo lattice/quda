@@ -242,10 +242,10 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 	  int canAccessPeer[2];
-	  qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+          qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+          qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-	  int accessRank[2] = { };
+          int accessRank[2] = { };
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
 	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);

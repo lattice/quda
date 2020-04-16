@@ -654,7 +654,8 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const qudaStream_t &stream) {
+   inline void apply(const qudaStream_t &stream)
+   {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");

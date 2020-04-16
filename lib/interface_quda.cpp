@@ -76,7 +76,6 @@
 
 #include <momentum.h>
 
-
 #include <quda_profiler_api.h>
 
 using namespace quda;
@@ -613,10 +612,8 @@ void initQudaDevice(int dev) {
   }
 #endif
 
-
-
   qudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
-  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+  // cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   // qudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
@@ -653,7 +650,7 @@ void initQudaMemory()
   for (int i=0; i<Nstream-1; i++) {
     cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream-1], qudaStreamDefault, leastPriority);
+  cudaStreamCreateWithPriority(&streams[Nstream - 1], qudaStreamDefault, leastPriority);
 
   checkCudaError();
   createDslashEvents();
@@ -664,7 +661,7 @@ void initQudaMemory()
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  qudaHostGetDevicePointer((void**)&num_failures_d, num_failures_h, 0);
+  qudaHostGetDevicePointer((void **)&num_failures_d, num_failures_h, 0);
 
   loadTuneCache();
 
@@ -1153,10 +1150,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
+      qudaMemcpy((char *)(in->V(false)), (char *)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
+      qudaMemcpy((char *)(in->V(true)), (char *)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);

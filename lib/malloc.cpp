@@ -261,7 +261,7 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    QUresult err = cuMemAlloc((QUdeviceptr*)&ptr, size);
+    QUresult err = cuMemAlloc((QUdeviceptr *)&ptr, size);
     if (err != QUDA_SUCCESS) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -306,7 +306,7 @@ namespace quda
   {
     MemAlloc a(func, file, line);
     void *ptr = aligned_malloc(a, size);
-    
+
     qudaError_t err = cudaHostRegister(ptr, a.base_size, qudaHostRegisterDefault);
     if (err != qudaSuccess) {
       errorQuda("Failed to register pinned memory of size %zu (%s:%d in %s())\n", size, file, line, func);

@@ -9,7 +9,7 @@ template <typename OutputType, typename InputType> class Texture
   typedef typename quda::mapper<InputType>::type RegType;
 
   private:
-  qudaTextureObject_t spinor;
+    qudaTextureObject_t spinor;
 
   public:
   Texture() : spinor(0) {}

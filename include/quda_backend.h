@@ -25,7 +25,7 @@
 // * cudaDeviceReset
 // * cudaDeviceSetCacheConfig
 // * cudaDeviceSynchronize
-// * cudaGetDeviceCount 
+// * cudaGetDeviceCount
 // * cudaGetDeviceProperties
 // * cudaHostGetDevicePointer
 // * cudaSetDevice
@@ -38,12 +38,10 @@
 // * cudaEventElapsedTime
 // * cudaEventRecord
 // * cudaEventSynchronize
- 
+
 // * cudaGetTextureObjectResourceDesc
 // cudaGetErrorString
 // cudaGetLastError
-
-
 
 // cudaHostAlloc
 // cudaHostRegister
@@ -63,7 +61,6 @@
 
 // cudaStreamCreateWithPriority
 // cudaStreamDestroy
-
 
 #ifdef CUDA_BACKEND
 #include <cuda.h>
@@ -120,10 +117,9 @@
 #define qudaWarpSize warpSize
 
 //?
-#define qudaFuncAttributeMaxDynamicSharedMemorySize cudaFuncAttributeMaxDynamicSharedMemorySize 
+#define qudaFuncAttributeMaxDynamicSharedMemorySize cudaFuncAttributeMaxDynamicSharedMemorySize
 #define qudaFuncAttributePreferredSharedMemoryCarveout cudaFuncAttributePreferredSharedMemoryCarveout
 #define qudaSharedmemCarveoutMaxShared cudaSharedmemCarveoutMaxShared
-
 
 #endif
 
@@ -140,7 +136,7 @@
 
 #define QUdeviceptr hipDeviceptr_t
 #define QUmemorytype hipMemoryType
-#define QUresult  hipError_t
+#define QUresult hipError_t
 
 #define qudaChannelFormatDesc hipChannelFormatDesc
 #define qudaChannelFormatKindFloat hipChannelFormatKindFloat
@@ -189,6 +185,5 @@
 #define qudaDeviceProp hipDeviceProp
 #define qudaTextureDesc hipTextureDesc
 #define qudaWarpSize hipWarpSize
-
 
 #endif

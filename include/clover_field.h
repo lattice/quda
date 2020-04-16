@@ -208,18 +208,18 @@ namespace quda {
     virtual ~cudaCloverField();
 
 #ifdef USE_TEXTURE_OBJECTS
-    const qudaTextureObject_t& Tex() const { return tex; }
-    const qudaTextureObject_t& NormTex() const { return normTex; }
-    const qudaTextureObject_t& InvTex() const { return invTex; }
-    const qudaTextureObject_t& InvNormTex() const { return invNormTex; }
-    const qudaTextureObject_t& EvenTex() const { return evenTex; }
-    const qudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const qudaTextureObject_t& OddTex() const { return oddTex; }
-    const qudaTextureObject_t& OddNormTex() const { return oddNormTex; }
-    const qudaTextureObject_t& EvenInvTex() const { return evenInvTex; }
-    const qudaTextureObject_t& EvenInvNormTex() const { return evenInvNormTex; }
-    const qudaTextureObject_t& OddInvTex() const { return oddInvTex; }
-    const qudaTextureObject_t& OddInvNormTex() const { return oddInvNormTex; }
+    const qudaTextureObject_t &Tex() const { return tex; }
+    const qudaTextureObject_t &NormTex() const { return normTex; }
+    const qudaTextureObject_t &InvTex() const { return invTex; }
+    const qudaTextureObject_t &InvNormTex() const { return invNormTex; }
+    const qudaTextureObject_t &EvenTex() const { return evenTex; }
+    const qudaTextureObject_t &EvenNormTex() const { return evenNormTex; }
+    const qudaTextureObject_t &OddTex() const { return oddTex; }
+    const qudaTextureObject_t &OddNormTex() const { return oddNormTex; }
+    const qudaTextureObject_t &EvenInvTex() const { return evenInvTex; }
+    const qudaTextureObject_t &EvenInvNormTex() const { return evenInvNormTex; }
+    const qudaTextureObject_t &OddInvTex() const { return oddInvTex; }
+    const qudaTextureObject_t &OddInvNormTex() const { return oddInvNormTex; }
 #endif
 
     /**
@@ -314,10 +314,10 @@ namespace quda {
     const qudaTextureObject_t &evenNormTex;
     const qudaTextureObject_t &oddTex;
     const qudaTextureObject_t &oddNormTex;
-    const qudaTextureObject_t& EvenTex() const { return evenTex; }
-    const qudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
-    const qudaTextureObject_t& OddTex() const { return oddTex; }
-    const qudaTextureObject_t& OddNormTex() const { return oddNormTex; }    
+    const qudaTextureObject_t &EvenTex() const { return evenTex; }
+    const qudaTextureObject_t &EvenNormTex() const { return evenNormTex; }
+    const qudaTextureObject_t &OddTex() const { return oddTex; }
+    const qudaTextureObject_t &OddNormTex() const { return oddNormTex; }
 #endif
 
     FullClover(const cudaCloverField &clover, bool inverse=false) :

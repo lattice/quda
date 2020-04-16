@@ -189,13 +189,13 @@ namespace quda {
      Complex *evecm = static_cast<Complex*>( args.ritzVecs.data());
      double  *evalm = static_cast<double *>( args.Tmvals.data());
 
-     cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(evecm), m * m * sizeof(Complex), qudaHostRegisterDefault);
      magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
      //Solve m-1 dim eigenproblem:
      DenseMatrix ritzVecsm1(args.Tm);
      Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
 
-     cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(evecm1), m * m * sizeof(Complex), qudaHostRegisterDefault);
      magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
      // fill 0s in mth element of old evecs:
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;

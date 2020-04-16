@@ -344,7 +344,7 @@ static int hisq_force_test(void)
   gettimeofday(&t0, NULL);
 
   fermion_force::hisqStaplesForce(*cudaForce_ex, *cudaOprod_ex, *cudaGauge_ex, d_act_path_coeff);
-  qudaDeviceSynchronize(); 
+  qudaDeviceSynchronize();
   gettimeofday(&t1, NULL);
 
   delete cudaOprod_ex; //doing this to lower the peak memory usage
@@ -354,7 +354,7 @@ static int hisq_force_test(void)
   cudaLongLinkOprod_ex->loadCPUField(*cpuLongLinkOprod);
   cudaLongLinkOprod_ex->exchangeExtendedGhost(cudaLongLinkOprod_ex->R());
   fermion_force::hisqLongLinkForce(*cudaForce_ex, *cudaLongLinkOprod_ex, *cudaGauge_ex, d_act_path_coeff[1]);
-  qudaDeviceSynchronize(); 
+  qudaDeviceSynchronize();
 
   gettimeofday(&t2, NULL);
 

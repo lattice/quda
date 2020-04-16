@@ -250,13 +250,13 @@ namespace quda {
 	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
-	  qudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
+          qudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
 
-	  // pinned buffer used for receiving
+          // pinned buffer used for receiving
 	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
-	  qudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
+          qudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
         }
 
         initGhostFaceBuffer = true;
@@ -462,9 +462,8 @@ namespace quda {
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
-	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-			       qudaIpcMemLazyEnablePeerAccess);
-	}
+          cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], qudaIpcMemLazyEnablePeerAccess);
+        }
 	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
@@ -494,8 +493,8 @@ namespace quda {
 	  // now send
           qudaIpcEventHandle_t ipcLocalEventHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
-	    qudaEventCreateWithFlags(&ipcCopyEvent[b][dir][dim], qudaEventDisableTiming | qudaEventInterprocess);
-	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
+            qudaEventCreateWithFlags(&ipcCopyEvent[b][dir][dim], qudaEventDisableTiming | qudaEventInterprocess);
+            cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
 	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
 						    sizeof(ipcLocalEventHandle));
@@ -571,8 +570,8 @@ namespace quda {
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
-	    qudaEventDestroy(ipcCopyEvent[b][1][dim]);
-	    // only close this handle if it doesn't alias the back ghost
+            qudaEventDestroy(ipcCopyEvent[b][1][dim]);
+            // only close this handle if it doesn't alias the back ghost
 	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
 	  }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
@@ -581,8 +580,8 @@ namespace quda {
 
 	if (comm_peer2peer_enabled(0,dim)) {
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
-	    qudaEventDestroy(ipcCopyEvent[b][0][dim]);
-	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+            qudaEventDestroy(ipcCopyEvent[b][0][dim]);
+            cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
 	  }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
@@ -609,11 +608,13 @@ namespace quda {
     return (qudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
-  const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+  const qudaEvent_t &LatticeField::getIPCCopyEvent(int dir, int dim) const
+  {
     return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
-  const qudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
+  const qudaEvent_t &LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const
+  {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }
 

@@ -718,9 +718,9 @@ namespace quda {
 	 can't guarantee that all nodes are partaking */
       if (comm_rank() == 0 || !commGlobalReduction() || policyTuning()) {
 	TuneParam best_param;
-	qudaError_t error = qudaSuccess;
-	qudaEvent_t start, end;
-	float elapsed_time, best_time;
+        qudaError_t error = qudaSuccess;
+        qudaEvent_t start, end;
+        float elapsed_time, best_time;
 	time_t now;
 
 	tuning = true;
@@ -730,10 +730,10 @@ namespace quda {
 	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
 	tunable.preTune();
 
-	qudaEventCreate(&start);
-	qudaEventCreate(&end);
+        qudaEventCreate(&start);
+        qudaEventCreate(&end);
 
-	if (verbosity >= QUDA_DEBUG_VERBOSE) {
+        if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	  printfQuda("Tuning %s with %s at vol=%s\n", key.name, key.aux, key.volume);
 	}
 
@@ -742,8 +742,8 @@ namespace quda {
 
         tunable.initTuneParam(param);
 	while (tuning) {
-	  qudaDeviceSynchronize();
-	  cudaGetLastError(); // clear error counter
+          qudaDeviceSynchronize();
+          cudaGetLastError(); // clear error counter
 	  tunable.checkLaunchParam(param);
 	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
@@ -754,46 +754,46 @@ namespace quda {
 		       param.aux.x, param.aux.y, param.aux.z);
 	  }
 
-	  qudaEventRecord(start, 0);
-	  for (int i=0; i<tunable.tuningIter(); i++) {
+          qudaEventRecord(start, 0);
+          for (int i=0; i<tunable.tuningIter(); i++) {
 	    tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
 	  }
-	  qudaEventRecord(end, 0);
-	  qudaEventSynchronize(end);
-	  qudaEventElapsedTime(&elapsed_time, start, end);
-	  qudaDeviceSynchronize();
-	  error = cudaGetLastError();
+          qudaEventRecord(end, 0);
+          qudaEventSynchronize(end);
+          qudaEventElapsedTime(&elapsed_time, start, end);
+          qudaDeviceSynchronize();
+          error = cudaGetLastError();
 
 	  { // check that error state is cleared
-	    qudaDeviceSynchronize();
-	    qudaError_t error = cudaGetLastError();
-	    if (error != qudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
-	  }
+            qudaDeviceSynchronize();
+            qudaError_t error = cudaGetLastError();
+            if (error != qudaSuccess) errorQuda("Failed to clear error state %s\n", cudaGetErrorString(error));
+          }
 
 	  elapsed_time /= (1e3 * tunable.tuningIter());
-	  if ( (elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == QUDA_SUCCESS) ) {
-	    best_time = elapsed_time;
+          if ((elapsed_time < best_time) && (error == qudaSuccess) && (tunable.jitifyError() == QUDA_SUCCESS)) {
+            best_time = elapsed_time;
 	    best_param = param;
-	  }
-	  if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
-	    if (error == qudaSuccess && tunable.jitifyError() == QUDA_SUCCESS) {
-	      printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
+          }
+          if ((verbosity >= QUDA_DEBUG_VERBOSE)) {
+            if (error == qudaSuccess && tunable.jitifyError() == QUDA_SUCCESS) {
+              printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(),
 			 tunable.perfString(elapsed_time).c_str());
             } else {
-	      if (tunable.jitifyError() == QUDA_SUCCESS) {
+              if (tunable.jitifyError() == QUDA_SUCCESS) {
                 // if not jitify error must be regular error
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), cudaGetErrorString(error));
-	      } else {
+              } else {
                 // else is a jitify error
 		const char *str;
 		cuGetErrorString(tunable.jitifyError(), &str);
 		printfQuda("    %s gives %s\n", tunable.paramString(param).c_str(), str);
-	      }
+              }
             }
-	  }
+          }
 	  tuning = tunable.advanceTuneParam(param);
-	  tunable.jitifyError() = QUDA_SUCCESS;
-	}
+          tunable.jitifyError() = QUDA_SUCCESS;
+        }
 
         tune_timer.Stop(__func__, __FILE__, __LINE__);
 
@@ -810,10 +810,10 @@ namespace quda {
 	best_param.comment += ctime(&now); // includes a newline
 	best_param.time = best_time;
 
-	qudaEventDestroy(start);
-	qudaEventDestroy(end);
+        qudaEventDestroy(start);
+        qudaEventDestroy(end);
 
-	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
+        if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
 	tunable.postTune();
 	param = best_param;
 	tunecache[key] = best_param;

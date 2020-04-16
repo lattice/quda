@@ -55,9 +55,9 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  extern qudaDeviceProp deviceProp;  
+  extern qudaDeviceProp deviceProp;
   extern qudaStream_t *streams;
- 
+
 #ifdef __cplusplus
 }
 #endif

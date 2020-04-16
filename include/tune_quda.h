@@ -196,10 +196,10 @@ namespace quda {
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
     {
 #if CUDA_VERSION >= 9000
-      qudaFuncSetAttribute(
-          (const void *)func, qudaFuncAttributePreferredSharedMemoryCarveout, (int)qudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute(
-          (const void *)func, qudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
+      qudaFuncSetAttribute((const void *)func, qudaFuncAttributePreferredSharedMemoryCarveout,
+                           (int)qudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute((const void *)func, qudaFuncAttributeMaxDynamicSharedMemorySize,
+                           maxDynamicSharedBytesPerBlock());
 #endif
     }
 
@@ -412,7 +412,7 @@ namespace quda {
     }
 
     QUresult jitifyError() const { return jitify_error; }
-    QUresult& jitifyError() { return jitify_error; }
+    QUresult &jitifyError() { return jitify_error; }
   };
 
   

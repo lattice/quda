@@ -470,12 +470,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -642,16 +642,18 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
-    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p=NULL)
+    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+
+    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                            bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
-    { errorQuda("Not implemented"); }
-
-    virtual int commsQuery(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
