@@ -198,6 +198,15 @@ namespace quda {
 #endif
   }
 
+  qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line) {
+    qudaError_t error = cudaGetLastError();
+    return error;
+  }
+
+  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line) {
+    return cudaGetErrorString(error);
+  }
+  
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line)
   {
     if (count == 0) return;

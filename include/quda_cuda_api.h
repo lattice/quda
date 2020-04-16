@@ -14,6 +14,16 @@
 namespace quda {
 
   /**
+     @brief Wrapper around qudaGetErrorString
+  */
+  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
+  
+  /**
+     @brief Wrapper around qudaGetLastError
+  */
+  qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
+  
+  /**
      @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
