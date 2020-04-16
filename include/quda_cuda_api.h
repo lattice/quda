@@ -380,10 +380,16 @@ namespace quda {
 // END Host
 //-------------------------------------------------------------------------------------
 
-// START ErrorString
+//START Misc
 //-------------------------------------------------------------------------------------
-#define qudaRuntimeGetVersion(runtimeVersion)                                                                          \
-  ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-// END ErrorString
+#define qudaGetLastError()						\
+  ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaGetErrorString(error)					\
+  ::quda::qudaGetErrorString_(error,__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream) \
+  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+//END Misc
 //-------------------------------------------------------------------------------------
 #endif
