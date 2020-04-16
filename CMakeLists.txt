@@ -25,6 +25,11 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
+if(DEFINED ENV{QUDA_BACKEND})
+  set(DEFBACKEND $ENV{QUDA_BACKEND})
+else()
+  set(DEFBACKEND "CUDA")
+endif()
 
 if(GIT_FOUND)
   execute_process(COMMAND ${GIT_EXECUTABLE} show
@@ -57,6 +62,7 @@ if(GIT_FOUND)
   endif()
 endif(GIT_FOUND)
 
+# Build type
 set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
 set(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
@@ -66,6 +72,18 @@ list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
 
 if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
+
+# Backend type
+set(VALID_BACKEND_TYPES CUDA HIP)
+set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
+set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CUDA HIP)
+
+string(TOUPPER ${QUDA_BACKEND_TYPE} CHECK_BACKEND_TYPE)
+list(FIND VALID_BACKEND_TYPES ${CHECK_BACKEND_TYPE} BACKEND_TYPE_VALID)
+
+if(BACKEND_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_BACKEND_TYPE type! Valid backend types are:" "${VALID_BACKEND_TYPES}")
 endif()
 
 #
@@ -83,6 +101,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
+# Build options
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -97,7 +116,6 @@ set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
     CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
-# build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
@@ -245,7 +263,8 @@ if(QUDA_DOWNLOAD_EIGEN)
   set(EIGEN_VERSION 3.3.7)
 
   set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  # Use https as some systems will not allow connections to http
+  set(EIGEN_URL https://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
   set(EIGEN_SHA 9f13cf90dedbe3e52a19f43000d71fdf72e986beb9a5436dddcd61ff9d77a3ce)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
@@ -301,7 +320,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -326,7 +345,7 @@ set(
 enable_language(CXX)
 
 # define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING -DDEVEL"Flags used by the C compiler during regular development builds.")
+set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
     "-Wall -O3 -Werror -Wno-error=unused-private-field"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
@@ -663,6 +682,14 @@ endif()
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
+# Set backend preprocessor flags
+if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
+  add_definitions(-DCUDA_BACKEND)
+endif()
+if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
+  add_definitions(-DHIP_BACKEND)
+endif()
+
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
@@ -829,7 +856,7 @@ endif(QUDA_VERBOSE_BUILD)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "${QUDA_NVCC_FLAGS} -lineinfo -DDEVEL -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
