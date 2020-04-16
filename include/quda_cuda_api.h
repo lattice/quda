@@ -115,8 +115,7 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream);
+  qudaError_t qudaLaunchKernel_(const void* func_arg, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaEventCreate
@@ -375,7 +374,7 @@ namespace quda {
 
 // START Host
 //-------------------------------------------------------------------------------------
-#define qudaHostRegister(ptr, size, flags)                                                                             \
+#define qudaHostRegister(ptr, size, flags)				\
   ::quda::qudaHostRegister_(ptr, size, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 // END Host
 //-------------------------------------------------------------------------------------

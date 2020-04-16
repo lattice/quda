@@ -241,12 +241,13 @@ namespace quda {
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
-
-  qudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                               qudaStream_t stream)
+  
+  qudaError_t qudaLaunchKernel_(const void *func_arg, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+				qudaStream_t stream, const char *func, const char *file, const char *line)
   {
+    qudaError_t error;
     // no driver API variant here since we have C++ functions
-    PROFILE(qudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream),
+    PROFILE(error = cudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream),
             QUDA_PROFILE_LAUNCH_KERNEL);
     if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
     return error;
