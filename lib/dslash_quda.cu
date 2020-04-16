@@ -97,14 +97,14 @@ namespace quda {
     using namespace dslash;
     // add qudaEventDisableTiming for lower sync overhead
     for (int i=0; i<Nstream; i++) {
-      cudaEventCreateWithFlags(&gatherStart[i], qudaEventDisableTiming);
-      cudaEventCreateWithFlags(&gatherEnd[i], qudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterStart[i], qudaEventDisableTiming);
-      cudaEventCreateWithFlags(&scatterEnd[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&gatherStart[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&gatherEnd[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&scatterStart[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&scatterEnd[i], qudaEventDisableTiming);
     }
     for (int i=0; i<2; i++) {
-      cudaEventCreateWithFlags(&packEnd[i], qudaEventDisableTiming);
-      cudaEventCreateWithFlags(&dslashStart[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&packEnd[i], qudaEventDisableTiming);
+      qudaEventCreateWithFlags(&dslashStart[i], qudaEventDisableTiming);
     }
 
     aux_worker = NULL;
@@ -112,7 +112,7 @@ namespace quda {
 #if CUDA_VERSION >= 8000
     commsEnd_h = static_cast<cuuint32_t*>(mapped_malloc(Nstream*sizeof(int)));
     for (int i=0; i<Nstream; i++) {
-      cudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
+      qudaHostGetDevicePointer((void**)&commsEnd_d[i], commsEnd_h+i, 0);
       commsEnd_h[i] = 0;
     }
 #endif
@@ -151,15 +151,15 @@ namespace quda {
 #endif
 
     for (int i=0; i<Nstream; i++) {
-      cudaEventDestroy(gatherStart[i]);
-      cudaEventDestroy(gatherEnd[i]);
-      cudaEventDestroy(scatterStart[i]);
-      cudaEventDestroy(scatterEnd[i]);
+      qudaEventDestroy(gatherStart[i]);
+      qudaEventDestroy(gatherEnd[i]);
+      qudaEventDestroy(scatterStart[i]);
+      qudaEventDestroy(scatterEnd[i]);
     }
 
     for (int i=0; i<2; i++) {
-      cudaEventDestroy(packEnd[i]);
-      cudaEventDestroy(dslashStart[i]);
+      qudaEventDestroy(packEnd[i]);
+      qudaEventDestroy(dslashStart[i]);
     }
 
     checkCudaError();

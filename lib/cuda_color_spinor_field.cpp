@@ -174,10 +174,10 @@ namespace quda {
 	break;
       case QUDA_MEMORY_MAPPED:
 	v_h = mapped_malloc(bytes);
-	cudaHostGetDevicePointer(&v, v_h, 0); // set the matching device pointer
+	qudaHostGetDevicePointer(&v, v_h, 0); // set the matching device pointer
 	if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
 	  norm_h = mapped_malloc(norm_bytes);
-	  cudaHostGetDevicePointer(&norm, norm_h, 0); // set the matching device pointer
+	  qudaHostGetDevicePointer(&norm, norm_h, 0); // set the matching device pointer
 	}
 	break;
       default:
@@ -358,7 +358,7 @@ namespace quda {
         errorQuda("Attempting to bind too large a texture %lu > %d", texels, deviceProp.maxTexture1DLinear);
       }
 
-      cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
+      qudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
       checkCudaError();
 
@@ -386,7 +386,7 @@ namespace quda {
         memset(&texDesc, 0, sizeof(texDesc));
         texDesc.readMode = qudaReadModeElementType;
 
-        cudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&texNorm, &resDesc, &texDesc, NULL);
 
         checkCudaError();
       }
@@ -438,7 +438,7 @@ namespace quda {
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) texDesc.readMode = qudaReadModeNormalizedFloat;
 	else texDesc.readMode = qudaReadModeElementType;
 
-	cudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
+	qudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
 
 	// second set of ghost texture map to the host-mapped pinned receive buffers
 	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
@@ -446,7 +446,7 @@ namespace quda {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
         }
-        cudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
+        qudaCreateTextureObject(&ghostTex[2 + b], &resDesc, &texDesc, NULL);
 
         if (ghost_precision == QUDA_HALF_PRECISION || ghost_precision == QUDA_QUARTER_PRECISION) {
           qudaChannelFormatDesc desc;
@@ -470,14 +470,14 @@ namespace quda {
           memset(&texDesc, 0, sizeof(texDesc));
           texDesc.readMode = qudaReadModeElementType;
 
-          cudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
+          qudaCreateTextureObject(&ghostTexNorm[b], &resDesc, &texDesc, NULL);
 
 	  resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
             errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                       resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
           }
-          cudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
+          qudaCreateTextureObject(&ghostTexNorm[2 + b], &resDesc, &texDesc, NULL);
         }
 
         ghost_field_tex[b] = ghost_recv_buffer_d[b];
@@ -494,17 +494,17 @@ namespace quda {
 
   void cudaColorSpinorField::destroyTexObject() {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && texInit) {
-      cudaDestroyTextureObject(tex);
-      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) cudaDestroyTextureObject(texNorm);
+      qudaDestroyTextureObject(tex);
+      if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) qudaDestroyTextureObject(texNorm);
       texInit = false;
     }
   }
 
   void cudaColorSpinorField::destroyGhostTexObject() const {
     if ( (isNative() || fieldOrder == QUDA_FLOAT2_FIELD_ORDER) && nVec == 1 && ghostTexInit) {
-      for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTex[i]);
+      for (int i=0; i<4; i++) qudaDestroyTextureObject(ghostTex[i]);
       if (ghost_precision_tex == QUDA_HALF_PRECISION || ghost_precision_tex == QUDA_QUARTER_PRECISION)
-        for (int i=0; i<4; i++) cudaDestroyTextureObject(ghostTexNorm[i]);
+        for (int i=0; i<4; i++) qudaDestroyTextureObject(ghostTexNorm[i]);
       ghostTexInit = false;
       ghost_precision_tex = QUDA_INVALID_PRECISION;
     }
@@ -686,7 +686,7 @@ namespace quda {
       if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
         // special case where we use mapped memory to read/write directly from application's array
         void *src_d;
-        qudaError_t error = cudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
+        qudaError_t error = qudaHostGetDevicePointer(&src_d, const_cast<void*>(src.V()), 0);
         if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
@@ -701,7 +701,7 @@ namespace quda {
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
           memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-          qudaError_t error = cudaHostGetDevicePointer(&Src, buffer, 0);
+          qudaError_t error = qudaHostGetDevicePointer(&Src, buffer, 0);
           if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
@@ -735,7 +735,7 @@ namespace quda {
       if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *dest_d;
-	qudaError_t error = cudaHostGetDevicePointer(&dest_d, const_cast<void*>(dest.V()), 0);
+	qudaError_t error = qudaHostGetDevicePointer(&dest_d, const_cast<void*>(dest.V()), 0);
         if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
@@ -746,7 +746,7 @@ namespace quda {
           dstNorm = static_cast<char*>(dst) + dest.Bytes();
         } else {
           buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
-          qudaError_t error = cudaHostGetDevicePointer(&dst, buffer, 0);
+          qudaError_t error = qudaHostGetDevicePointer(&dst, buffer, 0);
           if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
           dstNorm = static_cast<char*>(dst)+dest.Bytes();
         }
@@ -1235,7 +1235,7 @@ namespace quda {
       // first wait on send to backwards
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_send_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
+	qudaEventSynchronize(ipcCopyEvent[bufferIndex][0][dim]);
       } else if (gdr_send) {
 	comm_wait(mh_send_rdma_back[bufferIndex][dim]);
       } else {
@@ -1245,7 +1245,7 @@ namespace quda {
       // second wait on receive from forwards
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_recv_p2p_fwd[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
+	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][1][dim]);
       } else if (gdr_recv) {
 	comm_wait(mh_recv_rdma_fwd[bufferIndex][dim]);
       } else {
@@ -1257,7 +1257,7 @@ namespace quda {
       // first wait on send to forwards
       if (comm_peer2peer_enabled(1,dim)) {
 	comm_wait(mh_send_p2p_fwd[bufferIndex][dim]);
-	cudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
+	qudaEventSynchronize(ipcCopyEvent[bufferIndex][1][dim]);
       } else if (gdr_send) {
 	comm_wait(mh_send_rdma_fwd[bufferIndex][dim]);
       } else {
@@ -1267,7 +1267,7 @@ namespace quda {
       // second wait on receive from backwards
       if (comm_peer2peer_enabled(0,dim)) {
 	comm_wait(mh_recv_p2p_back[bufferIndex][dim]);
-	cudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
+	qudaEventSynchronize(ipcRemoteCopyEvent[bufferIndex][0][dim]);
       } else if (gdr_recv) {
 	comm_wait(mh_recv_rdma_back[bufferIndex][dim]);
       } else {
@@ -1549,7 +1549,7 @@ namespace quda {
     std::cout << *this;
     qudaResourceDesc resDesc;
     //memset(&resDesc, 0, sizeof(resDesc));
-    cudaGetTextureObjectResourceDesc(&resDesc, this->Tex());
+    qudaGetTextureObjectResourceDesc(&resDesc, this->Tex());
     printfQuda("\nDevice pointer: %p\n", resDesc.res.linear.devPtr);
     printfQuda("\nVolume (in bytes): %lu\n", resDesc.res.linear.sizeInBytes);
     if (resDesc.resType == qudaResourceTypeLinear) printfQuda("\nResource type: linear \n");

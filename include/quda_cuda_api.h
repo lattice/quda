@@ -115,14 +115,14 @@ namespace quda {
   qudaError_t qudaEventQuery(qudaEvent_t &event);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
+     @brief Wrapper around qudaEventRecord or cuEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
   qudaError_t qudaEventRecord(qudaEvent_t &event, qudaStream_t stream=0);
 
   /**
-     @brief Wrapper around cudaEventRecord or cuEventRecord
+     @brief Wrapper around qudaEventRecord or cuEventRecord
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
@@ -136,13 +136,13 @@ namespace quda {
   qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
 
   /**
-     @brief Wrapper around cudaEventSynchronize or cuEventSynchronize
+     @brief Wrapper around qudaEventSynchronize or cuEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
    */
   qudaError_t qudaEventSynchronize(qudaEvent_t &event);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize or cuDeviceSynchronize
+     @brief Wrapper around qudaDeviceSynchronize or cuDeviceSynchronize
    */
   qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 

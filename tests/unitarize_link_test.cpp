@@ -180,15 +180,15 @@ static int unitarize_link_test(int &test_rc)
 
   int *num_failures_h = (int*)mapped_malloc(sizeof(int));
   int *num_failures_d = nullptr;
-  qudaError_t error = cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
-  if (error != qudaSuccess) errorQuda("cudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
+  qudaError_t error = qudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+  if (error != qudaSuccess) errorQuda("qudaHostGetDevicePointer failed with error: %s", cudaGetErrorString(error));
   *num_failures_h = 0;
 
   struct timeval t0, t1;
 
   gettimeofday(&t0,NULL);
   unitarizeLinks(*cudaULink, *cudaFatLink, num_failures_d);
-  cudaDeviceSynchronize();
+  qudaDeviceSynchronize();
   gettimeofday(&t1,NULL);
 
   if (verify_results) {
