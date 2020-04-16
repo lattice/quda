@@ -36,7 +36,7 @@ namespace quda {
     int commsCompleted[2] = {0,0};
 
     qudaEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) qudaEventCreate(&gatherEnd[dir], qudaEventDisableTiming);
+    for(int dir=0; dir<2; dir++) qudaEventCreateWithFlags(&gatherEnd[dir], qudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;

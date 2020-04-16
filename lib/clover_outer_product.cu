@@ -20,7 +20,7 @@ namespace quda {
   void createEventArray(qudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
     for(int i=0; i<N; ++i)
-      qudaEventCreate(&event[i],flags);
+      qudaEventCreateWithFlags(&event[i],flags);
     return;
   }
 
@@ -40,11 +40,11 @@ namespace quda {
 
 
   void createCloverForceEvents(){
-    qudaEventCreate(&packEnd, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&packEnd, qudaEventDisableTiming);
     createEventArray(gatherEnd, qudaEventDisableTiming);
     createEventArray(scatterEnd, qudaEventDisableTiming);
-    qudaEventCreate(&oprodStart, qudaEventDisableTiming);
-    qudaEventCreate(&oprodEnd, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodStart, qudaEventDisableTiming);
+    qudaEventCreateWithFlags(&oprodEnd, qudaEventDisableTiming);
     return;
   }
 

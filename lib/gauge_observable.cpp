@@ -9,8 +9,8 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
     if (param.su_project) {
       int *num_failures_h = static_cast<int *>(pool_pinned_malloc(sizeof(int)));
-      int *num_failures_d;
-      qudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
+      int *num_failures_d = 0;
+      qudaHostGetDevicePointer((void**)&num_failures_d, num_failures_h, 0);
       *num_failures_h = 0;
       auto tol = u.Precision() == QUDA_DOUBLE_PRECISION ? 1e-14 : QUDA_SINGLE_PRECISION;
       projectSU3(u, tol, num_failures_d);
