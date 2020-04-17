@@ -411,7 +411,7 @@ namespace quda {
   qudaError_t qudaGetTextureObjectResourceDesc_(qudaResourceDesc *pResDesc, qudaTextureObject_t texObject,
                                                 const char *func, const char *file, const char *line)
   {
-    qudaGetTextureObjectResourceDesc(pResDesc, texObject);
+    cudaGetTextureObjectResourceDesc(pResDesc, texObject);
     qudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
