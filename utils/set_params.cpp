@@ -1,5 +1,6 @@
 #include <command_line_params.h>
 #include <host_utils.h>
+#include "misc.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -986,15 +987,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     if (i == 0) { // top-level treatment
       if (coarse_solve_type[0] != solve_type)
-        errorQuda("Mismatch between top-level MG solve type %d and outer solve type %d", coarse_solve_type[0],
-                  solve_type);
+        errorQuda("Mismatch between top-level MG solve type %s and outer solve type %s",
+                  get_solve_str(coarse_solve_type[0]), get_solve_str(solve_type));
 
       if (solve_type == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", solve_type);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(solve_type));
       }
 
     } else {
@@ -1004,7 +1005,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(coarse_solve_type[i]));
       }
     }
 
@@ -1119,7 +1120,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.matpc_type = matpc_type;
 
   if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
-    errorQuda("Unknown deflated solver type %d.", inv_type);
+    errorQuda("Requested solver %s is not a deflated solver type", get_solver_str(inv_type));
 
   //! For deflated solvers only:
   inv_param.inv_type = inv_type;
@@ -1177,7 +1178,6 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
 void setDeflationParam(QudaEigParam &df_param)
 {
-
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
@@ -1196,7 +1196,6 @@ void setDeflationParam(QudaEigParam &df_param)
 
 void setQudaStaggeredInvTestParams()
 {
-
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (test_type != 0) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }
 
