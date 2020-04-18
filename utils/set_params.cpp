@@ -36,7 +36,7 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
+  gauge_param.t_boundary = fermion_t_boundary;
 
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
@@ -85,7 +85,7 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   }
 
   gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.t_boundary = fermion_t_boundary;
   gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
   gauge_param.type = QUDA_WILSON_LINKS;
 
@@ -356,6 +356,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
+    mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
 
     // Basis to use for CA-CGN(E/R) setup
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];

@@ -84,6 +84,7 @@ QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
+QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
@@ -266,6 +267,8 @@ namespace
                                                            {"mat-pc", QUDA_MATPC_SOLUTION},
                                                            {"mat-pc-dag", QUDA_MATPC_DAG_SOLUTION},
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
+
+  CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T}, {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {
     {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
@@ -451,6 +454,12 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "--solution-type", solution_type,
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
+
+  quda_app
+    ->add_option(
+      "--fermion-t-boundary", fermion_t_boundary,
+      "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
+    ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
 
   quda_app
     ->add_option("--solve-type", solve_type,

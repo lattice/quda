@@ -217,6 +217,7 @@ extern QudaMassNormalization normalization;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
+extern QudaTboundary fermion_t_boundary;
 
 extern int mg_levels;
 
