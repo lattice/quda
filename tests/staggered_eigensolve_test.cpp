@@ -87,10 +87,11 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
   setQudaDefaultPrecs();
 
-  // Only these fermions are supported in this file
+  // Only these fermions are supported in this file. Ensure a reasonable default,
+  // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
+    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type), get_dslash_str(QUDA_ASQTAD_DSLASH));
+    dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
   if (test_type != 0 && test_type != 3 && test_type != 4) {
