@@ -69,6 +69,8 @@ double getTolerance(QudaPrecision prec)
 
 void init(int argc, char **argv) {
 
+  initQuda(device);
+
   cuda_prec = prec;
 
   gauge_param = newQudaGaugeParam();
@@ -277,8 +279,6 @@ void init(int argc, char **argv) {
 
   printfQuda("done.\n"); fflush(stdout);
   
-  initQuda(device);
-
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
   inv_param.verbosity = verbosity;

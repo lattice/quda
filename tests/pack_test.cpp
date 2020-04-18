@@ -98,7 +98,7 @@ void end() {
 
 void packTest() {
 
-  printf("Sending fields to GPU...\n"); fflush(stdout);
+  printfQuda("Sending fields to GPU...\n"); fflush(stdout);
   
 #ifdef BUILD_CPS_INTERFACE
   {
@@ -115,12 +115,12 @@ void packTest() {
     stopwatchStart();
     cudaCpsGauge.loadCPUField(cpsCpuGauge);
     double cpsGtime = stopwatchReadSeconds();
-    printf("CPS Gauge send time = %e seconds\n", cpsGtime);
+    printfQuda("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
     cudaCpsGauge.saveCPUField(cpsCpuGauge);
     double cpsGRtime = stopwatchReadSeconds();
-    printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+    printfQuda("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
 #endif
 
@@ -139,12 +139,12 @@ void packTest() {
     stopwatchStart();
     cudaQdpGauge.loadCPUField(qdpCpuGauge);
     double qdpGtime = stopwatchReadSeconds();
-    printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+    printfQuda("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
     cudaQdpGauge.saveCPUField(qdpCpuGauge);
     double qdpGRtime = stopwatchReadSeconds();
-    printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+    printfQuda("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
 #endif
 
@@ -152,19 +152,19 @@ void packTest() {
 
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
+  printfQuda("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
-  printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
+  printfQuda("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
   
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);
   double spinor2_norm = blas::norm2(*spinor2);
 
-  printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
-	 spinor_norm, cuda_spinor_norm, spinor2_norm);
+  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
+             spinor_norm, cuda_spinor_norm, spinor2_norm);
 
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
 
