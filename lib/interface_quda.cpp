@@ -3988,7 +3988,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   } else {
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.setPrecision(gParam.Precision(), true);
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
 
     cudaSiteLink = new cudaGaugeField(gParam);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);

@@ -160,7 +160,7 @@ int main(int argc, char **argv)
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-  setStaggeredQDPGaugeParam(gauge_param);
+  setStaggeredGaugeParam(gauge_param);
   if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();

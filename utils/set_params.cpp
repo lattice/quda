@@ -3,35 +3,93 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
+void setGaugeParam(QudaGaugeParam &gauge_param)
 {
+  gauge_param.type = QUDA_SU3_LINKS;
+
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  gauge_param.anisotropy = anisotropy;
+  gauge_param.cpu_prec = cpu_prec;
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.cuda_prec_sloppy = cuda_prec;
+  gauge_param.cuda_prec_precondition = cuda_prec;
+
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = link_recon;
+  gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_refinement_sloppy = link_recon;
+
+  gauge_param.anisotropy = 1.0;
   gauge_param.tadpole_coeff = 1.0;
+
+  gauge_param.ga_pad = 0;
+  gauge_param.mom_ga_pad = 0;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+}
+
+void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
+{
+  setGaugeParam(gauge_param);
+  gauge_param.anisotropy = anisotropy;
   gauge_param.type = QUDA_WILSON_LINKS;
   gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
   gauge_param.t_boundary = QUDA_PERIODIC_T;
 
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = cuda_prec;
   gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_precondition;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
 
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
 
   int pad_size = 0;
   // For multi-GPU, ga_pad must be large enough to store a time-slice
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  pad_size = MAX(x_face_size, y_face_size);
+  pad_size = MAX(pad_size, z_face_size);
+  pad_size = MAX(pad_size, t_face_size);
+#endif
+  gauge_param.ga_pad = pad_size;
+}
+
+void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
+{
+  setGaugeParam(gauge_param);
+
+  gauge_param.cuda_prec_sloppy = prec_sloppy;
+  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+
+  // For HISQ, this must always be set to 1.0, since the tadpole
+  // correction is baked into the coefficients for the first fattening.
+  // The tadpole doesn't mean anything for the second fattening
+  // since the input fields are unitarized.
+  gauge_param.tadpole_coeff = 1.0;
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param.scale = -1.0 / 24.0;
+    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
+  } else {
+    gauge_param.scale = 1.0;
+  }
+
+  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
+  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  gauge_param.type = QUDA_WILSON_LINKS;
+
+  int pad_size = 0;
 #ifdef MULTI_GPU
   int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
@@ -625,55 +683,6 @@ void setContractInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
-{
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_sloppy = prec_sloppy;
-  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  gauge_param.cuda_prec_precondition = prec_precondition;
-
-  gauge_param.anisotropy = 1.0;
-
-  // For HISQ, this must always be set to 1.0, since the tadpole
-  // correction is baked into the coefficients for the first fattening.
-  // The tadpole doesn't mean anything for the second fattening
-  // since the input fields are unitarized.
-  gauge_param.tadpole_coeff = 1.0;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0 / 24.0;
-    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
-  } else {
-    gauge_param.scale = 1.0;
-  }
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_LINKS;
-
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-#endif
-  gauge_param.ga_pad = pad_size;
-}
-
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
@@ -1252,7 +1261,6 @@ void setQudaStaggeredInvTestParams()
 
 void setQudaStaggeredEigTestParams()
 {
-
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     // LAPLACE operator path, only DIRECT solves feasible.
     if (test_type != 0) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }

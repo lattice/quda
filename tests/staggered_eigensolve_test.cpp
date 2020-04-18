@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
-  setStaggeredQDPGaugeParam(gauge_param);
+  setStaggeredGaugeParam(gauge_param);
   // Though no inversions are performed, the inv_param
   // structure contains all the information we need to
   // construct the dirac operator. We encapsualte the

@@ -224,6 +224,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param);
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param);
 
 // Gauge param types
+void setGaugeParam(QudaGaugeParam &gauge_param);
 void setWilsonGaugeParam(QudaGaugeParam &gauge_param);
-void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param);
-void setStaggeredMILCGaugeParam(QudaGaugeParam &gauge_param, int pad_size);
+void setStaggeredGaugeParam(QudaGaugeParam &gauge_param);

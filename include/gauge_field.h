@@ -130,8 +130,8 @@ namespace quda {
     {
     }
 
-  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
-    : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
+    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS) :
+      LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
       nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
       order(param.gauge_order), fixed(param.gauge_fix),
       link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
@@ -140,48 +140,47 @@ namespace quda {
       compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
       staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
       site_offset(param.gauge_offset), site_size(param.site_size)
-	{
-	  switch(link_type) {
-	  case QUDA_SU3_LINKS:
-	  case QUDA_GENERAL_LINKS:
-	  case QUDA_SMEARED_LINKS:
-	  case QUDA_MOMENTUM_LINKS:
-	    nFace = 1; break;
-	  case QUDA_THREE_LINKS:
-	    nFace = 3; break;
-	  default:
-	    errorQuda("Error: invalid link type(%d)\n", link_type);
-	  }
-	}
+    {
+      switch(link_type) {
+      case QUDA_SU3_LINKS:
+      case QUDA_GENERAL_LINKS:
+      case QUDA_SMEARED_LINKS:
+      case QUDA_MOMENTUM_LINKS:
+        nFace = 1; break;
+      case QUDA_THREE_LINKS:
+        nFace = 3; break;
+      default:
+        errorQuda("Error: invalid link type(%d)\n", link_type);
+      }
+    }
 
-        /**
-           @brief Helper function for setting the precision and corresponding
-           field order for QUDA internal fields.
-           @param precision The precision to use
-         */
-        void setPrecision(QudaPrecision precision, bool force_native = false)
-        {
-          // is the current status in native field order?
-          bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
-          this->precision = precision;
-          this->ghost_precision = precision;
+    /**
+       @brief Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use
+    */
+    void setPrecision(QudaPrecision precision, bool force_native = false)
+    {
+      // is the current status in native field order?
+      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
+      this->precision = precision;
+      this->ghost_precision = precision;
 
-          if (native) {
-            if (precision == QUDA_DOUBLE_PRECISION || precision == QUDA_DOUBLE_PRECISION
-                || reconstruct == QUDA_RECONSTRUCT_NO) {
-              order = QUDA_FLOAT2_GAUGE_ORDER;
-            } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-                       && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
+      if (native) {
+        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+          order = QUDA_FLOAT2_GAUGE_ORDER;
+        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
 #ifdef FLOAT8
-              order = QUDA_FLOAT8_GAUGE_ORDER;
+          order = QUDA_FLOAT8_GAUGE_ORDER;
 #else
-              order = QUDA_FLOAT4_GAUGE_ORDER;
+          order = QUDA_FLOAT4_GAUGE_ORDER;
 #endif
-            } else {
-              order = QUDA_FLOAT4_GAUGE_ORDER;
-            }
-          }
+        } else {
+          order = QUDA_FLOAT4_GAUGE_ORDER;
         }
+      }
+    }
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
