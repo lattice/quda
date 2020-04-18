@@ -199,11 +199,50 @@ void init(int precision, QudaReconstructType link_recon, int partition)
   }
 
   // for load, etc
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  //gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
+  //constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
+  //qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
 
-  constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
-                                         qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
+    // load a field WITHOUT PHASES
+  if (strcmp(latfile,"")) {
+    read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
+    if (dslash_type != QUDA_LAPLACE_DSLASH) {
+      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
+    } 
+  } else {
+    if (dslash_type == QUDA_LAPLACE_DSLASH) {
+      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+    } else {
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
+				 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
+    }
+  }
 
+  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
+  // "compute" the fat/long links or not.
+  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
+    for (int dir = 0; dir < 4; dir++) {
+      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+      memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
+    }
+  } else { 
+    // QUDA_ASQTAD_DSLASH
+    if (compute_fatlong) {
+      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
+                              gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
+    } else {
+      // Not computing FatLong
+      for (int dir = 0; dir < 4; dir++) {
+        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+        memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
+        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
+      }
+    }
+  }
+
+  
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink_gpu, qdp_fatlink_gpu, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
@@ -677,13 +716,19 @@ TEST_P(StaggeredDslashTest, benchmark) {
       return app->exit(e);
     }
     initComms(argc, argv, gridsize_from_cmdline);
-
-    // Ensure that the default is improved staggered
-    if (dslash_type != QUDA_STAGGERED_DSLASH &&
-        dslash_type != QUDA_ASQTAD_DSLASH &&
-        dslash_type != QUDA_LAPLACE_DSLASH) {
-      warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
-      dslash_type = QUDA_ASQTAD_DSLASH;
+    
+    // Ensure gtest prints only from rank 0
+    ::testing::TestEventListeners& listeners =
+	::testing::UnitTest::GetInstance()->listeners();
+    if (comm_rank() != 0) {
+      delete listeners.Release(listeners.default_result_printer());
+    }
+    
+    // Only these fermions are supported in this file. Ensure a reasonable default,
+    // ensure that the default is improved staggered
+    if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
+      printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type), get_dslash_str(QUDA_ASQTAD_DSLASH));
+    dslash_type = QUDA_ASQTAD_DSLASH;
     }
 
     // Sanity check: if you pass in a gauge field, want to test the asqtad/hisq dslash, and don't
