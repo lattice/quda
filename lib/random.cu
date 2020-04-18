@@ -130,7 +130,7 @@ namespace quda {
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
       state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      CUDA_SAFE_CALL(cudaMemset(state, 0, size * sizeof(cuRNGState)));
+      CUDA_SAFE_CALL(qudaMemset(state, 0, size * sizeof(cuRNGState)));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
                    size * sizeof(cuRNGState) / (float)(1048576));
@@ -154,22 +154,13 @@ namespace quda {
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore() {
-    qudaError_t err = cudaMemcpy(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
-    if (err != qudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to restore curand rng states array\n");
-    }
+    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
     host_free(backup_state);
   }
 
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup() {
     backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    qudaError_t err = cudaMemcpy(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
-    if (err != qudaSuccess) {
-      host_free(backup_state);
-      errorQuda("Failed to backup curand rng states array\n");
-    }
+    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
   }
-
 } // namespace quda

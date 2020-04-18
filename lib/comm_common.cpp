@@ -485,7 +485,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    qudaError_t err = cudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
+    qudaError_t err = qudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
     if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
@@ -519,7 +519,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaError_t err = cudaMemset(buffer, 0, nbytes);
+    qudaError_t err = qudaMemset(buffer, 0, nbytes);
     if (err != qudaSuccess) {
       printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
       errorQuda("aborting with error %s", cudaGetErrorString(err));
@@ -557,12 +557,9 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    qudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
-    if (err != qudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    printfQuda("Testing buffer (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+	       file, line, func, dim, dir, blksize, nblocks, stride);
+    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif

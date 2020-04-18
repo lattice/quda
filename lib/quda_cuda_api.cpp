@@ -167,6 +167,14 @@ namespace quda {
     }
   }
 
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
+		     cudaMemcpyKind kind, const char *func, const char *file, const char *line)
+  {
+    qudaError_t error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+  
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                           cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
                           const char *line)
@@ -209,9 +217,8 @@ namespace quda {
   
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line)
   {
-    if (count == 0) return;
-    cudaMemset(dst, val, count);
-    qudaError_t error = cudaGetLastError();
+    if (count == 0) return;    
+    qudaError_t error = cudaMemset(dst, val, count);
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
@@ -219,8 +226,7 @@ namespace quda {
                         const char *file, const char *line)
   {
     if (count == 0) return;
-    cudaMemsetAsync(dst, val, count, stream);
-    qudaError_t error = cudaGetLastError();
+    qudaError_t error = cudaMemsetAsync(dst, val, count, stream);
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 

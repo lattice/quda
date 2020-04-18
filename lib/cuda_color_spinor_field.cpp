@@ -560,10 +560,10 @@ namespace quda {
   void cudaColorSpinorField::backup() const {
     if (backed_up) errorQuda("ColorSpinorField already backed up");
     backup_h = new char[bytes];
-    cudaMemcpy(backup_h, v, bytes, qudaMemcpyDeviceToHost);
+    qudaMemcpy(backup_h, v, bytes, qudaMemcpyDeviceToHost);
     if (norm_bytes) {
       backup_norm_h = new char[norm_bytes];
-      cudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
     checkCudaError();
     backed_up = true;
@@ -572,10 +572,10 @@ namespace quda {
   void cudaColorSpinorField::restore() const
   {
     if (!backed_up) errorQuda("Cannot restore since not backed up");
-    cudaMemcpy(v, backup_h, bytes, qudaMemcpyHostToDevice);
+    qudaMemcpy(v, backup_h, bytes, qudaMemcpyHostToDevice);
     delete []backup_h;
     if (norm_bytes) {
-      cudaMemcpy(v, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
+      qudaMemcpy(v, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
       delete []backup_norm_h;
     }
     checkCudaError();

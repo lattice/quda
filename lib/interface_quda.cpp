@@ -4519,7 +4519,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  qudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);

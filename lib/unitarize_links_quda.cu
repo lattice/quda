@@ -358,7 +358,7 @@ namespace {
     void preTune() { if (arg.in.gauge == arg.out.gauge) arg.out.save(); }
     void postTune() {
       if (arg.in.gauge == arg.out.gauge) arg.out.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const {
@@ -448,7 +448,7 @@ namespace {
     void preTune() { arg.u.save(); }
     void postTune() {
       arg.u.load();
-      cudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
+      qudaMemset(arg.fails, 0, sizeof(int)); // reset fails counter
     }
 
     long long flops() const { return 0; } // depends on number of iterations

@@ -32,8 +32,7 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
-                   const char *line);
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaMemcpyAsync or driver API equivalent
@@ -46,6 +45,21 @@ namespace quda {
   */
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
+
+    /**
+     @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
+     call directly, rather call macro below which will grab the
+     location of the call.
+     @param[out] dst Destination pointer
+     @param[in] dpitch Destination pitch
+     @param[in] src Source pointer
+     @param[in] spitch Source pitch
+     @param[in] width Width in bytes
+     @param[in] height Number of rows
+     @param[in] kind Type of memory copy
+  */
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+		     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
@@ -293,6 +307,9 @@ namespace quda {
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__,                                       \
+                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
                              quda::file_name(__FILE__), __STRINGIFY__(__LINE__));

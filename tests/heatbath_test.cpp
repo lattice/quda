@@ -109,10 +109,10 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge){
    using namespace quda;
    int *num_failures_dev = (int*)device_malloc(sizeof(int));
    int num_failures;
-   cudaMemset(num_failures_dev, 0, sizeof(int));
+   qudaMemset(num_failures_dev, 0, sizeof(int));
    unitarizeLinks(*cudaInGauge, num_failures_dev);
 
-   cudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
+   qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
    if(num_failures>0) errorQuda("Error in the unitarization\n");
    device_free(num_failures_dev);
   }
