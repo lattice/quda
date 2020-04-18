@@ -229,7 +229,10 @@ int main(int argc, char **argv)
   setMultigridParam(mg_param);
   display_test_info();
 
-  // *** Everything between here and the call to initQuda() is
+  // initialize the QUDA library
+  initQuda(device);
+  
+  // *** Everything between here and the timer is
   // *** application-specific.
 
   setDims(gauge_param.X);
@@ -270,8 +273,6 @@ int main(int argc, char **argv)
 
   // start the timer
   double time0 = -((double)clock());
-  // initialize the QUDA library
-  initQuda(device);
   {
     using namespace quda;
     GaugeFieldParam gParam(0, gauge_param);
