@@ -31,8 +31,7 @@ int Ncolor;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
   printfQuda("S_dimension T_dimension Nspin Ncolor\n");
@@ -43,7 +42,6 @@ display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3));
-  return;
 }
 
 void initFields(QudaPrecision prec)
@@ -233,8 +231,7 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
-  // enable the tuning
-  setVerbosity(QUDA_SUMMARIZE);
+  setVerbosity(verbosity);
 
   Nspin = 2;
 
