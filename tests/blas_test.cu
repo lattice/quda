@@ -1084,6 +1084,13 @@ int main(int argc, char** argv)
   display_test_info();
   initQuda(device);
 
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners& listeners =
+      ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) {
+    delete listeners.Release(listeners.default_result_printer());
+  }
+  
   setVerbosity(verbosity);
 
   // clear the error state
