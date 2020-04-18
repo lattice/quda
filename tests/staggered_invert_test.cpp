@@ -138,16 +138,18 @@ int main(int argc, char **argv)
 
   initRand();
 
-  // Only these fermions are supported in this file
+  // Only these fermions are supported in this file. Ensure a reasonable default,
+  // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
+    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type), get_dslash_str(QUDA_ASQTAD_DSLASH));
+    dslash_type = QUDA_ASQTAD_DSLASH;
   }
-
-  // Need to add support for LAPLACE MG
+  
+  // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
     if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
-      printfQuda("dslash_type %d not supported\n", dslash_type);
+      printfQuda("dslash_type %s not supported for multigrid preconditioner\n",
+		 get_dslash_str(dslash_type));
       exit(0);
     }
   }
@@ -319,7 +321,6 @@ int main(int argc, char **argv)
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
       if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      printQudaInvertParam(&inv_param);
       invertQuda(out->V(), in->V(), &inv_param);
 
       time[k] = inv_param.secs;
