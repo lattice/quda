@@ -175,24 +175,41 @@ public:
     /**
        @brief Rotate part of kSpace
        @param[in/out] kSpace The current Krylov space
-       @param[in] array The rotation matrix
+       @param[in] array The real rotation matrix
        @param[in] rank row rank of array
        @param[in] is Start of i index
        @param[in] ie End of i index
        @param[in] js Start of j index
        @param[in] je End of j index
        @param[in] blockType Type of caxpy(_U/L) to perform
+       @param[in] je End of j index
+       @param[in] offset Position of extra vectors in kSpace
     */
     void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
-    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i, const range &j, blockType b_type);
+
+    /**
+       @brief Rotate part of kSpace
+       @param[in/out] kSpace The current Krylov space
+       @param[in] array The complex rotation matrix
+       @param[in] rank row rank of array
+       @param[in] is Start of i index
+       @param[in] ie End of i index
+       @param[in] js Start of j index
+       @param[in] je End of j index
+       @param[in] blockType Type of caxpy(_U/L) to perform
+       @param[in] offset Position of extra vectors in kSpace
+    */
+    
+    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i, const range &j, blockType b_type, int offset);
     
     /**
        @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space
        @param[in] js Start of j index
        @param[in] je End of j index
+       @param[in] offset Position of extra vectors in kSpace
     */
-    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je);
+    void blockReset(std::vector<ColorSpinorField *> &kSpace, int js, int je, int offset);
 
     /**
        @brief Deflate a set of source vectors with a given eigenspace
@@ -380,8 +397,6 @@ public:
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
   };
-
-
   
   /**
      @brief Block Thick Restarted Lanczos Method.
@@ -413,7 +428,6 @@ public:
       
     /** Temp storage used in blockLanczosStep, fixed size. */
     Complex *jth_block;
-    double *alpha_old;
     
     /** Size of blocks of data in alpha/beta */
     int block_data_length; 

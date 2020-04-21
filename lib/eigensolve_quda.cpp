@@ -424,19 +424,18 @@ namespace quda
     saveTuneCache();
   }
   
-  
-  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end)
+  void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end, int offset)
   {
     // copy back to correct position, zero out the workspace
     for (int j = j_start; j < j_end; j++) {
-      int k = nKr + 1 + j - j_start;
+      int k = offset + j - j_start;
       std::swap(kSpace[j + num_locked], kSpace[k]);
       blas::zero(*kSpace[k]);
     }
   }
-
+  
   void EigenSolver::blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i_range,
-				const range &j_range, blockType b_type)
+				       const range &j_range, blockType b_type, int offset)
   {
     int block_i_rank = i_range.second - i_range.first;
     int block_j_rank = j_range.second - j_range.first;
@@ -451,10 +450,10 @@ namespace quda
     // Alias the extra space vectors
     kSpace_ptr.reserve(block_j_rank);
     for (int j = j_range.first; j < j_range.second; j++) {
-      int k = nKr + 1 + j - j_range.first;
+      int k = offset + j - j_range.first;
       kSpace_ptr.push_back(kSpace[k]);
     }
-
+    
     Complex *batch_array = (Complex *)safe_malloc((block_i_rank * block_j_rank) * sizeof(Complex));
     // Populate batch array (COLUM major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
@@ -466,8 +465,8 @@ namespace quda
     }
     switch (b_type) {
     case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;      
-    case LOWER_TRI: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
-    case UPPER_TRI: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
+    case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
+    case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
