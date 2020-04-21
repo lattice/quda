@@ -79,7 +79,7 @@ if(QUDA_DIRAC_WILSON
   target_link_libraries(dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(dslash_test QUDA_BUILD_ALL_TESTS)
   quda_checkbuildtest(dslash_ctest QUDA_BUILD_ALL_TESTS)
-  install(TARGETS dslash_test dslash_ctest ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS dslash_test dslash_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(
     invert_test
@@ -87,7 +87,7 @@ if(QUDA_DIRAC_WILSON
     domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   quda_checkbuildtest(invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS invert_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(
     eigensolve_test
@@ -95,7 +95,7 @@ if(QUDA_DIRAC_WILSON
     domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_BLOCKSOLVER)
     add_executable(
@@ -103,7 +103,7 @@ if(QUDA_DIRAC_WILSON
                       domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL})
+    install(TARGETS invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 endif()
 
@@ -118,7 +118,7 @@ if(QUDA_DIRAC_WILSON
                          domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(deflated_invert_test ${TEST_LIBS})
   quda_checkbuildtest(deflated_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
@@ -134,7 +134,7 @@ if(QUDA_DIRAC_STAGGERED)
   target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
   quda_checkbuildtest(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
-  install(TARGETS staggered_dslash_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS staggered_dslash_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(
     staggered_invert_test
@@ -142,7 +142,7 @@ if(QUDA_DIRAC_STAGGERED)
     staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS staggered_invert_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS staggered_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(
     staggered_eigensolve_test
@@ -150,7 +150,7 @@ if(QUDA_DIRAC_STAGGERED)
     llfat_reference.cpp)
   target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_BLOCKSOLVER)
     add_executable(
@@ -159,7 +159,7 @@ if(QUDA_DIRAC_STAGGERED)
       blas_reference.cpp)
     target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL})
+    install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 
   if(QUDA_MULTIGRID)
@@ -169,7 +169,7 @@ if(QUDA_DIRAC_STAGGERED)
       staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
     target_link_libraries(staggered_multigrid_invert_test ${TEST_LIBS})
     quda_checkbuildtest(staggered_multigrid_invert_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS eigestaggered_multigrid_invert_testnsolve_test)
+    install(TARGETS eigestaggered_multigrid_invert_testnsolve_test DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 endif()
 
@@ -183,7 +183,7 @@ if(QUDA_DIRAC_WILSON
   add_executable(blas_test blas_test.cu)
   target_link_libraries(blas_test ${TEST_LIBS})
   quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_MULTIGRID)
@@ -193,12 +193,12 @@ if(QUDA_MULTIGRID)
     domain_wall_dslash_reference.cpp blas_reference.cpp)
   target_link_libraries(multigrid_invert_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS multigrid_invert_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS multigrid_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(${QUDA_GAUGE_ALG})
     add_executable(
@@ -207,7 +207,7 @@ if(QUDA_MULTIGRID)
       clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
     target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
     quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL})
+    install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
 
 endif()
@@ -215,47 +215,47 @@ endif()
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS plaq_test ${QUDA_EXCLUDE_FROM_INSTALL})
+install(TARGETS plaq_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(su3_test su3_test.cpp)
 target_link_libraries(su3_test ${TEST_LIBS})
 quda_checkbuildtest(su3_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS su3_test ${QUDA_EXCLUDE_FROM_INSTALL})
+install(TARGETS su3_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(pack_test pack_test.cpp)
 target_link_libraries(pack_test ${TEST_LIBS})
 quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
-install(TARGETS pack_test ${QUDA_EXCLUDE_FROM_INSTALL})
+install(TARGETS pack_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_COVDEV)
   add_executable(covdev_test covdev_test.cpp covdev_reference.cpp)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_CONTRACT)
   add_executable(contract_test contract_test.cpp)
   target_link_libraries(contract_test ${TEST_LIBS})
   quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
   add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
   quda_checkbuildtest(llfat_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS llfat_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS llfat_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(unitarize_link_test unitarize_link_test.cpp)
   target_link_libraries(unitarize_link_test ${TEST_LIBS})
   quda_checkbuildtest(unitarize_link_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS unitarize_link_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS unitarize_link_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(hisq_stencil_test hisq_stencil_test.cpp llfat_reference.cpp)
   target_link_libraries(hisq_stencil_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_FORCE_GAUGE)
@@ -263,19 +263,19 @@ if(QUDA_FORCE_GAUGE)
                                   gauge_force_reference.cpp)
   target_link_libraries(gauge_force_test ${TEST_LIBS})
   quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_GAUGE_ALG)
   add_executable(gauge_alg_test gauge_alg_test.cpp)
   target_link_libraries(gauge_alg_test ${TEST_LIBS})
   quda_checkbuildtest(gauge_alg_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS gauge_alg_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(heatbath_test heatbath_test.cpp)
   target_link_libraries(heatbath_test ${TEST_LIBS})
   quda_checkbuildtest(heatbath_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS heatbath_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_FORCE_HISQ)
@@ -284,13 +284,13 @@ if(QUDA_FORCE_HISQ)
                           hisq_force_reference2.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS hisq_paths_force_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS hisq_paths_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   add_executable(hisq_unitarize_force_test hisq_unitarize_force_test.cpp
                                            hisq_force_reference.cpp)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL})
+  install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # use FindMPI variables for QUDA_CTEST_LAUNCH set MPIEXEC_MAX_NUMPROCS to the
