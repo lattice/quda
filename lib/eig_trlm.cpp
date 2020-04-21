@@ -326,8 +326,7 @@ namespace quda
     }
 
     // Orthogonalise r against the Krylov space
-    if (j > 0)
-      for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j);
+    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j+1);
 
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));

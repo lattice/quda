@@ -345,19 +345,33 @@ namespace quda
 
     // r = r - b_{j-1} * v_{j-1}
     int start = (j > num_keep) ? j - block_size : 0;
-    if (j - start > 0 && block_size == 1) {
+    if (j - start > 0) {
+
       std::vector<ColorSpinorField *> r_;
       r_.reserve(block_size);
       for (int i = 0; i < block_size; i++) r_.push_back(r[i]);
+
+      int blocks = (j - start)/block_size;
       std::vector<Complex> beta_;
-      beta_.reserve(block_data_length);
-      for (int i = 0; i < block_data_length; i++) {
-        beta_.push_back(-block_beta[arrow_offset - block_data_length + i]);
+      beta_.reserve(blocks * block_data_length);
+      
+      // Switch beta block order from COLUMN to ROW major
+      // This switches the block from upper to lower triangular
+      for (int i = 0; i < blocks; i++) {
+	int block_offset = (i + start/block_size) * block_data_length;
+	for (int b = 0; b < block_size; b++) {
+	  for (int c = 0; c < block_size; c++) {
+	    idx = c * block_size + b;
+	    beta_.push_back(-block_beta[block_offset + idx]);
+	  }
+	}
       }
+      
       std::vector<ColorSpinorField *> v_;
-      v_.reserve((j - start) * block_size);
+      v_.reserve(j - start);
       for (int i = start; i < j; i++) { v_.push_back(v[i]); }
-      // blas::caxpy(beta_.data(), v_, r_);
+      if(blocks == 1) blas::caxpy_L(beta_.data(), v_, r_);
+      else blas::caxpy(beta_.data(), v_, r_);
     }
 
     // a_j = v_j^dag * r
