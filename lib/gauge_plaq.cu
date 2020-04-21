@@ -11,9 +11,9 @@ namespace quda {
 
     Arg &arg;
     const GaugeField &meta;
-
-  private:
     bool tuneGridDim() const { return true; }
+    unsigned int minGridSize() const { return maxGridSize() / 8; }
+    int gridStep() const { return minGridSize(); }
 
   public:
     GaugePlaq(Arg &arg, const GaugeField &meta) :
