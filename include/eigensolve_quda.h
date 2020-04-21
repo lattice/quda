@@ -129,8 +129,10 @@ public:
        @param[in] v Vector space
        @param[in] r Vectors to be orthogonalised
        @param[in] j Use vectors v[0:j]
+       @param[in] s array of 
     */
-    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
+    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r,
+			    int j);
 
     /**
        @brief Orthogonalise input vector space v using Gram-Schmidt
@@ -182,7 +184,8 @@ public:
        @param[in] blockType Type of caxpy(_U/L) to perform
     */
     void blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i, const range &j, blockType b_type);
-
+    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i, const range &j, blockType b_type);
+    
     /**
        @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space
@@ -367,10 +370,8 @@ public:
 
     /**
        @brief Get the eigendecomposition from the arrow matrix
-       @param[in] nLocked Number of locked eigenvectors
-       @param[in] arrow_pos position of arrowhead
     */
-    void eigensolveFromArrowMat(int nLocked, int arror_pos);
+    void eigensolveFromArrowMat();
 
     /**
        @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
@@ -410,13 +411,12 @@ public:
     Complex *block_alpha;
     Complex *block_beta;
       
-    /** Temp storage used in blockLanczosStep */
+    /** Temp storage used in blockLanczosStep, fixed size. */
     Complex *jth_block;
-    double *beta_diag_inv;
     double *alpha_old;
-      
-    int n_blocks; //** Number of blocks in Krylov space */
-    int block_data_length; //** Size of blocks of data in alpha/beta */
+    
+    /** Size of blocks of data in alpha/beta */
+    int block_data_length; 
       
     /**
        @brief Compute eigenpairs
@@ -434,9 +434,8 @@ public:
       
     /**
        @brief Get the eigendecomposition from the current block arrow matrix
-       @param[in] block_pos position of current block
     */
-    void eigensolveFromBlockArrowMat(int block_pos);
+    void eigensolveFromBlockArrowMat();
       
     /**
        @brief Accumulate the R products of QR into the block beta array

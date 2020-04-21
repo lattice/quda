@@ -15,8 +15,6 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Dense>
 
-//#define DEBUG_LOCAL
-
 namespace quda
 {
 
@@ -44,20 +42,21 @@ namespace quda
       errorQuda("Block size %d passed to block eigensolver", block_size);
     }
     
-    n_blocks = nKr / block_size;
+    int n_blocks = nKr / block_size;
     block_data_length = block_size * block_size;
-    int arrow_mat_size = block_data_length * n_blocks;
+    int arrow_mat_array_size = block_data_length * n_blocks;
     // Tridiagonal/Arrow matrix
-    block_alpha = (Complex *)safe_malloc(arrow_mat_size * sizeof(Complex));
-    block_beta = (Complex *)safe_malloc(arrow_mat_size * sizeof(Complex));
-    for (int i = 0; i < arrow_mat_size; i++) {
+    block_alpha = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
+    block_beta = (Complex *)safe_malloc(arrow_mat_array_size * sizeof(Complex));
+    for (int i = 0; i < arrow_mat_array_size; i++) {
       block_alpha[i] = 0.0;
       block_beta[i] = 0.0;
     }    
 
     // Temp storage used in blockLanczosStep
     jth_block = (Complex *)safe_malloc(block_data_length * sizeof(Complex));
-    beta_diag_inv = (double *)safe_malloc(block_size * sizeof(double));
+
+    // Used to measure convergence of eigenvalues
     alpha_old = (double *)safe_malloc(nKr * sizeof(double));      
     
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
@@ -88,7 +87,7 @@ namespace quda
     
     // Test for initial guess vectors
     // DMH: This is an important step. With block solvers, initial guesses
-    //      of block sizes N can be subspaces rich in exremal eigenmodes,
+    //      of block sizes N can be subspaces rich in extremal eigenmodes,
     //      N times more rich than non-blocked solvers.
     //      Final paragraph, IV.B https://arxiv.org/pdf/1902.02064.pdf
     double norm = sqrt(blas::norm2(*kSpace[0]));
@@ -107,12 +106,15 @@ namespace quda
       }
     }
 
-    printfQuda("Orthonormalising initial guesses with Gram-Schmidt.\n"); 
-    orthonormalizeMGS(kSpace, block_size);
-    //orthogonalizeGS(kSpace, block_size);
-    
-    printfQuda("Checking initial guesses.\n"); 
-    orthoCheck(kSpace, block_size);
+    printfQuda("Orthonormalising initial guesses with Gram-Schmidt.\n");
+    bool orthed = false;
+    int k=0, kmax = 10;
+    while (!orthed && k<kmax) {
+      orthonormalizeMGS(kSpace, block_size);
+      printfQuda("Checking initial guesses. k=%d\n", k); 
+      orthed = orthoCheck(kSpace, block_size);
+      k++;
+    }
     
     printfQuda("Estimate Chebyshev max.\n"); 
     // Check for Chebyshev maximum estimation
@@ -179,25 +181,88 @@ namespace quda
     // Loop over restart iterations.
     while (restart_iter < max_restarts && !converged) {
 
-      for (int step = num_keep; step < nKr; step += block_size) {
-	//printfQuda("Performing block step %d\n", step);
-	blockLanczosStep(kSpace, step);
-	//printfQuda("Block step %d complete\n", step);
-      }
+      for (int step = num_keep; step < nKr; step += block_size) blockLanczosStep(kSpace, step);
       iter += (nKr - num_keep);
 
+      // Solve current block tridiag
       profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      //printfQuda("Performing block Ritz\n");
-      computeBlockKeptRitz(kSpace);
-      for(int ev=0; ev<nEv; ev++) printfQuda("alpha %d = %.16e\n", ev, alpha[ev]);
-      //printfQuda("Block Ritz complete\n");
+      eigensolveFromBlockArrowMat();
       profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      
+      // mat_norm is updated.
+      for (int i = num_locked; i < nKr; i++)
+        if (fabs(alpha[i]) > mat_norm) mat_norm = fabs(alpha[i]);
 
+      printfQuda("mat norm = %e\n", mat_norm);
+
+      // Locking check
+      iter_locked = 0;
+      for (int i = 1; i < (nKr - num_locked); i++) {
+	if (residua[i + num_locked] < epsilon * mat_norm) {
+	  //if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+	  printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked],
+		     epsilon * mat_norm);
+	  iter_locked = i;
+	} else {
+          // Unlikely to find new locked pairs
+	  break;
+	}
+      }
+      
+      // Convergence check
+      iter_converged = iter_locked;
+      for (int i = iter_locked + 1; i < nKr - num_locked; i++) {
+	if (residua[i + num_locked] < tol * mat_norm) {
+	  //if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+	  printfQuda("**** Converged %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], tol * mat_norm);
+	  iter_converged = i;
+	} else {
+	  // Unlikely to find new converged pairs
+	  break;
+	}
+      }
+      /*
+	} else {            
+	// Locking check
+	iter_locked = 0;
+	double factor = 1.0;
+	for (int i = 1; i < (nKr - num_locked); i++) {
+	//double resid = abs(alpha[i + num_locked] - alpha_old[i + num_locked]);
+	//printfQuda("**** Checking %d resid=%+.6e condition=%.6e ****\n", i, residua[i + num_locked], mat_norm * epsilon * factor);
+	if (residua[i + num_locked] < mat_norm * epsilon * factor) {
+	//if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+	printfQuda("**** Locking %d resid=%+.6e condition=%.6e ****\n", i + num_locked, residua[i + num_locked],
+	mat_norm * epsilon * factor);
+	iter_locked = i;
+	} else {
+	// Unlikely to find new locked pairs
+	break;
+	}
+	}
+	iter_converged = iter_locked;
+	}
+      */
+      
+      iter_keep = std::min(iter_converged + (nKr - num_converged) / 2, nKr - num_locked);
+      iter_keep = (iter_keep/block_size)*block_size;
+      
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
+      computeBlockKeptRitz(kSpace);
+      profile.TPSTART(QUDA_PROFILE_COMPUTE);
+      
+      num_converged = num_locked + iter_converged;
+      num_keep = num_locked + iter_keep;
+      num_locked += iter_locked;
+
+      num_converged = (num_converged/block_size)*block_size;
+      num_keep = (num_keep/block_size)*block_size;
+      num_locked = (num_locked/block_size)*block_size;
+      
       if (getVerbosity() >= QUDA_VERBOSE) {
         printfQuda("%04d converged eigenvalues at restart iter %04d\n", num_converged, restart_iter + 1);
       }
       
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
+      //if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
         printfQuda("iter Conv = %d\n", iter_converged);
         printfQuda("iter Keep = %d\n", iter_keep);
         printfQuda("iter Lock = %d\n", iter_locked);
@@ -205,21 +270,20 @@ namespace quda
         printfQuda("num_keep = %d\n", num_keep);
         printfQuda("num_locked = %d\n", num_locked);
         for (int i = 0; i < nKr; i++) {
-          printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
+          //printfQuda("Ritz[%d] = %.16e residual[%d] = %.16e\n", i, alpha[i], i, residua[i]);
         }
-      }
+	//}
       
       // Check for convergence
       if (num_converged >= nConv) {
-        reorder(kSpace);
+        //reorder(kSpace);
         converged = true;
       }
-      num_keep = nEv;
       restart_iter++;
     }
-
+    
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-
+    
     if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
       printfQuda("kSpace size at convergence/max restarts = %d\n", (int)kSpace.size());
     // Prune the Krylov space back to size when passed to eigensolver
@@ -227,6 +291,9 @@ namespace quda
     kSpace.resize(nConv);
     evals.resize(nConv);
 
+    // Compute eigenvalues
+    computeEvals(mat, kSpace, evals);      
+    
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
@@ -288,7 +355,6 @@ namespace quda
   BLKTRLM::~BLKTRLM()
   {
     host_free(jth_block);
-    host_free(beta_diag_inv);
     host_free(alpha_old);
     host_free(block_alpha);
     host_free(block_beta);
@@ -306,11 +372,10 @@ namespace quda
     
     // r = A * v_j
     for(int b=0; b<block_size; b++) chebyOp(mat, *r[b], *v[j + b]);
-
+    
     // r = r - b_{j-1} * v_{j-1}
-    /*
-    int start = (j > num_keep) ? j - 1 : 0;
-    if (j - start > 0) {
+    int start = (j > num_keep) ? j - block_size : 0;
+    if (j - start > 0 && block_size == 1) {      
       std::vector<ColorSpinorField *> r_;
       r_.reserve(block_size);
       for(int i=0; i<block_size; i++) r_.push_back(r[i]);
@@ -324,9 +389,9 @@ namespace quda
       for (int i = start; i < j; i++) {
         v_.push_back(v[i]);
       }
-      blas::caxpy(beta_.data(), v_, r_);
+      //blas::caxpy(beta_.data(), v_, r_);      
     }
-    */
+    
     
     // a_j = v_j^dag * r
     std::vector<ColorSpinorField *> vecs_ptr;
@@ -335,20 +400,6 @@ namespace quda
     // Block dot products stored in alpha_block.
     blas::cDotProduct(block_alpha + arrow_offset, vecs_ptr, r);
 
-#ifdef DEBUG_LOCAL
-    printfQuda("Current alpha\n");
-    for(int b=0; b<block_size; b++) {
-      for(int c=0; c<block_size; c++) {
-	idx = c*block_size + b;
-	printfQuda("(%e,%e) ", block_alpha[arrow_offset + idx].real(), block_alpha[arrow_offset + idx].imag());
-      }
-      printfQuda("\n");
-    }
-#endif
-    
-    // Solve current block tridiag
-    eigensolveFromBlockArrowMat(j);
-    
     // Use jth_block to negate alpha data and apply block BLAS.
     // Data is in square hermitian form, no need to switch to ROW major    
     for(int b=0; b<block_size; b++) {
@@ -362,8 +413,9 @@ namespace quda
     blas::caxpy(jth_block, vecs_ptr, r);
     
     // Orthogonalise R[0:block_size] against the Krylov space V[0:block_offset] 
-    if(j > 0) blockOrthogonalize(v, r, j);
-    
+    //if(j > 0) {
+    for(int k=0; k < 2; k++) blockOrthogonalize(v, r, j);
+    //}
     // QR decomposition via modified Gram Scmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
     // May perform the QR iteratively to recover
@@ -379,18 +431,22 @@ namespace quda
 
     // Column major order
     bool orthed = false;
-    int k = 0;
-    while(!orthed && k<1) {
+    int k = 0, kmax = 3;
+    while(!orthed && k < kmax) {
       // Compute R_{k}
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Orthing k = %d\n", k);
       for(int b=0; b<block_size; b++) {      
 	double norm = sqrt(blas::norm2(*r[b]));
 	blas::ax(1.0 / norm, *r[b]);
 	jth_block[b*(block_size + 1)] = norm;
-	for(int c=0; c<b; c++) {
-	  idx      = b*block_size + c;
-	  idx_conj = c*block_size + b;
-	  Complex cnorm = blas::cDotProduct(*r[c], *r[b]);
-	  blas::caxpy(-cnorm, *r[c], *r[b]);	
+	for(int c=b+1; c<block_size; c++) {
+	  
+	  Complex cnorm = blas::cDotProduct(*r[b], *r[c]);
+	  blas::caxpy(-cnorm, *r[b], *r[c]);
+
+	  idx      = c*block_size + b;
+	  idx_conj = b*block_size + c;
+	  
 	  jth_block[idx     ] = cnorm;
 	  jth_block[idx_conj] = 0.0;	  
 	}
@@ -400,23 +456,11 @@ namespace quda
       orthed = orthoCheck(r, block_size);
       k++;
     }
-#ifdef DEBUG_LOCAL
-    printfQuda("Orthed at k=%d\n", k);
-#endif
+
     // Prepare next step.
     // v_{j+1} = r
     for(int b=0; b<block_size; b++) *v[j + block_size + b] = *r[b];
 
-#ifdef DEBUG_LOCAL
-    printfQuda("Current beta\n");
-    for(int b=0; b<block_size; b++) {
-      for(int c=0; c<block_size; c++) {
-	idx = c*block_size + b;
-	printfQuda("(%e,%e) ", block_beta[arrow_offset + idx].real(), block_beta[arrow_offset + idx].imag());
-      }
-      printfQuda("\n");
-    }
-#endif
     // Save Lanczos step tuning
     saveTuneCache();    
   }
@@ -425,10 +469,10 @@ namespace quda
   {
     if(k == 0) {
       //Copy over the jth_block matrix to block beta, Beta = R_0
-      int idx = 0, idx_conj = 0;
+      int idx = 0;
       for(int b=0; b<block_size; b++) {
 	for(int c=0; c<b+1; c++) {
-	  idx      = b*block_size + c;
+	  idx = b*block_size + c;
 	  block_beta[arrow_offset + idx] = jth_block[idx];
 	}
       }
@@ -439,6 +483,8 @@ namespace quda
       MatrixXcd beta  = MatrixXcd::Zero(block_size, block_size);
       MatrixXcd Rk    = MatrixXcd::Zero(block_size, block_size);
       int idx = 0;
+
+      // Populate matrices
       for(int b=0; b<block_size; b++) {
 	for(int c=0; c<b+1; c++) {
 	  idx = b*block_size + c;
@@ -446,7 +492,10 @@ namespace quda
 	  Rk(c,b)   = jth_block[idx];
 	}
       }
-      betaN = beta * Rk;
+      // Multiply using Eigen
+      betaN = Rk * beta;
+
+      // Copy back to beta array
       for(int b=0; b<block_size; b++) {
 	for(int c=0; c<b+1; c++) {
 	  idx = b*block_size + c;
@@ -456,118 +505,140 @@ namespace quda
     }
   }
   
-  void BLKTRLM::eigensolveFromBlockArrowMat(int block_pos)
+  void BLKTRLM::eigensolveFromBlockArrowMat()
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
-    int dim = block_pos + block_size;
-    int current_block = block_pos/block_size;
-    if(block_pos%block_size != 0) errorQuda("Block pos %d != block size %d\n",
-					    block_pos, block_size);
+    int dim = nKr - num_locked;
+    if(dim%block_size != 0) errorQuda("dim = %d modulo block_size = %d != 0", dim, block_size);
+    int blocks = dim/block_size;
+    
+    int arrow_pos = num_keep - num_locked;
+    if(arrow_pos%block_size != 0) errorQuda("arrow_pos = %d modulo block_size = %d != 0", arrow_pos, block_size);	
+    int block_arrow_pos = arrow_pos/block_size;
+    int num_locked_offset = (num_locked/block_size)*block_data_length;
     
     // Eigen objects
     MatrixXcd T = MatrixXcd::Zero(dim, dim);
     block_ritz_mat.resize(dim * dim);
-    for (int i = 0; i < dim * dim; i++) block_ritz_mat[i] = 0.0;
-    int idx = 0, idx_conj = 0;
+    int idx = 0;
 
     // Populate the r and eblocks
-    if(restart_iter > 0) {
-      //printfQuda("R + E\n");
-      for(int i=0; i<nEv/block_size; i++) {	
-	for(int b=0; b<block_size; b++) {
-	  // E block
-	  idx = i*block_size + b;
-	  T(idx, idx) = alpha[idx];	    
-	  
-	  for(int c=0; c<block_size; c++) {	    
-	    // r blocks
-	    idx = b*block_size + c;	    
-	    T(nEv + c, i*block_size + b) =      block_beta[i*block_data_length + idx];
-	    T(i*block_size + b, nEv + c) = conj(block_beta[i*block_data_length + idx]);
-	  }
+    for(int i=0; i<block_arrow_pos; i++) {	
+      for(int b=0; b<block_size; b++) {
+	// E block
+	idx = i*block_size + b;
+	T(idx, idx) = alpha[idx + num_locked];	    
+	
+	for(int c=0; c<block_size; c++) {	    
+	  // r blocks
+	  idx = num_locked_offset + b*block_size + c;	    
+	  T(arrow_pos + c, i*block_size + b) =      block_beta[i*block_data_length + idx];
+	  T(i*block_size + b, arrow_pos + c) = conj(block_beta[i*block_data_length + idx]);
 	}
       }
-      // Inspect T
-#ifdef DEBUG_LOCAL
-      std::cout << T << std::endl << std::endl;
-#endif
     }
-
+    
     // Add the alpha blocks
-    if(block_pos < nKr) {
-      //printfQuda("Alpha\n");
-      for(int i=num_keep/block_size; i<current_block + 1; i++) {
-	for(int b=0; b<block_size; b++) {
-	  for(int c=0; c<block_size; c++) {
-	    idx = b*block_size + c;
-	    T(i*block_size + c, i*block_size + b) = block_alpha[i*block_data_length + idx];
-	  }
+    for(int i=block_arrow_pos; i<blocks; i++) {
+      for(int b=0; b<block_size; b++) {
+	for(int c=0; c<block_size; c++) {
+	  idx = num_locked_offset + b*block_size + c;
+	  T(i*block_size + b, i*block_size + c) = block_alpha[i*block_data_length + idx];
 	}
       }
-      // Inspect T
-#ifdef DEBUG_LOCAL
-      std::cout << T << std::endl << std::endl;
-#endif
     }
     
-    // Add the current beta blocks
-    if(current_block > 0) {
-      //printfQuda("Beta\n");
-      for(int i=num_keep/block_size; i<current_block; i++) {
-	for(int b=0; b<block_size; b++) {
-	  for(int c=0; c<b+1; c++) {
-	    idx = b*block_size + c;
-	    T(i*block_size + b, (i+1)*block_size + c) = conj(block_beta[i*block_data_length + idx]);
-	    T((i+1)*block_size + c, i*block_size + b) =      block_beta[i*block_data_length + idx];
-	  }
+    // Add the beta blocks
+    for(int i=block_arrow_pos; i<blocks - 1; i++) {
+      for(int b=0; b<block_size; b++) {
+	for(int c=0; c<b+1; c++) {
+	  idx = num_locked_offset + b*block_size + c;
+	  // Sub diag
+	  T((i+1)*block_size + c, i*block_size + b) =      block_beta[i*block_data_length + idx];
+	  // Super diag
+	  T(i*block_size + b, (i+1)*block_size + c) = conj(block_beta[i*block_data_length + idx]);  
 	}
       }
-      // Inspect T
-#ifdef DEBUG_LOCAL
-      std::cout << T << std::endl << std::endl;
-#endif
     }
     
-    // Invert the spectrum due to Chebyshev (except the current E block)
+    // Invert the spectrum due to Chebyshev (except the arrow diagonal)
     if (reverse) {
       for(int b=0; b<dim; b++) {
-	for(int c=0; c<dim; c++) {
-	  if(b != c && b > num_keep && c > num_keep) T(c, b) *= -1.0;
+	for(int c=0; c<dim; c++) {	  
+	  T(c, b) *= -1.0;
+	  if(restart_iter > 0)
+	    if(b == c && b < arrow_pos && c < arrow_pos)
+	      T(c, b) *= -1.0;	  
 	}
       }
     }
+
+    // Inspect T    
+    for(int i=0; i<arrow_pos; i++) {
+      //printfQuda("alpha[%d] = %e, beta[%d] = %e\n", i, T(i,i).real(), i, T(arrow_pos,i).real());
+    }
+    for(int i=arrow_pos; i<dim-1; i++) {
+      //printfQuda("alpha[%d] = %e, beta[%d] = %e\n", i, T(i,i).real(), i, T(i+1,i).real());
+    }
     
+    //std::cout << T << std::endl << std::endl;
     // Eigensolve the arrow matrix
     SelfAdjointEigenSolver<MatrixXcd> eigensolver;
     eigensolver.compute(T);
-
-    // Populate the alpha array with eigenvalues of negated operator
-    for(int i=0; i<dim; i++) alpha[i] = eigensolver.eigenvalues()[i];
+    
+    // Populate the alpha array with eigenvalues, recored the old ones for
+    // convergence testing
+    for(int i=0; i<dim; i++) {
+      alpha_old[i + num_locked] = alpha[i + num_locked];
+      alpha[i + num_locked] = eigensolver.eigenvalues()[i];
+    }
     
     // Repopulate ritz matrix: COLUMN major
     for (int i = 0; i < dim; i++)
       for (int j = 0; j < dim; j++)
 	block_ritz_mat[dim * i + j] = eigensolver.eigenvectors().col(i)[j];
     
+    for (int i = 0; i < blocks; i++) {
+      double beta_max = 0;
+      for(int b=0; b<block_size; b++) {
+	idx = b*(block_size + 1);
+	if(fabs(block_beta[nKr*block_size - block_data_length + idx]) > beta_max) {
+	  beta_max = fabs(block_beta[nKr*block_size - block_data_length + idx]);
+	}
+      }
+      for(int b=0; b<block_size; b++) {
+	idx = b*(block_size + 1);
+
+	/*
+	residua[i*block_size + b + num_locked] = fabs(beta_max * block_ritz_mat[dim * (i*block_size + b + 1) - 1]);
+	printfQuda("residual[%d] = %e = %e * %e\n", i*block_size + b, residua[i*block_size + b + num_locked], beta_max, fabs(block_ritz_mat[dim * (i*block_size + b + 1) - 1]));	
+	
+	residua[i*block_size + b + num_locked] = fabs(block_beta[nKr*block_size - block_data_length + idx] * block_ritz_mat[dim * (i*block_size + b + 1) - 1]);
+	printfQuda("residual[%d] = %e = %e * %e\n", i*block_size + b, residua[i*block_size + b + num_locked], fabs(block_beta[nKr*block_size - block_data_length + idx]), fabs(block_ritz_mat[dim * (i*block_size + b + 1) - 1]));
+	*/
+	
+	residua[i*block_size + b + num_locked] = fabs(block_beta[nKr*block_size - 1] * block_ritz_mat[dim * (i*block_size + b + 1) - 1]);
+	printfQuda("residual[%d] = %e = %e * %e\n", i*block_size + b, residua[i*block_size + b + num_locked], fabs(block_beta[nKr*block_size - 1]), fabs(block_ritz_mat[dim * (i*block_size + b + 1) - 1]));
+      }
+    }
     profile.TPSTOP(QUDA_PROFILE_EIGEN);
-    //printfQuda("eigensolveFromBlockArrowMat Complete\n");
   }
   
   void BLKTRLM::computeBlockKeptRitz(std::vector<ColorSpinorField *> &kSpace)
   {
     int offset = nKr + block_size;
-    int dim = nKr - num_locked;
+    int dim = nKr - num_locked;    
     
     // Multi-BLAS friendly array to store part of Ritz matrix we want
-    Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * nEv) * sizeof(Complex));
+    Complex *ritz_mat_keep = (Complex *)safe_malloc((dim * iter_keep) * sizeof(Complex));
     
     // If we have memory availible, do the entire rotation
-    if (batched_rotate <= 0 || batched_rotate >= nEv) {
-      if ((int)kSpace.size() < offset + nEv) {
+    if (batched_rotate <= 0 || batched_rotate >= iter_keep) {
+      if ((int)kSpace.size() < offset + iter_keep) {
 	ColorSpinorParam csParamClone(*kSpace[0]);
-        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + nEv);
-        kSpace.reserve(offset + nEv);
-        for (int i = kSpace.size(); i < offset + nEv; i++) {
+        if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + iter_keep);
+        kSpace.reserve(offset + iter_keep);
+        for (int i = kSpace.size(); i < offset + iter_keep; i++) {
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
@@ -577,97 +648,51 @@ namespace quda
       std::vector<ColorSpinorField *> kSpace_ptr;
 
       // Alias the extra space vectors, zero the workspace
-      vecs_ptr.reserve(nEv);
-      for (int i = 0; i < nEv; i++) {
+      kSpace_ptr.reserve(iter_keep);
+      for (int i = 0; i < iter_keep; i++) {
         kSpace_ptr.push_back(kSpace[offset + i]);
         blas::zero(*kSpace_ptr[i]);
       }
 
       // Alias the vectors we wish to keep, populate the Ritz matrix and transpose.
-      kSpace_ptr.reserve(dim);
+      vecs_ptr.reserve(dim);
       for (int j = 0; j < dim; j++) {
-        vecs_ptr.push_back(kSpace[j]);
-        for (int i = 0; i < nEv; i++) { ritz_mat_keep[j * nEv + i] = block_ritz_mat[i * dim + j]; }
+        vecs_ptr.push_back(kSpace[num_locked + j]);
+        for (int i = 0; i < iter_keep; i++) {
+	  ritz_mat_keep[j * iter_keep + i] = block_ritz_mat[i * dim + j];
+	}
       }
-
+      
       // multiBLAS caxpy
       blas::caxpy(ritz_mat_keep, vecs_ptr, kSpace_ptr);
+      
+      // Copy compress Krylov
+      for (int i = 0; i < iter_keep; i++) std::swap(kSpace[i + num_locked], kSpace[offset + i]);
 
-      // Copy back to the Krylov space
-      for (int i = 0; i < nEv; i++) std::swap(kSpace[i], kSpace[offset + i]);
-
-      // Compute new r block
-      // Use Eigen, it's neater
-      MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd ri = MatrixXcd::Zero(block_size, block_size);
-      MatrixXcd ritzi = MatrixXcd::Zero(block_size, block_size);
-      int blocks = nEv/block_size;
-      int idx = 0;
-      int beta_offset = ((nKr/block_size) - 1)*block_data_length;
-      for(int b=0; b<block_size; b++) {
-	for(int c=0; c<b+1; c++) {
-	  idx = b*block_size + c;
-	  beta(c,b) = block_beta[beta_offset + idx];
-	}
-      }
-#ifdef DEBUG_LOCAL
-      printfQuda("Current beta\n");
-      for(int c=0; c<block_size; c++) {
-	for(int b=0; b<block_size; b++) {
-	  printfQuda("(%e,%e) ", beta(c,b).real(), beta(c,b).imag());
-	}
-	printfQuda("\n");
-      }
-#endif      
-      for(int i=0; i<blocks; i++) {
-	for(int b=0; b<block_size; b++) {
-	  for(int c=0; c<block_size; c++) {
-	    idx = b*dim + (dim-block_size) + c;
-	    ritzi(c,b) = block_ritz_mat[idx];
-	  }
-	}
-#ifdef DEBUG_LOCAL	
-	printfQuda("Current RITZi\n");
-	for(int c=0; c<block_size; c++) {
-	  for(int b=0; b<block_size; b++) {	    
-	    idx = c*block_size + b;
-	    printfQuda("(%e,%e) ", ritzi(c,b).real(), ritzi(c,b).imag());
-	  }
-	  printfQuda("\n");
-	}
-#endif
-	ri = beta * ritzi;
-	for(int b=0; b<block_size; b++) {
-	  for(int c=0; c<block_size; c++) {
-	    idx = b*block_size + c;
-	    block_beta[i*block_data_length + idx] = ri(c,b);
-	  }
-	}
-      }
     } else {
-      /*
+      
       // Do batched rotation to save on memory
       int batch_size = batched_rotate;
       int full_batches = iter_keep / batch_size;
       int batch_size_r = iter_keep % batch_size;
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
-
+      
       if ((int)kSpace.size() < offset + batch_size) {
-      ColorSpinorParam csParamClone(*kSpace[0]);
+	ColorSpinorParam csParamClone(*kSpace[0]);
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
           kSpace.push_back(ColorSpinorField::Create(csParamClone));
         }
       }
-
+      
       profile.TPSTART(QUDA_PROFILE_EIGEN);
       MatrixXd mat = MatrixXd::Zero(dim, iter_keep);
       for (int j = 0; j < iter_keep; j++)
-        for (int i = 0; i < dim; i++) mat(i, j) = ritz_mat[j * dim + i];
-
+        for (int i = 0; i < dim; i++) mat(i, j) = block_ritz_mat[j * dim + i].real();
+      
       FullPivLU<MatrixXd> matLU(mat);
-
+      
       // Extract the upper triagnular matrix
       MatrixXd matUpper = MatrixXd::Zero(iter_keep, iter_keep);
       matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
@@ -745,16 +770,45 @@ namespace quda
       // Do Q Permute
       //---------------------------------------------------------------------------
       permuteVecs(kSpace, matQ.data(), iter_keep);
-      profile.TPSTOP(QUDA_PROFILE_COMPUTE);
-      */
+      profile.TPSTOP(QUDA_PROFILE_COMPUTE);      
     }
+
+    // Update residual vectors
+    for (int i = 0; i < block_size; i++) std::swap(kSpace[num_locked + iter_keep + i], kSpace[nKr + i]);
+    
+    // Compute new r block
+    // Use Eigen, it's neater
+    MatrixXcd beta = MatrixXcd::Zero(block_size, block_size);
+    MatrixXcd ri = MatrixXcd::Zero(block_size, block_size);
+    MatrixXcd ritzi = MatrixXcd::Zero(block_size, block_size);
+    int blocks = iter_keep/block_size;
+    int idx = 0;
+    int beta_offset = nKr*block_size - block_data_length;
+    int num_locked_offset = num_locked*block_size;
+    
+    for(int b=0; b<block_size; b++) {
+      for(int c=0; c<b+1; c++) {
+	idx = b*block_size + c;
+	beta(c,b) = block_beta[beta_offset + idx];
+      }
+    }
+    for(int i=0; i<blocks; i++) {
+      for(int b=0; b<block_size; b++) {
+	for(int c=0; c<block_size; c++) {
+	  idx = i*block_size*dim + b*dim + (dim-block_size) + c;
+	  ritzi(c,b) = block_ritz_mat[idx];
+	}
+      }
       
-    // Update residual vector
-    std::swap(kSpace[num_locked + iter_keep], kSpace[nKr]);
-
-    // Update sub arrow matrix
-    //for (int i = 0; i < iter_keep; i++) beta[i + num_locked] = beta[nKr - 1] * block_ritz_mat[dim * (i + 1) - 1];
-
+      ri = beta * ritzi;
+      for(int b=0; b<block_size; b++) {
+	for(int c=0; c<block_size; c++) {
+	  idx = num_locked_offset + b*block_size + c;
+	  block_beta[i*block_data_length + idx] = ri(c,b);
+	}
+      }
+    }
+    
     host_free(ritz_mat_keep);
 
     // Save Krylov rotation tuning
