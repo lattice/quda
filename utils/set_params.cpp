@@ -1,4 +1,4 @@
-#include <algorithm.h>
+#include <algorithm>
 #include <command_line_params.h>
 #include <host_utils.h>
 #include "misc.h"
