@@ -1036,7 +1036,7 @@ namespace quda {
           double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm1);
-	  return nrm1;
+          return nrm1;
 	}
 
 	/**
@@ -1048,7 +1048,7 @@ namespace quda {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
-	  return nrm2;
+          return nrm2;
 	}
 
 	/**
@@ -1060,7 +1060,7 @@ namespace quda {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
-	  return absmax;
+          return absmax;
 	}
 
 	/**
@@ -1072,7 +1072,7 @@ namespace quda {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
-	  return absmin;
+          return absmin;
 	}
 
 	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */

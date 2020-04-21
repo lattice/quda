@@ -129,10 +129,9 @@ public:
        @param[in] v Vector space
        @param[in] r Vectors to be orthogonalised
        @param[in] j Use vectors v[0:j]
-       @param[in] s array of 
+       @param[in] s array of
     */
-    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r,
-			    int j);
+    void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
 
     /**
        @brief Orthogonalise input vector space v using Gram-Schmidt
@@ -151,7 +150,7 @@ public:
     /**
        @brief Orthonormalise input vector space v using Modified Gram-Schmidt
        @param[in] v Vector space
-       @param[in] j Use vectors v[0:j-1] 
+       @param[in] j Use vectors v[0:j-1]
     */
     void orthonormalizeMGS(std::vector<ColorSpinorField *> &v, int j);
 
@@ -160,10 +159,10 @@ public:
        @param[out] bool If all vectors are orthonormal to 1e-16 returns true,
        else false.
        @param[in] v Vector space
-       @param[in] j Use vectors v[0:j-1] 
+       @param[in] j Use vectors v[0:j-1]
     */
     bool orthoCheck(std::vector<ColorSpinorField *> v, int j);
-    
+
     /**
        @brief Permute the vector space using the permutation matrix.
        @param[in/out] kSpace The current Krylov space
@@ -199,9 +198,10 @@ public:
        @param[in] blockType Type of caxpy(_U/L) to perform
        @param[in] offset Position of extra vectors in kSpace
     */
-    
-    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i, const range &j, blockType b_type, int offset);
-    
+
+    void blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i,
+                            const range &j, blockType b_type, int offset);
+
     /**
        @brief Copy temp part of kSpace, zero out for next use
        @param[in/out] kSpace The current Krylov space
@@ -397,7 +397,7 @@ public:
     void computeKeptRitz(std::vector<ColorSpinorField *> &kSpace);
 
   };
-  
+
   /**
      @brief Block Thick Restarted Lanczos Method.
   */
@@ -411,53 +411,53 @@ public:
        @param profile Time Profile
     */
     BLKTRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
-      
+
     /**
        @brief Destructor for Thick Restarted Eigensolver class
     */
     virtual ~BLKTRLM();
-      
+
     virtual bool hermitian() { return true; } /** (BLOCK)TRLM is only for Hermitian systems */
-      
+
     // Variable size matrix
     std::vector<Complex> block_ritz_mat;
-      
+
     /** Block Tridiagonal/Arrow matrix, fixed size. */
     Complex *block_alpha;
     Complex *block_beta;
-      
+
     /** Temp storage used in blockLanczosStep, fixed size. */
     Complex *jth_block;
-    
+
     /** Size of blocks of data in alpha/beta */
-    int block_data_length; 
-      
+    int block_data_length;
+
     /**
        @brief Compute eigenpairs
        @param[in] kSpace Krylov vector space
        @param[in] evals Computed eigenvalues
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
-      
+
     /**
        @brief block lanczos step: extends the Kylov space in block step
        @param[in] v Vector space
        @param[in] j Index of block of vectors being computed
     */
-    void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);    
-      
+    void blockLanczosStep(std::vector<ColorSpinorField *> v, int j);
+
     /**
        @brief Get the eigendecomposition from the current block arrow matrix
     */
     void eigensolveFromBlockArrowMat();
-      
+
     /**
        @brief Accumulate the R products of QR into the block beta array
        @param[in] k The QR iteration
        @param[in] arrow_offset The current block position
     */
     void updateBlockBeta(int k, int arrow_offset);
-      
+
     /**
        @brief Rotate the Ritz vectors usinng the arrow matrix eigendecomposition
        Uses a complex ritz matrix

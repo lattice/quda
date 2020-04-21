@@ -242,32 +242,34 @@ namespace quda
   bool EigenSolver::orthoCheck(std::vector<ColorSpinorField *> vecs, int size)
   {
     bool orthed = true;
-    const Complex Unit(1.0,0.0);
+    const Complex Unit(1.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(size);
     for(int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
     
     for(int i=0; i<size; i++) {
       for(int j=0; j<size; j++) {
-	Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]);	
-	if(j != i) {
-	  if(abs(cnorm) > 5e-16) {
-	    if(getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
-	    //printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
-	    orthed = false;
-	  }
-	} else {
-	  if (abs(Unit - cnorm) > 5e-16) {
-	    if(getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
-	    //printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));	    
-	    orthed = false;
-	  }
-	}
+        Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]);
+        if (j != i) {
+          if (abs(cnorm) > 5e-16) {
+            if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+              printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
+            // printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
+            orthed = false;
+          }
+        } else {
+          if (abs(Unit - cnorm) > 5e-16) {
+            if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+              printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
+            // printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
+            orthed = false;
+          }
+        }
       }
     }
     return orthed;
   }
-  
+
   void EigenSolver::orthogonalizeGS(std::vector<ColorSpinorField *> &vecs, int size)
   {
     std::vector<ColorSpinorField *> vecs_ptr;
@@ -281,17 +283,16 @@ namespace quda
     }
   }
 
-  
   void EigenSolver::orthonormalizeMGS(std::vector<ColorSpinorField *> &vecs, int size)
   {
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(size);
     for(int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
-    
+
     for(int i=0; i<size; i++) {
       for(int j=0; j<i; j++) {
-	Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i> with i normalised.
-	blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]); // i = i - proj_{j}(i) = i - <j|i> * i 
+        Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i> with i normalised.
+        blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * i
       }
       double norm = sqrt(blas::norm2(*vecs_ptr[i]));
       blas::ax(1.0 / norm, *vecs_ptr[i]); // i/<i|i>
@@ -318,10 +319,10 @@ namespace quda
     blas::caxpy(s.data(), vecs_ptr, rvec);
 
     // Save orthonormalisation tuning
-    saveTuneCache();    
+    saveTuneCache();
     return sum;
   }
-  
+
   // Orthogonalise r[0:block_size] against V_[0:j*block_size]
   void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
   {
@@ -329,18 +330,18 @@ namespace quda
     int r_size = (int)rvecs.size();
     int array_size = vecs_size * r_size;
     std::vector<Complex> s(array_size);
-    
+
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(vecs_size);
     for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
     
     // Block dot products stored in s.
     blas::cDotProduct(s.data(), vecs_ptr, rvecs);
-    
+
     // Block orthogonalise
     for (int i = 0; i < array_size; i++) s[i] *= -1.0;
     blas::caxpy(s.data(), vecs_ptr, rvecs);
-    
+
     // Save orthonormalisation tuning
     saveTuneCache();
     
@@ -382,7 +383,6 @@ namespace quda
     }
   }
 
-  
   void EigenSolver::blockRotate(std::vector<ColorSpinorField *> &kSpace, double *array, int rank, const range &i_range,
                                 const range &j_range, blockType b_type)
   {
@@ -423,7 +423,7 @@ namespace quda
     // Save Krylov block rotation tuning
     saveTuneCache();
   }
-  
+
   void EigenSolver::blockReset(std::vector<ColorSpinorField *> &kSpace, int j_start, int j_end, int offset)
   {
     // copy back to correct position, zero out the workspace
@@ -433,9 +433,9 @@ namespace quda
       blas::zero(*kSpace[k]);
     }
   }
-  
-  void EigenSolver::blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank, const range &i_range,
-				       const range &j_range, blockType b_type, int offset)
+
+  void EigenSolver::blockRotateComplex(std::vector<ColorSpinorField *> &kSpace, Complex *array, int rank,
+                                       const range &i_range, const range &j_range, blockType b_type, int offset)
   {
     int block_i_rank = i_range.second - i_range.first;
     int block_j_rank = j_range.second - j_range.first;
@@ -453,7 +453,7 @@ namespace quda
       int k = offset + j - j_range.first;
       kSpace_ptr.push_back(kSpace[k]);
     }
-    
+
     Complex *batch_array = (Complex *)safe_malloc((block_i_rank * block_j_rank) * sizeof(Complex));
     // Populate batch array (COLUM major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
@@ -464,13 +464,13 @@ namespace quda
       }
     }
     switch (b_type) {
-    case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;      
+    case PENCIL: blas::caxpy(batch_array, vecs_ptr, kSpace_ptr); break;
     case LOWER_TRI: blas::caxpy_L(batch_array, vecs_ptr, kSpace_ptr); break;
     case UPPER_TRI: blas::caxpy_U(batch_array, vecs_ptr, kSpace_ptr); break;
     default: errorQuda("Undefined MultiBLAS type in blockRotate");
     }
     host_free(batch_array);
-    
+
     // Save Krylov block rotation tuning
     saveTuneCache();
   }

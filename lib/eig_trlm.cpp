@@ -281,7 +281,7 @@ namespace quda
 
     // Save TRLM tuning
     saveTuneCache();
-    
+
     mat.flops();
   }
 
@@ -482,8 +482,8 @@ namespace quda
       bool do_batch_remainder = (batch_size_r != 0 ? true : false);
 
       if ((int)kSpace.size() < offset + batch_size) {
-	ColorSpinorParam csParamClone(*kSpace[0]);
-	csParamClone.create = QUDA_ZERO_FIELD_CREATE;
+        ColorSpinorParam csParamClone(*kSpace[0]);
+        csParamClone.create = QUDA_ZERO_FIELD_CREATE;
         if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Resizing kSpace to %d vectors\n", offset + batch_size);
         kSpace.reserve(offset + batch_size);
         for (int i = kSpace.size(); i < offset + batch_size; i++) {
@@ -589,4 +589,4 @@ namespace quda
     // Save Krylov rotation tuning
     saveTuneCache();
   }
-}
+} // namespace quda

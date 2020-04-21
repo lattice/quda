@@ -720,7 +720,6 @@ int main(int argc, char **argv)
       errorQuda("Solution type %d not implemented", inv_param.solution_type);
     }
 
-
     int vol = inv_param.solution_type == QUDA_MAT_SOLUTION ? V : Vh;
     mxpy(spinorIn, spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
     double nrm2 = norm_2(spinorCheck, vol*spinorSiteSize*inv_param.Ls, inv_param.cpu_prec);
