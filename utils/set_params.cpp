@@ -1,8 +1,7 @@
+#include <algorithm.h>
 #include <command_line_params.h>
 #include <host_utils.h>
 #include "misc.h"
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
@@ -54,9 +53,7 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
 }
@@ -96,9 +93,7 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
 }
@@ -830,11 +825,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  int tmpint = MAX(ydim * zdim * tdim, xdim * zdim * tdim);
-  tmpint = MAX(tmpint, xdim * ydim * tdim);
-  tmpint = MAX(tmpint, xdim * ydim * zdim);
-
-  // inv_param.sp_pad = tmpint;
   inv_param.sp_pad = 0;
 }
 
