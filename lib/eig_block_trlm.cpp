@@ -393,9 +393,9 @@ namespace quda
     // r = r - a_j * v_j
     blas::caxpy(jth_block, vecs_ptr, r);
 
-    // Orthogonalise R[0:block_size] against the Krylov space V[0:block_offset]
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j);
-
+    // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
+    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
+    
     // QR decomposition via modified Gram Scmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
     // May perform the QR iteratively to recover

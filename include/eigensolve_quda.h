@@ -114,16 +114,6 @@ public:
     double estimateChebyOpMax(const DiracMatrix &mat, ColorSpinorField &out, ColorSpinorField &in);
 
     /**
-       @brief Orthogonalise input vector r against
-       vector space v using block-BLAS
-       @param[out] Sum of inner products
-       @param[in] v Vector space
-       @param[in] r Vector to be orthogonalised
-       @param[in] j Number of vectors in v to orthogonalise against
-    */
-    Complex orthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
-
-    /**
        @brief Orthogonalise input vectors r against
        vector space v using block-BLAS
        @param[in] v Vector space
@@ -132,20 +122,6 @@ public:
        @param[in] s array of
     */
     void blockOrthogonalize(std::vector<ColorSpinorField *> v, std::vector<ColorSpinorField *> &r, int j);
-
-    /**
-       @brief Orthogonalise input vector space v using Gram-Schmidt
-       @param[in] v Vector space
-       @param[in] j Use vectors v[0:j-1] 
-    */
-    void orthogonalizeGS(std::vector<ColorSpinorField *> &v, int j);
-
-    /**
-       @brief Orthonormalise input vector space v using Gram-Schmidt
-       @param[in] v Vector space
-       @param[in] j Use vectors v[0:j-1] 
-    */
-    void orthonormalizeGS(std::vector<ColorSpinorField *> &v, int j);
 
     /**
        @brief Orthonormalise input vector space v using Modified Gram-Schmidt

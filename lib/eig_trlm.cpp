@@ -19,7 +19,7 @@ namespace quda
 {
 
   using namespace Eigen;
-
+  
   // Thick Restarted Lanczos Method constructor
   TRLM::TRLM(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     EigenSolver(mat, eig_param, profile)
@@ -326,8 +326,8 @@ namespace quda
     }
 
     // Orthogonalise r against the Krylov space
-    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j+1);
-
+    for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + 1);
+    
     // b_j = ||r||
     beta[j] = sqrt(blas::norm2(*r[0]));
 
@@ -371,7 +371,9 @@ namespace quda
   {
     profile.TPSTART(QUDA_PROFILE_EIGEN);
     int dim = nKr - num_locked;
+    //int arrow_pos = std::max(num_keep - num_locked + 1, 2); 
     int arrow_pos = num_keep - num_locked;
+    
     // Eigen objects
     MatrixXd A = MatrixXd::Zero(dim, dim);
     ritz_mat.resize(dim * dim);
@@ -396,12 +398,12 @@ namespace quda
     for (int i = 0; i < arrow_pos; i++) {
 
       // beta populates the arrow
-      A(i, arrow_pos - 1) = beta[i + num_locked];
-      A(arrow_pos - 1, i) = beta[i + num_locked];
+      A(i, arrow_pos) = beta[i + num_locked];
+      A(arrow_pos, i) = beta[i + num_locked];
     }
 
     for (int i = arrow_pos; i < dim - 1; i++) {
-
+      
       // beta populates the sub-diagonal
       A(i, i + 1) = beta[i + num_locked];
       A(i + 1, i) = beta[i + num_locked];
@@ -497,7 +499,7 @@ namespace quda
 
       FullPivLU<MatrixXd> matLU(mat);
 
-      // Extract the upper triagnular matrix
+      // Extract the upper triangular matrix
       MatrixXd matUpper = MatrixXd::Zero(iter_keep, iter_keep);
       matUpper = matLU.matrixLU().triangularView<Eigen::Upper>();
       matUpper.conservativeResize(iter_keep, iter_keep);

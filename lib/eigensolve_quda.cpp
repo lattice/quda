@@ -254,33 +254,18 @@ namespace quda
           if (abs(cnorm) > 5e-16) {
             if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
-            // printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(cnorm));
             orthed = false;
           }
         } else {
           if (abs(Unit - cnorm) > 5e-16) {
             if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
               printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
-            // printfQuda("Norm <%d|%d>^2 = (%e,%e): %e\n", i, j, cnorm.real(), cnorm.imag(), abs(Unit - cnorm));
             orthed = false;
           }
         }
       }
     }
     return orthed;
-  }
-
-  void EigenSolver::orthogonalizeGS(std::vector<ColorSpinorField *> &vecs, int size)
-  {
-    std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(size);
-    for(int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);    
-    for(int i=0; i<size; i++) {
-      for(int j=0; j<i; j++) {
-	Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i>
-	blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]); // i - i<j|i> 
-      }
-    }
   }
 
   void EigenSolver::orthonormalizeMGS(std::vector<ColorSpinorField *> &vecs, int size)
@@ -299,34 +284,10 @@ namespace quda
     }
   }
 
-  // Orthogonalise r[0] against V_[0:j]
-  Complex EigenSolver::orthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvec, int j)
-  {
-    int vecs_size = j + 1;
-    std::vector<Complex> s(vecs_size);
-    Complex sum(0.0, 0.0);
-    std::vector<ColorSpinorField *> vecs_ptr;
-    vecs_ptr.reserve(vecs_size);
-    for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
-    // Block dot products stored in s.
-    blas::cDotProduct(s.data(), vecs_ptr, rvec);
-
-    // Block orthogonalise
-    for (int i = 0; i < vecs_size; i++) {
-      sum += s[i];
-      s[i] *= -1.0;
-    }
-    blas::caxpy(s.data(), vecs_ptr, rvec);
-
-    // Save orthonormalisation tuning
-    saveTuneCache();
-    return sum;
-  }
-
-  // Orthogonalise r[0:block_size] against V_[0:j*block_size]
+  // Orthogonalise r[0:] against V_[0:j]
   void EigenSolver::blockOrthogonalize(std::vector<ColorSpinorField *> vecs, std::vector<ColorSpinorField *> &rvecs, int j)
   {
-    int vecs_size = j + block_size;
+    int vecs_size = j;
     int r_size = (int)rvecs.size();
     int array_size = vecs_size * r_size;
     std::vector<Complex> s(array_size);
