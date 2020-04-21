@@ -351,27 +351,29 @@ namespace quda
       r_.reserve(block_size);
       for (int i = 0; i < block_size; i++) r_.push_back(r[i]);
 
-      int blocks = (j - start)/block_size;
+      int blocks = (j - start) / block_size;
       std::vector<Complex> beta_;
       beta_.reserve(blocks * block_data_length);
-      
+
       // Switch beta block order from COLUMN to ROW major
       // This switches the block from upper to lower triangular
       for (int i = 0; i < blocks; i++) {
-	int block_offset = (i + start/block_size) * block_data_length;
-	for (int b = 0; b < block_size; b++) {
-	  for (int c = 0; c < block_size; c++) {
-	    idx = c * block_size + b;
-	    beta_.push_back(-block_beta[block_offset + idx]);
-	  }
-	}
+        int block_offset = (i + start / block_size) * block_data_length;
+        for (int b = 0; b < block_size; b++) {
+          for (int c = 0; c < block_size; c++) {
+            idx = c * block_size + b;
+            beta_.push_back(-block_beta[block_offset + idx]);
+          }
+        }
       }
-      
+
       std::vector<ColorSpinorField *> v_;
       v_.reserve(j - start);
       for (int i = start; i < j; i++) { v_.push_back(v[i]); }
-      if(blocks == 1) blas::caxpy_L(beta_.data(), v_, r_);
-      else blas::caxpy(beta_.data(), v_, r_);
+      if (blocks == 1)
+        blas::caxpy_L(beta_.data(), v_, r_);
+      else
+        blas::caxpy(beta_.data(), v_, r_);
     }
 
     // a_j = v_j^dag * r
@@ -395,7 +397,7 @@ namespace quda
 
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
-    
+
     // QR decomposition via modified Gram Scmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
     // May perform the QR iteratively to recover

@@ -469,7 +469,7 @@ namespace quda {
           double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm1);
           return nrm1;
-	}
+        }
 
 	/**
 	 * @brief Returns the L2 norm suared of the field
@@ -480,7 +480,7 @@ namespace quda {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
-	}
+        }
 
 	/**
 	 * @brief Returns the Linfinity norm of the field
@@ -491,7 +491,7 @@ namespace quda {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
-	}
+        }
 
 	/**
 	 * @brief Returns the minimum absolute value of the field
@@ -503,7 +503,7 @@ namespace quda {
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
           return absmax;
-	}
+        }
 
       };
 
