@@ -245,6 +245,13 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners& listeners =
+      ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) {
+    delete listeners.Release(listeners.default_result_printer());
+  }
+  
   display_test_info();
 
   init(argc, argv);

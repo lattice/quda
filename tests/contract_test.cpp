@@ -60,6 +60,14 @@ int main(int argc, char **argv)
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners& listeners =
+      ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) {
+    delete listeners.Release(listeners.default_result_printer());
+  }
+  
   // call srand() with a rank-dependent seed
   initRand();
   display_test_info();

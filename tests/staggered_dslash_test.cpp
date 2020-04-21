@@ -27,7 +27,9 @@
 using namespace quda;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
 #define staggeredSpinorSiteSize 6
+
 
 void *qdp_inlink[4] = { nullptr, nullptr, nullptr, nullptr };
 
@@ -46,6 +48,8 @@ void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 
 QudaParity parity = QUDA_EVEN_PARITY;
+
+
 
 int X[4];
 
@@ -91,7 +95,7 @@ void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
   gauge_param.reconstruct = link_recon;
   gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
   gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-
+  
   // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
     dslash_type = QUDA_ASQTAD_DSLASH;
@@ -190,29 +194,30 @@ void init()
     if (qdp_inlink[dir] == nullptr) { qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
   }
 
+  /*
   // for load, etc
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-
+  
   bool gauge_loaded = false;
   constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
                                          qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
+  */
 
-  /*
   // load a field WITHOUT PHASES
-  if (strcmp(latfile,"")) {
+  if (strcmp(latfile, "")) {
     read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
     if (dslash_type != QUDA_LAPLACE_DSLASH) {
       applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
     } // else it's already been loaded
   } else {
     if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      construct_gauge_field(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
+      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
     } else {
-      construct_fat_long_gauge_field(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec,&gauge_param,compute_fatlong
-  ? QUDA_STAGGERED_DSLASH : dslash_type);
+      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
+                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
     }
   }
-
+  
   // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
   // "compute" the fat/long links or not.
   if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
@@ -222,12 +227,12 @@ void init()
       memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
       memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
     }
-  } else { // QUDA_ASQTAD_DSLASH
-
+  } else { 
+    // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
       computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
                               gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
-    } else {
+    } else { 
       // Not computing FatLong
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
@@ -236,8 +241,7 @@ void init()
       }
     }
   }
-  */
-
+  
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink_gpu, qdp_fatlink_gpu, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
@@ -573,8 +577,10 @@ static int dslashTest()
     }
 
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
+    //blas::axpy(-1.0, *spinorRef, *spinorOut);
+    //double diff = blas::norm2(*spinorOut);
     printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-
+    
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0 || failed) warningQuda("Tests failed");
@@ -606,7 +612,7 @@ int main(int argc, char **argv)
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-
+  
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
@@ -622,11 +628,17 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
-  // Ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH &&
-      dslash_type != QUDA_ASQTAD_DSLASH &&
-      dslash_type != QUDA_LAPLACE_DSLASH) {
-    warningQuda("The dslash_type %d isn't staggered, asqtad, or laplace. Defaulting to asqtad.\n", dslash_type);
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners& listeners =
+      ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) {
+    delete listeners.Release(listeners.default_result_printer());
+  }
+  
+  // Only these fermions are supported in this file. Ensure a reasonable default,
+  // ensure that the default is improved staggered
+  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
+    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type), get_dslash_str(QUDA_ASQTAD_DSLASH));
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
