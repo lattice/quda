@@ -2360,7 +2360,6 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
                                             void **qdp_fatlink_cpu, void **qdp_fatlink_gpu, QudaGaugeParam &gauge_param,
                                             int argc, char **argv, bool &gauge_loaded)
 {
-
   // load a field WITHOUT PHASES
   if (strcmp(latfile, "")) {
     if (!gauge_loaded) {

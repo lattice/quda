@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -26,18 +27,15 @@
 
 using namespace quda;
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 #define staggeredSpinorSiteSize 6
-
 
 void *qdp_inlink[4] = { nullptr, nullptr, nullptr, nullptr };
 
 QudaGaugeParam gauge_param;
 QudaInvertParam inv_param;
 
-cpuGaugeField *cpuFat = NULL;
-cpuGaugeField *cpuLong = NULL;
+cpuGaugeField *cpuFat = nullptr;
+cpuGaugeField *cpuLong = nullptr;
 
 cpuColorSpinorField *spinor, *spinorOut, *spinorRef, *tmpCpu;
 cudaColorSpinorField *cudaSpinor, *cudaSpinorOut;
@@ -48,10 +46,6 @@ void *qdp_fatlink_cpu[4], *qdp_longlink_cpu[4];
 void **ghost_fatlink_cpu, **ghost_longlink_cpu;
 
 QudaParity parity = QUDA_EVEN_PARITY;
-
-
-
-int X[4];
 
 Dirac* dirac;
 
@@ -71,87 +65,6 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       // {"Dslash4pre", dslash_test_type::Dslash4pre}
                                                     };
 
-double getTolerance(QudaPrecision prec)
-{
-  switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 1e-1;
-  case QUDA_HALF_PRECISION: return 1e-3;
-  case QUDA_SINGLE_PRECISION: return 1e-4;
-  case QUDA_DOUBLE_PRECISION: return 1e-11;
-  case QUDA_INVALID_PRECISION: return 1.0;
-  }
-  return 1.0;
-}
-
-void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
-{
-  gauge_param.X[0] = X[0] = xdim;
-  gauge_param.X[1] = X[1] = ydim;
-  gauge_param.X[2] = X[2] = zdim;
-  gauge_param.X[3] = X[3] = tdim;
-
-  gauge_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = gauge_param.reconstruct;
-  gauge_param.cuda_prec_sloppy = gauge_param.cuda_prec;
-  
-  // ensure that the default is improved staggered
-  if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    dslash_type = QUDA_ASQTAD_DSLASH;
-  }
-
-  gauge_param.anisotropy = 1.0;
-
-  // For HISQ, this must always be set to 1.0, since the tadpole
-  // correction is baked into the coefficients for the first fattening.
-  // The tadpole doesn't mean anything for the second fattening
-  // since the input fields are unitarized.
-  gauge_param.tadpole_coeff = 1.0;
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0 / 24.0;
-    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
-  } else {
-    gauge_param.scale = 1.0;
-  }
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_LINKS;
-
-  int tmpint = MAX(X[1] * X[2] * X[3], X[0] * X[2] * X[3]);
-  tmpint = MAX(tmpint, X[0] * X[1] * X[3]);
-  tmpint = MAX(tmpint, X[0] * X[1] * X[2]);
-
-  gauge_param.ga_pad = tmpint;
-}
-
-void setStaggeredInvertParam(QudaInvertParam &inv_param)
-{
-  inv_param.cpu_prec = QUDA_DOUBLE_PRECISION;
-  inv_param.cuda_prec = prec;
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-  inv_param.dagger = dagger;
-  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN;
-  inv_param.dslash_type = dslash_type;
-  inv_param.mass = mass;
-  inv_param.kappa = kappa = 1.0/(8.0+mass); // for laplace
-  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-  inv_param.laplace3D = laplace3D; // for laplace
-  inv_param.verbosity = verbosity;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-  int tmpint = MAX(X[1]*X[2]*X[3], X[0]*X[2]*X[3]);
-  tmpint = MAX(tmpint, X[0]*X[1]*X[3]);
-  tmpint = MAX(tmpint, X[0]*X[1]*X[2]);
-
-  inv_param.sp_pad = tmpint;
-}
-
 void init()
 {
   initQuda(device);
@@ -161,6 +74,7 @@ void init()
 
   setStaggeredGaugeParam(gauge_param);
   setStaggeredInvertParam(inv_param);
+  inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
 
   setDims(gauge_param.X);
   dw_setDims(gauge_param.X, Nsrc); // so we can use 5-d indexing from dwf
@@ -194,54 +108,10 @@ void init()
     if (qdp_inlink[dir] == nullptr) { qdp_inlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size); }
   }
 
-  /*
-  // for load, etc
-  gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
-  
   bool gauge_loaded = false;
   constructStaggeredHostDeviceGaugeField(qdp_inlink, qdp_longlink_cpu, qdp_longlink_gpu, qdp_fatlink_cpu,
-                                         qdp_longlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
-  */
+                                         qdp_fatlink_gpu, gauge_param, argc_copy, argv_copy, gauge_loaded);
 
-  // load a field WITHOUT PHASES
-  if (strcmp(latfile, "")) {
-    read_gauge_field(latfile, qdp_inlink, gauge_param.cpu_prec, gauge_param.X, argc_copy, argv_copy);
-    if (dslash_type != QUDA_LAPLACE_DSLASH) {
-      applyGaugeFieldScaling_long(qdp_inlink, Vh, &gauge_param, QUDA_STAGGERED_DSLASH, gauge_param.cpu_prec);
-    } // else it's already been loaded
-  } else {
-    if (dslash_type == QUDA_LAPLACE_DSLASH) {
-      constructQudaGaugeField(qdp_inlink, 1, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      constructFatLongGaugeField(qdp_inlink, qdp_longlink_cpu, 1, gauge_param.cpu_prec, &gauge_param,
-                                 compute_fatlong ? QUDA_STAGGERED_DSLASH : dslash_type);
-    }
-  }
-  
-  // QUDA_STAGGERED_DSLASH follows the same codepath whether or not you
-  // "compute" the fat/long links or not.
-  if (dslash_type == QUDA_STAGGERED_DSLASH || dslash_type == QUDA_LAPLACE_DSLASH) {
-    for (int dir = 0; dir < 4; dir++) {
-      memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-      memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
-    }
-  } else { 
-    // QUDA_ASQTAD_DSLASH
-    if (compute_fatlong) {
-      computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
-                              gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
-    } else { 
-      // Not computing FatLong
-      for (int dir = 0; dir < 4; dir++) {
-        memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_fatlink_cpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);
-        memcpy(qdp_longlink_gpu[dir], qdp_longlink_cpu[dir], V * gauge_site_size * host_gauge_data_type_size);
-      }
-    }
-  }
-  
   // Alright, we've created all the void** links.
   // Create the void* pointers
   reorderQDPtoMILC(milc_fatlink_gpu, qdp_fatlink_gpu, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
@@ -252,7 +122,6 @@ void init()
   // prepare and load the GPU fields
 
 #ifdef MULTI_GPU
-
   gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
   gauge_param.reconstruct = QUDA_RECONSTRUCT_NO;
   GaugeFieldParam cpuFatParam(milc_fatlink_cpu, gauge_param);
@@ -265,15 +134,6 @@ void init()
   cpuLongParam.ghostExchange = QUDA_GHOST_EXCHANGE_PAD;
   cpuLong = new cpuGaugeField(cpuLongParam);
   ghost_longlink_cpu = cpuLong->Ghost();
-
-  int x_face_size = X[1]*X[2]*X[3]/2;
-  int y_face_size = X[0]*X[2]*X[3]/2;
-  int z_face_size = X[0]*X[1]*X[3]/2;
-  int t_face_size = X[0]*X[1]*X[2]/2;
-  int pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
 #endif
 
   gauge_param.type = (dslash_type == QUDA_ASQTAD_DSLASH) ? QUDA_ASQTAD_FAT_LINKS : QUDA_SU3_LINKS;
@@ -288,14 +148,13 @@ void init()
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
 
-  // printfQuda("Fat links sending...");
+  printfQuda("Sending fat links to GPU\n");
   loadGaugeQuda(milc_fatlink_gpu, &gauge_param);
-  // printfQuda("Fat links sent\n");
 
   gauge_param.type = QUDA_ASQTAD_LONG_LINKS;
 
 #ifdef MULTI_GPU
-  gauge_param.ga_pad = 3 * pad_size;
+  gauge_param.ga_pad *= 3;
 #endif
 
   if (dslash_type == QUDA_ASQTAD_DSLASH) {
@@ -303,10 +162,8 @@ void init()
     gauge_param.reconstruct = gauge_param.reconstruct_sloppy = (link_recon == QUDA_RECONSTRUCT_12) ?
       QUDA_RECONSTRUCT_13 :
       (link_recon == QUDA_RECONSTRUCT_8) ? QUDA_RECONSTRUCT_9 : link_recon;
-
-    // printfQuda("Long links sending...");
+    printfQuda("Sending long links to GPU\n");
     loadGaugeQuda(milc_longlink_gpu, &gauge_param);
-    // printfQuda("Long links sent...\n");
   }
 
   ColorSpinorParam csParam;
@@ -367,8 +224,6 @@ void init()
   free(milc_longlink_cpu); milc_longlink_cpu = nullptr;
 
   gauge_param.reconstruct = link_recon;
-
-  return;
 }
 
 void end()
@@ -577,10 +432,8 @@ static int dslashTest()
     }
 
     double cuda_spinor_out_norm2 = blas::norm2(*cudaSpinorOut);
-    //blas::axpy(-1.0, *spinorRef, *spinorOut);
-    //double diff = blas::norm2(*spinorOut);
     printfQuda("Results: CPU=%f, CUDA=%f, CPU-CUDA=%f\n", spinor_ref_norm2, cuda_spinor_out_norm2, spinor_out_norm2);
-    
+
     if (verify_results) {
       test_rc = RUN_ALL_TESTS();
       if (test_rc != 0 || failed) warningQuda("Tests failed");
@@ -600,8 +453,6 @@ void display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
       dimPartitioned(3));
-
-  return ;
 }
 
 int main(int argc, char **argv)
@@ -612,14 +463,10 @@ int main(int argc, char **argv)
 
   // initalize google test
   ::testing::InitGoogleTest(&argc, argv);
-  
+
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

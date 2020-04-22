@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -22,8 +23,6 @@
 // google test frame work
 #include <gtest/gtest.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 using namespace quda;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
@@ -37,9 +36,9 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
-Dirac *dirac = NULL;
-DiracMobiusPC *dirac_mdwf = NULL; // create the MDWF Dirac operator
-DiracDomainWall4DPC *dirac_4dpc = NULL; // create the 4d preconditioned DWF Dirac operator
+Dirac *dirac = nullptr;
+DiracMobiusPC *dirac_mdwf = nullptr; // create the MDWF Dirac operator
+DiracDomainWall4DPC *dirac_4dpc = nullptr; // create the 4d preconditioned DWF Dirac operator
 
 QudaDagType not_dagger;
 
@@ -63,29 +62,23 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       {"M5inv", dslash_test_type::M5inv},
                                                       {"Dslash4pre", dslash_test_type::Dslash4pre}};
 
-double getTolerance(QudaPrecision prec)
+void init(int precision, QudaReconstructType link_recon)
 {
-  switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 1e-1;
-  case QUDA_HALF_PRECISION: return 1e-3;
-  case QUDA_SINGLE_PRECISION: return 1e-4;
-  case QUDA_DOUBLE_PRECISION: return 1e-11;
-  case QUDA_INVALID_PRECISION: return 1.0;
-  }
-  return 1.0;
-}
-
-void init(int precision, QudaReconstructType link_recon) {
-  printfQuda("%s\n", __func__);
   cuda_prec = getPrecision(precision);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
+  setWilsonGaugeParam(gauge_param);
+  gauge_param.cuda_prec = cuda_prec;
+  gauge_param.cuda_prec_sloppy = cuda_prec;
+  gauge_param.cuda_prec_precondition = cuda_prec;
+  gauge_param.cuda_prec_refinement_sloppy = cuda_prec;
+
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = link_recon;
+  gauge_param.reconstruct = link_recon;
+  gauge_param.reconstruct_sloppy = link_recon;
 
   if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
@@ -99,81 +92,16 @@ void init(int precision, QudaReconstructType link_recon) {
 
   setSpinorSiteSize(24);
 
-  gauge_param.anisotropy = 1.0;
-
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon;
-  gauge_param.cuda_prec_sloppy = cuda_prec;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  inv_param.kappa = 0.1;
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = epsilon;
-    inv_param.twist_flavor = twist_flavor;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH || dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
-    inv_param.m5 = -1.5;
-    kappa5 = 0.5/(5 + inv_param.m5);
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.m5 = -1.5;
-    kappa5 = 0.5/(5 + inv_param.m5);
-    for (int k = 0; k < Lsdim; k++) {
-      // b5[k], c[k] values are chosen for arbitrary values,
-      // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.50;
-      inv_param.c_5[k] = 0.50;
-    }
-  }
-
-  inv_param.mu = mu;
-  inv_param.mass = mass;
-  inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 2;
+  setInvertParam(inv_param);
+  inv_param.cuda_prec = cuda_prec;
+  inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
+  not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
 
   inv_param.solve_type = (dtest_type == dslash_test_type::Mat || dtest_type == dslash_test_type::MatDagMat) ?
     QUDA_DIRECT_SOLVE :
     QUDA_DIRECT_PC_SOLVE;
 
-  inv_param.matpc_type = matpc_type;
-  inv_param.dagger = dagger;
-  not_dagger = (QudaDagType)((dagger + 1)%2);
-
-  inv_param.cpu_prec = cpu_prec;
-  if (inv_param.cpu_prec != gauge_param.cpu_prec) {
-    errorQuda("Gauge and spinor CPU precisions must match");
-  }
-  inv_param.cuda_prec = cuda_prec;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-#ifndef MULTI_GPU // free parameter for single GPU
-  gauge_param.ga_pad = 0;
-#else // must be this one c/b face for multi gpu
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
-#endif
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  //inv_param.sp_pad = xdim*ydim*zdim/2;
-  //inv_param.cl_pad = 24*24*24;
-
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -184,7 +112,7 @@ void init(int precision, QudaReconstructType link_recon) {
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
     }
-  } else if(dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -207,26 +135,18 @@ void init(int precision, QudaReconstructType link_recon) {
     }
   }
 
-  inv_param.dslash_type = dslash_type;
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
-      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_cuda_prec_sloppy = inv_param.clover_cuda_prec;
-    inv_param.clover_cuda_prec_precondition = inv_param.clover_cuda_prec_sloppy;
-    inv_param.clover_cuda_prec_refinement_sloppy = inv_param.clover_cuda_prec_precondition;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
-    hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-    hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-  }
+  if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
 
-  ColorSpinorParam csParam;
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+    hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+  }
 
+  ColorSpinorParam csParam;
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
@@ -276,8 +196,6 @@ void init(int precision, QudaReconstructType link_recon) {
 
   csParam.x[0] = gauge_param.X[0];
 
-  // printfQuda("Randomizing fields... ");
-
   constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
   loadGaugeQuda(hostGauge, &gauge_param);
 
@@ -288,8 +206,7 @@ void init(int precision, QudaReconstructType link_recon) {
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
   }
 
-  spinor->Source(QUDA_RANDOM_SOURCE, 0);
-  // printfQuda("done.\n"); fflush(stdout);
+  spinor->Source(QUDA_RANDOM_SOURCE);
 
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
@@ -298,13 +215,7 @@ void init(int precision, QudaReconstructType link_recon) {
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.setPrecision(inv_param.cuda_prec);
-    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
-      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    } else {
-      /* Single and half */
-      csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-    }
+    csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;

@@ -206,6 +206,18 @@ inline int getReconstructNibble(QudaReconstructType recon)
   }
 }
 
+inline double getTolerance(QudaPrecision prec)
+{
+  switch (prec) {
+  case QUDA_QUARTER_PRECISION: return 1e-1;
+  case QUDA_HALF_PRECISION: return 1e-3;
+  case QUDA_SINGLE_PRECISION: return 1e-4;
+  case QUDA_DOUBLE_PRECISION: return 1e-11;
+  case QUDA_INVALID_PRECISION: return 1.0;
+  }
+  return 1.0;
+}
+
 // MG param types
 void setMultigridParam(QudaMultigridParam &mg_param);
 void setStaggeredMultigridParam(QudaMultigridParam &mg_param);

@@ -166,7 +166,7 @@ extern int &ydim;
 extern int &zdim;
 extern int &tdim;
 extern int Lsdim;
-extern QudaDagType dagger;
+extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern char latfile[256];
