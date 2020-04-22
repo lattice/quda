@@ -34,8 +34,11 @@
 #include <jitify.hpp>
 
 #else
+/*
+#if defined(__HIP__)
 typedef hipError_t CUresult;
-
+#endif
+*/
 #endif
 
 namespace quda {

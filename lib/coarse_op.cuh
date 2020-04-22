@@ -32,7 +32,8 @@ namespace quda {
    */
   template <QudaFieldLocation location, bool from_coarse, typename Float, int fineSpin,
             int fineColor, int coarseSpin, int coarseColor, typename Arg> struct Launch {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const hipStream_t &stream)
+//    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const hipStream_t &stream)
+    Launch(Arg &arg, TuneParam &tp, ComputeType type, const hipStream_t &stream)
     {
       if (type == COMPUTE_UV) {
         if (arg.dir == QUDA_BACKWARDS) {
@@ -130,7 +131,8 @@ namespace quda {
   */
   template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
-    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const hipStream_t &stream)
+//    Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const hipStream_t &stream)
+    Launch(Arg &arg, TuneParam &tp, ComputeType type, const hipStream_t &stream)
     {
 #ifdef JITIFY
       using namespace jitify::reflection;
@@ -576,7 +578,8 @@ namespace quda {
       if (type == COMPUTE_VUV || type == COMPUTE_CONVERT || type == COMPUTE_RESCALE) arg.dim_index = 4*(dir==QUDA_BACKWARDS ? 0 : 1) + dim;
 
       if (type == COMPUTE_VUV) tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, stream);
+//      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp, type, stream);
+      Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, tp, type, stream);
       if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
     };
 

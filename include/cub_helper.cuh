@@ -7,8 +7,15 @@
 
 using namespace quda;
 
+#if defined(__HIP__)
 #include <hipcub/hipcub.hpp>
 namespace cub=hipcub;
+#include <hipcub/rocprim/block/block_reduce.hpp>
+#endif
+
+#if defined(__NVCC__)
+#include <cub/block/block_reduce.cuh>
+#endif
 
 // ensures we use shfl_sync and not shfl when compiling with clang
 #if defined(__clang__) && defined(__CUDA__) && CUDA_VERSION >= 9000
@@ -20,7 +27,6 @@ namespace cub=hipcub;
 struct __half { };
 #endif
 
-#include <hipcub/rocprim/block/block_reduce.hpp>
 
 #if __COMPUTE_CAPABILITY__ >= 300
 #include <generics/shfl.h>
@@ -99,10 +105,11 @@ namespace quda {
   __device__ unsigned int count[QUDA_MAX_MULTI_REDUCE] = { };
   __shared__ bool isLastBlockDone;
 
-  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=hipcub::Sum>
+  //template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=hipcub::Sum>
+  template <int block_size_x, int block_size_y, typename T, bool do_sum=true, typename Reducer=cub::Sum>
   __device__ inline void reduce2d(ReduceArg<T> arg, const T &in, const int idx=0) {
 
-    typedef hipcub::BlockReduce<T, block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    typedef cub::BlockReduce<T, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage cub_tmp;
 
     Reducer r;
@@ -142,7 +149,7 @@ namespace quda {
     }
   }
 
-  template <int block_size, typename T, bool do_sum = true, typename Reducer = hipcub::Sum>
+  template <int block_size, typename T, bool do_sum = true, typename Reducer = cub::Sum>
   __device__ inline void reduce(ReduceArg<T> arg, const T &in, const int idx=0) { reduce2d<block_size, 1, T, do_sum, Reducer>(arg, in, idx); }
 
 
@@ -216,7 +223,7 @@ namespace quda {
   __device__ inline void reduceRow(ReduceArg<T> arg, const T &in) {
 
     typedef vector_type<T,block_size_y> vector;
-    typedef hipcub::BlockReduce<vector, block_size_x, hipcub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
+    typedef cub::BlockReduce<vector, block_size_x, cub::BLOCK_REDUCE_WARP_REDUCTIONS, block_size_y> BlockReduce;
     constexpr int n_word = sizeof(T) / sizeof(int);
 
     __shared__ union {

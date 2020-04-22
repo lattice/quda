@@ -447,7 +447,9 @@ inline bool isHost(const void *buffer)
   hipMemoryType memType;
   void *attrdata[] = {(void *)&memType};
   hipPointerAttribute_t attributes;//[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  hipError_t err = hipPointerGetAttributes(&attributes, (hipDeviceptr_t)buffer);memType=attributes.memoryType;
+  //hipError_t err = hipPointerGetAttributes(&attributes, (hipDeviceptr_t)buffer);memType=attributes.memoryType;
+  hipError_t err = hipPointerGetAttributes(&attributes, buffer);memType=attributes.memoryType;
+
   if (err != hipSuccess) {
     memType=hipMemoryTypeHost;
     printfQuda("hipPointerGetAttributes returned unknown address, surppose it to be a host address\n");

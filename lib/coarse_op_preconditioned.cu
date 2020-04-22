@@ -13,25 +13,35 @@ namespace quda {
   /**
      @brief Launcher for CPU instantiations of preconditioned coarse-link construction
   */
+
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
+//    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
+    Launch(Arg &arg, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
     {
+
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
       else
         CalculateYhatCPU<false, Arg>(arg);
+
     }
-  };
+
+//    Launch(hipError_t &error) {} 
+ };
 
   /**
      @brief Launcher for GPU instantiations of preconditioned coarse-link construction
   */
   template <typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
-    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
-    {
-      if (compute_max_only) {
+//   Launch(hipError_t &error) {}
+
+//   Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
+   Launch(Arg &arg, bool compute_max_only, TuneParam &tp, const hipStream_t &stream)
+   {
+ 
+     if (compute_max_only) {
         if (!activeTuning()) {
           qudaMemsetAsync(arg.max_d, 0, sizeof(typename Arg::Float), stream);
         }
@@ -104,7 +114,8 @@ namespace quda {
     void apply(const hipStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      Launch<location, Arg>(arg, jitify_error, compute_max_only, tp, stream);
+//      Launch<location, Arg>(arg, jitify_error, compute_max_only, tp, stream);
+      Launch<location, Arg>(arg,compute_max_only, tp, stream);
     }
 
     /**

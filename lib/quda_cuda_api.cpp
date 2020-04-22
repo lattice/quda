@@ -124,7 +124,7 @@ namespace quda {
           case hipMemcpyHostToDevice:   hipMemcpyHtoD((hipDeviceptr_t)dst, const_cast<void *>(src), count);              break;
           case hipMemcpyHostToHost:     memcpy(dst, src, count);                                 break;
           case hipMemcpyDeviceToDevice: hipMemcpyDtoD((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count); break;
-          case hipMemcpyDefault:        hipMemcpy((hipDeviceptr_t)dst, (hipDeviceptr_t)src, count, kind);     break;
+          case hipMemcpyDefault:        hipMemcpy(dst, src, count, kind);     break;
           default:
             errorQuda("Unsupported hipMemcpy %d", kind);
           }
@@ -219,9 +219,14 @@ namespace quda {
     switch (kind) {
     case hipMemcpyDeviceToHost:
       param.srcDevice = (hipDeviceptr_t)src;
+#ifdef __HIP_PLATFORM_HCC__ 
       param.srcMemoryType = hipMemoryTypeDevice;
-      param.dstHost = dst;
       param.dstMemoryType = hipMemoryTypeHost;
+#else
+      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+      param.dstMemoryType = CU_MEMORYTYPE_HOST;
+#endif
+      param.dstHost = dst;
       break;
     default:
       errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
@@ -380,10 +385,10 @@ namespace quda {
   }
 
 #if (CUDA_VERSION >= 9000)
-  hipError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
   {
     // no driver API variant here since we have C++ functions
-    PROFILE(hipError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
     return error;
   }
 #endif

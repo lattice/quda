@@ -298,7 +298,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -D__STRICT_ANSI__ -O3 -Wall ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -D__STRICT_ANSI__ -O3 -Wall -arch=${QUDA_GPU_ARCH} ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -479,6 +479,7 @@ if(QUDA_QMP)
 
   include_directories(SYSTEM ${QUDA_QMPHOME}/include)
   include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
+  include_directories(SYSTEM /public/software/mpi/openmpi/3.1.3/gnu/include)
   set(COMM_OBJS comm_qmp.cpp)
 endif()
 

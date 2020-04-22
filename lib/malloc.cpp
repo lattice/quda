@@ -241,7 +241,8 @@ namespace quda
 
     a.size = a.base_size = size;
 
-    hipError_t err = hipMalloc((hipDeviceptr_t*)&ptr, size);
+    //hipError_t err = hipMalloc((hipDeviceptr_t*)&ptr, size);
+    hipError_t err = hipMalloc(&ptr, size);
     if (err != hipSuccess) {
       errorQuda("Failed to allocate device memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
@@ -392,7 +393,8 @@ namespace quda
     if (!alloc[DEVICE_PINNED].count(ptr)) {
       errorQuda("Attempt to free invalid device pointer (%s:%d in %s())\n", file, line, func);
     }
-    hipError_t err = hipFree((hipDeviceptr_t)ptr);
+    //hipError_t err = hipFree((hipDeviceptr_t)ptr);
+    hipError_t err = hipFree(ptr);
     if (err != hipSuccess) { printfQuda("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
     track_free(DEVICE_PINNED, ptr);
   }
@@ -476,9 +478,18 @@ namespace quda
 
   QudaFieldLocation get_pointer_location(const void *ptr) {
 
-    hipPointerAttribute_t attribute;//[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
     hipMemoryType mem_type;
     void *data[] = { &mem_type };
+#if defined(__NVCC__)    
+    CUpointer_attribute attribute[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
+    CUresult error = cuPointerGetAttributes(1, attribute, data, reinterpret_cast<CUdeviceptr>(ptr));    
+    if (error != CUDA_SUCCESS) {
+      const char *string;
+      cuGetErrorString(error, &string);
+      errorQuda("cuPointerGetAttributes failed with error %s", string);
+    }
+#else    
+    hipPointerAttribute_t attribute;//[] = { CU_POINTER_ATTRIBUTE_MEMORY_TYPE };
     hipError_t error = hipPointerGetAttributes(&attribute,ptr);mem_type=attribute.memoryType;
     if (error != hipSuccess) {
       mem_type = hipMemoryTypeHost;
@@ -486,6 +497,7 @@ namespace quda
       string=hipGetErrorString(error);
       printfQuda("cuPointerGetAttributes failed with error %s, would be on the host\n", string);
     }
+#endif
 
     // catch pointers that have not been created in CUDA
     if (mem_type == 0) mem_type = hipMemoryTypeHost;

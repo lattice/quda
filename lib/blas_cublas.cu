@@ -32,17 +32,21 @@ namespace quda {
 #endif
 
     void init() {
+/*
 #ifdef CUBLAS_LIB
       hipblasStatus_t error = hipblasCreate(&handle);
       if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("hipblasCreate failed with error %d", error);
 #endif
+*/
     }
 
     void destroy() {
+/*
 #ifdef CUBLAS_LIB
       hipblasStatus_t error = hipblasDestroy(handle);
       if (error != HIPBLAS_STATUS_SUCCESS) errorQuda("\nError indestroying cublas context, error code = %d\n", error);
 #endif
+*/
     }
 
     // mini kernel to set the array of pointers needed for batched cublas

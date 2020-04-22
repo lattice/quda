@@ -2406,9 +2406,18 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
   }
 
   // Copy eigen values back
-  for (int i = 0; i < eig_param->nConv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
-
-  // Transfer Eigenpairs back to host if using GPU eigensolver
+      if (sizeof(Complex) != sizeof(double _Complex)) {
+        errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+      }
+      double *host=(double *)host_evals;
+       for (int i = 0; i < eig_param->nConv; i++)
+       {
+            host[2*i]=real(evals[i]);
+            host[2*i+1]=imag(evals[i]);
+       }
+//  for (int i = 0; i < eig_param->nConv; i++) { host_evals[i] = real(evals[i]) + imag(evals[i]) * _Complex_I; }
+ 
+ // Transfer Eigenpairs back to host if using GPU eigensolver
   if (!(eig_param->arpack_check)) {
     profileEigensolve.TPSTART(QUDA_PROFILE_D2H);
     for (int i = 0; i < eig_param->nConv; i++) *host_evecs_[i] = *kSpace[i];

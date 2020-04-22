@@ -20,7 +20,9 @@
    @param addr Address that stores the atomic variable to be updated
    @param val Value to be added to the atomic
 */
-/*static inline __device__ double atomicAdd(double* address, double val)
+
+#if defined(__NVCC__)
+static inline __device__ double atomicAdd(double* address, double val)
 {
   unsigned long long int* address_as_ull =
                             (unsigned long long int*)address;
@@ -36,7 +38,9 @@
   } while (assumed != old);
 
   return __longlong_as_double(old);
-}*/
+}
+#endif
+
 #endif
 
 #endif

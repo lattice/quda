@@ -153,7 +153,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  hipError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value);
 #endif
 
   /**
