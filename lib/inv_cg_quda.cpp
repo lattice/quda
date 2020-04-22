@@ -854,7 +854,7 @@ void CG::blocksolve(ColorSpinorField& x, ColorSpinorField& b) {
   if(!rnewp) {
     csParam.create = QUDA_ZERO_FIELD_CREATE;
     csParam.setPrecision(param.precision_sloppy);
-    // ColorSpinorField *rpnew = ColorSpinorField::Create(csParam);
+    rnewp = ColorSpinorField::Create(csParam);
   }
 
   ColorSpinorField &r = *rp;
