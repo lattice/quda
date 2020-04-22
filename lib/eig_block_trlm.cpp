@@ -66,7 +66,7 @@ namespace quda
     saveTuneCache();
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(mat, kSpace, evals);
       return;
     }
@@ -100,17 +100,16 @@ namespace quda
       }
     }
 
-    printfQuda("Orthonormalising initial guesses with Gram-Schmidt.\n");
     bool orthed = false;
     int k = 0, kmax = 5;
     while (!orthed && k < kmax) {
       orthonormalizeMGS(kSpace, block_size);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Orthonormalising initial guesses. k=%d\n", k);
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Orthonormalising initial guesses with Gram Schmidt, k=%d\n", k);
       orthed = orthoCheck(kSpace, block_size);
       k++;
     }
 
-    printfQuda("Estimate Chebyshev max.\n");
+    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Estimate Chebyshev max.\n");
     // Check for Chebyshev maximum estimation
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
       // Use two vectors from kSpace as temps
@@ -279,9 +278,9 @@ namespace quda
     } else {
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
-                   "%d OP*x operations.\n",
-                   nConv, restart_iter, block_size, iter);
-
+                   "%d BLOCKED OP*x operations.\n",
+                   nConv, restart_iter, block_size, iter/block_size);
+	
         // Dump all Ritz values and residua
         for (int i = 0; i < nConv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
