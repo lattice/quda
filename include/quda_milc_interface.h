@@ -317,6 +317,44 @@ extern "C" {
       const char* const mg_param_file);
 
   /**
+   * Solve Ax=b for an improved staggered operator using MG.
+   * All fields are fields passed and returned are host (CPU)
+   * field in MILC order.  This function requires that persistent
+   * gauge and clover fields have been created prior. It also
+   * requires a multigrid parameter built from qudaSetupMultigrid
+   * This interface is experimental.
+   *
+   * @param external_precision Precision of host fields passed to QUDA (2 - double, 1 - single)
+   * @param quda_precision Precision for QUDA to use (2 - double, 1 - single)
+   * @param mass Fermion mass parameter
+   * @param inv_args Struct setting some solver metadata
+   * @param target_residual Target residual
+   * @param target_relative_residual Target Fermilab residual
+   * @param milc_fatlink Fat-link field on the host
+   * @param milc_longlink Long-link field on the host
+   * @param mg_preconditioner MG preconditioner structure created by qudaSetupMultigrid
+   * @param source Right-hand side source field
+   * @param solution Solution spinor field
+   * @param final_residual True residual
+   * @param final_relative_residual True Fermilab residual
+   * @param num_iters Number of iterations taken
+   */
+  void qudaInvertMG(int external_precision,
+      int quda_precision,
+      double mass,
+      QudaInvertArgs_t inv_args,
+      double target_residual,
+      double target_fermilab_residual,
+      const void *const milc_fatlink,
+      const void *const milc_longlink,
+      void *mg_preconditioner,
+      void *source,
+      void *solution,
+      double *const final_residual,
+      double *const final_fermilab_residual,
+      int *num_iters);
+
+  /**
    * Clean up a staggered/HISQ multigrid object, freeing all internal
    * fields and otherwise allocated memory.
    *

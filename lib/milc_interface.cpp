@@ -615,6 +615,8 @@ static void setInvertParams(const int dim[4], QudaPrecision cpu_prec, QudaPrecis
   invertParam->cuda_prec_sloppy = invertParam->heavy_quark_check ? cuda_prec : cuda_prec_sloppy;
   invertParam->cuda_prec_precondition = cuda_prec_sloppy;
 
+  invertParam->gcrNkrylov = 10;
+
   invertParam->solution_type = QUDA_MATPC_SOLUTION;
   invertParam->solve_type = QUDA_DIRECT_PC_SOLVE;
   invertParam->preserve_source = QUDA_PRESERVE_SOURCE_YES;
@@ -1182,21 +1184,41 @@ void setMultigridParam(QudaMultigridParam &mg_param, std::map<std::string, std::
     inv_param.dagger = QUDA_DAG_NO;
     inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
 
-    inv_param.matpc_type = QUDA_MAT_SOLUTION; // matpc_type;
+    // this gets ignored
+    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN; // matpc_type;
+
+    // req'd for staggered/hisq
     inv_param.solution_type = QUDA_MAT_SOLUTION;
 
     inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
     mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
 
+    // hard coded for now, remove later
+    double mg_levels = 4;
+
     mg_param.invert_param = &inv_param;
-    mg_param.n_level = 4; //mg_levels;
+    mg_param.n_level = mg_levels; // set from file
     for (int i = 0; i < mg_param.n_level; i++) {
-      for (int j = 0; j < 4; j++) {
+
+      // hard code override for a one node, 32^3x64 for now
+      /*for (int j = 0; j < 4; j++) {
         // if not defined use 4
         mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
+      }*/
+      switch (i) {
+        //case 1:
+        //  for (int j = 0; j < 4; j++) {
+        //    mg_param.geo_block_size[i][j] = 4;
+        //  }
+        //  break;
+        default: // 2^4 K-D, then 2^4 for the last 
+          for (int j = 0; j < 4; j++) {
+            mg_param.geo_block_size[i][j] = 2;
+          }
+          break;
       }
-      mg_param.use_eig_solver[i] = mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
       mg_param.verbosity[i] = QUDA_VERBOSE; // mg_verbosity[i];
       mg_param.setup_inv_type[i] = QUDA_CGNR_INVERTER; // setup_inv[i];
       mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
@@ -1252,7 +1274,7 @@ void setMultigridParam(QudaMultigridParam &mg_param, std::map<std::string, std::
       mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
 
       // if using Schwarz preconditioning then use local reductions only
-      mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+      mg_param.global_reduction[i] = QUDA_BOOLEAN_TRUE; // (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
       // set number of Schwarz cycles to apply
       mg_param.smoother_schwarz_cycle[i] = 1; // schwarz_cycle[i];
@@ -1354,16 +1376,16 @@ void setMultigridParam(QudaMultigridParam &mg_param, std::map<std::string, std::
 
     // set file i/o parameters
     for (int i = 0; i < mg_param.n_level; i++) {
-      /*strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
-      strcpy(mg_param.vec_outfile[i], mg_vec_outfile[i]);
-      if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+      strcpy(mg_param.vec_infile[i], ""); //mg_vec_infile[i]);
+      strcpy(mg_param.vec_outfile[i], ""); //mg_vec_outfile[i]);
+      /*if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
       if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;*/
       mg_param.vec_load[i] = QUDA_BOOLEAN_FALSE;
       mg_param.vec_store[i] = QUDA_BOOLEAN_FALSE;
     }
 
 
-    mg_param.coarse_guess = false; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.coarse_guess = QUDA_BOOLEAN_FALSE; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // these need to tbe set for now but are actually ignored by the MG setup
     // needed to make it pass the initialization test
@@ -1388,8 +1410,8 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 {
   mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS; // mg_eig_type[level];
   mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
-  if ((mg_eig_type[level] == QUDA_EIG_TR_LANCZOS || mg_eig_type[level] == QUDA_EIG_IR_LANCZOS)
-      && !(mg_eig_spectrum[level] == QUDA_SPECTRUM_LR_EIG || mg_eig_spectrum[level] == QUDA_SPECTRUM_SR_EIG)) {
+  if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type)
+      && !(mg_eig_param.spectrum == QUDA_SPECTRUM_LR_EIG || mg_eig_param.spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
@@ -1422,7 +1444,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 }
 
 void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-      const void* const milc_fatlink, const void* const milc_longlink,const char* const mg_param_file)
+      const void* const fatlink, const void* const longlink, const char* const mg_param_file)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1464,9 +1486,15 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
     invertParam.verbosity = verbosity;
     invertParam.mass = mass;
 
+    // set some reasonable values
+    // hard coded for now, should be getting from file
+    double tol = 1e-10;
+    double tol_hq = 0.;
+
     // outer solver parameters
+    // TEMPORARY: USE BICGSTAB instead of MG
     invertParam.inv_type = QUDA_GCR_INVERTER;
-    invertParam.tol = 1e-10; // tol; // get from file
+    invertParam.tol = tol; // get from file
     invertParam.maxiter = 50; // niter; // get from file
     invertParam.reliable_delta = 1e-4;
     invertParam.pipeline = 16; // pipeline; // get from file
@@ -1482,10 +1510,13 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
     invertParam.tol_hq = tol_hq; // specify a tolerance for the residual for heavy quark residual
 
     /* ESW HACK: comment this out to do a non-MG solve. */
-    invertParam.inv_type_precondition = QUDA_MG_INVERTER;
+
+    // TEMPORARY: USE BICGSTAB isntead of MG
+    //invertParam.inv_type_precondition = QUDA_MG_INVERTER;
+
     // invertParam.verbosity_precondition = mg_verbosity[0];
-    invertParam.verbosity_precondition = QUDA_SUMMARIZE; // QUDA_SILENT;
-    invertParam.cuda_prec_precondition = cuda_prec_precondition; // get from file
+    invertParam.verbosity_precondition = QUDA_VERBOSE; // QUDA_SILENT;
+    invertParam.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition; // get from file
 
     // Specify Krylov sub-size for GCR, BICGSTAB(L)
     invertParam.gcrNkrylov = 15; // gcrNkrylov; // get from file
@@ -1495,7 +1526,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
 
     // do we want to use an even-odd preconditioned solve or not
     invertParam.solve_type = QUDA_DIRECT_SOLVE; // req'd for now, more generally `solve_type`
-    invertParam.matpc_type = QUDA_MAT_SOLUTION; // req'd for now, more generally `matpc_type`
+    invertParam.matpc_type = QUDA_MATPC_EVEN_EVEN; // req'd for now, more generally `matpc_type`, ignored
     invertParam.dagger = QUDA_DAG_NO;
     invertParam.mass_normalization = QUDA_MASS_NORMALIZATION;
 
@@ -1537,28 +1568,8 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   }
 
 
-  /*ColorSpinorParam csParam;
-  //setColorSpinorParams(localDim, host_precision, &csParam);
-
-  {
-    csParam.nColor = 3;
-    csParam.nSpin = 1;
-    csParam.nDim = 5;
-
-    bool pc = (invertParam.solution_type == QUDA_MATPC_SOLUTION || invertParam.solution_type == QUDA_MATPCDAG_MATPC_SOLUTION);
-
-    for (int dir = 0; dir < 4; ++dir) csParam.x[dir] = localDim[dir];
-    if (pc) csParam.x[0] /= 2;
-    csParam.x[4] = 1;
-
-    csParam.setPrecision(precision);
-    csParam.pad = 0;
-    csParam.siteSubset = pc ? QUDA_PARITY_SITE_SUBSET : QUDA_FULL_SITE_SUBSET;
-    csParam.siteOrder = QUDA_EVEN_ODD_SITE_ORDER;
-    csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
-    csParam.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // meaningless, but required by the code.
-    csParam.create = QUDA_ZERO_FIELD_CREATE;
-  }*/
+  // hard coding here, delete later
+  int mg_levels = 4;
 
   // Setup multigrid params from config file
 
@@ -1568,7 +1579,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   // set mg_eig[0] to false (and throw a warning if a user set it to true)
   if (false /*mg_eig[0]*/) {
     printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
-    mg_eig[0] = false;
+    //mg_eig[0] = false;
   }
   for (int i = 0; i < mg_levels; i++) {
     mg_eig_param[i] = newQudaEigParam();
@@ -1584,7 +1595,9 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   setMultigridParam(mg_param, fileio_info);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  // compounding hack: *num_iters == 1 is always true here
+  //if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
@@ -1600,6 +1613,84 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   qudamilc_called<false>(__func__, verbosity);
 
   return mg_preconditioner;
+}
+
+void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                double target_residual, double target_fermilab_residual, const void *const fatlink,
+                const void *const longlink, void *mg_preconditioner, void *source, void *solution, double *const final_residual,
+                double *const final_fermilab_residual, int *num_iters)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  qudamilc_called<true>(__func__, verbosity);
+
+
+  // For now just invert it with BiCGstab
+
+
+  if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
+
+  // static const QudaVerbosity verbosity = getVerbosity();
+  QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
+  QudaPrecision device_precision_sloppy;
+
+  switch(inv_args.mixed_precision) {
+  case 2: device_precision_sloppy = QUDA_HALF_PRECISION; break;
+  case 1: device_precision_sloppy = QUDA_SINGLE_PRECISION; break;
+  default: device_precision_sloppy = device_precision;
+  }
+
+  QudaGaugeParam fat_param = newQudaGaugeParam();
+  QudaGaugeParam long_param = newQudaGaugeParam();
+  setGaugeParams(fat_param, long_param, fatlink, longlink, localDim, host_precision, device_precision,
+                 device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
+
+  QudaInvertParam invertParam = newQudaInvertParam();
+
+  QudaParity local_parity = inv_args.evenodd; // ignored, just needed to set some defaults
+  const double reliable_delta = 1e-1;
+
+  setInvertParams(localDim, host_precision, device_precision, device_precision_sloppy, mass, target_residual,
+                  target_fermilab_residual, inv_args.max_iter, reliable_delta, local_parity, verbosity,
+                  QUDA_GCR_INVERTER, &invertParam);
+
+  // Override a few things for WAR
+  invertParam.inv_type = QUDA_BICGSTAB_INVERTER;
+  invertParam.solution_type = QUDA_MAT_SOLUTION;
+  invertParam.solve_type = QUDA_DIRECT_SOLVE;
+  invertParam.preconditioner = 0; // mg_preconditioner;
+  invertParam.inv_type_precondition = QUDA_INVALID_INVERTER; // QUDA_MG_INVERTER; // slightly important
+  invertParam.verbosity_precondition = QUDA_VERBOSE;
+
+
+  ColorSpinorParam csParam;
+  setColorSpinorParams(localDim, host_precision, &csParam);
+
+  // dirty hack to invalidate the cached gauge field without breaking interface compatability
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+
+  if (invalidate_quda_gauge || !create_quda_gauge) {
+    loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
+    if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
+    invalidate_quda_gauge = false;
+  }
+
+  if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
+
+  int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
+
+  invertQuda(static_cast<char *>(solution) + quark_offset, static_cast<char *>(source) + quark_offset, &invertParam);
+
+  // return the number of iterations taken by the inverter
+  *num_iters = invertParam.iter;
+  *final_residual = invertParam.true_res;
+  *final_fermilab_residual = invertParam.true_res_hq;
+
+  if (!create_quda_gauge) invalidateGaugeQuda();
+
+
+
+  qudamilc_called<false>(__func__, verbosity);
 }
 
 void qudaCleanupMultigrid(void* mg_preconditioner)

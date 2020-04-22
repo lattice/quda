@@ -89,7 +89,7 @@ namespace quda
             }
           }
           if (param.mg_global.num_setup_iter[param.level] > 0) {
-            if (strcmp(param.mg_global.vec_infile[param.level], "")
+            if (param.mg_global.vec_load[param.level] == QUDA_BOOLEAN_TRUE && strcmp(param.mg_global.vec_infile[param.level], "")
                 != 0) { // only load if infile is defined and not computing
               loadVectors(param.B);
             } else if (param.mg_global.use_eig_solver[param.level]) {
