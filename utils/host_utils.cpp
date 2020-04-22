@@ -2387,12 +2387,12 @@ void constructStaggeredHostDeviceGaugeField(void **qdp_inlink, void **qdp_longli
       memset(qdp_longlink_gpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
       memset(qdp_longlink_cpu[dir], 0, V * gauge_site_size * host_gauge_data_type_size);
     }
-  } else { 
+  } else {
     // QUDA_ASQTAD_DSLASH
     if (compute_fatlong) {
       computeFatLongGPUandCPU(qdp_fatlink_gpu, qdp_longlink_gpu, qdp_fatlink_cpu, qdp_longlink_cpu, qdp_inlink,
                               gauge_param, host_gauge_data_type_size, n_naiks, eps_naik);
-    } else { 
+    } else {
       // Not computing FatLong
       for (int dir = 0; dir < 4; dir++) {
         memcpy(qdp_fatlink_gpu[dir], qdp_inlink[dir], V * gauge_site_size * host_gauge_data_type_size);

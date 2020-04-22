@@ -145,14 +145,14 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
         int odd_dst_index = 0;
         int startd;
         int endd;
-        if(ite == 0){ //back
-	  startd = 0;
+        if (ite == 0) { // back
+          startd = 0;
 	  endd= nFace;
-	}else{//fwd
-	  startd = X[dir] - nFace;
+        } else { // fwd
+          startd = X[dir] - nFace;
 	  endd =X[dir];
-	}
-	for(d = startd; d < endd; d++){
+        }
+        for(d = startd; d < endd; d++){
 	  for(a = 0; a < A[dir]; a++){
 	    for(b = 0; b < B[dir]; b++){
 	      for(c = 0; c < C[dir]; c++){

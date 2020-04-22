@@ -17,57 +17,10 @@
 static QudaGaugeParam qudaGaugeParam;
 static QudaGaugeFieldOrder gauge_order = QUDA_QDP_GAUGE_ORDER;
 
-int length[]={
-  3,
-  3,
-  3,
-  3,
-  3,
-  3,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
-  5,
+int length[] = {
+  3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+  5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
 };
-
 
 float loop_coeff_f[]={
   1.1,
@@ -224,55 +177,13 @@ int path_dir_y[][5] = {
 };
 
 int path_dir_z[][5] = {
-  { 3 ,5 ,4 },
-  { 4 ,5 ,3 },
-  { 0 ,5 ,7 },
-  { 7 ,5 ,0 },
-  { 1 ,5 ,6 },
-  { 6 ,5 ,1 },
-  { 2 ,3 ,5 ,5 ,4 },
-  { 3 ,5 ,5 ,4 ,2 },
-  { 4 ,5 ,5 ,3 ,2 },
-  { 2 ,4 ,5 ,5 ,3 },
-  { 2 ,0 ,5 ,5 ,7 },
-  { 0 ,5 ,5 ,7 ,2 },
-  { 7 ,5 ,5 ,0 ,2 },
-  { 2 ,7 ,5 ,5 ,0 },
-  { 2 ,1 ,5 ,5 ,6 },
-  { 1 ,5 ,5 ,6 ,2 },
-  { 6 ,5 ,5 ,1 ,2 },
-  { 2 ,6 ,5 ,5 ,1 },
-  { 4 ,4 ,5 ,3 ,3 },
-  { 3 ,3 ,5 ,4 ,4 },
-  { 7 ,7 ,5 ,0 ,0 },
-  { 0 ,0 ,5 ,7 ,7 },
-  { 6 ,6 ,5 ,1 ,1 },
-  { 1 ,1 ,5 ,6 ,6 },
-  { 3 ,0 ,5 ,4 ,7 },
-  { 7 ,4 ,5 ,0 ,3 },
-  { 3 ,7 ,5 ,4 ,0 },
-  { 0 ,4 ,5 ,7 ,3 },
-  { 4 ,0 ,5 ,3 ,7 },
-  { 7 ,3 ,5 ,0 ,4 },
-  { 4 ,7 ,5 ,3 ,0 },
-  { 0 ,3 ,5 ,7 ,4 },
-  { 3 ,1 ,5 ,4 ,6 },
-  { 6 ,4 ,5 ,1 ,3 },
-  { 3 ,6 ,5 ,4 ,1 },
-  { 1 ,4 ,5 ,6 ,3 },
-  { 4 ,1 ,5 ,3 ,6 },
-  { 6 ,3 ,5 ,1 ,4 },
-  { 4 ,6 ,5 ,3 ,1 },
-  { 1 ,3 ,5 ,6 ,4 },
-  { 0 ,1 ,5 ,7 ,6 },
-  { 6 ,7 ,5 ,1 ,0 },
-  { 0 ,6 ,5 ,7 ,1 },
-  { 1 ,7 ,5 ,6 ,0 },
-  { 7 ,1 ,5 ,0 ,6 },
-  { 6 ,0 ,5 ,1 ,7 },
-  { 7 ,6 ,5 ,0 ,1 },
-  { 1 ,0 ,5 ,6 ,7 }
-};
+  {3, 5, 4},       {4, 5, 3},       {0, 5, 7},       {7, 5, 0},       {1, 5, 6},       {6, 5, 1},       {2, 3, 5, 5, 4},
+  {3, 5, 5, 4, 2}, {4, 5, 5, 3, 2}, {2, 4, 5, 5, 3}, {2, 0, 5, 5, 7}, {0, 5, 5, 7, 2}, {7, 5, 5, 0, 2}, {2, 7, 5, 5, 0},
+  {2, 1, 5, 5, 6}, {1, 5, 5, 6, 2}, {6, 5, 5, 1, 2}, {2, 6, 5, 5, 1}, {4, 4, 5, 3, 3}, {3, 3, 5, 4, 4}, {7, 7, 5, 0, 0},
+  {0, 0, 5, 7, 7}, {6, 6, 5, 1, 1}, {1, 1, 5, 6, 6}, {3, 0, 5, 4, 7}, {7, 4, 5, 0, 3}, {3, 7, 5, 4, 0}, {0, 4, 5, 7, 3},
+  {4, 0, 5, 3, 7}, {7, 3, 5, 0, 4}, {4, 7, 5, 3, 0}, {0, 3, 5, 7, 4}, {3, 1, 5, 4, 6}, {6, 4, 5, 1, 3}, {3, 6, 5, 4, 1},
+  {1, 4, 5, 6, 3}, {4, 1, 5, 3, 6}, {6, 3, 5, 1, 4}, {4, 6, 5, 3, 1}, {1, 3, 5, 6, 4}, {0, 1, 5, 7, 6}, {6, 7, 5, 1, 0},
+  {0, 6, 5, 7, 1}, {1, 7, 5, 6, 0}, {7, 1, 5, 0, 6}, {6, 0, 5, 1, 7}, {7, 6, 5, 0, 1}, {1, 0, 5, 6, 7}};
 
 int path_dir_t[][5] = {
   { 0 ,4 ,7 },
@@ -353,7 +264,7 @@ void gauge_force_test(void)
   // fills the gauge field with random numbers
   createSiteLinkCPU(sitelink_2d, qudaGaugeParam.cpu_prec, 0);
 
-  //copy the 2d sitelink to 1d milc format
+  // copy the 2d sitelink to 1d milc format
 
   for(int dir = 0; dir < 4; dir++){
     for(int i=0; i < V; i++){
@@ -362,9 +273,9 @@ void gauge_force_test(void)
       memcpy(dst, src, gauge_site_size * qudaGaugeParam.cpu_prec);
     }
   }
-  if (qudaGaugeParam.gauge_order ==  QUDA_MILC_GAUGE_ORDER){
-    sitelink =  sitelink_1d;
-  }else if (qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER) {
+  if (qudaGaugeParam.gauge_order == QUDA_MILC_GAUGE_ORDER) {
+    sitelink = sitelink_1d;
+  } else if (qudaGaugeParam.gauge_order == QUDA_QDP_GAUGE_ORDER) {
     sitelink = (void**)sitelink_2d;
   } else {
     errorQuda("Unsupported gauge order %d", qudaGaugeParam.gauge_order);
@@ -423,7 +334,6 @@ void gauge_force_test(void)
     }//dir
   }//i
 
-
   for(int dir = 0; dir < 4; dir++){
     for(int i=0; i < V_ex; i++){
       char *src = ((char *)sitelink_ex_2d[dir]) + i * gauge_site_size * qudaGaugeParam.cpu_prec;
@@ -457,7 +367,7 @@ void gauge_force_test(void)
 
   int** input_path_buf[4];
   for(int dir =0; dir < 4; dir++){
-    input_path_buf[dir] = (int**)safe_malloc(num_paths*sizeof(int*));
+    input_path_buf[dir] = (int **)safe_malloc(num_paths * sizeof(int *));
     for(int i=0;i < num_paths;i++){
       input_path_buf[dir][i] = (int*)safe_malloc(length[i]*sizeof(int));
       if(dir == 0) memcpy(input_path_buf[dir][i], path_dir_x[i], length[i]*sizeof(int));
@@ -540,12 +450,10 @@ static void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("link_precision           link_reconstruct           space_dim(x/y/z)              T_dimension        Gauge_order    niter\n");
-  printfQuda("%s                       %s                         %d/%d/%d                       %d                  %s           %d\n",
-	 get_prec_str(prec),
-	 get_recon_str(link_recon),
-	 xdim,ydim,zdim, tdim,
-	 get_gauge_order_str(gauge_order),
-	 niter);
+  printfQuda("%s                       %s                         %d/%d/%d                       %d                  "
+             "%s           %d\n",
+             get_prec_str(prec), get_recon_str(link_recon), xdim, ydim, zdim, tdim, get_gauge_order_str(gauge_order),
+             niter);
 }
 
 int main(int argc, char **argv)

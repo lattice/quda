@@ -130,27 +130,35 @@ namespace quda {
     {
     }
 
-    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS) :
-      LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
-      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
-      order(param.gauge_order), fixed(param.gauge_fix),
-      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge),
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
-      compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
-      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
-      site_offset(param.gauge_offset), site_size(param.site_size)
+    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+      LatticeFieldParam(param),
+      location(QUDA_CPU_FIELD_LOCATION),
+      nColor(3),
+      nFace(0),
+      reconstruct(QUDA_RECONSTRUCT_NO),
+      order(param.gauge_order),
+      fixed(param.gauge_fix),
+      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
+      t_boundary(param.t_boundary),
+      anisotropy(param.anisotropy),
+      tadpole(param.tadpole_coeff),
+      gauge(h_gauge),
+      create(QUDA_REFERENCE_FIELD_CREATE),
+      geometry(QUDA_VECTOR_GEOMETRY),
+      compute_fat_link_max(false),
+      staggeredPhaseType(param.staggered_phase_type),
+      staggeredPhaseApplied(param.staggered_phase_applied),
+      i_mu(param.i_mu),
+      site_offset(param.gauge_offset),
+      site_size(param.site_size)
     {
-      switch(link_type) {
+      switch (link_type) {
       case QUDA_SU3_LINKS:
       case QUDA_GENERAL_LINKS:
       case QUDA_SMEARED_LINKS:
-      case QUDA_MOMENTUM_LINKS:
-        nFace = 1; break;
-      case QUDA_THREE_LINKS:
-        nFace = 3; break;
-      default:
-        errorQuda("Error: invalid link type(%d)\n", link_type);
+      case QUDA_MOMENTUM_LINKS: nFace = 1; break;
+      case QUDA_THREE_LINKS: nFace = 3; break;
+      default: errorQuda("Error: invalid link type(%d)\n", link_type);
       }
     }
 
@@ -167,7 +175,8 @@ namespace quda {
       this->ghost_precision = precision;
 
       if (native) {
-        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO || reconstruct == QUDA_RECONSTRUCT_10) {
+        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
+            || reconstruct == QUDA_RECONSTRUCT_10) {
           order = QUDA_FLOAT2_GAUGE_ORDER;
         } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
                    && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {

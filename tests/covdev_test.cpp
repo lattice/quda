@@ -57,8 +57,7 @@ void init(int argc, char **argv)
   setDims(gauge_param.X);
   Ls = 1;
 
-  if (Nsrc != 1)
-    warningQuda("The covariant derivative doesn't support 5-d indexing, only source 0 will be tested");
+  if (Nsrc != 1) warningQuda("The covariant derivative doesn't support 5-d indexing, only source 0 will be tested");
 
   setSpinorSiteSize(24);
 
@@ -113,7 +112,7 @@ void init(int argc, char **argv)
   loadGaugeQuda(links, &gauge_param);
   printfQuda("Links sent\n"); 
 
-  printfQuda("Sending fields to GPU..."); 
+  printfQuda("Sending fields to GPU...");
 
   csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
   csParam.pad = inv_param.sp_pad;
@@ -130,9 +129,9 @@ void init(int argc, char **argv)
 
   cudaDeviceSynchronize();
   checkCudaError();
-	
+
   double spinor_norm2 = blas::norm2(*spinor);
-  double cuda_spinor_norm2=  blas::norm2(*cudaSpinor);
+  double cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
 
   csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -141,7 +140,7 @@ void init(int argc, char **argv)
   DiracParam diracParam;
   setDiracParam(diracParam, &inv_param, false);
 
-  diracParam.tmp1=tmp;
+  diracParam.tmp1 = tmp;
 
   dirac = new GaugeCovDev(diracParam);
 }
@@ -246,12 +245,9 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners& listeners =
-      ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) {
-    delete listeners.Release(listeners.default_result_printer());
-  }
-  
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
   display_test_info();
 
   init(argc, argv);

@@ -37,7 +37,7 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
 Dirac *dirac = nullptr;
-DiracMobiusPC *dirac_mdwf = nullptr; // create the MDWF Dirac operator
+DiracMobiusPC *dirac_mdwf = nullptr;       // create the MDWF Dirac operator
 DiracDomainWall4DPC *dirac_4dpc = nullptr; // create the 4d preconditioned DWF Dirac operator
 
 QudaDagType not_dagger;

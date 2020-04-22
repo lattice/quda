@@ -264,12 +264,9 @@ int main(int argc, char **argv){
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners& listeners =
-      ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) {
-    delete listeners.Release(listeners.default_result_printer());
-  }
-  
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
   initQuda(device);
   test_rc = RUN_ALL_TESTS();
   endQuda();

@@ -268,7 +268,8 @@ namespace
                                                            {"mat-pc-dag", QUDA_MATPC_DAG_SOLUTION},
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
-  CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T}, {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
+  CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
+                                                             {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {
     {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
@@ -456,9 +457,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
 
   quda_app
-    ->add_option(
-      "--fermion-t-boundary", fermion_t_boundary,
-      "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
+    ->add_option("--fermion-t-boundary", fermion_t_boundary,
+                 "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
     ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
 
   quda_app

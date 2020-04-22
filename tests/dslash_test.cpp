@@ -130,7 +130,7 @@ void init(int argc, char **argv)
   }
 
   ColorSpinorParam csParam;
-    csParam.nColor = 3;
+  csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
   for (int d=0; d<4; d++) csParam.x[d] = gauge_param.X[d];
@@ -146,7 +146,7 @@ void init(int argc, char **argv)
     csParam.pc_type = QUDA_4D_PC;
   }
 
-  //ndeg_tm
+  // ndeg_tm
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
     csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_SINGLET) ? 4 : 5;
@@ -176,7 +176,7 @@ void init(int argc, char **argv)
   spinor->Source(QUDA_RANDOM_SOURCE);
 
   csParam.x[0] = gauge_param.X[0];
-  
+
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
   inv_param.verbosity = verbosity;
@@ -872,12 +872,9 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   // Ensure gtest prints only from rank 0
-  ::testing::TestEventListeners& listeners =
-      ::testing::UnitTest::GetInstance()->listeners();
-  if (comm_rank() != 0) {
-    delete listeners.Release(listeners.default_result_printer());
-  }
-  
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
+
   display_test_info();
 
   init(argc, argv);

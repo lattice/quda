@@ -18,8 +18,6 @@
 #include <domain_wall_dslash_reference.h>
 #include "misc.h"
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 namespace quda {
   extern void setTransferGPU(bool);
 }
@@ -54,10 +52,9 @@ void display_test_info()
   printfQuda("running the following test:\n");
 
   printfQuda("prec    sloppy_prec    link_recon  sloppy_link_recon S_dimension T_dimension Ls_dimension\n");
-  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n",
-	     get_prec_str(prec),get_prec_str(prec_sloppy),
-	     get_recon_str(link_recon),
-	     get_recon_str(link_recon_sloppy),  xdim, ydim, zdim, tdim, Lsdim);
+  printfQuda("%s   %s             %s            %s            %d/%d/%d          %d         %d\n", get_prec_str(prec),
+             get_prec_str(prec_sloppy), get_recon_str(link_recon), get_recon_str(link_recon_sloppy), xdim, ydim, zdim,
+             tdim, Lsdim);
 
   printfQuda("MG parameters\n");
   printfQuda(" - number of levels %d\n", mg_levels);
@@ -95,11 +92,8 @@ void display_test_info()
   }
 
   printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n",
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3));
+  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
+             dimPartitioned(3));
 }
 
 int main(int argc, char **argv)
@@ -404,7 +398,8 @@ int main(int argc, char **argv)
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
-      if (inv_multigrid) updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
+      if (inv_multigrid)
+        updateMultigridQuda(mg_preconditioner, &mg_param); // update the multigrid operator for new mass and mu values
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
@@ -439,8 +434,8 @@ int main(int argc, char **argv)
   time0 += clock();
   time0 /= CLOCKS_PER_SEC;
 
-  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n",
-             inv_param.iter, inv_param.secs, inv_param.gflops/inv_param.secs, time0);
+  printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
+             inv_param.gflops / inv_param.secs, time0);
 
   freeGaugeQuda();
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) freeCloverQuda();
