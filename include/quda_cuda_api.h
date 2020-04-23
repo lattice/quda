@@ -35,6 +35,17 @@ namespace quda {
   void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around qudaMemcpy used for callls where tuning
+     should be disabled. Do not call directly, rather call macro below 
+     which will grab the location of the call.
+     @param[out] dst Destination pointer
+     @param[in] src Source pointer
+     @param[in] count Size of transfer
+     @param[in] kind Type of memory copy
+  */
+  void qudaMemcpyNoTune_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file, const char *line);
+  
+  /**
      @brief Wrapper around qudaMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
@@ -305,6 +316,8 @@ namespace quda {
 
 #define qudaMemcpy(dst, src, count, kind)                                                                              \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemcpyNoTune(dst, src, count, kind)                                                                              \
+  ::quda::qudaMemcpyNoTune_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \

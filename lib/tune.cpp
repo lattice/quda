@@ -119,7 +119,7 @@ namespace quda {
   static bool tuning = false;
 
   bool activeTuning() { return tuning; }
-
+  
   static bool profile_count = true;
 
   void disableProfileCount() { profile_count = false; }

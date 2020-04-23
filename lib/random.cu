@@ -151,6 +151,6 @@ namespace quda
   /*! @brief Backup CURAND array states initialization */
   void RNG::backup() {
     backup_state = (cuRNGState *)safe_malloc(size * sizeof(cuRNGState));
-    qudaMemcpy(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
+    qudaMemcpyNoTune(backup_state, state, size * sizeof(cuRNGState), qudaMemcpyDeviceToHost);
   }
 } // namespace quda

@@ -155,7 +155,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   {
     if (norm_bytes > 0) {
       *norm_h = new char[norm_bytes];
-      qudaMemcpy(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpyNoTune(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
     checkCudaError();
   }
@@ -451,7 +451,7 @@ public:
       StoreType *spinor = ST::tex.Spinor();
 #endif
       *spinor_h = new char[bytes];
-      qudaMemcpy(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpyNoTune(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
       SN::backup(norm_h, norm_bytes);
       checkCudaError();
     }

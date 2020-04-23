@@ -833,7 +833,7 @@ namespace quda {
   void cudaGaugeField::backup() const {
     if (backed_up) errorQuda("Gauge field already backed up");
     backup_h = new char[bytes];
-    qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
+    qudaMemcpyNoTune(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
     checkCudaError();
     backed_up = true;
   }

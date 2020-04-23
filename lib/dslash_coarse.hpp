@@ -313,12 +313,12 @@ namespace quda {
 
     void preTune() {
       saveOut = new char[out.Bytes()];
-      qudaMemcpy(saveOut, out.V(), out.Bytes(), qudaMemcpyDeviceToHost);
+      qudaMemcpyNoTune(saveOut, out.V(), out.Bytes(), qudaMemcpyDeviceToHost);
     }
 
     void postTune()
     {
-      qudaMemcpy(out.V(), saveOut, out.Bytes(), qudaMemcpyHostToDevice);
+      qudaMemcpyNoTune(out.V(), saveOut, out.Bytes(), qudaMemcpyHostToDevice);
       delete[] saveOut;
     }
 
