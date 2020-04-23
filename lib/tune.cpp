@@ -723,7 +723,7 @@ namespace quda {
         float elapsed_time, best_time;
         time_t now;
 
-	tuning = true;
+        tuning = true;
 	active_tunable = &tunable;
 	best_time = FLT_MAX;
 
@@ -745,7 +745,7 @@ namespace quda {
           qudaDeviceSynchronize();
           qudaGetLastError(); // clear error counter
           tunable.checkLaunchParam(param);
-	  tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
+          tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
 	  if (verbosity >= QUDA_DEBUG_VERBOSE) {
 	    printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
 		       param.block.x, param.block.y, param.block.z,
@@ -756,7 +756,7 @@ namespace quda {
 
           qudaEventRecord(start, 0);
           for (int i = 0; i < tunable.tuningIter(); i++) {
-            tunable.apply(0);  // calls tuneLaunch() again, which simply returns the currently active param
+            tunable.apply(0); // calls tuneLaunch() again, which simply returns the currently active param
           }
           qudaEventRecord(end, 0);
           qudaEventSynchronize(end);
@@ -815,7 +815,7 @@ namespace quda {
 
         if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PostTune %s\n", key.name);
         tunable.postTune();
-	param = best_param;
+        param = best_param;
 	tunecache[key] = best_param;
 
       }

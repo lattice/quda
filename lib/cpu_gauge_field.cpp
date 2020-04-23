@@ -306,8 +306,9 @@ namespace quda {
           qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
         }
 
-        if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<geometry; d++)
+        if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+            && nFace)
+          for (int d=0; d<geometry; d++)
             qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
 
         free_gauge_buffer(buffer, order, geometry);

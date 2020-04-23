@@ -416,23 +416,23 @@ namespace quda {
 
         // all FLOAT2-ordred fields that are not double precision
         if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
-	  desc.x = 8*ghost_precision;
+          desc.x = 8*ghost_precision;
 	  desc.y = 8*ghost_precision;
 	  desc.z = 0;
 	  desc.w = 0;
-	} else { // all others are four component (double2 is spread across int4)
-	  desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+        } else { // all others are four component (double2 is spread across int4)
+          desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.z = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.w = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
-	}
+        }
 
         qudaResourceDesc resDesc;
         memset(&resDesc, 0, sizeof(resDesc));
         resDesc.resType = qudaResourceTypeLinear;
         resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
         resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = ghost_bytes;
+        resDesc.res.linear.sizeInBytes = ghost_bytes;
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
@@ -470,7 +470,7 @@ namespace quda {
           resDesc.resType = qudaResourceTypeLinear;
           resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
           resDesc.res.linear.desc = desc;
-	  resDesc.res.linear.sizeInBytes = ghost_bytes;
+          resDesc.res.linear.sizeInBytes = ghost_bytes;
 
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
             errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
@@ -1396,7 +1396,7 @@ namespace quda {
               cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                               2 * ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
             } else {
-              if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (pack_destination[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                                 ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
               if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
@@ -1404,7 +1404,7 @@ namespace quda {
                                 ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
             }
           }
-	}
+        }
       } else if (total_bytes && !pack_host) {
         cudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, qudaMemcpyDeviceToHost, 0);
       }
@@ -1453,7 +1453,7 @@ namespace quda {
               cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                               2 * ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
             } else {
-              if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (halo_location[2 * i + 0] == Device && !comm_peer2peer_enabled(0, i))
                 cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                 ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
               if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
@@ -1461,7 +1461,7 @@ namespace quda {
                                 ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
             }
           }
-	}
+        }
       } else if (total_bytes && !halo_host) {
         cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, qudaMemcpyHostToDevice,
                         0);

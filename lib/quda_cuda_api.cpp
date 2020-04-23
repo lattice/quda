@@ -158,16 +158,17 @@ namespace quda {
     long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2*count : count; }
   };
 
-  void qudaMemPrefetchAsync_(const void* devPtr, size_t count, int dstDevice, const cudaStream_t &stream, const char *func, const char *file, const char *line)
+  void qudaMemPrefetchAsync_(const void *devPtr, size_t count, int dstDevice, const cudaStream_t &stream,
+                             const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
     cudaError_t error = cudaMemPrefetchAsync(devPtr, count, dstDevice, stream);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
-  
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
-                   const char *func, const char *file, const char *line)
+
+  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func, const char *file,
+                   const char *line)
   {
     if (count == 0) return;
     QudaMem copy(dst, src, count, kind, false, func, file, line);

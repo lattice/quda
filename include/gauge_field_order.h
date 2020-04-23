@@ -1998,7 +1998,7 @@ namespace quda {
         qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
         host_free(backup_h);
         backup_h = nullptr;
-	checkCudaError();
+        checkCudaError();
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

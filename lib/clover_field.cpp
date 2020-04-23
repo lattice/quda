@@ -227,7 +227,7 @@ namespace quda {
         resDesc.resType = qudaResourceTypeLinear;
         resDesc.res.linear.devPtr = norm;
         resDesc.res.linear.desc = desc;
-	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
+        resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",

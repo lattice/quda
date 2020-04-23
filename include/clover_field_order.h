@@ -741,7 +741,7 @@ namespace quda {
             qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
           }
           checkCudaError();
-	}
+        }
 
 	/**
 	   @brief Restore the field from the host after tuning
@@ -750,11 +750,11 @@ namespace quda {
           qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
           host_free(backup_h);
           backup_h = nullptr;
-	  if (norm_bytes) {
+          if (norm_bytes) {
             qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
             host_free(backup_norm_h);
             backup_norm_h = nullptr;
-	  }
+          }
 	  checkCudaError();
 	}
 
