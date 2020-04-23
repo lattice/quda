@@ -411,7 +411,7 @@ namespace quda {
   {
     cudaError_t error = cudaEventQuery(event);
     if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) warningQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
   }
 

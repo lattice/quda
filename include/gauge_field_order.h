@@ -1987,7 +1987,7 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-        qudaMemcpy(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpyNoTune(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
         checkCudaError();
       }
 
