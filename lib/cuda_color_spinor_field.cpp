@@ -416,13 +416,13 @@ namespace quda {
 
         // all FLOAT2-ordred fields that are not double precision
         if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
-          desc.x = 8*ghost_precision;
-	  desc.y = 8*ghost_precision;
+          desc.x = 8 * ghost_precision;
+          desc.y = 8*ghost_precision;
 	  desc.z = 0;
 	  desc.w = 0;
         } else { // all others are four component (double2 is spread across int4)
-          desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
-	  desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+          desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8 * ghost_precision;
+          desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.z = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.w = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
         }

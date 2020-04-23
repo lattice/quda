@@ -499,7 +499,7 @@ namespace quda {
             sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp, sizeof(ipcLocalEventHandle));
           }
 
-	  if (receiveHandle) comm_start(receiveHandle);
+          if (receiveHandle) comm_start(receiveHandle);
 	  if (sendHandle) comm_start(sendHandle);
 
 	  if (receiveHandle) comm_wait(receiveHandle);

@@ -743,7 +743,7 @@ namespace quda {
           checkCudaError();
         }
 
-	/**
+        /**
 	   @brief Restore the field from the host after tuning
 	*/
 	void load() {
@@ -755,7 +755,7 @@ namespace quda {
             host_free(backup_norm_h);
             backup_norm_h = nullptr;
           }
-	  checkCudaError();
+          checkCudaError();
 	}
 
 	size_t Bytes() const {
