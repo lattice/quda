@@ -24,6 +24,16 @@ namespace quda {
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
 
   /**
+     @brief Wrapper around cudaMemPrefetchAsync Do not call directly, 
+     rather call macro below which will grab the location of the call.
+     @param[in] devPtr Pointer to be prefetched
+     @param[in] count Size in bytes
+     @param[in] dstDevice Destination device to prefetch to
+     @param[in] stream Stream to enqueue prefetch operation
+  */  
+  void qudaMemPrefetchAsync_(const void* devPtr, size_t count, int dstDevice, const qudaStream_t &stream, const char *func, const char *file, const char *line);
+  
+  /**
      @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
@@ -316,25 +326,27 @@ namespace quda {
 
 // START Memcpy
 //-------------------------------------------------------------------------------------
-
-#define qudaMemcpy(dst, src, count, kind)                                                                              \
+#define qudaMemPrefetchAsync(devPtr, count, dstDevice, stream)		\
+  ::quda::qudaMemPrefetchAsync_(devPtr, count, dstDevice, stream, __func__, quda::file_name(__FILE__), \
+			       __STRINGIFY__(__LINE__));
+#define qudaMemcpy(dst, src, count, kind)				\
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemcpyNoTune(dst, src, count, kind)                                                                        \
+#define qudaMemcpyNoTune(dst, src, count, kind)				\
   ::quda::qudaMemcpyNoTune_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
+#define qudaMemcpyAsync(dst, src, count, kind, stream)			\
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
-  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
+#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)	\
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__), \
                         __STRINGIFY__(__LINE__));
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
-  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
+#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
+  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, \
                              quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 // END Memcpy
 //-------------------------------------------------------------------------------------
 
 // START Event
 //-------------------------------------------------------------------------------------
-#define qudaEventCreate(event)                                                                                         \
+#define qudaEventCreate(event)						\
   ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaEventCreateWithFlags(event, flags)                                                                         \
   ::quda::qudaEventCreateWithFlags_(event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));

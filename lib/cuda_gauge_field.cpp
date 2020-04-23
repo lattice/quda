@@ -859,13 +859,13 @@ namespace quda {
       else
         errorQuda("Invalid QudaFieldLocation.");
 
-      if (gauge) cudaMemPrefetchAsync(gauge, bytes, dev_id, stream);
+      if (gauge) qudaMemPrefetchAsync(gauge, bytes, dev_id, stream);
       if (!isNative()) {
         for (int i = 0; i < nDim; i++) {
           size_t nbytes = nFace * surface[i] * nInternal * precision;
-          if (ghost[i] && nbytes) cudaMemPrefetchAsync(ghost[i], nbytes, dev_id, stream);
+          if (ghost[i] && nbytes) qudaMemPrefetchAsync(ghost[i], nbytes, dev_id, stream);
           if (ghost[i + 4] && nbytes && geometry == QUDA_COARSE_GEOMETRY)
-            cudaMemPrefetchAsync(ghost[i + 4], nbytes, dev_id, stream);
+            qudaMemPrefetchAsync(ghost[i + 4], nbytes, dev_id, stream);
         }
       }
     }

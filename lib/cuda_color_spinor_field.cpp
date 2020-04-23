@@ -598,9 +598,9 @@ namespace quda {
       else
         errorQuda("Invalid QudaFieldLocation.");
 
-      cudaMemPrefetchAsync(v, bytes, dev_id, stream);
+      qudaMemPrefetchAsync(v, bytes, dev_id, stream);
       if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) && norm_bytes > 0)
-        cudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
+        qudaMemPrefetchAsync(norm, norm_bytes, dev_id, stream);
     }
   }
 
