@@ -253,7 +253,7 @@ namespace quda {
           qudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
 
           // pinned buffer used for receiving
-	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
           qudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
@@ -464,7 +464,7 @@ namespace quda {
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
           cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], qudaIpcMemLazyEnablePeerAccess);
         }
-	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
+        if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
 
@@ -496,7 +496,7 @@ namespace quda {
             qudaEventCreateWithFlags(&ipcCopyEvent[b][dir][dim], qudaEventDisableTiming | qudaEventInterprocess);
             cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
+            sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
 						    sizeof(ipcLocalEventHandle));
 	  }
 
@@ -572,7 +572,7 @@ namespace quda {
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
             qudaEventDestroy(ipcCopyEvent[b][1][dim]);
             // only close this handle if it doesn't alias the back ghost
-	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+            if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
 	  }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
           if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
@@ -582,7 +582,7 @@ namespace quda {
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
             qudaEventDestroy(ipcCopyEvent[b][0][dim]);
             cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
-	  }
+          }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
         }

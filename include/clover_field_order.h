@@ -737,10 +737,10 @@ namespace quda {
 	  backup_h = safe_malloc(bytes);
           qudaMemcpy(backup_h, clover, bytes, qudaMemcpyDeviceToHost);
           if (norm_bytes) {
-	    backup_norm_h = safe_malloc(norm_bytes);
+            backup_norm_h = safe_malloc(norm_bytes);
             qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
           }
-	  checkCudaError();
+          checkCudaError();
 	}
 
 	/**
@@ -749,11 +749,11 @@ namespace quda {
 	void load() {
           qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
           host_free(backup_h);
-	  backup_h = nullptr;
+          backup_h = nullptr;
 	  if (norm_bytes) {
             qudaMemcpy(norm, backup_norm_h, norm_bytes, qudaMemcpyHostToDevice);
             host_free(backup_norm_h);
-	    backup_norm_h = nullptr;
+            backup_norm_h = nullptr;
 	  }
 	  checkCudaError();
 	}

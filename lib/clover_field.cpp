@@ -217,13 +217,16 @@ namespace quda {
         qudaChannelFormatDesc desc;
         memset(&desc, 0, sizeof(qudaChannelFormatDesc));
         desc.f = qudaChannelFormatKindFloat;
-        desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
+        desc.x = 8 * QUDA_SINGLE_PRECISION;
+        desc.y = 0;
+        desc.z = 0;
+        desc.w = 0;
 
         qudaResourceDesc resDesc;
         memset(&resDesc, 0, sizeof(resDesc));
         resDesc.resType = qudaResourceTypeLinear;
         resDesc.res.linear.devPtr = norm;
-	resDesc.res.linear.desc = desc;
+        resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = norm_bytes/(!full ? 2 : 1);
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {

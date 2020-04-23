@@ -16,13 +16,13 @@ namespace quda {
   /**
      @brief Wrapper around qudaGetErrorString
   */
-  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
-  
+  const char *qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around qudaGetLastError
   */
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
-  
+
   /**
      @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
@@ -32,19 +32,21 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file, const char *line);
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
+                   const char *line);
 
   /**
      @brief Wrapper around qudaMemcpy used for callls where tuning
-     should be disabled. Do not call directly, rather call macro below 
+     should be disabled. Do not call directly, rather call macro below
      which will grab the location of the call.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  void qudaMemcpyNoTune_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file, const char *line);
-  
+  void qudaMemcpyNoTune_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func,
+                         const char *file, const char *line);
+
   /**
      @brief Wrapper around qudaMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
@@ -57,20 +59,20 @@ namespace quda {
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line);
 
-    /**
-     @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
-     call directly, rather call macro below which will grab the
-     location of the call.
-     @param[out] dst Destination pointer
-     @param[in] dpitch Destination pitch
-     @param[in] src Source pointer
-     @param[in] spitch Source pitch
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-     @param[in] kind Type of memory copy
-  */
+  /**
+   @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
+   call directly, rather call macro below which will grab the
+   location of the call.
+   @param[out] dst Destination pointer
+   @param[in] dpitch Destination pitch
+   @param[in] src Source pointer
+   @param[in] spitch Source pitch
+   @param[in] width Width in bytes
+   @param[in] height Number of rows
+   @param[in] kind Type of memory copy
+*/
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
-		     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
+                     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
@@ -140,7 +142,8 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel_(const void* func_arg, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream, const char *func, const char *file, const char *line);
+  qudaError_t qudaLaunchKernel_(const void *func_arg, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+                                qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaEventCreate
@@ -316,13 +319,13 @@ namespace quda {
 
 #define qudaMemcpy(dst, src, count, kind)                                                                              \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemcpyNoTune(dst, src, count, kind)                                                                              \
+#define qudaMemcpyNoTune(dst, src, count, kind)                                                                        \
   ::quda::qudaMemcpyNoTune_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
-  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__,                                       \
-                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
+                        __STRINGIFY__(__LINE__));
 #define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
   ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
                              quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
@@ -404,21 +407,21 @@ namespace quda {
 
 // START Host
 //-------------------------------------------------------------------------------------
-#define qudaHostRegister(ptr, size, flags)				\
+#define qudaHostRegister(ptr, size, flags)                                                                             \
   ::quda::qudaHostRegister_(ptr, size, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 // END Host
 //-------------------------------------------------------------------------------------
 
-//START Misc
+// START Misc
 //-------------------------------------------------------------------------------------
-#define qudaGetLastError()						\
-  ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaGetLastError() ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaGetErrorString(error)					\
-  ::quda::qudaGetErrorString_(error,__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaGetErrorString(error)                                                                                      \
+  ::quda::qudaGetErrorString_(error, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream) \
-  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Misc
+#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream)                                         \
+  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), \
+                            __STRINGIFY__(__LINE__));
+// END Misc
 //-------------------------------------------------------------------------------------
 #endif

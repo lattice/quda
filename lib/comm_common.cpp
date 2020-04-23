@@ -245,7 +245,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
           qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-          int accessRank[2] = { };
+          int accessRank[2] = {};
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
 	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
@@ -557,8 +557,8 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    printfQuda("Testing buffer (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-	       file, line, func, dim, dir, blksize, nblocks, stride);
+    printfQuda("Testing buffer (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file, line, func,
+               dim, dir, blksize, nblocks, stride);
     qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }

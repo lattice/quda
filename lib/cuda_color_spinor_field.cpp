@@ -176,10 +176,10 @@ namespace quda {
 	v_h = mapped_malloc(bytes);
         qudaHostGetDevicePointer(&v, v_h, 0); // set the matching device pointer
         if (precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION) {
-	  norm_h = mapped_malloc(norm_bytes);
+          norm_h = mapped_malloc(norm_bytes);
           qudaHostGetDevicePointer(&norm, norm_h, 0); // set the matching device pointer
         }
-	break;
+        break;
       default:
 	errorQuda("Unsupported memory type %d", mem_type);
       }
@@ -415,7 +415,7 @@ namespace quda {
           desc.f = qudaChannelFormatKindSigned; // half is short, double is int2
 
         // all FLOAT2-ordred fields that are not double precision
-	if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
+        if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
 	  desc.x = 8*ghost_precision;
 	  desc.y = 8*ghost_precision;
 	  desc.z = 0;
@@ -431,7 +431,7 @@ namespace quda {
         memset(&resDesc, 0, sizeof(resDesc));
         resDesc.resType = qudaResourceTypeLinear;
         resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
-	resDesc.res.linear.desc = desc;
+        resDesc.res.linear.desc = desc;
 	resDesc.res.linear.sizeInBytes = ghost_bytes;
 
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
@@ -449,7 +449,7 @@ namespace quda {
         qudaCreateTextureObject(&ghostTex[b], &resDesc, &texDesc, NULL);
 
         // second set of ghost texture map to the host-mapped pinned receive buffers
-	resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
+        resDesc.res.linear.devPtr = ghost_pinned_recv_buffer_hd[b];
         if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
           errorQuda("Allocation size %lu does not have correct alignment for textures (%lu)",
                     resDesc.res.linear.sizeInBytes, deviceProp.textureAlignment);
@@ -460,13 +460,16 @@ namespace quda {
           qudaChannelFormatDesc desc;
           memset(&desc, 0, sizeof(qudaChannelFormatDesc));
           desc.f = qudaChannelFormatKindFloat;
-          desc.x = 8*QUDA_SINGLE_PRECISION; desc.y = 0; desc.z = 0; desc.w = 0;
+          desc.x = 8 * QUDA_SINGLE_PRECISION;
+          desc.y = 0;
+          desc.z = 0;
+          desc.w = 0;
 
           qudaResourceDesc resDesc;
           memset(&resDesc, 0, sizeof(resDesc));
           resDesc.resType = qudaResourceTypeLinear;
           resDesc.res.linear.devPtr = ghost_recv_buffer_d[b];
-	  resDesc.res.linear.desc = desc;
+          resDesc.res.linear.desc = desc;
 	  resDesc.res.linear.sizeInBytes = ghost_bytes;
 
           if (!is_aligned(resDesc.res.linear.devPtr, deviceProp.textureAlignment)) {
@@ -1393,14 +1396,14 @@ namespace quda {
               cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                               2 * ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
             } else {
-	      if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (pack_destination[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
                 cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][0], my_face_dim_dir_d[bufferIndex][i][0],
                                 ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
-              if (pack_destination[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
+              if (pack_destination[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
                 cudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][i][1], my_face_dim_dir_d[bufferIndex][i][1],
                                 ghost_face_bytes[i], qudaMemcpyDeviceToHost, 0);
             }
-	  }
+          }
 	}
       } else if (total_bytes && !pack_host) {
         cudaMemcpyAsync(my_face_h[bufferIndex], ghost_send_buffer_d[bufferIndex], total_bytes, qudaMemcpyDeviceToHost, 0);
@@ -1450,14 +1453,14 @@ namespace quda {
               cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                               2 * ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
             } else {
-	      if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
+              if (halo_location[2*i+0] == Device && !comm_peer2peer_enabled(0,i))
                 cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][0], from_face_dim_dir_h[bufferIndex][i][0],
                                 ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
-              if (halo_location[2*i+1] == Device && !comm_peer2peer_enabled(1,i))
+              if (halo_location[2 * i + 1] == Device && !comm_peer2peer_enabled(1, i))
                 cudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][i][1], from_face_dim_dir_h[bufferIndex][i][1],
                                 ghost_face_bytes[i], qudaMemcpyHostToDevice, 0);
             }
-	  }
+          }
 	}
       } else if (total_bytes && !halo_host) {
         cudaMemcpyAsync(ghost_recv_buffer_d[bufferIndex], from_face_h[bufferIndex], total_bytes, qudaMemcpyHostToDevice,

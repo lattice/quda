@@ -1997,7 +1997,7 @@ namespace quda {
       void load() {
         qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
         host_free(backup_h);
-	backup_h = nullptr;
+        backup_h = nullptr;
 	checkCudaError();
       }
 
