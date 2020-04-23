@@ -482,6 +482,11 @@ public:
    */
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
 
+namespace mma {
+
+  void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
+
+}
   /**
      This is an object that captures an entire MG preconditioner
      state.  A bit of a hack at the moment, this is used to allow us

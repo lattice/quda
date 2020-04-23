@@ -67,7 +67,7 @@ struct use_direct {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value, T>::type
 load_warp_contiguous(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
     const T* warp_begin_src = src - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     const U* as_int_src = (const U*)warp_begin_src;
@@ -87,7 +87,7 @@ load_warp_contiguous(const T* src) {
 template<typename T>
 __device__ typename enable_if<detail::use_shfl<T>::value>::type
 store_warp_contiguous(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
     T* warp_begin_dest = dest - warp_id;
     typedef typename detail::dismember_type<T>::type U;
     U* as_int_dest = (U*)warp_begin_dest;
@@ -205,7 +205,7 @@ bool is_contiguous(int warp_id, const T* ptr) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value, T>::type
 load_dispatch(const T* src) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
     // if (detail::is_contiguous(warp_id, src)) {
     //     return detail::load_warp_contiguous(src);
     // } else {
@@ -233,7 +233,7 @@ load_dispatch(const T* src) {
 template<typename T>
 __device__ typename enable_if<use_shfl<T>::value>::type
 store_dispatch(const T& data, T* dest) {
-    int warp_id = threadIdx.x & WARP_MASK;
+    int warp_id = ((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x) & WARP_MASK;
     // if (detail::is_contiguous(warp_id, dest)) {
     //     detail::store_warp_contiguous(data, dest);
     // } else {

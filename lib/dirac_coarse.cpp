@@ -254,7 +254,12 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    calculateYhat(Yhat, Xinv, Y, X);
+    int N = Y.Ncolor();
+    if (N == 48 || N == 64) {
+      mma::calculateYhat(Yhat, Xinv, Y, X);
+    } else {
+      calculateYhat(Yhat, Xinv, Y, X);
+    }
   }
 
   void DiracCoarse::Clover(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const
