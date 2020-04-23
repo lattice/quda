@@ -9,19 +9,9 @@
 #include <index_helper.cuh>
 
 #define BLOCKSDIVUP(a, b)  (((a)+(b)-1)/(b))
-#define CUDA_SAFE_CALL_NO_SYNC( call) {                                 \
-    qudaError err = call;                                               \
-    if( qudaSuccess != err) {                                           \
-      fprintf(stderr, "Cuda error in file '%s' in line %i : %s.\n",     \
-              __FILE__, __LINE__, cudaGetErrorString( err) );           \
-      exit(EXIT_FAILURE);                                               \
-    }                                                                   \
-  }
-#define CUDA_SAFE_CALL( call) CUDA_SAFE_CALL_NO_SYNC(call);
 
-
-namespace quda {
-
+namespace quda
+{
   dim3 GetBlockDim(size_t threads, size_t size) {
     int blockx = BLOCKSDIVUP(size, threads);
     dim3 blocks(blockx,1,1);
@@ -130,7 +120,6 @@ namespace quda {
   void RNG::AllocateRNG() {
     if (size > 0 && state == nullptr) {
       state = (cuRNGState *)device_malloc(size * sizeof(cuRNGState));
-      //CUDA_SAFE_CALL(qudaMemset(state, 0, size * sizeof(cuRNGState)));
       qudaMemset(state, 0, size * sizeof(cuRNGState));
       if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
         printfQuda("Allocated array of random numbers with size: %.2f MB\n",
