@@ -33,11 +33,19 @@ namespace quda
   };
 
   template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
+    
     T *ptr;
 
-    __device__ T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
+    __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
 
-    __device__ const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
+    __device__ inline const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
+    
+    template<class VecType>
+    __device__ inline void vector_load(int i, int j, VecType vec) { 
+      VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
+      constexpr int vector_length = sizeof(VecType) / sizeof(T);
+      ptr_[(i * ldm + j * ldn) / vector_length] = vec;
+    }
   };
 
   template <int M, int N, int ldm, int ldn, class T> __device__ auto make_smem_obj(T *ptr_)

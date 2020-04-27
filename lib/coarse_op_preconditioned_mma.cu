@@ -97,9 +97,9 @@ namespace quda
         tp.block.z = block_z;
         constexpr int bM_pad = bM + (bM == 48 ? 2 : 10);
         constexpr int bN_pad = bN + (bN == 48 ? 2 : 10);
-        int shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
+        tp.shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
         // int shared_bytes = sharedBytesPerBlock(tp);
-        kernel<<<tp.grid, tp.block, shared_bytes, stream>>>(arg);
+        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
       }
 
       /**
@@ -124,9 +124,14 @@ namespace quda
           if (arg.M == 48) {
             switch (tp.aux.x) {
             // clang-format off
-            case 0: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
-            case 1: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
-            case 2: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
+            case 0: launch_kernel<48, 48, 48,  4,  8>(tp, stream); break;
+            case 1: launch_kernel<48, 48, 48,  4, 24>(tp, stream); break;
+            case 2: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
+            case 3: launch_kernel<48, 48, 48,  8, 12>(tp, stream); break;
+            case 4: launch_kernel<48, 48, 48, 12,  8>(tp, stream); break;
+            case 5: launch_kernel<48, 48, 48, 12, 24>(tp, stream); break;
+            case 6: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
+            case 7: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
             // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
             }
@@ -158,7 +163,7 @@ namespace quda
 
       void apply(const cudaStream_t &stream)
       {
-        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch(tp, stream);
       }
 
@@ -172,7 +177,7 @@ namespace quda
       virtual bool advanceAux(TuneParam &param) const
       {
         if (arg.M == 48) {
-          if (param.aux.x < 2) {
+          if (param.aux.x < 7) {
             param.aux.x++;
             return true;
           }

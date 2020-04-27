@@ -51,18 +51,24 @@ namespace quda
     {
 #if 1
       for (int col = threadIdx.y; col < N; col += col_stride) {
-        for (int row = threadIdx.z; row < M; row += row_stride) {
+        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
           if (!dagger) {
             // if(blockIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
             //   printf("y = %02d, z = %02d, row = %02d, col = %02d, y.real = %8.4e\n", threadIdx.y, threadIdx.z, row,
             //   col, double(from(col, row).real()));
-            auto y = from(row, col);
-            to_real(row, col) = __float2half(+y.real());
-            to_imag(row, col) = __float2half(+y.imag());
+            auto x = from(row + 0, col);
+            auto y = from(row + 1, col);
+            to_real.vector_load(row, col, __floats2half2_rn(+x.real(), +y.real()));
+            to_imag.vector_load(row, col, __floats2half2_rn(+x.imag(), +y.imag()));
+            // to_real(row, col) = __float2half(+y.real());
+            // to_imag(row, col) = __float2half(+y.imag());
           } else {
-            auto y = from(col, row);
-            to_real(row, col) = __float2half(+y.real());
-            to_imag(row, col) = __float2half(-y.imag());
+            auto x = from(col, row + 0);
+            auto y = from(col, row + 1);
+            to_real.vector_load(row, col, __floats2half2_rn(+x.real(), +y.real()));
+            to_imag.vector_load(row, col, __floats2half2_rn(-x.imag(), -y.imag()));
+            // to_real(row, col) = __float2half(+y.real());
+            // to_imag(row, col) = __float2half(-y.imag());
           }
         }
       }
