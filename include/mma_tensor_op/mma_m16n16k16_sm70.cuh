@@ -33,15 +33,15 @@ namespace quda
   };
 
   template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
-    
+
     T *ptr;
 
     __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
 
     __device__ inline const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
-    
-    template<class VecType>
-    __device__ inline void vector_load(int i, int j, VecType vec) { 
+
+    template <class VecType> __device__ inline void vector_load(int i, int j, VecType vec)
+    {
       VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
       constexpr int vector_length = sizeof(VecType) / sizeof(T);
       ptr_[(i * ldm + j * ldn) / vector_length] = vec;
@@ -168,9 +168,9 @@ namespace quda
     __host__ __device__ real &operator[](int i) { return v[i]; }
   };
 
-  template <int total_warp, int M, int N, int K, int M_PAD, int N_PAD, class Accessor>
-  __device__ inline void zmma_sync_gemm(half *sm_a_real, half *sm_a_imag, half *sm_b_real, half *sm_b_imag,
-                                        Accessor accessor)
+  template <int total_warp, int M, int N, int K, int M_PAD, int N_PAD, bool compute_max, class Accessor>
+  __device__ inline float zmma_sync_gemm(half *sm_a_real, half *sm_a_imag, half *sm_b_real, half *sm_b_imag,
+                                         Accessor accessor)
   {
 #ifdef USE_FP16_MMA_ACCUMULATE
     using accumuate_reg_type = half;
@@ -192,6 +192,8 @@ namespace quda
     const int warp_id = thread_id / warp_size;
     const WarpRegisterMapping wrm(thread_id);
 
+    float max = 0.0f; // XXX: Accessor::Float
+
 #pragma unroll
     for (int c = 0; c < warp_cycle; c++) {
 
@@ -202,8 +204,6 @@ namespace quda
 
       MmaOperandC<N_PAD / 2, accumuate_reg_type> op_c_real;
       MmaOperandC<N_PAD / 2, accumuate_reg_type> op_c_imag;
-
-      // if(thread_id == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) printf("row = %02d, col = %02d\n", warp_row, warp_col);
 
 #pragma unroll
       for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
@@ -233,26 +233,65 @@ namespace quda
       // const int col = warp_col * 16 + wrm.quad_col * 8;
       const int col = warp_col * 2 + wrm.quad_col;
 
-      using structure = Structure<float, 16>;
+      constexpr bool fixed = Accessor::fixed;
 
-      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
-      structure s;
+      if (fixed) {
+
+        if (compute_max) {
+
+          for (int i = 0; i < 4; i++) {
+            const half2 r2 = __habs2(*(reinterpret_cast<const half2 *>(&(op_c_real.reg[i]))));
+            const half2 i2 = __habs2(*(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i]))));
+            max = fmax(max, r2.x);
+            max = fmax(max, r2.y);
+            max = fmax(max, i2.x);
+            max = fmax(max, i2.y);
+          }
+
+        } else {
+          using structure = Structure<short, 16>;
+
+          trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
+          structure s;
+
+          const float scale = accessor.scale;
 
 #pragma unroll
-      for (int i = 0; i < 4; i++) {
-        const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
-        const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-        s[i * 4 + 0] = __half2float(r2.x);
-        s[i * 4 + 1] = __half2float(i2.x);
-        s[i * 4 + 2] = __half2float(r2.y);
-        s[i * 4 + 3] = __half2float(i2.y);
-      }
+          for (int i = 0; i < 4; i++) {
+            const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
+            const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
+            s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
+            s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
+            s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
+            s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
+          }
 
-      ptr_[row * (N / 8) + col] = s;
+          ptr_[row * (N / 8) + col] = s;
+        }
+      } else {
+        using structure = Structure<float, 16>;
+
+        trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
+        structure s;
+
+#pragma unroll
+        for (int i = 0; i < 4; i++) {
+          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
+          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
+          s[i * 4 + 0] = __half2float(r2.x);
+          s[i * 4 + 1] = __half2float(i2.x);
+          s[i * 4 + 2] = __half2float(r2.y);
+          s[i * 4 + 3] = __half2float(i2.y);
+        }
+
+        ptr_[row * (N / 8) + col] = s;
+      }
 #else
       static_assert(false, "fp32 accumulate hasn't been implemented.");
 #endif
     }
+
+    return max;
   }
 
 } // namespace quda

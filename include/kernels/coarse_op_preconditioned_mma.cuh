@@ -45,10 +45,8 @@ namespace quda
         }
       }
     };
-    
-    __device__ __host__ constexpr int inline pad_size(int m) {
-      return m == 48 ? 2 : 10;
-    }
+
+    __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
 
     template <int M, int N, int row_stride, int col_stride, bool dagger, class AccessorTo, class AccessorFrom>
     __device__ inline void load_cache(AccessorTo to_real, AccessorTo to_imag, AccessorFrom from)
@@ -147,8 +145,8 @@ namespace quda
 
         __syncthreads();
 
-        zmma_sync_gemm<total_warp, M, N, K, lda, ldb>(smem_a_real, smem_a_imag, smem_b_real, smem_b_imag,
-                                                      arg.Yhat(d, 1 - parity, ghost_idx, 0, 0));
+        yHatMax = zmma_sync_gemm<total_warp, M, N, K, lda, ldb, compute_max_only>(
+          smem_a_real, smem_a_imag, smem_b_real, smem_b_imag, arg.Yhat(d, 1 - parity, ghost_idx, 0, 0));
 
         __syncthreads();
 
@@ -184,8 +182,8 @@ namespace quda
 
         __syncthreads();
 
-        zmma_sync_gemm<total_warp, M, N, K, lda, ldb>(smem_a_real, smem_a_imag, smem_b_real, smem_b_imag,
-                                                      arg.Yhat(d, 1 - parity, back_idx, 0, 0));
+        yHatMax = zmma_sync_gemm<total_warp, M, N, K, lda, ldb, compute_max_only>(
+          smem_a_real, smem_a_imag, smem_b_real, smem_b_imag, arg.Yhat(d, 1 - parity, back_idx, 0, 0));
 
         __syncthreads();
 
@@ -220,10 +218,12 @@ namespace quda
 
         __syncthreads();
 
-        zmma_sync_gemm<total_warp, M, N, K, lda, ldb>(smem_a_real, smem_a_imag, smem_b_real, smem_b_imag,
-                                                      arg.Yhat(d + 4, parity, x_cb, 0, 0));
+        typename Arg::Float yHatMax_ = zmma_sync_gemm<total_warp, M, N, K, lda, ldb, compute_max_only>(
+          smem_a_real, smem_a_imag, smem_b_real, smem_b_imag, arg.Yhat(d + 4, parity, x_cb, 0, 0));
 
         __syncthreads();
+
+        yHatMax = fmax(yHatMax, yHatMax_);
 
         /**
               auto yHat = make_tile_C<complex, false>(arg.tile);

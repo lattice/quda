@@ -90,8 +90,6 @@ namespace quda
       template <int bM, int bN, int bK, int block_y, int block_z>
       void launch_kernel(TuneParam &tp, const cudaStream_t &stream)
       {
-        auto kernel = mma::CalculateYhatGPU<false, Arg, bM, bN, bK, block_y, block_z>;
-        setMaxDynamicSharedBytesPerBlock(kernel);
         tp.block.x = 1;
         tp.block.y = block_y;
         tp.block.z = block_z;
@@ -99,7 +97,15 @@ namespace quda
         constexpr int bN_pad = bN + pad_size(bN);
         tp.shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
         // int shared_bytes = sharedBytesPerBlock(tp);
-        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        if (compute_max_only) {
+          auto kernel = mma::CalculateYhatGPU<true, Arg, bM, bN, bK, block_y, block_z>;
+          setMaxDynamicSharedBytesPerBlock(kernel);
+          kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        } else {
+          auto kernel = mma::CalculateYhatGPU<false, Arg, bM, bN, bK, block_y, block_z>;
+          setMaxDynamicSharedBytesPerBlock(kernel);
+          kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+        }
       }
 
       /**
@@ -118,9 +124,7 @@ namespace quda
                          .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                          .launch(arg);
 #else
-        if (compute_max_only) {
-          // quda::CalculateYhatGPU<true, Arg><<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
-        } else {
+        {
           if (arg.M == 48) {
             switch (tp.aux.x) {
             // clang-format off
@@ -282,9 +286,9 @@ namespace quda
         param_Xinv.order = gOrder_milc;
 
         // need to copy into AoS format for CUBLAS
-        param_Y.setPrecision(X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
-        param_Yhat.setPrecision(X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
-        param_Xinv.setPrecision(X.Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION : X.Precision());
+        param_Y.setPrecision(X.Precision());
+        param_Yhat.setPrecision(X.Precision());
+        param_Xinv.setPrecision(X.Precision());
 
         cudaGaugeField Y_(param_Y);
         cudaGaugeField Yhat_(param_Yhat);
@@ -318,7 +322,7 @@ namespace quda
 
           if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Yhat Max = %e\n", *arg.max_h);
 
-          Yhat.Scale(*arg.max_h);
+          Yhat_.Scale(*arg.max_h);
           arg.Yhat.resetScale(*arg.max_h);
         }
         yHat.setComputeMaxOnly(false);
