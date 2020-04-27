@@ -45,14 +45,18 @@ namespace quda
         }
       }
     };
+    
+    __device__ __host__ constexpr int inline pad_size(int m) {
+      return m == 48 ? 2 : 10;
+    }
 
     template <int M, int N, int row_stride, int col_stride, bool dagger, class AccessorTo, class AccessorFrom>
     __device__ inline void load_cache(AccessorTo to_real, AccessorTo to_imag, AccessorFrom from)
     {
-#if 1
-      for (int col = threadIdx.y; col < N; col += col_stride) {
-        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
-          if (!dagger) {
+#if 0
+      if (!dagger) {
+        for (int col = threadIdx.y; col < N; col += col_stride) {
+          for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
             // if(blockIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
             //   printf("y = %02d, z = %02d, row = %02d, col = %02d, y.real = %8.4e\n", threadIdx.y, threadIdx.z, row,
             //   col, double(from(col, row).real()));
@@ -62,53 +66,36 @@ namespace quda
             to_imag.vector_load(row, col, __floats2half2_rn(+x.imag(), +y.imag()));
             // to_real(row, col) = __float2half(+y.real());
             // to_imag(row, col) = __float2half(+y.imag());
+          }
+        }
+
+      } else {
+        for (int col = threadIdx.y * 2; col < N; col += col_stride * 2) {
+          for (int row = threadIdx.z; row < M; row += row_stride) {
+            auto x = from(row, col + 0);
+            auto y = from(row, col + 1);
+            to_real.vector_load(col, row, __floats2half2_rn(+x.real(), +y.real()));
+            to_imag.vector_load(col, row, __floats2half2_rn(-x.imag(), -y.imag()));
+            // to_real(row, col) = __float2half(+y.real());
+            // to_imag(row, col) = __float2half(-y.imag());
+          }
+        }
+
+      }
+#else
+      for (int col = threadIdx.y; col < N; col += col_stride) {
+        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
+          if (!dagger) {
+            auto x = from(row + 0, col);
+            auto y = from(row + 1, col);
+            to_real.vector_load(row, col, __floats2half2_rn(+x.real(), +y.real()));
+            to_imag.vector_load(row, col, __floats2half2_rn(+x.imag(), +y.imag()));
           } else {
             auto x = from(col, row + 0);
             auto y = from(col, row + 1);
             to_real.vector_load(row, col, __floats2half2_rn(+x.real(), +y.real()));
             to_imag.vector_load(row, col, __floats2half2_rn(-x.imag(), -y.imag()));
-            // to_real(row, col) = __float2half(+y.real());
-            // to_imag(row, col) = __float2half(-y.imag());
           }
-        }
-      }
-#else
-      for (int row = threadIdx.y * row_dim; row < (threadIdx.y + 1) * row_dim; row++) {
-        for (int col = threadIdx.z * col_dim; col < (threadIdx.z + 1) * col_dim; col++) {
-          if (!dagger) {
-            // if(blockIdx.x == 2 && threadIdx.y == 3 && threadIdx.z == 0)
-            //   printf("y = %02d, z = %02d, row = %02d, col = %02d, y.real = %8.4e\n", threadIdx.y, threadIdx.z, row,
-            //   col, double(from(col, row).real()));
-            auto y = from(row, col);
-            to_real(row, col) = __float2half(+y.real());
-            to_imag(row, col) = __float2half(+y.imag());
-          } else {
-            auto y = from(col, row);
-            to_real(row, col) = __float2half(+y.real());
-            to_imag(row, col) = __float2half(-y.imag());
-          }
-        }
-      }
-#endif
-    }
-
-    template <int M, int N, int row_stride, int col_stride, class AccessorTo, class AccessorFrom>
-    __device__ inline void store_cache(AccessorTo to, AccessorFrom from_real, AccessorFrom from_imag)
-    {
-#if 1
-      for (int col = threadIdx.y; col < N; col += col_stride) {
-        for (int row = threadIdx.z; row < M; row += row_stride) {
-          // if(blockIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) printf("y = %02d, z = %02d, row = %02d, col =
-          // %02d\n", threadIdx.y, threadIdx.z, row, col);
-          to(row, col) = complex<float>(__half2float(from_real(row, col)), __half2float(from_imag(row, col)));
-        }
-      }
-#else
-      for (int row = threadIdx.y * row_dim; row < (threadIdx.y + 1) * row_dim; row++) {
-        for (int col = threadIdx.z * col_dim; col < (threadIdx.z + 1) * col_dim; col++) {
-          // if(blockIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) printf("y = %02d, z = %02d, row = %02d, col =
-          // %02d\n", threadIdx.y, threadIdx.z, row, col);
-          to(row, col) = complex<float>(__half2float(from_real(row, col)), __half2float(from_imag(row, col)));
         }
       }
 #endif
@@ -131,8 +118,8 @@ namespace quda
       constexpr int N = bN;
       constexpr int K = bK;
 
-      constexpr int lda = M + (M == 48 ? 2 : 10);
-      constexpr int ldb = N + (M == 48 ? 2 : 10);
+      constexpr int lda = M + pad_size(M);
+      constexpr int ldb = N + pad_size(N);
 
       constexpr int n_row = block_z;
       constexpr int n_col = block_y;

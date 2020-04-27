@@ -95,8 +95,8 @@ namespace quda
         tp.block.x = 1;
         tp.block.y = block_y;
         tp.block.z = block_z;
-        constexpr int bM_pad = bM + (bM == 48 ? 2 : 10);
-        constexpr int bN_pad = bN + (bN == 48 ? 2 : 10);
+        constexpr int bM_pad = bM + pad_size(bM);
+        constexpr int bN_pad = bN + pad_size(bN);
         tp.shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
         // int shared_bytes = sharedBytesPerBlock(tp);
         kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
