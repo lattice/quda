@@ -115,8 +115,9 @@ int main(int argc, char **argv)
   } else {
     setDims(gauge_param.X);
   }
-  // Set spinor site size
-  int sss = (dslash_type == QUDA_LAPLACE_DSLASH ? 6 : 24);
+
+  // Set spinor site size (wilson types only in this file)
+  int sss = 24;
   setSpinorSiteSize(sss);
 
   // Allocate host side memory for the gauge field.
