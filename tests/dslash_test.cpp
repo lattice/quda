@@ -40,10 +40,6 @@ Dirac *dirac = nullptr;
 
 QudaDagType not_dagger;
 
-// For loading the gauge fields
-int argc_copy;
-char **argv_copy;
-
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
                                                       {"MatPC", dslash_test_type::MatPC},
@@ -182,7 +178,7 @@ void init(int argc, char **argv)
   inv_param.verbosity = verbosity;
 
   printfQuda("Randomizing fields... ");
-  constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
+  constructHostGaugeField(hostGauge, gauge_param, argc, argv);
 
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
