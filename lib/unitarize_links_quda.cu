@@ -1,15 +1,11 @@
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
-#include <iomanip>
-#include <cuda.h>
+
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
-
 #include <su3_project.cuh>
 #include <index_helper.cuh>
 #include <instantiate.h>

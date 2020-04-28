@@ -1,20 +1,13 @@
-include_directories(. googletest/include googletest)
-
-# enable_language(Fortran)
+#TODO: we might be able to clean that up a bit and have the include directories propagate with the libs
+include_directories(. googletest/include googletest ../utils ../host_reference)
 
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
-set(QUDA_TEST_COMMON googletest/src/gtest-all.cc test_util.cpp test_params.cpp
-                     misc.cpp face_gauge.cpp)
-add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-if(QUDA_QMP
-   AND QUDA_DOWNLOAD_USQCD
-   AND NOT QUDA_QMPHOME)
-  add_dependencies(quda_test QMP)
-endif()
+add_library(quda_test STATIC googletest/src/gtest-all.cc)
 
+# need to check why this is here ...
 if(QUDA_QDPJIT)
   target_link_libraries(quda
                         INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
@@ -24,11 +17,12 @@ endif()
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
+
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
-set(TEST_LIBS quda quda_test)
+set(TEST_LIBS quda quda_test quda_reference quda_utils)
 
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16
@@ -40,6 +34,7 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
+
   if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
@@ -69,40 +64,27 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_NDEG_TWISTED_MASS
    OR QUDA_DIRAC_DOMAIN_WALL)
-  add_executable(
-    dslash_test
-    dslash_test.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp
-    domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
-  add_executable(
-    dslash_ctest
-    dslash_ctest.cpp dslash_test_helpers.cpp wilson_dslash_reference.cpp
-    domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  add_executable(dslash_test dslash_test.cpp)
   target_link_libraries(dslash_test ${TEST_LIBS})
-  target_link_libraries(dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(dslash_test QUDA_BUILD_ALL_TESTS)
+
+  add_executable(dslash_ctest dslash_ctest.cpp)
+  target_link_libraries(dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(dslash_ctest QUDA_BUILD_ALL_TESTS)
   install(TARGETS dslash_test dslash_ctest ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(
-    invert_test
-    invert_test.cpp wilson_dslash_reference.cpp
-    domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  add_executable(invert_test invert_test.cpp)
   target_link_libraries(invert_test ${TEST_LIBS})
   quda_checkbuildtest(invert_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(
-    eigensolve_test
-    eigensolve_test.cpp wilson_dslash_reference.cpp
-    domain_wall_dslash_reference.cpp clover_reference.cpp blas_reference.cpp)
+  add_executable(eigensolve_test eigensolve_test.cpp)
   target_link_libraries(eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_BLOCKSOLVER)
-    add_executable(
-      invertmsrc_test invertmsrc_test.cpp wilson_dslash_reference.cpp
-                      domain_wall_dslash_reference.cpp blas_reference.cpp)
+    add_executable(invertmsrc_test invertmsrc_test.cpp)
     target_link_libraries(invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(invertmsrc_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -115,64 +97,39 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_TWISTED_CLOVER
    OR QUDA_DIRAC_DOMAIN_WALL
    OR QUDA_DIRAC_STAGGERED)
-  add_executable(
-    deflated_invert_test deflated_invert_test.cpp wilson_dslash_reference.cpp
-                         domain_wall_dslash_reference.cpp blas_reference.cpp)
+  add_executable(deflated_invert_test deflated_invert_test.cpp)
   target_link_libraries(deflated_invert_test ${TEST_LIBS})
   quda_checkbuildtest(deflated_invert_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS deflated_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  add_executable(
-    staggered_dslash_test
-    staggered_dslash_test.cpp staggered_dslash_reference.cpp
-    staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
+  add_executable(staggered_dslash_test staggered_dslash_test.cpp)
   target_link_libraries(staggered_dslash_test ${TEST_LIBS})
-  add_executable(
-    staggered_dslash_ctest
-    staggered_dslash_ctest.cpp staggered_dslash_reference.cpp
-    staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
-  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_test QUDA_BUILD_ALL_TESTS)
+
+  add_executable(staggered_dslash_ctest staggered_dslash_ctest.cpp)
+  target_link_libraries(staggered_dslash_ctest ${TEST_LIBS})
   quda_checkbuildtest(staggered_dslash_ctest QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_dslash_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(
-    staggered_invert_test
-    staggered_invert_test.cpp staggered_dslash_reference.cpp
-    staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
+  add_executable(staggered_invert_test staggered_invert_test.cpp)
   target_link_libraries(staggered_invert_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_invert_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(
-    staggered_eigensolve_test
-    staggered_eigensolve_test.cpp staggered_gauge_utils.cpp blas_reference.cpp
-    llfat_reference.cpp)
+  add_executable(staggered_eigensolve_test staggered_eigensolve_test.cpp)
   target_link_libraries(staggered_eigensolve_test ${TEST_LIBS})
   quda_checkbuildtest(staggered_eigensolve_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS staggered_eigensolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(QUDA_BLOCKSOLVER)
-    add_executable(
-      staggered_invertmsrc_test
-      staggered_invertmsrc_test.cpp staggered_dslash_reference.cpp
-      blas_reference.cpp)
+    add_executable(staggered_invertmsrc_test staggered_invertmsrc_test.cpp)
     target_link_libraries(staggered_invertmsrc_test ${TEST_LIBS})
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
-
-  if(QUDA_MULTIGRID)
-    add_executable(
-      staggered_multigrid_invert_test
-      staggered_multigrid_invert_test.cpp staggered_dslash_reference.cpp
-      staggered_gauge_utils.cpp blas_reference.cpp llfat_reference.cpp)
-    target_link_libraries(staggered_multigrid_invert_test ${TEST_LIBS})
-    quda_checkbuildtest(staggered_multigrid_invert_test QUDA_BUILD_ALL_TESTS)
-    install(TARGETS eigestaggered_multigrid_invert_testnsolve_test DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
+  
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -184,29 +141,18 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cu)
   target_link_libraries(blas_test ${TEST_LIBS})
-  quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
+  QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-
+  
 if(QUDA_MULTIGRID)
-  add_executable(
-    multigrid_invert_test
-    multigrid_invert_test.cpp wilson_dslash_reference.cpp clover_reference.cpp
-    domain_wall_dslash_reference.cpp blas_reference.cpp)
-  target_link_libraries(multigrid_invert_test ${TEST_LIBS})
-  quda_checkbuildtest(multigrid_invert_test QUDA_BUILD_ALL_TESTS)
-  install(TARGETS multigrid_invert_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
-
   add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
   quda_checkbuildtest(multigrid_benchmark_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS multigrid_benchmark_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
   if(${QUDA_GAUGE_ALG})
-    add_executable(
-      multigrid_evolve_test
-      multigrid_evolve_test.cpp wilson_dslash_reference.cpp
-      clover_reference.cpp domain_wall_dslash_reference.cpp blas_reference.cpp)
+    add_executable(multigrid_evolve_test multigrid_evolve_test.cpp)
     target_link_libraries(multigrid_evolve_test ${TEST_LIBS})
     quda_checkbuildtest(multigrid_evolve_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS multigrid_evolve_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -216,7 +162,7 @@ endif()
 
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
-quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
+QUDA_CHECKBUILDTEST(plaq_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS plaq_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(su3_test su3_test.cpp)
@@ -230,7 +176,7 @@ quda_checkbuildtest(pack_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS pack_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 if(QUDA_COVDEV)
-  add_executable(covdev_test covdev_test.cpp covdev_reference.cpp)
+  add_executable(covdev_test covdev_test.cpp)
   target_link_libraries(covdev_test ${TEST_LIBS})
   quda_checkbuildtest(covdev_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS covdev_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -239,12 +185,12 @@ endif()
 if(QUDA_CONTRACT)
   add_executable(contract_test contract_test.cpp)
   target_link_libraries(contract_test ${TEST_LIBS})
-  quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
+  QUDA_CHECKBUILDTEST(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_DIRAC_STAGGERED)
-  add_executable(llfat_test llfat_test.cpp llfat_reference.cpp)
+  add_executable(llfat_test llfat_test.cpp)
   target_link_libraries(llfat_test ${TEST_LIBS})
   quda_checkbuildtest(llfat_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS llfat_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -254,15 +200,14 @@ if(QUDA_DIRAC_STAGGERED)
   quda_checkbuildtest(unitarize_link_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS unitarize_link_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(hisq_stencil_test hisq_stencil_test.cpp llfat_reference.cpp)
+  add_executable(hisq_stencil_test hisq_stencil_test.cpp)
   target_link_libraries(hisq_stencil_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_stencil_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_stencil_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  add_executable(gauge_force_test gauge_force_test.cpp
-                                  gauge_force_reference.cpp)
+  add_executable(gauge_force_test gauge_force_test.cpp)
   target_link_libraries(gauge_force_test ${TEST_LIBS})
   quda_checkbuildtest(gauge_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS gauge_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -281,15 +226,12 @@ if(QUDA_GAUGE_ALG)
 endif()
 
 if(QUDA_FORCE_HISQ)
-  add_executable(
-    hisq_paths_force_test hisq_paths_force_test.cpp hisq_force_reference.cpp
-                          hisq_force_reference2.cpp)
+  add_executable(hisq_paths_force_test hisq_paths_force_test.cpp)
   target_link_libraries(hisq_paths_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_paths_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_paths_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  add_executable(hisq_unitarize_force_test hisq_unitarize_force_test.cpp
-                                           hisq_force_reference.cpp)
+  add_executable(hisq_unitarize_force_test hisq_unitarize_force_test.cpp)
   target_link_libraries(hisq_unitarize_force_test ${TEST_LIBS})
   quda_checkbuildtest(hisq_unitarize_force_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS hisq_unitarize_force_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -326,13 +268,13 @@ if(QUDA_DIRAC_STAGGERED)
                    --dim 2 4 6 8
                    --dslash-type staggered
                    --solve-type direct-pc
-      --gtest_output=xml:blas_test_parity.xml)
+                   --gtest_output=xml:blas_test_parity.xml)
   add_test(NAME blas_test_full_staggered
            COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:blas_test> ${MPIEXEC_POSTFLAGS}
                    --dim 2 4 6 8
                    --dslash-type staggered
                    --solve-type direct
-      --gtest_output=xml:blas_test_full.xml)
+                   --gtest_output=xml:blas_test_full.xml)
 endif()
 
 # loop over Dslash policies
@@ -368,7 +310,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dslash-type wilson
                      --test MatPCDagMatPC
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_wilson_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_wilson-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
@@ -400,7 +342,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
     endif()
   endif()
 
-  if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
+ if(QUDA_DIRAC_CLOVER_HASENBUSCH_TWIST)
     # symmetric preconditioning
     add_test(NAME dslash_clover_hasenbusch_twist-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -408,7 +350,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --test MatPCDagMatPC
                      --matpc even-even
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_clover_test_sym_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_clover_hasenbusch_twist-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
@@ -420,12 +362,12 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_clover_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
-
+  
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -436,7 +378,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_twisted-mass-sym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
@@ -445,11 +387,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dslash-type twisted-mass
                      --test MatPCDagMatPC
                      --matpc even-even-asym
-        --dim 2 4 6 8
-        --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_twisted-mass-asym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
@@ -462,10 +404,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg-twisted-mass-sym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
@@ -476,10 +418,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even-asym
                      --flavor nondeg-doublet
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_ndeg-twisted-mass_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_ndeg-twisted-mass-asym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
@@ -490,11 +432,11 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dslash-type twisted-clover
                      --test MatPCDagMatPC
                      --matpc even-even
-        --dim 2 4 6 8
-        --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
+                     --dim 2 4 6 8
+                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_twisted-clover-sym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
     # asymmetric preconditioning
@@ -504,10 +446,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --test MatPCDagMatPC
                      --matpc even-even-asym
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_twisted-clover_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_twisted-clover-asym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
 
@@ -519,7 +461,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_domain-wall_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_domain-wall-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
@@ -532,7 +474,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
     add_test(NAME dslash_mobius-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
@@ -543,7 +485,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
       set_tests_properties(dslash_mobius-sym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
 
@@ -555,7 +497,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --matpc even-even-asym
                      --dim 2 4 6 8
                      --Lsdim 4
-        --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_domain-wall-4d_test_pol${pol2}.xml)
     add_test(NAME dslash_mobius-asym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type mobius
@@ -566,7 +508,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
       set_tests_properties(dslash_mobius-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
@@ -577,18 +519,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dslash-type asqtad
                      --test MatPC
                      --dim 6 8 10 12
-        --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_improved_staggered_test_pol${pol2}.xml)
     add_test(NAME dslash_naive_staggered-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:staggered_dslash_ctest> ${MPIEXEC_POSTFLAGS}
                      --dslash-type staggered
                      --test MatPC
                      --dim 2 4 6 8
-        --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_naive_staggered_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_improved_staggered-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
       set_tests_properties(dslash_naive_staggered-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
 
     add_test(NAME dslash_improved_staggered_build-policy${pol2}
@@ -599,10 +541,10 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --compute-fat-long true
                      --epsilon-naik -0.01
                      --tadpole-coeff 0.9
-        --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
+                     --gtest_output=xml:dslash_improved_staggered_build_test_pol${pol2}.xml)
     if(polenv)
       set_tests_properties(dslash_improved_staggered_build-policy${pol2}
-        PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
+                           PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol2})
     endif()
   endif()
 
@@ -611,6 +553,6 @@ foreach(pol IN LISTS DSLASH_POLICIES)
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:covdev_test> ${MPIEXEEC_POSTFLAGS}
                      --dim 6 8 10 12
                      --gtest_output=xml:covdev_test_pol${pol2}.xml)
-  endif()
+   endif()
 
 endforeach(pol)
