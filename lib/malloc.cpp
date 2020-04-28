@@ -329,11 +329,16 @@ namespace quda
 
 #if 0
     void *ptr;
-    cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
-    if (err != cudaSuccess) { errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
+    static int page_size = 2*getpagesize();
+    a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
+    a.size = size;
+    cudaError_t err = cudaHostAlloc(&ptr, a.base_size, cudaHostAllocMapped | cudaHostAllocPortable);
+    if (err != cudaSuccess) {
+      errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
+    }
 #else
     void *ptr = aligned_malloc(a, size);
-    cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped);
+    cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped | cudaHostRegisterPortable);
     if (err != cudaSuccess) {
       errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
     }
