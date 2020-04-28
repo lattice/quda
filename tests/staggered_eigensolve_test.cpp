@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
   // Set values for precisions via the command line.
   setQudaPrecisions();
-  
+
   // Only these fermions are supported in this file. Ensure a reasonable default,
   // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {

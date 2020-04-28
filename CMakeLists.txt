@@ -797,6 +797,10 @@ if(QUDA_COVDEV)
   add_definitions(-DGPU_COVDEV)
 endif(QUDA_COVDEV)
 
+if(QUDA_TEX AND QUDA_FLOAT8)
+  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
+endif()
+
 # define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 

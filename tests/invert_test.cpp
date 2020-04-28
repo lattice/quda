@@ -161,7 +161,7 @@ int main(int argc, char **argv)
   QudaEigParam eig_param = newQudaEigParam();
   if (inv_multigrid) {
 
-    setQudaMgSolveTypes();    
+    setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;

@@ -110,7 +110,7 @@ void init(int argc, char **argv)
 
   printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);
-  printfQuda("Links sent\n"); 
+  printfQuda("Links sent\n");
 
   printfQuda("Sending fields to GPU...");
 
