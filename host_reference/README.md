@@ -12,6 +12,7 @@ operators are:
 	 4. Twisted clover
 	 5. Non-degenerate twisted mass/clover	
 	 6. Staggered dslash
+            (naive, HISQ)
 	 7. Domain Wall dslash
 	    (Shamir 4d, Shamir 5d, Mobius) 
 	 8. Covariant derivative

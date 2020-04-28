@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <cstdlib>
-#include <typeinfo>
 
 #include <staggered_oprod.h>
 #include <tune_quda.h>

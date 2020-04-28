@@ -1,6 +1,5 @@
 #pragma once
 
-#include <typeinfo>
 #include <cub_helper.cuh>
 #include <uint_to_char.h>
 #include <tune_quda.h>

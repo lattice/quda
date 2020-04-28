@@ -1,5 +1,4 @@
 #include <cstdio>
-#include <typeinfo>
 
 #include <quda_internal.h>
 #include <gauge_field.h>

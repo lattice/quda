@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <gauge_field.h>
 #include <blas_cublas.h>
 #include <blas_quda.h>

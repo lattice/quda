@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <tune_quda.h>
 
 #include <jitify_helper.cuh>

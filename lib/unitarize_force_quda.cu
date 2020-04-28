@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <cstdio>
-#include <typeinfo>
 
 #include <gauge_field.h>
 #include <tune_quda.h>

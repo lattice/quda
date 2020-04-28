@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <cstdio>
-#include <typeinfo>
 
 #include <gauge_field.h>
 #include <gauge_field_order.h>

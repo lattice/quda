@@ -1,5 +1,3 @@
-#include <typeinfo>
-
 #include <gauge_field_order.h>
 #include <quda_matrix.h>
 #include <index_helper.cuh>

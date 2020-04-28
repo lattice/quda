@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <quda_internal.h>
 #include <quda_matrix.h>
 #include <tune_quda.h>
@@ -11,7 +10,6 @@
 #include <random_quda.h>
 #include <cub_helper.cuh>
 #include <index_helper.cuh>
-
 
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi

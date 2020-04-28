@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <cstdlib>
-#include <typeinfo>
 
 #include <tune_quda.h>
 #include <quda_internal.h>

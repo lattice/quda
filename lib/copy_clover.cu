@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <clover_field_order.h>
 #include <tune_quda.h>
 
