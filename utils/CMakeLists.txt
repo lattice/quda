@@ -1,41 +1,26 @@
 # enable utils build a common library for all utils
-set(QUDA_UTILS_COMMON misc.cpp face_gauge.cpp host_utils.cpp host_blas.cpp command_line_params.cpp llfat_utils.cpp staggered_gauge_utils.cpp set_params.cpp)
-cuda_add_library(quda_utils STATIC ${QUDA_UTILS_COMMON})
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
-  add_dependencies(quda_utils QMP)
-endif()
+add_library(
+  quda_utils STATIC
+  misc.cpp
+  face_gauge.cpp
+  host_utils.cpp
+  host_blas.cpp
+  command_line_params.cpp
+  llfat_utils.cpp
+  staggered_gauge_utils.cpp
+  set_params.cpp)
 
-if(QUDA_QDPJIT)
-  target_link_libraries(quda
-    INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-    ${QMP_LIB} ${MPI_CXX_LIBRARIES})
-endif()
+# if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
+# add_dependencies(quda_utils QMP) endif()
 
-if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+if(QUDA_QIO
+   AND QUDA_DOWNLOAD_USQCD
+   AND NOT QIO_FOUND)
   add_dependencies(quda_utils QIO)
 endif()
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+
+if(QUDA_QMP
+   AND QUDA_DOWNLOAD_USQCD
+   AND NOT QMP_FOUND)
   add_dependencies(quda_utils QMP)
-endif()
-
-set(UTILS_LIBS quda quda_utils)
-
-macro(QUDA_CHECKBUILDUTILS mytarget qudabuildutils)
-  if(NOT ${qudabuildutils})
-    set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
-  endif()
-
-  if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    add_dependencies(${mytarget} QIO)
-  endif()
-  if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    add_dependencies(${mytarget} QMP)
-  endif()
-endmacro()
-
-if(QUDA_ARPACK)
-  list(APPEND UTILS_LIBS ${ARPACK})
-  if(QUDA_MPI OR QUDA_QMP)
-    list(APPEND UTILS_LIBS ${PARPACK})
-  endif()
 endif()

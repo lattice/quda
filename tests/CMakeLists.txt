@@ -1,12 +1,10 @@
+#TODO: we might be able to clean that up a bit and have the include directories propagate with the libs
 include_directories(. googletest/include googletest ../utils ../host_reference)
 
 # enable tests build a common library for all test utilities
-set(QUDA_TEST_COMMON googletest/src/gtest-all.cc)
-cuda_add_library(quda_test STATIC ${QUDA_TEST_COMMON})
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
-  add_dependencies(quda_test QMP)
-endif()
+add_library(quda_test STATIC googletest/src/gtest-all.cc)
 
+# need to check why this is here ...
 if(QUDA_QDPJIT)
   target_link_libraries(quda
                         INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
@@ -16,6 +14,7 @@ endif()
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
+
 if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
@@ -30,6 +29,7 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
+
   if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
