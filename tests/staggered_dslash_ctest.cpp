@@ -362,7 +362,6 @@ void staggeredDslashRef()
 {
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
-  fflush(stdout);
   switch (dtest_type) {
     case dslash_test_type::Dslash:
       staggeredDslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
@@ -400,8 +399,6 @@ void display_test_info(int precision, QudaReconstructType link_recon)
   printfQuda("prec recon   test_type     dagger   S_dim         T_dimension\n");
   printfQuda("%s   %s       %s           %d       %d/%d/%d        %d \n", get_prec_str(prec), get_recon_str(link_recon),
              get_string(dtest_type_map, dtest_type).c_str(), dagger, xdim, ydim, zdim, tdim);
-  return ;
-
 }
 
 using ::testing::TestWithParam;
