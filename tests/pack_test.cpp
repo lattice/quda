@@ -99,7 +99,6 @@ void end() {
 void packTest() {
 
   printfQuda("Sending fields to GPU...\n");
-  fflush(stdout);
 
 #ifdef BUILD_CPS_INTERFACE
   {
@@ -154,13 +153,11 @@ void packTest() {
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
   printfQuda("Spinor send time = %e seconds\n", sSendTime);
-  fflush(stdout);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
   printfQuda("Spinor receive time = %e seconds\n", sRecTime);
-  fflush(stdout);
 
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);
@@ -169,15 +166,11 @@ void packTest() {
   printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
 
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
-
 }
 
 int main(int argc, char **argv) {
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

@@ -195,7 +195,6 @@ void covdevRef(int mu)
 {
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
-  fflush(stdout);
 #ifdef MULTI_GPU
   mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else

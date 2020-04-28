@@ -26,8 +26,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
 
@@ -46,15 +45,11 @@ display_test_info()
 	     dimPartitioned(1),
 	     dimPartitioned(2),
 	     dimPartitioned(3));
-
-  return ;
-
 }
 
 
 int main(int argc, char **argv)
 {
-
   auto app = make_app();
   // app->get_formatter()->column_width(40);
   // add_eigen_option_group(app);
