@@ -123,8 +123,6 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
-
   // Set values for precisions via the command line.
   setQudaPrecisions();
 

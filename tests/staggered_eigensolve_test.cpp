@@ -97,10 +97,6 @@ int main(int argc, char **argv)
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
-  if (test_type != 0 && test_type != 3 && test_type != 4) {
-    errorQuda("Test type %d is outside the valid range.\n", test_type);
-  }
-
   setQudaStaggeredEigTestParams();
 
   display_test_info();
@@ -199,7 +195,7 @@ int main(int argc, char **argv)
     break;
 
   default: errorQuda("Unsupported test type");
-
+    
   } // switch
 
   // Deallocate host memory
