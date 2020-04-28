@@ -105,13 +105,23 @@ namespace quda
 
     __device__ void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
     {
-      unsigned *C = reinterpret_cast<unsigned *>(smem);
+      reg_type *C = reinterpret_cast<reg_type *>(smem);
 
       const int idx_strided = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
       const int idx_contiguous = warp_col * 8 + wrm.quad_col * 4;
       const int thread_offset_c = idx_strided * stride + idx_contiguous;
 #pragma unroll
       for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = reg[i]; }
+    }
+
+    template <class F> __device__ void abs_max(F &max)
+    {
+#pragma unroll
+      for (int i = 0; i < 4; i++) {
+        const half2 h2 = __habs2(*(reinterpret_cast<const half2 *>(&(reg[i]))));
+        max = fmax(max, h2.x);
+        max = fmax(max, h2.y);
+      }
     }
   };
 
@@ -229,48 +239,19 @@ namespace quda
       }
 #ifdef USE_FP16_MMA_ACCUMULATE
 
-      const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
-      // const int col = warp_col * 16 + wrm.quad_col * 8;
-      const int col = warp_col * 2 + wrm.quad_col;
+      if (compute_max) {
 
-      constexpr bool fixed = Accessor::fixed;
+        op_c_real.abs_max(max);
+        op_c_imag.abs_max(max);
 
-      if (fixed) {
-
-        if (compute_max) {
-
-          for (int i = 0; i < 4; i++) {
-            const half2 r2 = __habs2(*(reinterpret_cast<const half2 *>(&(op_c_real.reg[i]))));
-            const half2 i2 = __habs2(*(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i]))));
-            max = fmax(max, r2.x);
-            max = fmax(max, r2.y);
-            max = fmax(max, i2.x);
-            max = fmax(max, i2.y);
-          }
-
-        } else {
-          using structure = Structure<short, 16>;
-
-          trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
-          structure s;
-
-          const float scale = accessor.scale;
-
-#pragma unroll
-          for (int i = 0; i < 4; i++) {
-            const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
-            const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-            s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
-            s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
-            s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
-            s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
-          }
-
-          ptr_[row * (N / 8) + col] = s;
-        }
       } else {
-        using structure = Structure<float, 16>;
 
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+        // const int col = warp_col * 16 + wrm.quad_col * 8;
+        const int col = warp_col * 2 + wrm.quad_col;
+
+        constexpr bool fixed = Accessor::fixed;
+        using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
         trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
         structure s;
 
@@ -278,10 +259,18 @@ namespace quda
         for (int i = 0; i < 4; i++) {
           const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
           const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
-          s[i * 4 + 0] = __half2float(r2.x);
-          s[i * 4 + 1] = __half2float(i2.x);
-          s[i * 4 + 2] = __half2float(r2.y);
-          s[i * 4 + 3] = __half2float(i2.y);
+          if (fixed) {
+            const float scale = accessor.scale;
+            s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
+            s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
+            s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
+            s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
+          } else {
+            s[i * 4 + 0] = __half2float(r2.x);
+            s[i * 4 + 1] = __half2float(i2.x);
+            s[i * 4 + 2] = __half2float(r2.y);
+            s[i * 4 + 3] = __half2float(i2.y);
+          }
         }
 
         ptr_[row * (N / 8) + col] = s;
