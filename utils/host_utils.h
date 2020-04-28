@@ -40,8 +40,8 @@ extern QudaPrecision &cuda_prec_precondition;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
-void setQudaDefaultPrecs();
-void setQudaDefaultMgSolveTypes();
+void setQudaPrecisions();
+void setQudaMgSolveTypes();
 void setQudaDefaultMgTestParams();
 void setQudaStaggeredEigTestParams();
 void setQudaStaggeredInvTestParams();

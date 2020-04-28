@@ -85,8 +85,10 @@ int main(int argc, char **argv)
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
-  setQudaDefaultPrecs();
 
+  // Set values for precisions via the command line.
+  setQudaPrecisions();
+  
   // Only these fermions are supported in this file. Ensure a reasonable default,
   // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {

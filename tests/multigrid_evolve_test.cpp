@@ -108,10 +108,8 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  // Set some default values for precisions and solve types
-  // if none are passed through the command line
-  setQudaDefaultPrecs();
-  if (inv_multigrid) { setQudaDefaultMgSolveTypes(); }
+  // Set values for precisions via the command line.
+  setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -153,6 +151,7 @@ int main(int argc, char **argv)
   QudaEigParam mg_eig_param[mg_levels];
 
   if (inv_multigrid) {
+    setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
