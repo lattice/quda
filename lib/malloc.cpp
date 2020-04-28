@@ -318,8 +318,6 @@ namespace quda
     return ptr;
   }
 
-#define HOST_ALLOC // this needs to be set presently on P9
-
   /**
    * Allocate page-locked ("pinned") host memory, and map it into the
    * GPU address space.  This function should only be called via the
@@ -329,7 +327,7 @@ namespace quda
   {
     MemAlloc a(func, file, line);
 
-#ifdef HOST_ALLOC
+#if 0
     void *ptr;
     cudaError_t err = cudaHostAlloc(&ptr, size, cudaHostRegisterMapped | cudaHostRegisterPortable);
     if (err != cudaSuccess) { errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
