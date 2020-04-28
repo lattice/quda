@@ -249,10 +249,10 @@ void init(int argc, char **argv)
 void end()
 {
   if (!transfer) {
-    if(dirac != NULL)
+    if(dirac != nullptr)
     {
       delete dirac;
-      dirac = NULL;
+      dirac = nullptr;
     }
     delete cudaSpinor;
     delete cudaSpinorOut;
@@ -299,7 +299,7 @@ DslashTime dslashCUDA(int niter) {
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    gettimeofday(&tstart, nullptr);
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       switch (dtest_type) {
@@ -427,7 +427,7 @@ DslashTime dslashCUDA(int niter) {
       }
     }
 
-    gettimeofday(&tstop, NULL);
+    gettimeofday(&tstop, nullptr);
     long ds = tstop.tv_sec - tstart.tv_sec;
     long dus = tstop.tv_usec - tstart.tv_usec;
     double elapsed = ds + 0.000001*dus;
