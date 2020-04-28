@@ -2,7 +2,7 @@
 
 #include <mma.h>
 
-#define USE_FP16_MMA_ACCUMULATE
+// #define USE_FP16_HMMA_ACCUMULATE
 
 namespace quda
 {
@@ -155,11 +155,17 @@ namespace quda
       thread_offset_c = (idx_strided + 2) * stride + (idx_contiguous + 2);
       C[thread_offset_c] = __floats2half2_rn(reg[6], reg[7]);
     }
+
+    template <class F> __device__ void abs_max(F &max)
+    {
+#pragma unroll
+      for (int i = 0; i < 8; i++) { max = fmax(max, fabsf(reg[i])); }
+    }
   };
 
   template <class TA, class TB, class TC> __device__ inline void gemm(const TA &op_a, const TB &op_b, TC &op_c)
   {
-#ifdef USE_FP16_MMA_ACCUMULATE
+#ifdef USE_FP16_HMMA_ACCUMULATE
     asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
                  : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
                  : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
@@ -182,7 +188,7 @@ namespace quda
   __device__ inline float zmma_sync_gemm(half *sm_a_real, half *sm_a_imag, half *sm_b_real, half *sm_b_imag,
                                          Accessor accessor)
   {
-#ifdef USE_FP16_MMA_ACCUMULATE
+#ifdef USE_FP16_HMMA_ACCUMULATE
     using accumuate_reg_type = half;
 #else
     using accumuate_reg_type = float;
@@ -237,7 +243,6 @@ namespace quda
         op_a_imag.negate();
         gemm(op_a_imag, op_b_imag, op_c_real);
       }
-#ifdef USE_FP16_MMA_ACCUMULATE
 
       if (compute_max) {
 
@@ -245,7 +250,7 @@ namespace quda
         op_c_imag.abs_max(max);
 
       } else {
-
+#ifdef USE_FP16_HMMA_ACCUMULATE
         const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
         // const int col = warp_col * 16 + wrm.quad_col * 8;
         const int col = warp_col * 2 + wrm.quad_col;
@@ -274,10 +279,35 @@ namespace quda
         }
 
         ptr_[row * (N / 8) + col] = s;
-      }
-#else
-      static_assert(false, "fp32 accumulate hasn't been implemented.");
+#else // USE_FP16_HMMA_ACCUMULATE
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+        const int col = warp_col * 16 + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
+
+        constexpr bool fixed = Accessor::fixed;
+        using structure = typename std::conditional<fixed, Structure<short, 4>, Structure<float, 4>>::type;
+        trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&accessor.v[accessor.idx]));
+        structure s;
+
+#pragma unroll
+        for (int i = 0; i < 4; i++) {
+          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
+          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
+          if (fixed) {
+            const float scale = accessor.scale;
+            s[0] = short(op_c_real.reg[i * 2 + 0] * scale);
+            s[1] = short(op_c_imag.reg[i * 2 + 0] * scale);
+            s[2] = short(op_c_real.reg[i * 2 + 1] * scale);
+            s[3] = short(op_c_imag.reg[i * 2 + 1] * scale);
+          } else {
+            s[0] = op_c_real.reg[i * 2 + 0];
+            s[1] = op_c_imag.reg[i * 2 + 0];
+            s[2] = op_c_real.reg[i * 2 + 1];
+            s[3] = op_c_imag.reg[i * 2 + 1];
+          }
+          ptr_[((row + (i % 2) * 2) * N + (col + (i / 2) * 4)) / 2] = s;
+        }
 #endif
+      }
     }
 
     return max;
