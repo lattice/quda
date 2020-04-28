@@ -1749,13 +1749,13 @@ namespace quda {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
     DiracParam diracPreParam;
-    
+
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
     bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    
+
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
     dPre = Dirac::create(diracPreParam);
@@ -1767,22 +1767,22 @@ namespace quda {
     DiracParam diracSloppyParam;
     DiracParam diracPreParam;
     DiracParam diracRefParam;
-    
+
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracRefineParam(diracRefParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
     bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    
+
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
     dPre = Dirac::create(diracPreParam);
     dRef = Dirac::create(diracRefParam);
   }
-  
+
   static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
-  
+
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
@@ -3743,12 +3743,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
           cudaColorSpinorField tmp(cudaParam);
 
-          for(int j=0; j < nRefine; j++) {
-	    q[j] = new cudaColorSpinorField(cudaParam);
+          for (int j = 0; j < nRefine; j++) {
+            q[j] = new cudaColorSpinorField(cudaParam);
 	    z[j] = new cudaColorSpinorField(cudaParam);
-	  }
+          }
 
-	  *z[0] = *x[0]; // zero solution already solved
+          *z[0] = *x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
 #else
