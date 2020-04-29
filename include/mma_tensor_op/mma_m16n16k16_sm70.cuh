@@ -2,7 +2,7 @@
 
 #include <mma.h>
 
-#define USE_FP16_HMMA_ACCUMULATE
+//#define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision() {
 #ifdef USE_FP16_HMMA_ACCUMULATE
