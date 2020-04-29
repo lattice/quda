@@ -167,7 +167,7 @@ namespace quda
 
       void apply(const cudaStream_t &stream)
       {
-        TuneParam &tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         launch(tp, stream);
       }
 

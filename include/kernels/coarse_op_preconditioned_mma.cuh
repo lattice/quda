@@ -146,7 +146,7 @@ namespace quda
         __syncthreads();
 
         yHatMax = zmma_sync_gemm<total_warp, M, N, K, lda, ldb, compute_max_only>(
-          smem_a_real, smem_a_imag, smem_b_real, smem_b_imag, arg.Yhat(d, 1 - parity, ghost_idx, 0, 0));
+          smem_a_real, smem_a_imag, smem_b_real, smem_b_imag, arg.Yhat.Ghost(d, 1 - parity, ghost_idx, 0, 0));
 
         __syncthreads();
 
