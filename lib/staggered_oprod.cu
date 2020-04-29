@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
-#include <staggered_oprod.h>
 
+#include <staggered_oprod.h>
 #include <tune_quda.h>
 #include <quda_internal.h>
 #include <gauge_field_order.h>

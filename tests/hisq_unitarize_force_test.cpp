@@ -3,8 +3,8 @@
 #include <cstring>
 
 #include <quda.h>
-#include "test_util.h"
-#include <test_params.h>
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -150,7 +150,8 @@ static void hisq_force_test()
   
   printfQuda("Comparing CPU and GPU results\n");
   for(int dir=0; dir<4; ++dir){
-    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
+    int res = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+                             cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 #ifdef MULTI_GPU
     comm_allreduce_int(&res);
     res /= comm_size();

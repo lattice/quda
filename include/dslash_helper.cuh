@@ -190,7 +190,7 @@ namespace quda
     // Threads with threadDim = z can handle z,y,x offsets
     // Threads with threadDim = y can handle y,x offsets
     // Threads with threadDim = x can handle x offsets
-    if (!arg.ghostDim[offsetDim]) return false;
+    if (!arg.commDim[offsetDim]) return false;
 
     if (kernel_type == EXTERIOR_KERNEL_ALL) {
       if (threadDim < offsetDim) return false;
@@ -200,21 +200,21 @@ namespace quda
         break;
 
       case 2: // threadDim = Z
-        if (!arg.ghostDim[3]) break;
-        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (!arg.commDim[3]) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
         break;
 
       case 1: // threadDim = Y
-        if ((!arg.ghostDim[3]) && (!arg.ghostDim[2])) break;
-        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.ghostDim[2] && inBoundary<2>(coord, arg)) return false;
+        if ((!arg.commDim[3]) && (!arg.commDim[2])) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
         break;
 
       case 0: // threadDim = X
-        if ((!arg.ghostDim[3]) && (!arg.ghostDim[2]) && (!arg.ghostDim[1])) break;
-        if (arg.ghostDim[3] && inBoundary<3>(coord, arg)) return false;
-        if (arg.ghostDim[2] && inBoundary<2>(coord, arg)) return false;
-        if (arg.ghostDim[1] && inBoundary<1>(coord, arg)) return false;
+        if ((!arg.commDim[3]) && (!arg.commDim[2]) && (!arg.commDim[1])) break;
+        if (arg.commDim[3] && inBoundary<3>(coord, arg)) return false;
+        if (arg.commDim[2] && inBoundary<2>(coord, arg)) return false;
+        if (arg.commDim[1] && inBoundary<1>(coord, arg)) return false;
         break;
 
       default: break;
@@ -240,7 +240,6 @@ namespace quda
     const int_fastdiv dim[5]; // full lattice dimensions
     const int volumeCB;       // checkerboarded volume
     int commDim[4];           // whether a given dimension is partitioned or not (potentially overridden for Schwarz)
-    int ghostDim[4]; // always equal to actual dimension partitioning (used inside kernel to ensure correct indexing)
 
     const bool dagger; // dagger
     const bool xpay;   // whether we are doing xpay or not
@@ -296,7 +295,6 @@ namespace quda
       pack_blocks(0)
     {
       for (int d = 0; d < 4; d++) {
-        ghostDim[d] = comm_dim_partitioned(d);
         commDim[d] = (comm_override[d] == 0) ? 0 : comm_dim_partitioned(d);
       }
 
@@ -344,9 +342,6 @@ namespace quda
     out << "commDim = { ";
     for (int i = 0; i < 4; i++) out << arg.commDim[i] << (i < 3 ? ", " : " }");
     out << std::endl;
-    out << "ghostDim = { ";
-    for (int i = 0; i < 4; i++) out << arg.ghostDim[i] << (i < 3 ? ", " : " }");
-    out << std::endl;
     out << "volumeCB = " << arg.volumeCB << std::endl;
     out << "dagger = " << arg.dagger << std::endl;
     out << "xpay = " << arg.xpay << std::endl;
@@ -359,15 +354,16 @@ namespace quda
     out << "threadDimMapUpper = { ";
     for (int i = 0; i < 4; i++) out << arg.threadDimMapUpper[i] << (i < 3 ? ", " : " }");
     out << std::endl;
-    out << "twist_a = " << arg.twist_a;
-    out << "twist_b = " << arg.twist_b;
-    out << "twist_c = " << arg.twist_c;
-    out << "pack_threads = " << arg.pack_threads;
-    out << "blocks_per_dir = " << arg.blocks_per_dir;
+    out << "twist_a = " << arg.twist_a << std::endl;
+    out << "twist_b = " << arg.twist_b << std::endl;
+    out << "twist_c = " << arg.twist_c << std::endl;
+    out << "pack_threads = " << arg.pack_threads << std::endl;
+    out << "blocks_per_dir = " << arg.blocks_per_dir << std::endl;
     out << "dim_map = { ";
     for (int i = 0; i < 4; i++) out << arg.dim_map[i] << (i < 3 ? ", " : " }");
-    out << "active_dims = " << arg.active_dims;
-    out << "pack_blocks = " << arg.pack_blocks;
+    out << std::endl;
+    out << "active_dims = " << arg.active_dims << std::endl;
+    out << "pack_blocks = " << arg.pack_blocks << std::endl;
 
     return out;
   }
