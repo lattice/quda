@@ -37,7 +37,8 @@ namespace quda
       inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   }
 
-  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+  PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                     SolverParam &param, TimeProfile &profile) :
     Solver(mat, matSloppy, matPrecon, param, profile),
     K(0),
     Kparam(param)

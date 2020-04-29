@@ -7,7 +7,7 @@
 #include <quda_internal.h>
 #include <comm_quda.h>
 
-#include <test_util.h>
+#include <host_utils.h>
 
 using namespace quda;
 
@@ -31,7 +31,7 @@ enum {
 
 
 //FIXME remove this legacy macro
-#define gaugeSiteSize 18 // real numbers per gauge field
+#define gauge_site_size 18 // real numbers per gauge field
 
 static void* fwd_nbr_staple[4];
 static void* back_nbr_staple[4];
@@ -44,7 +44,7 @@ static int volumeCB;
 static int Vs[4], Vsh[4];
 
 #include "gauge_field.h"
-extern void setup_dims_in_gauge(int *XX);
+// extern void setup_dims_in_gauge(int *XX);
 
 static void
 setup_dims(int* X)
@@ -126,36 +126,36 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
       //ther is only one staple in the same location
       for(int linkdir=0; linkdir < 1; linkdir ++){
 	Float* even_src = cpuStaple;
-	Float* odd_src = cpuStaple + volumeCB*gaugeSiteSize;
+        Float *odd_src = cpuStaple + volumeCB * gauge_site_size;
 
-	Float* even_dst;
-	Float* odd_dst;
+        Float *even_dst;
+        Float *odd_dst;
 
-	//switching odd and even ghost cpuLink when that dimension size is odd
-	//only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
-	if((X[dir] % 2 ==0) || (comm_dim(dir) == 1)){
-	  even_dst = dst[dir];
-	  odd_dst = even_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;
-	}else{
-	  odd_dst = dst[dir];
-	  even_dst = dst[dir] + nFace*faceVolumeCB[dir]*gaugeSiteSize;
-	}
+        // switching odd and even ghost cpuLink when that dimension size is odd
+        // only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
+        if ((X[dir] % 2 == 0) || (comm_dim(dir) == 1)) {
+          even_dst = dst[dir];
+          odd_dst = even_dst + nFace * faceVolumeCB[dir] * gauge_site_size;
+        } else {
+          odd_dst = dst[dir];
+          even_dst = dst[dir] + nFace * faceVolumeCB[dir] * gauge_site_size;
+        }
 
-	int even_dst_index = 0;
-	int odd_dst_index = 0;
-	int startd;
-	int endd;
-	if(ite == 0){ //back
-	  startd = 0;
-	  endd= nFace;
-	}else{//fwd
-	  startd = X[dir] - nFace;
-	  endd =X[dir];
-	}
-	for(d = startd; d < endd; d++){
-	  for(a = 0; a < A[dir]; a++){
-	    for(b = 0; b < B[dir]; b++){
-	      for(c = 0; c < C[dir]; c++){
+        int even_dst_index = 0;
+        int odd_dst_index = 0;
+        int startd;
+        int endd;
+        if (ite == 0) { // back
+          startd = 0;
+          endd = nFace;
+        } else { // fwd
+          startd = X[dir] - nFace;
+          endd = X[dir];
+        }
+        for (d = startd; d < endd; d++) {
+          for (a = 0; a < A[dir]; a++) {
+            for (b = 0; b < B[dir]; b++) {
+              for(c = 0; c < C[dir]; c++){
 		int index = ( a*f[dir][0] + b*f[dir][1]+ c*f[dir][2] + d*f[dir][3])>> 1;
 		int oddness = (a+b+c+d)%2;
 		if (oddness == 0){ //even
@@ -170,11 +170,11 @@ void packGhostAllStaples(Float *cpuStaple, Float **cpuGhostBack,Float**cpuGhostF
 		  odd_dst_index++;
 		}
 	      }//c
-	    }//b
-	  }//a
-	}//d
-	assert( even_dst_index == nFace*faceVolumeCB[dir]);
-	assert( odd_dst_index == nFace*faceVolumeCB[dir]);
+            }  // b
+          }    // a
+        }      // d
+        assert(even_dst_index == nFace * faceVolumeCB[dir]);
+        assert(odd_dst_index == nFace * faceVolumeCB[dir]);
       }//linkdir
     }//dir
   }//ite
@@ -209,9 +209,9 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
   int even_dst_idx = 0;
   int odd_dst_idx = 0;
   char* dst_even =(char*)buf;
-  char* dst_odd = dst_even + (X[dir1]*X[dir2]/2)*gaugeSiteSize*prec;
+  char *dst_odd = dst_even + (X[dir1] * X[dir2] / 2) * gauge_site_size * prec;
   char* src_even = (char*)sitelink[nu];
-  char* src_odd = src_even + (X[0]*X[1]*X[2]*X[3]/2)*gaugeSiteSize*prec;
+  char *src_odd = src_even + (X[0] * X[1] * X[2] * X[3] / 2) * gauge_site_size * prec;
 
   if( (X[nu]+X[mu]) % 2 == 1){
     //oddness will change between me and the diagonal neighbor
@@ -226,15 +226,15 @@ void pack_gauge_diag(void* buf, int* X, void** sitelink, int nu, int mu, int dir
       int src_idx = ((X[nu]-1)*mul_factor[nu]+ 0*mul_factor[mu]+i*mul_factor[dir2]+j*mul_factor[dir1])>>1;
       int oddness = ( (X[nu]-1) + 0 + i + j) %2;
       if(oddness==0){
-	for(int tmpidx = 0; tmpidx < gaugeSiteSize; tmpidx++){
-	  memcpy(&dst_even[(18*even_dst_idx+tmpidx)*prec], &src_even[(18*src_idx + tmpidx)*prec], prec);
-	}
-	even_dst_idx++;
+        for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
+          memcpy(&dst_even[(18 * even_dst_idx + tmpidx) * prec], &src_even[(18 * src_idx + tmpidx) * prec], prec);
+        }
+        even_dst_idx++;
       }else{
-	for(int tmpidx = 0; tmpidx < gaugeSiteSize; tmpidx++){
-	  memcpy(&dst_odd[(18*odd_dst_idx+tmpidx)*prec], &src_odd[(18*src_idx + tmpidx)*prec], prec);
-	}
-	odd_dst_idx++;
+        for (int tmpidx = 0; tmpidx < gauge_site_size; tmpidx++) {
+          memcpy(&dst_odd[(18 * odd_dst_idx + tmpidx) * prec], &src_odd[(18 * src_idx + tmpidx) * prec], prec);
+        }
+        odd_dst_idx++;
       }//if
     }//for j
   }//for i
@@ -308,18 +308,18 @@ void packGhostAllLinks(Float **cpuLink, Float **cpuGhostBack,Float**cpuGhostFwd,
     //we need copy all 4 links in the same location
     for(int linkdir=0; linkdir < 4; linkdir ++){
       Float* even_src = cpuLink[linkdir];
-      Float* odd_src = cpuLink[linkdir] + volumeCB*gaugeSiteSize;
+      Float *odd_src = cpuLink[linkdir] + volumeCB * gauge_site_size;
       Float* even_dst;
       Float* odd_dst;
 
       //switching odd and even ghost cpuLink when that dimension size is odd
       //only switch if X[dir] is odd and the gridsize in that dimension is greater than 1
       if((X[dir] % 2 ==0) || (comm_dim(dir) == 1)){
-	even_dst = dst[dir] + 2*linkdir* nFace *faceVolumeCB[dir]*gaugeSiteSize;
-	odd_dst = even_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+        even_dst = dst[dir] + 2 * linkdir * nFace * faceVolumeCB[dir] * gauge_site_size;
+        odd_dst = even_dst + nFace * faceVolumeCB[dir] * gauge_site_size;
       }else{
-	odd_dst = dst[dir] + 2*linkdir* nFace *faceVolumeCB[dir]*gaugeSiteSize;
-	even_dst = odd_dst + nFace*faceVolumeCB[dir]*gaugeSiteSize;
+        odd_dst = dst[dir] + 2 * linkdir * nFace * faceVolumeCB[dir] * gauge_site_size;
+        even_dst = odd_dst + nFace * faceVolumeCB[dir] * gauge_site_size;
       }
 
       int even_dst_index = 0;
@@ -379,7 +379,7 @@ void exchange_llfat_init(QudaPrecision prec)
   
   for (int i=0; i < 4; i++) {
 
-    size_t packet_size = Vs[i]*gaugeSiteSize*prec;
+    size_t packet_size = Vs[i] * gauge_site_size * prec;
 
     fwd_nbr_staple[i] = pinned_malloc(packet_size);
     back_nbr_staple[i] = pinned_malloc(packet_size);
@@ -430,7 +430,7 @@ void exchange_sitelink_diag(int* X, Float** sitelink,  Float** ghost_sitelink_di
       if(dir1 == 4 || dir2 == 4){
 	errorQuda("Invalid dir1/dir2");
       }
-      int len = X[dir1]*X[dir2]*gaugeSiteSize*sizeof(Float);
+      int len = X[dir1] * X[dir2] * gauge_site_size * sizeof(Float);
       void *sendbuf = safe_malloc(len);
       
       pack_gauge_diag(sendbuf, X, (void**)sitelink, nu, mu, dir1, dir2, (QudaPrecision)sizeof(Float));
@@ -472,9 +472,9 @@ exchange_sitelink(int*X, Float** sitelink, Float** ghost_sitelink, Float** ghost
 
   for (int dir = 0; dir < 4; dir++) {
     if(optflag && !commDimPartitioned(dir)) continue;
-    int len = Vsh[dir]*gaugeSiteSize*sizeof(Float);
+    int len = Vsh[dir] * gauge_site_size * sizeof(Float);
     Float* ghost_sitelink_back = ghost_sitelink[dir];
-    Float* ghost_sitelink_fwd = ghost_sitelink[dir] + 8*Vsh[dir]*gaugeSiteSize;
+    Float *ghost_sitelink_fwd = ghost_sitelink[dir] + 8 * Vsh[dir] * gauge_site_size;
 
     MsgHandle *mh_recv_back;
     MsgHandle *mh_recv_fwd;
@@ -519,7 +519,7 @@ void exchange_cpu_sitelink(int* X,
   static void*  sitelink_back_sendbuf[4];
 
   for (int i=0; i<4; i++) {
-    int nbytes = 4*Vs[i]*gaugeSiteSize*gPrecision;
+    int nbytes = 4 * Vs[i] * gauge_site_size * gPrecision;
     sitelink_fwd_sendbuf[i] = safe_malloc(nbytes);
     sitelink_back_sendbuf[i] = safe_malloc(nbytes);
     memset(sitelink_fwd_sendbuf[i], 0, nbytes);
@@ -639,7 +639,7 @@ void exchange_cpu_sitelink(int* X,
  * @sitelink: this is stored according to dimension size  (X4+R4) * (X1+R1) * (X2+R2) * (X3+R3)
  */
 
-// gaugeSiteSize
+// gauge_site_size
 
 void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrder cpu_order,
 			      QudaPrecision gPrecision, int optflag, int geometry)
@@ -675,7 +675,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
   int slice_3d[] = { E[3]*E[2]*E[1], E[3]*E[2]*E[0], E[3]*E[1]*E[0], E[2]*E[1]*E[0]};  
   int len[4];
   for(int i=0; i<4;i++){
-    len[i] = slice_3d[i] * R[i] * geometry*gaugeSiteSize*gPrecision; //2 slices, 4 directions' links
+    len[i] = slice_3d[i] * R[i] * geometry * gauge_site_size * gPrecision; // 2 slices, 4 directions' links
   }
 
   void* ghost_sitelink_fwd_sendbuf[4];
@@ -691,7 +691,7 @@ void exchange_cpu_sitelink_ex(int* X, int *R, void** sitelink, QudaGaugeFieldOrd
     ghost_sitelink_back[i] = safe_malloc(len[i]);
   }
 
-  int gaugebytes = gaugeSiteSize*gPrecision;
+  int gaugebytes = gauge_site_size * gPrecision;
   int a, b, c,d;
   for(int dir =0;dir < 4;dir++){
     if( (!commDimPartitioned(dir)) && optflag) continue;
@@ -936,17 +936,13 @@ do_exchange_cpu_staple(Float* staple, Float** ghost_staple, Float** staple_fwd_s
 
   
   int Vsh[4] = {Vsh_x, Vsh_y, Vsh_z, Vsh_t};
-  size_t len[4] = {
-    Vsh_x*gaugeSiteSize*sizeof(Float),
-    Vsh_y*gaugeSiteSize*sizeof(Float),
-    Vsh_z*gaugeSiteSize*sizeof(Float),
-    Vsh_t*gaugeSiteSize*sizeof(Float)
-  };
-  
+  size_t len[4] = {Vsh_x * gauge_site_size * sizeof(Float), Vsh_y * gauge_site_size * sizeof(Float),
+                   Vsh_z * gauge_site_size * sizeof(Float), Vsh_t * gauge_site_size * sizeof(Float)};
+
   for (int dir=0;dir < 4; dir++) {
 
     Float *ghost_staple_back = ghost_staple[dir];
-    Float *ghost_staple_fwd = ghost_staple[dir] + 2*Vsh[dir]*gaugeSiteSize;
+    Float *ghost_staple_fwd = ghost_staple[dir] + 2 * Vsh[dir] * gauge_site_size;
 
     MsgHandle *mh_recv_back;
     MsgHandle *mh_recv_fwd;
@@ -986,8 +982,8 @@ void exchange_cpu_staple(int* X, void* staple, void** ghost_staple, QudaPrecisio
   void *staple_back_sendbuf[4];
 
   for(int i=0;i < 4; i++){
-    staple_fwd_sendbuf[i] = safe_malloc(Vs[i]*gaugeSiteSize*gPrecision);
-    staple_back_sendbuf[i] = safe_malloc(Vs[i]*gaugeSiteSize*gPrecision);
+    staple_fwd_sendbuf[i] = safe_malloc(Vs[i] * gauge_site_size * gPrecision);
+    staple_back_sendbuf[i] = safe_malloc(Vs[i] * gauge_site_size * gPrecision);
   }
   
   if (gPrecision == QUDA_DOUBLE_PRECISION) {
@@ -1025,4 +1021,4 @@ void exchange_llfat_cleanup(void)
   checkCudaError();
 }
 
-#undef gaugeSiteSize
+#undef gauge_site_size

@@ -52,8 +52,6 @@
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-#define spinorSiteSize 24 // real numbers per spinor
-
 #define MAX_GPU_NUM_PER_NODE 16
 
 // define newQudaGaugeParam() and newQudaInvertParam()
@@ -1751,13 +1749,13 @@ namespace quda {
     DiracParam diracParam;
     DiracParam diracSloppyParam;
     DiracParam diracPreParam;
-    
+
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
     bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    
+
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
     dPre = Dirac::create(diracPreParam);
@@ -1769,22 +1767,22 @@ namespace quda {
     DiracParam diracSloppyParam;
     DiracParam diracPreParam;
     DiracParam diracRefParam;
-    
+
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     setDiracRefineParam(diracRefParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
     bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
-    
+
     d = Dirac::create(diracParam); // create the Dirac operator
     dSloppy = Dirac::create(diracSloppyParam);
     dPre = Dirac::create(diracPreParam);
     dRef = Dirac::create(diracRefParam);
   }
-  
+
   static double unscaled_shifts[QUDA_MAX_MULTI_SHIFT];
-  
+
   void massRescale(cudaColorSpinorField &b, QudaInvertParam &param) {
 
     double kappa5 = (0.5/(5.0 + param.m5));
@@ -3483,8 +3481,8 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   checkGauge(param);
 
   if (param->num_offset > QUDA_MAX_MULTI_SHIFT)
-    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d",
-        param->num_offset, QUDA_MAX_MULTI_SHIFT);
+    errorQuda("Number of shifts %d requested greater than QUDA_MAX_MULTI_SHIFT %d", param->num_offset,
+              QUDA_MAX_MULTI_SHIFT);
 
   pushVerbosity(param->verbosity);
 
@@ -3492,7 +3490,6 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   bool pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) || (param->solve_type == QUDA_NORMOP_PC_SOLVE);
   bool mat_solution = (param->solution_type == QUDA_MAT_SOLUTION) || (param->solution_type ==  QUDA_MATPC_SOLUTION);
   bool direct_solve = (param->solve_type == QUDA_DIRECT_SOLVE) || (param->solve_type == QUDA_DIRECT_PC_SOLVE);
-
 
   if (param->dslash_type == QUDA_ASQTAD_DSLASH ||
       param->dslash_type == QUDA_STAGGERED_DSLASH) {
@@ -3598,6 +3595,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
   ColorSpinorParam cudaParam(cpuParam, *param);
   // This setting will download a host vector
   cudaParam.create = QUDA_COPY_FIELD_CREATE;
+  cudaParam.location = QUDA_CUDA_FIELD_LOCATION;
   b = new cudaColorSpinorField(*h_b, cudaParam); // Creates b and downloads h_b to it
   profileMulti.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -3607,8 +3605,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // now check if we need to invalidate the solutionResident vectors
   bool invalidate = false;
-  for (auto v : solutionResident)
-    if (cudaParam.Precision() != v->Precision()) { invalidate = true; break; }
+  for (auto v : solutionResident) {
+    if (cudaParam.Precision() != v->Precision()) {
+      invalidate = true;
+      break;
+    }
+  }
 
   if (invalidate) {
     for (auto v : solutionResident) delete v;
@@ -3617,12 +3619,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // grow resident solutions to be big enough
   for (int i=solutionResident.size(); i < param->num_offset; i++) {
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding vector %d to solutionsResident\n", i);
     solutionResident.push_back(new cudaColorSpinorField(cudaParam));
   }
   for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
-
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
-
 
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
 
@@ -3735,27 +3736,27 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	  const int nRefine = param->num_offset - i + 1;
 #endif
 
-	  std::vector<ColorSpinorField*> q;
-	  q.resize(nRefine);
-	  std::vector<ColorSpinorField*> z;
-	  z.resize(nRefine);
-	  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-	  cudaColorSpinorField tmp(cudaParam);
+          std::vector<ColorSpinorField *> q;
+          q.resize(nRefine);
+          std::vector<ColorSpinorField *> z;
+          z.resize(nRefine);
+          cudaParam.create = QUDA_NULL_FIELD_CREATE;
+          cudaColorSpinorField tmp(cudaParam);
 
-	  for(int j=0; j < nRefine; j++) {
-	    q[j] = new cudaColorSpinorField(cudaParam);
-	    z[j] = new cudaColorSpinorField(cudaParam);
-	  }
+          for (int j = 0; j < nRefine; j++) {
+            q[j] = new cudaColorSpinorField(cudaParam);
+            z[j] = new cudaColorSpinorField(cudaParam);
+          }
 
-	  *z[0] = *x[0]; // zero solution already solved
+          *z[0] = *x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
 #else
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[param->num_offset-j];
 #endif
 
-	  bool orthogonal = true;
-	  bool apply_mat = true;
+          bool orthogonal = true;
+          bool apply_mat = true;
           bool hermitian = true;
 	  MinResExt mre(*m, orthogonal, apply_mat, hermitian, profileMulti);
 	  blas::copy(tmp, *b);
@@ -3986,7 +3987,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   } else {
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.setPrecision(gParam.Precision(), true);
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
 
     cudaSiteLink = new cudaGaugeField(gParam);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);

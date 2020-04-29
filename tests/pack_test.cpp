@@ -6,9 +6,9 @@
 #include <gauge_field.h>
 #include <util_quda.h>
 
-#include <test_util.h>
-#include <test_params.h>
-#include <dslash_util.h>
+#include <host_utils.h>
+#include <command_line_params.h>
+#include <dslash_reference.h>
 
 #include <color_spinor_field.h>
 #include <blas_quda.h>
@@ -53,10 +53,8 @@ void init() {
   param.gauge_fix = QUDA_GAUGE_FIXED_NO;
 
   // construct input fields
-  for (int dir = 0; dir < 4; dir++) {
-    qdpCpuGauge_p[dir] = malloc(V*gaugeSiteSize*param.cpu_prec);
-  }
-  cpsCpuGauge_p = malloc(4*V*gaugeSiteSize*param.cpu_prec);
+  for (int dir = 0; dir < 4; dir++) { qdpCpuGauge_p[dir] = malloc(V * gauge_site_size * param.cpu_prec); }
+  cpsCpuGauge_p = malloc(4 * V * gauge_site_size * param.cpu_prec);
 
   csParam.nColor = 3;
   csParam.nSpin = 4;
@@ -100,8 +98,8 @@ void end() {
 
 void packTest() {
 
-  printf("Sending fields to GPU...\n"); fflush(stdout);
-  
+  printfQuda("Sending fields to GPU...\n");
+
 #ifdef BUILD_CPS_INTERFACE
   {
     param.gauge_order = QUDA_CPS_WILSON_GAUGE_ORDER;
@@ -117,12 +115,12 @@ void packTest() {
     stopwatchStart();
     cudaCpsGauge.loadCPUField(cpsCpuGauge);
     double cpsGtime = stopwatchReadSeconds();
-    printf("CPS Gauge send time = %e seconds\n", cpsGtime);
+    printfQuda("CPS Gauge send time = %e seconds\n", cpsGtime);
 
     stopwatchStart();
     cudaCpsGauge.saveCPUField(cpsCpuGauge);
     double cpsGRtime = stopwatchReadSeconds();
-    printf("CPS Gauge restore time = %e seconds\n", cpsGRtime);
+    printfQuda("CPS Gauge restore time = %e seconds\n", cpsGRtime);
   }
 #endif
 
@@ -141,12 +139,12 @@ void packTest() {
     stopwatchStart();
     cudaQdpGauge.loadCPUField(qdpCpuGauge);
     double qdpGtime = stopwatchReadSeconds();
-    printf("QDP Gauge send time = %e seconds\n", qdpGtime);
+    printfQuda("QDP Gauge send time = %e seconds\n", qdpGtime);
 
     stopwatchStart();
     cudaQdpGauge.saveCPUField(qdpCpuGauge);
     double qdpGRtime = stopwatchReadSeconds();
-    printf("QDP Gauge restore time = %e seconds\n", qdpGRtime);
+    printfQuda("QDP Gauge restore time = %e seconds\n", qdpGRtime);
   }
 #endif
 
@@ -154,30 +152,25 @@ void packTest() {
 
   *cudaSpinor = *spinor;
   double sSendTime = stopwatchReadSeconds();
-  printf("Spinor send time = %e seconds\n", sSendTime); fflush(stdout);
+  printfQuda("Spinor send time = %e seconds\n", sSendTime);
 
   stopwatchStart();
   *spinor2 = *cudaSpinor;
   double sRecTime = stopwatchReadSeconds();
-  printf("Spinor receive time = %e seconds\n", sRecTime); fflush(stdout);
-  
+  printfQuda("Spinor receive time = %e seconds\n", sRecTime);
+
   double spinor_norm = blas::norm2(*spinor);
   double cuda_spinor_norm = blas::norm2(*cudaSpinor);
   double spinor2_norm = blas::norm2(*spinor2);
 
-  printf("Norm check: CPU = %e, CUDA = %e, CPU = %e\n",
-	 spinor_norm, cuda_spinor_norm, spinor2_norm);
+  printfQuda("Norm check: CPU = %e, CUDA = %e, CPU = %e\n", spinor_norm, cuda_spinor_norm, spinor2_norm);
 
   cpuColorSpinorField::Compare(*spinor, *spinor2, 1);
-
 }
 
 int main(int argc, char **argv) {
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

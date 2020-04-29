@@ -950,7 +950,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-# add tests and quda library
+# add tests, utils, reference, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(utils)
+add_subdirectory(host_reference)
 add_subdirectory(doc)
