@@ -57,6 +57,8 @@ static bool create_quda_gauge = false;
 
 static bool invalidate_quda_mom = true;
 
+static bool invalidate_quda_mg = true;
+
 static void *df_preconditioner = nullptr;
 
 // set to 1 for GPU resident pipeline (not yet supported in mainline MILC)
@@ -1155,6 +1157,18 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   qudamilc_called<false>(__func__, verbosity);
 } // qudaEigCGInvert
 
+// Internal structure that maintains `QudaMultigridParam`,
+// `QudaInvertParam`, `QudaEigParam`s, and the traditional
+// void* returned by `newMultigridQuda`.
+// last_mass tracks rebuilds based on changing the mass.
+struct milcMultigridPack {
+  QudaMultigridParam mg_param;
+  QudaInvertParam mg_inv_param;
+  QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
+  double last_mass;
+  void* mg_preconditioner;
+};
+
 void setMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precision, QudaPrecision device_precision,
         QudaPrecision device_precision_sloppy, double mass, std::map<std::string, std::string>& ioparam)
 {
@@ -1276,7 +1290,7 @@ void setMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precisio
       mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
 
       // Basis size for CACG coarse solver/
-      mg_param.coarse_solver_ca_basis_size[i] = 4; //coarse_solver_ca_basis_size[i];
+      mg_param.coarse_solver_ca_basis_size[i] = 16; //coarse_solver_ca_basis_size[i];
 
       // Minimum and maximum eigenvalue for Chebyshev CA basis
       mg_param.coarse_solver_ca_lambda_min[i] = 0.0; // coarse_solver_ca_lambda_min[i];
@@ -1464,13 +1478,6 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   strcpy(mg_eig_param.QUDA_logfile, ""/*eig_QUDA_logfile*/);
 }
 
-// FIXME: Major hack for now: we can't let the mg_inv_param
-// and mg_param defined below fall off the stack.
-// Solution is to define a custom structure that contains
-// these as well as the output of `newMultigridQuda()`.
-static QudaInvertParam static_mg_inv_param;
-static QudaMultigridParam static_mg_param;
-
 void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
       const void* const fatlink, const void* const longlink, const char* const mg_param_file)
 {
@@ -1504,29 +1511,23 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   // hard coding here, delete later
   int mg_levels = 4;
 
-  // Setup multigrid params from config file
-  // TO DO: also make static...
-  QudaEigParam mg_eig_param[mg_levels];
+  // Prepare a multigrid pack
+  milcMultigridPack* mg_pack = new milcMultigridPack;
 
-  // Since the top level is just a unitary rotation, we manually
-  // set mg_eig[0] to false (and throw a warning if a user set it to true)
-  if (false /*mg_eig[0]*/) {
-    printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
-    //mg_eig[0] = false;
-  }
+  // Prepare eigenvector params
   for (int i = 0; i < mg_levels; i++) {
-    mg_eig_param[i] = newQudaEigParam();
-    setMultigridEigParam(mg_eig_param[i], i);
+    mg_pack->mg_eig_param[i] = newQudaEigParam();
+    setMultigridEigParam(mg_pack->mg_eig_param[i], i);
   }
 
-  // need to preserve, set to static vars
-  static_mg_inv_param = newQudaInvertParam();
-  static_mg_param = newQudaMultigridParam();
+  mg_pack->mg_inv_param = newQudaInvertParam();
+  mg_pack->mg_param = newQudaMultigridParam();
+  mg_pack->last_mass = mass;
 
-  static_mg_param.invert_param = &static_mg_inv_param;
-  for (int i = 0; i < mg_levels; i++) { static_mg_param.eig_param[i] = &mg_eig_param[i]; }
+  mg_pack->mg_param.invert_param = &mg_pack->mg_inv_param;
+  for (int i = 0; i < mg_levels; i++) { mg_pack->mg_param.eig_param[i] = &mg_pack->mg_eig_param[i]; }
 
-  setMultigridParam(static_mg_param, host_precision, device_precision, device_precision_sloppy, mass, fileio_info);
+  setMultigridParam(mg_pack->mg_param, host_precision, device_precision, device_precision_sloppy, mass, fileio_info);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
@@ -1540,25 +1541,27 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   }
 
 
-  void* mg_preconditioner = newMultigridQuda(&static_mg_param);
+  mg_pack->mg_preconditioner = newMultigridQuda(&mg_pack->mg_param);
+
+  invalidate_quda_mg = false;
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
   qudamilc_called<false>(__func__, verbosity);
 
-  return mg_preconditioner;
+  return (void*)mg_pack;
 }
 
 void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                 double target_residual, double target_fermilab_residual, const void *const fatlink,
-                const void *const longlink, void *mg_preconditioner, void *source, void *solution, double *const final_residual,
+                const void *const longlink, void *mg_pack_ptr, void *source, void *solution, double *const final_residual,
                 double *const final_fermilab_residual, int *num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
 
-  // For now just invert it with BiCGstab
+  milcMultigridPack* mg_pack = (milcMultigridPack*)(mg_pack_ptr);
 
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
@@ -1598,7 +1601,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.inv_type_precondition = QUDA_INVALID_INVERTER;
 #else
   invertParam.inv_type = QUDA_GCR_INVERTER;
-  invertParam.preconditioner = mg_preconditioner;
+  invertParam.preconditioner = mg_pack->mg_preconditioner;
   invertParam.inv_type_precondition = QUDA_MG_INVERTER;
 #endif
   invertParam.solution_type = QUDA_MAT_SOLUTION;
@@ -1614,9 +1617,17 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   setColorSpinorParams(localDim, host_precision, &csParam);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
-  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) {
+    invalidateGaugeQuda();
+    invalidate_quda_mg = true;
+  }
 
-  if (invalidate_quda_gauge || !create_quda_gauge) {
+  if (mass != mg_pack->last_mass) {
+     mg_pack->mg_param.invert_param->mass = mass;
+     invalidate_quda_mg = true;
+  }
+
+  if (invalidate_quda_gauge || !create_quda_gauge || invalidate_quda_mg) {
     loadGaugeQuda(const_cast<void *>(fatlink), &fat_param);
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
@@ -1624,7 +1635,8 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
     // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
-    updateMultigridQuda(mg_preconditioner, &static_mg_param);
+    updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    invalidate_quda_mg = false;
   }
 
   if (longlink == nullptr) invertParam.dslash_type = QUDA_STAGGERED_DSLASH;
@@ -1645,13 +1657,15 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   qudamilc_called<false>(__func__, verbosity);
 }
 
-void qudaCleanupMultigrid(void* mg_preconditioner)
+void qudaCleanupMultigrid(void* mg_pack_ptr)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
-  if (mg_preconditioner != 0) {
-    destroyMultigridQuda(mg_preconditioner);
+  if (mg_pack_ptr != 0) {
+    milcMultigridPack* mg_pack = (milcMultigridPack*)(mg_pack_ptr);
+    destroyMultigridQuda(mg_pack->mg_preconditioner);
+    delete mg_pack;
   }
 
   qudamilc_called<false>(__func__, verbosity);  

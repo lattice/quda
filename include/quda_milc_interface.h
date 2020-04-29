@@ -306,7 +306,7 @@ extern "C" {
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
    * @param mg_param_file Path to an input text file describing the MG solve, to be documented on QUDA wiki
-   * @return Void pointer mapping to multigrid structure created by `newMultigridQuda` in `interface_quda.cpp`
+   * @return Void pointer wrapping a pack of multigrid-related structures
    */
   void* qudaSetupMultigrid(int external_precision,
       int quda_precision,
@@ -332,7 +332,7 @@ extern "C" {
    * @param target_relative_residual Target Fermilab residual
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
-   * @param mg_preconditioner MG preconditioner structure created by qudaSetupMultigrid
+   * @param mg_pack_ptr MG preconditioner structure created by qudaSetupMultigrid
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    * @param final_residual True residual
@@ -347,7 +347,7 @@ extern "C" {
       double target_fermilab_residual,
       const void *const milc_fatlink,
       const void *const milc_longlink,
-      void *mg_preconditioner,
+      void *mg_pack_ptr,
       void *source,
       void *solution,
       double *const final_residual,
@@ -358,9 +358,9 @@ extern "C" {
    * Clean up a staggered/HISQ multigrid object, freeing all internal
    * fields and otherwise allocated memory.
    *
-   * @param mg_preconditioner Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
+   * @param mg_pack_ptr Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
    */
-  void qudaCleanupMultigrid(void* mg_preconditioner);
+  void qudaCleanupMultigrid(void* mg_pack_ptr);
 
   /**
    * Solve Ax=b for an improved staggered operator with many right hand sides. 
