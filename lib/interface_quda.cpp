@@ -3745,7 +3745,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
           for (int j = 0; j < nRefine; j++) {
             q[j] = new cudaColorSpinorField(cudaParam);
-	    z[j] = new cudaColorSpinorField(cudaParam);
+            z[j] = new cudaColorSpinorField(cudaParam);
           }
 
           *z[0] = *x[0]; // zero solution already solved

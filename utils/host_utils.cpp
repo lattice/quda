@@ -66,7 +66,6 @@ size_t host_gauge_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(
 size_t host_spinor_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 size_t host_clover_data_type_size = (cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
 
-
 void setQudaPrecisions()
 {
   if (prec_sloppy == QUDA_INVALID_PRECISION) prec_sloppy = prec;
@@ -142,11 +141,6 @@ void setQudaDefaultMgTestParams()
     strcpy(mg_vec_outfile[i], "");
   }
 }
-
-
-
-
-
 
 void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, QudaGaugeParam *param)
 {
@@ -255,8 +249,6 @@ void constructRandomSpinorSource(void *v, int nSpin, int nColor, QudaPrecision p
   quda::cpuColorSpinorField spinor_in(param);
   quda::spinorNoise(spinor_in, rng, QUDA_NOISE_UNIFORM);
 }
-
-
 
 void initComms(int argc, char **argv, std::array<int, 4> &commDims) { initComms(argc, argv, commDims.data()); }
 
@@ -395,42 +387,41 @@ bool last_node_in_t()
 // displacements of magnitude one always interchange odd and even lattices.
 //
 
-int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1) {
+int neighborIndex(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
+{
   int Y = fullLatticeIndex(i, oddBit);
-  int x4 = Y/(Z[2]*Z[1]*Z[0]);
-  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
-  int x2 = (Y/Z[0]) % Z[1];
+  int x4 = Y / (Z[2] * Z[1] * Z[0]);
+  int x3 = (Y / (Z[1] * Z[0])) % Z[2];
+  int x2 = (Y / Z[0]) % Z[1];
   int x1 = Y % Z[0];
 
   // assert (oddBit == (x+y+z+t)%2);
 
-  x4 = (x4+dx4+Z[3]) % Z[3];
-  x3 = (x3+dx3+Z[2]) % Z[2];
-  x2 = (x2+dx2+Z[1]) % Z[1];
-  x1 = (x1+dx1+Z[0]) % Z[0];
+  x4 = (x4 + dx4 + Z[3]) % Z[3];
+  x3 = (x3 + dx3 + Z[2]) % Z[2];
+  x2 = (x2 + dx2 + Z[1]) % Z[1];
+  x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  return (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
+  return (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
 }
 
-
-int neighborIndex(int dim[4], int index, int oddBit, int dx[4]){
+int neighborIndex(int dim[4], int index, int oddBit, int dx[4])
+{
 
   const int fullIndex = fullLatticeIndex(dim, index, oddBit);
 
   int x[4];
-  x[3] = fullIndex/(dim[2]*dim[1]*dim[0]);
-  x[2] = (fullIndex/(dim[1]*dim[0])) % dim[2];
-  x[1] = (fullIndex/dim[0]) % dim[1];
+  x[3] = fullIndex / (dim[2] * dim[1] * dim[0]);
+  x[2] = (fullIndex / (dim[1] * dim[0])) % dim[2];
+  x[1] = (fullIndex / dim[0]) % dim[1];
   x[0] = fullIndex % dim[0];
 
-  for(int dir=0; dir<4; ++dir)
-    x[dir] = (x[dir]+dx[dir]+dim[dir]) % dim[dir];
+  for (int dir = 0; dir < 4; ++dir) x[dir] = (x[dir] + dx[dir] + dim[dir]) % dim[dir];
 
-  return (((x[3]*dim[2] + x[2])*dim[1] + x[1])*dim[0] + x[0])/2;
+  return (((x[3] * dim[2] + x[2]) * dim[1] + x[1]) * dim[0] + x[0]) / 2;
 }
 
-int
-neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
+int neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
 {
   int ret;
 
@@ -440,18 +431,18 @@ neighborIndex_mg(int i, int oddBit, int dx4, int dx3, int dx2, int dx1)
   int x2 = (Y/Z[0]) % Z[1];
   int x1 = Y % Z[0];
 
-  int ghost_x4 = x4+ dx4;
+  int ghost_x4 = x4 + dx4;
 
   // assert (oddBit == (x+y+z+t)%2);
 
-  x4 = (x4+dx4+Z[3]) % Z[3];
-  x3 = (x3+dx3+Z[2]) % Z[2];
-  x2 = (x2+dx2+Z[1]) % Z[1];
-  x1 = (x1+dx1+Z[0]) % Z[0];
+  x4 = (x4 + dx4 + Z[3]) % Z[3];
+  x3 = (x3 + dx3 + Z[2]) % Z[2];
+  x2 = (x2 + dx2 + Z[1]) % Z[1];
+  x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ( (ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)){
-    ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
-  }else{
+  if ((ghost_x4 >= 0 && ghost_x4 < Z[3]) || !comm_dim_partitioned(3)) {
+    ret = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
+  } else {
     ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
   }
 
@@ -467,44 +458,38 @@ int neighborIndexFullLattice(int i, int dx4, int dx3, int dx2, int dx1)
 {
   int oddBit = 0;
   int half_idx = i;
-  if (i >= Vh){
-    oddBit =1;
+  if (i >= Vh) {
+    oddBit = 1;
     half_idx = i - Vh;
   }
 
-  int nbr_half_idx = neighborIndex(half_idx, oddBit, dx4,dx3,dx2,dx1);
-  int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
-  if (oddBitChanged){
-    oddBit = 1 - oddBit;
-  }
+  int nbr_half_idx = neighborIndex(half_idx, oddBit, dx4, dx3, dx2, dx1);
+  int oddBitChanged = (dx4 + dx3 + dx2 + dx1) % 2;
+  if (oddBitChanged) { oddBit = 1 - oddBit; }
   int ret = nbr_half_idx;
-  if (oddBit){
-    ret = Vh + nbr_half_idx;
-  }
+  if (oddBit) { ret = Vh + nbr_half_idx; }
 
   return ret;
 }
 
 int neighborIndexFullLattice(int dim[4], int index, int dx[4])
 {
-  const int volume = dim[0]*dim[1]*dim[2]*dim[3];
-  const int halfVolume = volume/2;
+  const int volume = dim[0] * dim[1] * dim[2] * dim[3];
+  const int halfVolume = volume / 2;
   int oddBit = 0;
   int halfIndex = index;
 
-  if(index >= halfVolume){
+  if (index >= halfVolume) {
     oddBit = 1;
     halfIndex = index - halfVolume;
   }
 
   int neighborHalfIndex = neighborIndex(dim, halfIndex, oddBit, dx);
 
-  int oddBitChanged = (dx[0]+dx[1]+dx[2]+dx[3])%2;
-  if(oddBitChanged){
-    oddBit = 1 - oddBit;
-  }
+  int oddBitChanged = (dx[0] + dx[1] + dx[2] + dx[3]) % 2;
+  if (oddBitChanged) { oddBit = 1 - oddBit; }
 
-  return neighborHalfIndex + oddBit*halfVolume;
+  return neighborHalfIndex + oddBit * halfVolume;
 }
 
 int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
@@ -512,52 +497,50 @@ int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1)
   int ret;
   int oddBit = 0;
   int half_idx = i;
-  if (i >= Vh){
-    oddBit =1;
+  if (i >= Vh) {
+    oddBit = 1;
     half_idx = i - Vh;
   }
 
   int Y = fullLatticeIndex(half_idx, oddBit);
-  int x4 = Y/(Z[2]*Z[1]*Z[0]);
-  int x3 = (Y/(Z[1]*Z[0])) % Z[2];
-  int x2 = (Y/Z[0]) % Z[1];
+  int x4 = Y / (Z[2] * Z[1] * Z[0]);
+  int x3 = (Y / (Z[1] * Z[0])) % Z[2];
+  int x2 = (Y / Z[0]) % Z[1];
   int x1 = Y % Z[0];
-  int ghost_x4 = x4+ dx4;
+  int ghost_x4 = x4 + dx4;
 
-  x4 = (x4+dx4+Z[3]) % Z[3];
-  x3 = (x3+dx3+Z[2]) % Z[2];
-  x2 = (x2+dx2+Z[1]) % Z[1];
-  x1 = (x1+dx1+Z[0]) % Z[0];
+  x4 = (x4 + dx4 + Z[3]) % Z[3];
+  x3 = (x3 + dx3 + Z[2]) % Z[2];
+  x2 = (x2 + dx2 + Z[1]) % Z[1];
+  x1 = (x1 + dx1 + Z[0]) % Z[0];
 
-  if ( ghost_x4 >= 0 && ghost_x4 < Z[3]){
-    ret = (x4*(Z[2]*Z[1]*Z[0]) + x3*(Z[1]*Z[0]) + x2*(Z[0]) + x1) / 2;
-  }else{
+  if (ghost_x4 >= 0 && ghost_x4 < Z[3]) {
+    ret = (x4 * (Z[2] * Z[1] * Z[0]) + x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
+  } else {
     ret = (x3 * (Z[1] * Z[0]) + x2 * (Z[0]) + x1) / 2;
     return ret;
   }
 
-  int oddBitChanged = (dx4+dx3+dx2+dx1)%2;
-  if (oddBitChanged){
-    oddBit = 1 - oddBit;
-  }
+  int oddBitChanged = (dx4 + dx3 + dx2 + dx1) % 2;
+  if (oddBitChanged) { oddBit = 1 - oddBit; }
 
-  if (oddBit){
-    ret += Vh;
-  }
+  if (oddBit) { ret += Vh; }
 
   return ret;
 }
 
 // X indexes the lattice site
-void printSpinorElement(void *spinor, int X, QudaPrecision precision) {
+void printSpinorElement(void *spinor, int X, QudaPrecision precision)
+{
   if (precision == QUDA_DOUBLE_PRECISION)
-    for (int s=0; s<4; s++) printVector((double*)spinor+X*24+s*6);
+    for (int s = 0; s < 4; s++) printVector((double *)spinor + X * 24 + s * 6);
   else
-    for (int s=0; s<4; s++) printVector((float*)spinor+X*24+s*6);
+    for (int s = 0; s < 4; s++) printVector((float *)spinor + X * 24 + s * 6);
 }
 
 // X indexes the full lattice
-void printGaugeElement(void *gauge, int X, QudaPrecision precision) {
+void printGaugeElement(void *gauge, int X, QudaPrecision precision)
+{
   if (getOddBit(X) == 0) {
     if (precision == QUDA_DOUBLE_PRECISION)
       for (int m = 0; m < 3; m++) printVector((double *)gauge + (X / 2) * gauge_site_size + m * 3 * 2);
@@ -611,19 +594,13 @@ int fullLatticeIndex(int i, int oddBit) {
   return X;
 }
 
-
-
-
 extern "C" {
-  /**
-     @brief Set the default ASAN options.  This ensures that QUDA just
-     works when SANITIZE is enabled without requiring ASAN_OPTIONS to
-     be set.
-   */
-  const char *__asan_default_options()
-  {
-    return "protect_shadow_gap=0";
-  }
+/**
+   @brief Set the default ASAN options.  This ensures that QUDA just
+   works when SANITIZE is enabled without requiring ASAN_OPTIONS to
+   be set.
+ */
+const char *__asan_default_options() { return "protect_shadow_gap=0"; }
 }
 
 /**
@@ -650,93 +627,83 @@ void get_gridsize_from_env(int *const dims)
 int lex_rank_from_coords_t(const int *coords, void *fdata)
 {
   int rank = coords[0];
-  for (int i = 1; i < 4; i++) {
-    rank = gridsize_from_cmdline[i] * rank + coords[i];
-  }
+  for (int i = 1; i < 4; i++) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
   return rank;
 }
 
 int lex_rank_from_coords_x(const int *coords, void *fdata)
 {
   int rank = coords[3];
-  for (int i = 2; i >= 0; i--) {
-    rank = gridsize_from_cmdline[i] * rank + coords[i];
-  }
+  for (int i = 2; i >= 0; i--) { rank = gridsize_from_cmdline[i] * rank + coords[i]; }
   return rank;
 }
 
-
-
-
-
-
-
-template <typename Float>
-void printVector(Float *v) {
+template <typename Float> void printVector(Float *v)
+{
   printfQuda("{(%f %f) (%f %f) (%f %f)}\n", v[0], v[1], v[2], v[3], v[4], v[5]);
 }
 
-
 // returns 0 or 1 if the full lattice index X is even or odd
-int getOddBit(int Y) {
+int getOddBit(int Y)
+{
   int x4 = Y/(Z[2]*Z[1]*Z[0]);
   int x3 = (Y/(Z[1]*Z[0])) % Z[2];
   int x2 = (Y/Z[0]) % Z[1];
   int x1 = Y % Z[0];
-  return (x4+x3+x2+x1) % 2;
+  return (x4 + x3 + x2 + x1) % 2;
 }
 
 // a+=b
-template <typename Float>
-inline void complexAddTo(Float *a, Float *b) {
+template <typename Float> inline void complexAddTo(Float *a, Float *b)
+{
   a[0] += b[0];
   a[1] += b[1];
 }
 
 // a = b*c
-template <typename Float>
-inline void complexProduct(Float *a, Float *b, Float *c) {
-  a[0] = b[0]*c[0] - b[1]*c[1];
-  a[1] = b[0]*c[1] + b[1]*c[0];
+template <typename Float> inline void complexProduct(Float *a, Float *b, Float *c)
+{
+  a[0] = b[0] * c[0] - b[1] * c[1];
+  a[1] = b[0] * c[1] + b[1] * c[0];
 }
 
 // a = conj(b)*conj(c)
-template <typename Float>
-inline void complexConjugateProduct(Float *a, Float *b, Float *c) {
-  a[0] = b[0]*c[0] - b[1]*c[1];
-  a[1] = -b[0]*c[1] - b[1]*c[0];
+template <typename Float> inline void complexConjugateProduct(Float *a, Float *b, Float *c)
+{
+  a[0] = b[0] * c[0] - b[1] * c[1];
+  a[1] = -b[0] * c[1] - b[1] * c[0];
 }
 
 // a = conj(b)*c
-template <typename Float>
-inline void complexDotProduct(Float *a, Float *b, Float *c) {
-  a[0] = b[0]*c[0] + b[1]*c[1];
-  a[1] = b[0]*c[1] - b[1]*c[0];
+template <typename Float> inline void complexDotProduct(Float *a, Float *b, Float *c)
+{
+  a[0] = b[0] * c[0] + b[1] * c[1];
+  a[1] = b[0] * c[1] - b[1] * c[0];
 }
 
 // a += b*c
-template <typename Float>
-inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign) {
-  a[0] += sign*(b[0]*c[0] - b[1]*c[1]);
-  a[1] += sign*(b[0]*c[1] + b[1]*c[0]);
+template <typename Float> inline void accumulateComplexProduct(Float *a, Float *b, Float *c, Float sign)
+{
+  a[0] += sign * (b[0] * c[0] - b[1] * c[1]);
+  a[1] += sign * (b[0] * c[1] + b[1] * c[0]);
 }
 
 // a += conj(b)*c)
-template <typename Float>
-inline void accumulateComplexDotProduct(Float *a, Float *b, Float *c) {
-  a[0] += b[0]*c[0] + b[1]*c[1];
-  a[1] += b[0]*c[1] - b[1]*c[0];
+template <typename Float> inline void accumulateComplexDotProduct(Float *a, Float *b, Float *c)
+{
+  a[0] += b[0] * c[0] + b[1] * c[1];
+  a[1] += b[0] * c[1] - b[1] * c[0];
 }
 
-template <typename Float>
-inline void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign) {
-  a[0] += sign * (b[0]*c[0] - b[1]*c[1]);
-  a[1] -= sign * (b[0]*c[1] + b[1]*c[0]);
+template <typename Float> inline void accumulateConjugateProduct(Float *a, Float *b, Float *c, int sign)
+{
+  a[0] += sign * (b[0] * c[0] - b[1] * c[1]);
+  a[1] -= sign * (b[0] * c[1] + b[1] * c[0]);
 }
 
-template <typename Float>
-inline void su3Construct12(Float *mat) {
-  Float *w = mat+12;
+template <typename Float> inline void su3Construct12(Float *mat)
+{
+  Float *w = mat + 12;
   w[0] = 0.0;
   w[1] = 0.0;
   w[2] = 0.0;
@@ -746,20 +713,25 @@ inline void su3Construct12(Float *mat) {
 }
 
 // Stabilized Bunk and Sommer
-template <typename Float>
-inline void su3Construct8(Float *mat) {
+template <typename Float> inline void su3Construct8(Float *mat)
+{
   mat[0] = atan2(mat[1], mat[0]);
   mat[1] = atan2(mat[13], mat[12]);
-  for (int i=8; i<18; i++) mat[i] = 0.0;
+  for (int i = 8; i < 18; i++) mat[i] = 0.0;
 }
 
-void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision) {
+void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision)
+{
   if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Construct12((double*)mat);
-    else su3Construct12((float*)mat);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      su3Construct12((double *)mat);
+    else
+      su3Construct12((float *)mat);
   } else {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Construct8((double*)mat);
-    else su3Construct8((float*)mat);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      su3Construct8((double *)mat);
+    else
+      su3Construct8((float *)mat);
   }
 }
 
@@ -767,34 +739,42 @@ void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision pre
 // as the cross product of the conjugate vectors: w = u* x v*
 //
 // 48 flops
-template <typename Float>
-static void su3Reconstruct12(Float *mat, int dir, int ga_idx, QudaGaugeParam *param) {
-  Float *u = &mat[0*(3*2)];
-  Float *v = &mat[1*(3*2)];
-  Float *w = &mat[2*(3*2)];
-  w[0] = 0.0; w[1] = 0.0; w[2] = 0.0; w[3] = 0.0; w[4] = 0.0; w[5] = 0.0;
-  accumulateConjugateProduct(w+0*(2), u+1*(2), v+2*(2), +1);
-  accumulateConjugateProduct(w+0*(2), u+2*(2), v+1*(2), -1);
-  accumulateConjugateProduct(w+1*(2), u+2*(2), v+0*(2), +1);
-  accumulateConjugateProduct(w+1*(2), u+0*(2), v+2*(2), -1);
-  accumulateConjugateProduct(w+2*(2), u+0*(2), v+1*(2), +1);
-  accumulateConjugateProduct(w+2*(2), u+1*(2), v+0*(2), -1);
-  Float u0 = (dir < 3 ? param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
-  w[0]*=u0; w[1]*=u0; w[2]*=u0; w[3]*=u0; w[4]*=u0; w[5]*=u0;
+template <typename Float> static void su3Reconstruct12(Float *mat, int dir, int ga_idx, QudaGaugeParam *param)
+{
+  Float *u = &mat[0 * (3 * 2)];
+  Float *v = &mat[1 * (3 * 2)];
+  Float *w = &mat[2 * (3 * 2)];
+  w[0] = 0.0;
+  w[1] = 0.0;
+  w[2] = 0.0;
+  w[3] = 0.0;
+  w[4] = 0.0;
+  w[5] = 0.0;
+  accumulateConjugateProduct(w + 0 * (2), u + 1 * (2), v + 2 * (2), +1);
+  accumulateConjugateProduct(w + 0 * (2), u + 2 * (2), v + 1 * (2), -1);
+  accumulateConjugateProduct(w + 1 * (2), u + 2 * (2), v + 0 * (2), +1);
+  accumulateConjugateProduct(w + 1 * (2), u + 0 * (2), v + 2 * (2), -1);
+  accumulateConjugateProduct(w + 2 * (2), u + 0 * (2), v + 1 * (2), +1);
+  accumulateConjugateProduct(w + 2 * (2), u + 1 * (2), v + 0 * (2), -1);
+  Float u0 = (dir < 3 ? param->anisotropy : (ga_idx >= (Z[3] - 1) * Z[0] * Z[1] * Z[2] / 2 ? param->t_boundary : 1));
+  w[0] *= u0;
+  w[1] *= u0;
+  w[2] *= u0;
+  w[3] *= u0;
+  w[4] *= u0;
+  w[5] *= u0;
 }
 
-template <typename Float>
-static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *param) {
+template <typename Float> static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *param)
+{
   // First reconstruct first row
   Float row_sum = 0.0;
-  row_sum += mat[2]*mat[2];
-  row_sum += mat[3]*mat[3];
-  row_sum += mat[4]*mat[4];
-  row_sum += mat[5]*mat[5];
-  Float u0 = (dir < 3 ? param->anisotropy :
-	      (ga_idx >= (Z[3]-1)*Z[0]*Z[1]*Z[2]/2 ? param->t_boundary : 1));
-  Float U00_mag = sqrt(1.f/(u0*u0) - row_sum);
+  row_sum += mat[2] * mat[2];
+  row_sum += mat[3] * mat[3];
+  row_sum += mat[4] * mat[4];
+  row_sum += mat[5] * mat[5];
+  Float u0 = (dir < 3 ? param->anisotropy : (ga_idx >= (Z[3] - 1) * Z[0] * Z[1] * Z[2] / 2 ? param->t_boundary : 1));
+  Float U00_mag = sqrt(1.f / (u0 * u0) - row_sum);
 
   mat[14] = mat[0];
   mat[15] = mat[1];
@@ -803,9 +783,9 @@ static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *par
   mat[1] = U00_mag * sin(mat[14]);
 
   Float column_sum = 0.0;
-  for (int i=0; i<2; i++) column_sum += mat[i]*mat[i];
-  for (int i=6; i<8; i++) column_sum += mat[i]*mat[i];
-  Float U20_mag = sqrt(1.f/(u0*u0) - column_sum);
+  for (int i = 0; i < 2; i++) column_sum += mat[i] * mat[i];
+  for (int i = 6; i < 8; i++) column_sum += mat[i] * mat[i];
+  Float U20_mag = sqrt(1.f / (u0 * u0) - column_sum);
 
   mat[12] = U20_mag * cos(mat[15]);
   mat[13] = U20_mag * sin(mat[15]);
@@ -813,48 +793,54 @@ static void su3Reconstruct8(Float *mat, int dir, int ga_idx, QudaGaugeParam *par
   // First column now restored
 
   // finally reconstruct last elements from SU(2) rotation
-  Float r_inv2 = 1.0/(u0*row_sum);
+  Float r_inv2 = 1.0 / (u0 * row_sum);
 
   // U11
   Float A[2];
-  complexDotProduct(A, mat+0, mat+6);
-  complexConjugateProduct(mat+8, mat+12, mat+4);
-  accumulateComplexProduct(mat+8, A, mat+2, u0);
+  complexDotProduct(A, mat + 0, mat + 6);
+  complexConjugateProduct(mat + 8, mat + 12, mat + 4);
+  accumulateComplexProduct(mat + 8, A, mat + 2, u0);
   mat[8] *= -r_inv2;
   mat[9] *= -r_inv2;
 
   // U12
-  complexConjugateProduct(mat+10, mat+12, mat+2);
-  accumulateComplexProduct(mat+10, A, mat+4, -u0);
+  complexConjugateProduct(mat + 10, mat + 12, mat + 2);
+  accumulateComplexProduct(mat + 10, A, mat + 4, -u0);
   mat[10] *= r_inv2;
   mat[11] *= r_inv2;
 
   // U21
-  complexDotProduct(A, mat+0, mat+12);
-  complexConjugateProduct(mat+14, mat+6, mat+4);
-  accumulateComplexProduct(mat+14, A, mat+2, -u0);
+  complexDotProduct(A, mat + 0, mat + 12);
+  complexConjugateProduct(mat + 14, mat + 6, mat + 4);
+  accumulateComplexProduct(mat + 14, A, mat + 2, -u0);
   mat[14] *= r_inv2;
   mat[15] *= r_inv2;
 
   // U12
-  complexConjugateProduct(mat+16, mat+6, mat+2);
-  accumulateComplexProduct(mat+16, A, mat+4, u0);
+  complexConjugateProduct(mat + 16, mat + 6, mat + 2);
+  accumulateComplexProduct(mat + 16, A, mat + 4, u0);
   mat[16] *= -r_inv2;
   mat[17] *= -r_inv2;
 }
 
-void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision, QudaGaugeParam *param) {
+void su3_reconstruct(void *mat, int dir, int ga_idx, QudaReconstructType reconstruct, QudaPrecision precision,
+                     QudaGaugeParam *param)
+{
   if (reconstruct == QUDA_RECONSTRUCT_12) {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct12((double*)mat, dir, ga_idx, param);
-    else su3Reconstruct12((float*)mat, dir, ga_idx, param);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      su3Reconstruct12((double *)mat, dir, ga_idx, param);
+    else
+      su3Reconstruct12((float *)mat, dir, ga_idx, param);
   } else {
-    if (precision == QUDA_DOUBLE_PRECISION) su3Reconstruct8((double*)mat, dir, ga_idx, param);
-    else su3Reconstruct8((float*)mat, dir, ga_idx, param);
+    if (precision == QUDA_DOUBLE_PRECISION)
+      su3Reconstruct8((double *)mat, dir, ga_idx, param);
+    else
+      su3Reconstruct8((float *)mat, dir, ga_idx, param);
   }
 }
 
-template <typename Float>
-static int compareFloats(Float *a, Float *b, int len, double epsilon) {
+template <typename Float> static int compareFloats(Float *a, Float *b, int len, double epsilon)
+{
   for (int i = 0; i < len; i++) {
     double diff = fabs(a[i] - b[i]);
     if (diff > epsilon) {
@@ -865,12 +851,13 @@ static int compareFloats(Float *a, Float *b, int len, double epsilon) {
   return 1;
 }
 
-int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision) {
-  if  (precision == QUDA_DOUBLE_PRECISION) return compareFloats((double*)a, (double*)b, len, epsilon);
-  else return compareFloats((float*)a, (float*)b, len, epsilon);
+int compare_floats(void *a, void *b, int len, double epsilon, QudaPrecision precision)
+{
+  if (precision == QUDA_DOUBLE_PRECISION)
+    return compareFloats((double *)a, (double *)b, len, epsilon);
+  else
+    return compareFloats((float *)a, (float *)b, len, epsilon);
 }
-
-
 
 // 4d checkerboard.
 // given a "half index" i into either an even or odd half lattice (corresponding
@@ -936,8 +923,8 @@ int x4_from_full_index(int i)
   return x4;
 }
 
-template <typename Float>
-void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
+template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param)
+{
   // Apply spatial scaling factor (u0) to spatial links
   for (int d = 0; d < 3; d++) {
     for (int i = 0; i < gauge_site_size * Vh * 2; i++) { gauge[d][i] /= param->anisotropy; }
@@ -973,10 +960,9 @@ void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param) {
   }
 }
 
-
-//static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
-template <typename Float>
-void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
+// static void constructUnitGaugeField(Float **res, QudaGaugeParam *param) {
+template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param)
+{
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
     resEven[dir] = res[dir];
@@ -1015,8 +1001,7 @@ static void orthogonalize(complex<Float> *a, complex<Float> *b, int len) {
   for (int i=0; i<len; i++) b[i] -= (complex<Float>)dot*a[i];
 }
 
-template <typename Float>
-void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type)
+template <typename Float> void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type)
 {
   Float *resOdd[4], *resEven[4];
   for (int dir = 0; dir < 4; dir++) {
@@ -1150,9 +1135,8 @@ template <typename Float> void constructUnitaryGaugeField(Float **res)
   }
 }
 
-
-template <typename Float>
-void constructCloverField(Float *res, double norm, double diag) {
+template <typename Float> void constructCloverField(Float *res, double norm, double diag)
+{
 
   Float c = 2.0 * norm / RAND_MAX;
 
@@ -1559,8 +1543,6 @@ int strong_check_mom(void *momA, void *momB, int len, QudaPrecision prec)
   return ret;
 }
 
-
-
 static struct timeval startTime;
 
 void stopwatchStart() { gettimeofday(&startTime, NULL); }
@@ -1602,4 +1584,3 @@ void performanceStats(double *time, double *gflops)
   printfQuda("%d solves, with mean solve time %g (stddev = %g), mean GFLOPS %g (stddev = %g) [excluding first solve]\n",
              Nsrc, mean_time, stddev_time, mean_gflops, stddev_gflops);
 }
-

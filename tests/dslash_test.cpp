@@ -249,8 +249,7 @@ void init(int argc, char **argv)
 void end()
 {
   if (!transfer) {
-    if(dirac != nullptr)
-    {
+    if (dirac != nullptr) {
       delete dirac;
       dirac = nullptr;
     }
@@ -814,7 +813,6 @@ void dslashRef()
 
   printfQuda("done.\n");
 }
-
 
 void display_test_info()
 {

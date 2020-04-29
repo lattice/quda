@@ -54,7 +54,7 @@ int main(int argc, char **argv)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();
-  
+
   // Only these fermions are supported in this file
   if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
       && dslash_type != QUDA_TWISTED_MASS_DSLASH && dslash_type != QUDA_TWISTED_CLOVER_DSLASH
@@ -63,13 +63,12 @@ int main(int argc, char **argv)
     printfQuda("dslash_type %s not supported\n", get_dslash_str(dslash_type));
     exit(0);
   }
-  
 
   // Set QUDA's internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
   QudaInvertParam inv_param = newQudaInvertParam();
-  setInvertParam(inv_param);  
+  setInvertParam(inv_param);
   // offsets used only by multi-shift solver
   inv_param.num_offset = 12;
   inv_param.num_src = Nsrc;
@@ -79,7 +78,7 @@ int main(int argc, char **argv)
   // initialize the QUDA library
   initQuda(device);
 
-  // Set some dimension parameters for the host routines 
+  // Set some dimension parameters for the host routines
   if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
       dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
       dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
@@ -108,41 +107,40 @@ int main(int argc, char **argv)
     clover = malloc(V * clover_site_size * host_clover_data_type_size);
     clover_inv = malloc(V * clover_site_size * host_spinor_data_type_size);
     constructHostCloverField(clover, clover_inv, inv_param);
-    
+
     // Load the clover terms to the device
     loadCloverQuda(clover, clover_inv, &inv_param);
   }
 
   auto *rng = new quda::RNG(quda::LatticeFieldParam(gauge_param), 1234);
   rng->Init();
-  
+
   // Vector construct START
   //-----------------------------------------------------------------------------------
   quda::ColorSpinorField *check;
   quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   check = quda::ColorSpinorField::Create(cs_param);
-  
+
   // Host arrays for solutions, sources, and check
   void **outMulti = (void **)malloc(inv_param.num_src * sizeof(void *));
-  void **inMulti  = (void **)malloc(inv_param.num_src * sizeof(void *));
+  void **inMulti = (void **)malloc(inv_param.num_src * sizeof(void *));
   // QUDA host arrays
   std::vector<quda::ColorSpinorField *> qudaOutMulti(inv_param.num_src);
   std::vector<quda::ColorSpinorField *> qudaInMulti(inv_param.num_src);
-  
-  for(int i=0; i<inv_param.num_src; i++) {
+
+  for (int i = 0; i < inv_param.num_src; i++) {
     // Allocate memory and set pointers
     qudaOutMulti[i] = quda::ColorSpinorField::Create(cs_param);
     outMulti[i] = qudaOutMulti[i]->V();
-    
+
     qudaInMulti[i] = quda::ColorSpinorField::Create(cs_param);
     inMulti[i] = qudaInMulti[i]->V();
     // Populate the host spinor with random numbers.
     constructRandomSpinorSource(qudaInMulti[i]->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
   }
   // Vector construct END
-  //-----------------------------------------------------------------------------------  
-
+  //-----------------------------------------------------------------------------------
 
   // QUDA invert test BEGIN
   //----------------------------------------------------------------------------
@@ -158,7 +156,7 @@ int main(int argc, char **argv)
 
   printfQuda("\nDone: %i iter / %g secs = %g Gflops, total time = %g secs\n", inv_param.iter, inv_param.secs,
              inv_param.gflops / inv_param.secs, time0);
-  
+
   // Perform host side verification of inversion if requested
   if (verify_results) {
     for (int i = 0; i < inv_param.num_src; i++) {
@@ -179,7 +177,7 @@ int main(int argc, char **argv)
     delete qudaOutMulti[i];
     delete qudaInMulti[i];
   }
-  
+
   freeGaugeQuda();
   for (int dir = 0; dir < 4; dir++) free(gauge[dir]);
 

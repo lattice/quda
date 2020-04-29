@@ -195,7 +195,7 @@ int main(int argc, char **argv)
     break;
 
   default: errorQuda("Unsupported test type");
-    
+
   } // switch
 
   // Deallocate host memory

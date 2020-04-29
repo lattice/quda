@@ -40,12 +40,10 @@ extern QudaPrecision &cuda_prec_precondition;
 extern QudaPrecision &cuda_prec_refinement_sloppy;
 extern QudaPrecision &cuda_prec_ritz;
 
-
 // Set some basic parameters via command line or use defaults
 // Implemented in set_params.cpp
 void setQudaStaggeredEigTestParams();
 void setQudaStaggeredInvTestParams();
-
 
 // Staggered gauge field utils
 //------------------------------------------------------
@@ -66,8 +64,7 @@ template <typename Float>
 void applyGaugeFieldScaling_long(Float **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type);
 void applyGaugeFieldScaling_long(void **gauge, int Vh, QudaGaugeParam *param, QudaDslashType dslash_type,
                                  QudaPrecision local_prec);
-template <typename Float>
-void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type);
+template <typename Float> void applyStaggeredScaling(Float **res, QudaGaugeParam *param, int type);
 //------------------------------------------------------
 
 // Spinor utils
@@ -76,7 +73,6 @@ void constructStaggeredTestSpinorParam(quda::ColorSpinorParam *csParam, const Qu
                                        const QudaGaugeParam *gauge_param);
 //------------------------------------------------------
 
-
 // MILC Data reordering routines
 //------------------------------------------------------
 void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPrecision out_precision,
@@ -84,7 +80,6 @@ void reorderQDPtoMILC(void *milc_out, void **qdp_in, int V, int siteSize, QudaPr
 void reorderMILCtoQDP(void **qdp_out, void *milc_in, int V, int siteSize, QudaPrecision out_precision,
                       QudaPrecision in_precision);
 //------------------------------------------------------
-
 
 // Set some basic parameters via command line or use defaults
 void setQudaPrecisions();
@@ -97,14 +92,11 @@ void constructQudaGaugeField(void **gauge, int type, QudaPrecision precision, Qu
 void constructHostGaugeField(void **gauge, QudaGaugeParam &gauge_param, int argc, char **argv);
 void constructHostCloverField(void *clover, void *clover_inv, QudaInvertParam &inv_param);
 void constructQudaCloverField(void *clover, double norm, double diag, QudaPrecision precision);
-template <typename Float>
-void constructCloverField(Float *res, double norm, double diag);
-template <typename Float>
-void constructUnitGaugeField(Float **res, QudaGaugeParam *param);
+template <typename Float> void constructCloverField(Float *res, double norm, double diag);
+template <typename Float> void constructUnitGaugeField(Float **res, QudaGaugeParam *param);
 template <typename Float>
 void constructRandomGaugeField(Float **res, QudaGaugeParam *param, QudaDslashType dslash_type = QUDA_WILSON_DSLASH);
-template <typename Float>
-void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
+template <typename Float> void applyGaugeFieldScaling(Float **gauge, int Vh, QudaGaugeParam *param);
 //------------------------------------------------------
 
 // Spinor utils
@@ -144,13 +136,11 @@ int neighborIndexFullLattice_mg(int i, int dx4, int dx3, int dx2, int dx1);
 
 void printSpinorElement(void *spinor, int X, QudaPrecision precision);
 void printGaugeElement(void *gauge, int X, QudaPrecision precision);
-template <typename Float>
-void printVector(Float *v);
+template <typename Float> void printVector(Float *v);
 
 int fullLatticeIndex(int i, int oddBit);
 int fullLatticeIndex(int dim[], int index, int oddBit);
 int getOddBit(int X);
-
 
 void createSiteLinkCPU(void **link, QudaPrecision precision, int phase);
 void su3_construct(void *mat, QudaReconstructType reconstruct, QudaPrecision precision);
@@ -178,7 +168,6 @@ int fullLatticeIndex_5d(int i, int oddBit);
 int fullLatticeIndex_5d_4dpc(int i, int oddBit);
 int process_command_line_option(int argc, char **argv, int *idx);
 int process_options(int argc, char **argv);
-
 
 #ifdef __cplusplus
 extern "C" {
