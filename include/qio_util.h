@@ -1,5 +1,4 @@
-#ifndef QIO_TEST_H
-#define QIO_TEST_H
+#pragma once
 
 #ifdef HAVE_QIO
 
@@ -19,9 +18,9 @@ typedef struct
 {
   float re;
   float im;
-} complex;
+} qio_complex;
 
-typedef struct { complex e[NCLR][NCLR]; } suN_matrix;
+typedef struct { qio_complex e[NCLR][NCLR]; } suN_matrix;
 
 /* get and put */
 void vput_R(char *buf, size_t index, int count, void *qfin);
@@ -42,11 +41,10 @@ void vputM(char *s1, size_t index, int count, void *s2)
   //For the site specified by "index", move an array of "count" data
   //from the read buffer to an array of fields
 
-  for (int i=0;i<count;i++)
-    {
-      oFloat *dest = field[i] + len*index;
-      for (int j=0; j<len; j++) dest[j] = src[i*len+j];
-    }
+  for (int i=0;i<count;i++) {
+    oFloat *dest = field[i] + len*index;
+    for (int j=0; j<len; j++) dest[j] = src[i*len+j];
+  }
 }
 
 // for vector fields this order implies [spin][color][complex]
@@ -66,7 +64,6 @@ void vgetM(char *s1, size_t index, int count, void *s2)
     }
 }
 
-
 int vcreate_R(float *field_out[],int count);
 int vcreate_M(suN_matrix *field[] , int count);
 void vdestroy_R(float *field[], int count);
@@ -83,6 +80,3 @@ int qio_test(int output_volfmt, int output_serpar, int ildgstyle,
 int qio_host_test(QIO_Filesystem *fs, int argc, char *argv[]);
 
 #endif // HAVE_QIO
-
-
-#endif /* QIO_TEST_H */

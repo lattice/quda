@@ -1,5 +1,4 @@
-#ifndef _GAUGE_QIO_H
-#define _GAUGE_QIO_H
+#pragma once
 
 #ifdef HAVE_QIO
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision prec, const int *X,
@@ -37,5 +36,3 @@ inline void write_spinor_field(const char *filename, void *V[], QudaPrecision pr
 }
 
 #endif
-
-#endif // _GAUGE_QIO_H
