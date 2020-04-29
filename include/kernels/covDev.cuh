@@ -36,16 +36,22 @@ namespace quda
 
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
               const int *comm_override) :
-
       DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
       U(U),
       mu(mu)
     {
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in);        // check all orders match
+      checkPrecision(out, in, U); // check all precisions match
+      checkLocation(out, in, U);  // check all locations match
       if (!out.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+      pushKernelPackT(true); // non-spin projection requires kernel packing
     }
+
+    virtual ~CovDevArg() { popKernelPackT(); }
   };
 
   /**
@@ -84,7 +90,6 @@ namespace quda
         const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
         out += U * in;
-
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -165,7 +170,7 @@ namespace quda
         break;
       }
 
-      if (kernel_type != INTERIOR_KERNEL) {
+      if (kernel_type != INTERIOR_KERNEL && active) {
         Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out += x;
       }

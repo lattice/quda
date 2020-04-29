@@ -8,9 +8,8 @@
 
 #include "quda.h"
 #include "gauge_field.h"
-#include "test_util.h"
-#include <test_params.h>
-#include "llfat_reference.h"
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "misc.h"
 #include "util_quda.h"
 #include "llfat_quda.h"
@@ -36,7 +35,6 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
@@ -48,7 +46,7 @@ TEST(unitarization, verify) {
   unitarizeLinksCPU(*cpuULink, *cpuFatLink);
   cudaULink->saveCPUField(*cudaResult);
 
-  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gaugeSiteSize,
+  int res = compare_floats(cudaResult->Gauge_p(), cpuULink->Gauge_p(), 4 * cudaResult->Volume() * gauge_site_size,
                            unittol, cpu_prec);
 
 #ifdef MULTI_GPU
@@ -102,29 +100,29 @@ static int unitarize_link_test(int &test_rc)
 
   TimeProfile profile("dummy");
 
-  void* fatlink = (void*)malloc(4*V*gaugeSiteSize*cpu_prec);
+  void *fatlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
   if(fatlink == NULL){
     errorQuda("ERROR: allocating fatlink failed\n");
   }
 
   void* sitelink[4];
   for(int i=0;i < 4;i++){
-    cudaMallocHost((void**)&sitelink[i], V*gaugeSiteSize*cpu_prec);
+    cudaMallocHost((void **)&sitelink[i], V * gauge_site_size * cpu_prec);
     if(sitelink[i] == NULL){
       errorQuda("ERROR; allocate sitelink[%d] failed\n", i);
     }
   }
 
   createSiteLinkCPU(sitelink, qudaGaugeParam.cpu_prec, 1);
-  void* inlink =  (void*)malloc(4*V*gaugeSiteSize*cpu_prec);
+  void *inlink = (void *)malloc(4 * V * gauge_site_size * cpu_prec);
 
   if (cpu_prec == QUDA_DOUBLE_PRECISION){
     double* link = reinterpret_cast<double*>(inlink);
     for(int dir=0; dir<4; ++dir){
       double* slink = reinterpret_cast<double*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }
@@ -133,8 +131,8 @@ static int unitarize_link_test(int &test_rc)
     for(int dir=0; dir<4; ++dir){
       float* slink = reinterpret_cast<float*>(sitelink[dir]);
       for(int i=0; i<V; ++i){
-        for(int j=0; j<gaugeSiteSize; j++){
-          link[(i*4 + dir)*gaugeSiteSize + j] = slink[i*gaugeSiteSize + j];
+        for (int j = 0; j < gauge_site_size; j++) {
+          link[(i * 4 + dir) * gauge_site_size + j] = slink[i * gauge_site_size + j];
         }
       }
     }
@@ -254,9 +252,6 @@ int main(int argc, char **argv)
   xdim=ydim=zdim=tdim=8;
 
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -264,6 +259,10 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   display_test_info();
   int num_failures = unitarize_link_test(test_rc);
