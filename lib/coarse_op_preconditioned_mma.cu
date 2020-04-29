@@ -1,3 +1,4 @@
+
 #include <gauge_field.h>
 #include <blas_cublas.h>
 #include <blas_quda.h>
@@ -217,6 +218,7 @@ namespace quda
         char Aux[TuneKey::aux_n];
         strcpy(Aux, aux);
         strcat(Aux, ",mma");
+        strcat(Aux, accumulate_precision() == QUDA_SINGLE_PRECISION ? ",fp32_acc" : ",fp16_acc");
         if (compute_max_only) strcat(Aux, ",compute_max_only");
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
           strcat(Aux, meta.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
