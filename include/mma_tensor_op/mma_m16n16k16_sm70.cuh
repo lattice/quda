@@ -377,7 +377,7 @@ namespace quda
 
   template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
             class A, class B, class C>
-  __device__ inline float perform_mma(A a, B b, C c)
+  __device__ inline float perform_mma(A aa, B bb, C cc)
   {
     constexpr int lda = bM + pad_size(bM);
     constexpr int ldb = bN + pad_size(bN);
@@ -397,17 +397,158 @@ namespace quda
     auto smem_obj_b_real = make_smem_obj<bN, bK, 1, ldb>(smem_b_real);
     auto smem_obj_b_imag = make_smem_obj<bN, bK, 1, ldb>(smem_b_imag);
 
-    __syncthreads();
-
-    load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, a);
-    load_cache<bK, bN, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, b);
-
-    __syncthreads();
-
     constexpr int total_warp = n_row * n_col / warp_size;
 
-    return zmma_sync_gemm<total_warp, bM, bN, bK, lda, ldb, compute_max_only>(smem_a_real, smem_a_imag, smem_b_real,
-                                                                              smem_b_imag, c);
+#ifdef USE_FP16_HMMA_ACCUMULATE
+    using accumuate_reg_type = half;
+#else
+    using accumuate_reg_type = float;
+#endif
+
+    constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
+    constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension
+    constexpr int tile_acc_dim = bK / WMMA_K; // number of tiles in the accumulate dimension
+
+    static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
+                  "Total number of tiles should be divisible by the number of warps.");
+
+    constexpr int total_tile = tile_row_dim * tile_col_dim;
+    constexpr int warp_cycle = total_tile / total_warp;
+
+    const int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
+    const int warp_id = thread_id / warp_size;
+    const WarpRegisterMapping wrm(thread_id);
+
+    float max = 0.0f; // XXX: Accessor::Float
+
+    MmaOperandC<ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
+    MmaOperandC<ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
+
+#pragma unroll
+    for (int bk = 0; bk < N; bk += bK) {
+
+      __syncthreads();
+
+      auto aa_offset = [&](int i, int j) { return aa(i, j + bk); };
+
+      auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk, j) : bb(i, j + bk); };
+
+      load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, aa_offset);
+      load_cache<bN, bK, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, bb_offset);
+
+      __syncthreads();
+
+#pragma unroll
+      for (int c = 0; c < warp_cycle; c++) {
+
+        // The logical warp assigned to each part of the matrix.
+        const int logical_warp_index = warp_id * warp_cycle + c;
+        const int warp_row = logical_warp_index / tile_col_dim;
+        const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+#pragma unroll
+        for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+
+          const int k_idx = tile_k;
+
+          MmaOperandA<lda / 2> op_a_real;
+          op_a_real.load(smem_a_real, k_idx, warp_row, wrm);
+          MmaOperandA<lda / 2> op_a_imag;
+          op_a_imag.load(smem_a_imag, k_idx, warp_row, wrm);
+
+          MmaOperandB<ldb / 2> op_b_real;
+          op_b_real.load(smem_b_real, k_idx, warp_col, wrm);
+          MmaOperandB<ldb / 2> op_b_imag;
+          op_b_imag.load(smem_b_imag, k_idx, warp_col, wrm);
+
+          gemm(op_a_real, op_b_real, op_c_real[c]);
+          gemm(op_a_imag, op_b_real, op_c_imag[c]);
+          gemm(op_a_real, op_b_imag, op_c_imag[c]);
+          // revert op_imag
+          op_a_imag.negate();
+          gemm(op_a_imag, op_b_imag, op_c_real[c]);
+        }
+      }
+    }
+
+    // wrap up!
+#pragma unroll
+    for (int c = 0; c < warp_cycle; c++) {
+
+      if (compute_max_only) {
+
+        op_c_real[c].abs_max(max);
+        op_c_imag[c].abs_max(max);
+
+      } else {
+
+        // The logical warp assigned to each part of the matrix.
+        const int logical_warp_index = warp_id * warp_cycle + c;
+        const int warp_row = logical_warp_index / tile_col_dim;
+        const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+#ifdef USE_FP16_HMMA_ACCUMULATE
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+        // const int col = warp_col * 16 + wrm.quad_col * 8;
+        const int col = warp_col * 2 + wrm.quad_col;
+
+        constexpr bool fixed = Accessor::fixed;
+        using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
+        trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&cc.v[cc.idx]));
+        structure s;
+
+#pragma unroll
+        for (int i = 0; i < 4; i++) {
+          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real[c].reg[i])));
+          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag[c].reg[i])));
+          if (fixed) {
+            const float scale = cc.scale;
+            s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
+            s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
+            s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
+            s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
+          } else {
+            s[i * 4 + 0] = __half2float(r2.x);
+            s[i * 4 + 1] = __half2float(i2.x);
+            s[i * 4 + 2] = __half2float(r2.y);
+            s[i * 4 + 3] = __half2float(i2.y);
+          }
+        }
+
+        ptr_[row * (N / 8) + col] = s;
+#else // USE_FP16_HMMA_ACCUMULATE
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+        const int col = warp_col * 16 + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
+
+        constexpr bool fixed = C::fixed;
+        using structure = typename std::conditional<fixed, Structure<short, 4>, Structure<float, 4>>::type;
+        trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&cc.v[cc.idx]));
+        structure s;
+
+#pragma unroll
+        for (int i = 0; i < 4; i++) {
+          const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real[c].reg[i])));
+          const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag[c].reg[i])));
+          if (fixed) {
+            const float scale = cc.scale;
+            s[0] = short(op_c_real[c].reg[i * 2 + 0] * scale);
+            s[1] = short(op_c_imag[c].reg[i * 2 + 0] * scale);
+            s[2] = short(op_c_real[c].reg[i * 2 + 1] * scale);
+            s[3] = short(op_c_imag[c].reg[i * 2 + 1] * scale);
+          } else {
+            s[0] = op_c_real[c].reg[i * 2 + 0];
+            s[1] = op_c_imag[c].reg[i * 2 + 0];
+            s[2] = op_c_real[c].reg[i * 2 + 1];
+            s[3] = op_c_imag[c].reg[i * 2 + 1];
+          }
+          ptr_[((row + (i % 2) * 2) * N + (col + (i / 2) * 4)) / 2] = s;
+        }
+#endif
+      }
+    }
+
+    return max;
+
   }
 
 } // namespace quda
