@@ -166,7 +166,6 @@ int main(int argc, char **argv)
 
     // Set some default values for MG solve types
     setQudaMgSolveTypes();
-    reliable_delta = 1e-4;
 
     setStaggeredMGInvertParam(inv_param);
     // Set sub structures
