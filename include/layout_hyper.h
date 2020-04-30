@@ -5,12 +5,14 @@
 extern "C" {
 #endif
   /* layout_hyper */
-  int setup_layout(int len[], int nd, int numnodes);
-  int node_number(const int x[]);
-  int node_index(const int x[]);
-  void get_coords(int x[], int node, int index);
-  int num_sites(int node);
-  extern int this_node;
+  /* These routines get a quda_* prefix to avoid
+     linker conflicts with MILC */
+  int quda_setup_layout(int len[], int nd, int numnodes);
+  int quda_node_number(const int x[]);
+  int quda_node_index(const int x[]);
+  void quda_get_coords(int x[], int node, int index);
+  int quda_num_sites(int node);
+  extern int quda_this_node;
 
 #ifdef __cplusplus
 }

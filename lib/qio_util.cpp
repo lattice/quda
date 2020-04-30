@@ -35,8 +35,8 @@ void vset_M(suN_matrix *field[], int count)
 	for (x[1] = 0; x[1] < lattice_size[1]; x[1]++)
 	  for (x[0] = 0; x[0] < lattice_size[0]; x[0]++)
 	    {
-	      if (node_number(x) == this_node) {
-		int index = node_index(x);
+	      if(quda_node_number(x) == quda_this_node){
+		int index = quda_node_index(x);
 		vfill_m(field[i] + index, x, i);
 	      }
 	    }
@@ -45,10 +45,10 @@ void vset_M(suN_matrix *field[], int count)
 int vcreate_M(suN_matrix *field[], int count)
 {
   /* Create an output field */
-  for (int i = 0; i < count; i++) {
-    field[i] = (suN_matrix *)malloc(sizeof(suN_matrix)*num_sites(this_node));
-    if (field[i] == NULL) {
-      printf("vcreate_M(%d): Can't malloc field\n", this_node);
+  for (int i = 0; i < count; i++){
+    field[i] = (suN_matrix *)malloc(sizeof(suN_matrix)*quda_num_sites(quda_this_node));
+    if(field[i] == NULL){
+      printf("vcreate_M(%d): Can't malloc field\n",quda_this_node);
       return 1;
     }
   }
@@ -67,7 +67,7 @@ float vcompare_M(suN_matrix *fielda[], suN_matrix *fieldb[], int count)
   float sum2 = 0;
 
   for (int k = 0; k < count; k++)
-    for (int m = 0; m < num_sites(this_node); m++)
+    for (int m = 0; m < quda_num_sites(quda_this_node); m++)
     {
       for (int j  =0; j < NCLR; j++)
 	for (int i = 0; i < NCLR; i++)

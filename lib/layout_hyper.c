@@ -25,10 +25,10 @@
 */
 
 /*
-   setup_layout()  sets up layout
-   node_number()   returns the node number on which a site lives
-   node_index()    returns the index of the site on the node
-   get_coords()    gives lattice coords from node & index
+   quda_setup_layout()       sets up layout, prefixed w/quda_ to avoid linker clashes with MILC
+   quda_node_number()        returns the node number on which a site lives
+   quda_node_index()         returns the index of the site on the node
+   quda_get_coords()         gives lattice coords from node & index
 */
 
 
@@ -133,7 +133,7 @@ static void setup_hyper_prime(int len[], int nd, int numnodes)
 
     /* This can fail if we run out of prime factors in the dimensions */
     if(j<0) {
-      if(this_node==0) {
+      if(quda_this_node==0) {
 	fprintf(stderr, "LAYOUT: Not enough prime factors in lattice dimensions\n");
       }
       QMP_abort(1);
@@ -147,7 +147,7 @@ static void setup_hyper_prime(int len[], int nd, int numnodes)
   }
 }
 
-int setup_layout(int len[], int nd, int numnodes){
+int quda_setup_layout(int len[], int nd, int numnodes){
   int i;
 
   ndim = nd;
@@ -211,7 +211,7 @@ int setup_layout(int len[], int nd, int numnodes){
   return 0;
 }
 
-int node_number(const int x[])
+int quda_node_number(const int x[])
 {
   int i;
 
@@ -221,7 +221,7 @@ int node_number(const int x[])
   return QMP_get_node_number_from(mcoord);
 }
 
-int node_index(const int x[])
+int quda_node_index(const int x[])
 {
   int i, r=0, p=0;
 
@@ -238,7 +238,7 @@ int node_index(const int x[])
   return r;
 }
 
-void get_coords(int x[], int node, int index)
+void quda_get_coords(int x[], int node, int index)
 {
   int i, s, si;
   int *m;
@@ -273,8 +273,8 @@ void get_coords(int x[], int node, int index)
   free(m);
 
   /* Check the result */
-  if(node_index(x)!=si) {
-    if(this_node==0) {
+  if(quda_node_index(x)!=si) {
+    if(quda_this_node==0) {
       fprintf(stderr,"get_coords: error in layout!\n");
       for(i=0; i<ndim; i++) {
 	fprintf(stderr,"%i\t%i\t%i\n", size1[0][i], size1[1][i], size2[i]);
@@ -289,6 +289,6 @@ void get_coords(int x[], int node, int index)
 }
 
 /* The number of sites on the specified node */
-int num_sites(int node){
+int quda_num_sites(int node){
   return sites_on_node;
 }
