@@ -1,7 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <map>
 #include <quda.h>
 #include <quda_milc_interface.h>
 #include <quda_internal.h>
@@ -10,6 +9,9 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
+
+#include <vector>
+#include <fstream>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -1157,6 +1159,258 @@ void qudaEigCGInvert(int external_precision, int quda_precision, double mass, Qu
   qudamilc_called<false>(__func__, verbosity);
 } // qudaEigCGInvert
 
+// Structure used to handle loading from input file
+struct mgInputStruct {
+
+  int mg_levels;
+  bool verify_results;
+
+  // Setup
+  int nvec[QUDA_MAX_MG_LEVEL]; // ignored on first level, if non-zero on last level we deflate
+  QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
+  double setup_tol[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
+  double setup_maxiter[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
+  char mg_vec_infile[QUDA_MAX_MG_LEVEL][256]; // ignored on first and last level
+  char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256]; // ignored on first and last level
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (first is 2 2 2 2)
+
+  // Solve
+  QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL]; // ignored on first level
+  double coarse_solver_tol[QUDA_MAX_MG_LEVEL]; // ignored on first level
+  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL]; // ignored on first level
+  QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL]; // all but last level
+  int nu_pre[QUDA_MAX_MG_LEVEL]; // all but last level
+  int nu_post[QUDA_MAX_MG_LEVEL]; // all but last level
+
+  // Misc
+  bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
+
+  // Coarsest level deflation
+  int deflate_nEv;
+  int deflate_nKr;
+  int deflate_max_restarts;
+  double deflate_tol;
+  bool deflate_use_poly_acc;
+  double deflate_a_min; // ignored if no polynomial acceleration
+  int deflate_poly_deg; // ignored if no polynomial acceleration
+
+  // set defaults
+  mgInputStruct()
+    : mg_levels(4), verify_results(true), deflate_nEv(66),
+      deflate_nKr(128), deflate_max_restarts(50), deflate_tol(1e-5),
+      deflate_use_poly_acc(false), deflate_a_min(1e-2), deflate_poly_deg(50)
+  {
+    nvec[0] = 24; // must be this
+    geo_block_size[0][0] = 2; // must be this...
+    geo_block_size[0][1] = 2; // "
+    geo_block_size[0][2] = 2; // "
+    geo_block_size[0][3] = 2; // "
+
+    nvec[1] = 64;
+    geo_block_size[1][0] = 2;
+    geo_block_size[1][1] = 2;
+    geo_block_size[1][2] = 2;
+    geo_block_size[1][3] = 2;
+
+    nvec[2] = 96;
+    geo_block_size[2][0] = 2;
+    geo_block_size[2][1] = 2;
+    geo_block_size[2][2] = 2;
+    geo_block_size[2][3] = 2;
+
+    /* Setup */
+
+    /* level 0 -> 1 is K-D, no customization */
+
+    /* Level 1 (pseudo-fine) to 2 (intermediate) */
+    setup_inv[1] = QUDA_CGNR_INVERTER;
+    setup_tol[1] = 1e-5;
+    setup_maxiter[1] = 500;
+    mg_vec_infile[1][0] = 0;
+    mg_vec_outfile[1][0] = 0;
+
+    /* Level 2 (intermediate) to 3 (coarsest) */
+    setup_inv[2] = QUDA_CGNR_INVERTER;
+    setup_tol[2] = 1e-5;
+    setup_maxiter[2] = 500;
+    mg_vec_infile[2][0] = 0;
+    mg_vec_outfile[2][0] = 0;
+
+    /* Solve info */
+
+    /* Level 0 only needs a smoother */
+    smoother_type[0] = QUDA_CA_GCR_INVERTER;
+    nu_pre[0] = 0;
+    nu_post[0] = 4;
+
+    /* Level 1 */
+    coarse_solver[1] = QUDA_GCR_INVERTER;
+    coarse_solver_tol[1] = 5e-2;
+    coarse_solver_maxiter[1] = 4;
+    smoother_type[1] = QUDA_CA_GCR_INVERTER;
+    nu_pre[1] = 0;
+    nu_post[1] = 2;
+
+    /* Level 2 */
+    coarse_solver[2] = QUDA_GCR_INVERTER;
+    coarse_solver_tol[2] = 0.25;
+    coarse_solver_maxiter[2] = 4;
+    smoother_type[2] = QUDA_CA_GCR_INVERTER;
+    nu_pre[2] = 0;
+    nu_post[2] = 2;
+
+    /* Level 3 */
+    coarse_solver[3] = QUDA_CA_GCR_INVERTER; // use CGNR for non-deflated... sometimes
+    coarse_solver_tol[3] = 0.25;
+    coarse_solver_maxiter[3] = 16; // use larger for non-deflated
+
+    /* Misc */
+    mg_verbosity[0] = false;
+    mg_verbosity[1] = false;
+    mg_verbosity[2] = false;
+    mg_verbosity[3] = false;
+
+    /* Deflation */
+    nvec[3] = 0; // 64; // do not deflate
+    mg_vec_infile[3][0] = 0;
+    mg_vec_outfile[3][0] = 0;
+    deflate_nEv = 66;
+    deflate_nKr = 128;
+    deflate_tol = 1e-3;
+    deflate_max_restarts = 50;
+    deflate_use_poly_acc = false;
+    deflate_a_min = 1e-2;
+    deflate_poly_deg = 20;
+
+  }
+
+  QudaInverterType getQudaInverterType(const char* name) {
+    if (strcmp(name, "gcr") == 0) { return QUDA_GCR_INVERTER; }
+    else if (strcmp(name, "cgnr") == 0) { return QUDA_CGNR_INVERTER; }
+    else if (strcmp(name, "cgne") == 0) { return QUDA_CGNE_INVERTER; }
+    else if (strcmp(name, "bicgstab") == 0) { return QUDA_BICGSTAB_INVERTER; }
+    else if (strcmp(name, "ca-gcr") == 0) { return QUDA_CA_GCR_INVERTER; }
+    else { return QUDA_INVALID_INVERTER; }
+  }
+
+
+  // parse out a line
+  bool update(std::vector<std::string>& input_line) {
+  
+    int error_code = 0; // no error
+                        // 1 = wrong number of arguments
+
+    if (strcmp(input_line[0].c_str(), "mg_levels") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { mg_levels = atoi(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "verify_results") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { verify_results = input_line[1][0] == 't' ? true : false; }
+
+    } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { mg_verbosity[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false; }
+
+    } else /* Begin Setup */
+    if (strcmp(input_line[0].c_str(), "nvec") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { nvec[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "geo_block_size") == 0) {
+      if (input_line.size() < 6) { error_code = 1; }
+      else { for (int d = 0; d < 4; d++) geo_block_size[atoi(input_line[1].c_str())][d] = atoi(input_line[2+d].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "setup_inv") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { setup_inv[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "setup_tol") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { setup_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "setup_maxiter") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "mg_vec_infile") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { strcpy(mg_vec_infile[atoi(input_line[1].c_str())], input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "mg_vec_outfile") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { strcpy(mg_vec_outfile[atoi(input_line[1].c_str())], input_line[2].c_str()); }
+
+    } else /* Begin Solvers */
+    if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { coarse_solver[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver_tol") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { coarse_solver_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "coarse_solver_maxiter") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "smoother_type") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { smoother_type[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "nu_pre") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { nu_pre[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "nu_post") == 0) {
+      if (input_line.size() < 3) { error_code = 1; }
+      else { nu_post[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+
+    } else /* Begin Deflation */
+    if (strcmp(input_line[0].c_str(), "deflate_nEv") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_nEv = atoi(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_nKr") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_nKr = atoi(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_max_restarts") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_max_restarts = atoi(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_tol") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_tol = atof(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_use_poly_acc") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_use_poly_acc = input_line[1][0] == 't' ? true : false; }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_a_min") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_a_min = atof(input_line[1].c_str()); }
+
+    } else if (strcmp(input_line[0].c_str(), "deflate_poly_deg") == 0) {
+      if (input_line.size() < 2) { error_code = 1; }
+      else { deflate_poly_deg = atoi(input_line[1].c_str()); }
+
+    } else {
+      printf("Invalid option %s\n", input_line[0].c_str());
+      return false;
+    }
+
+    if (error_code == 1) {
+      printf("Input option %s has an invalid number of arguments\n", input_line[0].c_str());
+      return false;
+    }
+
+    return true;
+
+  }
+
+};
+
 // Internal structure that maintains `QudaMultigridParam`,
 // `QudaInvertParam`, `QudaEigParam`s, and the traditional
 // void* returned by `newMultigridQuda`.
@@ -1169,279 +1423,8 @@ struct milcMultigridPack {
   void* mg_preconditioner;
 };
 
-void milcSetMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precision, QudaPrecision device_precision,
-        QudaPrecision device_precision_sloppy, double mass, std::map<std::string, std::string>& ioparam)
-{
-  {
-    QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
-
-    inv_param.Ls = 1;
-
-    inv_param.sp_pad = 0;
-    inv_param.cl_pad = 0;
-
-    inv_param.cpu_prec = host_precision;
-    inv_param.cuda_prec = device_precision;
-    inv_param.cuda_prec_sloppy = device_precision_sloppy;
-    inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition;
-    inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
-    inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
-    inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-    inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-    inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-    inv_param.dslash_type = QUDA_ASQTAD_DSLASH; // dslash_type;
-
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
-
-    inv_param.dagger = QUDA_DAG_NO;
-    inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
-
-    // this gets ignored
-    inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN; // matpc_type;
-
-    // req'd for staggered/hisq
-    inv_param.solution_type = QUDA_MAT_SOLUTION;
-
-    auto solve_type = QUDA_DIRECT_SOLVE;
-    inv_param.solve_type = solve_type;
-
-    mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
-
-    // hard coded for now, remove later
-    double mg_levels = 4;
-
-    mg_param.invert_param = &inv_param;
-    mg_param.n_level = mg_levels; // set from file
-    for (int i = 0; i < mg_param.n_level; i++) {
-
-      // hard code override for a one node, 32^3x64 for now
-      /*for (int j = 0; j < 4; j++) {
-        // if not defined use 4
-        mg_param.geo_block_size[i][j] = geo_block_size[i][j] ? geo_block_size[i][j] : 4;
-      }*/
-      switch (i) {
-        //case 1:
-        //  for (int j = 0; j < 4; j++) {
-        //    mg_param.geo_block_size[i][j] = 4;
-        //  }
-        //  break;
-        default: // 2^4 K-D, then 2^4 for the last 
-          for (int j = 0; j < 4; j++) {
-            mg_param.geo_block_size[i][j] = 2;
-          }
-          break;
-      }
-      mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      mg_param.verbosity[i] = QUDA_VERBOSE; // mg_verbosity[i];
-      mg_param.setup_inv_type[i] = QUDA_CGNR_INVERTER; // setup_inv[i];
-      mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
-      mg_param.setup_tol[i] = 1e-5; // setup_tol[i];
-      mg_param.setup_maxiter[i] = 500; // setup_maxiter[i];
-
-      // Basis to use for CA-CGN(E/R) setup
-      mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; //setup_ca_basis[i];
-
-      // Basis size for CACG setup
-      mg_param.setup_ca_basis_size[i] = 4; //setup_ca_basis_size[i];
-
-      // Minimum and maximum eigenvalue for Chebyshev CA basis setup
-      mg_param.setup_ca_lambda_min[i] = 0.0; // setup_ca_lambda_min[i];
-      mg_param.setup_ca_lambda_max[i] = -1.0; // use power iterations // setup_ca_lambda_max[i];
-
-      mg_param.spin_block_size[i] = 1;
-      // change this to refresh fields when mass or links change
-      mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
-      mg_param.n_vec[i] = (i==0) ? 24 : (i==1) ? 64 : 96; //(i == 0) ? 24 : nvec[i] == 0 ? 96 : nvec[i]; // default to 96 vectors if not set
-      mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                    // number of times to Gram-Schmidt
-      mg_param.precision_null[i] = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
-      mg_param.smoother_halo_precision[i] = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
-      mg_param.nu_pre[i] = 0; // nu_pre[i];
-      mg_param.nu_post[i] = (i == 0) ? 4 : 2; //nu_post[i];
-      mg_param.mu_factor[i] = 1.; // mu_factor[i];
-
-      mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
-
-      // set the coarse solver wrappers including bottom solver
-      // this hack for the bottom level will go away when I expose
-      // an input file
-      if (i == 1) { // pseudo-fine level sometimes gets special treatment
-        mg_param.coarse_solver[i] = QUDA_GCR_INVERTER;
-        mg_param.coarse_solver_tol[i] = 0.25; // sometimes 5e-2...
-        mg_param.coarse_solver_maxiter[i] = 4; // sometimes more, sometimes less
-                                               // we're all winging this
-      } else if (i == mg_param.n_level-1) { // coarsest level always gets special treatment
-        mg_param.coarse_solver[i] = QUDA_CA_GCR_INVERTER; // or CGNR if no deflation
-        mg_param.coarse_solver_tol[i] = 0.25; 
-        mg_param.coarse_solver_maxiter[i] = 16; // or ~1024 if no deflation
-      } else {
-        mg_param.coarse_solver[i] = QUDA_GCR_INVERTER; // coarse_solver[i];
-        mg_param.coarse_solver_tol[i] = 0.25; // coarse_solver_tol[i];
-        mg_param.coarse_solver_maxiter[i] = 16; //coarse_solver_maxiter[i];
-      }
-      //mg_param.coarse_solver[i] = QUDA_GCR_INVERTER; // coarse_solver[i];
-      //mg_param.coarse_solver_tol[i] = 0.25; // coarse_solver_tol[i];
-      //mg_param.coarse_solver_maxiter[i] = (i==0) ? 8 : 16; //coarse_solver_maxiter[i];
-      
-
-      // Basis to use for CA-CGN(E/R) coarse solver
-      mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
-
-      // Basis size for CACG coarse solver/
-      mg_param.coarse_solver_ca_basis_size[i] = 16; //coarse_solver_ca_basis_size[i];
-
-      // Minimum and maximum eigenvalue for Chebyshev CA basis
-      mg_param.coarse_solver_ca_lambda_min[i] = 0.0; // coarse_solver_ca_lambda_min[i];
-      mg_param.coarse_solver_ca_lambda_max[i] = -1.0; // use power iterations // coarse_solver_ca_lambda_max[i];
-
-      mg_param.smoother[i] = QUDA_CA_GCR_INVERTER; // smoother_type[i];
-
-      // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
-      mg_param.smoother_tol[i] = 0.25; // smoother_tol[i];
-
-      // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
-      // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-      mg_param.smoother_solve_type[i] = (i==0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
-
-      // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-      mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
-
-      // if using Schwarz preconditioning then use local reductions only
-      mg_param.global_reduction[i] = QUDA_BOOLEAN_TRUE; // (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-      // set number of Schwarz cycles to apply
-      mg_param.smoother_schwarz_cycle[i] = 1; // schwarz_cycle[i];
-
-      // Set set coarse_grid_solution_type: this defines which linear
-      // system we are solving on a given level
-      // * QUDA_MAT_SOLUTION - we are solving the full system and inject
-      //   a full field into coarse grid
-      // * QUDA_MATPC_SOLUTION - we are solving the e/o-preconditioned
-      //   system, and only inject single parity field into coarse grid
-      //
-      // Multiple possible scenarios here
-      //
-      // 1. **Direct outer solver and direct smoother**: here we use
-      // full-field residual coarsening, and everything involves the
-      // full system so coarse_grid_solution_type = QUDA_MAT_SOLUTION
-      //
-      // 2. **Direct outer solver and preconditioned smoother**: here,
-      // only the smoothing uses e/o preconditioning, so
-      // coarse_grid_solution_type = QUDA_MAT_SOLUTION_TYPE.
-      // We reconstruct the full residual prior to coarsening after the
-      // pre-smoother, and then need to project the solution for post
-      // smoothing.
-      //
-      // 3. **Preconditioned outer solver and preconditioned smoother**:
-      // here we use single-parity residual coarsening throughout, so
-      // coarse_grid_solution_type = QUDA_MATPC_SOLUTION.  This is a bit
-      // questionable from a theoretical point of view, since we don't
-      // coarsen the preconditioned operator directly, rather we coarsen
-      // the full operator and preconditioned that, but it just works.
-      // This is the optimal combination in general for Wilson-type
-      // operators: although there is an occasional increase in
-      // iteration or two), by working completely in the preconditioned
-      // space, we save the cost of reconstructing the full residual
-      // from the preconditioned smoother, and re-projecting for the
-      // subsequent smoother, as well as reducing the cost of the
-      // ancillary blas operations in the coarse-grid solve.
-      //
-      // Note, we cannot use preconditioned outer solve with direct
-      // smoother
-      //
-      // Finally, we have to treat the top level carefully: for all
-      // other levels the entry into and out of the grid will be a
-      // full-field, which we can then work in Schur complement space or
-      // not (e.g., freedom to choose coarse_grid_solution_type).  For
-      // the top level, if the outer solver is for the preconditioned
-      // system, then we must use preconditoning, e.g., option 3.) above.
-
-      if (i == 0) { // top-level treatment
-
-        // Always this for now
-        if (solve_type == QUDA_DIRECT_SOLVE) {
-          mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-        } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
-          mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-        } else {
-          errorQuda("Unexpected solve_type = %d\n", solve_type);
-        }
-
-      } else {
-
-        // Always this for now. Will be tunable.
-        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-
-        // solve
-        //if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
-        //  mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
-        //} else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
-        //  mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
-        //} else {
-        //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
-        //}
-      }
-
-      mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
-
-      mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION; //  solver_location[i];
-      mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION; // setup_location[i];
-      
-    }
-
-    // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
-    mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
-
-    // coarsening the spin on the first restriction is undefined for staggered fields.
-    mg_param.spin_block_size[0] = 0;
-
-    mg_param.setup_type = QUDA_NULL_VECTOR_SETUP; // setup_type;
-    mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    mg_param.post_orthonormalize = QUDA_BOOLEAN_TRUE; // post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES; // generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
-
-    mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE; // generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    mg_param.run_verify = QUDA_BOOLEAN_TRUE; // verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE; // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    mg_param.run_oblique_proj_check = QUDA_BOOLEAN_FALSE; // oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    // set file i/o parameters
-    for (int i = 0; i < mg_param.n_level; i++) {
-      strcpy(mg_param.vec_infile[i], ""); //mg_vec_infile[i]);
-      strcpy(mg_param.vec_outfile[i], ""); //mg_vec_outfile[i]);
-      /*if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
-      if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;*/
-      mg_param.vec_load[i] = QUDA_BOOLEAN_FALSE;
-      mg_param.vec_store[i] = QUDA_BOOLEAN_FALSE;
-    }
-
-
-    mg_param.coarse_guess = QUDA_BOOLEAN_FALSE; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    // these need to tbe set for now but are actually ignored by the MG setup
-    // needed to make it pass the initialization test
-    inv_param.inv_type = QUDA_GCR_INVERTER;
-    inv_param.tol = 1e-10;
-    inv_param.maxiter = 1000;
-    inv_param.reliable_delta = 1e-6; // reliable_delta;
-    inv_param.gcrNkrylov = 10;
-
-    inv_param.verbosity = QUDA_VERBOSE; // verbosity;
-   
-    inv_param.verbosity_precondition = QUDA_VERBOSE; // verbosity;
-
-  }
-
-
-
-}
-
 // Parameters defining the eigensolver
-void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, int level)
+void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct& input_struct, int level)
 {
   mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS; // mg_eig_type[level];
   mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
@@ -1450,24 +1433,24 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
-  mg_eig_param.nEv = 98; // mg_eig_nEv[level];
-  mg_eig_param.nKr = 160; // mg_eig_nKr[level];
-  mg_eig_param.nConv = (level==1) ? 64 : 96; // nvec[level];
+  mg_eig_param.nEv = input_struct.deflate_nEv; // mg_eig_nEv[level];
+  mg_eig_param.nKr = input_struct.deflate_nKr; // mg_eig_nKr[level];
+  mg_eig_param.nConv = input_struct.nvec[level];
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
   mg_eig_param.require_convergence = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.tol = 1e-6; // mg_eig_tol[level];
+  mg_eig_param.tol = input_struct.deflate_tol; // mg_eig_tol[level];
   mg_eig_param.check_interval = 10; // mg_eig_check_interval[level];
-  mg_eig_param.max_restarts = 50; // mg_eig_max_restarts[level];
+  mg_eig_param.max_restarts = input_struct.deflate_max_restarts; // mg_eig_max_restarts[level];
   mg_eig_param.cuda_prec_ritz = QUDA_DOUBLE_PRECISION; // cuda_prec;
 
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = QUDA_BOOLEAN_TRUE; // mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_dagger = QUDA_BOOLEAN_FALSE; // mg_eig_use_dagger[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.use_poly_acc = QUDA_BOOLEAN_FALSE; // mg_eig_use_poly_acc[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_eig_param.poly_deg = 100; // mg_eig_poly_deg[level];
-  mg_eig_param.a_min = 0.1; // mg_eig_amin[level];
+  mg_eig_param.use_poly_acc = input_struct.deflate_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.poly_deg = input_struct.deflate_poly_deg; // mg_eig_poly_deg[level];
+  mg_eig_param.a_min = input_struct.deflate_a_min; // mg_eig_amin[level];
   mg_eig_param.a_max = 0.0; // compute estimate // mg_eig_amax[level];
 
   // set file i/o parameters
@@ -1477,6 +1460,320 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 
   strcpy(mg_eig_param.QUDA_logfile, ""/*eig_QUDA_logfile*/);
 }
+
+void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precision, QudaPrecision device_precision,
+        QudaPrecision device_precision_sloppy, double mass, const char* const mg_param_file)
+{
+  static const QudaVerbosity verbosity = getVerbosity();
+  QudaMultigridParam& mg_param = mg_pack->mg_param;
+
+  // Create an input struct
+  mgInputStruct input_struct;
+
+  // Load input struct on rank 0
+  if (comm_rank() == 0) {
+    std::ifstream input_file(mg_param_file, std::ios_base::in);
+
+    if (!input_file.is_open()) {
+      errorQuda("MILC interface MG input file %s does not exist!", mg_param_file);
+    }
+
+    // enter parameter loop
+    char buffer[1024];
+    std::vector<std::string> elements;
+    while (!input_file.eof()) {
+
+      elements.clear();
+
+      // get line
+      input_file.getline(buffer, 1024);
+
+      // split on spaces, tabs
+      char* pch = strtok (buffer," \t");
+      while (pch != nullptr)
+      {
+        elements.emplace_back(std::string(pch));
+        pch = strtok (nullptr, " \t");
+      }
+
+      // skip empty lines, comments
+      if (elements.size() == 0 || elements[0][0] == '#')
+        continue;
+
+      // debug: print back out
+      if (verbosity == QUDA_VERBOSE) {
+        for (auto elem : elements) {
+          printf("%s ", elem.c_str());
+        }
+        printf("\n");
+      }
+
+      input_struct.update(elements);
+
+    }
+  }
+
+  comm_barrier();
+  comm_broadcast((void*)&input_struct, sizeof(mgInputStruct));
+
+  auto mg_levels = input_struct.mg_levels;
+
+  // Prepare eigenvector params
+  for (int i = 0; i < mg_levels; i++) {
+    mg_pack->mg_eig_param[i] = newQudaEigParam();
+    milcSetMultigridEigParam(mg_pack->mg_eig_param[i], input_struct, i);
+  }
+
+  mg_pack->mg_inv_param = newQudaInvertParam();
+  mg_pack->mg_param = newQudaMultigridParam();
+  mg_pack->last_mass = mass;
+
+  mg_pack->mg_param.invert_param = &mg_pack->mg_inv_param;
+  for (int i = 0; i < mg_levels; i++) { mg_pack->mg_param.eig_param[i] = &mg_pack->mg_eig_param[i]; }
+
+  QudaInvertParam &inv_param = *mg_param.invert_param; // this will be used to setup SolverParam parent in MGParam class
+
+  inv_param.Ls = 1;
+
+  inv_param.sp_pad = 0;
+  inv_param.cl_pad = 0;
+
+  inv_param.cpu_prec = host_precision;
+  inv_param.cuda_prec = device_precision;
+  inv_param.cuda_prec_sloppy = device_precision_sloppy;
+  inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  inv_param.dirac_order = QUDA_DIRAC_ORDER;
+
+  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
+  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
+
+  inv_param.dslash_type = QUDA_ASQTAD_DSLASH; // dslash_type;
+
+  inv_param.mass = mass;
+  inv_param.kappa = 1.0 / (2.0 * (4.0 + inv_param.mass));
+
+  inv_param.dagger = QUDA_DAG_NO;
+  inv_param.mass_normalization = QUDA_MASS_NORMALIZATION;
+
+  // this gets ignored
+  inv_param.matpc_type = QUDA_MATPC_EVEN_EVEN; // matpc_type;
+
+  // req'd for staggered/hisq
+  inv_param.solution_type = QUDA_MAT_SOLUTION;
+
+  auto solve_type = QUDA_DIRECT_SOLVE;
+  inv_param.solve_type = solve_type;
+
+  mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
+
+  mg_param.invert_param = &inv_param;
+  mg_param.n_level = mg_levels; // set from file
+
+  for (int i = 0; i < mg_param.n_level; i++) {
+
+    if (i == 0) {
+      for (int j = 0; j < 4; j++) {
+        mg_param.geo_block_size[i][j] = 2; // Kahler-Dirac blocking
+      }
+    } else {
+      for (int j = 0; j < 4; j++) {
+        mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j];
+      }
+    }
+
+    // mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    if (i == mg_param.n_level-1 && input_struct.nvec[i] > 0) {
+      mg_param.use_eig_solver[i] = QUDA_BOOLEAN_TRUE;
+    } else {
+      mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE;
+    }
+
+    mg_param.verbosity[i] = input_struct.mg_verbosity[i] ? QUDA_VERBOSE : QUDA_SUMMARIZE; // mg_verbosity[i];
+    mg_param.setup_inv_type[i] = input_struct.setup_inv[i];
+    mg_param.num_setup_iter[i] = 1; // num_setup_iter[i];
+    mg_param.setup_tol[i] = input_struct.setup_tol[i];
+    mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
+
+    // Basis to use for CA-CGN(E/R) setup
+    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; //setup_ca_basis[i];
+
+    // Basis size for CACG setup
+    mg_param.setup_ca_basis_size[i] = 4; //setup_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis setup
+    mg_param.setup_ca_lambda_min[i] = 0.0; // setup_ca_lambda_min[i];
+    mg_param.setup_ca_lambda_max[i] = -1.0; // use power iterations // setup_ca_lambda_max[i];
+
+    mg_param.spin_block_size[i] = 1;
+    // change this to refresh fields when mass or links change
+    mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
+    mg_param.n_vec[i] = (i==0) ? 24 : input_struct.nvec[i];
+    mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                    // number of times to Gram-Schmidt
+    mg_param.precision_null[i] = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i] = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
+    mg_param.nu_pre[i] = input_struct.nu_pre[i];
+    mg_param.nu_post[i] = input_struct.nu_post[i];
+    mg_param.mu_factor[i] = 1.; // mu_factor[i];
+
+    mg_param.cycle_type[i] = QUDA_MG_CYCLE_RECURSIVE;
+
+    // set the coarse solver wrappers including bottom solver
+    mg_param.coarse_solver[i] = input_struct.coarse_solver[i];
+    mg_param.coarse_solver_tol[i] = input_struct.coarse_solver_tol[i];
+    mg_param.coarse_solver_maxiter[i] = input_struct.coarse_solver_maxiter[i];
+    
+
+    // Basis to use for CA-CGN(E/R) coarse solver
+    mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
+
+    // Basis size for CACG coarse solver/
+    mg_param.coarse_solver_ca_basis_size[i] = 16; //coarse_solver_ca_basis_size[i];
+
+    // Minimum and maximum eigenvalue for Chebyshev CA basis
+    mg_param.coarse_solver_ca_lambda_min[i] = 0.0; // coarse_solver_ca_lambda_min[i];
+    mg_param.coarse_solver_ca_lambda_max[i] = -1.0; // use power iterations // coarse_solver_ca_lambda_max[i];
+
+    mg_param.smoother[i] = input_struct.smoother_type[i];
+
+    // set the smoother / bottom solver tolerance (for MR smoothing this will be ignored)
+    mg_param.smoother_tol[i] = 1e-10; // smoother_tol[i];
+
+    // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
+    // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
+    mg_param.smoother_solve_type[i] = (i==0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
+
+    // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
+    mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
+
+    // if using Schwarz preconditioning then use local reductions only
+    mg_param.global_reduction[i] = QUDA_BOOLEAN_TRUE; // (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+    // set number of Schwarz cycles to apply
+    mg_param.smoother_schwarz_cycle[i] = 1; // schwarz_cycle[i];
+
+    // Set set coarse_grid_solution_type: this defines which linear
+    // system we are solving on a given level
+    // * QUDA_MAT_SOLUTION - we are solving the full system and inject
+    //   a full field into coarse grid
+    // * QUDA_MATPC_SOLUTION - we are solving the e/o-preconditioned
+    //   system, and only inject single parity field into coarse grid
+    //
+    // Multiple possible scenarios here
+    //
+    // 1. **Direct outer solver and direct smoother**: here we use
+    // full-field residual coarsening, and everything involves the
+    // full system so coarse_grid_solution_type = QUDA_MAT_SOLUTION
+    //
+    // 2. **Direct outer solver and preconditioned smoother**: here,
+    // only the smoothing uses e/o preconditioning, so
+    // coarse_grid_solution_type = QUDA_MAT_SOLUTION_TYPE.
+    // We reconstruct the full residual prior to coarsening after the
+    // pre-smoother, and then need to project the solution for post
+    // smoothing.
+    //
+    // 3. **Preconditioned outer solver and preconditioned smoother**:
+    // here we use single-parity residual coarsening throughout, so
+    // coarse_grid_solution_type = QUDA_MATPC_SOLUTION.  This is a bit
+    // questionable from a theoretical point of view, since we don't
+    // coarsen the preconditioned operator directly, rather we coarsen
+    // the full operator and preconditioned that, but it just works.
+    // This is the optimal combination in general for Wilson-type
+    // operators: although there is an occasional increase in
+    // iteration or two), by working completely in the preconditioned
+    // space, we save the cost of reconstructing the full residual
+    // from the preconditioned smoother, and re-projecting for the
+    // subsequent smoother, as well as reducing the cost of the
+    // ancillary blas operations in the coarse-grid solve.
+    //
+    // Note, we cannot use preconditioned outer solve with direct
+    // smoother
+    //
+    // Finally, we have to treat the top level carefully: for all
+    // other levels the entry into and out of the grid will be a
+    // full-field, which we can then work in Schur complement space or
+    // not (e.g., freedom to choose coarse_grid_solution_type).  For
+    // the top level, if the outer solver is for the preconditioned
+    // system, then we must use preconditoning, e.g., option 3.) above.
+
+    if (i == 0) { // top-level treatment
+
+      // Always this for now
+      if (solve_type == QUDA_DIRECT_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
+        mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      } else {
+        errorQuda("Unexpected solve_type = %d\n", solve_type);
+      }
+
+    } else {
+
+      // Always this for now. Will be tunable.
+      mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+
+      // solve
+      //if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+      //  mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
+      //} else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
+      //  mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
+      //} else {
+      //  errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+      //}
+    }
+
+    mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
+
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION; //  solver_location[i];
+    mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION; // setup_location[i];
+    
+  }
+
+  // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
+  mg_param.setup_minimize_memory = QUDA_BOOLEAN_FALSE;
+
+  // coarsening the spin on the first restriction is undefined for staggered fields.
+  mg_param.spin_block_size[0] = 0;
+
+  mg_param.setup_type = QUDA_NULL_VECTOR_SETUP; // setup_type;
+  mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.post_orthonormalize = QUDA_BOOLEAN_TRUE; // post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES; // generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
+
+  mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE; // generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  mg_param.run_verify = input_struct.verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE; // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_oblique_proj_check = QUDA_BOOLEAN_FALSE; // oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // set file i/o parameters
+  for (int i = 0; i < mg_param.n_level; i++) {
+    strcpy(mg_param.vec_infile[i], input_struct.mg_vec_infile[i]);
+    strcpy(mg_param.vec_outfile[i], input_struct.mg_vec_outfile[i]);
+    if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
+    if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
+  }
+
+
+  mg_param.coarse_guess = QUDA_BOOLEAN_FALSE; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
+  // these need to tbe set for now but are actually ignored by the MG setup
+  // needed to make it pass the initialization test
+  inv_param.inv_type = QUDA_GCR_INVERTER;
+  inv_param.tol = 1e-10;
+  inv_param.maxiter = 1000;
+  inv_param.reliable_delta = 1e-6; // reliable_delta;
+  inv_param.gcrNkrylov = 10;
+
+  inv_param.verbosity = verbosity;
+ 
+  inv_param.verbosity_precondition = verbosity;
+
+
+}
+
 
 void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
       const void* const fatlink, const void* const longlink, const char* const mg_param_file)
@@ -1494,10 +1791,6 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   setGaugeParams(fat_param, long_param, fatlink, longlink, localDim, host_precision, device_precision,
                  device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
 
-  // DO LOAD FROM FILE HERE
-
-  std::map<std::string, std::string> fileio_info;
-
   // Set some other smart defaults
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
   fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
@@ -1508,26 +1801,11 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   long_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   long_param.reconstruct_refinement_sloppy = long_param.reconstruct_sloppy;
 
-  // hard coding here, delete later
-  int mg_levels = 4;
-
   // Prepare a multigrid pack
   milcMultigridPack* mg_pack = new milcMultigridPack;
 
-  // Prepare eigenvector params
-  for (int i = 0; i < mg_levels; i++) {
-    mg_pack->mg_eig_param[i] = newQudaEigParam();
-    milcSetMultigridEigParam(mg_pack->mg_eig_param[i], i);
-  }
-
-  mg_pack->mg_inv_param = newQudaInvertParam();
-  mg_pack->mg_param = newQudaMultigridParam();
-  mg_pack->last_mass = mass;
-
-  mg_pack->mg_param.invert_param = &mg_pack->mg_inv_param;
-  for (int i = 0; i < mg_levels; i++) { mg_pack->mg_param.eig_param[i] = &mg_pack->mg_eig_param[i]; }
-
-  milcSetMultigridParam(mg_pack->mg_param, host_precision, device_precision, device_precision_sloppy, mass, fileio_info);
+  // Set parameters incl. loading from the parameter file here.
+  milcSetMultigridParam(mg_pack, host_precision, device_precision, device_precision_sloppy, mass, mg_param_file);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
@@ -1624,6 +1902,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   if (mass != mg_pack->last_mass) {
      mg_pack->mg_param.invert_param->mass = mass;
+     mg_pack->last_mass = mass;
      invalidate_quda_mg = true;
   }
 
