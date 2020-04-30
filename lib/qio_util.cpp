@@ -1,15 +1,13 @@
 /* Utilities for testing QIO */
 #include <stdio.h>
 #include <string.h>
-
 #include <qio_util.h>
 
 void print_m(suN_matrix *a)
 {
-  for (int i=0; i< NCLR; i++)
-    {
-      printf("%f %f %f %f %f %f\n",a->e[i][0].re,a->e[i][0].im,a->e[i][1].re,a->e[i][1].im,a->e[i][2].re,a->e[i][2].im);
-    }
+  for (int i=0; i< NCLR; i++) {
+    printf("%f %f %f %f %f %f\n",a->e[i][0].re,a->e[i][0].im,a->e[i][1].re,a->e[i][1].im,a->e[i][2].re,a->e[i][2].im);
+  }
 }
 
 void vfill_m(suN_matrix *a, int coords[], int rank)
@@ -84,35 +82,6 @@ float vcompare_M(suN_matrix *fielda[], suN_matrix *fieldb[], int count)
   /* Global sum */
   QMP_sum_float(&sum2);
   return sum2;
-}
-
-void vput_M(char *s1, size_t index, int count, void *s2)
-{
-  suN_matrix **field = (suN_matrix **)s2;
-  suN_matrix *dest;
-  suN_matrix *src = (suN_matrix *)s1;
-
-/* For the site specified by "index", move an array of "count" data
-   from the read buffer to an array of fields */
-
-  for (int i = 0; i < count; i++) {
-    dest = field[i] + index;
-    *dest = *(src + i);
-  }
-}
-
-void vget_M(char *s1, size_t index, int count, void *s2)
-{
-  suN_matrix **field = (suN_matrix **)s2;
-  suN_matrix *src;
-  suN_matrix *dest = (suN_matrix *)s1;
-
-/* For the site specified by "index", move an array of "count" data
-   from the array of fields to the write buffer */
-  for (int i=0; i < count; i++, dest++) {
-    src = field[i] + index;
-    *dest = *src;
-  }
 }
 
 /* Copy a subset */

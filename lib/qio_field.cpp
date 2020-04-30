@@ -1,3 +1,4 @@
+#include <iostream>
 #include <qio.h>
 #include <qio_util.h>
 #include <quda.h>
@@ -9,6 +10,23 @@ QIO_Layout layout;
 int lattice_dim;
 int lattice_size[4];
 int this_node;
+
+std::ostream& operator<<(std::ostream &out, const QIO_Layout &layout)
+{
+  out << "node_number = " << layout.node_number << std::endl;
+  out << "node_index = " << layout.node_index << std::endl;
+  out << "get_coords = " << layout.get_coords << std::endl;
+  out << "num_sites = " << layout.num_sites << std::endl;
+  out << "latdim = " << layout.latdim << std::endl;
+  out << "latsize = {";
+  for (int d=0; d<layout.latdim; d++) out << layout.latsize[d] << (d<layout.latdim-1 ? ", " : "}");
+  out << std::endl;
+  out << "volume = " << layout.volume << std::endl;
+  out << "sites_on_node = " << layout.sites_on_node << std::endl;
+  out << "this_node = " << layout.this_node << std::endl;
+  out << "number_of_nodes = " << layout.number_of_nodes << std::endl;
+  return out;
+}
 
 QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
 {
@@ -123,19 +141,19 @@ int read_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecision cp
   /* Read the field record and convert to cpu precision*/
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_read(infile, rec_info, xml_record_in, vputM<double, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
                         field_in);
     } else {
-      status = QIO_read(infile, rec_info, xml_record_in, vputM<double, float, len>, rec_size, QUDA_SINGLE_PRECISION,
+      status = QIO_read(infile, rec_info, xml_record_in, vput<double, float, len>, rec_size, QUDA_SINGLE_PRECISION,
                         field_in);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_read(infile, rec_info, xml_record_in, vputM<float, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
+      status = QIO_read(infile, rec_info, xml_record_in, vput<float, double, len>, rec_size, QUDA_DOUBLE_PRECISION,
                         field_in);
     } else {
       status
-        = QIO_read(infile, rec_info, xml_record_in, vputM<float, float, len>, rec_size, QUDA_SINGLE_PRECISION, field_in);
+        = QIO_read(infile, rec_info, xml_record_in, vput<float, float, len>, rec_size, QUDA_SINGLE_PRECISION, field_in);
     }
   }
 
@@ -316,18 +334,18 @@ int write_field(QIO_Writer *outfile, int count, void *field_out[], QudaPrecision
   size_t rec_size = file_prec*count*len;
   if (cpu_prec == QUDA_DOUBLE_PRECISION) {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<double,double,len>,
+      status = QIO_write(outfile, rec_info, xml_record_out, vget<double,double,len>,
 			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<double,float,len>,
+      status = QIO_write(outfile, rec_info, xml_record_out, vget<double,float,len>,
 			 rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   } else {
     if (file_prec == QUDA_DOUBLE_PRECISION) {
-      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<float,double,len>,
+      status = QIO_write(outfile, rec_info, xml_record_out, vget<float,double,len>,
 			 rec_size, QUDA_DOUBLE_PRECISION, field_out);
     } else {
-      status = QIO_write(outfile, rec_info, xml_record_out, vgetM<float,float,len>,
+      status = QIO_write(outfile, rec_info, xml_record_out, vget<float,float,len>,
 			 rec_size, QUDA_SINGLE_PRECISION, field_out);
     }
   }
