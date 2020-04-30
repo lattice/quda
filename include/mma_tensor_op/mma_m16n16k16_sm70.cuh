@@ -439,29 +439,53 @@ namespace quda
     MmaOperandC<ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
     MmaOperandC<ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
 
-#pragma unroll
-    for (int bk = 0; bk < N; bk += bK) {
+    GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
+                                                                                         smem_obj_a_imag);
+    GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
+                                                                                         smem_obj_b_imag);
 
-      __syncthreads();
+    // __syncthreads();
 
-      auto aa_offset = [&](int i, int j) { return aa(i, j + bk); };
+    {
 
-      auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk, j) : bb(i, j + bk); };
+      // auto aa_offset = [&](int i, int j) { return aa(i, j + 0); };
+
+      // auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + 0, j) : bb(i, j + 0); };
 
       // load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, aa_offset);
       // load_cache<bN, bK, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, bb_offset);
 
-      GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
-                                                                                           smem_obj_a_imag);
-      aa_loader.g2r(aa_offset);
+      aa_loader.g2r(aa);
       aa_loader.r2s();
 
-      GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
-                                                                                           smem_obj_b_imag);
-      bb_loader.g2r(bb_offset);
+      bb_loader.g2r(bb);
       bb_loader.r2s();
+    }
 
-      __syncthreads();
+    __syncthreads();
+
+#pragma unroll
+    for (int bk = 0; bk < N; bk += bK) {
+
+      // __syncthreads();
+
+      if (bk + bK < N) {
+
+        auto aa_offset = [&](int i, int j) { return aa(i, j + bk + bK); };
+
+        auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk + bK, j) : bb(i, j + bk + bK); };
+
+        // load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, aa_offset);
+        // load_cache<bN, bK, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, bb_offset);
+
+        aa_loader.g2r(aa_offset);
+        // aa_loader.r2s();
+
+        bb_loader.g2r(bb_offset);
+        // bb_loader.r2s();
+      }
+
+      // __syncthreads();
 
 #pragma unroll
       for (int c = 0; c < warp_cycle; c++) {
@@ -494,6 +518,16 @@ namespace quda
           gemm(op_a_imag, op_b_imag, op_c_real[c]);
         }
       }
+
+      __syncthreads();
+
+      if (bk + bK < N) {
+
+        aa_loader.r2s();
+        bb_loader.r2s();
+      }
+
+      __syncthreads();
     }
 
     // wrap up!
