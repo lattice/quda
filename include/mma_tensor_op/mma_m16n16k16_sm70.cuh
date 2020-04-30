@@ -59,7 +59,7 @@ namespace quda
 
   template <int M, int N, int ldm, int ldn, class T> __device__ auto make_smem_obj(T *ptr_)
   {
-    return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
+    return SharedMemoryObject<T, M, N, ldm, ldn>{ptr_};
   }
 
   template <int stride> struct MmaOperandA {
@@ -327,36 +327,6 @@ namespace quda
   template <int M, int N, int row_stride, int col_stride, bool dagger, class AccessorTo, class AccessorFrom>
   __device__ inline void load_cache(AccessorTo to_real, AccessorTo to_imag, AccessorFrom from)
   {
-#if 0
-      if (!dagger) {
-        for (int col = threadIdx.y; col < N; col += col_stride) {
-          for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
-            // if(blockIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
-            //   printf("y = %02d, z = %02d, row = %02d, col = %02d, y.real = %8.4e\n", threadIdx.y, threadIdx.z, row,
-            //   col, double(from(col, row).real()));
-            auto x = from(row + 0, col);
-            auto y = from(row + 1, col);
-            to_real.vector_load(row, col, __floats2half2_rn(+x.real(), +y.real()));
-            to_imag.vector_load(row, col, __floats2half2_rn(+x.imag(), +y.imag()));
-            // to_real(row, col) = __float2half(+y.real());
-            // to_imag(row, col) = __float2half(+y.imag());
-          }
-        }
-
-      } else {
-        for (int col = threadIdx.y * 2; col < N; col += col_stride * 2) {
-          for (int row = threadIdx.z; row < M; row += row_stride) {
-            auto x = from(row, col + 0);
-            auto y = from(row, col + 1);
-            to_real.vector_load(col, row, __floats2half2_rn(+x.real(), +y.real()));
-            to_imag.vector_load(col, row, __floats2half2_rn(-x.imag(), -y.imag()));
-            // to_real(row, col) = __float2half(+y.real());
-            // to_imag(row, col) = __float2half(-y.imag());
-          }
-        }
-
-      }
-#else
     for (int col = threadIdx.y; col < N; col += col_stride) {
       for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
         if (!dagger) {
@@ -372,8 +342,50 @@ namespace quda
         }
       }
     }
-#endif
   }
+
+  template <int M, int N, int row_stride, int col_stride, bool dagger, class SmemAccessor> struct GlobalMemoryLoader {
+
+    static constexpr int m_dim = (M + row_stride * 2 - 1) / (row_stride * 2);
+    static constexpr int n_dim = (N + col_stride - 1) / col_stride;
+
+    SmemAccessor smem_real;
+    SmemAccessor smem_imag;
+
+    half2 reg_real[m_dim][n_dim];
+    half2 reg_imag[m_dim][n_dim];
+
+    __device__ GlobalMemoryLoader(SmemAccessor real_, SmemAccessor imag_) : smem_real(real_), smem_imag(imag_) {}
+
+    template <class GmemAccessor> __device__ inline void g2r(GmemAccessor gmem)
+    {
+      for (int col = threadIdx.y; col < N; col += col_stride) {
+        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
+          if (!dagger) {
+            auto x = gmem(row + 0, col);
+            auto y = gmem(row + 1, col);
+            reg_real[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.real(), +y.real());
+            reg_imag[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.imag(), +y.imag());
+          } else {
+            auto x = gmem(col, row + 0);
+            auto y = gmem(col, row + 1);
+            reg_real[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.real(), +y.real());
+            reg_imag[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(-x.imag(), -y.imag());
+          }
+        }
+      }
+    }
+
+    __device__ inline void r2s()
+    {
+      for (int col = threadIdx.y; col < N; col += col_stride) {
+        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
+          smem_real.vector_load(row, col, reg_real[row / (row_stride * 2)][col / col_stride]);
+          smem_imag.vector_load(row, col, reg_imag[row / (row_stride * 2)][col / col_stride]);
+        }
+      }
+    }
+  };
 
   template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
             class A, class B, class C>
@@ -436,8 +448,18 @@ namespace quda
 
       auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk, j) : bb(i, j + bk); };
 
-      load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, aa_offset);
-      load_cache<bN, bK, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, bb_offset);
+      // load_cache<bM, bK, n_row, n_col, a_dag>(smem_obj_a_real, smem_obj_a_imag, aa_offset);
+      // load_cache<bN, bK, n_row, n_col, b_dag>(smem_obj_b_real, smem_obj_b_imag, bb_offset);
+
+      GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
+                                                                                           smem_obj_a_imag);
+      aa_loader.g2r(aa_offset);
+      aa_loader.r2s();
+
+      GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
+                                                                                           smem_obj_b_imag);
+      bb_loader.g2r(bb_offset);
+      bb_loader.r2s();
 
       __syncthreads();
 
@@ -551,7 +573,6 @@ namespace quda
     }
 
     return max;
-
   }
 
 } // namespace quda
