@@ -1169,7 +1169,7 @@ struct milcMultigridPack {
   void* mg_preconditioner;
 };
 
-void setMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precision, QudaPrecision device_precision,
+void milcSetMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precision, QudaPrecision device_precision,
         QudaPrecision device_precision_sloppy, double mass, std::map<std::string, std::string>& ioparam)
 {
   {
@@ -1441,7 +1441,7 @@ void setMultigridParam(QudaMultigridParam &mg_param, QudaPrecision host_precisio
 }
 
 // Parameters defining the eigensolver
-void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
+void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, int level)
 {
   mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS; // mg_eig_type[level];
   mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
@@ -1517,7 +1517,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   // Prepare eigenvector params
   for (int i = 0; i < mg_levels; i++) {
     mg_pack->mg_eig_param[i] = newQudaEigParam();
-    setMultigridEigParam(mg_pack->mg_eig_param[i], i);
+    milcSetMultigridEigParam(mg_pack->mg_eig_param[i], i);
   }
 
   mg_pack->mg_inv_param = newQudaInvertParam();
@@ -1527,7 +1527,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   mg_pack->mg_param.invert_param = &mg_pack->mg_inv_param;
   for (int i = 0; i < mg_levels; i++) { mg_pack->mg_param.eig_param[i] = &mg_pack->mg_eig_param[i]; }
 
-  setMultigridParam(mg_pack->mg_param, host_precision, device_precision, device_precision_sloppy, mass, fileio_info);
+  milcSetMultigridParam(mg_pack->mg_param, host_precision, device_precision, device_precision_sloppy, mass, fileio_info);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
