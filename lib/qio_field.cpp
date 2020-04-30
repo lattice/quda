@@ -8,7 +8,7 @@
 QIO_Layout layout;
 int lattice_dim;
 int lattice_size[4];
-int this_node;
+int quda_this_node;
 
 QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
 {
@@ -24,7 +24,7 @@ QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
   QIO_Reader *infile = QIO_open_read(xml_file_in, filename, &layout, NULL, &iflag);
 
   if (infile == NULL) {
-    printfQuda("%s(%d): QIO_open_read returns NULL.\n", __func__, this_node);
+    printfQuda("%s(%d): QIO_open_read returns NULL.\n", __func__, quda_this_node);
     QIO_string_destroy(xml_file_in);
     return NULL;
   }
@@ -60,7 +60,7 @@ QIO_Writer *open_test_output(const char *filename, int volfmt, int serpar, int i
 
   QIO_string_destroy(oflag.ildgLFN);
   if (outfile == NULL) {
-    printfQuda("%s(%d): QIO_open_write returns NULL.\n", __func__, this_node);
+    printfQuda("%s(%d): QIO_open_write returns NULL.\n", __func__, quda_this_node);
     QIO_string_destroy(xml_file_out);
     return NULL;
   }
@@ -162,26 +162,26 @@ void set_layout(const int *X)
   }
 
   /* Set the mapping of coordinates to nodes */
-  if (setup_layout(lattice_size, 4, QMP_get_number_of_nodes()) != 0) { errorQuda("Setup layout failed\n"); }
+  if (quda_setup_layout(lattice_size, 4, QMP_get_number_of_nodes()) != 0) { errorQuda("Setup layout failed\n"); }
   printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
-  int sites_on_node = num_sites(this_node);
+  int sites_on_node = quda_num_sites(quda_this_node);
 
   /* Build the layout structure */
-  layout.node_number     = node_number;
-  layout.node_index      = node_index;
-  layout.get_coords      = get_coords;
-  layout.num_sites       = num_sites;
+  layout.node_number     = quda_node_number;
+  layout.node_index      = quda_node_index;
+  layout.get_coords      = quda_get_coords;
+  layout.num_sites       = quda_num_sites;
   layout.latsize         = lattice_size;
   layout.latdim          = lattice_dim;
   layout.volume          = lattice_volume;
   layout.sites_on_node   = sites_on_node;
-  layout.this_node       = this_node;
+  layout.this_node       = quda_this_node;
   layout.number_of_nodes = QMP_get_number_of_nodes();
 }
 
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
 {
-  this_node = mynode();
+  quda_this_node = mynode();
 
   set_layout(X);
 
@@ -221,7 +221,7 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
 {
-  this_node = mynode();
+  quda_this_node = mynode();
 
   set_layout(X);
 
@@ -350,7 +350,7 @@ int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
 
 void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
 {
-  this_node = mynode();
+  quda_this_node = mynode();
 
   set_layout(X);
 
@@ -407,7 +407,7 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                         QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
 {
-  this_node = mynode();
+  quda_this_node = mynode();
 
   set_layout(X);
 
