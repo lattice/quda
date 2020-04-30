@@ -105,11 +105,17 @@ namespace quda
             switch (tp.aux.x) {
             // clang-format off
             case  0: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
-            case  1: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
-            case  2: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
-            case  3: launch_kernel<48, 48, 24,  8,  4>(tp, stream); break;
-            case  4: launch_kernel<48, 48, 24, 16,  6>(tp, stream); break;
-            case  5: launch_kernel<48, 48, 24, 24, 12>(tp, stream); break;
+            case  1: launch_kernel<48, 48, 48,  4,  8>(tp, stream); break;
+            case  2: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
+            case  3: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
+            case  4: launch_kernel<48, 48, 48, 12, 24>(tp, stream); break;
+
+            case  5: launch_kernel<48, 48, 24,  8,  4>(tp, stream); break;
+            case  6: launch_kernel<48, 48, 24,  4,  8>(tp, stream); break;
+            case  7: launch_kernel<48, 48, 24, 12, 24>(tp, stream); break;
+
+            case  8: launch_kernel<48, 48, 12,  4,  8>(tp, stream); break;
+            case  9: launch_kernel<48, 48, 12, 12, 24>(tp, stream); break;
             // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
             }
@@ -119,10 +125,26 @@ namespace quda
             case  0: launch_kernel<64, 64, 64, 16, 16>(tp, stream); break;
             case  1: launch_kernel<64, 64, 64, 32,  4>(tp, stream); break;
             case  2: launch_kernel<64, 64, 64, 32,  8>(tp, stream); break;
-            case  3: launch_kernel<64, 64, 32, 16,  8>(tp, stream); break;
+
+            case  3: launch_kernel<64, 64, 32, 16, 32>(tp, stream); break;
             case  4: launch_kernel<64, 64, 32, 16, 16>(tp, stream); break;
-            case  5: launch_kernel<64, 64, 32, 32,  4>(tp, stream); break;
-            case  6: launch_kernel<64, 64, 16, 16, 16>(tp, stream); break;
+            case  5: launch_kernel<64, 64, 32, 16,  8>(tp, stream); break;
+            case  6: launch_kernel<64, 64, 32, 32,  8>(tp, stream); break;
+            case  7: launch_kernel<64, 64, 32, 32,  4>(tp, stream); break;
+
+            case  8: launch_kernel<64, 64, 16, 16, 32>(tp, stream); break;
+            case  9: launch_kernel<64, 64, 16, 16, 16>(tp, stream); break;
+            case 10: launch_kernel<64, 64, 16, 16,  8>(tp, stream); break;
+            case 11: launch_kernel<64, 64, 16, 16,  4>(tp, stream); break;
+
+            case 12: launch_kernel<64, 64, 16,  8, 32>(tp, stream); break;
+            case 13: launch_kernel<64, 64, 16,  8, 16>(tp, stream); break;
+            case 14: launch_kernel<64, 64, 16,  8,  8>(tp, stream); break;
+            case 15: launch_kernel<64, 64, 16,  8,  4>(tp, stream); break;
+
+            case 16: launch_kernel<64, 64, 16,  4, 32>(tp, stream); break;
+            case 17: launch_kernel<64, 64, 16,  4, 16>(tp, stream); break;
+            case 18: launch_kernel<64, 64, 16,  4,  8>(tp, stream); break;
             // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
             }
@@ -153,12 +175,12 @@ namespace quda
       virtual bool advanceAux(TuneParam &param) const
       {
         if (arg.M == 48) {
-          if (param.aux.x < 5) {
+          if (param.aux.x < 9) {
             param.aux.x++;
             return true;
           }
         } else if (arg.M == 64) {
-          if (param.aux.x < 6) {
+          if (param.aux.x < 18) {
             param.aux.x++;
             return true;
           }

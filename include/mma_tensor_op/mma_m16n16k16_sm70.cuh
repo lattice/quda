@@ -346,6 +346,9 @@ namespace quda
 
   template <int M, int N, int row_stride, int col_stride, bool dagger, class SmemAccessor> struct GlobalMemoryLoader {
 
+    static_assert(M % (row_stride * 2) == 0, "M needs to be divisible by (row_stride * 2).");
+    static_assert(N % col_stride == 0, "N needs to be divisible by col_stride.");
+
     static constexpr int m_dim = (M + row_stride * 2 - 1) / (row_stride * 2);
     static constexpr int n_dim = (N + col_stride - 1) / col_stride;
 
@@ -359,18 +362,24 @@ namespace quda
 
     template <class GmemAccessor> __device__ inline void g2r(GmemAccessor gmem)
     {
-      for (int col = threadIdx.y; col < N; col += col_stride) {
-        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
-          if (!dagger) {
-            auto x = gmem(row + 0, col);
-            auto y = gmem(row + 1, col);
-            reg_real[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.real(), +y.real());
-            reg_imag[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.imag(), +y.imag());
-          } else {
-            auto x = gmem(col, row + 0);
-            auto y = gmem(col, row + 1);
-            reg_real[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(+x.real(), +y.real());
-            reg_imag[row / (row_stride * 2)][col / col_stride] = __floats2half2_rn(-x.imag(), -y.imag());
+#pragma unroll
+      for (int col = 0; col < n_dim; col++) {
+#pragma unroll
+        for (int row = 0; row < m_dim; row++) {
+          int col_idx = col * col_stride + threadIdx.y;
+          int row_idx = row * (row_stride * 2) + (threadIdx.z * 2);
+          if (row_idx < M && col_idx < N) {
+            if (!dagger) {
+              auto x = gmem(row_idx + 0, col_idx);
+              auto y = gmem(row_idx + 1, col_idx);
+              reg_real[row][col] = __floats2half2_rn(+x.real(), +y.real());
+              reg_imag[row][col] = __floats2half2_rn(+x.imag(), +y.imag());
+            } else {
+              auto x = gmem(col_idx, row_idx + 0);
+              auto y = gmem(col_idx, row_idx + 1);
+              reg_real[row][col] = __floats2half2_rn(+x.real(), +y.real());
+              reg_imag[row][col] = __floats2half2_rn(-x.imag(), -y.imag());
+            }
           }
         }
       }
@@ -378,10 +387,16 @@ namespace quda
 
     __device__ inline void r2s()
     {
-      for (int col = threadIdx.y; col < N; col += col_stride) {
-        for (int row = threadIdx.z * 2; row < M; row += row_stride * 2) {
-          smem_real.vector_load(row, col, reg_real[row / (row_stride * 2)][col / col_stride]);
-          smem_imag.vector_load(row, col, reg_imag[row / (row_stride * 2)][col / col_stride]);
+#pragma unroll
+      for (int col = 0; col < n_dim; col++) {
+#pragma unroll
+        for (int row = 0; row < m_dim; row++) {
+          int col_idx = col * col_stride + threadIdx.y;
+          int row_idx = row * (row_stride * 2) + (threadIdx.z * 2);
+          if (row_idx < M && col_idx < N) {
+            smem_real.vector_load(row_idx, col_idx, reg_real[row][col]);
+            smem_imag.vector_load(row_idx, col_idx, reg_imag[row][col]);
+          }
         }
       }
     }
