@@ -41,32 +41,7 @@ namespace quda
       int blockStep() const { return 1; }
       unsigned int maxBlockSize(const TuneParam &param) const { return 1u; }
 
-      virtual bool advanceBlockDim(TuneParam &param) const
-      {
-#if 1
-        return false;
-#else
-        const unsigned int max_threads = maxBlockSize(param);
-        const unsigned int max_shared = maxDynamicSharedBytesPerBlock();
-        bool ret;
-
-        param.block.x += blockStep();
-        int nthreads = param.block.x * param.block.y * param.block.z;
-        if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
-            || sharedBytesPerBlock(param) > max_shared) {
-          resetBlockDim(param);
-          ret = false;
-        } else {
-          ret = true;
-        }
-
-        if (!tuneGridDim()) param.grid = dim3((minThreads() + param.block.x - 1) / param.block.x, 2, 4);
-
-        param.shared_bytes = sharedBytesPerBlock(param);
-
-        return ret;
-#endif
-      }
+      virtual bool advanceBlockDim(TuneParam &param) const { return false; }
 
     public:
       CalculateYhat(Arg &arg, const LatticeField &meta) : arg(arg), meta(meta), n(arg.M), compute_max_only(false)
@@ -129,29 +104,25 @@ namespace quda
           if (arg.M == 48) {
             switch (tp.aux.x) {
             // clang-format off
-            case 0: launch_kernel<48, 48, 48,  4,  8>(tp, stream); break;
-            case 1: launch_kernel<48, 48, 48,  4, 24>(tp, stream); break;
-            case 2: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
-            case 3: launch_kernel<48, 48, 48,  8, 12>(tp, stream); break;
-            case 4: launch_kernel<48, 48, 48, 12,  8>(tp, stream); break;
-            case 5: launch_kernel<48, 48, 48, 12, 24>(tp, stream); break;
-            case 6: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
-            case 7: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
+            case  0: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
+            case  1: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
+            case  2: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
+            case  3: launch_kernel<48, 48, 24,  8,  4>(tp, stream); break;
+            case  4: launch_kernel<48, 48, 24, 16,  6>(tp, stream); break;
+            case  5: launch_kernel<48, 48, 24, 24, 12>(tp, stream); break;
             // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
             }
           } else if (arg.M == 64) {
             switch (tp.aux.x) {
             // clang-format off
-            case 0: launch_kernel<64, 64, 64,  8,  4>(tp, stream); break;
-            case 1: launch_kernel<64, 64, 64,  8,  8>(tp, stream); break;
-            case 2: launch_kernel<64, 64, 64,  8, 16>(tp, stream); break;
-            case 3: launch_kernel<64, 64, 64, 16,  4>(tp, stream); break;
-            case 4: launch_kernel<64, 64, 64, 16,  8>(tp, stream); break;
-            case 5: launch_kernel<64, 64, 64, 16, 16>(tp, stream); break;
-            case 6: launch_kernel<64, 64, 64, 32,  4>(tp, stream); break;
-            case 7: launch_kernel<64, 64, 64, 32,  8>(tp, stream); break;
-            case 8: launch_kernel<64, 64, 64, 32, 16>(tp, stream); break;
+            case  0: launch_kernel<64, 64, 64, 16, 16>(tp, stream); break;
+            case  1: launch_kernel<64, 64, 64, 32,  4>(tp, stream); break;
+            case  2: launch_kernel<64, 64, 64, 32,  8>(tp, stream); break;
+            case  3: launch_kernel<64, 64, 32, 16,  8>(tp, stream); break;
+            case  4: launch_kernel<64, 64, 32, 16, 16>(tp, stream); break;
+            case  5: launch_kernel<64, 64, 32, 32,  4>(tp, stream); break;
+            case  6: launch_kernel<64, 64, 16, 16, 16>(tp, stream); break;
             // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
             }
@@ -182,12 +153,12 @@ namespace quda
       virtual bool advanceAux(TuneParam &param) const
       {
         if (arg.M == 48) {
-          if (param.aux.x < 7) {
+          if (param.aux.x < 5) {
             param.aux.x++;
             return true;
           }
         } else if (arg.M == 64) {
-          if (param.aux.x < 8) {
+          if (param.aux.x < 6) {
             param.aux.x++;
             return true;
           }
@@ -299,9 +270,10 @@ namespace quda
         Xinv_.copy(Xinv);
         Y_.copy(Y);
 
+        constexpr bool use_native_ghosts = true;
         // use spin-ignorant accessor to make multiplication simpler
-        typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, true, storeFloat> gCoarse;
-        typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, true, storeFloat> gPreconditionedCoarse;
+        typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat> gCoarse;
+        typedef typename gauge::FieldOrder<Float, N, 1, gOrder_milc, use_native_ghosts, storeFloat> gPreconditionedCoarse;
         gCoarse yAccessor(Y_);
         gPreconditionedCoarse yHatAccessor(Yhat_);
         gCoarse xInvAccessor(Xinv_);

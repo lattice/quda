@@ -404,6 +404,9 @@ namespace quda
 #else
     using accumuate_reg_type = float;
 #endif
+    static_assert(bM % WMMA_M == 0, "bM must be divisible by WMMA_M.");
+    static_assert(bN % WMMA_N == 0, "bM must be divisible by WMMA_N.");
+    static_assert(bK % WMMA_K == 0, "bM must be divisible by WMMA_K.");
 
     constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
     constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension

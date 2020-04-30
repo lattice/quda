@@ -5,6 +5,8 @@
 
 #include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 
+#include <type_traits>
+
 namespace quda
 {
 
@@ -98,21 +100,18 @@ namespace quda
     }
 
     template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ void CalculateYhatGPU(Arg arg)
+    __global__ typename std::enable_if<Arg::N != bM, void>::type CalculateYhatGPU(Arg arg)
+    {
+    }
+
+    template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
+    __global__ typename std::enable_if<Arg::N == bM, void>::type CalculateYhatGPU(Arg arg)
     {
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
       if (x_cb >= arg.Y.VolumeCB()) return;
 
-      // blockDim.y == arg.tile.M_tiles
-      // int i_parity = blockDim.y * blockIdx.y + threadIdx.y;
-      // if (i_parity >= 2 * arg.tile.M_tiles) return;
-      // int i = threadIdx.y;     // i_parity % arg.tile.M_tiles;
       int parity = blockIdx.y; // i_parity / arg.tile.M_tiles;
 
-      // blockDim.z == arg.tile.N_tiles
-      // int j_d = blockDim.z*blockIdx.z + threadIdx.z;
-      // if (j_d >= 4*arg.tile.N_tiles) return;
-      // int j = threadIdx.z; // j_d % arg.tile.N_tiles;
       int d = blockIdx.z; // j_d / arg.tile.N_tiles;
 
       extern __shared__ half smem_ptr[];
