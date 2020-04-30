@@ -110,7 +110,7 @@ void init(int argc, char **argv)
 
   printfQuda("Links sending...");
   loadGaugeQuda(links, &gauge_param);
-  printfQuda("Links sent\n"); 
+  printfQuda("Links sent\n");
 
   printfQuda("Sending fields to GPU...");
 
@@ -195,7 +195,6 @@ void covdevRef(int mu)
 {
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
-  fflush(stdout);
 #ifdef MULTI_GPU
   mat_mg4dir(spinorRef, links, ghostLink, spinor, dagger, mu, inv_param.cpu_prec, gauge_param.cpu_prec);
 #else

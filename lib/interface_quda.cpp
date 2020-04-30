@@ -1744,7 +1744,6 @@ namespace quda {
                 inv_param->cuda_prec_precondition);
   }
 
-
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
     DiracParam diracParam;
@@ -3744,12 +3743,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
           cudaParam.create = QUDA_NULL_FIELD_CREATE;
           cudaColorSpinorField tmp(cudaParam);
 
-          for(int j=0; j < nRefine; j++) {
-	    q[j] = new cudaColorSpinorField(cudaParam);
-	    z[j] = new cudaColorSpinorField(cudaParam);
-	  }
+          for (int j = 0; j < nRefine; j++) {
+            q[j] = new cudaColorSpinorField(cudaParam);
+            z[j] = new cudaColorSpinorField(cudaParam);
+          }
 
-	  *z[0] = *x[0]; // zero solution already solved
+          *z[0] = *x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
 #else

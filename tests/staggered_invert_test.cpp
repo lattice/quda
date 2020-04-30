@@ -123,15 +123,8 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
-
-  // Set some default values for precisions and solve types
-  // if none are passed through the command line
-  setQudaDefaultPrecs();
-  if (inv_multigrid) {
-    setQudaDefaultMgSolveTypes();
-    reliable_delta = 1e-4;
-  }
+  // Set values for precisions via the command line.
+  setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -170,6 +163,10 @@ int main(int argc, char **argv)
   QudaEigParam mg_eig_param[mg_levels];
 
   if (inv_multigrid) {
+
+    // Set some default values for MG solve types
+    setQudaMgSolveTypes();
+
     setStaggeredMGInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;

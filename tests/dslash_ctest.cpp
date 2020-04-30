@@ -489,7 +489,6 @@ void dslashRef() {
 
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
-  fflush(stdout);
 
   if (dslash_type == QUDA_WILSON_DSLASH) {
     switch (dtest_type) {
@@ -542,7 +541,6 @@ void dslashRef() {
     }
   } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n", inv_param.kappa, inv_param.mu);
-    fflush(stdout);
     switch (dtest_type) {
     case dslash_test_type::Dslash:
       // My dslash should be the same as the clover dslash
@@ -996,10 +994,6 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
-
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -1008,6 +1002,11 @@ int main(int argc, char **argv)
 
   initComms(argc, argv, gridsize_from_cmdline);
 
+  // The 'SetUp()' method of the Google Test class from which DslashTest
+  // in derived has no arguments, but QUDA's implementation requires the
+  // use of argc and argv to set up the test via the function 'init'.
+  // As a workaround, we declare argc_copy and argv_copy as global pointers
+  // so that they are visible inside the 'init' function.
   argc_copy = argc;
   argv_copy = argv;
 

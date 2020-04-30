@@ -40,10 +40,6 @@ Dirac *dirac = nullptr;
 
 QudaDagType not_dagger;
 
-// For loading the gauge fields
-int argc_copy;
-char **argv_copy;
-
 dslash_test_type dtest_type = dslash_test_type::Dslash;
 CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
                                                       {"MatPC", dslash_test_type::MatPC},
@@ -182,7 +178,7 @@ void init(int argc, char **argv)
   inv_param.verbosity = verbosity;
 
   printfQuda("Randomizing fields... ");
-  constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
+  constructHostGaugeField(hostGauge, gauge_param, argc, argv);
 
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
@@ -253,10 +249,9 @@ void init(int argc, char **argv)
 void end()
 {
   if (!transfer) {
-    if(dirac != NULL)
-    {
+    if (dirac != nullptr) {
       delete dirac;
-      dirac = NULL;
+      dirac = nullptr;
     }
     delete cudaSpinor;
     delete cudaSpinorOut;
@@ -303,7 +298,7 @@ DslashTime dslashCUDA(int niter) {
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    gettimeofday(&tstart, nullptr);
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       switch (dtest_type) {
@@ -431,7 +426,7 @@ DslashTime dslashCUDA(int niter) {
       }
     }
 
-    gettimeofday(&tstop, NULL);
+    gettimeofday(&tstop, nullptr);
     long ds = tstop.tv_sec - tstart.tv_sec;
     long dus = tstop.tv_usec - tstart.tv_usec;
     double elapsed = ds + 0.000001*dus;
@@ -461,11 +456,10 @@ DslashTime dslashCUDA(int niter) {
   return dslash_time;
 }
 
-void dslashRef() {
-
+void dslashRef()
+{
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
-  fflush(stdout);
 
   if (dslash_type == QUDA_WILSON_DSLASH) {
     switch (dtest_type) {
@@ -522,7 +516,6 @@ void dslashRef() {
     }
   } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n", inv_param.kappa, inv_param.mu);
-    fflush(stdout);
     switch (dtest_type) {
     case dslash_test_type::Dslash:
       // My dslash should be the same as the clover dslash
@@ -821,7 +814,6 @@ void dslashRef() {
   printfQuda("done.\n");
 }
 
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -860,9 +852,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

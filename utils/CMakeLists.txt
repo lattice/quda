@@ -4,6 +4,7 @@ add_library(
   misc.cpp
   face_gauge.cpp
   host_utils.cpp
+  staggered_host_utils.cpp
   host_blas.cpp
   command_line_params.cpp
   llfat_utils.cpp

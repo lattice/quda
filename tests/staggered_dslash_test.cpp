@@ -333,7 +333,6 @@ void staggeredDslashRef()
 
   // compare to dslash reference implementation
   // printfQuda("Calculating reference implementation...");
-  fflush(stdout);
   switch (dtest_type) {
     case dslash_test_type::Dslash:
       staggeredDslash(spinorRef, qdp_fatlink_cpu, qdp_longlink_cpu, ghost_fatlink_cpu, ghost_longlink_cpu, spinor,
