@@ -218,7 +218,7 @@ namespace quda {
   }
 
   void qudaMemcpyAsyncNoTune_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
-			      const char *func, const char *file, const char *line)
+                              const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
 
@@ -233,26 +233,24 @@ namespace quda {
     case cudaMemcpyDeviceToDevice:
       PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
       break;
-    default:
-      errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
+    default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
     }
 #else
     cudaMemcpyAsync(dst, src, count, kind, stream);
 #endif
-}
+  }
 
-  
   void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
                      cudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
     PROFILE(cudaError_t error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind),
-	    kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_2D : QUDA_PROFILE_MEMCPY_H2D_2D);
+            kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_2D : QUDA_PROFILE_MEMCPY_H2D_2D);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpy2DNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-			   cudaMemcpyKind kind, const char *func, const char *file, const char *line)
+                           cudaMemcpyKind kind, const char *func, const char *file, const char *line)
   {
     cudaError_t error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
     if (error != cudaSuccess && !activeTuning())
@@ -291,8 +289,8 @@ namespace quda {
   }
 
   void qudaMemcpy2DAsyncNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-				cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-				const char *line)
+                                cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                                const char *line)
   {
 #ifdef USE_DRIVER_API
     CUDA_MEMCPY2D param;
@@ -312,15 +310,13 @@ namespace quda {
       param.dstHost = dst;
       param.dstMemoryType = CU_MEMORYTYPE_HOST;
       break;
-    default:
-      errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
+    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
     }
     cuMemcpy2DAsync(&param, stream);
 #else
     cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
 #endif
   }
-
 
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line)
   {
@@ -342,16 +338,15 @@ namespace quda {
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
   }
-  
+
   void qudaMemsetNoTune_(void *dst, int value, size_t count, const char *func, const char *file, const char *line)
-  {    
+  {
     if (count == 0) return;
     cudaError_t error = cudaMemset(dst, value, count);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
   }
 
-  
   void qudaMemsetAsync_(void *dst, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
@@ -420,7 +415,8 @@ namespace quda {
   {
     cudaError_t error = cudaEventQuery(event);
     if (error != cudaSuccess && !activeTuning())
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE) warningQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
+        warningQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
     return error;
   }
 
@@ -442,7 +438,8 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line)
+  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func,
+                                   const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -459,7 +456,7 @@ namespace quda {
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;    
+    return error;
 #endif
   }
 
@@ -524,7 +521,7 @@ namespace quda {
     return error;
 #endif
   }
-  
+
   qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -685,7 +682,8 @@ namespace quda {
   {
     cudaError_t error = cudaHostRegister(ptr, size, flags);
     if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to register pinned memory of size %zu (%s:%s in %s())", cudaGetErrorString(error), size, file, line, func);
+      errorQuda("(CUDA) %s\n Failed to register pinned memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
+                size, file, line, func);
     return error;
   }
 
@@ -693,7 +691,8 @@ namespace quda {
   {
     cudaError_t error = cudaHostUnregister(ptr);
     if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to unregister pinned memory (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+      errorQuda("(CUDA) %s\n Failed to unregister pinned memory (%s:%s in %s())", cudaGetErrorString(error), file, line,
+                func);
     return error;
   }
 
@@ -717,7 +716,8 @@ namespace quda {
   {
     cudaError_t error = cudaMalloc(&ptr, size);
     if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error), size, file, line, func);
+      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
+                size, file, line, func);
     return error;
   }
 
@@ -725,17 +725,17 @@ namespace quda {
   {
     cudaError_t error = cudaMallocManaged(&ptr, size);
     if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error), size, file, line, func);
+      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
+                size, file, line, func);
     return error;
   }
 
   qudaError_t qudaMemAlloc_(void *ptr, size_t size, const char *func, const char *file, const char *line)
   {
-#ifdef USE_DRIVER_API    
+#ifdef USE_DRIVER_API
     CUresult error = cuMemAlloc((CUdeviceptr *)&ptr, size);
     switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
+    case CUDA_SUCCESS: return cudaSuccess;
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
@@ -750,11 +750,10 @@ namespace quda {
 
   qudaError_t qudaMemFree_(void *ptr, const char *func, const char *file, const char *line)
   {
-#ifdef USE_DRIVER_API    
+#ifdef USE_DRIVER_API
     CUresult error = cuMemFree((CUdeviceptr)ptr);
     switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
+    case CUDA_SUCCESS: return cudaSuccess;
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
@@ -762,30 +761,29 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    errorQuda("qudaMemFree may only be called when USE_DRIVER_API is defined. (%s:%s in %s())", str, file, line, func);    
+    errorQuda("qudaMemFree may only be called when USE_DRIVER_API is defined. (%s:%s in %s())", str, file, line, func);
     return cudaErrorUnknown;
 #endif
   }
-  
-  
-  qudaError_t qudaHostAlloc_(void **ptr, size_t size, unsigned int flags, const char *func, const char *file, const char *line)
+
+  qudaError_t qudaHostAlloc_(void **ptr, size_t size, unsigned int flags, const char *func, const char *file,
+                             const char *line)
   {
     cudaError_t error = cudaHostAlloc(&ptr, size, flags);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n failed of size %zu (%s:%s in %s())", cudaGetErrorString(error), size, file, line, func);
     return error;
   }
-  
+
   // Returns attributes about a specified pointer.
-  qudaPointerAttributes qudaPointerGetAttributes_(cudaPointerAttributes* attributes, const void* ptr)
+  qudaPointerAttributes qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr)
   {
     return cudaPointerGetAttributes(attributes, ptr);
   }
 
-
-  
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual, const char *file, const char *line)
+  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
+                                    const char *file, const char *line)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);

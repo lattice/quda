@@ -500,7 +500,7 @@ namespace quda {
           }
 
           if (receiveHandle) comm_start(receiveHandle);
-	  if (sendHandle) comm_start(sendHandle);
+          if (sendHandle) comm_start(sendHandle);
 
 	  if (receiveHandle) comm_wait(receiveHandle);
 	  if (sendHandle) comm_wait(sendHandle);

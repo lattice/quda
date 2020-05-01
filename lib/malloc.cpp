@@ -230,7 +230,7 @@ namespace quda
     a.size = a.base_size = size;
 
     qudaMalloc(&ptr, size);
-    
+
     track_malloc(DEVICE, a, ptr);
 #ifdef HOST_DEBUG
     qudaMemset(ptr, 0xff, size);
@@ -260,7 +260,7 @@ namespace quda
     a.size = a.base_size = size;
 
     qudaMemAlloc((QUdeviceptr *)&ptr, size);
-    
+
     track_malloc(DEVICE_PINNED, a, ptr);
 #ifdef HOST_DEBUG
     qudaMemset(ptr, 0xff, size);
@@ -304,7 +304,7 @@ namespace quda
     void *ptr = aligned_malloc(a, size);
 
     qudaHostRegister(ptr, a.base_size, qudaHostRegisterDefault);
-    
+
     track_malloc(PINNED, a, ptr);
 #ifdef HOST_DEBUG
     memset(ptr, 0xff, a.base_size);
@@ -320,18 +320,18 @@ namespace quda
   void *mapped_malloc_(const char *func, const char *file, int line, size_t size)
   {
     MemAlloc a(func, file, line);
-    
+
 #if 0
     void *ptr;
     static int page_size = 2*getpagesize();
     a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
     a.size = size;
     qudaHostAlloc(&ptr, a.base_size, qudaHostAllocMapped | qudaHostAllocPortable);
-    
+
 #else
     void *ptr = aligned_malloc(a, size);
     qudaHostRegister(ptr, a.base_size, qudaHostRegisterMapped | qudaHostRegisterPortable);
-  
+
 #endif
     track_malloc(MAPPED, a, ptr);
 #ifdef HOST_DEBUG
@@ -339,7 +339,7 @@ namespace quda
 #endif
     return ptr;
   }
-  
+
   /**
    * Perform a standard cudaMallocManaged() with error-checking.  This
    * function should only be called via the managed_malloc() macro,
@@ -352,7 +352,7 @@ namespace quda
     a.size = a.base_size = size;
 
     qudaMallocManaged(&ptr, size);
-    
+
     track_malloc(MANAGED, a, ptr);
 #ifdef HOST_DEBUG
     qudaMemset(ptr, 0xff, size);
@@ -428,7 +428,7 @@ namespace quda
   void host_free_(const char *func, const char *file, int line, void *ptr)
   {
     if (!ptr) { errorQuda("Attempt to free NULL host pointer (%s:%d in %s())\n", file, line, func); }
-    
+
     if (alloc[HOST].count(ptr)) {
       track_free(HOST, ptr);
       free(ptr);

@@ -254,7 +254,7 @@ namespace quda {
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
           qudaMemcpyAsyncNoTune(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-				ghost_face_bytes[dim], qudaMemcpyDeviceToHost, streams[2 * dim + dir]);
+                                ghost_face_bytes[dim], qudaMemcpyDeviceToHost, streams[2 * dim + dir]);
         }
       }
 
@@ -273,8 +273,9 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
-          qudaMemcpyAsyncNoTune(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
-                          ghost_face_bytes[dim], qudaMemcpyHostToDevice, streams[2 * dim + dir]);
+          qudaMemcpyAsyncNoTune(from_face_dim_dir_d[bufferIndex][dim][1 - dir],
+                                from_face_dim_dir_h[bufferIndex][dim][1 - dir], ghost_face_bytes[dim],
+                                qudaMemcpyHostToDevice, streams[2 * dim + dir]);
         }
       }
 
@@ -549,9 +550,9 @@ namespace quda {
         }
 
         // if either direction is not peer-to-peer then we need to synchronize
-        if (!comm_peer2peer_enabled(0,dim) || !comm_peer2peer_enabled(1,dim)) qudaDeviceSynchronize();
+        if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
 
-	// if we pass a stream to sendStart then we must ensure that stream is synchronized
+        // if we pass a stream to sendStart then we must ensure that stream is synchronized
 	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
 	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
 
@@ -696,7 +697,7 @@ namespace quda {
         } else {
           void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
           size_t ghost_bytes[8];
-	  int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
+          int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
 	  for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
 	  void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
 

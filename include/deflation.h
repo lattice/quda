@@ -66,9 +66,9 @@ namespace quda {
      }
 
      ~DeflationParam(){
-        qudaHostUnregister(matProj);
-        if(matProj) delete[]  matProj;
-        if(invRitzVals)       delete[]  invRitzVals;
+       qudaHostUnregister(matProj);
+       if (matProj) delete[] matProj;
+       if (invRitzVals) delete[] invRitzVals;
      }
   };
 

@@ -321,7 +321,7 @@ DslashTime dslashCUDA(int niter)
   qudaEvent_t start, end;
   qudaEventCreate(&start);
   qudaEventCreate(&end);
-  
+
   comm_barrier();
   qudaEventRecord(start, 0);
 
@@ -468,20 +468,20 @@ DslashTime dslashCUDA(int niter)
     }
   }
 
-    qudaEventRecord(end, 0);
-    qudaEventSynchronize(end);
-    float runTime;
-    qudaEventElapsedTime(&runTime, start, end);
-    qudaEventDestroy(start);
-    qudaEventDestroy(end);
+  qudaEventRecord(end, 0);
+  qudaEventSynchronize(end);
+  float runTime;
+  qudaEventElapsedTime(&runTime, start, end);
+  qudaEventDestroy(start);
+  qudaEventDestroy(end);
 
-    dslash_time.event_time = runTime / 1000;
+  dslash_time.event_time = runTime / 1000;
 
-    // check for errors
-    qudaError_t stat = cudaGetLastError();
-    if (stat != qudaSuccess) printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
+  // check for errors
+  qudaError_t stat = cudaGetLastError();
+  if (stat != qudaSuccess) printfQuda("with ERROR: %s\n", cudaGetErrorString(stat));
 
-    return dslash_time;
+  return dslash_time;
 }
 
 void dslashRef() {

@@ -128,7 +128,7 @@ void init(int argc, char **argv)
   *cudaSpinor = *spinor;
 
   qudaDeviceSynchronize();
-  
+
   double spinor_norm2 = blas::norm2(*spinor);
   double cuda_spinor_norm2 = blas::norm2(*cudaSpinor);
   printfQuda("Source CPU = %f, CUDA=%f\n", spinor_norm2, cuda_spinor_norm2);
@@ -163,13 +163,14 @@ void end(void)
   endQuda();
 }
 
-double dslashCUDA(int niter, int mu) {
+double dslashCUDA(int niter, int mu)
+{
 
   qudaEvent_t start, end;
   qudaEventCreate(&start);
   qudaEventRecord(start, 0);
   qudaEventSynchronize(start);
-  
+
   for (int i = 0; i < niter; i++) dirac->MCD(*cudaSpinorOut, *cudaSpinor, mu);
 
   qudaEventCreate(&end);

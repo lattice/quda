@@ -417,13 +417,13 @@ namespace quda {
         // all FLOAT2-ordred fields that are not double precision
         if (ghost_precision != QUDA_DOUBLE_PRECISION && fieldOrder == QUDA_FLOAT2_FIELD_ORDER) {
           desc.x = 8 * ghost_precision;
-          desc.y = 8*ghost_precision;
-	  desc.z = 0;
+          desc.y = 8 * ghost_precision;
+          desc.z = 0;
 	  desc.w = 0;
         } else { // all others are four component (double2 is spread across int4)
           desc.x = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8 * ghost_precision;
-          desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
-	  desc.z = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
+          desc.y = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8 * ghost_precision;
+          desc.z = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
 	  desc.w = (ghost_precision == QUDA_DOUBLE_PRECISION) ? 32 : 8*ghost_precision;
         }
 
@@ -627,7 +627,7 @@ namespace quda {
       char   *dst  = (char*)v + ((!composite_descr.is_composite || composite_descr.is_component) ? volumeCB : composite_descr.volumeCB)*fieldOrder*precision;
       if (pad_bytes)
         for (int subset=0; subset<siteSubset; subset++) {
-          qudaMemset2DAsync(dst + subset*bytes/siteSubset, pitch, 0, pad_bytes, Npad, 0);
+          qudaMemset2DAsync(dst + subset * bytes / siteSubset, pitch, 0, pad_bytes, Npad, 0);
         }
     }
 
@@ -836,8 +836,8 @@ namespace quda {
 
 #ifdef MULTI_GPU
     if (precision != ghost_precision) { pushKernelPackT(true); }
-    
-    if (dim !=3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single qudaMemcpy
+
+    if (dim != 3 || getKernelPackT()) { // use kernels to pack into contiguous buffers then a single qudaMemcpy
 
       void* gpu_buf = (dir == QUDA_BACKWARDS) ? my_face_dim_dir_d[bufferIndex][dim][0] : my_face_dim_dir_d[bufferIndex][dim][1];
       qudaMemcpyAsync(ghost_spinor, gpu_buf, ghost_face_bytes[dim], qudaMemcpyDeviceToHost, *stream);
