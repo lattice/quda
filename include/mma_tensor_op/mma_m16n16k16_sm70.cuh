@@ -2,7 +2,7 @@
 
 #include <mma.h>
 
-//#define USE_FP16_HMMA_ACCUMULATE
+// #define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
 {
@@ -424,7 +424,7 @@ namespace quda
         // const int col = warp_col * 16 + wrm.quad_col * 8;
         const int col = warp_col * 2 + wrm.quad_col;
 
-        constexpr bool fixed = Accessor::fixed;
+        constexpr bool fixed = C::fixed;
         using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
         trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&cc.v[cc.idx]));
         structure s;
