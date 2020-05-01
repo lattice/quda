@@ -318,8 +318,6 @@ namespace quda
     return ptr;
   }
 
-#define HOST_ALLOC // this needs to be set presently on P9
-
   /**
    * Allocate page-locked ("pinned") host memory, and map it into the
    * GPU address space.  This function should only be called via the
@@ -329,24 +327,28 @@ namespace quda
   {
     MemAlloc a(func, file, line);
 
-#ifdef HOST_ALLOC
-    void *ptr;
-    qudaError_t err = cudaHostAlloc(&ptr, size, qudaHostRegisterMapped | qudaHostRegisterPortable);
-    if (err != qudaSuccess) { errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
-#else
-    void *ptr = aligned_malloc(a, size);
-    qudaError_t err = cudaHostRegister(ptr, a.base_size, qudaHostRegisterMapped);
-    if (err != qudaSuccess) {
-      errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
-    }
-#endif
-    track_malloc(MAPPED, a, ptr);
-#ifdef HOST_DEBUG
-    memset(ptr, 0xff, a.base_size);
-#endif
-    return ptr;
+#if 0
+    static int page_size = 2*getpagesize();
+    a.base_size = ((size + page_size - 1) / page_size) * page_size; // round up to the nearest multiple of page_size
+    a.size = size;
+    cudaError_t err = cudaHostAlloc(&ptr, a.base_size, cudaHostAllocMapped | cudaHostAllocPortable);
+    if (err != cudaSuccess) {
+      errorQuda("cudaHostAlloc failed of size %zu (%s:%d in %s())\n", size, file, line, func); }
   }
-
+#else
+  void *ptr = aligned_malloc(a, size);
+  cudaError_t err = cudaHostRegister(ptr, a.base_size, cudaHostRegisterMapped | cudaHostRegisterPortable);
+  if (err != cudaSuccess) {
+    errorQuda("Failed to register host-mapped memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+  }
+#endif
+  track_malloc(MAPPED, a, ptr);
+#ifdef HOST_DEBUG
+  memset(ptr, 0xff, a.base_size);
+#endif
+  return ptr;
+  }
+  
   /**
    * Perform a standard cudaMallocManaged() with error-checking.  This
    * function should only be called via the managed_malloc() macro,

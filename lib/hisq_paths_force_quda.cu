@@ -1,5 +1,4 @@
 #include <utility>
-#include <typeinfo>
 #include <quda_internal.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>

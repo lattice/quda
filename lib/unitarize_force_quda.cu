@@ -5,7 +5,7 @@
 #include <quda_backend.h>
 #include <gauge_field.h>
 #include <tune_quda.h>
-
+#include <gauge_field.h>
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <gauge_field_order.h>

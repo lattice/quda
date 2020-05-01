@@ -4,10 +4,10 @@
 #include <string.h>
 #include <type_traits>
 
-#include "quda.h"
-#include "test_util.h"
-#include "misc.h"
-#include "hisq_force_reference.h"
+#include <quda.h>
+#include <host_utils.h>
+#include <misc.h>
+#include <hisq_force_reference.h>
 
 extern int Z[4];
 extern int V;

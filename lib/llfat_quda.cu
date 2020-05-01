@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <quda_backend.h>
-#include <quda_backend.h>
-
+#include <cstdio>
 #include <quda_internal.h>
 #include <gauge_field.h>
 #include <llfat_quda.h>

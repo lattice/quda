@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
 #include <uint_to_char.h>
-#include <typeinfo>
 #include <vector>
 #include <assert.h>
 #include <utility>

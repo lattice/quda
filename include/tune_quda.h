@@ -1,5 +1,4 @@
-#ifndef _TUNE_QUDA_H
-#define _TUNE_QUDA_H
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -9,6 +8,7 @@
 #include <stdarg.h>
 #include <map>
 #include <algorithm>
+#include <typeinfo>
 
 #include <tune_key.h>
 #include <quda_internal.h>
@@ -628,5 +628,3 @@ namespace quda {
 #endif
 
 #define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
-
-#endif // _TUNE_QUDA_H

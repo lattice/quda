@@ -1,5 +1,4 @@
 #pragma once
-#include <blas_reference.h>
 #include <quda_internal.h>
 #include "color_spinor_field.h"
 

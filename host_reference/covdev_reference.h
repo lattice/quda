@@ -1,13 +1,6 @@
-
-#ifndef _COVDEV_QUDA_DSLASH_REF_H
-#define _COVDEV_QUDA_DSLASH_REF_H
-#include <blas_reference.h>
+#pragma once
 #include <quda_internal.h>
 #include "color_spinor_field.h"
-
-extern int Z[4];
-extern int Vh;
-extern int V;
 
 using namespace quda;
 
@@ -29,4 +22,3 @@ void matdagmat_mg4dir(cpuColorSpinorField* out, void **link, void** ghostLink,
 		      cpuColorSpinorField* in, int dagger_bit, int mu,
 		      QudaPrecision sPrecision, QudaPrecision gPrecision, cpuColorSpinorField* tmp, QudaParity parity);
 
-#endif // _QUDA_DLASH_REF_H

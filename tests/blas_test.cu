@@ -5,11 +5,11 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 
 // include because of nasty globals used in the tests
-#include <dslash_util.h>
+#include <dslash_reference.h>
 
 // google test
 #include <gtest/gtest.h>

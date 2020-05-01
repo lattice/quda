@@ -3,8 +3,8 @@
 #include <time.h>
 #include <math.h>
 
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <dslash_util.h>
 #include <blas_reference.h>
 #include <staggered_dslash_reference.h>
@@ -21,7 +21,7 @@
 #endif
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
-#define mySpinorSiteSize 6
+#define my_spinor_site_size 6
 
 void *qdp_fatlink[4];
 void *qdp_longlink[4];
@@ -172,26 +172,28 @@ invert_test(void)
   dw_setDims(gaugeParam.X,1); // so we can use 5-d indexing from dwf
   setSpinorSiteSize(6);
 
-  size_t gSize = (gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
   for (int dir = 0; dir < 4; dir++) {
-    qdp_fatlink[dir] = malloc(V*gaugeSiteSize*gSize);
-    qdp_longlink[dir] = malloc(V*gaugeSiteSize*gSize);
+    qdp_fatlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    qdp_longlink[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
-  fatlink = malloc(4*V*gaugeSiteSize*gSize);
-  longlink = malloc(4*V*gaugeSiteSize*gSize);
+  fatlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
+  longlink = malloc(4 * V * gauge_site_size * host_gauge_data_type_size);
 
   construct_fat_long_gauge_field(qdp_fatlink, qdp_longlink, 1, gaugeParam.cpu_prec,
 				 &gaugeParam, dslash_type);
 
   for(int dir=0; dir<4; ++dir){
     for(int i=0; i<V; ++i){
-      for(int j=0; j<gaugeSiteSize; ++j){
+      for (int j = 0; j < gauge_site_size; ++j) {
         if(gaugeParam.cpu_prec == QUDA_DOUBLE_PRECISION){
-          ((double*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((double*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((double*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          ((double *)fatlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((double *)qdp_fatlink[dir])[i * gauge_site_size + j];
+          ((double *)longlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((double *)qdp_longlink[dir])[i * gauge_site_size + j];
         }else{
-          ((float*)fatlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_fatlink[dir])[i*gaugeSiteSize + j];
-          ((float*)longlink)[(i*4 + dir)*gaugeSiteSize + j] = ((float*)qdp_longlink[dir])[i*gaugeSiteSize + j];
+          ((float *)fatlink)[(i * 4 + dir) * gauge_site_size + j] = ((float *)qdp_fatlink[dir])[i * gauge_site_size + j];
+          ((float *)longlink)[(i * 4 + dir) * gauge_site_size + j]
+            = ((float *)qdp_longlink[dir])[i * gauge_site_size + j];
         }
       }
     }
@@ -340,9 +342,9 @@ invert_test(void)
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_EVEN_PARITY);
 #endif
 
-      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
 
       for(int i=1; i < inv_param.num_src;i++) delete spinorOutArray[i];
       for(int i=1; i < inv_param.num_src;i++) delete spinorInArray[i];
@@ -369,9 +371,9 @@ invert_test(void)
 #else
       matdagmat(ref->V(), qdp_fatlink, qdp_longlink, out->V(), mass, 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), QUDA_ODD_PARITY);
 #endif
-      mxpy(in->V(), ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      nrm2 = norm_2(ref->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
-      src2 = norm_2(in->V(), Vh*mySpinorSiteSize, inv_param.cpu_prec);
+      mxpy(in->V(), ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      nrm2 = norm_2(ref->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
+      src2 = norm_2(in->V(), Vh * my_spinor_site_size, inv_param.cpu_prec);
 
       break;
 
@@ -449,21 +451,20 @@ invert_test(void)
           matdagmat(ref->V(), qdp_fatlink, qdp_longlink, outArray[i], masses[i], 0, inv_param.cpu_prec, gaugeParam.cpu_prec, tmp->V(), parity);
 #endif
 
-	  mxpy(in->V(), ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double nrm2 = norm_2(ref->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double src2 = norm_2(in->V(), len*mySpinorSiteSize, inv_param.cpu_prec);
-	  double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
-	  double l2r = sqrt(nrm2/src2);
+          mxpy(in->V(), ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double nrm2 = norm_2(ref->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double src2 = norm_2(in->V(), len * my_spinor_site_size, inv_param.cpu_prec);
+          double hqr = sqrt(blas::HeavyQuarkResidualNorm(*spinorOutArray[i], *ref).z);
+          double l2r = sqrt(nrm2 / src2);
 
-	  printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, host = %g\n",
-		   i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r,
-		   inv_param.tol_hq_offset[i], inv_param.true_res_hq_offset[i], hqr);
+          printfQuda("Shift %d residuals: (L2 relative) tol %g, QUDA = %g, host = %g; (heavy-quark) tol %g, QUDA = %g, "
+                     "host = %g\n",
+                     i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
+                     inv_param.true_res_hq_offset[i], hqr);
 
-	  //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-	  if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	    ret |=1;
-	  }
-	}
+          // emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+          if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) { ret |= 1; }
+        }
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }
@@ -544,10 +545,6 @@ int main(int argc, char** argv)
   auto app = make_app();
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3}, {"odd", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -565,8 +562,7 @@ int main(int argc, char** argv)
     if(test_type != 0 && test_type != 1) errorQuda("Preconditioning is currently not supported in multi-shift solver solvers");
   }
 
-
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   display_test_info();

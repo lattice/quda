@@ -7,8 +7,8 @@
 #include <gauge_field.h>
 
 #include <comm_quda.h>
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 #include <gauge_tools.h>
 
 #include <pgauge_monte.h>
@@ -16,12 +16,6 @@
 #include <unitarization_links.h>
 
 #include <qio_field.h>
-
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
 
 #include <gtest/gtest.h>
 
@@ -32,48 +26,6 @@ int *num_failures_dev;
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define DABS(a) ((a)<(0.)?(-(a)):(a))
-
-QudaPrecision &cpu_prec = prec;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-
-
-void cpuSetGaugeParam(QudaGaugeParam &gauge_param) {
-
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
-  gauge_param.cpu_prec = cpu_prec;
-
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  gauge_param.ga_pad = 0;
-  // For multi-GPU, ga_pad must be large enough to store a time-slice
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif
-}
-
 
 class GaugeAlgTest : public ::testing::Test {
  protected:
@@ -130,7 +82,7 @@ class GaugeAlgTest : public ::testing::Test {
 
     param = newQudaGaugeParam();
 
-    //Setup Gauge container!!!!!!
+    // Setup gauge container.
     param.cpu_prec = prec;
     param.cpu_prec = prec;
     param.cuda_prec = prec;
@@ -303,9 +255,6 @@ int main(int argc, char **argv){
 
   // command line options
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -313,6 +262,10 @@ int main(int argc, char **argv){
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   initQuda(device);
   test_rc = RUN_ALL_TESTS();

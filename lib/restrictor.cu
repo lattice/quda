@@ -1,6 +1,5 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <launch_kernel.cuh>
 
 #include <jitify_helper.cuh>

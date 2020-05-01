@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <multigrid_helper.cuh>
 #include <index_helper.cuh>
 

@@ -3,8 +3,8 @@
 #include <cstring>
 
 #include <quda.h>
-#include "test_util.h"
-#include <test_params.h>
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -239,7 +239,7 @@ static void hisq_force_init()
 
   //createMomCPU(cpuMom->Gauge_p(), mom_prec);
 
-  hw = malloc(4*cpuGauge->Volume()*hwSiteSize*qudaGaugeParam.cpu_prec);
+  hw = malloc(4 * cpuGauge->Volume() * hw_site_size * qudaGaugeParam.cpu_prec);
   if (hw == NULL){
     fprintf(stderr, "ERROR: malloc failed for hw\n");
     exit(1);
@@ -381,7 +381,8 @@ static int hisq_force_test(void)
   int accuracy_level = 3;
   if(verify_results){
     int res;
-    res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume()*momSiteSize, 1e-5, qudaGaugeParam.cpu_prec);
+    res = compare_floats(cpuMom->Gauge_p(), refMom->Gauge_p(), 4 * cpuMom->Volume() * mom_site_size, 1e-5,
+                         qudaGaugeParam.cpu_prec);
 
     accuracy_level = strong_check_mom(cpuMom->Gauge_p(), refMom->Gauge_p(), 4*cpuMom->Volume(), qudaGaugeParam.cpu_prec);
     printfQuda("Test %s\n",(1 == res) ? "PASSED" : "FAILED");
