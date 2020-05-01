@@ -192,17 +192,22 @@ void laphSourceInvert(std::vector<ColorSpinorField *> &quarks, QudaInvertParam *
   int iter = 0;
 
   for (int i = 0; i < (int)quarks.size(); i++) {
-    *b = *quarks[i];
-    dirac.prepare(in, out, *x, *b, inv_param->solution_type);
-    DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    SolverParam solverParam(*inv_param);
-    Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileLaphInvert);
+    int t_size = comm_dim(3) * tdim;
 
-    (*solve)(*out, *in);
-
-    *quarks[i] = *x;
-    solverParam.updateInvertParam(*inv_param);
-
+    for(int t=0; t<t_size; t++) {
+      *b = *quarks[i];
+      temporalDiluteQuda(*b, t);
+      dirac.prepare(in, out, *x, *b, inv_param->solution_type);
+      DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
+      SolverParam solverParam(*inv_param);
+      Solver *solve = Solver::create(solverParam, m, mSloppy, mPre, profileLaphInvert);
+      
+      (*solve)(*out, *in);
+      
+      *quarks[i] = *x;
+      solverParam.updateInvertParam(*inv_param);
+    }
+    
     // Accumulate Solver stats
     secs += inv_param->secs;
     gflops += inv_param->gflops;
@@ -348,12 +353,3 @@ void stochLaphSmearQuda(void **host_quarks, void **host_evecs,
     delete quda_evecs[i];
   }  
 }
-
-
-
-
-
-
-
-
-

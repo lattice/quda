@@ -96,7 +96,6 @@ namespace quda
     
     if (x.Ncolor() != 3 || y.Ncolor() != 3) errorQuda("Unexpected number of colors x=%d y=%d", x.Ncolor(), y.Ncolor());
     if (x.Nspin() != 4 || y.Nspin() != 1) errorQuda("Unexpected number of spins x=%d y=%d", x.Nspin(), y.Nspin());
-
     
     if(x.Ncolor() == 3) {
       // Here we switch on the T dim size, but pass 2*T to account for the complex
@@ -104,6 +103,16 @@ namespace quda
       // We use a double4 in the kernels for reduction, one for the real values of
       // the four spins, and the other for the imaginary.
       switch(t_dim_size) {
+      case 4 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 8>(x, y, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 8>(x, y, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+	
       case 8 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
 	  evecProject<float, 3, 16>(x, y, (float*)result);
