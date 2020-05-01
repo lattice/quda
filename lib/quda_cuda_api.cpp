@@ -433,7 +433,7 @@ namespace quda {
     return error;
   }
 
-  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags)
+  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -443,19 +443,43 @@ namespace quda {
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuStreamWaitEvent returned error %s", str);
+      errorQuda("(CUDA) cuStreamWaitEvent returned error %s\n (%s:%s in %s())\n", str, file, line, func);
     }
     return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    return error;
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;    
 #endif
   }
 
-  qudaError_t qudaStreamSynchronize(qudaStream_t &stream)
+  qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+    return error;
+
+#endif
+  }
+
+  qudaError_t qudaStreamCreate_(qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuStreamCreate(&stream, 0), QUDA_PROFILE_STREAM_CREATE);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
@@ -466,12 +490,33 @@ namespace quda {
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    PROFILE(cudaError_t error = cudaStreamCreate(stream), QUDA_PROFILE_STREAM_CREATE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
 #endif
   }
 
-  qudaError_t qudaEventSynchronize(qudaEvent_t &event)
+  qudaError_t qudaStreamDestroy_(qudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuStreamDestroy(stream), QUDA_PROFILE_STREAM_DESTROY);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuStreamSynchronize returned error %s", str);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaStreamDestroy(stream), QUDA_PROFILE_STREAM_DESTROY);
+    return error;
+#endif
+  }
+  
+  qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
@@ -645,10 +690,12 @@ namespace quda {
 
   
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute(const void *func, qudaFuncAttribute attr, int value)
+  qudaError_t qudaFuncSetAttribute(const void *func, qudaFuncAttribute attr, int value, const char *func_actual, const char *file, const char *line)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func_actual);
     return error;
   }
 #endif

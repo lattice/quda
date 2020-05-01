@@ -253,8 +253,8 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	recvStart(dim, dir); // prepost the receive
 	if (!comm_peer2peer_enabled(dir,dim) && !comm_gdr_enabled()) {
-          qudaMemcpyAsync(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
-                          ghost_face_bytes[dim], qudaMemcpyDeviceToHost, streams[2 * dim + dir]);
+          qudaMemcpyAsyncNoTune(my_face_dim_dir_h[bufferIndex][dim][dir], my_face_dim_dir_d[bufferIndex][dim][dir],
+				ghost_face_bytes[dim], qudaMemcpyDeviceToHost, streams[2 * dim + dir]);
         }
       }
 
@@ -273,7 +273,7 @@ namespace quda {
 	if (!comm_dim_partitioned(dim)) continue;
 	commsComplete(dim, dir);
 	if (!comm_peer2peer_enabled(1-dir,dim) && !comm_gdr_enabled()) {
-          qudaMemcpyAsync(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
+          qudaMemcpyAsyncNoTune(from_face_dim_dir_d[bufferIndex][dim][1 - dir], from_face_dim_dir_h[bufferIndex][dim][1 - dir],
                           ghost_face_bytes[dim], qudaMemcpyHostToDevice, streams[2 * dim + dir]);
         }
       }

@@ -252,7 +252,7 @@ namespace quda {
      @brief Wrapper around qudaEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
   */
-  qudaError_t qudaEventSynchronize(qudaEvent_t &event);
+  qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around qudaStreamWaitEvent
@@ -260,13 +260,29 @@ namespace quda {
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
   */
-  qudaError_t qudaStreamWaitEvent(qudaStream_t stream, qudaEvent_t event, unsigned int flags);
+  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file,
+                                    const char *line);
 
   /**
      @brief Wrapper around qudaStreamSynchronize or quStreamSynchronize
-     @param[in] stream Stream which we are synchronizing with respect to
+     @param[in] stream Stream which we are synchronizing 
   */
-  qudaError_t qudaStreamSynchronize(qudaStream_t &stream);
+  qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file,
+                                    const char *line);
+
+    /**
+     @brief Wrapper around qudaStreamCreate or quStreamCreate
+     @param[in] stream Stream which we are creating
+  */
+  qudaError_t qudaStreamCreate_(qudaStream_t &stream, const char *func, const char *file,
+                                    const char *line);
+
+    /**
+     @brief Wrapper around qudaStreamDestroy or quStreamDestroy
+     @param[in] stream Stream which we are destroying
+  */
+  qudaError_t qudaStreamDestroy_(qudaStream_t &stream, const char *func, const char *file,
+				 const char *line);
 
   // QUDA texture objects
   /**
@@ -407,18 +423,20 @@ namespace quda {
 
 // START Event
 //-------------------------------------------------------------------------------------
-#define qudaEventCreate(event)                                                                                         \
+#define qudaEventCreate(event)						\
   ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaEventCreateWithFlags(event, flags)                                                                         \
+#define qudaEventCreateWithFlags(event, flags)				\
   ::quda::qudaEventCreateWithFlags_(event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaEventDestroy(event)                                                                                        \
+#define qudaEventDestroy(event)						\
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaEventQuery(event)                                                                                          \
+#define qudaEventQuery(event)						\
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaEventRecord(event, stream)                                                                                 \
+#define qudaEventRecord(event, stream)					\
   ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaEventElapsedTime(ms, start, end)                                                                           \
+#define qudaEventElapsedTime(ms, start, end)				\
   ::quda::qudaEventElapsedTime_(ms, start, end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaEventSynchronize(event)					\
+  ::quda::qudaEventSynchronize_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 //-------------------------------------------------------------------------------------
 
 // START Memset
@@ -476,6 +494,19 @@ namespace quda {
 #define qudaRuntimeGetVersion(runtimeVersion)                                                                          \
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 // END Device
+//-------------------------------------------------------------------------------------
+
+// START Stream
+//-------------------------------------------------------------------------------------
+#define qudaStreamWaitEvent(stream, event, flags)			\
+  ::quda::qudaStreamWaitEvent_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamSynchronize(stream)					\
+  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamCreate(stream)					\
+  ::quda::qudaStreamCreate_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamDestroy(stream)					\
+  ::quda::qudaStreamDestroy_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+// END Stream
 //-------------------------------------------------------------------------------------
 
 // START Host

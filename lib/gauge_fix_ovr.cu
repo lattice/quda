@@ -1368,11 +1368,11 @@ public:
         #else
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[d]);
+            qudaMemcpyAsyncNoTune(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
-            cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[4 + d]);
+            qudaMemcpyAsyncNoTune(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[4 + d]);
           }
         #endif
           //compute interior points
@@ -1389,12 +1389,12 @@ public:
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_back[d]);
-            cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[d]);
+            qudaMemcpyAsyncNoTune(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[d]);
           }
           for ( int d = 0; d < 4; d++ ) {
             if ( !commDimPartitioned(d)) continue;
             comm_wait(mh_recv_fwd[d]);
-            cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[4 + d]);
+            qudaMemcpyAsyncNoTune(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[4 + d]);
           }
         #endif
           for ( int d = 0; d < 4; d++ ) {
