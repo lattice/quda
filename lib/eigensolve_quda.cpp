@@ -505,7 +505,6 @@ namespace quda
 
   void EigenSolver::loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string vec_infile)
   {
-
 #ifdef HAVE_QIO
     const int Nvec = eig_vecs.size();
     auto spinor_parity = eig_vecs[0]->SuggestedParity();
@@ -684,7 +683,7 @@ namespace quda
       }
     }
 
-    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), eig_vecs[0]->SiteSubset(),
+    write_spinor_field(vec_outfile.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
 
     host_free(V);

@@ -169,7 +169,7 @@ int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecisio
   return read_field<18>(infile, count, field_in, cpu_prec, QUDA_FULL_SITE_SUBSET, QUDA_INVALID_PARITY, 1, 9);
 }
 
-void set_layout(const int *X)
+void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 {
   /* Lattice dimensions */
   lattice_dim = 4;
@@ -180,7 +180,7 @@ void set_layout(const int *X)
   }
 
   /* Set the mapping of coordinates to nodes */
-  if (quda_setup_layout(lattice_size, 4, QMP_get_number_of_nodes()) != 0) { errorQuda("Setup layout failed\n"); }
+  if (quda_setup_layout(lattice_size, 4, QMP_get_number_of_nodes(), subset == QUDA_PARITY_SITE_SUBSET) != 0) { errorQuda("Setup layout failed\n"); }
   printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
   int sites_on_node = quda_num_sites(quda_this_node);
 
@@ -241,7 +241,7 @@ void read_spinor_field(const char *filename, void *V[], QudaPrecision precision,
 {
   quda_this_node = mynode();
 
-  set_layout(X);
+  set_layout(X, subset);
 
   /* Open the test file for reading */
   QIO_Reader *infile = open_test_input(filename, QIO_UNKNOWN, QIO_PARALLEL);
@@ -426,7 +426,7 @@ void write_spinor_field(const char *filename, void *V[], QudaPrecision precision
 {
   quda_this_node = mynode();
 
-  set_layout(X);
+  set_layout(X, subset);
 
   QudaPrecision file_prec = precision;
 

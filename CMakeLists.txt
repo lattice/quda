@@ -539,7 +539,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
