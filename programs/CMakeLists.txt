@@ -51,7 +51,7 @@ if(QUDA_QDPJIT)
   set(QUDA_BUILD_ALL_PROGRAMS OFF)
 endif()
 
-set_property(TARGET stoch_laph_quark_smear PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 add_executable(stoch_laph_quark_smear stoch_laph_quark_smear_driver.cpp  stoch_laph_quark_smear_utils.cpp)
+set_property(TARGET stoch_laph_quark_smear PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 target_link_libraries(stoch_laph_quark_smear PRIVATE ${PROG_LIBS})
 quda_checkbuildtest(stoch_laph_quark_smear QUDA_BUILD_ALL_PROGRAMS)
