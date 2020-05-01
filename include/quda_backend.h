@@ -116,10 +116,14 @@
 #define qudaDeviceProp cudaDeviceProp
 #define qudaWarpSize warpSize
 
-//?
 #define qudaFuncAttributeMaxDynamicSharedMemorySize cudaFuncAttributeMaxDynamicSharedMemorySize
 #define qudaFuncAttributePreferredSharedMemoryCarveout cudaFuncAttributePreferredSharedMemoryCarveout
 #define qudaSharedmemCarveoutMaxShared cudaSharedmemCarveoutMaxShared
+
+#define qudaHostAllocDefault cudaHostAllocDefault
+#define qudaHostAllocWriteCombined cudaHostAllocWriteCombined
+#define qudaHostAllocMapped cudaHostAllocMapped
+#define qudaHostAllocPortable cudaHostAllocPortable
 
 #endif
 

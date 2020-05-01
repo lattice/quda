@@ -371,8 +371,42 @@ namespace quda {
      @brief Wrapper around cudaHostUnregister
   */
   qudaError_t qudaHostUnregister_(void *ptr, const char *func, const char *file, const char *line);
-  
-  
+
+  /**
+     @brief Wrapper around cudaHostAlloc
+  */
+  qudaError_t qudaHostAlloc_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMallocManaged
+  */
+  qudaError_t qudaMallocManaged_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMalloc
+  */
+  qudaError_t qudaMalloc_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaFree
+  */
+  qudaError_t qudaFree_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaFreeHost
+  */
+  qudaError_t qudaFreeHost_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cuMemAlloc
+  */
+  qudaError_t qudaMemAlloc_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cuMemFree
+  */
+  qudaError_t qudaMemFree_(void *ptr, const char *func, const char *file, const char *line);
+
 #if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around qudaFuncSetAttribute
@@ -491,8 +525,21 @@ namespace quda {
                                     __STRINGIFY__(__LINE__));
 #define qudaDriverGetVersion(driverVersion)                                                                            \
   ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaRuntimeGetVersion(runtimeVersion)                                                                          \
+#define qudaRuntimeGetVersion(runtimeVersion)				\
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMallocManaged(ptr, size)					\
+  ::quda::qudaMallocManaged_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMalloc(ptr, size)						\
+  ::quda::qudaMalloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaFree(ptr)							\
+  ::quda::qudaFree_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaFreeHost(ptr)						\
+  ::quda::qudaFreeHost_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemAlloc(ptr, size)						\
+  ::quda::qudaMemAlloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemFree(ptr)						\
+  ::quda::qudaMemFree_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 // END Device
 //-------------------------------------------------------------------------------------
 
@@ -515,6 +562,8 @@ namespace quda {
   ::quda::qudaHostRegister_(ptr, size, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #define qudaHostUnregister(ptr)						\
   ::quda::qudaHostUnregister_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaHostAlloc(ptr, size)					\
+  ::quda::qudaHostAlloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 // END Host
 //-------------------------------------------------------------------------------------
 
