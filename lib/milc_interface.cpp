@@ -9,6 +9,7 @@
 #include <unitarization_links.h>
 #include <ks_improved_force.h>
 #include <dslash_quda.h>
+#include <vector_io.h>
 
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -98,6 +99,7 @@ void qudaInit(QudaInitArgs_t input)
   qudamilc_called<true>(__func__);
   qudaSetLayout(input.layout);
   initialized = true;
+  set_io_parity_inflation_quda(QUDA_BOOLEAN_TRUE);
   qudamilc_called<false>(__func__);
 }
 
