@@ -1,8 +1,8 @@
 #include <blas_magma.h>
 #include <string.h>
 
-#include <util_quda.h>
 #include <quda_internal.h>
+#include <util_quda.h>
 
 #ifdef MAGMA_LIB
 
@@ -23,8 +23,8 @@
 
   template<typename magmaFloat> void magma_gesv(void *sol, const int ldn, const int n, void *Mat, const int ldm)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gesv, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_gesv, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t *ipiv;
     magma_int_t err, info;
@@ -36,7 +36,7 @@
     magma_malloc_pinned((void**)&tmp, ldm*n*sizeof(magmaFloat));
     memcpy(tmp, Mat, ldm*n*sizeof(magmaFloat));
 
-    if ( ptr_attr.memoryType == cudaMemoryTypeDevice ) {
+    if ( ptr_attr.memoryType == qudaMemoryTypeDevice ) {
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {  
          err = magma_cgesv_gpu(n, 1, static_cast<magmaFloatComplex* >(tmp), ldm, ipiv, static_cast<magmaFloatComplex* >(sol), ldn, &info);
@@ -47,7 +47,7 @@
          err = magma_zgesv_gpu(n, 1, static_cast<magmaDoubleComplex*>(tmp), ldm, ipiv, static_cast<magmaDoubleComplex*>(sol), ldn, &info);
          if(err != 0) errorQuda("\nError in SolveGPUProjMatrix (magma_zgesv_gpu), exit ...\n");
       }
-    }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
+    }  else if ( ptr_attr.memoryType == qudaMemoryTypeHost ) {
 
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {  
@@ -72,16 +72,16 @@
 
   template<typename magmaFloat> void magma_geev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_geev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_geev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info;
 
     void *work_  = nullptr, *rwork_ = nullptr;
 
-    if ( ptr_attr.memoryType == cudaMemoryTypeDevice ) {
+    if ( ptr_attr.memoryType == qudaMemoryTypeDevice ) {
       errorQuda("\nGPU version is not supported.\n");
-    }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
+    }  else if ( ptr_attr.memoryType == qudaMemoryTypeHost ) {
 
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {
@@ -132,13 +132,13 @@
 
   template<typename  magmaFloat> void magma_gels(void *Mat, void *c, int rows, int cols, int ldm)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info, lwork;
     void *hwork_ = nullptr;
 
-    if ( ptr_attr.memoryType == cudaMemoryTypeDevice )
+    if ( ptr_attr.memoryType == qudaMemoryTypeDevice )
     {
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {
@@ -162,7 +162,7 @@
                              ldm, hwork, lwork, &info );
         if (err != 0)  errorQuda("\nError in magma_zgels_gpu, %d, exit ...\n", info);
       }
-    }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
+    }  else if ( ptr_attr.memoryType == qudaMemoryTypeHost ) {
 
 
      if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
@@ -197,8 +197,8 @@
 
  template<typename magmaFloat> void magma_heev(void *Mat, const int m, const int ldm, void *evalues)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_heev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_heev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info;
 
@@ -206,9 +206,9 @@
     int *iwork   = nullptr;
     int qiwork;
 
-    if ( ptr_attr.memoryType == cudaMemoryTypeDevice ) {
+    if ( ptr_attr.memoryType == qudaMemoryTypeDevice ) {
       errorQuda("\nGPU version is not supported.\n");
-    }  else if ( ptr_attr.memoryType == cudaMemoryTypeHost ) {
+    }  else if ( ptr_attr.memoryType == qudaMemoryTypeHost ) {
       if(sizeof(magmaFloat) == sizeof(magmaFloatComplex))
       {
         magmaFloatComplex qwork;

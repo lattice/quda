@@ -45,6 +45,7 @@
 #define qudaSuccess cudaSuccess
 #define qudaEvent_t cudaEvent_t
 #define qudaError_t cudaError_t
+#define qudaErrorInvalidValue cudaErrorInvalidValue
 #define qudaMemcpyKind cudaMemcpyKind
 #define qudaMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define qudaMemcpyHostToDevice cudaMemcpyHostToDevice
@@ -63,6 +64,11 @@
 #define qudaHostAllocMapped cudaHostAllocMapped
 #define qudaHostAllocPortable cudaHostAllocPortable
 
+#define qudaPointerAttributes cudaPointerAttributes
+#define qudaMemoryTypeDevice cudaMemoryTypeDevice
+#define qudaMemoryTypeArray cudaMemoryTypeArray
+#define qudaMemoryTypeUnified cudaMemoryTypeUnified
+#define qudaMemoryTypeHost cudaMemoryTypeHost
 #endif
 
 #ifdef HIP_BACKEND
