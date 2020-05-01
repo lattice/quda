@@ -125,7 +125,7 @@
 
 #ifdef HIP_BACKEND
 #include <hip/hip_runtime.h>
-#include <hip/hip_profiler_api.h
+#include <hip/hip_profiler_api.h>
 
 #define QUDA_SUCCESS hipSuccess
 #define QUDA_MEMORYTYPE_ARRAY hipMemoryTypeArray

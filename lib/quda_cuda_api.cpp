@@ -343,6 +343,16 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
+  void qudaMemsetNoTune_(void *dst, int value, size_t count, const char *func, const char *file, const char *line)
+  {
+    
+    if (count == 0) return;
+    cudaError_t error cudaMemset(dst, value, count);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
+  }
+
+  
   void qudaMemsetAsync_(void *dst, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {

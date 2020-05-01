@@ -485,11 +485,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    qudaError_t err = cudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
-    if (err != qudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemcpyNoTune(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -519,11 +515,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaError_t err = qudaMemset(buffer, 0, nbytes);
-    if (err != qudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemsetNoTune(buffer, 0, nbytes);
   }
 #endif
 
