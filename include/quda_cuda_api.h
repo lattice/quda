@@ -380,7 +380,7 @@ namespace quda {
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  qudaError_t qudaFuncSetAttribute(const void *func, qudaFuncAttribute attr, int value);
+  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual, const char *file, const char *line);
 #endif
 
   /**
@@ -528,6 +528,12 @@ namespace quda {
 #define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream)                                         \
   ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), \
                             __STRINGIFY__(__LINE__));
+#if CUDA_VERSION >= 9000
+#define qudaFuncSetAttribute(func, attr, value);			\
+  ::quda::qudaFuncSetAttribute_(func, attr, value, __func__, quda::file_name(__FILE__), \
+				__STRINGIFY__(__LINE__));
+#endif
+
 // END Misc
 //-------------------------------------------------------------------------------------
 #endif

@@ -342,12 +342,11 @@ namespace quda {
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
-
+  
   void qudaMemsetNoTune_(void *dst, int value, size_t count, const char *func, const char *file, const char *line)
-  {
-    
+  {    
     if (count == 0) return;
-    cudaError_t error cudaMemset(dst, value, count);
+    cudaError_t error = cudaMemset(dst, value, count);
     if (error != cudaSuccess && !activeTuning())
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
@@ -700,7 +699,7 @@ namespace quda {
 
   
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute(const void *func, qudaFuncAttribute attr, int value, const char *func_actual, const char *file, const char *line)
+  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual, const char *file, const char *line)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
