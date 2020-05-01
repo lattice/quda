@@ -196,7 +196,7 @@ void laphSourceInvert(std::vector<ColorSpinorField *> &quarks, QudaInvertParam *
 
     for(int t=0; t<t_size; t++) {
       *b = *quarks[i];
-      temporalDiluteQuda(*b, t);
+      //temporalDiluteQuda(*b, t);
       dirac.prepare(in, out, *x, *b, inv_param->solution_type);
       DiracM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
       SolverParam solverParam(*inv_param);
@@ -206,6 +206,7 @@ void laphSourceInvert(std::vector<ColorSpinorField *> &quarks, QudaInvertParam *
       
       *quarks[i] = *x;
       solverParam.updateInvertParam(*inv_param);
+      delete solve;
     }
     
     // Accumulate Solver stats
@@ -216,7 +217,7 @@ void laphSourceInvert(std::vector<ColorSpinorField *> &quarks, QudaInvertParam *
     inv_param->secs = 0;
     inv_param->gflops = 0;
     inv_param->iter = 0;
-    delete solve;
+
   }
 
   delete x;
