@@ -404,7 +404,7 @@ namespace quda {
   /**
      @brief Wrapper around qudaPointerGetAttributes
   */
-  qudaPointerAttributes qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func,
+  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func,
                                                   const char *file, const char *line);
 
 #if CUDA_VERSION >= 9000

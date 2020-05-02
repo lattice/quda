@@ -776,11 +776,11 @@ namespace quda {
   }
 
   // Returns attributes about a specified pointer.
-  qudaPointerAttributes qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr)
+  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr)
   {
     return cudaPointerGetAttributes(attributes, ptr);
   }
-
+  
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
                                     const char *file, const char *line)
