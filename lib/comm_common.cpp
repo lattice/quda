@@ -248,8 +248,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           int accessRank[2] = {};
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	    qudaDeviceGetP2PAttribute(&accessRank[0], qudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+	    qudaDeviceGetP2PAttribute(&accessRank[1], qudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
 	  }
 #endif
 
@@ -549,9 +549,6 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    qudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
-    printfQuda("Testing buffer (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n", file, line, func,
-               dim, dir, blksize, nblocks, stride);
     qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
@@ -585,12 +582,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
-    if (err != qudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
-		 file, line, func, dim, dir, blksize, nblocks, stride);
-      errorQuda("aborting with error %s", qudaGetErrorString(err));
-    }
+    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
   }
 #endif
 

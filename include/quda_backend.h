@@ -64,7 +64,9 @@
 #define qudaHostAllocMapped cudaHostAllocMapped
 #define qudaHostAllocPortable cudaHostAllocPortable
 
+#define qudaDevP2PAttrPerformanceRank cudaDevP2PAttrPerformanceRank
 #define qudaPointerAttributes cudaPointerAttributes
+#define qudaDeviceP2PAttr cudaDeviceP2PAttr
 #define qudaMemoryTypeDevice cudaMemoryTypeDevice
 #define qudaMemoryTypeArray cudaMemoryTypeArray
 #define qudaMemoryTypeUnified cudaMemoryTypeUnified

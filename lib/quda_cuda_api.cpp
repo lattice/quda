@@ -358,6 +358,16 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
   }
 
+  void qudaMemsetAsyncNoTune_(void *dst, int value, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line)
+  {
+    if (count == 0) return;
+    cudaError_t error = cudaMemsetAsync(dst, value, count, stream);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+  }
+
+  
   void qudaMemset2D_(void *dst, size_t pitch, int val, size_t width, size_t height, const char *func, const char *file,
                      const char *line)
   {
@@ -776,11 +786,20 @@ namespace quda {
   }
 
   // Returns attributes about a specified pointer.
-  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr)
+  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr, const char *func,
+					const char *file, const char *line)
   {
     return cudaPointerGetAttributes(attributes, ptr);
   }
-  
+
+
+  //Queries attributes of the link between two devices. 
+  qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice, const char *func,
+					  const char *file, const char *line)
+  {
+    return cudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice);
+  }
+
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
                                     const char *file, const char *line)
