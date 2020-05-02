@@ -404,7 +404,7 @@ namespace quda {
   /**
      @brief Wrapper around qudaPointerGetAttributes
   */
-  qudaPointerAttributes qudaPointerGetAttributes_(qudaPointerAttributes attributes, void *ptr, const char *func,
+  qudaPointerAttributes qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func,
                                                   const char *file, const char *line);
 
 #if CUDA_VERSION >= 9000
@@ -569,7 +569,7 @@ namespace quda {
 // START Misc
 //-------------------------------------------------------------------------------------
 #define qudaPointerGetAttributes(attributes, ptr)                                                                      \
-  ::quda::qudaPointerGetAttributes_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+  ::quda::qudaPointerGetAttributes_(attributes, ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaGetLastError() ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
