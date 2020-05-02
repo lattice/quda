@@ -934,6 +934,9 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
     extendedGaugeResident = createExtendedGauge(*gaugePrecise, R, profileGauge, false, recon);
   }
 
+  saveTuneCache();
+  saveProfile();
+
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
@@ -1171,6 +1174,8 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
   profileClover.TPSTOP(QUDA_PROFILE_FREE);
 
   popVerbosity();
+  saveTuneCache();
+  saveProfile();
 
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -5331,6 +5336,9 @@ void plaqQuda(double plaq[3])
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  saveTuneCache();
+  saveProfile();
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
 }
