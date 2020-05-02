@@ -671,6 +671,9 @@ extern "C" {
     /** Boolean for if this is a staggered solve or not */
     QudaBoolean is_staggered;
 
+    /** Whether to use tensor cores (if available) */
+    QudaBoolean use_mma;
+
   } QudaMultigridParam;
 
   typedef struct QudaGaugeObservableParam_s {

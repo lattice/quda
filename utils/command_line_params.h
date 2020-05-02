@@ -258,8 +258,9 @@ extern bool generate_nullspace;
 extern bool generate_all_levels;
 extern quda::mgarray<QudaSchwarzType> schwarz_type;
 extern quda::mgarray<int> schwarz_cycle;
-
 extern quda::mgarray<std::array<int, 4>> geo_block_size;
+extern bool mg_use_mma;
+
 extern int nev;
 extern int max_search_dim;
 extern int deflation_grid;

@@ -503,6 +503,8 @@ void setMultigridParam(QudaMultigridParam &mg_param)
   // Is NOT a staggered solve
   mg_param.is_staggered = QUDA_BOOLEAN_FALSE;
 
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
     strcpy(mg_param.vec_infile[i], mg_vec_infile[i]);
@@ -862,6 +864,8 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
   inv_param.solve_type = QUDA_DIRECT_SOLVE;
 
   mg_param.is_staggered = QUDA_BOOLEAN_TRUE;
+
+  mg_param.use_mma = mg_use_mma ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.invert_param = &inv_param;
   mg_param.n_level = mg_levels;

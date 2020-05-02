@@ -12,6 +12,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    use_mma(param.use_mma),
     Y_h(nullptr),
     X_h(nullptr),
     Xinv_h(nullptr),
@@ -42,6 +43,7 @@ namespace quda {
     transfer(nullptr),
     dirac(nullptr),
     need_bidirectional(false),
+    use_mma(false),
     Y_h(Y_h),
     X_h(X_h),
     Xinv_h(Xinv_h),
@@ -68,6 +70,7 @@ namespace quda {
     transfer(param.transfer),
     dirac(param.dirac),
     need_bidirectional(param.need_bidirectional),
+    use_mma(param.use_mma),
     Y_h(dirac.Y_h),
     X_h(dirac.X_h),
     Xinv_h(dirac.Xinv_h),
@@ -254,8 +257,7 @@ namespace quda {
   }
 
   void DiracCoarse::createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {
-    int N = Y.Ncolor();
-    if (N == 48 || N == 64) {
+    if (use_mma) {
       mma::calculateYhat(Yhat, Xinv, Y, X);
     } else {
       calculateYhat(Yhat, Xinv, Y, X);

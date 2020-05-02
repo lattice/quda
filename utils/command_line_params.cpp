@@ -128,6 +128,8 @@ quda::mgarray<int> schwarz_cycle = {};
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
+bool mg_use_mma = true;
+
 int nev = 8;
 int max_search_dim = 64;
 int deflation_grid = 16;
@@ -783,6 +785,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(opgroup, "--mg-verbosity", mg_verbosity, CLI::QUDACheckedTransformer(verbosity_map),
                          "The verbosity to use on each level of the multigrid (default summarize)");
+
+  opgroup->add_option("--mg-use-mma", mg_use_mma, "Use tensor-core to accelerate multigrid (default = true)");
 }
 
 void add_su3_option_group(std::shared_ptr<QUDAApp> quda_app)
