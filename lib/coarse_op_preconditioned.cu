@@ -9,8 +9,6 @@
 
 namespace quda {
 
-#ifdef GPU_MULTIGRID
-
   /**
      @brief Launcher for CPU instantiations of preconditioned coarse-link construction
   */
@@ -260,8 +258,6 @@ namespace quda {
     default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
     }
   }
-
-#endif
 
   //Does the heavy lifting of creating the coarse color matrices Y
   void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X) {

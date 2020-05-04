@@ -13,8 +13,6 @@ namespace quda
   namespace mma
   {
 
-#ifdef GPU_MULTIGRID
-
     template <typename Arg> class CalculateYhat : public Tunable
     {
 
@@ -41,7 +39,7 @@ namespace quda
       int blockStep() const { return 1; }
       unsigned int maxBlockSize(const TuneParam &param) const { return 1u; }
 
-      virtual bool advanceBlockDim(TuneParam &param) const { return false; }
+      bool advanceBlockDim(TuneParam &param) const { return false; }
 
     public:
       CalculateYhat(Arg &arg, const LatticeField &meta) : arg(arg), meta(meta), n(arg.M), compute_max_only(false)
@@ -66,6 +64,9 @@ namespace quda
       template <int bM, int bN, int bK, int block_y, int block_z>
       void launch_kernel(TuneParam &tp, const cudaStream_t &stream)
       {
+        constexpr auto bytes = 2 * sizeof(float) * (bM * bK + bN * bK);
+        static_assert(bytes <= 96 * 1024, "too much shared memory");
+
         tp.block.x = 1;
         tp.block.y = block_y;
         tp.block.z = block_z;
@@ -101,9 +102,9 @@ namespace quda
                          .launch(arg);
 #else
         {
+          // clang-format off
           if (arg.M == 48) {
             switch (tp.aux.x) {
-            // clang-format off
             case  0: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
             case  1: launch_kernel<48, 48, 48,  4,  8>(tp, stream); break;
             case  2: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
@@ -116,12 +117,10 @@ namespace quda
 
             case  8: launch_kernel<48, 48, 12,  4,  8>(tp, stream); break;
             case  9: launch_kernel<48, 48, 12, 12, 24>(tp, stream); break;
-            // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
             }
           } else if (arg.M == 64) {
             switch (tp.aux.x) {
-            // clang-format off
             case  0: launch_kernel<64, 64, 64, 16, 16>(tp, stream); break;
             case  1: launch_kernel<64, 64, 64, 32,  4>(tp, stream); break;
             case  2: launch_kernel<64, 64, 64, 32,  8>(tp, stream); break;
@@ -145,10 +144,56 @@ namespace quda
             case 16: launch_kernel<64, 64, 16,  4, 32>(tp, stream); break;
             case 17: launch_kernel<64, 64, 16,  4, 16>(tp, stream); break;
             case 18: launch_kernel<64, 64, 16,  4,  8>(tp, stream); break;
-            // clang-format on
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
             }
+          } else if (arg.M == 128) {
+            switch (tp.aux.x) {
+            case  0: launch_kernel<128, 128, 32, 16, 32>(tp, stream); break;
+            case  1: launch_kernel<128, 128, 32, 16, 16>(tp, stream); break;
+            case  2: launch_kernel<128, 128, 32, 16,  8>(tp, stream); break;
+            case  3: launch_kernel<128, 128, 32, 32,  8>(tp, stream); break;
+            case  4: launch_kernel<128, 128, 32, 32,  4>(tp, stream); break;
+
+            case  5: launch_kernel<128, 128, 16, 16, 32>(tp, stream); break;
+            case  6: launch_kernel<128, 128, 16, 16, 16>(tp, stream); break;
+            case  7: launch_kernel<128, 128, 16, 16,  8>(tp, stream); break;
+            case  8: launch_kernel<128, 128, 16, 16,  4>(tp, stream); break;
+
+            case  9: launch_kernel<128, 128, 16,  8, 32>(tp, stream); break;
+            case 10: launch_kernel<128, 128, 16,  8, 16>(tp, stream); break;
+            case 11: launch_kernel<128, 128, 16,  8,  8>(tp, stream); break;
+            case 12: launch_kernel<128, 128, 16,  8,  4>(tp, stream); break;
+
+            case 13: launch_kernel<128, 128, 16,  4, 32>(tp, stream); break;
+            case 14: launch_kernel<128, 128, 16,  4, 16>(tp, stream); break;
+            case 15: launch_kernel<128, 128, 16,  4,  8>(tp, stream); break;
+            default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
+            }
+          } else if (arg.M == 192) {
+            switch (tp.aux.x) {
+            case  0: launch_kernel<192, 192, 32, 16, 32>(tp, stream); break;
+            case  1: launch_kernel<192, 192, 32, 16, 16>(tp, stream); break;
+            case  2: launch_kernel<192, 192, 32, 16,  8>(tp, stream); break;
+            case  3: launch_kernel<192, 192, 32, 32,  8>(tp, stream); break;
+            case  4: launch_kernel<192, 192, 32, 32,  4>(tp, stream); break;
+
+            case  5: launch_kernel<192, 192, 16, 16, 32>(tp, stream); break;
+            case  6: launch_kernel<192, 192, 16, 16, 16>(tp, stream); break;
+            case  7: launch_kernel<192, 192, 16, 16,  8>(tp, stream); break;
+            case  8: launch_kernel<192, 192, 16, 16,  4>(tp, stream); break;
+
+            case  9: launch_kernel<192, 192, 16,  8, 32>(tp, stream); break;
+            case 10: launch_kernel<192, 192, 16,  8, 16>(tp, stream); break;
+            case 11: launch_kernel<192, 192, 16,  8,  8>(tp, stream); break;
+            case 12: launch_kernel<192, 192, 16,  8,  4>(tp, stream); break;
+
+            case 13: launch_kernel<192, 192, 16,  4, 32>(tp, stream); break;
+            case 14: launch_kernel<192, 192, 16,  4, 16>(tp, stream); break;
+            case 15: launch_kernel<192, 192, 16,  4,  8>(tp, stream); break;
+            default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 192", tp.aux.x);
+            }
           }
+          // clang-format on
         }
 #endif
         if (compute_max_only) {
@@ -174,16 +219,18 @@ namespace quda
       virtual bool tuneAuxDim() const { return true; }
       virtual bool advanceAux(TuneParam &param) const
       {
-        if (arg.M == 48) {
-          if (param.aux.x < 9) {
-            param.aux.x++;
-            return true;
-          }
-        } else if (arg.M == 64) {
-          if (param.aux.x < 18) {
-            param.aux.x++;
-            return true;
-          }
+        int max_aux;
+        switch (arg.M) {
+        case 48: max_aux = 9; break;
+        case 64: max_aux = 18; break;
+        case 128: max_aux = 15; break;
+        case 192: max_aux = 15; break;
+        default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
+        }
+
+        if (param.aux.x < max_aux) {
+          param.aux.x++;
+          return true;
         }
         return false;
       }
@@ -215,9 +262,6 @@ namespace quda
         if (compute_max_only) strcat(Aux, ",compute_max_only");
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
           strcat(Aux, meta.MemType() == QUDA_MEMORY_MAPPED ? ",GPU-mapped" : ",GPU-device");
-        } else if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
-          strcat(Aux, ",CPU");
-          strcat(Aux, getOmpThreadStr());
         }
         return TuneKey(meta.VolString(), typeid(*this).name(), Aux);
       }
@@ -269,7 +313,7 @@ namespace quda
         for (int i = 0; i < 4; i++) xc_size[i] = X.X()[i];
         xc_size[4] = 1;
 
-        // XXX: Change gaufe field order
+        // XXX: Change gauge field order
         GaugeFieldParam param_Y(Y);
         GaugeFieldParam param_Yhat(Yhat);
         GaugeFieldParam param_Xinv(Xinv);
@@ -348,14 +392,11 @@ namespace quda
     template <typename storeFloat, typename Float, int N>
     void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
     {
-      if (Y.Location() == QUDA_CPU_FIELD_LOCATION) {
-        errorQuda("Unsupported field order %d\n", Y.FieldOrder());
-      } else if (Y.FieldOrder() == QUDA_FLOAT2_GAUGE_ORDER) {
+      if (Y.FieldOrder() == QUDA_FLOAT2_GAUGE_ORDER) {
         constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
         calculateYhat<storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X);
-      } else if (Y.FieldOrder() == QUDA_MILC_GAUGE_ORDER) {
-        constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
-        calculateYhat<storeFloat, Float, N, gOrder>(Yhat, Xinv, Y, X);
+      } else {
+        errorQuda("Unsupported field order %d", Y.FieldOrder());
       }
     }
 
@@ -369,23 +410,20 @@ namespace quda
       // case 12: calculateYhat<storeFloat,Float,12>(Yhat, Xinv, Y, X); break;
       case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
-#if 0
 #ifdef NSPIN1
-    case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
-    case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
+      case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+      case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN1
-#endif
       default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
       }
     }
 
-#endif
-
     // Does the heavy lifting of creating the coarse color matrices Y
     void calculateYhat(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X)
     {
-
 #ifdef GPU_MULTIGRID
+      if (Y.Location() == QUDA_CPU_FIELD_LOCATION) errorQuda("Unsupported field location %d\n", Y.Location());
+
       QudaPrecision precision = checkPrecision(Xinv, Y, X);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Computing Yhat field......\n");
 
