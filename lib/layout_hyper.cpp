@@ -11,8 +11,6 @@
 #include <qmp.h>
 #include <layout_hyper.h>
 
-//#include <qio_util.h>
-
 /* The following globals are required:
    QMP_get_logical_topology()
    QMP_logical_topology_is_declared()
@@ -28,21 +26,6 @@ static int sites_on_node;
 static int *mcoord = nullptr;
 static bool single_parity = false;
 
-static void setup_qmp_fixed(int len[], int nd, int numnodes)
-{
-  if (QMP_get_number_of_nodes() == 1) {
-    for (int i=0; i<ndim; i++) {
-      nsquares[i] = 1;
-      squaresize[i] = len[i]/nsquares[i];
-    }
-  } else {
-    for (int i=0; i<ndim; i++) {
-      nsquares[i] = QMP_get_logical_dimensions()[i];
-      squaresize[i] = len[i]/nsquares[i];
-    }
-  }
-}
-
 int quda_setup_layout(int len[], int nd, int numnodes, int single_parity_)
 {
   ndim = nd;
@@ -57,12 +40,15 @@ int quda_setup_layout(int len[], int nd, int numnodes, int single_parity_)
   if (mcoord) free(mcoord);
   mcoord = (int *) malloc(ndim*sizeof(int));
 
-  setup_qmp_fixed(len, ndim, numnodes); // use the predetermined geometry
-
   /* setup QMP logical topology */
   if (!QMP_logical_topology_is_declared()) {
-    if (QMP_declare_logical_topology(nsquares, ndim)!=0)
-      return 1;
+    if (QMP_declare_logical_topology(nsquares, ndim)!=0) return 1;
+  }
+
+  // use the predetermined geometry
+  for (int i=0; i<ndim; i++) {
+    nsquares[i] = QMP_get_logical_dimensions()[i];
+    squaresize[i] = len[i]/nsquares[i];
   }
 
   sites_on_node = 1;
@@ -150,24 +136,24 @@ void quda_get_coords(int x[], int node, int index)
   } else {
     // ((t*Z + z) * Y + y) * X + x
 
-    for (int i=ndim-1; i>0; i--) {
+    for (int i = ndim-1; i > 0; i--) {
       x[i] += index/size2[i];
       index %= size2[i];
     }
+    x[0] = index;
   }
 
   free(m);
 
   /* Check the result */
-  if (quda_node_index(x)!=si) {
+  if (quda_node_index(x) != si) {
     if (quda_this_node==0) {
       fprintf(stderr,"get_coords: error in layout!\n");
       for (int i=0; i<ndim; i++) {
 	fprintf(stderr,"%i\t%i\t%i\n", size1[0][i], size1[1][i], size2[i]);
       }
-      fprintf(stderr,"%i\t%i", node, si);
-      for (int i=0; i<ndim; i++) fprintf(stderr,"\t%i", x[i]);
-      fprintf(stderr,"\n");
+      fprintf(stderr,"%i\tindex=%i\tx=(", node, si);
+      for (int i=0; i<ndim; i++) fprintf(stderr, i < ndim - 1 ? "%i, " : "%i)\n", x[i]);
     }
     QMP_abort(1);
     exit(1);
