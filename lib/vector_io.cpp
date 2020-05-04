@@ -14,7 +14,7 @@ namespace quda {
   VectorIO::VectorIO(const std::string &filename) :
     filename(filename)
   {
-    if (strcmp(filename.c_str(), "") == 0) { 
+    if (strcmp(filename.c_str(), "") == 0) {
       errorQuda("No eigenspace input file defined.");
     }
   }
@@ -52,18 +52,26 @@ namespace quda {
       }
     }
 
-    void **V = static_cast<void **>(safe_malloc(Nvec * sizeof(void *)));
-    for (int i = 0; i < Nvec; i++) {
-      V[i] = tmp[i]->V();
-      if (V[i] == NULL) {
-        if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Could not allocate space for eigenVector[%d]\n", i);
+    if (vecs[0]->Ndim() == 4 || vecs[0]->Ndim() == 5) {
+      // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
+      auto Ls = vecs[0]->Ndim() == 5 ? tmp[0]->X(4) : 1;
+      auto V4 = tmp[0]->Volume() / Ls;
+      auto stride = V4 * tmp[0]->Ncolor() * tmp[0]->Nspin() * 2 * tmp[0]->Precision();
+      void **V = static_cast<void **>(safe_malloc(Nvec * Ls * sizeof(void *)));
+      for (int i = 0; i < Nvec; i++) {
+        for (int j = 0; j < Ls; j++) {
+          V[i * Ls + j] = static_cast<char*>(tmp[i]->V()) + j * stride;
+        }
       }
+
+      read_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                        spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
+
+      host_free(V);
+    } else {
+      errorQuda("Unexpected field dimension %d", vecs[0]->Ndim());
     }
 
-    read_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
-                      spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
-
-    host_free(V);
     if (vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION) {
 
       ColorSpinorParam csParam(*vecs[0]);
@@ -72,7 +80,7 @@ namespace quda {
           *vecs[i] = *tmp[i];
           delete tmp[i];
         }
-      } else { // nColor == 3 field with a single parity: need to copy it out of the full-field vector.
+      } else {
         // Create a temporary single-parity CPU field
         csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         csParam.setPrecision(vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
@@ -127,7 +135,7 @@ namespace quda {
       ColorSpinorParam csParam(*vecs[0]);
       csParam.fieldOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
       csParam.setPrecision(vecs[0]->Precision() < QUDA_SINGLE_PRECISION ? QUDA_SINGLE_PRECISION :
-                                                                              vecs[0]->Precision());
+                           vecs[0]->Precision());
       csParam.location = QUDA_CPU_FIELD_LOCATION;
 
       if (csParam.siteSubset == QUDA_FULL_SITE_SUBSET || !parity_inflate) {
@@ -185,18 +193,26 @@ namespace quda {
 
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Start saving %d vectors to %s\n", Nvec, filename.c_str());
 
-    void **V = static_cast<void **>(safe_malloc(Nvec * sizeof(void *)));
-    for (int i = 0; i < Nvec; i++) {
-      V[i] = tmp[i]->V();
-      if (V[i] == NULL) {
-        if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Could not allocate space for eigenVector[%04d]\n", i);
+    if (vecs[0]->Ndim() == 4 || vecs[0]->Ndim() == 5) {
+      // since QIO routines presently assume we have 4-d fields, we need to convert to array of 4-d fields
+      auto Ls = vecs[0]->Ndim() == 5 ? tmp[0]->X(4) : 1;
+      auto V4 = tmp[0]->Volume() / Ls;
+      auto stride = V4 * tmp[0]->Ncolor() * tmp[0]->Nspin() * 2 * tmp[0]->Precision();
+      void **V = static_cast<void **>(safe_malloc(Nvec * Ls * sizeof(void *)));
+      for (int i = 0; i < Nvec; i++) {
+        for (int j = 0; j < Ls; j++) {
+          V[i * Ls + j] = static_cast<char*>(tmp[i]->V()) + j * stride;
+        }
       }
+
+      write_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
+                         spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec * Ls, 0, (char **)0);
+
+      host_free(V);
+    } else {
+      errorQuda("Unexpected field dimension %d", vecs[0]->Ndim());
     }
 
-    write_spinor_field(filename.c_str(), &V[0], tmp[0]->Precision(), tmp[0]->X(), tmp[0]->SiteSubset(),
-                       spinor_parity, tmp[0]->Ncolor(), tmp[0]->Nspin(), Nvec, 0, (char **)0);
-
-    host_free(V);
     if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Done saving vectors\n");
     if (vecs[0]->Location() == QUDA_CUDA_FIELD_LOCATION
         || (vecs[0]->Location() == QUDA_CPU_FIELD_LOCATION && vecs[0]->SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
@@ -208,4 +224,3 @@ namespace quda {
   }
 
 }
-
