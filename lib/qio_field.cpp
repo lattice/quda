@@ -36,8 +36,8 @@ template <typename oFloat, typename iFloat, int len> void vput(char *s1, size_t 
   oFloat **field = (oFloat **)s2;
   iFloat *src = (iFloat *)s1;
 
-  //For the site specified by "index", move an array of "count" data
-  //from the read buffer to an array of fields
+  // For the site specified by "index", move an array of "count" data
+  // from the read buffer to an array of fields
 
   for (int i = 0; i < count; i++) {
     oFloat *dest = field[i] + len * index;
@@ -52,8 +52,8 @@ template <typename oFloat, typename iFloat, int len> void vget(char *s1, size_t 
   iFloat **field = (iFloat **)s2;
   oFloat *dest = (oFloat *)s1;
 
-/* For the site specified by "index", move an array of "count" data
-   from the array of fields to the write buffer */
+  /* For the site specified by "index", move an array of "count" data
+     from the array of fields to the write buffer */
   for (int i = 0; i < count; i++, dest += len) {
     iFloat *src = field[i] + len * index;
     for (int j = 0; j < len; j++) dest[j] = src[j];

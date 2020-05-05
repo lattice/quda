@@ -6,17 +6,17 @@ namespace quda
 {
 
   extern "C" {
-  /**
-     @brief Set whether to inflate single-fields to full fields when
-      doing IO (required for compatability with MILC).
-      @param[in] parity_inflate Whether to inflate
-  */
-  void set_io_parity_inflation_quda(QudaBoolean parity_inflate);
+    /**
+       @brief Set whether to inflate single-fields to full fields when
+       doing IO (required for compatability with MILC).
+       @param[in] parity_inflate Whether to inflate
+    */
+    void set_io_parity_inflation_quda(QudaBoolean parity_inflate);
   }
 
   /**
      @brief VectorIO is a simple wrapper class for loading and saving
-     sets of vectors using QIO.
+     sets of vector fields using QIO.
    */
   class VectorIO
   {
@@ -33,13 +33,13 @@ namespace quda
 
     /**
        @brief Load vectors from filename
-       @param[in] eig_vecs The eigenvectors to load
+       @param[in] vecs The set of vectors to load
     */
     void load(std::vector<ColorSpinorField *> &vecs);
 
     /**
        @brief Save vectors to filename
-       @param[in] eig_vecs The eigenvectors to save
+       @param[in] vecs The set of vectors to save
     */
     void save(const std::vector<ColorSpinorField *> &vecs);
   };
