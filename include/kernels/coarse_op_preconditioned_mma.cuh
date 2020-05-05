@@ -3,7 +3,7 @@
 #include <gauge_field_order.h>
 #include <index_helper.cuh>
 
-#include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
+#include <mma_tensor_op/gemm.cuh>
 
 #include <type_traits>
 
