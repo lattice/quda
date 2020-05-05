@@ -1,14 +1,14 @@
 #include <iostream>
+#include <qmp.h>
 #include <qio.h>
-#include <qio_util.h>
 #include <quda.h>
 #include <util_quda.h>
+#include <layout_hyper.h>
 
 #include <string>
 
-QIO_Layout layout;
-int lattice_dim;
-int lattice_size[4];
+static QIO_Layout layout;
+static int lattice_size[4];
 int quda_this_node;
 
 std::ostream &operator<<(std::ostream &out, const QIO_Layout &layout)
@@ -26,6 +26,38 @@ std::ostream &operator<<(std::ostream &out, const QIO_Layout &layout)
   out << "this_node = " << layout.this_node << std::endl;
   out << "number_of_nodes = " << layout.number_of_nodes << std::endl;
   return out;
+}
+
+// for matrix fields this order implies [color][color][complex]
+// for vector fields this order implies [spin][color][complex]
+// templatized version to allow for precision conversion
+template <typename oFloat, typename iFloat, int len> void vput(char *s1, size_t index, int count, void *s2)
+{
+  oFloat **field = (oFloat **)s2;
+  iFloat *src = (iFloat *)s1;
+
+  //For the site specified by "index", move an array of "count" data
+  //from the read buffer to an array of fields
+
+  for (int i = 0; i < count; i++) {
+    oFloat *dest = field[i] + len * index;
+    for (int j = 0; j < len; j++) dest[j] = src[i * len + j];
+  }
+}
+
+// for vector fields this order implies [spin][color][complex]
+// templatized version of vget_M to allow for precision conversion
+template <typename oFloat, typename iFloat, int len> void vget(char *s1, size_t index, int count, void *s2)
+{
+  iFloat **field = (iFloat **)s2;
+  oFloat *dest = (oFloat *)s1;
+
+/* For the site specified by "index", move an array of "count" data
+   from the array of fields to the write buffer */
+  for (int i = 0; i < count; i++, dest += len) {
+    iFloat *src = field[i] + len * index;
+    for (int j = 0; j < len; j++) dest[j] = src[j];
+  }
 }
 
 QIO_Reader *open_test_input(const char *filename, int volfmt, int serpar)
@@ -172,7 +204,7 @@ int read_su3_field(QIO_Reader *infile, int count, void *field_in[], QudaPrecisio
 void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 {
   /* Lattice dimensions */
-  lattice_dim = 4;
+  int lattice_dim = 4; // assume the comms topology is 4-d
   int lattice_volume = 1;
   for (int d=0; d<4; d++) {
     lattice_size[d] = comm_dim(d)*X[d];
@@ -180,7 +212,7 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
   }
 
   /* Set the mapping of coordinates to nodes */
-  if (quda_setup_layout(lattice_size, 4, QMP_get_number_of_nodes(), subset == QUDA_PARITY_SITE_SUBSET) != 0) {
+  if (quda_setup_layout(lattice_size, lattice_dim, QMP_get_number_of_nodes(), subset == QUDA_PARITY_SITE_SUBSET) != 0) {
     errorQuda("Setup layout failed\n");
   }
   printfQuda("%s layout set for %d nodes\n", __func__, QMP_get_number_of_nodes());
@@ -201,7 +233,7 @@ void set_layout(const int *X, QudaSiteSubset subset = QUDA_FULL_SITE_SUBSET)
 
 void read_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
 {
-  quda_this_node = mynode();
+  quda_this_node = QMP_get_node_number();
 
   set_layout(X);
 
@@ -241,7 +273,7 @@ int read_field(QIO_Reader *infile, int Ninternal, int count, void *field_in[], Q
 void read_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                        QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
 {
-  quda_this_node = mynode();
+  quda_this_node = QMP_get_node_number();
 
   set_layout(X, subset);
 
@@ -369,7 +401,7 @@ int write_su3_field(QIO_Writer *outfile, int count, void *field_out[],
 
 void write_gauge_field(const char *filename, void *gauge[], QudaPrecision precision, const int *X, int argc, char *argv[])
 {
-  quda_this_node = mynode();
+  quda_this_node = QMP_get_node_number();
 
   set_layout(X);
 
@@ -426,7 +458,7 @@ int write_field(QIO_Writer *outfile, int Ninternal, int count, void *field_out[]
 void write_spinor_field(const char *filename, void *V[], QudaPrecision precision, const int *X, QudaSiteSubset subset,
                         QudaParity parity, int nColor, int nSpin, int Nvec, int argc, char *argv[])
 {
-  quda_this_node = mynode();
+  quda_this_node = QMP_get_node_number();
 
   set_layout(X, subset);
 
