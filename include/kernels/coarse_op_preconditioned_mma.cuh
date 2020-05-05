@@ -47,7 +47,7 @@ namespace quda
     };
 
     template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
-    inline __device__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, half *smem_ptr)
+    inline __device__ auto computeYhat(Arg &arg, int d, int x_cb, int parity, half *smem_ptr, int m, int n)
     {
       using real = typename Arg::Float;
       using complex = complex<real>;
@@ -68,7 +68,7 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc);
+        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
 
       } else {
 
@@ -80,7 +80,7 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc);
+        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
@@ -92,22 +92,32 @@ namespace quda
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
         real yHatMax_
-          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc);
+          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
         yHatMax = fmax(yHatMax, yHatMax_);
       }
 
       return yHatMax;
     }
 
-    template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ typename std::enable_if<Arg::N != bM, void>::type CalculateYhatGPU(Arg arg)
+    template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
+    __global__ typename std::enable_if<Arg::N != N, void>::type CalculateYhatGPU(Arg arg)
     {
     }
 
-    template <bool compute_max_only, typename Arg, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ typename std::enable_if<Arg::N == bM, void>::type CalculateYhatGPU(Arg arg)
+    template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
+    __global__ __launch_bounds__(block_y * block_z, 2)
+    typename std::enable_if<Arg::N == N, void>::type CalculateYhatGPU(Arg arg)
     {
-      int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
+      int index_x = blockDim.x * blockIdx.x + threadIdx.x;
+
+      constexpr int t_m = Arg::M / bM;
+      constexpr int t_n = Arg::N / bN;
+      int x_cb = index_x / (t_m * t_n);
+      int mn = index_x % (t_m * t_n);
+      
+      int n = (mn % t_n) * bN;
+      int m = (mn / t_n) * bM;
+
       if (x_cb >= arg.Y.VolumeCB()) return;
 
       int parity = blockIdx.y; // i_parity / arg.tile.M_tiles;
@@ -117,7 +127,7 @@ namespace quda
       extern __shared__ half smem_ptr[];
 
       typename Arg::Float max
-        = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, d, x_cb, parity, smem_ptr);
+        = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, d, x_cb, parity, smem_ptr, m, n);
       if (compute_max_only) atomicAbsMax(arg.max_d, max);
     }
 

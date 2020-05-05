@@ -2,7 +2,7 @@
 
 #include <mma.h>
 
-// #define USE_FP16_HMMA_ACCUMULATE
+#define USE_FP16_HMMA_ACCUMULATE
 
 constexpr QudaPrecision accumulate_precision()
 {
@@ -285,7 +285,7 @@ namespace quda
 
   template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
             class A, class B, class C>
-  __device__ inline float perform_mma(A aa, B bb, C cc)
+  __device__ inline float perform_mma(A aa, B bb, C cc, int m, int n)
   {
     constexpr int lda = bM + pad_size(bM);
     constexpr int ldb = bN + pad_size(bN);
@@ -340,21 +340,25 @@ namespace quda
     GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
                                                                                          smem_obj_b_imag);
 
-    aa_loader.g2r(aa);
-    aa_loader.r2s();
+    {
+      auto aa_offset = [&](int i, int j) { return aa(i + m, j); };
+      auto bb_offset = [&](int i, int j) { return b_dag ? bb(i, j + n) : bb(i + n, j); };
 
-    bb_loader.g2r(bb);
-    bb_loader.r2s();
+      aa_loader.g2r(aa_offset);
+      aa_loader.r2s();
 
+      bb_loader.g2r(bb_offset);
+      bb_loader.r2s();
+    }
+    
     __syncthreads();
 
-#pragma unroll
+#pragma unroll 1
     for (int bk = 0; bk < N; bk += bK) {
 
       if (bk + bK < N) {
-
-        auto aa_offset = [&](int i, int j) { return aa(i, j + bk + bK); };
-        auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk + bK, j) : bb(i, j + bk + bK); };
+        auto aa_offset = [&](int i, int j) { return aa(i + m, j + bk + bK); };
+        auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk + bK, j + n) : bb(i + n, j + bk + bK); };
 
         aa_loader.g2r(aa_offset);
         bb_loader.g2r(bb_offset);
@@ -420,9 +424,9 @@ namespace quda
         const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
 #ifdef USE_FP16_HMMA_ACCUMULATE
-        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread + m;
         // const int col = warp_col * 16 + wrm.quad_col * 8;
-        const int col = warp_col * 2 + wrm.quad_col;
+        const int col = warp_col * 16 + wrm.quad_col * 8 + n;
 
         constexpr bool fixed = C::fixed;
         using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
@@ -447,10 +451,10 @@ namespace quda
           }
         }
 
-        ptr_[row * (N / 8) + col] = s;
+        ptr_[(row * N + col) / 8] = s;
 #else // USE_FP16_HMMA_ACCUMULATE
-        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
-        const int col = warp_col * 16 + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
+        const int row = warp_row * 16 + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2) + m;
+        const int col = warp_col * 16 + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2 + n;
 
         constexpr bool fixed = C::fixed;
         using structure = typename std::conditional<fixed, Structure<short, 4>, Structure<float, 4>>::type;

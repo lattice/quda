@@ -29,7 +29,7 @@ namespace quda
       } // 8 from dir, 8 from complexity,
       long long bytes() const
       {
-        return 2l * (arg.Xinv.Bytes() + 8 * arg.Y.Bytes() + !compute_max_only * 8 * arg.Yhat.Bytes()) * n;
+        return 2l * (arg.Xinv.Bytes() + arg.Y.Bytes() + !compute_max_only * arg.Yhat.Bytes()) * n;
       }
 
       unsigned int minThreads() const { return arg.Y.VolumeCB(); }
@@ -61,25 +61,30 @@ namespace quda
         pool_pinned_free(arg.max_h);
       }
 
-      template <int bM, int bN, int bK, int block_y, int block_z>
+      template <int N, int bM, int bN, int bK, int block_y, int block_z>
       void launch_kernel(TuneParam &tp, const cudaStream_t &stream)
       {
-        constexpr auto bytes = 2 * sizeof(float) * (bM * bK + bN * bK);
-        static_assert(bytes <= 96 * 1024, "too much shared memory");
-
         tp.block.x = 1;
         tp.block.y = block_y;
         tp.block.z = block_z;
         constexpr int bM_pad = bM + pad_size(bM);
         constexpr int bN_pad = bN + pad_size(bN);
-        tp.shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
+        constexpr int shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
+        tp.shared_bytes = shared_bytes;
+        static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
+        
+        constexpr int t_m = Arg::M / bM;
+        constexpr int t_n = Arg::N / bN;
+
+        tp.grid = dim3(minThreads() * t_m * t_n, 2, 4);
+        
         // int shared_bytes = sharedBytesPerBlock(tp);
         if (compute_max_only) {
-          auto kernel = mma::CalculateYhatGPU<true, Arg, bM, bN, bK, block_y, block_z>;
+          auto kernel = mma::CalculateYhatGPU<true, Arg, N, bM, bN, bK, block_y, block_z>;
           setMaxDynamicSharedBytesPerBlock(kernel);
           kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         } else {
-          auto kernel = mma::CalculateYhatGPU<false, Arg, bM, bN, bK, block_y, block_z>;
+          auto kernel = mma::CalculateYhatGPU<false, Arg, N, bM, bN, bK, block_y, block_z>;
           setMaxDynamicSharedBytesPerBlock(kernel);
           kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
         }
@@ -105,50 +110,37 @@ namespace quda
           // clang-format off
           if (arg.M == 48) {
             switch (tp.aux.x) {
-            case  0: launch_kernel<48, 48, 48,  8,  4>(tp, stream); break;
-            case  1: launch_kernel<48, 48, 48,  4,  8>(tp, stream); break;
-            case  2: launch_kernel<48, 48, 48, 16,  6>(tp, stream); break;
-            case  3: launch_kernel<48, 48, 48, 24, 12>(tp, stream); break;
-            case  4: launch_kernel<48, 48, 48, 12, 24>(tp, stream); break;
+            case  0: launch_kernel<48, 48, 48, 48, 16,  6>(tp, stream); break;
+            case  1: launch_kernel<48, 48, 48, 48, 24, 12>(tp, stream); break;
+            case  2: launch_kernel<48, 48, 48, 48, 12, 24>(tp, stream); break;
 
-            case  5: launch_kernel<48, 48, 24,  8,  4>(tp, stream); break;
-            case  6: launch_kernel<48, 48, 24,  4,  8>(tp, stream); break;
-            case  7: launch_kernel<48, 48, 24, 12, 24>(tp, stream); break;
+            case  3: launch_kernel<48, 48, 48, 24, 12, 24>(tp, stream); break;
 
-            case  8: launch_kernel<48, 48, 12,  4,  8>(tp, stream); break;
-            case  9: launch_kernel<48, 48, 12, 12, 24>(tp, stream); break;
+            case  4: launch_kernel<48, 48, 48, 12, 12, 24>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
             }
           } else if (arg.M == 64) {
             switch (tp.aux.x) {
-            case  0: launch_kernel<64, 64, 64, 16, 16>(tp, stream); break;
-            case  1: launch_kernel<64, 64, 64, 32,  4>(tp, stream); break;
-            case  2: launch_kernel<64, 64, 64, 32,  8>(tp, stream); break;
+            case  0: launch_kernel<64, 64, 64, 64, 16, 16>(tp, stream); break;
+            case  1: launch_kernel<64, 64, 64, 64, 32,  8>(tp, stream); break;
 
-            case  3: launch_kernel<64, 64, 32, 16, 32>(tp, stream); break;
-            case  4: launch_kernel<64, 64, 32, 16, 16>(tp, stream); break;
-            case  5: launch_kernel<64, 64, 32, 16,  8>(tp, stream); break;
-            case  6: launch_kernel<64, 64, 32, 32,  8>(tp, stream); break;
-            case  7: launch_kernel<64, 64, 32, 32,  4>(tp, stream); break;
+            case  2: launch_kernel<64, 64, 64, 32, 16, 32>(tp, stream); break;
+            case  3: launch_kernel<64, 64, 64, 32, 16, 16>(tp, stream); break;
+            case  4: launch_kernel<64, 64, 64, 32, 16,  8>(tp, stream); break;
+            case  5: launch_kernel<64, 64, 64, 32, 32,  8>(tp, stream); break;
 
-            case  8: launch_kernel<64, 64, 16, 16, 32>(tp, stream); break;
-            case  9: launch_kernel<64, 64, 16, 16, 16>(tp, stream); break;
-            case 10: launch_kernel<64, 64, 16, 16,  8>(tp, stream); break;
-            case 11: launch_kernel<64, 64, 16, 16,  4>(tp, stream); break;
+            case  6: launch_kernel<64, 64, 64, 16, 16, 32>(tp, stream); break;
+            case  7: launch_kernel<64, 64, 64, 16, 16, 16>(tp, stream); break;
+            case  8: launch_kernel<64, 64, 64, 16, 16,  8>(tp, stream); break;
 
-            case 12: launch_kernel<64, 64, 16,  8, 32>(tp, stream); break;
-            case 13: launch_kernel<64, 64, 16,  8, 16>(tp, stream); break;
-            case 14: launch_kernel<64, 64, 16,  8,  8>(tp, stream); break;
-            case 15: launch_kernel<64, 64, 16,  8,  4>(tp, stream); break;
-
-            case 16: launch_kernel<64, 64, 16,  4, 32>(tp, stream); break;
-            case 17: launch_kernel<64, 64, 16,  4, 16>(tp, stream); break;
-            case 18: launch_kernel<64, 64, 16,  4,  8>(tp, stream); break;
+            case  9: launch_kernel<64, 64, 64, 16,  8, 32>(tp, stream); break;
+            case 10: launch_kernel<64, 64, 64, 16,  8, 16>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
             }
           } else if (arg.M == 128) {
             switch (tp.aux.x) {
-            case  0: launch_kernel<128, 128, 32, 16, 32>(tp, stream); break;
+#if 0
+            case  0: launch_kernel<128, 128, 32, 16, 16>(tp, stream); break;
             case  1: launch_kernel<128, 128, 32, 16, 16>(tp, stream); break;
             case  2: launch_kernel<128, 128, 32, 16,  8>(tp, stream); break;
             case  3: launch_kernel<128, 128, 32, 32,  8>(tp, stream); break;
@@ -167,29 +159,41 @@ namespace quda
             case 13: launch_kernel<128, 128, 16,  4, 32>(tp, stream); break;
             case 14: launch_kernel<128, 128, 16,  4, 16>(tp, stream); break;
             case 15: launch_kernel<128, 128, 16,  4,  8>(tp, stream); break;
+#endif
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
             }
           } else if (arg.M == 192) {
             switch (tp.aux.x) {
-            case  0: launch_kernel<192, 192, 32, 16, 32>(tp, stream); break;
-            case  1: launch_kernel<192, 192, 32, 16, 16>(tp, stream); break;
-            case  2: launch_kernel<192, 192, 32, 16,  8>(tp, stream); break;
-            case  3: launch_kernel<192, 192, 32, 32,  8>(tp, stream); break;
-            case  4: launch_kernel<192, 192, 32, 32,  4>(tp, stream); break;
-
-            case  5: launch_kernel<192, 192, 16, 16, 32>(tp, stream); break;
-            case  6: launch_kernel<192, 192, 16, 16, 16>(tp, stream); break;
-            case  7: launch_kernel<192, 192, 16, 16,  8>(tp, stream); break;
-            case  8: launch_kernel<192, 192, 16, 16,  4>(tp, stream); break;
-
-            case  9: launch_kernel<192, 192, 16,  8, 32>(tp, stream); break;
-            case 10: launch_kernel<192, 192, 16,  8, 16>(tp, stream); break;
-            case 11: launch_kernel<192, 192, 16,  8,  8>(tp, stream); break;
-            case 12: launch_kernel<192, 192, 16,  8,  4>(tp, stream); break;
-
-            case 13: launch_kernel<192, 192, 16,  4, 32>(tp, stream); break;
-            case 14: launch_kernel<192, 192, 16,  4, 16>(tp, stream); break;
-            case 15: launch_kernel<192, 192, 16,  4,  8>(tp, stream); break;
+            case   0: launch_kernel<192,  96,  96,  24,   6,  48>(tp, stream); break;
+            case   1: launch_kernel<192,  96,  96,  24,  12,  24>(tp, stream); break;
+            case   2: launch_kernel<192,  96,  96,  24,  24,  12>(tp, stream); break;
+            case   3: launch_kernel<192,  96,  96,  24,   8,  48>(tp, stream); break;
+            case   4: launch_kernel<192,  96,  96,  24,  24,  16>(tp, stream); break;
+            case   5: launch_kernel<192,  96,  96,  24,  12,  48>(tp, stream); break;
+            case   6: launch_kernel<192,  96,  96,  24,  24,  24>(tp, stream); break;
+            case   7: launch_kernel<192,  96,  96,  32,   8,  48>(tp, stream); break;
+            case   8: launch_kernel<192,  96,  96,  32,  32,  12>(tp, stream); break;
+            case   9: launch_kernel<192,  96,  96,  32,  16,  24>(tp, stream); break;
+            case  10: launch_kernel<192,  96,  96,  48,   6,  48>(tp, stream); break;
+            case  11: launch_kernel<192,  96,  96,  48,  12,  24>(tp, stream); break;
+            case  12: launch_kernel<192,  96,  96,  48,  48,   6>(tp, stream); break;
+            case  13: launch_kernel<192,  96,  96,  48,  24,  12>(tp, stream); break;
+            case  14: launch_kernel<192,  96,  96,  48,   8,  48>(tp, stream); break;
+            case  15: launch_kernel<192,  96,  96,  48,  48,   8>(tp, stream); break;
+            case  16: launch_kernel<192,  96,  96,  48,  16,  24>(tp, stream); break;
+            case  17: launch_kernel<192,  96,  96,  48,  24,  16>(tp, stream); break;
+            case  18: launch_kernel<192,  96,  96,  48,  12,  48>(tp, stream); break;
+            case  19: launch_kernel<192,  96,  96,  48,  24,  24>(tp, stream); break;
+            case  20: launch_kernel<192,  96,  96,  48,  48,  12>(tp, stream); break;
+            // case  0: launch_kernel<192, 64, 64, 16, 16, 16>(tp, stream); break;
+            // case  1: launch_kernel<192, 64, 64, 32, 16, 16>(tp, stream); break;
+            // case  2: launch_kernel<192, 64, 64, 32, 16, 16>(tp, stream); break;
+            // case  3: launch_kernel<192, 64, 64, 32, 32, 16>(tp, stream); break;
+            // case  4: launch_kernel<192, 96, 96,  8,  8, 48>(tp, stream); break;
+            // case  5: launch_kernel<192, 96, 96, 16, 16, 24>(tp, stream); break;
+            // case  6: launch_kernel<192, 96, 96, 16, 16, 12>(tp, stream); break;
+            // case  7: launch_kernel<192, 96, 96, 32, 16, 24>(tp, stream); break;
+            // case  8: launch_kernel<192, 96, 96, 48, 16, 24>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 192", tp.aux.x);
             }
           }
@@ -221,10 +225,10 @@ namespace quda
       {
         int max_aux;
         switch (arg.M) {
-        case 48: max_aux = 9; break;
-        case 64: max_aux = 18; break;
-        case 128: max_aux = 15; break;
-        case 192: max_aux = 15; break;
+        case 48: max_aux = 4; break;
+        case 64: max_aux = 10; break;
+        // case 128: max_aux = 15; break;
+        case 192: max_aux = 20; break;
         default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
         }
 
@@ -411,7 +415,7 @@ namespace quda
       case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
 #ifdef NSPIN1
-      case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+      // case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
       case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN1
       default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
@@ -435,11 +439,13 @@ namespace quda
         errorQuda("Double precision multigrid has not been enabled");
 #endif
       } else if (precision == QUDA_SINGLE_PRECISION) {
+#if 0
         if (Yhat.Precision() == QUDA_SINGLE_PRECISION) {
           calculateYhat<float, float>(Yhat, Xinv, Y, X);
         } else {
           errorQuda("Unsupported precision %d\n", precision);
         }
+#endif
       } else if (precision == QUDA_HALF_PRECISION) {
         if (Yhat.Precision() == QUDA_HALF_PRECISION) {
           calculateYhat<short, float>(Yhat, Xinv, Y, X);
