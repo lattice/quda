@@ -100,13 +100,7 @@ namespace quda
     }
 
     template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ typename std::enable_if<Arg::N != N, void>::type CalculateYhatGPU(Arg arg)
-    {
-    }
-
-    template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ __launch_bounds__(block_y * block_z, 2)
-    typename std::enable_if<Arg::N == N, void>::type CalculateYhatGPU(Arg arg)
+    __global__ __launch_bounds__(block_y * block_z, 2) void CalculateYhatGPU(Arg arg)
     {
       int index_x = blockDim.x * blockIdx.x + threadIdx.x;
 

@@ -62,7 +62,12 @@ namespace quda
       }
 
       template <int N, int bM, int bN, int bK, int block_y, int block_z>
-      void launch_kernel(TuneParam &tp, const cudaStream_t &stream)
+      typename std::enable_if<Arg::N != N, void>::type launch_kernel(TuneParam &tp, const cudaStream_t &stream)
+      {
+      }
+
+      template <int N, int bM, int bN, int bK, int block_y, int block_z>
+      typename std::enable_if<Arg::N == N, void>::type launch_kernel(TuneParam &tp, const cudaStream_t &stream)
       {
         tp.block.x = 1;
         tp.block.y = block_y;
