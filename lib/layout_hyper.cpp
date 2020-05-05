@@ -101,6 +101,7 @@ int quda_node_index(const int x[])
       r = (r+sites_on_node)/2;
     }
   }
+
   return r;
 }
 
@@ -135,12 +136,11 @@ void quda_get_coords(int x[], int node, int index)
     x[0] += 2*index + s;
   } else {
     // ((t*Z + z) * Y + y) * X + x
-
     for (int i = ndim-1; i > 0; i--) {
       x[i] += index/size2[i];
       index %= size2[i];
     }
-    x[0] = index;
+    x[0] += index;
   }
 
   free(m);
