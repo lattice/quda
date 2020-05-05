@@ -227,8 +227,8 @@ namespace quda
     SmemAccessor smem_real;
     SmemAccessor smem_imag;
 
-    half2 reg_real[m_dim][n_dim];
-    half2 reg_imag[m_dim][n_dim];
+    half2 reg_real[m_dim * n_dim];
+    half2 reg_imag[m_dim * n_dim];
 
     const int y;
     const int z;
@@ -253,13 +253,13 @@ namespace quda
             if (!dagger) {
               auto x = gmem(row_idx + 0, col_idx);
               auto y = gmem(row_idx + 1, col_idx);
-              reg_real[row][col] = __floats2half2_rn(+x.real(), +y.real());
-              reg_imag[row][col] = __floats2half2_rn(+x.imag(), +y.imag());
+              reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
+              reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
             } else {
               auto x = gmem(col_idx, row_idx + 0);
               auto y = gmem(col_idx, row_idx + 1);
-              reg_real[row][col] = __floats2half2_rn(+x.real(), +y.real());
-              reg_imag[row][col] = __floats2half2_rn(-x.imag(), -y.imag());
+              reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
+              reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
             }
           }
         }
@@ -275,8 +275,8 @@ namespace quda
           const int col_idx = col * col_stride + y;
           const int row_idx = row * row_stride_pack + z;
           if (row_idx < M && col_idx < N) {
-            smem_real.vector_load(row_idx, col_idx, reg_real[row][col]);
-            smem_imag.vector_load(row_idx, col_idx, reg_imag[row][col]);
+            smem_real.vector_load(row_idx, col_idx, reg_real[row * n_dim + col]);
+            smem_imag.vector_load(row_idx, col_idx, reg_imag[row * n_dim + col]);
           }
         }
       }

@@ -68,7 +68,8 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
+        yHatMax
+          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
 
       } else {
 
@@ -80,7 +81,8 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
+        yHatMax
+          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
@@ -100,7 +102,7 @@ namespace quda
     }
 
     template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ __launch_bounds__(block_y * block_z, 2) void CalculateYhatGPU(Arg arg)
+    __global__ void CalculateYhatGPU(Arg arg)
     {
       int index_x = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -108,7 +110,7 @@ namespace quda
       constexpr int t_n = Arg::N / bN;
       int x_cb = index_x / (t_m * t_n);
       int mn = index_x % (t_m * t_n);
-      
+
       int n = (mn % t_n) * bN;
       int m = (mn / t_n) * bM;
 
