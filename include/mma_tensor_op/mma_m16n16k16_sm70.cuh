@@ -29,7 +29,7 @@ namespace quda
     int quad_hilo;   // quad higher or lower.
     int quad_thread; // 0,1,2,3
 
-    __device__ WarpRegisterMapping(int thread_id)
+    __device__ inline WarpRegisterMapping(int thread_id)
     {
       const int lane_id = thread_id & 31;
       const int octl_id = lane_id >> 2;
@@ -57,7 +57,7 @@ namespace quda
     }
   };
 
-  template <int M, int N, int ldm, int ldn, class T> __device__ auto make_smem_obj(T *ptr_)
+  template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
   {
     return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
   }
@@ -106,13 +106,13 @@ namespace quda
     using reg_type = unsigned;
     reg_type reg[4];
 
-    __device__ MmaOperandC()
+    __device__ inline MmaOperandC()
     {
 #pragma unroll
       for (int i = 0; i < 4; i++) { reg[i] = 0; }
     }
 
-    __device__ void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
+    __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
     {
       reg_type *C = reinterpret_cast<reg_type *>(smem);
 
@@ -123,7 +123,7 @@ namespace quda
       for (int i = 0; i < 4; i++) { C[thread_offset_c + i] = reg[i]; }
     }
 
-    template <class F> __device__ void abs_max(F &max)
+    template <class F> __device__ inline void abs_max(F &max)
     {
 #pragma unroll
       for (int i = 0; i < 4; i++) {
@@ -139,13 +139,13 @@ namespace quda
     using reg_type = float;
     reg_type reg[8];
 
-    __device__ MmaOperandC()
+    __device__ inline MmaOperandC()
     {
 #pragma unroll
       for (int i = 0; i < 8; i++) { reg[i] = 0; }
     }
 
-    __device__ void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
+    __device__ inline void store(void *smem, int warp_row, int warp_col, const WarpRegisterMapping &wrm)
     {
       half2 *C = reinterpret_cast<half2 *>(smem);
 
@@ -165,7 +165,7 @@ namespace quda
       C[thread_offset_c] = __floats2half2_rn(reg[6], reg[7]);
     }
 
-    template <class F> __device__ void abs_max(F &max)
+    template <class F> __device__ inline void abs_max(F &max)
     {
 #pragma unroll
       for (int i = 0; i < 8; i++) { max = fmax(max, fabsf(reg[i])); }
@@ -189,8 +189,8 @@ namespace quda
 
   template <typename real, int length> struct Structure {
     real v[length];
-    __host__ __device__ const real &operator[](int i) const { return v[i]; }
-    __host__ __device__ real &operator[](int i) { return v[i]; }
+    __host__ __device__ inline const real &operator[](int i) const { return v[i]; }
+    __host__ __device__ inline real &operator[](int i) { return v[i]; }
   };
 
   __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
@@ -233,7 +233,7 @@ namespace quda
     const int y;
     const int z;
 
-    __device__ GlobalMemoryLoader(SmemAccessor real_, SmemAccessor imag_) :
+    __device__ inline GlobalMemoryLoader(SmemAccessor real_, SmemAccessor imag_) :
       smem_real(real_),
       smem_imag(imag_),
       y(threadIdx.y),
