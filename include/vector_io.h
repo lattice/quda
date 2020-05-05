@@ -10,7 +10,7 @@ namespace quda {
         doing IO (required for compatability with MILC).
         @param[in] parity_inflate Whether to inflate
     */
-    void set_io_parity_inflation(QudaBoolean parity_inflate);
+    void set_io_parity_inflation_quda(QudaBoolean parity_inflate);
   }
 
   /**
