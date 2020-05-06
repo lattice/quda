@@ -43,7 +43,7 @@ protected:
     int num_converged;
     int num_locked;
     int num_keep;
-
+    
     double *residua;
 
     // Device side vector workspace
@@ -86,6 +86,46 @@ public:
      */
     static EigenSolver *create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile);
 
+    /**
+       @brief Check for an initial guess. If none present, populate with rands, then 
+       orthonormalise
+       @param[in] kSpace The Krylov space vectors
+    */    
+    void prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Check for a maximum of the Chebyshev operator
+       @param[in] mat The problem operator
+       @param[in] kSpace The Krylov space vectors
+    */    
+    void checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace);
+
+    /**
+       @brief Extend the Krylov space
+       @param[in] kSpace The Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */    
+    void prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    
+    /**
+       @brief Set the epsilon parameter
+       @param[in] prec Precision of the solver instance
+       @param[out] epsilon The deduced epsilon value
+    */
+    double setEpsilon(const QudaPrecision prec);
+    
+    /**
+       @brief Dump the eigensolver parameters to stdout
+    */
+    void printEigensolverSetup();
+    
+    /**
+       @brief Release memory, save eigenvectors, resize the Krylov space to its original dimension
+       @param[in] kSpace The Krylov space vectors
+       @param[in] evals The eigenvalue array
+    */
+    void cleanUpEigensolver(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+    
     /**
        @brief Applies the specified matVec operation:
        M, Mdag, MMdag, MdagM

@@ -64,110 +64,41 @@ namespace quda
   {
     // In case we are deflating an operator, save the tunechache from the inverter
     saveTuneCache();
+
+    // Pre-launch checks and preparation
+    //---------------------------------------------------------------------------
     // Check to see if we are loading eigenvectors
     if (strcmp(eig_param->vec_infile, "") != 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
+      printfQuda("Loading evecs from file name %s\n", eig_param->vec_infile);
       loadFromFile(mat, kSpace, evals);
       return;
     }
-
-    // Create device side residual vectors by cloning
-    // the kSpace passed to the function.
-    ColorSpinorParam csParamClone(*kSpace[0]);
-    // Increase Krylov space to nKr+block_size
-    kSpace.reserve(nKr + block_size);
-    for (int i = nConv; i < nKr + block_size; i++) kSpace.push_back(ColorSpinorField::Create(csParamClone));
-    // create residual vectors
-    csParamClone.create = QUDA_ZERO_FIELD_CREATE;
-    for (int b = 0; b < block_size; b++) { r.push_back(ColorSpinorField::Create(csParamClone)); }
-
-    // Test for initial guess vectors
+    
+    // Check for an initial guess. If none present, populate with rands, then 
+    // orthonormalise
     // DMH: This is an important step. With block solvers, initial guesses
     //      of block sizes N can be subspaces rich in extremal eigenmodes,
     //      N times more rich than non-blocked solvers.
     //      Final paragraph, IV.B https://arxiv.org/pdf/1902.02064.pdf
-    double norm = sqrt(blas::norm2(*kSpace[0]));
-    if (norm == 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residua are zero. Populating with rands.\n");
-      if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-        for (int b = 0; b < block_size; b++) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
-      } else {
-        RNG *rng = new RNG(*kSpace[0], 1234);
-        rng->Init();
-        for (int b = 0; b < block_size; b++) spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM);
-        rng->Release();
-        delete rng;
-      }
-    }
+    prepareInitialGuess(kSpace);
 
-    bool orthed = false;
-    int k = 0, kmax = 5;
-    while (!orthed && k < kmax) {
-      orthonormalizeMGS(kSpace, block_size);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Orthonormalising initial guesses with Gram Schmidt, k=%d\n", k);
-      orthed = orthoCheck(kSpace, block_size);
-      k++;
-    }
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Estimate Chebyshev max.\n");
     // Check for Chebyshev maximum estimation
-    if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
-      // Use two vectors from kSpace as temps
-      eig_param->a_max = estimateChebyOpMax(mat, *kSpace[block_size + 1], *kSpace[block_size]);
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
-    }
-
-    // Increase evals space to nEv
-    evals.reserve(nEv);
-    for (int i = nConv; i < nEv; i++) evals.push_back(0.0);
-    //---------------------------------------------------------------------------
+    checkChebyOpMax(mat, kSpace);
+    
+    // Increase the size of kSpace passed to the function, will be trimmed to
+    // original size before exit.
+    prepareKrylovSpace(kSpace, evals);
 
     // Convergence and locking criteria
     double mat_norm = 0.0;
-    double epsilon = DBL_EPSILON;
-    QudaPrecision prec = kSpace[0]->Precision();
-    switch (prec) {
-    case QUDA_DOUBLE_PRECISION:
-      epsilon = DBL_EPSILON;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in double precision\n");
-      break;
-    case QUDA_SINGLE_PRECISION:
-      epsilon = FLT_EPSILON;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in single precision\n");
-      break;
-    case QUDA_HALF_PRECISION:
-      epsilon = 2e-3;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in half precision\n");
-      break;
-    case QUDA_QUARTER_PRECISION:
-      epsilon = 5e-2;
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
-      break;
-    default: errorQuda("Invalid precision %d", prec);
-    }
+    double epsilon = setEpsilon(kSpace[0]->Precision());
+
+    // Print Eigensolver params
+    printEigensolverSetup();
+    //---------------------------------------------------------------------------
 
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("***********************************\n");
-      printfQuda("**** START BLOCK TRLM SOLUTION ****\n");
-      printfQuda("***********************************\n");
-    }
-
-    // Print Eigensolver params
-    if (getVerbosity() >= QUDA_VERBOSE) {
-      printfQuda("spectrum %s\n", spectrum);
-      printfQuda("tol %.4e\n", tol);
-      printfQuda("nConv %d\n", nConv);
-      printfQuda("nEv %d\n", nEv);
-      printfQuda("nKr %d\n", nKr);
-      printfQuda("block size %d\n", block_size);
-      if (eig_param->use_poly_acc) {
-        printfQuda("polyDeg %d\n", eig_param->poly_deg);
-        printfQuda("a-min %f\n", eig_param->a_min);
-        printfQuda("a-max %f\n", eig_param->a_max);
-      }
-    }
 
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
@@ -254,15 +185,6 @@ namespace quda
 
     profile.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) {
-      printfQuda("kSpace size at convergence/max restarts = %d\n", (int)kSpace.size());
-    }
-
-    // Prune the Krylov space back to size when passed to eigensolver
-    for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
-    kSpace.resize(nConv);
-    evals.resize(nConv);
-
     // Post computation report
     //---------------------------------------------------------------------------
     if (!converged) {
@@ -292,33 +214,7 @@ namespace quda
     }
 
     // Local clean-up
-    for (int b = 0; b < block_size; b++) delete r[b];
-    r.resize(0);
-
-    // Only save if outfile is defined
-    if (strcmp(eig_param->vec_outfile, "") != 0) {
-      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
-      // Make an array of size nConv
-      std::vector<ColorSpinorField *> vecs_ptr;
-      vecs_ptr.reserve(nConv);
-      const QudaParity mat_parity = impliedParityFromMatPC(mat.getMatPCType());
-      for (int i = 0; i < nConv; i++) {
-        kSpace[i]->setSuggestedParity(mat_parity);
-        vecs_ptr.push_back(kSpace[i]);
-      }
-      saveVectors(vecs_ptr, eig_param->vec_outfile);
-    }
-
-    if (getVerbosity() >= QUDA_SUMMARIZE) {
-      printfQuda("***********************************\n");
-      printfQuda("***** END BLOCK TRLM SOLUTION *****\n");
-      printfQuda("***********************************\n");
-    }
-
-    // Save BLOCK TRLM tuning
-    saveTuneCache();
-
-    mat.flops();
+    cleanUpEigensolver(kSpace, evals);
   }
 
   // Destructor
