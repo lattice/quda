@@ -1542,7 +1542,7 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
   inv_param.cuda_prec = device_precision;
   inv_param.cuda_prec_sloppy = device_precision_sloppy;
   inv_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // cuda_prec_precondition;
-  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_NO;
+  inv_param.preserve_source = QUDA_PRESERVE_SOURCE_YES;
   inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
   inv_param.dirac_order = QUDA_DIRAC_ORDER;
 
@@ -1781,6 +1781,10 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
+  // Flip the sign of the mass to fix a consistency issue between MILC, QUDA full
+  // parity dslash operator
+  mass = -mass; 
+
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
   QudaPrecision device_precision = (quda_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1792,6 +1796,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
                  device_precision_sloppy, inv_args.tadpole, inv_args.naik_epsilon);
 
   // Set some other smart defaults
+  fat_param.type = QUDA_ASQTAD_FAT_LINKS;
   fat_param.cuda_prec_refinement_sloppy = fat_param.cuda_prec_sloppy;
   fat_param.cuda_prec_precondition = QUDA_HALF_PRECISION; // override
   fat_param.reconstruct_refinement_sloppy = QUDA_RECONSTRUCT_NO;
@@ -1820,6 +1825,7 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
 
 
   mg_pack->mg_preconditioner = newMultigridQuda(&mg_pack->mg_param);
+  mg_pack->last_mass = mass;
 
   invalidate_quda_mg = false;
 
@@ -1837,6 +1843,10 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
+
+  // FIXME: Flip the sign of the mass to fix a consistency issue between
+  // MILC, QUDA full parity dslash operator
+  mass = -mass; 
 
 
   milcMultigridPack* mg_pack = (milcMultigridPack*)(mg_pack_ptr);
@@ -1901,9 +1911,10 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   }
 
   if (mass != mg_pack->last_mass) {
-     mg_pack->mg_param.invert_param->mass = mass;
-     mg_pack->last_mass = mass;
-     invalidate_quda_mg = true;
+    mg_pack->mg_param.invert_param->mass = mass;
+    mg_pack->last_mass = mass;
+    invalidateGaugeQuda();
+    invalidate_quda_mg = true;
   }
 
   if (invalidate_quda_gauge || !create_quda_gauge || invalidate_quda_mg) {
@@ -1922,7 +1933,25 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   int quark_offset = getColorVectorOffset(local_parity, false, localDim) * host_precision;
 
+  // FIXME: due to sign convention woes passing in an initial
+  // guess is currently broken. Needs a sign flip to fix.
+  // MG is fast enough we won't worry...
+
   invertQuda(static_cast<char *>(solution) + quark_offset, static_cast<char *>(source) + quark_offset, &invertParam);
+
+  // FIXME: Flip sign on solution to correct for mass convention
+  int cv_size = localDim[0]*localDim[1]*localDim[2]*localDim[3]*3*2; // (dimension * Nc = 3 * cplx)
+  if (host_precision == QUDA_DOUBLE_PRECISION) {
+    auto soln = (double*)(solution);
+    for (long i = 0; i < cv_size; i++) {
+      soln[i] = -soln[i];
+    }
+  } else {
+    auto soln = (float*)(solution);
+    for (long i = 0; i < cv_size; i++) {
+      soln[i] = -soln[i];
+    }
+  }
 
   // return the number of iterations taken by the inverter
   *num_iters = invertParam.iter;
