@@ -74,8 +74,8 @@ namespace quda
       {
       }
 
-      template <bool transpose, class GmemAccessor>
-      __device__ inline void g2r(GmemAccessor gmem, int m_offset, int n_offset)
+      template <int matrix_n, bool transpose, class GmemAccessor>
+      __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
 #pragma unroll
         for (int col = 0; col < n_dim; col++) {
@@ -85,25 +85,25 @@ namespace quda
             const int row_idx = row * row_stride_pack + z + m_offset;
             if (!transpose) {
               if (!dagger) {
-                auto x = gmem(row_idx + 0, col_idx);
-                auto y = gmem(row_idx + 1, col_idx);
+                auto x = gmem.load<matrix_n>(row_idx + 0, col_idx);
+                auto y = gmem.load<matrix_n>(row_idx + 1, col_idx);
                 reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
               } else {
-                auto x = gmem(col_idx, row_idx + 0);
-                auto y = gmem(col_idx, row_idx + 1);
+                auto x = gmem.load<matrix_n>(col_idx, row_idx + 0);
+                auto y = gmem.load<matrix_n>(col_idx, row_idx + 1);
                 reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
               }
             } else {
               if (!dagger) {
-                auto x = gmem(col_idx, row_idx + 0);
-                auto y = gmem(col_idx, row_idx + 1);
+                auto x = gmem.load<matrix_n>(col_idx, row_idx + 0);
+                auto y = gmem.load<matrix_n>(col_idx, row_idx + 1);
                 reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
               } else {
-                auto x = gmem(row_idx + 0, col_idx);
-                auto y = gmem(row_idx + 1, col_idx);
+                auto x = gmem.load<matrix_n>(row_idx + 0, col_idx);
+                auto y = gmem.load<matrix_n>(row_idx + 1, col_idx);
                 reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
               }
@@ -129,7 +129,7 @@ namespace quda
 
     template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
               class A, class B, class C>
-    __device__ inline float perform_mma(A aa, B bb, C cc, int m, int n)
+    __device__ inline float perform_mma(const A &aa, const B &bb, C cc, int m, int n)
     {
       constexpr int lda = bM + pad_size(bM);
       constexpr int ldb = bN + pad_size(bN);
@@ -188,10 +188,10 @@ namespace quda
       constexpr bool b_transpose = true;
 
       {
-        aa_loader.g2r<a_transpose>(aa, m, 0);
+        aa_loader.g2r<N, a_transpose>(aa, m, 0);
         aa_loader.r2s();
 
-        bb_loader.g2r<b_transpose>(bb, n, 0);
+        bb_loader.g2r<N, b_transpose>(bb, n, 0);
         bb_loader.r2s();
       }
 
@@ -201,8 +201,8 @@ namespace quda
       for (int bk = 0; bk < N; bk += bK) {
 
         if (bk + bK < N) {
-          aa_loader.g2r<a_transpose>(aa, m, bk + bK);
-          bb_loader.g2r<b_transpose>(bb, n, bk + bK);
+          aa_loader.g2r<N, a_transpose>(aa, m, bk + bK);
+          bb_loader.g2r<N, b_transpose>(bb, n, bk + bK);
         }
 
 #pragma unroll

@@ -289,6 +289,17 @@ namespace quda {
           }
         }
 
+        template <int N>
+        __device__ __host__ inline auto load(int row, int col) const
+        {
+          auto tmp_store = v[idx + row * N + col];
+          if (fixed) {
+            return scale_inv * static_cast<complex<Float>>(tmp_store);
+          } else {
+            return tmp_store;
+          }
+        }
+
 	/**
 	   @brief negation operator
            @return negation of this complex number
@@ -577,6 +588,11 @@ namespace quda {
 	}
       }
 
+      __device__ __host__ inline const auto operator()(int d, int parity, int x) const
+      {
+        return fieldorder_wrapper<Float, storeFloat>(u, ((parity * volumeCB + x) * geometry + d) * nColor * nColor, scale, scale_inv);
+      }
+
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
 	{ return fieldorder_wrapper<Float,storeFloat>
 	    (u, (((parity*volumeCB+x)*geometry + d)*nColor + row)*nColor + col, scale, scale_inv); }
@@ -669,6 +685,11 @@ namespace quda {
 	} else {
 	  return complex<Float>(tmp.x,tmp.y);
 	}
+      }
+
+      __device__ __host__ inline const auto operator()(int d, int parity, int x) const
+      {
+        return fieldorder_wrapper<Float, storeFloat>(ghost[d], parity * ghostOffset[d] + x * nColor * nColor, scale, scale_inv);
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
@@ -930,8 +951,11 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float> operator()(int d, int parity, int x, int row = 0, int col = 0) const
-	{ return accessor(d,parity,x,row,col); }
+  __device__ __host__ complex<Float> operator()(int d, int parity, int x, int row, int col) const
+  { return accessor(d,parity,x,row,col); }
+
+  __device__ __host__ const auto operator()(int d, int parity, int x) const
+  { return accessor(d, parity, x); }
 
 	/**
 	 * Writable complex-member accessor function
@@ -952,8 +976,11 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row = 0, int col = 0) const
-	{ return ghostAccessor(d,parity,x,row,col); }
+	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
+  { return ghostAccessor(d,parity,x,row,col); }
+
+  __device__ __host__ auto Ghost(int d, int parity, int x) const
+  { return ghostAccessor(d, parity, x); }
 
 	/**
 	 * Writable complex-member accessor function for the ghost zone
