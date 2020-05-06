@@ -263,6 +263,32 @@ namespace quda {
           }
         }
 
+        __device__ __host__ inline auto data() {
+          return &v[idx];
+        }
+
+        template <int N, int col_tile_dim>
+        __device__ __host__ inline auto load_tile(int row, int col) const
+        {
+          constexpr int vector_length = col_tile_dim * 2;
+          static_assert(col_tile_dim == 2, "Currently col_tile_dim can only be equal to 2.");
+          using vector_type = typename VectorType<Float, vector_length>::type;
+          using store_vector_type = typename VectorType<storeFloat, vector_length>::type;
+          store_vector_type tmp_store_v = reinterpret_cast<store_vector_type *>(&v[idx + row * N + col]);
+	        if (vector_length == 4) {
+            if (fixed) {
+              vector_type tmp_v;
+              tmp_v.x = scale_inv * static_cast<Float>(tmp_store_v.x);
+              tmp_v.y = scale_inv * static_cast<Float>(tmp_store_v.y);
+              tmp_v.z = scale_inv * static_cast<Float>(tmp_store_v.z);
+              tmp_v.w = scale_inv * static_cast<Float>(tmp_store_v.w);
+              return tmp_v;
+            } else {
+              return tmp_store_v;
+            }
+          }
+        }
+
 	/**
 	   @brief negation operator
            @return negation of this complex number
@@ -904,7 +930,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float> operator()(int d, int parity, int x, int row, int col) const
+	__device__ __host__ complex<Float> operator()(int d, int parity, int x, int row = 0, int col = 0) const
 	{ return accessor(d,parity,x,row,col); }
 
 	/**
@@ -915,7 +941,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ fieldorder_wrapper<Float,storeFloat> operator() (int d, int parity, int x, int row, int col)
+	__device__ __host__ fieldorder_wrapper<Float,storeFloat> operator() (int d, int parity, int x, int row = 0, int col = 0)
 	{ return accessor(d,parity,x,row,col); }
 
 	/**
@@ -926,7 +952,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
+	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row = 0, int col = 0) const
 	{ return ghostAccessor(d,parity,x,row,col); }
 
 	/**
@@ -937,7 +963,7 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ fieldorder_wrapper<Float,storeFloat> Ghost(int d, int parity, int x, int row, int col)
+	__device__ __host__ fieldorder_wrapper<Float,storeFloat> Ghost(int d, int parity, int x, int row = 0, int col = 0)
 	{ return ghostAccessor(d,parity,x,row,col); }
 
     	/**

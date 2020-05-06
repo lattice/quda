@@ -7,7 +7,26 @@ namespace quda
 {
   namespace mma
   {
-    __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
+    template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
+
+      T *ptr;
+
+      __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
+
+      __device__ inline const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
+
+      template <class VecType> __device__ inline void vector_load(int i, int j, VecType vec)
+      {
+        VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
+        constexpr int vector_length = sizeof(VecType) / sizeof(T);
+        ptr_[(i * ldm + j * ldn) / vector_length] = vec;
+      }
+    };
+
+    template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
+    {
+      return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
+    }
 
     template <int M, int N, int row_stride, int col_stride, bool dagger, class AccessorTo, class AccessorFrom>
     __device__ inline void load_cache(AccessorTo to_real, AccessorTo to_imag, AccessorFrom from)
@@ -55,7 +74,8 @@ namespace quda
       {
       }
 
-      template <class GmemAccessor> __device__ inline void g2r(GmemAccessor gmem)
+      template <class GmemAccessor>
+      __device__ inline void g2r(GmemAccessor gmem)
       {
 #pragma unroll
         for (int col = 0; col < n_dim; col++) {
@@ -155,8 +175,8 @@ namespace quda
                                                                                            smem_obj_b_imag);
 
       {
-        auto aa_offset = [&](int i, int j) { return aa(i + m, j); };
-        auto bb_offset = [&](int i, int j) { return b_dag ? bb(i, j + n) : bb(i + n, j); };
+        auto aa_offset = [&](int i, int j) { return a_dag ? aa(i, j + m) : aa(i + m, j); };
+        auto bb_offset = [&](int i, int j) { return b_dag ? bb(j + n, i) : bb(j, i + n); };
 
         aa_loader.g2r(aa_offset);
         aa_loader.r2s();
@@ -171,8 +191,8 @@ namespace quda
       for (int bk = 0; bk < N; bk += bK) {
 
         if (bk + bK < N) {
-          auto aa_offset = [&](int i, int j) { return aa(i + m, j + bk + bK); };
-          auto bb_offset = [&](int i, int j) { return b_dag ? bb(i + bk + bK, j + n) : bb(i + n, j + bk + bK); };
+          auto aa_offset = [&](int i, int j) { return a_dag ? aa(i + bk + bK, j + m) : aa(i + m, j + bk + bK); };
+          auto bb_offset = [&](int i, int j) { return b_dag ? bb(j + n, i + bk + bK) : bb(j + bk + bK, i + n); };
 
           aa_loader.g2r(aa_offset);
           bb_loader.g2r(bb_offset);

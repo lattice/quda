@@ -17,6 +17,8 @@ namespace quda
 {
   namespace mma
   {
+    __device__ __host__ constexpr int inline pad_size(int m) { return m == 48 ? 2 : 10; }
+
     constexpr int WMMA_M = 16;
     constexpr int WMMA_N = 16;
     constexpr int WMMA_K = 4;
@@ -42,27 +44,6 @@ namespace quda
         quad_thread = lane_id & 3;
       }
     };
-
-    template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
-
-      T *ptr;
-
-      __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
-
-      __device__ inline const T &operator()(int i, int j) const { return ptr[i * ldm + j * ldn]; }
-
-      template <class VecType> __device__ inline void vector_load(int i, int j, VecType vec)
-      {
-        VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
-        constexpr int vector_length = sizeof(VecType) / sizeof(T);
-        ptr_[(i * ldm + j * ldn) / vector_length] = vec;
-      }
-    };
-
-    template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
-    {
-      return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
-    }
 
     template <int stride> struct MmaOperandA {
 
@@ -206,7 +187,7 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
       using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
-      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&cc.v[cc.idx]));
+      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
       structure s;
 
 #pragma unroll
@@ -234,7 +215,7 @@ namespace quda
 
       constexpr bool fixed = GmemOperandC::fixed;
       using structure = typename std::conditional<fixed, Structure<short, 4>, Structure<float, 4>>::type;
-      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(&cc.v[cc.idx]));
+      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
       structure s;
 
 #pragma unroll

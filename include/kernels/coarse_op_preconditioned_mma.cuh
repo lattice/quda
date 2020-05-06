@@ -63,8 +63,8 @@ namespace quda
         const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
         auto aa = [&](int i, int j) { return arg.Y.Ghost(d, 1 - parity, ghost_idx, i, j); };
-        auto bb = [&](int i, int j) { return arg.Xinv(0, parity, x_cb, j, i); };
-        auto cc = arg.Yhat.Ghost(d, 1 - parity, ghost_idx, 0, 0);
+        auto bb = [&](int i, int j) { return arg.Xinv(0, parity, x_cb, i, j); };
+        auto cc = arg.Yhat.Ghost(d, 1 - parity, ghost_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -76,8 +76,8 @@ namespace quda
         const int back_idx = linkIndexM1(coord, arg.dim, d);
 
         auto aa = [&](int i, int j) { return arg.Y(d, 1 - parity, back_idx, i, j); };
-        auto bb = [&](int i, int j) { return arg.Xinv(0, parity, x_cb, j, i); };
-        auto cc = arg.Yhat(d, 1 - parity, back_idx, 0, 0);
+        auto bb = [&](int i, int j) { return arg.Xinv(0, parity, x_cb, i, j); };
+        auto cc = arg.Yhat(d, 1 - parity, back_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -88,8 +88,8 @@ namespace quda
       { // now do the forwards links X^{-1} * Y^{-\mu}
 
         auto aa = [&](int i, int j) { return arg.Xinv(0, parity, x_cb, i, j); };
-        auto bb = [&](int i, int j) { return arg.Y(d + 4, parity, x_cb, j, i); };
-        auto cc = arg.Yhat(d + 4, parity, x_cb, 0, 0);
+        auto bb = [&](int i, int j) { return arg.Y(d + 4, parity, x_cb, i, j); };
+        auto cc = arg.Yhat(d + 4, parity, x_cb);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
@@ -122,7 +122,7 @@ namespace quda
 
       extern __shared__ half smem_ptr[];
 
-      typename Arg::Float max= 0.0;
+      typename Arg::Float max = 0.0;
       switch (d) {
       case 0: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n); break;
       case 1: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n); break;
