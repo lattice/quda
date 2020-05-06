@@ -807,11 +807,11 @@ void printQudaMultigridParam(QudaMultigridParam *param) {
 
   for (int i = 0; i < n_level - 1; i++) {
 #ifdef INIT_PARAM
-    P(vec_load[i], QUDA_BOOLEAN_INVALID);
-    P(vec_store[i], QUDA_BOOLEAN_INVALID);
-#else
     P(vec_load[i], QUDA_BOOLEAN_FALSE);
     P(vec_store[i], QUDA_BOOLEAN_FALSE);
+#else
+    P(vec_load[i], QUDA_BOOLEAN_INVALID);
+    P(vec_store[i], QUDA_BOOLEAN_INVALID);
 #endif
   }
 

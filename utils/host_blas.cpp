@@ -1,4 +1,4 @@
-#include <blas_reference.h>
+#include <host_utils.h>
 #include <stdio.h>
 #include <comm_quda.h>
 
@@ -67,5 +67,32 @@ void cxpay(void *x, double _Complex a, void *y, int length, QudaPrecision precis
     xpay((double _Complex *)x, (double _Complex)a, (double _Complex *)y, length / 2);
   } else {
     xpay((float _Complex *)x, (float _Complex)a, (float _Complex *)y, length / 2);
+  }
+}
+
+// CPU-style BLAS routines for staggered
+void cpu_axy(QudaPrecision prec, double a, void *x, void *y, int size)
+{
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    double *dst = (double *)y;
+    double *src = (double *)x;
+    for (int i = 0; i < size; i++) { dst[i] = a * src[i]; }
+  } else { // QUDA_SINGLE_PRECISION
+    float *dst = (float *)y;
+    float *src = (float *)x;
+    for (int i = 0; i < size; i++) { dst[i] = a * src[i]; }
+  }
+}
+
+void cpu_xpy(QudaPrecision prec, void *x, void *y, int size)
+{
+  if (prec == QUDA_DOUBLE_PRECISION) {
+    double *dst = (double *)y;
+    double *src = (double *)x;
+    for (int i = 0; i < size; i++) { dst[i] += src[i]; }
+  } else { // QUDA_SINGLE_PRECISION
+    float *dst = (float *)y;
+    float *src = (float *)x;
+    for (int i = 0; i < size; i++) { dst[i] += src[i]; }
   }
 }

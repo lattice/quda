@@ -1010,8 +1010,7 @@ extern "C" {
    *               storage
    * @param parity The destination parity of the field
    */
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.

@@ -261,7 +261,7 @@ namespace quda
 
     // Save orthonormalisation tuning
     saveTuneCache();
-    
+
     return sum;
   }
 
@@ -322,7 +322,7 @@ namespace quda
     }
 
     double *batch_array = (double *)safe_malloc((block_i_rank * block_j_rank) * sizeof(double));
-    // Populate batch array (COLUM major -> ROW major)
+    // Populate batch array (COLUMN major -> ROW major)
     for (int j = j_range.first; j < j_range.second; j++) {
       for (int i = i_range.first; i < i_range.second; i++) {
         int j_arr = j - j_range.first;
@@ -397,7 +397,7 @@ namespace quda
     // Save SVD tuning
     saveTuneCache();
   }
-  
+
   // Deflate vec, place result in vec_defl
   void EigenSolver::deflateSVD(std::vector<ColorSpinorField *> &sol, const std::vector<ColorSpinorField *> &src,
                                const std::vector<ColorSpinorField *> &evecs, const std::vector<Complex> &evals,
@@ -805,7 +805,7 @@ namespace quda
 
     // Save TRLM tuning
     saveTuneCache();
-    
+
     mat.flops();
   }
 
