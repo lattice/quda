@@ -293,10 +293,9 @@ namespace quda
     // Orthogonalise R[0:block_size] against the Krylov space V[0:j + block_size]
     for (int k = 0; k < 1; k++) blockOrthogonalize(v, r, j + block_size);
 
-    // QR decomposition via modified Gram Scmidt
+    // QR decomposition via modified Gram-Schmidt
     // NB, QR via modified Gram-Schmidt is numerically unstable.
-    // May perform the QR iteratively to recover
-    // numerical stability?
+    // We perform the QR iteratively to recover numerical stability.
     //
     // Q_0 * R_0(V)   -> Q_0 * R_0 = V
     // Q_1 * R_1(Q_0) -> Q_1 * R_1 = V * R_0^-1 -> Q_1 * R_1 * R_0 = V
