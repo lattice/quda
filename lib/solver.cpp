@@ -145,16 +145,15 @@ namespace quda {
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
-      solver = new CG3(mat, matSloppy, param, profile);
+      solver = new CG3(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      // CG3NR is included in CG3NE
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NR(mat, matSloppy, matPrecon, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
