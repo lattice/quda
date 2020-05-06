@@ -6,14 +6,9 @@
 namespace quda
 {
 
-  bool VectorIO::parity_inflate = false;
-
-  void set_io_parity_inflation_quda(QudaBoolean parity_inflate_)
-  {
-    VectorIO::parity_inflate = parity_inflate_ == QUDA_BOOLEAN_TRUE ? true : false;
-  }
-
-  VectorIO::VectorIO(const std::string &filename) : filename(filename)
+  VectorIO::VectorIO(const std::string &filename, bool parity_inflate) :
+    filename(filename),
+    parity_inflate(parity_inflate)
   {
     if (strcmp(filename.c_str(), "") == 0) { errorQuda("No eigenspace input file defined."); }
   }

@@ -516,9 +516,11 @@ namespace quda
     vecs_ptr.reserve(nConv);
     for (int i = 0; i < nConv; i++) { vecs_ptr.push_back(kSpace[i]); }
 
-    // load the vectors
-    VectorIO io(eig_param->vec_infile);
-    io.load(vecs_ptr);
+    {
+      // load the vectors
+      VectorIO io(eig_param->vec_infile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      io.load(vecs_ptr);
+    }
 
     // Create the device side residual vector by cloning
     // the kSpace passed to the function.
@@ -793,7 +795,7 @@ namespace quda
         kSpace[i]->setSuggestedParity(mat_parity);
         vecs_ptr.push_back(kSpace[i]);
       }
-      VectorIO io(eig_param->vec_outfile);
+      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
       io.save(vecs_ptr);
     }
 
