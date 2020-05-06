@@ -74,16 +74,16 @@ namespace quda
       {
       }
 
-      template <class GmemAccessor>
-      __device__ inline void g2r(GmemAccessor gmem)
+      template <bool transpose, class GmemAccessor>
+      __device__ inline void g2r(GmemAccessor gmem, int m_offset, int n_offset)
       {
 #pragma unroll
         for (int col = 0; col < n_dim; col++) {
 #pragma unroll
           for (int row = 0; row < m_dim; row++) {
-            const int col_idx = col * col_stride + y;
-            const int row_idx = row * row_stride_pack + z;
-            if (row_idx < M && col_idx < N) {
+            const int col_idx = col * col_stride + y + n_offset;
+            const int row_idx = row * row_stride_pack + z + m_offset;
+            if (!transpose) {
               if (!dagger) {
                 auto x = gmem(row_idx + 0, col_idx);
                 auto y = gmem(row_idx + 1, col_idx);
@@ -92,6 +92,18 @@ namespace quda
               } else {
                 auto x = gmem(col_idx, row_idx + 0);
                 auto y = gmem(col_idx, row_idx + 1);
+                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
+                reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
+              }
+            } else {
+              if (!dagger) {
+                auto x = gmem(col_idx, row_idx + 0);
+                auto y = gmem(col_idx, row_idx + 1);
+                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
+                reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
+              } else {
+                auto x = gmem(row_idx + 0, col_idx);
+                auto y = gmem(row_idx + 1, col_idx);
                 reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
               }
@@ -108,10 +120,8 @@ namespace quda
           for (int row = 0; row < m_dim; row++) {
             const int col_idx = col * col_stride + y;
             const int row_idx = row * row_stride_pack + z;
-            if (row_idx < M && col_idx < N) {
-              smem_real.vector_load(row_idx, col_idx, reg_real[row * n_dim + col]);
-              smem_imag.vector_load(row_idx, col_idx, reg_imag[row * n_dim + col]);
-            }
+            smem_real.vector_load(row_idx, col_idx, reg_real[row * n_dim + col]);
+            smem_imag.vector_load(row_idx, col_idx, reg_imag[row * n_dim + col]);
           }
         }
       }
@@ -174,14 +184,14 @@ namespace quda
       GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
                                                                                            smem_obj_b_imag);
 
-      {
-        auto aa_offset = [&](int i, int j) { return a_dag ? aa(i, j + m) : aa(i + m, j); };
-        auto bb_offset = [&](int i, int j) { return b_dag ? bb(j + n, i) : bb(j, i + n); };
+      constexpr bool a_transpose = false;
+      constexpr bool b_transpose = true;
 
-        aa_loader.g2r(aa_offset);
+      {
+        aa_loader.g2r<a_transpose>(aa, m, 0);
         aa_loader.r2s();
 
-        bb_loader.g2r(bb_offset);
+        bb_loader.g2r<b_transpose>(bb, n, 0);
         bb_loader.r2s();
       }
 
@@ -191,11 +201,8 @@ namespace quda
       for (int bk = 0; bk < N; bk += bK) {
 
         if (bk + bK < N) {
-          auto aa_offset = [&](int i, int j) { return a_dag ? aa(i + bk + bK, j + m) : aa(i + m, j + bk + bK); };
-          auto bb_offset = [&](int i, int j) { return b_dag ? bb(j + n, i + bk + bK) : bb(j + bk + bK, i + n); };
-
-          aa_loader.g2r(aa_offset);
-          bb_loader.g2r(bb_offset);
+          aa_loader.g2r<a_transpose>(aa, m, bk + bK);
+          bb_loader.g2r<b_transpose>(bb, n, bk + bK);
         }
 
 #pragma unroll
@@ -230,16 +237,14 @@ namespace quda
           }
         }
 
-
         if (bk + bK < N) {
           __syncthreads();
 
           aa_loader.r2s();
           bb_loader.r2s();
-        
+
           __syncthreads();
         }
-
       }
 
       // wrap up!

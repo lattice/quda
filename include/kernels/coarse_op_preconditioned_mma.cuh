@@ -124,10 +124,18 @@ namespace quda
 
       typename Arg::Float max = 0.0;
       switch (d) {
-      case 0: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n); break;
-      case 1: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n); break;
-      case 2: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, smem_ptr, m, n); break;
-      case 3: max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, smem_ptr, m, n); break;
+      case 0:
+        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 0, x_cb, parity, smem_ptr, m, n);
+        break;
+      case 1:
+        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 1, x_cb, parity, smem_ptr, m, n);
+        break;
+      case 2:
+        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 2, x_cb, parity, smem_ptr, m, n);
+        break;
+      case 3:
+        max = computeYhat<compute_max_only, Arg, bM, bN, bK, block_y, block_z>(arg, 3, x_cb, parity, smem_ptr, m, n);
+        break;
       }
       if (compute_max_only) atomicAbsMax(arg.max_d, max);
     }
