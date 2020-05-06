@@ -773,7 +773,7 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
   // set file i/o parameters
   strcpy(df_param->vec_infile, vec_infile);
   strcpy(df_param->vec_outfile, vec_outfile);
-  df_param.single_parity_inflate = QUDA_BOOLEAN_TRUE;
+  df_param->io_parity_inflate = QUDA_BOOLEAN_TRUE;
 }
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])
