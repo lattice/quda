@@ -77,34 +77,31 @@ namespace quda
       template <int matrix_n, bool transpose, class GmemAccessor>
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
+        auto p = gmem.data();
+        auto scale_inv = gmem.scale_inv;
+        constexpr bool fixed = GmemAccessor::fixed;
 #pragma unroll
         for (int col = 0; col < n_dim; col++) {
 #pragma unroll
           for (int row = 0; row < m_dim; row++) {
             const int col_idx = col * col_stride + y + n_offset;
             const int row_idx = row * row_stride_pack + z + m_offset;
-            if (!transpose) {
+
+            auto x = transpose == dagger ? p[(row_idx + 0) * matrix_n + col_idx] : p[col_idx * matrix_n + row_idx + 0];
+            auto y = transpose == dagger ? p[(row_idx + 1) * matrix_n + col_idx] : p[col_idx * matrix_n + row_idx + 1];
+
+            if (fixed) {
+              reg_real[row * n_dim + col] = __floats2half2_rn(+scale_inv * x.real(), +scale_inv * y.real());
               if (!dagger) {
-                auto x = gmem.load<matrix_n>(row_idx + 0, col_idx);
-                auto y = gmem.load<matrix_n>(row_idx + 1, col_idx);
-                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
-                reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
+                reg_imag[row * n_dim + col] = __floats2half2_rn(+scale_inv * x.imag(), +scale_inv * y.imag());
               } else {
-                auto x = gmem.load<matrix_n>(col_idx, row_idx + 0);
-                auto y = gmem.load<matrix_n>(col_idx, row_idx + 1);
-                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
-                reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
+                reg_imag[row * n_dim + col] = __floats2half2_rn(-scale_inv * x.imag(), -scale_inv * y.imag());
               }
             } else {
+              reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
               if (!dagger) {
-                auto x = gmem.load<matrix_n>(col_idx, row_idx + 0);
-                auto y = gmem.load<matrix_n>(col_idx, row_idx + 1);
-                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
               } else {
-                auto x = gmem.load<matrix_n>(row_idx + 0, col_idx);
-                auto y = gmem.load<matrix_n>(row_idx + 1, col_idx);
-                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
                 reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
               }
             }
