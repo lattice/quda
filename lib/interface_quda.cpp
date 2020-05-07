@@ -3727,10 +3727,10 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         // need to curry in the shift if we are not doing staggered
         if (param->dslash_type != QUDA_ASQTAD_DSLASH && param->dslash_type != QUDA_STAGGERED_DSLASH) {
           m->shift = param->offset[i];
-	  mSloppy->shift = param->offset[i];
-	}
+          mSloppy->shift = param->offset[i];
+        }
 
-	if (false) { // experimenting with Minimum residual extrapolation
+        if (false) { // experimenting with Minimum residual extrapolation
 	  // only perform MRE using current and previously refined solutions
 #ifdef REFINE_INCREASING_MASS
 	  const int nRefine = i+1;

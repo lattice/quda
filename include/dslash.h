@@ -608,7 +608,8 @@ namespace quda
      @param[in] args Additional arguments for different dslash kernels
   */
   template <template <typename, int, QudaReconstructType> class Apply, typename Recon = WilsonReconstruct, typename... Args>
-  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, Args &&... args)
+  inline void instantiatePreconditioner(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U,
+                                        Args &&... args)
   {
     if (U.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
