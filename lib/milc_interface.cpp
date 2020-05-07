@@ -171,7 +171,6 @@ void qudaFreePinned(void *ptr) {
 
 void qudaHisqParamsInit(QudaHisqParams_t params)
 {
-
   static bool initialized = false;
 
   if(initialized) return;
@@ -767,13 +766,11 @@ static void setColorSpinorParams(const int dim[4], QudaPrecision precision, Colo
 void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz, QudaMemoryType mem_type_ritz,
                        QudaExtLibType deflation_ext_lib, char vec_infile[], char vec_outfile[], QudaEigParam *df_param)
 {
-
   df_param->import_vectors = strcmp(vec_infile,"") ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   df_param->cuda_prec_ritz = ritz_prec;
   df_param->location       = location_ritz;
   df_param->mem_type_ritz  = mem_type_ritz;
-
 
   df_param->run_verify     = QUDA_BOOLEAN_FALSE;
 
@@ -783,6 +780,7 @@ void setDeflationParam(QudaPrecision ritz_prec, QudaFieldLocation location_ritz,
   // set file i/o parameters
   strcpy(df_param->vec_infile, vec_infile);
   strcpy(df_param->vec_outfile, vec_outfile);
+  df_param->io_parity_inflate = QUDA_BOOLEAN_TRUE;
 }
 
 static size_t getColorVectorOffset(QudaParity local_parity, bool even_odd_exchange, const int dim[4])

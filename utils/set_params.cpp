@@ -276,6 +276,7 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param)
@@ -655,7 +656,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   // Give empty strings, Multigrid will handle IO.
   strcpy(mg_eig_param.vec_infile, "");
   strcpy(mg_eig_param.vec_outfile, "");
-
+  mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
@@ -1182,6 +1183,7 @@ void setDeflationParam(QudaEigParam &df_param)
   // set file i/o parameters
   strcpy(df_param.vec_infile, eig_vec_infile);
   strcpy(df_param.vec_outfile, eig_vec_outfile);
+  df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setQudaStaggeredInvTestParams()

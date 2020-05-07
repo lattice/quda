@@ -1,8 +1,7 @@
-#include <multigrid.h>
-#include <qio_field.h>
-#include <string.h>
+#include <cstring>
 
-#include <eigensolve_quda.h>
+#include <multigrid.h>
+#include <vector_io.h>
 
 namespace quda
 {
@@ -1151,7 +1150,8 @@ namespace quda
       vec_infile += std::to_string(param.level);
       vec_infile += "_nvec_";
       vec_infile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::loadVectors(B, vec_infile);
+      VectorIO io(vec_infile);
+      io.load(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);
@@ -1172,7 +1172,8 @@ namespace quda
       vec_outfile += std::to_string(param.level);
       vec_outfile += "_nvec_";
       vec_outfile += std::to_string(param.mg_global.n_vec[param.level]);
-      EigenSolver::saveVectors(B, vec_outfile);
+      VectorIO io(vec_outfile);
+      io.save(B);
       popLevel(param.level);
       profile_global.TPSTOP(QUDA_PROFILE_IO);
       if (is_running) profile_global.TPSTART(QUDA_PROFILE_INIT);

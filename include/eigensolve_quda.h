@@ -257,20 +257,6 @@ public:
     }
 
     /**
-       @brief Load vectors from file
-       @param[in] eig_vecs The eigenvectors to load
-       @param[in] file The filename to load
-    */
-    static void loadVectors(std::vector<ColorSpinorField *> &eig_vecs, std::string file);
-
-    /**
-       @brief Save vectors to file
-       @param[in] eig_vecs The eigenvectors to save
-       @param[in] file The filename to save
-    */
-    static void saveVectors(const std::vector<ColorSpinorField *> &eig_vecs, std::string file);
-
-    /**
        @brief Load and check eigenpairs from file
        @param[in] mat Matrix operator
        @param[in] eig_vecs The eigenvectors to save
