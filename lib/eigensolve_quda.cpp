@@ -243,7 +243,9 @@ namespace quda
         kSpace[i]->setSuggestedParity(mat_parity);
         vecs_ptr.push_back(kSpace[i]);
       }
-      saveVectors(vecs_ptr, eig_param->vec_outfile);
+      // save the vectors
+      VectorIO io(eig_param->vec_outfile, eig_param->io_parity_inflate == QUDA_BOOLEAN_TRUE);
+      io.save(vecs_ptr);
     }
 
     // Save TRLM tuning
