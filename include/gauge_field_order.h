@@ -268,10 +268,10 @@ namespace quda {
         __device__ __host__ inline const auto data() const { return &v[idx]; }
 
         /**
-	   @brief negation operator
+           @brief negation operator
            @return negation of this complex number
-	*/
-	__device__ __host__ inline complex<Float> operator-() const {
+        */
+        __device__ __host__ inline complex<Float> operator-() const {
 	  return fixed ? -scale_inv*static_cast<complex<Float> >(v[idx]) : -static_cast<complex<Float> >(v[idx]);
 	}
 
@@ -928,18 +928,20 @@ namespace quda {
         __device__ __host__ const auto operator()(int d, int parity, int x) const { return accessor(d, parity, x); }
 
         /**
-	 * Writable complex-member accessor function
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param row row index
-	 * @param c column index
-	 */
+         * Writable complex-member accessor function
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param row row index
+         * @param c column index
+         */
         __device__ __host__ fieldorder_wrapper<Float, storeFloat> operator()(int d, int parity, int x, int row = 0,
                                                                              int col = 0)
-        { return accessor(d,parity,x,row,col); }
+        {
+          return accessor(d, parity, x, row, col);
+        }
 
-	/**
+        /**
 	 * Read-only complex-member accessor function for the ghost zone
 	 * @param d dimension index
 	 * @param parity Parity index
@@ -955,17 +957,19 @@ namespace quda {
         __device__ __host__ auto Ghost(int d, int parity, int x) const { return ghostAccessor(d, parity, x); }
 
         /**
-	 * Writable complex-member accessor function for the ghost zone
-	 * @param d dimension index
-	 * @param parity Parity index
-	 * @param x 1-d site index
-	 * @param row row index
-	 * @param c column index
-	 */
+         * Writable complex-member accessor function for the ghost zone
+         * @param d dimension index
+         * @param parity Parity index
+         * @param x 1-d site index
+         * @param row row index
+         * @param c column index
+         */
         __device__ __host__ fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int row = 0, int col = 0)
-        { return ghostAccessor(d,parity,x,row,col); }
+        {
+          return ghostAccessor(d, parity, x, row, col);
+        }
 
-    	/**
+        /**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)
 	 * @param d dimension index
 	 * @param parity Parity index
