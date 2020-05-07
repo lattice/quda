@@ -208,6 +208,12 @@ void printQudaEigParam(QudaEigParam *param) {
   P(location, QUDA_INVALID_FIELD_LOCATION);
 #endif
 
+#if defined INIT_PARAM
+  P(io_parity_inflate, QUDA_BOOLEAN_FALSE);
+#else
+  P(io_parity_inflate, QUDA_BOOLEAN_INVALID);
+#endif
+
 #ifdef INIT_PARAM
   return ret;
 #endif

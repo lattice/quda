@@ -299,6 +299,7 @@ extern char eig_arpack_logfile[256];
 extern char eig_QUDA_logfile[256];
 extern char eig_vec_infile[256];
 extern char eig_vec_outfile[256];
+extern bool eig_io_parity_inflate;
 
 // Parameters for the MG eigensolver.
 // The coarsest grid params are for deflation,
