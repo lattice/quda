@@ -1746,6 +1746,8 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
   mg_param.run_verify = input_struct.verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE; // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = QUDA_BOOLEAN_FALSE; // oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.preserve_deflation = QUDA_BOOLEAN_TRUE; // FIXME, controversial, should update if mass changes?
+
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
