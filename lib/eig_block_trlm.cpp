@@ -73,8 +73,8 @@ namespace quda
       loadFromFile(mat, kSpace, evals);
       return;
     }
-    
-    // Check for an initial guess. If none present, populate with rands, then 
+
+    // Check for an initial guess. If none present, populate with rands, then
     // orthonormalise
     // DMH: This is an important step. With block solvers, initial guesses
     //      of block sizes N can be subspaces rich in extremal eigenmodes,
@@ -201,8 +201,8 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         printfQuda("BLOCK TRLM computed the requested %d vectors in %d restart steps with %d block size and "
                    "%d BLOCKED OP*x operations.\n",
-                   nConv, restart_iter, block_size, iter/block_size);
-	
+                   nConv, restart_iter, block_size, iter / block_size);
+
         // Dump all Ritz values and residua
         for (int i = 0; i < nConv; i++) {
           printfQuda("RitzValue[%04d]: (%+.16e, %+.16e) residual %.16e\n", i, alpha[i], 0.0, residua[i]);
