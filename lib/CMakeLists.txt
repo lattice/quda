@@ -6,7 +6,7 @@ set (QUDA_OBJS
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
   coarse_op_preconditioned_mma.cu
-  eigensolve_quda.cpp quda_arpack_interface.cpp
+  vector_io.cpp eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp malloc.cpp

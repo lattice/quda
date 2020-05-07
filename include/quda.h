@@ -479,6 +479,11 @@ extern "C" {
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
 
+    /** Whether to inflate single-parity eigen-vector I/O to a full
+        field (e.g., enabling this is required for compatability with
+        MILC I/O) */
+    QudaBoolean io_parity_inflate;
+
     /** The Gflops rate of the eigensolver setup */
     double gflops;
 
