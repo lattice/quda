@@ -6,10 +6,9 @@
 #include <complex.h>
 
 #include <quda.h>
-#include <test_util.h>
-#include <dslash_util.h>
+#include <host_utils.h>
+#include <dslash_reference.h>
 #include <domain_wall_dslash_reference.h>
-#include <blas_reference.h>
 
 #include <gauge_field.h>
 #include <color_spinor_field.h>
@@ -284,7 +283,7 @@ void dslashReference_4d_sgpu(sFloat *res, gFloat **gaugeFull, sFloat *spinorFiel
     gaugeEven[dir] = gaugeFull[dir];
     // Note the use of Vh here, since the gauge fields
     // are 4-dim'l.
-    gaugeOdd[dir]  = gaugeFull[dir]+Vh*gaugeSiteSize;
+    gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
   }
   int sp_idx,gaugeOddBit;
   for (int xs=0;xs<Ls;xs++) {
@@ -330,19 +329,19 @@ template <QudaPCType type, typename sFloat, typename gFloat>
 void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGauge, sFloat *spinorField,
     sFloat **fwdSpinor, sFloat **backSpinor, int oddBit, int daggerBit)
 {
-  int mySpinorSiteSize = 24;		    
-  for (int i=0; i<V5h*mySpinorSiteSize; i++) res[i] = 0.0;
-  
+  // int my_spinor_site_size = 24;
+  for (int i = 0; i < V5h * spinor_site_size; i++) res[i] = 0.0;
+
   gFloat *gaugeEven[4], *gaugeOdd[4];
   gFloat *ghostGaugeEven[4], *ghostGaugeOdd[4];
   
   for (int dir = 0; dir < 4; dir++) 
   {  
     gaugeEven[dir] = gaugeFull[dir];
-    gaugeOdd[dir]  = gaugeFull[dir]+Vh*gaugeSiteSize;
+    gaugeOdd[dir] = gaugeFull[dir] + Vh * gauge_site_size;
 
     ghostGaugeEven[dir] = ghostGauge[dir];
-    ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir]/2)*gaugeSiteSize;
+    ghostGaugeOdd[dir] = ghostGauge[dir] + (faceVolume[dir] / 2) * gauge_site_size;
   }
   for (int xs=0;xs<Ls;xs++) 
   {  
@@ -356,17 +355,18 @@ void dslashReference_4d_mgpu(sFloat *res, gFloat **gaugeFull, gFloat **ghostGaug
 	
 	gFloat *gauge = gaugeLink_mgpu(i, dir, gaugeOddBit, gaugeEven, gaugeOdd, ghostGaugeEven, ghostGaugeOdd, 1, 1);//this is unchanged from MPi version
 	sFloat *spinor = spinorNeighbor_5d_mgpu<type>(sp_idx, dir, oddBit, spinorField, fwdSpinor, backSpinor, 1, 1);
-	
-	sFloat projectedSpinor[mySpinorSiteSize], gaugedSpinor[mySpinorSiteSize];
-	int projIdx = 2*(dir/2)+(dir+daggerBit)%2;
-	multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
-      
-	for (int s = 0; s < 4; s++) 
-	{
-	  if (dir % 2 == 0) su3Mul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	  else su3Tmul(&gaugedSpinor[s*(3*2)], gauge, &projectedSpinor[s*(3*2)]);
-	}
-	sum(&res[sp_idx*(4*3*2)], &res[sp_idx*(4*3*2)], gaugedSpinor, 4*3*2);
+
+        sFloat projectedSpinor[spinor_site_size], gaugedSpinor[spinor_site_size];
+        int projIdx = 2 * (dir / 2) + (dir + daggerBit) % 2;
+        multiplySpinorByDiracProjector5(projectedSpinor, projIdx, spinor);
+
+        for (int s = 0; s < 4; s++) {
+          if (dir % 2 == 0)
+            su3Mul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+          else
+            su3Tmul(&gaugedSpinor[s * (3 * 2)], gauge, &projectedSpinor[s * (3 * 2)]);
+        }
+        sum(&res[sp_idx * (4 * 3 * 2)], &res[sp_idx * (4 * 3 * 2)], gaugedSpinor, 4 * 3 * 2);
       }
     }
   }
@@ -847,8 +847,8 @@ void mdw_dslash_5(void *out, void **gauge, void *in, int oddBit, int daggerBit, 
     else dslashReference_5th<QUDA_4D_PC,false>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
   }
   for(int xs = 0 ; xs < Ls ; xs++) {
-    cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa[xs],
-        (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+    cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa[xs],
+          (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
   }
 }
 
@@ -860,8 +860,8 @@ void mdw_dslash_4_pre(void *out, void **gauge, void *in, int oddBit, int daggerB
     else dslashReference_5th<QUDA_4D_PC, false>((double*)out, (double*)in, oddBit, daggerBit, mferm);
     for(int xs = 0 ; xs < Ls ; xs++)
     {
-      axpby(b5[xs], (double _Complex *)in + Vh * spinorSiteSize / 2 * xs, 0.5 * c5[xs],
-          (double _Complex *)out + Vh * spinorSiteSize / 2 * xs, Vh * spinorSiteSize / 2);
+      axpby(b5[xs], (double _Complex *)in + Vh * spinor_site_size / 2 * xs, 0.5 * c5[xs],
+            (double _Complex *)out + Vh * spinor_site_size / 2 * xs, Vh * spinor_site_size / 2);
     }
   } else {
     if (zero_initialize)
@@ -869,9 +869,9 @@ void mdw_dslash_4_pre(void *out, void **gauge, void *in, int oddBit, int daggerB
     else dslashReference_5th<QUDA_4D_PC,false>((float*)out, (float*)in, oddBit, daggerBit, (float)mferm);
     for(int xs = 0 ; xs < Ls ; xs++)
     {
-      axpby((float _Complex)(b5[xs]), (float _Complex *)in + Vh * (spinorSiteSize / 2) * xs,
-          (float _Complex)(0.5 * c5[xs]), (float _Complex *)out + Vh * (spinorSiteSize / 2) * xs,
-          Vh * spinorSiteSize / 2);
+      axpby((float _Complex)(b5[xs]), (float _Complex *)in + Vh * (spinor_site_size / 2) * xs,
+            (float _Complex)(0.5 * c5[xs]), (float _Complex *)out + Vh * (spinor_site_size / 2) * xs,
+            Vh * spinor_site_size / 2);
     }
   }
   
@@ -880,23 +880,23 @@ void mdw_dslash_4_pre(void *out, void **gauge, void *in, int oddBit, int daggerB
 void dw_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) {
 
   void *inEven = in;
-  void *inOdd  = (char*)in + V5h*spinorSiteSize*precision;
+  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
-  void *outOdd = (char*)out + V5h*spinorSiteSize*precision;
+  void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
   dw_dslash(outOdd, gauge, inEven, 1, dagger_bit, precision, gauge_param, mferm);
   dw_dslash(outEven, gauge, inOdd, 0, dagger_bit, precision, gauge_param, mferm);
 
   // lastly apply the kappa term
-  xpay(in, -kappa, out, V5*spinorSiteSize, precision);
+  xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
 void dw_4d_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm) {
 
   void *inEven = in;
-  void *inOdd  = (char*)in + V5h*spinorSiteSize*precision;
+  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
-  void *outOdd = (char*)out + V5h*spinorSiteSize*precision;
+  void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
   dslash_4_4d(outOdd, gauge, inEven, 1, dagger_bit, precision, gauge_param, mferm);
   dw_dslash_5_4d(outOdd, gauge, inOdd, 1, dagger_bit, precision, gauge_param, mferm, false);
@@ -905,30 +905,30 @@ void dw_4d_mat(void *out, void **gauge, void *in, double kappa, int dagger_bit, 
   dw_dslash_5_4d(outEven, gauge, inEven, 0, dagger_bit, precision, gauge_param, mferm, false);
 
   // lastly apply the kappa term
-  xpay(in, -kappa, out, V5*spinorSiteSize, precision);
+  xpay(in, -kappa, out, V5 * spinor_site_size, precision);
 }
 
 void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c, int dagger,
     QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm, double _Complex *b5, double _Complex *c5)
 {
 
-  void *tmp = malloc(V5h*spinorSiteSize*precision);
+  void *tmp = malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
 
   for(int xs = 0; xs < Ls ; xs++) kappa5[xs] = 0.5*kappa_b[xs]/kappa_c[xs];
 
   void *inEven = in;
-  void *inOdd  = (char*)in + V5h*spinorSiteSize*precision;
+  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
   void *outEven = out;
-  void *outOdd = (char*)out + V5h*spinorSiteSize*precision;
+  void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
   mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
   dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
   mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
 
   for(int xs = 0 ; xs < Ls ; xs++) {
-    cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, -kappa_b[xs],
-        (char *)outOdd + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+    cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b[xs],
+          (char *)outOdd + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
   }
 
   mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
@@ -936,8 +936,8 @@ void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double
   mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
 
   for(int xs = 0 ; xs < Ls ; xs++) {
-    cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, -kappa_b[xs],
-        (char *)outEven + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+    cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b[xs],
+          (char *)outEven + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
   }
 
   free(kappa5);
@@ -948,7 +948,7 @@ void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double
 void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
 {
 
-  void *tmp = malloc(V5*spinorSiteSize*precision);  
+  void *tmp = malloc(V5 * spinor_site_size * precision);
   dw_mat(tmp, gauge, in, kappa, dagger_bit, precision, gauge_param, mferm);
   dagger_bit = (dagger_bit == 1) ? 0 : 1;
   dw_mat(out, gauge, tmp, kappa, dagger_bit, precision, gauge_param, mferm);
@@ -958,8 +958,8 @@ void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bi
 
 void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType matpc_type, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
 {
-  void *tmp = malloc(V5h*spinorSiteSize*precision);  
-  
+  void *tmp = malloc(V5h * spinor_site_size * precision);
+
   if (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_EVEN_EVEN_ASYMMETRIC) {
     dw_dslash(tmp, gauge, in, 1, dagger_bit, precision, gauge_param, mferm);
     dw_dslash(out, gauge, tmp, 0, dagger_bit, precision, gauge_param, mferm);
@@ -970,7 +970,7 @@ void dw_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType mat
 
   // lastly apply the kappa term
   double kappa2 = -kappa*kappa;
-  xpay(in, kappa2, out, V5h*spinorSiteSize, precision);
+  xpay(in, kappa2, out, V5h * spinor_site_size, precision);
 
   free(tmp);
 }
@@ -982,11 +982,10 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
   double *kappa5 = (double*)malloc(Ls*sizeof(double));
   for(int xs = 0; xs < Ls ; xs++)
     kappa5[xs] = kappa;
-  void *tmp = malloc(V5h*spinorSiteSize*precision);
+  void *tmp = malloc(V5h * spinor_site_size * precision);
   //------------------------------------------
   double *output = (double*)out;
-  for(int k = 0 ; k< V5h*spinorSiteSize; k++)
-    output[k] = 0.0;
+  for (int k = 0; k < V5h * spinor_site_size; k++) output[k] = 0.0;
   //------------------------------------------
 
   int odd_bit = (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
@@ -998,20 +997,20 @@ void dw_4d_matpc(void *out, void **gauge, void *in, double kappa, QudaMatPCType 
     dslash_5_inv(out, gauge, tmp, parity[0], dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger_bit, precision, gauge_param, mferm);
     dslash_5_inv(out, gauge, tmp, parity[1], dagger_bit, precision, gauge_param, mferm, kappa5);
-    xpay(in, kappa2, out, V5h*spinorSiteSize, precision);
+    xpay(in, kappa2, out, V5h * spinor_site_size, precision);
   } else if (symmetric && dagger_bit) {
     dslash_5_inv(tmp, gauge, in, parity[1], dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(out, gauge, tmp, parity[0], dagger_bit, precision, gauge_param, mferm);
     dslash_5_inv(tmp, gauge, out, parity[0], dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(out, gauge, tmp, parity[1], dagger_bit, precision, gauge_param, mferm);
-    xpay(in, kappa2, out, V5h*spinorSiteSize, precision);
+    xpay(in, kappa2, out, V5h * spinor_site_size, precision);
   } else {
     dslash_4_4d(tmp, gauge, in, parity[0], dagger_bit, precision, gauge_param, mferm);
     dslash_5_inv(out, gauge, tmp, parity[0], dagger_bit, precision, gauge_param, mferm, kappa5);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger_bit, precision, gauge_param, mferm);
-    xpay(in, kappa2, tmp, V5h*spinorSiteSize, precision);
+    xpay(in, kappa2, tmp, V5h * spinor_site_size, precision);
     dw_dslash_5_4d(out, gauge, in, parity[1], dagger_bit, precision, gauge_param, mferm, true);
-    xpay(tmp, -kappa, out, V5h*spinorSiteSize, precision);
+    xpay(tmp, -kappa, out, V5h * spinor_site_size, precision);
   }
   free(tmp);
   free(kappa5);
@@ -1021,7 +1020,7 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
     QudaMatPCType matpc_type, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
     double _Complex *b5, double _Complex *c5)
 {
-  void *tmp = malloc(V5h*spinorSiteSize*precision);
+  void *tmp = malloc(V5h * spinor_site_size * precision);
   double _Complex *kappa5 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
   double _Complex *kappa2 = (double _Complex *)malloc(Ls * sizeof(double _Complex));
   double _Complex *kappa_mdwf = (double _Complex *)malloc(Ls * sizeof(double _Complex));
@@ -1044,8 +1043,8 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa2[xs],
-          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+      cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
     }
   } else if (symmetric && dagger) {
     mdw_dslash_5_inv(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
@@ -1055,8 +1054,8 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      cxpay((char *)in + precision * Vh * spinorSiteSize * xs, kappa2[xs],
-          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+      cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
     }
   } else if (!symmetric && !dagger) {
     mdw_dslash_4_pre(out, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
@@ -1066,8 +1065,8 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
     dslash_4_4d(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, kappa2[xs],
-          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+      cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
     }
   } else if (!symmetric && dagger) {
     dslash_4_4d(out, gauge, in, parity[0], dagger, precision, gauge_param, mferm);
@@ -1077,8 +1076,8 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
     mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for(int xs = 0 ; xs < Ls ; xs++) {
-      cxpay((char *)tmp + precision * Vh * spinorSiteSize * xs, kappa2[xs],
-          (char *)out + precision * Vh * spinorSiteSize * xs, Vh * spinorSiteSize, precision);
+      cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
     }
   } else {
     errorQuda("Unsupported matpc_type=%d dagger=%d", matpc_type, dagger);
@@ -1156,12 +1155,12 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 
   static_assert(sizeof(char) == 1, "This code assumes sizeof(char) == 1.");
 
-  char *padded_in = (char *)malloc(padded_V5h * spinorSiteSize * precision);
-  memset(padded_in, 0, padded_V5h * spinorSiteSize * precision);
-  char *padded_out = (char *)malloc(padded_V5h * spinorSiteSize * precision);
-  memset(padded_out, 0, padded_V5h * spinorSiteSize * precision);
-  char *padded_tmp = (char *)malloc(padded_V5h * spinorSiteSize * precision);
-  memset(padded_tmp, 0, padded_V5h * spinorSiteSize * precision);
+  char *padded_in = (char *)malloc(padded_V5h * spinor_site_size * precision);
+  memset(padded_in, 0, padded_V5h * spinor_site_size * precision);
+  char *padded_out = (char *)malloc(padded_V5h * spinor_site_size * precision);
+  memset(padded_out, 0, padded_V5h * spinor_site_size * precision);
+  char *padded_tmp = (char *)malloc(padded_V5h * spinor_site_size * precision);
+  memset(padded_tmp, 0, padded_V5h * spinor_site_size * precision);
 
   char *in_alias = (char *)in;
   char *out_alias = (char *)out;
@@ -1173,8 +1172,8 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
       coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
       int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
       // copy data
-      memcpy(&padded_in[spinorSiteSize * precision * (s * padded_Vh + padded_index_cb_4d)],
-             &in_alias[spinorSiteSize * precision * (s * Vh + index_cb_4d)], spinorSiteSize * precision);
+      memcpy(&padded_in[spinor_site_size * precision * (s * padded_Vh + padded_index_cb_4d)],
+             &in_alias[spinor_site_size * precision * (s * Vh + index_cb_4d)], spinor_site_size * precision);
     }
   }
 
@@ -1216,8 +1215,8 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
       coordinate_from_shrinked_index(x, index_cb_4d, Z, R, 0); // parity = 0
       int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
       // copy data
-      memcpy(&out_alias[spinorSiteSize * precision * (s * Vh + index_cb_4d)],
-             &padded_out[spinorSiteSize * precision * (s * padded_Vh + padded_index_cb_4d)], spinorSiteSize * precision);
+      memcpy(&out_alias[spinor_site_size * precision * (s * Vh + index_cb_4d)],
+             &padded_out[spinor_site_size * precision * (s * padded_Vh + padded_index_cb_4d)], spinor_site_size * precision);
     }
   }
 
@@ -1232,10 +1231,10 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>
 void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
-	   QudaMatPCType matpc_type, sFloat mferm) {
-  
-  sFloat *tmp = (sFloat*)malloc(V5h*spinorSiteSize*sizeof(sFloat));
-    
+           QudaMatPCType matpc_type, sFloat mferm) {
+
+  sFloat *tmp = (sFloat*)malloc(V5h*spinor_site_size*sizeof(sFloat));
+
   // full dslash operator
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
     dslashReference_4d(tmp, gauge, inEven, 1, 0);
@@ -1247,21 +1246,21 @@ void MatPC(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
     dslashReference_5th(tmp, inEven, 0, 0, mferm);
     dslashReference_4d(outEven, gauge, tmp, 1, 0);
     dslashReference_5th(outEven, tmp, 1, 0, mferm);
-  }    
-  
+  }
+
   // lastly apply the kappa term
   sFloat kappa2 = -kappa*kappa;
-  xpay(inEven, kappa2, outEven, V5h*spinorSiteSize);
+  xpay(inEven, kappa2, outEven, V5h*spinor_site_size);
   free(tmp);
 }
 
 // Apply the even-odd preconditioned Dirac operator
 template <typename sFloat, typename gFloat>
-void MatPCDag(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa, 
-	      QudaMatPCType matpc_type, sFloat mferm) {
-  
-  sFloat *tmp = (sFloat*)malloc(V5h*spinorSiteSize*sizeof(sFloat));    
-  
+void MatPCDag(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
+              QudaMatPCType matpc_type, sFloat mferm) {
+
+  sFloat *tmp = (sFloat*)malloc(V5h*spinor_site_size*sizeof(sFloat));
+
   // full dslash operator
   if (matpc_type == QUDA_MATPC_EVEN_EVEN) {
     dslashReference_4d(tmp, gauge, inEven, 1, 1);
@@ -1274,9 +1273,9 @@ void MatPCDag(sFloat *outEven, gFloat **gauge, sFloat *inEven, sFloat kappa,
     dslashReference_4d(outEven, gauge, tmp, 1, 1);
     dslashReference_5th(outEven, tmp, 1, 1, mferm);
   }
-  
+
   sFloat kappa2 = -kappa*kappa;
-  xpay(inEven, kappa2, outEven, V5h*spinorSiteSize);
+  xpay(inEven, kappa2, outEven, V5h*spinor_site_size);
   free(tmp);
 }
 */
@@ -1312,24 +1311,24 @@ void matpc(void *outEven, void **gauge, void *inEven, double kappa,
 }
 
 /*
-template <typename sFloat, typename gFloat> 
-void MatDagMat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, sFloat mferm) 
+template <typename sFloat, typename gFloat>
+void MatDagMat(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, sFloat mferm)
 {
-  // Allocate a full spinor.        
-  sFloat *tmp = (sFloat*)malloc(V5*spinorSiteSize*sizeof(sFloat));
+  // Allocate a full spinor.
+  sFloat *tmp = (sFloat*)malloc(V5*spinor_site_size*sizeof(sFloat));
   // Call templates above.
   Mat(tmp, gauge, in, kappa, mferm);
   MatDag(out, gauge, tmp, kappa, mferm);
   free(tmp);
 }
 
-template <typename sFloat, typename gFloat> 
-void MatPCDagMatPC(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa, 
-		   QudaMatPCType matpc_type, sFloat mferm)
+template <typename sFloat, typename gFloat>
+void MatPCDagMatPC(sFloat *out, gFloat **gauge, sFloat *in, sFloat kappa,
+                   QudaMatPCType matpc_type, sFloat mferm)
 {
-  
+
   // Allocate half spinor
-  sFloat *tmp = (sFloat*)malloc(V5h*spinorSiteSize*sizeof(sFloat));
+  sFloat *tmp = (sFloat*)malloc(V5h*spinor_site_size*sizeof(sFloat));
   // Apply the PC templates above
   MatPC(tmp, gauge, in, kappa, matpc_type, mferm);
   MatPCDag(out, gauge, tmp, kappa, matpc_type, mferm);

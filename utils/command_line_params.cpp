@@ -1,4 +1,4 @@
-#include "test_params.h"
+#include "command_line_params.h"
 #include <comm_quda.h>
 
 // parameters parsed from the command line
@@ -33,7 +33,7 @@ int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
-QudaDagType dagger = QUDA_DAG_NO;
+bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
@@ -56,8 +56,9 @@ quda::mgarray<char[256]> mg_vec_infile;
 quda::mgarray<char[256]> mg_vec_outfile;
 QudaInverterType inv_type;
 bool inv_deflate = false;
+bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
-int multishift = 0;
+int multishift = 1;
 bool verify_results = true;
 bool low_mode_check = false;
 bool oblique_proj_check = false;
@@ -71,6 +72,7 @@ double c5 = 0.5;
 double anisotropy = 1.0;
 double tadpole_factor = 1.0;
 double eps_naik = 0.0;
+int n_naiks = 1;
 double clover_coeff = 0.1;
 bool compute_clover = false;
 bool compute_fatlong = false;
@@ -84,6 +86,7 @@ QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
+QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
@@ -195,7 +198,6 @@ int heatbath_num_heatbath_per_step = 5;
 int heatbath_num_overrelax_per_step = 5;
 bool heatbath_coldstart = false;
 
-double mobius_scale = 0.0;
 int eofa_pm = 1;
 double eofa_shift = -1.2345;
 double eofa_mq1 = 1.0;
@@ -275,6 +277,9 @@ namespace
                                                            {"mat-pc", QUDA_MATPC_SOLUTION},
                                                            {"mat-pc-dag", QUDA_MATPC_DAG_SOLUTION},
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
+
+  CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
+                                                             {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
 
   CLI::TransformPairs<QudaEigType> eig_type_map {
     {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
@@ -382,6 +387,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--inv-type", inv_type, "The type of solver to use (default cg)")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
   quda_app->add_option("--inv-deflate", inv_deflate, "Deflate the inverter using the eigensolver");
+  quda_app->add_option("--inv-multigrid", inv_multigrid, "Precondition the inverter using multigrid");
   quda_app->add_option("--kappa", kappa, "Kappa of Dirac operator (default 0.12195122... [equiv to mass])");
   quda_app->add_option(
     "--laplace3D", laplace3D,
@@ -402,7 +408,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
   quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
-  quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
+  quda_app->add_option(
+    "--multishift", multishift,
+    "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
+    "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
@@ -458,6 +467,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "--solution-type", solution_type,
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
+
+  quda_app
+    ->add_option("--fermion-t-boundary", fermion_t_boundary,
+                 "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
+    ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
 
   quda_app
     ->add_option("--solve-type", solve_type,
@@ -787,9 +801,6 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
-
-  opgroup->add_option("--mobius-scale", mobius_scale,
-                      "Set the Mobius scale (must be equal or larger than 1.0, default 0.0)");
 
   opgroup->add_option("--eofa-pm", eofa_pm,
                       "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");

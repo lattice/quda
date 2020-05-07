@@ -226,7 +226,7 @@ namespace quda {
     // normally used to create cuda param from a cpu param
     ColorSpinorParam(ColorSpinorParam &cpuParam, QudaInvertParam &inv_param,
                      QudaFieldLocation location = QUDA_CUDA_FIELD_LOCATION) :
-      LatticeFieldParam(cpuParam.nDim, cpuParam.x, inv_param.sp_pad, inv_param.cuda_prec),
+      LatticeFieldParam(cpuParam.nDim, cpuParam.x, 0, inv_param.cuda_prec),
       location(location),
       nColor(cpuParam.nColor),
       nSpin(cpuParam.nSpin),

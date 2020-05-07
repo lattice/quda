@@ -1,6 +1,4 @@
-#include <stdio.h>
-#include <cuda_runtime.h>
-#include <cuda.h>
+#include <cstdio>
 
 #include <quda_internal.h>
 #include <gauge_field.h>
