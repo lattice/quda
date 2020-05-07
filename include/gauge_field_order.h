@@ -263,19 +263,16 @@ namespace quda {
           }
         }
 
-        __device__ __host__ inline auto data() {
-          return &v[idx];
-        }
+        __device__ __host__ inline auto data() { return &v[idx]; }
 
-        template <int N, int col_tile_dim>
-        __device__ __host__ inline auto load_tile(int row, int col) const
+        template <int N, int col_tile_dim> __device__ __host__ inline auto load_tile(int row, int col) const
         {
           constexpr int vector_length = col_tile_dim * 2;
           static_assert(col_tile_dim == 2, "Currently col_tile_dim can only be equal to 2.");
           using vector_type = typename VectorType<Float, vector_length>::type;
           using store_vector_type = typename VectorType<storeFloat, vector_length>::type;
           store_vector_type tmp_store_v = reinterpret_cast<store_vector_type *>(&v[idx + row * N + col]);
-	        if (vector_length == 4) {
+          if (vector_length == 4) {
             if (fixed) {
               vector_type tmp_v;
               tmp_v.x = scale_inv * static_cast<Float>(tmp_store_v.x);
@@ -289,8 +286,7 @@ namespace quda {
           }
         }
 
-        template <int N>
-        __device__ __host__ inline auto load(int row, int col) const
+        template <int N> __device__ __host__ inline auto load(int row, int col) const
         {
           auto tmp_store = v[idx + row * N + col];
           if (fixed) {
@@ -300,7 +296,7 @@ namespace quda {
           }
         }
 
-	/**
+        /**
 	   @brief negation operator
            @return negation of this complex number
 	*/
@@ -590,7 +586,8 @@ namespace quda {
 
       __device__ __host__ inline const auto operator()(int d, int parity, int x) const
       {
-        return fieldorder_wrapper<Float, storeFloat>(u, ((parity * volumeCB + x) * geometry + d) * nColor * nColor, scale, scale_inv);
+        return fieldorder_wrapper<Float, storeFloat>(u, ((parity * volumeCB + x) * geometry + d) * nColor * nColor,
+                                                     scale, scale_inv);
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
@@ -689,7 +686,8 @@ namespace quda {
 
       __device__ __host__ inline const auto operator()(int d, int parity, int x) const
       {
-        return fieldorder_wrapper<Float, storeFloat>(ghost[d], parity * ghostOffset[d] + x * nColor * nColor, scale, scale_inv);
+        return fieldorder_wrapper<Float, storeFloat>(ghost[d], parity * ghostOffset[d] + x * nColor * nColor, scale,
+                                                     scale_inv);
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
@@ -951,13 +949,14 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-  __device__ __host__ complex<Float> operator()(int d, int parity, int x, int row, int col) const
-  { return accessor(d,parity,x,row,col); }
+        __device__ __host__ complex<Float> operator()(int d, int parity, int x, int row, int col) const
+        {
+          return accessor(d, parity, x, row, col);
+        }
 
-  __device__ __host__ const auto operator()(int d, int parity, int x) const
-  { return accessor(d, parity, x); }
+        __device__ __host__ const auto operator()(int d, int parity, int x) const { return accessor(d, parity, x); }
 
-	/**
+        /**
 	 * Writable complex-member accessor function
 	 * @param d dimension index
 	 * @param parity Parity index
@@ -965,8 +964,9 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ fieldorder_wrapper<Float,storeFloat> operator() (int d, int parity, int x, int row = 0, int col = 0)
-	{ return accessor(d,parity,x,row,col); }
+        __device__ __host__ fieldorder_wrapper<Float, storeFloat> operator()(int d, int parity, int x, int row = 0,
+                                                                             int col = 0)
+        { return accessor(d,parity,x,row,col); }
 
 	/**
 	 * Read-only complex-member accessor function for the ghost zone
@@ -977,12 +977,13 @@ namespace quda {
 	 * @param c column index
 	 */
 	__device__ __host__ complex<Float> Ghost(int d, int parity, int x, int row, int col) const
-  { return ghostAccessor(d,parity,x,row,col); }
+        {
+          return ghostAccessor(d, parity, x, row, col);
+        }
 
-  __device__ __host__ auto Ghost(int d, int parity, int x) const
-  { return ghostAccessor(d, parity, x); }
+        __device__ __host__ auto Ghost(int d, int parity, int x) const { return ghostAccessor(d, parity, x); }
 
-	/**
+        /**
 	 * Writable complex-member accessor function for the ghost zone
 	 * @param d dimension index
 	 * @param parity Parity index
@@ -990,8 +991,8 @@ namespace quda {
 	 * @param row row index
 	 * @param c column index
 	 */
-	__device__ __host__ fieldorder_wrapper<Float,storeFloat> Ghost(int d, int parity, int x, int row = 0, int col = 0)
-	{ return ghostAccessor(d,parity,x,row,col); }
+        __device__ __host__ fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int row = 0, int col = 0)
+        { return ghostAccessor(d,parity,x,row,col); }
 
     	/**
 	 * Specialized read-only complex-member accessor function (for coarse gauge field)

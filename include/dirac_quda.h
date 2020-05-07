@@ -52,7 +52,7 @@ namespace quda {
     Transfer *transfer; 
     Dirac *dirac;
     bool need_bidirectional; // whether or not we need to force a bi-directional build
-    bool use_mma; // whether to use tensor cores where applicable
+    bool use_mma;            // whether to use tensor cores where applicable
 
     // Default constructor
     DiracParam() :
@@ -1129,7 +1129,7 @@ public:
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
     const bool need_bidirectional; /** Whether or not to force a bi-directional build */
-    const bool use_mma; /** Whether to use tensor cores or not */
+    const bool use_mma;            /** Whether to use tensor cores or not */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
     mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
