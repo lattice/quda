@@ -66,13 +66,13 @@ namespace quda
     // orthonormalise
     prepareInitialGuess(kSpace);
 
-    // Check for Chebyshev maximum estimation
-    checkChebyOpMax(mat, kSpace);
-    
     // Increase the size of kSpace passed to the function, will be trimmed to
     // original size before exit.
     prepareKrylovSpace(kSpace, evals);
 
+    // Check for Chebyshev maximum estimation
+    checkChebyOpMax(mat, kSpace);
+    
     // Convergence and locking criteria
     double mat_norm = 0.0;
     double epsilon = setEpsilon(kSpace[0]->Precision());
