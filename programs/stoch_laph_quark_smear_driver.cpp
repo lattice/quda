@@ -21,6 +21,7 @@ using namespace quda;
 
 int main(int argc, char **argv)
 {
+#if 0
   // Set up QUDA
   //----------------------------------------------------------------------------------
   setQudaDefaultMgTestParams();
@@ -200,6 +201,7 @@ int main(int argc, char **argv)
   
   // All the information needed to compute the smeared quarks is now passed to QUDA
   // This function will populate the host_sinks array with the desired data.
+
   stochLaphSmearQuda(host_quarks, host_evecs, host_noise, host_sinks,
 		     dil_scheme, n_evecs, inv_param, X);
   //----------------------------------------------------------------------------------  
@@ -231,6 +233,6 @@ int main(int argc, char **argv)
   // finalize the QUDA library
   endQuda();
   finalizeComms();
-  
+#endif
   return 0;
 }
