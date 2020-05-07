@@ -265,36 +265,7 @@ namespace quda {
 
         __device__ __host__ inline auto data() { return &v[idx]; }
 
-        template <int N, int col_tile_dim> __device__ __host__ inline auto load_tile(int row, int col) const
-        {
-          constexpr int vector_length = col_tile_dim * 2;
-          static_assert(col_tile_dim == 2, "Currently col_tile_dim can only be equal to 2.");
-          using vector_type = typename VectorType<Float, vector_length>::type;
-          using store_vector_type = typename VectorType<storeFloat, vector_length>::type;
-          store_vector_type tmp_store_v = reinterpret_cast<store_vector_type *>(&v[idx + row * N + col]);
-          if (vector_length == 4) {
-            if (fixed) {
-              vector_type tmp_v;
-              tmp_v.x = scale_inv * static_cast<Float>(tmp_store_v.x);
-              tmp_v.y = scale_inv * static_cast<Float>(tmp_store_v.y);
-              tmp_v.z = scale_inv * static_cast<Float>(tmp_store_v.z);
-              tmp_v.w = scale_inv * static_cast<Float>(tmp_store_v.w);
-              return tmp_v;
-            } else {
-              return tmp_store_v;
-            }
-          }
-        }
-
-        template <int N> __device__ __host__ inline auto load(int row, int col) const
-        {
-          auto tmp_store = v[idx + row * N + col];
-          if (fixed) {
-            return scale_inv * static_cast<complex<Float>>(tmp_store);
-          } else {
-            return tmp_store;
-          }
-        }
+        __device__ __host__ inline const auto data() const { return &v[idx]; }
 
         /**
 	   @brief negation operator

@@ -86,23 +86,30 @@ namespace quda
           for (int row = 0; row < m_dim; row++) {
             const int col_idx = col * col_stride + y + n_offset;
             const int row_idx = row * row_stride_pack + z + m_offset;
+            if (transpose == dagger) {
+              auto x = p[(row_idx + 0) * matrix_n + col_idx];
+              auto y = p[(row_idx + 1) * matrix_n + col_idx];
 
-            auto x = transpose == dagger ? p[(row_idx + 0) * matrix_n + col_idx] : p[col_idx * matrix_n + row_idx + 0];
-            auto y = transpose == dagger ? p[(row_idx + 1) * matrix_n + col_idx] : p[col_idx * matrix_n + row_idx + 1];
-
-            if (fixed) {
-              reg_real[row * n_dim + col] = __floats2half2_rn(+scale_inv * x.real(), +scale_inv * y.real());
-              if (!dagger) {
-                reg_imag[row * n_dim + col] = __floats2half2_rn(+scale_inv * x.imag(), +scale_inv * y.imag());
+              if (fixed) {
+                reg_real[row * n_dim + col] = __floats2half2_rn(scale_inv * x.real(), scale_inv * y.real());
+                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                reg_imag[row * n_dim + col] = __floats2half2_rn(scale_inv_conj * x.imag(), scale_inv_conj * y.imag());
               } else {
-                reg_imag[row * n_dim + col] = __floats2half2_rn(-scale_inv * x.imag(), -scale_inv * y.imag());
+                reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
+                reg_imag[row * n_dim + col] = __floats2half2_rn(dagger ? -x.imag() : +x.imag(), dagger ? -y.imag(): +y.imag());
               }
             } else {
-              reg_real[row * n_dim + col] = __floats2half2_rn(+x.real(), +y.real());
-              if (!dagger) {
-                reg_imag[row * n_dim + col] = __floats2half2_rn(+x.imag(), +y.imag());
+              using store_type = complex<short>::value_type;
+              using store_vector_type = VectorType<store_type, 4>::type;
+              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[col_idx * matrix_n + row_idx]);
+
+              if (fixed) {
+                reg_real[row * n_dim + col] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
+                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                reg_imag[row * n_dim + col] = __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w);
               } else {
-                reg_imag[row * n_dim + col] = __floats2half2_rn(-x.imag(), -y.imag());
+                reg_real[row * n_dim + col] = __floats2half2_rn(+v.x, +v.z);
+                reg_imag[row * n_dim + col] = __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w: +v.w);
               }
             }
           }
