@@ -157,7 +157,6 @@ void printQudaEigParam(QudaEigParam *param) {
   P(compute_svd, QUDA_BOOLEAN_FALSE);
   P(require_convergence, QUDA_BOOLEAN_TRUE);
   P(spectrum, QUDA_SPECTRUM_LR_EIG);
-  P(block_size, 0);
   P(nEv, 0);
   P(nKr, 0);
   P(nConv, 0);
@@ -182,7 +181,6 @@ void printQudaEigParam(QudaEigParam *param) {
   P(use_norm_op, QUDA_BOOLEAN_INVALID);
   P(compute_svd, QUDA_BOOLEAN_INVALID);
   P(require_convergence, QUDA_BOOLEAN_INVALID);
-  P(block_size, INVALID_INT);
   P(nEv, INVALID_INT);
   P(nKr, INVALID_INT);
   P(nConv, INVALID_INT);
@@ -193,12 +191,16 @@ void printQudaEigParam(QudaEigParam *param) {
   P(arpack_check, QUDA_BOOLEAN_INVALID);
   P(nk, INVALID_INT);
   P(np, INVALID_INT);
-  P(check_interval, INVALID_INT);
-  P(max_restarts, INVALID_INT);
   P(eig_type, QUDA_EIG_INVALID);
   P(extlib_type, QUDA_EXTLIB_INVALID);
   P(mem_type_ritz, QUDA_MEMORY_INVALID);
 #endif
+
+  // only need to enfore block size checking if doing a block eigen solve
+#ifdef CHECK__PARAM
+  if (param->eig_type == QUDA_EIG_BLK_TR_LANCZOS)
+#endif
+    P(block_size, INVALID_INT);
 
 #if defined INIT_PARAM
   P(location, QUDA_CUDA_FIELD_LOCATION);
