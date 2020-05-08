@@ -18,11 +18,15 @@ namespace quda
       default: return 0;
       }
     };
+
+    constexpr int sm_n_pad_size()
+    {
 #ifdef USE_MMA_SYNC
-    constexpr int sm_n_pad_size = 10;
+      return 10;
 #else
-    constexpr int sm_n_pad_size = 16;
+      return 16;
 #endif
+    }
 
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 
@@ -292,7 +296,7 @@ namespace quda
       constexpr int M = 4 * Ls;
       constexpr int N = 6 * block_dim_x;
 
-      constexpr int N_sm = N + sm_n_pad_size;
+      constexpr int N_sm = N + sm_n_pad_size();
       constexpr int M_sm = M + sm_m_pad_size(Ls);
 
       float *smem_scale = shared_memory_data;
@@ -552,7 +556,7 @@ namespace quda
       unsigned int sharedBytesPerBlock(const TuneParam &param) const
       {
         const int a_size = (param.block.y * 4) * (param.block.y * 4 + sm_m_pad_size(arg.Ls));
-        const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size);
+        const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size());
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
           if (arg.type == 1) {
@@ -740,6 +744,9 @@ namespace quda
                             bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
     {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
+#ifdef FLOAT8
+      if (checkOrder(out, in, y, x) != QUDA_FLOAT8_FIELD_ORDER) errorQuda("FLOAT8 enabled but fields are not FLOAT8 ordered");
+#endif
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);
