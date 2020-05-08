@@ -214,7 +214,6 @@ namespace quda {
       writeAuxString("prec=%lu,stride=%d,extract=%d,dimension=%d,geometry=%d",
 		     sizeof(Float),arg.order.stride, extract, dim, arg.order.geometry);
     }
-    virtual ~ExtractGhostEx() { ; }
   
     void apply(const cudaStream_t &stream) {
       if (extract) {
@@ -435,11 +434,7 @@ namespace quda {
 				 void **ghost, bool extract) {
 
     if (u.Precision() == QUDA_DOUBLE_PRECISION) {
-#if QUDA_PRECISION & 8
       extractGhostEx(u, dim, R, (double**)ghost, extract);
-#else
-      errorQuda("QUDA_PRECISION=%d does not enable double precision", QUDA_PRECISION);
-#endif
     } else if (u.Precision() == QUDA_SINGLE_PRECISION) {
 #if QUDA_PRECISION & 4
       extractGhostEx(u, dim, R, (float**)ghost, extract);
