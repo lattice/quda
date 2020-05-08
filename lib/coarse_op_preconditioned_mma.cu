@@ -145,27 +145,28 @@ namespace quda
             }
           } else if (arg.M == 128) {
             switch (tp.aux.x) {
-#if 0
-            case  0: launch_kernel<128, 128, 32, 16, 16>(tp, stream); break;
-            case  1: launch_kernel<128, 128, 32, 16, 16>(tp, stream); break;
-            case  2: launch_kernel<128, 128, 32, 16,  8>(tp, stream); break;
-            case  3: launch_kernel<128, 128, 32, 32,  8>(tp, stream); break;
-            case  4: launch_kernel<128, 128, 32, 32,  4>(tp, stream); break;
-
-            case  5: launch_kernel<128, 128, 16, 16, 32>(tp, stream); break;
-            case  6: launch_kernel<128, 128, 16, 16, 16>(tp, stream); break;
-            case  7: launch_kernel<128, 128, 16, 16,  8>(tp, stream); break;
-            case  8: launch_kernel<128, 128, 16, 16,  4>(tp, stream); break;
-
-            case  9: launch_kernel<128, 128, 16,  8, 32>(tp, stream); break;
-            case 10: launch_kernel<128, 128, 16,  8, 16>(tp, stream); break;
-            case 11: launch_kernel<128, 128, 16,  8,  8>(tp, stream); break;
-            case 12: launch_kernel<128, 128, 16,  8,  4>(tp, stream); break;
-
-            case 13: launch_kernel<128, 128, 16,  4, 32>(tp, stream); break;
-            case 14: launch_kernel<128, 128, 16,  4, 16>(tp, stream); break;
-            case 15: launch_kernel<128, 128, 16,  4,  8>(tp, stream); break;
-#endif
+            case   0: launch_kernel<128,  64,  64,  16,  16,  32>(tp, stream); break;
+            case   1: launch_kernel<128,  64,  64,  32,  32,  16>(tp, stream); break;
+            case   2: launch_kernel<128,  64,  64,  32,  16,  32>(tp, stream); break;
+            case   3: launch_kernel<128,  64,  64,  64,  64,   8>(tp, stream); break;
+            case   4: launch_kernel<128,  64,  64,  64,  32,  16>(tp, stream); break;
+            case   5: launch_kernel<128,  64,  64,  64,  16,  32>(tp, stream); break;
+            case   6: launch_kernel<128, 128, 128,   8,   8,  64>(tp, stream); break;
+            case   7: launch_kernel<128, 128, 128,  16,   8,  64>(tp, stream); break;
+            case   8: launch_kernel<128, 128, 128,  16,  16,  32>(tp, stream); break;
+            case   9: launch_kernel<128, 128, 128,  16,  16,  64>(tp, stream); break;
+            case  10: launch_kernel<128, 128, 128,  32,  32,  16>(tp, stream); break;
+            case  11: launch_kernel<128, 128, 128,  32,   8,  64>(tp, stream); break;
+            case  12: launch_kernel<128, 128, 128,  32,  16,  32>(tp, stream); break;
+            case  13: launch_kernel<128, 128, 128,  32,  32,  32>(tp, stream); break;
+            case  14: launch_kernel<128, 128, 128,  32,  16,  64>(tp, stream); break;
+            case  15: launch_kernel<128, 128, 128,  64,  64,   8>(tp, stream); break;
+            case  16: launch_kernel<128, 128, 128,  64,  32,  16>(tp, stream); break;
+            case  17: launch_kernel<128, 128, 128,  64,   8,  64>(tp, stream); break;
+            case  18: launch_kernel<128, 128, 128,  64,  16,  32>(tp, stream); break;
+            case  19: launch_kernel<128, 128, 128,  64,  64,  16>(tp, stream); break;
+            case  20: launch_kernel<128, 128, 128,  64,  32,  32>(tp, stream); break;
+            case  21: launch_kernel<128, 128, 128,  64,  16,  64>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
             }
           } else if (arg.M == 192) {
@@ -221,7 +222,7 @@ namespace quda
         switch (arg.M) {
         case 48: max_aux = 5; break;
         case 64: max_aux = 15; break;
-        // case 128: max_aux = 15; break;
+        case 128: max_aux = 21; break;
         case 192: max_aux = 17; break;
         default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
         }
@@ -409,7 +410,7 @@ namespace quda
       case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
 #ifdef NSPIN1
-      // case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
+      case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
       case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN1
       default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
