@@ -1216,7 +1216,8 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
       int padded_index_cb_4d = index_4d_cb_from_coordinate_4d(x, W);
       // copy data
       memcpy(&out_alias[spinor_site_size * precision * (s * Vh + index_cb_4d)],
-             &padded_out[spinor_site_size * precision * (s * padded_Vh + padded_index_cb_4d)], spinor_site_size * precision);
+             &padded_out[spinor_site_size * precision * (s * padded_Vh + padded_index_cb_4d)],
+             spinor_site_size * precision);
     }
   }
 
