@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mma.h>
+#include <type_traits>
 
 // #define USE_FP16_HMMA_ACCUMULATE
 
@@ -155,38 +156,42 @@ namespace quda
       }
     };
 
-    template <class TA, class TB, class TC> __device__ inline void gemm(const TA &op_a, const TB &op_b, TC &op_c)
+    template <class TA, class TB, class TC>
+    __device__ inline typename std::enable_if<sizeof(TC) == 16, void>::type gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
-#ifdef USE_FP16_HMMA_ACCUMULATE
       asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
                    : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
                    : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
-#else
+    }
+
+    template <class TA, class TB, class TC>
+    __device__ inline typename std::enable_if<sizeof(TC) == 32, void>::type gemm(const TA &op_a, const TB &op_b, TC &op_c)
+    {
       asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
                    "{%0,%1,%2,%3,%4,%5,%6,%7};"
                    : "+f"(op_c.reg[0]), "+f"(op_c.reg[1]), "+f"(op_c.reg[2]), "+f"(op_c.reg[3]), "+f"(op_c.reg[4]),
                      "+f"(op_c.reg[5]), "+f"(op_c.reg[6]), "+f"(op_c.reg[7])
                    : "r"(op_a.reg[0]), "r"(op_a.reg[1]), "r"(op_b.reg[0]), "r"(op_b.reg[1]));
-#endif
     }
 
     template <typename real, int length> struct Structure {
       real v[length];
-      __host__ __device__ inline const real &operator[](int i) const { return v[i]; }
-      __host__ __device__ inline real &operator[](int i) { return v[i]; }
+      __device__ inline const real &operator[](int i) const { return v[i]; }
+      __device__ inline real &operator[](int i) { return v[i]; }
     };
 
     template <int N, class TC, class GmemOperandC>
-    inline __device__ void store_complex(int warp_row, int warp_col, WarpRegisterMapping wrm, GmemOperandC cc,
-                                         TC op_c_real, TC op_c_imag)
+    inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
+                                         const TC &op_c_real, const TC &op_c_imag)
     {
+      using store_type = typename GmemOperandC::store_type;
 
 #ifdef USE_FP16_HMMA_ACCUMULATE
       const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
       const int col = warp_col + wrm.quad_col * 8;
 
       constexpr bool fixed = GmemOperandC::fixed;
-      using structure = typename std::conditional<fixed, Structure<short, 16>, Structure<float, 16>>::type;
+      using structure = Structure<store_type, 16>;
       trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
       structure s;
 
@@ -195,7 +200,7 @@ namespace quda
         const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
-          const float scale = cc.scale;
+          auto scale = cc.scale;
           s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
           s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
           s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
@@ -214,7 +219,7 @@ namespace quda
       const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
 
       constexpr bool fixed = GmemOperandC::fixed;
-      using structure = typename std::conditional<fixed, Structure<short, 4>, Structure<float, 4>>::type;
+      using structure = Structure<store_type, 4>;
       trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
       structure s;
 
@@ -223,11 +228,11 @@ namespace quda
         const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
         const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
-          const float scale = cc.scale;
-          s[0] = short(op_c_real.reg[i * 2 + 0] * scale);
-          s[1] = short(op_c_imag.reg[i * 2 + 0] * scale);
-          s[2] = short(op_c_real.reg[i * 2 + 1] * scale);
-          s[3] = short(op_c_imag.reg[i * 2 + 1] * scale);
+          auto scale = cc.scale;
+          s[0] = static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+          s[1] = static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+          s[2] = static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+          s[3] = static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
         } else {
           s[0] = op_c_real.reg[i * 2 + 0];
           s[1] = op_c_imag.reg[i * 2 + 0];
