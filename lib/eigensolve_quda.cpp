@@ -388,11 +388,14 @@ namespace quda
     const Complex Unit(1.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(size);
-    for(int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
-    
-    for(int i=0; i<size; i++) {
-      for(int j=0; j<size; j++) {
-        Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]);
+    for (int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
+
+    std::vector<Complex> H(size * size);
+    blas::hDotProduct(H.data(), vecs_ptr, vecs_ptr);
+
+    for (int i=0; i<size; i++) {
+      for (int j=0; j<size; j++) {
+        auto cnorm = H[i*size + j];
         if (j != i) {
           if (abs(cnorm) > 5e-16) {
             if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
@@ -408,6 +411,7 @@ namespace quda
         }
       }
     }
+
     return orthed;
   }
 
