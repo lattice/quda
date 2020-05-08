@@ -326,7 +326,7 @@ int main(int argc, char **argv)
   if (verify_results) {
     verifyInversion(out->V(), (void **)outMulti, in->V(), check->V(), gauge_param, inv_param, gauge, clover, clover_inv);
   }
-  
+
   // Clean up memory allocations
   delete in;
   delete out;

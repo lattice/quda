@@ -471,7 +471,7 @@ namespace quda {
           return nrm1;
         }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm suared of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
@@ -482,7 +482,7 @@ namespace quda {
           return nrm2;
         }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
@@ -493,7 +493,7 @@ namespace quda {
           return absmax;
         }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
 	 * @return Minimum norm
@@ -504,7 +504,6 @@ namespace quda {
           if (global) comm_allreduce_min(&absmax);
           return absmax;
         }
-
       };
 
     /**

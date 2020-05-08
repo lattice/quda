@@ -56,7 +56,7 @@ namespace quda
     num_converged = 0;
     num_locked = 0;
     num_keep = 0;
-    
+
     // Sanity checks
     if (nKr <= nEv) errorQuda("nKr=%d is less than or equal to nEv=%d\n", nKr, nEv);
     if (nEv < nConv) errorQuda("nConv=%d is greater than nEv=%d\n", nConv, nEv);
@@ -111,7 +111,7 @@ namespace quda
       break;
     default: errorQuda("Invalid eig solver type");
     }
-    
+
     if (!mat.hermitian() && eig_solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian eigensolver");
     return eig_solver;
   }
@@ -121,18 +121,14 @@ namespace quda
   void EigenSolver::prepareInitialGuess(std::vector<ColorSpinorField *> &kSpace)
   {
     if (kSpace[0]->Location() == QUDA_CPU_FIELD_LOCATION) {
-      for(int b=0; b<block_size; b++) {
-	if (sqrt(blas::norm2(*kSpace[b])) == 0.0) {
-	  kSpace[b]->Source(QUDA_RANDOM_SOURCE);
-	}
+      for (int b = 0; b < block_size; b++) {
+        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { kSpace[b]->Source(QUDA_RANDOM_SOURCE); }
       }
     } else {
       RNG *rng = new RNG(*kSpace[0], 1234);
       rng->Init();
-      for(int b=0; b<block_size; b++) {
-	if (sqrt(blas::norm2(*kSpace[b])) == 0.0) {
-	  spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM);
-	}
+      for (int b = 0; b < block_size; b++) {
+        if (sqrt(blas::norm2(*kSpace[b])) == 0.0) { spinorNoise(*kSpace[b], *rng, QUDA_NOISE_UNIFORM); }
       }
       rng->Release();
       delete rng;
@@ -142,8 +138,10 @@ namespace quda
     while (!orthed && k < kmax) {
       orthonormalizeMGS(kSpace, block_size);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
-	if (block_size > 1) printfQuda("Orthonormalising initial guesses with Gram Schmidt, k=%d\n", k);
-	else printfQuda("Orthonormalising initial guess\n");
+        if (block_size > 1)
+          printfQuda("Orthonormalising initial guesses with Gram Schmidt, k=%d\n", k);
+        else
+          printfQuda("Orthonormalising initial guess\n");
       }
       orthed = orthoCheck(kSpace, block_size);
       k++;
@@ -152,13 +150,13 @@ namespace quda
   }
 
   void EigenSolver::checkChebyOpMax(const DiracMatrix &mat, std::vector<ColorSpinorField *> &kSpace)
-  {    
+  {
     if (eig_param->use_poly_acc && eig_param->a_max <= 0.0) {
       // Use part of the kSpace as temps
       eig_param->a_max = estimateChebyOpMax(mat, *kSpace[block_size + 2], *kSpace[block_size + 1]);
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Chebyshev maximum estimate: %e.\n", eig_param->a_max);
     }
-  }  
+  }
 
   void EigenSolver::prepareKrylovSpace(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals)
   {
@@ -180,22 +178,22 @@ namespace quda
       printfQuda("**** START TRLM SOLUTION ****\n");
       printfQuda("*****************************\n");
     }
-    
+
     if (getVerbosity() >= QUDA_VERBOSE) {
       printfQuda("spectrum %s\n", spectrum);
       printfQuda("tol %.4e\n", tol);
       printfQuda("nConv %d\n", nConv);
       printfQuda("nEv %d\n", nEv);
       printfQuda("nKr %d\n", nKr);
-      if (block_size > 1) printfQuda("block size %d\n", block_size); 
+      if (block_size > 1) printfQuda("block size %d\n", block_size);
       if (eig_param->use_poly_acc) {
         printfQuda("polyDeg %d\n", eig_param->poly_deg);
         printfQuda("a-min %f\n", eig_param->a_min);
         printfQuda("a-max %f\n", eig_param->a_max);
       }
-    }  
+    }
   }
-  
+
   double EigenSolver::setEpsilon(const QudaPrecision prec)
   {
     double eps = 0.0;
@@ -216,8 +214,7 @@ namespace quda
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Running Eigensolver in quarter precision\n");
       eps = 5e-2;
       break;
-    default: 
-      errorQuda("Invalid precision %d", prec);      
+    default: errorQuda("Invalid precision %d", prec);
     }
     return eps;
   }
@@ -231,7 +228,7 @@ namespace quda
     for (unsigned int i = nConv; i < kSpace.size(); i++) { delete kSpace[i]; }
     kSpace.resize(nConv);
     evals.resize(nConv);
-    
+
     // Only save if outfile is defined
     if (strcmp(eig_param->vec_outfile, "") != 0) {
       if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("saving eigenvectors\n");
@@ -250,17 +247,16 @@ namespace quda
 
     // Save TRLM tuning
     saveTuneCache();
-    
+
     mat.flops();
-    
+
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("*****************************\n");
       printfQuda("***** END TRLM SOLUTION *****\n");
       printfQuda("*****************************\n");
     }
   }
-				       
-  
+
   void EigenSolver::matVec(const DiracMatrix &mat, ColorSpinorField &out, const ColorSpinorField &in)
   {
     if (!tmp1 || !tmp2) {
@@ -388,13 +384,13 @@ namespace quda
     const Complex Unit(1.0, 0.0);
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(size);
-    for (int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
+    for (int i = 0; i < size; i++) vecs_ptr.push_back(vecs[i]);
 
     std::vector<Complex> H(size * size);
     blas::hDotProduct(H.data(), vecs_ptr, vecs_ptr);
 
-    for (int i=0; i<size; i++) {
-      for (int j=0; j<size; j++) {
+    for (int i = 0; i < size; i++) {
+      for (int j = 0; j < size; j++) {
         auto cnorm = H[i*size + j];
         if (j != i) {
           if (abs(cnorm) > 5e-16) {
@@ -419,10 +415,10 @@ namespace quda
   {
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(size);
-    for(int i=0; i<size; i++) vecs_ptr.push_back(vecs[i]);
+    for (int i = 0; i < size; i++) vecs_ptr.push_back(vecs[i]);
 
-    for(int i=0; i<size; i++) {
-      for(int j=0; j<i; j++) {
+    for (int i = 0; i < size; i++) {
+      for (int j = 0; j < i; j++) {
         Complex cnorm = blas::cDotProduct(*vecs_ptr[j], *vecs_ptr[i]); // <j|i> with i normalised.
         blas::caxpy(-cnorm, *vecs_ptr[j], *vecs_ptr[i]);               // i = i - proj_{j}(i) = i - <j|i> * i
       }
@@ -442,7 +438,7 @@ namespace quda
     std::vector<ColorSpinorField *> vecs_ptr;
     vecs_ptr.reserve(vecs_size);
     for (int i = 0; i < vecs_size; i++) { vecs_ptr.push_back(vecs[i]); }
-    
+
     // Block dot products stored in s.
     blas::cDotProduct(s.data(), vecs_ptr, rvecs);
 

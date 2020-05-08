@@ -26,7 +26,7 @@ namespace quda
   {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
-    
+
     // Tridiagonal/Arrow matrix
     alpha = (double *)safe_malloc(nKr * sizeof(double));
     beta = (double *)safe_malloc(nKr * sizeof(double));
@@ -51,8 +51,8 @@ namespace quda
     saveTuneCache();
 
     // Override any user input for block size.
-    block_size = 1; 
-    
+    block_size = 1;
+
     // Pre-launch checks and preparation
     //---------------------------------------------------------------------------
     // Check to see if we are loading eigenvectors
@@ -61,8 +61,8 @@ namespace quda
       loadFromFile(mat, kSpace, evals);
       return;
     }
-    
-    // Check for an initial guess. If none present, populate with rands, then 
+
+    // Check for an initial guess. If none present, populate with rands, then
     // orthonormalise
     prepareInitialGuess(kSpace);
 
@@ -72,7 +72,7 @@ namespace quda
 
     // Check for Chebyshev maximum estimation
     checkChebyOpMax(mat, kSpace);
-    
+
     // Convergence and locking criteria
     double mat_norm = 0.0;
     double epsilon = setEpsilon(kSpace[0]->Precision());
@@ -80,7 +80,7 @@ namespace quda
     // Print Eigensolver params
     printEigensolverSetup();
     //---------------------------------------------------------------------------
-    
+
     // Begin TRLM Eigensolver computation
     //---------------------------------------------------------------------------
     profile.TPSTART(QUDA_PROFILE_COMPUTE);

@@ -1039,7 +1039,7 @@ namespace quda {
           return nrm1;
         }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
@@ -1051,7 +1051,7 @@ namespace quda {
           return nrm2;
         }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Linfinity norm
@@ -1063,7 +1063,7 @@ namespace quda {
           return absmax;
         }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Minimum norm
@@ -1075,7 +1075,7 @@ namespace quda {
           return absmin;
         }
 
-	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
+        /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
       };
 
