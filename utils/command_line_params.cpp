@@ -43,7 +43,7 @@ char gauge_outfile[256] = "";
 int Nsrc = 1;
 int Msrc = 1;
 int niter = 100;
-int niter_precondition = 10;
+int maxiter_precondition = 10;
 int gcrNkrylov = 10;
 QudaCABasis ca_basis = QUDA_POWER_BASIS;
 double ca_lambda_min = 0.0;
@@ -415,8 +415,8 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 100)");
-  quda_app->add_option("--niter-precondition", niter_precondition,
-                       "The number of iterations to perform for the preconditioner (default 10)");
+  quda_app->add_option("--maxiter-precondition", maxiter_precondition,
+                       "The number of iterations to perform for any preconditioner (default 10)");
   quda_app->add_option("--nsrc", Nsrc,
                        "How many spinors to apply the dslash to simultaneusly (experimental for staggered only)");
 

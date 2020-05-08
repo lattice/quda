@@ -209,8 +209,8 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
   inv_param.cuda_prec_precondition = cuda_prec_precondition;
   inv_param.omega = 1.0;
@@ -797,8 +797,8 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
 
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
-  inv_param.tol_precondition = 1e-1;
-  inv_param.maxiter_precondition = 10;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = QUDA_SILENT;
   inv_param.cuda_prec_precondition = prec_precondition;
 
@@ -1164,8 +1164,8 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   // domain decomposition preconditioner parameters
   inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
   inv_param.precondition_cycle = 1;
-  inv_param.tol_precondition = 1e-2;
-  inv_param.maxiter_precondition = 10;
+  inv_param.tol_precondition = tol_precondition;
+  inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.omega = 1.0;
 
   inv_param.extlib_type = solver_ext_lib;

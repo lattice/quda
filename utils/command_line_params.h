@@ -177,7 +177,7 @@ extern char gauge_outfile[256];
 extern int Nsrc;
 extern int Msrc;
 extern int niter;
-extern int niter_precondition;
+extern int maxiter_precondition;
 extern int gcrNkrylov;
 extern QudaCABasis ca_basis;
 extern double ca_lambda_min;
