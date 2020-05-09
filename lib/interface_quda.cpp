@@ -2954,7 +2954,6 @@ void invertQuda(void *hp_x, void *hp_b, QudaInvertParam *param)
     solverParam.updateInvertParam(*param);
   } else if (!norm_error_solve) {
     DiracMdagM m(dirac), mSloppy(diracSloppy), mPre(diracPre);
-    param->inv_type_precondition = QUDA_CG_INVERTER;
     SolverParam solverParam(*param);
 
     // chronological forecasting

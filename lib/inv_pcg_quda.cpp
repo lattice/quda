@@ -19,10 +19,13 @@ namespace quda
   static void fillInnerSolverParam(SolverParam &inner, const SolverParam &outer)
   {
     inner.tol = outer.tol_precondition;
-    inner.maxiter = outer.maxiter_precondition;
     inner.delta = 1e-20;                            // no reliable updates within the inner solver
+
     inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
     inner.precision_sloppy = outer.precision_precondition;
+
+    // this sets a fixed iteration count if we're using the MR solver
+    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
 
     inner.iter = 0;
     inner.gflops = 0;
@@ -31,10 +34,22 @@ namespace quda
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
 
+    inner.maxiter = outer.maxiter_precondition;
+    if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
+      inner.Nkrylov = inner.maxiter / outer.precondition_cycle;
+    } else {
+      inner.Nsteps = outer.precondition_cycle;
+    }
+
     if (outer.inv_type == QUDA_PCG_INVERTER && outer.precision_sloppy != outer.precision_precondition)
       inner.preserve_source = QUDA_PRESERVE_SOURCE_NO;
     else
       inner.preserve_source = QUDA_PRESERVE_SOURCE_YES;
+
+    inner.verbosity_precondition = outer.verbosity_precondition;
+
+    inner.compute_true_res = false;
+    inner.sloppy_converge = true;
   }
 
   PreconCG::PreconCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
@@ -67,7 +82,6 @@ namespace quda
 
   void PreconCG::operator()(ColorSpinorField &x, ColorSpinorField &b)
   {
-
     profile.TPSTART(QUDA_PROFILE_INIT);
     // Check to see that we're not trying to invert on a zero-field source
     const double b2 = norm2(b);
@@ -212,15 +226,18 @@ namespace quda
       if (!(updateR || updateX)) {
 
         if (K) {
+          // can fuse these two kernels
           r_new_Minvr_old = reDotProduct(rSloppy, *minvrSloppy);
           *rPre = rSloppy;
+
           commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
           commGlobalReductionSet(true);
 
+          // can fuse these two kernels
           *minvrSloppy = *minvrPre;
-
           rMinvr = reDotProduct(rSloppy, *minvrSloppy);
+
           beta = (rMinvr - r_new_Minvr_old) / rMinvr_old;
           axpyZpbx(alpha, *p, xSloppy, *minvrSloppy, beta);
         } else {
@@ -230,8 +247,7 @@ namespace quda
       } else { // reliable update
 
         axpy(alpha, *p, xSloppy); // xSloppy += alpha*p
-        copy(x, xSloppy);
-        xpy(x, y); // y += x
+        xpy(xSloppy, y); // y += x
         // Now compute r
         mat(r, y, x); // x is just a temporary here
         r2 = xmyNorm(b, r);
