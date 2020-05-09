@@ -113,11 +113,6 @@ namespace quda {
 		out.GammaBasis(), in.GammaBasis());
     }
 
-    if (in.Precision() != out.Precision()) {
-      errorQuda("Input precision %d and output spinor precision %d don't match in dslash_quda",
-		in.Precision(), out.Precision());
-    }
-
     if (in.SiteSubset() != QUDA_PARITY_SITE_SUBSET || out.SiteSubset() != QUDA_PARITY_SITE_SUBSET) {
       errorQuda("ColorSpinorFields are not single parity: in = %d, out = %d", 
 		in.SiteSubset(), out.SiteSubset());
