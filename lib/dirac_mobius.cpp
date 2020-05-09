@@ -395,29 +395,20 @@ namespace quda {
 
   void DiracMobiusPC::MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
   {
-
     checkDWF(in, out);
     // checkParitySpinor(in, out);
     checkSpinorAlias(in, out);
 
     ColorSpinorParam csParam(out);
-
-#ifdef FLOAT8
-    csParam.fieldOrder
-      = QUDA_FLOAT8_FIELD_ORDER; // need to set field order after any call to setPrecision since this can override the order
-#endif
     csParam.create = QUDA_NULL_FIELD_CREATE;
-    cudaColorSpinorField in_(csParam);
-    cudaColorSpinorField out_(csParam);
-    in_ = in;
 
-    ColorSpinorField *unextended_tmp1 = new cudaColorSpinorField(csParam);
-    ColorSpinorField *unextended_tmp2 = new cudaColorSpinorField(csParam);
+    ColorSpinorField *unextended_tmp1 = ColorSpinorField::Create(csParam);
+    ColorSpinorField *unextended_tmp2 = ColorSpinorField::Create(csParam);
 
     csParam.x[0] += 2; // x direction is checkerboarded
     for (int i = 1; i < 4; ++i) { csParam.x[i] += 4; }
-    ColorSpinorField *extended_tmp1 = new cudaColorSpinorField(csParam);
-    ColorSpinorField *extended_tmp2 = new cudaColorSpinorField(csParam);
+    ColorSpinorField *extended_tmp1 = ColorSpinorField::Create(csParam);
+    ColorSpinorField *extended_tmp2 = ColorSpinorField::Create(csParam);
 
     int shift0[4] = {0, 0, 0, 0};
     int shift1[4] = {1, 1, 1, 1};
@@ -426,14 +417,14 @@ namespace quda {
     int odd_bit = (getMatPCType() == QUDA_MATPC_ODD_ODD) ? 1 : 0;
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
-      mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in_, *extended_gauge, *unextended_tmp2, in_, mass, m5,
-                                             b_5, c_5, dagger, parity[1], shift0, shift0, dslash5pre);
+      mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in, *extended_gauge, *unextended_tmp2, in, mass, m5, b_5, c_5, dagger,
+                                             parity[1], shift0, shift0, dslash5pre);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *unextended_tmp2, *extended_gauge, *extended_tmp2,
                                              *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
                                              dslash4_dslash5pre_dslash5inv);
 
-      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in_,
+      mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in,
                                              mass, m5, b_5, c_5, dagger, parity[1], shift0, shift1,
                                              dslash4_dslash5inv_dslash5invdag);
 
@@ -441,10 +432,8 @@ namespace quda {
                                              *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1,
                                              dslash4dag_dslash5predag_dslash5invdag);
 
-      mobius_tensor_core::apply_fused_dslash(out_, *extended_tmp2, *extended_gauge, out_, *unextended_tmp1, mass, m5,
-                                             b_5, c_5, dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
-
-      out = out_;
+      mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5,
+                                             c_5, dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1
@@ -477,7 +466,7 @@ namespace quda {
       delete unextended_tmp2;
 
     } else {
-      errorQuda("DiracMobiusPC::MdagMLocal(...) only supports half and quarter precision.\n");
+      errorQuda("DiracMobiusPC::MdagMLocal(...) only supports half and quarter precision");
     }
   }
 

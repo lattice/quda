@@ -149,6 +149,9 @@ namespace quda
     if (K) {
       csParam.create = QUDA_COPY_FIELD_CREATE;
       csParam.setPrecision(param.precision_precondition);
+#ifdef FLOAT8
+      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+#endif
       rPre = new cudaColorSpinorField(rSloppy, csParam);
       // Create minvrPre
       minvrPre = new cudaColorSpinorField(*rPre);
