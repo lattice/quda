@@ -5,105 +5,27 @@
 
 #include <quda.h>
 #include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
+//#include <color_spinor_field.h>
+//#include <dirac_quda.h>
+//#include <dslash_quda.h>
+//#include <invert_quda.h>
+//#include <util_quda.h>
+//#include <blas_quda.h>
 
-#include <command_line_params.h>
-#include <host_utils.h>
-#include <misc.h>
 
-#include <stoch_laph_quark_smear.h>
+//#include <host_utils.h>
+//#include <misc.h>
+
+#include <stoch_laph_quark_smear_kernels.h>
 
 using namespace quda;
 
 //!< Profiler for laphInvertSourcesQuda
 static TimeProfile profileLaphInvert("laphInvertSourcesQuda");
 
-void display_driver_info()
-{
-  printfQuda("Running the stochastic laph quark smear driver:\n");
-
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
-             "Ls_dimension   dslash_type  normalization\n");
-  printfQuda(
-    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
-    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
-
-  if (inv_multigrid) {
-    printfQuda("MG parameters\n");
-    printfQuda(" - number of levels %d\n", mg_levels);
-    for (int i = 0; i < mg_levels - 1; i++) {
-      printfQuda(" - level %d number of null-space vectors %d\n", i + 1, nvec[i]);
-      printfQuda(" - level %d number of pre-smoother applications %d\n", i + 1, nu_pre[i]);
-      printfQuda(" - level %d number of post-smoother applications %d\n", i + 1, nu_post[i]);
-    }
-
-    printfQuda("MG Eigensolver parameters\n");
-    for (int i = 0; i < mg_levels; i++) {
-      if (low_mode_check || mg_eig[i]) {
-        printfQuda(" - level %d solver mode %s\n", i + 1, get_eig_type_str(mg_eig_type[i]));
-        printfQuda(" - level %d spectrum requested %s\n", i + 1, get_eig_spectrum_str(mg_eig_spectrum[i]));
-        printfQuda(" - level %d number of eigenvectors requested nConv %d\n", i + 1, nvec[i]);
-        printfQuda(" - level %d size of eigenvector search space %d\n", i + 1, mg_eig_nEv[i]);
-        printfQuda(" - level %d size of Krylov space %d\n", i + 1, mg_eig_nKr[i]);
-        printfQuda(" - level %d solver tolerance %e\n", i + 1, mg_eig_tol[i]);
-        printfQuda(" - level %d convergence required (%s)\n", i + 1, mg_eig_require_convergence[i] ? "true" : "false");
-        printfQuda(" - level %d Operator: daggered (%s) , norm-op (%s)\n", i + 1,
-                   mg_eig_use_dagger[i] ? "true" : "false", mg_eig_use_normop[i] ? "true" : "false");
-        if (mg_eig_use_poly_acc[i]) {
-          printfQuda(" - level %d Chebyshev polynomial degree %d\n", i + 1, mg_eig_poly_deg[i]);
-          printfQuda(" - level %d Chebyshev polynomial minumum %e\n", i + 1, mg_eig_amin[i]);
-          if (mg_eig_amax[i] <= 0)
-            printfQuda(" - level %d Chebyshev polynomial maximum will be computed\n", i + 1);
-          else
-            printfQuda(" - level %d Chebyshev polynomial maximum %e\n", i + 1, mg_eig_amax[i]);
-        }
-        printfQuda("\n");
-      }
-    }
-  }
-
-  if (inv_deflate) {
-    printfQuda("\n   Eigensolver parameters\n");
-    printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
-    printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-    printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
-    printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
-    printfQuda(" - size of Krylov space %d\n", eig_nKr);
-    printfQuda(" - solver tolerance %e\n", eig_tol);
-    printfQuda(" - convergence required (%s)\n", eig_require_convergence ? "true" : "false");
-    if (eig_compute_svd) {
-      printfQuda(" - Operator: MdagM. Will compute SVD of M\n");
-      printfQuda(" - ***********************************************************\n");
-      printfQuda(" - **** Overriding any previous choices of operator type. ****\n");
-      printfQuda(" - ****    SVD demands normal operator, will use MdagM    ****\n");
-      printfQuda(" - ***********************************************************\n");
-    } else {
-      printfQuda(" - Operator: daggered (%s) , norm-op (%s)\n", eig_use_dagger ? "true" : "false",
-                 eig_use_normop ? "true" : "false");
-    }
-    if (eig_use_poly_acc) {
-      printfQuda(" - Chebyshev polynomial degree %d\n", eig_poly_deg);
-      printfQuda(" - Chebyshev polynomial minumum %e\n", eig_amin);
-      if (eig_amax <= 0)
-        printfQuda(" - Chebyshev polynomial maximum will be computed\n");
-      else
-        printfQuda(" - Chebyshev polynomial maximum %e\n\n", eig_amax);
-    }
-  }
-
-  printfQuda("Grid partition info:     X  Y  Z  T\n");
-  printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
-             dimPartitioned(3));
-}
 
 void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
-		     QudaInvertParam inv_param, const int X[4])
+		     QudaInvertParam inv_param, const int X[4], int t_size)
 {
   // Parameter object describing the sources and smeared quarks
   ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
@@ -147,11 +69,11 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order
   double time_lsp = -clock();
-  int t_size = comm_dim(3) * tdim;
+  //int t_size = comm_dim(3) * t_size;
   Complex sinks[cuda_quark_param.nSpin * t_size];
   evecProjectQuda(*quda_quark[0], *quda_evec[0], t_size, sinks);
   time_lsp += clock();
-  saveTuneCache();
+  saveTuneCache(true);
   
   printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);
 
@@ -357,20 +279,20 @@ void stochLaphSmearQuda(void **host_quarks, void **host_evecs,
   double time_lsc = -clock();
   laphSourceConstruct(quda_quarks, quda_evecs, host_noise_, dil_scheme);
   time_lsc += clock();
-  saveTuneCache();
+  saveTuneCache(true);
   
   // The quarks sources are located in quda_quarks. We invert using those
   // sources and place the propagator from that solve back into quda_quarks
   double time_lsi = -clock();
   laphSourceInvert(quda_quarks, &inv_param);
   time_lsi += clock();
-  saveTuneCache();
+  saveTuneCache(true);
 
   // We now perfrom the projection back onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order
   double time_lsp = -clock();
   time_lsp += clock();
-  saveTuneCache();
+  saveTuneCache(true);
   
   printfQuda("LSC time = %e\n", time_lsc/CLOCKS_PER_SEC);
   printfQuda("LSI time = %e\n", time_lsi/CLOCKS_PER_SEC);

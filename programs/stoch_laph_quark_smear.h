@@ -3,36 +3,8 @@
 #include <complex>
 #include <quda.h>
 #include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-
-#include <command_line_params.h>
-#include <host_utils.h>
-#include <misc.h>
-
-#define Complex std::complex<double>
 
 void display_driver_info();
 
-namespace quda
-{
-  void spinDiluteQuda(ColorSpinorField &x, const ColorSpinorField &y, const int alpha);
-  void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, const int t, void *result);
-} // namespace quda
-
 void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
-		     QudaInvertParam inv_param, const int X[4]);
-
-#if 0
-void laphSourceConstruct(std::vector<quda::ColorSpinorField *> &quarks, std::vector<quda::ColorSpinorField *> &evecs,
-                         const Complex noise[], const int dil_scheme);
-void laphSourceInvert(std::vector<quda::ColorSpinorField *> &quarks, QudaInvertParam *inv_param, const int *X);
-
-void stochLaphSmearQuda(void **host_quarks, void **host_evecs,
-			void *host_noise, void *host_sinks,
-			const int dil_scheme, const int n_evecs, 
-			QudaInvertParam inv_param, const int X[4]);
-#endif
+		     QudaInvertParam inv_param, const int X[4], int t_size);

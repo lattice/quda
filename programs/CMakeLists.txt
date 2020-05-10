@@ -1,7 +1,7 @@
 include_directories(. ../utils ../host_reference ../../quda/include/externals/)
 
 # enable programs build a common library for all programs
-set(QUDA_PROG_COMMON stoch_laph_quark_smear.h spin_dilute.cu evec_project.cu)
+set(QUDA_PROG_COMMON stoch_laph_quark_smear.h stoch_laph_quark_smear_utils.cpp spin_dilute.cu evec_project.cu)
 add_library(quda_prog STATIC ${QUDA_PROG_COMMON})
 set_target_properties(quda_prog PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
@@ -51,7 +51,8 @@ if(QUDA_QDPJIT)
   set(QUDA_BUILD_ALL_PROGRAMS OFF)
 endif()
 
-add_executable(stoch_laph_quark_smear stoch_laph_quark_smear_driver.cpp  stoch_laph_quark_smear_utils.cpp)
+#add_executable(stoch_laph_quark_smear stoch_laph_quark_smear_driver.cpp stoch_laph_quark_smear_utils.cpp)
+add_executable(stoch_laph_quark_smear stoch_laph_quark_smear_driver.cpp)
 set_property(TARGET stoch_laph_quark_smear PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 target_link_libraries(stoch_laph_quark_smear PRIVATE ${PROG_LIBS})
 quda_checkbuildtest(stoch_laph_quark_smear QUDA_BUILD_ALL_PROGRAMS)
