@@ -638,7 +638,7 @@ namespace quda {
      @param[in] in Input field
   */
   void gamma5(ColorSpinorField &out, const ColorSpinorField &in);
-
+  
 }
 
 #endif // _DSLASH_QUDA_H

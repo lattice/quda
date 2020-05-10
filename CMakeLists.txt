@@ -151,9 +151,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_BUILD_ALL_PROGRAMS OFF CACHE BOOL "do not build programs by default")
 set(QUDA_INSTALL_ALL_TESTS ON CACHE BOOL "install tests by default")
-set(QUDA_INSTALL_ALL_PROGRAMS OFF CACHE BOOL "do not install programs by default")
 
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
@@ -208,8 +206,6 @@ set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
-mark_as_advanced(QUDA_BUILD_ALL_PROGRAMS)
-mark_as_advanced(QUDA_INSTALL_ALL_PRGRAMS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
@@ -961,6 +957,5 @@ endif()
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(utils)
-add_subdirectory(programs)
 add_subdirectory(host_reference)
 add_subdirectory(doc)

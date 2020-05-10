@@ -24,6 +24,8 @@ endif()
 
 set(TEST_LIBS quda quda_test quda_reference quda_utils)
 
+install(TARGETS quda_test EXPORT qudaTargets LIBRARY DESTINATION lib ARCHIVE DESTINATION lib INCLUDES DESTINATION include)
+
 macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   # adding the linker language here as a workaround -- was not needed for cmake 3.16
   set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)

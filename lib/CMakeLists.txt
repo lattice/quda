@@ -72,7 +72,7 @@ set (QUDA_OBJS
   pgauge_det_trace.cu clover_outer_product.cu
   clover_sigma_outer_product.cu momentum.cu gauge_qcharge.cu
   quda_cuda_api.cpp deflation.cpp checksum.cu
-  instantiate.cpp version.cpp )
+  instantiate.cpp version.cpp evec_project.cu)
 # cmake-format: on
 
 # split source into cu and cpp files

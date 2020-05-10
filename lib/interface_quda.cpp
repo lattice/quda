@@ -5806,3 +5806,63 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   gaugeObservables(*gauge, *param, profileGaugeObs);
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
+
+void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
+		     QudaInvertParam inv_param, const int X[4], int t_size)
+{
+  // Parameter object describing the sources and smeared quarks
+  ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  cpu_quark_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
+  
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> quark;
+  cpu_quark_param.v = host_quark;
+  quark.push_back(ColorSpinorField::Create(cpu_quark_param));
+  
+  // Parameter object describing evecs
+  ColorSpinorParam cpu_evec_param(host_evec, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
+  // Switch to spin 1
+  cpu_evec_param.nSpin = 1;
+  // QUDA style wrapper around the host data
+  std::vector<ColorSpinorField*> evec;
+  cpu_evec_param.v = host_evec;
+  evec.push_back(ColorSpinorField::Create(cpu_evec_param));
+  
+  // Create device vectors
+  ColorSpinorParam cuda_quark_param(cpu_quark_param);
+  cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_quark_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  std::vector<ColorSpinorField *> quda_quark;
+  quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
+  // Copy data from host to device
+  *quda_quark[0] = *quark[0];
+
+  // Create device vectors for evecs
+  ColorSpinorParam cuda_evec_param(cpu_evec_param);
+  cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
+  cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
+  cuda_evec_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  cuda_evec_param.nSpin = 1;
+  std::vector<ColorSpinorField *> quda_evec;
+  quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
+  // Copy data from host to device
+  *quda_evec[0] = *evec[0];
+  
+  // We now perfrom the projection onto the eigenspace. The data
+  // is placed in host_sinks in i, X, Y, Z, T, spin order
+  double time_lsp = -clock();
+  //int t_size = comm_dim(3) * t_size;
+  Complex sinks[cuda_quark_param.nSpin * t_size];
+  evecProjectQuda(*quda_quark[0], *quda_evec[0], t_size, sinks);
+  time_lsp += clock();
+  saveTuneCache(true);
+  
+  printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);
+
+  // Clean up memory allocations
+  delete quark[0];
+  delete quda_quark[0];
+  delete evec[0];
+  delete quda_evec[0];
+}
