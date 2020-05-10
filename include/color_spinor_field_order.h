@@ -763,7 +763,7 @@ namespace quda {
         double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
                                                  abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
         if (global) comm_allreduce_max(&absmax);
-	return absmax;
+        return absmax;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }

@@ -1036,10 +1036,10 @@ namespace quda {
           double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          return nrm1;
+        }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
@@ -1048,10 +1048,10 @@ namespace quda {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+          return nrm2;
+        }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Linfinity norm
@@ -1060,10 +1060,10 @@ namespace quda {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+          return absmax;
+        }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Minimum norm
@@ -1072,10 +1072,10 @@ namespace quda {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
-	  return absmin;
-	}
+          return absmin;
+        }
 
-	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
+        /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
       };
 

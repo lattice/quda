@@ -169,6 +169,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_INSTALL_ALL_TESTS ON CACHE BOOL "install tests by default")
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
@@ -221,6 +222,7 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
@@ -558,7 +560,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
