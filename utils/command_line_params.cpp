@@ -144,6 +144,7 @@ QudaFieldLocation location_ritz = QUDA_CUDA_FIELD_LOCATION;
 QudaMemoryType mem_type_ritz = QUDA_MEMORY_DEVICE;
 
 // Parameters for the stand alone eigensolver
+int eig_block_size = 4;
 int eig_nEv = 16;
 int eig_nKr = 32;
 int eig_nConv = -1; // If unchanged, will be set to nEv
@@ -172,6 +173,7 @@ bool eig_io_parity_inflate = false;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 quda::mgarray<bool> mg_eig = {};
+quda::mgarray<int> mg_eig_block_size = {};
 quda::mgarray<int> mg_eig_nEv = {};
 quda::mgarray<int> mg_eig_nKr = {};
 quda::mgarray<int> mg_eig_batched_rotate = {};
@@ -269,11 +271,13 @@ namespace
                                                            {"mat-pc-dag", QUDA_MATPC_DAG_SOLUTION},
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
+  CLI::TransformPairs<QudaEigType> eig_type_map {{"trlm", QUDA_EIG_TR_LANCZOS},
+                                                 {"irlm", QUDA_EIG_IR_LANCZOS},
+                                                 {"iram", QUDA_EIG_IR_ARNOLDI},
+                                                 {"blktrlm", QUDA_EIG_BLK_TR_LANCZOS}};
+
   CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
                                                              {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
-
-  CLI::TransformPairs<QudaEigType> eig_type_map {
-    {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
 
   CLI::TransformPairs<QudaSolveType> solve_type_map {
     {"direct", QUDA_DIRECT_SOLVE},       {"direct-pc", QUDA_DIRECT_PC_SOLVE}, {"normop", QUDA_NORMOP_SOLVE},
@@ -560,6 +564,7 @@ void add_eigen_option_group(std::shared_ptr<QUDAApp> quda_app)
                       "Solve the MdagM problem, use to compute SVD of M (default false)");
   opgroup->add_option("--eig-max-restarts", eig_max_restarts, "Perform n iterations of the restart in the eigensolver");
   opgroup->add_option("--eig-nConv", eig_nConv, "The number of converged eigenvalues requested");
+  opgroup->add_option("--eig-block-size", eig_block_size, "The block size to use in the block variant eigensolver");
   opgroup->add_option("--eig-nEv", eig_nEv, "The size of eigenvector search space in the eigensolver");
   opgroup->add_option("--eig-nKr", eig_nKr, "The size of the Krylov subspace to use in the eigensolver");
   opgroup->add_option("--eig-batched-rotate", eig_batched_rotate,
@@ -672,6 +677,8 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
                        "If the multigrid operator is updated, preserve generated deflation space (default = false)");
   quda_app->add_mgoption(opgroup, "--mg-eig-max-restarts", mg_eig_max_restarts, CLI::PositiveNumber,
                          "Perform a maximun of n restarts in eigensolver (default 100)");
+  quda_app->add_mgoption(opgroup, "--mg-eig-block-size", mg_eig_block_size, CLI::Validator(),
+                         "The block size to use in the block variant eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nEv", mg_eig_nEv, CLI::Validator(),
                          "The size of eigenvector search space in the eigensolver");
   quda_app->add_mgoption(opgroup, "--mg-eig-nKr", mg_eig_nKr, CLI::Validator(),
