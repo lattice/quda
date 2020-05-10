@@ -462,11 +462,9 @@ invert_test(void)
                      i, inv_param.tol_offset[i], inv_param.true_res_offset[i], l2r, inv_param.tol_hq_offset[i],
                      inv_param.true_res_hq_offset[i], hqr);
 
-          //emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
-	  if (sqrt(nrm2/src2) > 10*inv_param.tol_offset[i]){
-	    ret |=1;
-	  }
-	}
+          // emperical, if the cpu residue is more than 1 order the target accuracy, the it fails to converge
+          if (sqrt(nrm2 / src2) > 10 * inv_param.tol_offset[i]) { ret |= 1; }
+        }
 
         for(int i=1; i < inv_param.num_offset;i++) delete spinorOutArray[i];
       }
@@ -547,10 +545,6 @@ int main(int argc, char** argv)
   auto app = make_app();
   CLI::TransformPairs<int> test_type_map {{"full", 0}, {"full_ee_prec", 1}, {"full_oo_prec", 2}, {"even", 3}, {"odd", 4}};
   app->add_option("--test", test_type, "Test method")->transform(CLI::CheckedTransformer(test_type_map));
-  // app->get_formatter()->column_width(40);
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

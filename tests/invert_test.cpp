@@ -6,37 +6,25 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
-#include <gauge_field.h>
-#include <unitarization_links.h>
-#include <random_quda.h>
+#include <color_spinor_field.h> // convenient quark field container
 
 // External headers
 #include <misc.h>
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
-#include <staggered_dslash_reference.h>
-#include <staggered_gauge_utils.h>
-#include <llfat_utils.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void display_test_info()
 {
   printfQuda("running the following test:\n");
-  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension "
-             "Ls_dimension   dslash_type  normalization\n");
-  printfQuda(
-    "%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
-    get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type), get_recon_str(link_recon),
-    get_recon_str(link_recon_sloppy), get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
-    get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
+  printfQuda("prec    prec_sloppy   multishift  matpc_type  recon  recon_sloppy solve_type S_dimension T_dimension Ls_dimension   dslash_type  normalization\n");
+  printfQuda("%6s   %6s          %d     %12s     %2s     %2s         %10s %3d/%3d/%3d     %3d         %2d       %14s  %8s\n",
+             get_prec_str(prec), get_prec_str(prec_sloppy), multishift, get_matpc_str(matpc_type),
+             get_recon_str(link_recon), get_recon_str(link_recon_sloppy),
+             get_solve_str(solve_type), xdim, ydim, zdim, tdim, Lsdim,
+             get_dslash_str(dslash_type), get_mass_normalization_str(normalization));
 
   if (inv_multigrid) {
     printfQuda("MG parameters\n");
@@ -125,19 +113,15 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  // Move these
+  // If a value greater than 1 is passed, heavier masses will be constructed
+  // and the multi-shift solver will be called
   if (multishift > 1) {
     // set a correct default for the multi-shift solver
     solution_type = QUDA_MATPCDAG_MATPC_SOLUTION;
   }
 
-  // Set some default values for precisions and solve types
-  // if none are passed through the command line
-  setQudaDefaultPrecs();
-  if (inv_multigrid) {
-    setQudaDefaultMgTestParams();
-    setQudaDefaultMgSolveTypes();
-  }
+  // Set values for precisions via the command line.
+  setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
@@ -176,6 +160,7 @@ int main(int argc, char **argv)
   QudaEigParam mg_eig_param[mg_levels];
   QudaEigParam eig_param = newQudaEigParam();
   if (inv_multigrid) {
+    setQudaMgSolveTypes();
     setMultigridInvertParam(inv_param);
     // Set sub structures
     mg_param.invert_param = &mg_inv_param;
@@ -262,10 +247,10 @@ int main(int argc, char **argv)
 
   // Vector construct START
   //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *check;
-  ColorSpinorParam cs_param;
+  quda::ColorSpinorField *in;
+  quda::ColorSpinorField *out;
+  quda::ColorSpinorField *check;
+  quda::ColorSpinorParam cs_param;
   constructWilsonTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
@@ -273,7 +258,7 @@ int main(int argc, char **argv)
   // Host array for solutions
   void **outMulti = (void **)malloc(multishift * sizeof(void *));
   // QUDA host array for internal checks and malloc
-  std::vector<ColorSpinorField *> qudaOutMulti(multishift);
+  std::vector<quda::ColorSpinorField *> qudaOutMulti(multishift);
   // Vector construct END
   //-----------------------------------------------------------------------------------
 
@@ -293,7 +278,7 @@ int main(int argc, char **argv)
       inv_param.tol_offset[i] = inv_param.tol;
       inv_param.tol_hq_offset[i] = inv_param.tol_hq;
       // Allocate memory and set pointers
-      qudaOutMulti[i] = ColorSpinorField::Create(cs_param);
+      qudaOutMulti[i] = quda::ColorSpinorField::Create(cs_param);
       outMulti[i] = qudaOutMulti[i]->V();
     }
   }

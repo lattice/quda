@@ -26,12 +26,7 @@
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
-namespace quda {
-  extern void setTransferGPU(bool);
-}
-
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
 
@@ -49,13 +44,10 @@ display_test_info()
   printfQuda("Deflation space info: location   mem_type\n");
   printfQuda("                     %5s     %8s\n", get_ritz_location_str(location_ritz),
              get_memory_type_str(mem_type_ritz));
-
-  return ;
 }
 
 int main(int argc, char **argv)
 {
-
   // command line options
   auto app = make_app();
   // add_eigen_option_group(app);
@@ -81,6 +73,9 @@ int main(int argc, char **argv)
   initRand();
 
   display_test_info();
+
+  // initialize the QUDA library
+  initQuda(device);
 
   // *** QUDA parameters begin here.
 
@@ -116,7 +111,7 @@ int main(int argc, char **argv)
     }
   }
 
-  QudaEigParam  df_param = newQudaEigParam();
+  QudaEigParam df_param = newQudaEigParam();
   df_param.invert_param = &inv_param;
   setDeflationParam(df_param);
 
@@ -163,9 +158,6 @@ int main(int argc, char **argv)
 
   // start the timer
   double time0 = -((double)clock());
-
-  // initialize the QUDA library
-  initQuda(device);
 
   // this line ensure that if we need to construct the clover inverse (in either the smoother or the solver) we do so
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) loadCloverQuda(clover, clover_inv, &inv_param);

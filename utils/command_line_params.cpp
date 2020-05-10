@@ -33,7 +33,7 @@ int &ydim = dim[1];
 int &zdim = dim[2];
 int &tdim = dim[3];
 int Lsdim = 16;
-QudaDagType dagger = QUDA_DAG_NO;
+bool dagger = false;
 QudaDslashType dslash_type = QUDA_WILSON_DSLASH;
 int laplace3D = 4;
 char latfile[256] = "";
@@ -84,6 +84,7 @@ QudaMassNormalization normalization = QUDA_KAPPA_NORMALIZATION;
 QudaMatPCType matpc_type = QUDA_MATPC_EVEN_EVEN;
 QudaSolveType solve_type = QUDA_NORMOP_PC_SOLVE;
 QudaSolutionType solution_type = QUDA_MAT_SOLUTION;
+QudaTboundary fermion_t_boundary = QUDA_ANTI_PERIODIC_T;
 
 int mg_levels = 2;
 
@@ -267,6 +268,9 @@ namespace
                                                            {"mat-pc-dag", QUDA_MATPC_DAG_SOLUTION},
                                                            {"mat-pc-dag-mat-pc", QUDA_MATPCDAG_MATPC_SOLUTION}};
 
+  CLI::TransformPairs<QudaTboundary> fermion_t_boundary_map {{"periodic", QUDA_PERIODIC_T},
+                                                             {"anti-periodic", QUDA_ANTI_PERIODIC_T}};
+
   CLI::TransformPairs<QudaEigType> eig_type_map {
     {"trlm", QUDA_EIG_TR_LANCZOS}, {"irlm", QUDA_EIG_IR_LANCZOS}, {"iram", QUDA_EIG_IR_ARNOLDI}};
 
@@ -394,7 +398,10 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--m5", m5, "Mass of shift of five-dimensional Dirac operators (default -1.5)");
   quda_app->add_option("--b5", b5, "Mobius b5 parameter (default 1.5)");
   quda_app->add_option("--c5", c5, "Mobius c5 parameter (default 0.5)");
-  quda_app->add_option("--multishift", multishift, "Whether to do a multi-shift solver test or not (default false)");
+  quda_app->add_option(
+    "--multishift", multishift,
+    "Whether to do a multi-shift solver test or not. Default is 1 (single mass)"
+    "If a value N > 1 is passed, heavier masses will be constructed and the multi-shift solver will be called");
   quda_app->add_option("--ngcrkrylov", gcrNkrylov,
                        "The number of inner iterations to use for GCR, BiCGstab-l, CA-CG (default 10)");
   quda_app->add_option("--niter", niter, "The number of iterations to perform (default 10)");
@@ -448,6 +455,11 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
       "--solution-type", solution_type,
       "The solution we desire (mat (default), mat-dag-mat, mat-pc, mat-pc-dag-mat-pc (default for multi-shift))")
     ->transform(CLI::QUDACheckedTransformer(solution_type_map));
+
+  quda_app
+    ->add_option("--fermion-t-boundary", fermion_t_boundary,
+                 "The fermoinic temporal boundary conditions (anti-periodic (default), periodic")
+    ->transform(CLI::QUDACheckedTransformer(fermion_t_boundary_map));
 
   quda_app
     ->add_option("--solve-type", solve_type,

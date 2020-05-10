@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include <quda.h>
-#include <quda_internal.h>
 #include <gauge_field.h>
 
 #include <comm_quda.h>
@@ -53,8 +52,7 @@ void CallUnitarizeLinks(quda::cudaGaugeField *cudaInGauge)
 }
 //------------------------------------------------------------------------------------
 
-void
-display_test_info()
+void display_test_info()
 {
   printfQuda("running the following test:\n");
 
@@ -66,13 +64,10 @@ display_test_info()
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
-
-  return ;
 }
 
 int main(int argc, char **argv)
 {
-
   // command line options
   auto app = make_app();
   try {
@@ -92,31 +87,27 @@ int main(int argc, char **argv)
 
   display_test_info();
 
+  // initialize the QUDA library
+  initQuda(device);
+
   // *** QUDA parameters begin here.
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   setWilsonGaugeParam(gauge_param);
 
-  // *** Everything between here and the call to initQuda() is
-  // *** application-specific.
-
+  // *** Everything between here and the timer is  application specific.
   setDims(gauge_param.X);
   setSpinorSiteSize(24);
 
-  size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
-
   void *load_gauge[4];
   // Allocate space on the host (always best to allocate and free in the same scope)
-  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gSize); }
+  for (int dir = 0; dir < 4; dir++) { load_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
   constructHostGaugeField(load_gauge, gauge_param, argc, argv);
   // Load the gauge field to the device
   loadGaugeQuda((void *)load_gauge, &gauge_param);
 
   // start the timer
   double time0 = -((double)clock());
-
-  // initialize the QUDA library
-  initQuda(device);
 
   {
     using namespace quda;
@@ -241,9 +232,8 @@ int main(int argc, char **argv)
       QudaGaugeParam gauge_param = newQudaGaugeParam();
       setWilsonGaugeParam(gauge_param);
 
-      size_t gSize = (gauge_param.cpu_prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
       void *cpu_gauge[4];
-      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gSize); }
+      for (int dir = 0; dir < 4; dir++) { cpu_gauge[dir] = malloc(V * gauge_site_size * gauge_param.cpu_prec); }
 
       // copy into regular field
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
@@ -251,7 +241,6 @@ int main(int argc, char **argv)
       saveGaugeFieldQuda((void*)cpu_gauge, (void*)gauge, &gauge_param);
 
       write_gauge_field(gauge_outfile, cpu_gauge, gauge_param.cpu_prec, gauge_param.X, 0, (char**)0);
-
 
       for (int dir = 0; dir<4; dir++) free(cpu_gauge[dir]);
     } else {

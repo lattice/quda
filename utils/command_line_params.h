@@ -166,7 +166,7 @@ extern int &ydim;
 extern int &zdim;
 extern int &tdim;
 extern int Lsdim;
-extern QudaDagType dagger;
+extern bool dagger;
 extern QudaDslashType dslash_type;
 extern int laplace3D;
 extern char latfile[256];
@@ -217,6 +217,7 @@ extern QudaMassNormalization normalization;
 extern QudaMatPCType matpc_type;
 extern QudaSolveType solve_type;
 extern QudaSolutionType solution_type;
+extern QudaTboundary fermion_t_boundary;
 
 extern int mg_levels;
 

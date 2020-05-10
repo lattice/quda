@@ -1,7 +1,6 @@
 #pragma once
 
 #include <host_utils.h>
-//#include <blas_reference.h>
 #include <quda_internal.h>
 #include "color_spinor_field.h"
 

@@ -52,9 +52,6 @@
 #define MAX(a,b) ((a)>(b)? (a):(b))
 #define TDIFF(a,b) (b.tv_sec - a.tv_sec + 0.000001*(b.tv_usec - a.tv_usec))
 
-// Is this even used?
-//#define spinorSiteSize 24 // real numbers per spinor
-
 #define MAX_GPU_NUM_PER_NODE 16
 
 // define newQudaGaugeParam() and newQudaInvertParam()
@@ -696,7 +693,7 @@ void initQuda(int dev)
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
 					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
 {
-  // profile.TPSTART(QUDA_PROFILE_INIT);
+  profile.TPSTART(QUDA_PROFILE_INIT);
   GaugeFieldParam gParamEx(in);
   gParamEx.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
   gParamEx.pad = 0;
@@ -713,7 +710,7 @@ static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, Tim
   // copy input field into the extended device gauge field
   copyExtendedGauge(*out, in, QUDA_CUDA_FIELD_LOCATION);
 
-  // profile.TPSTOP(QUDA_PROFILE_INIT);
+  profile.TPSTOP(QUDA_PROFILE_INIT);
 
   // now fill up the halos
   out->exchangeExtendedGhost(R,profile,redundant_comms);
@@ -1751,7 +1748,6 @@ namespace quda {
       errorQuda("Gauge precision %d does not match requested precision %d\n", diracParam.gauge->Precision(),
                 inv_param->cuda_prec_precondition);
   }
-
 
   void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve)
   {
@@ -3628,16 +3624,11 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
   // grow resident solutions to be big enough
   for (int i=solutionResident.size(); i < param->num_offset; i++) {
-    printfQuda("Adding vector %d to solutionsResident\n", i);
+    if (getVerbosity() >= QUDA_DEBUG_VERBOSE) printfQuda("Adding vector %d to solutionsResident\n", i);
     solutionResident.push_back(new cudaColorSpinorField(cudaParam));
   }
   for (int i=0; i < param->num_offset; i++) x[i] = solutionResident[i];
-
-  // DMH Heisenbug...
-  // printfQuda("Solution vectors size %d\n", (int)x.size());
-
   profileMulti.TPSTOP(QUDA_PROFILE_INIT);
-
 
   profileMulti.TPSTART(QUDA_PROFILE_PREAMBLE);
 
@@ -3752,17 +3743,17 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 
           std::vector<ColorSpinorField *> q;
           q.resize(nRefine);
-	  std::vector<ColorSpinorField*> z;
-	  z.resize(nRefine);
-	  cudaParam.create = QUDA_NULL_FIELD_CREATE;
-	  cudaColorSpinorField tmp(cudaParam);
+          std::vector<ColorSpinorField *> z;
+          z.resize(nRefine);
+          cudaParam.create = QUDA_NULL_FIELD_CREATE;
+          cudaColorSpinorField tmp(cudaParam);
 
-	  for(int j=0; j < nRefine; j++) {
-	    q[j] = new cudaColorSpinorField(cudaParam);
-	    z[j] = new cudaColorSpinorField(cudaParam);
-	  }
+          for (int j = 0; j < nRefine; j++) {
+            q[j] = new cudaColorSpinorField(cudaParam);
+            z[j] = new cudaColorSpinorField(cudaParam);
+          }
 
-	  *z[0] = *x[0]; // zero solution already solved
+          *z[0] = *x[0]; // zero solution already solved
 #ifdef REFINE_INCREASING_MASS
 	  for (int j=1; j<nRefine; j++) *z[j] = *x[j];
 #else
@@ -4001,7 +3992,7 @@ int computeGaugeForceQuda(void* mom, void* siteLink,  int*** input_path_buf, int
   } else {
     gParam.create = QUDA_NULL_FIELD_CREATE;
     gParam.reconstruct = qudaGaugeParam->reconstruct;
-    gParam.setPrecision(gParam.Precision(), true);
+    gParam.setPrecision(qudaGaugeParam->cuda_prec, true);
 
     cudaSiteLink = new cudaGaugeField(gParam);
     profileGaugeForce.TPSTOP(QUDA_PROFILE_INIT);

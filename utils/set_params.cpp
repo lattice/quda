@@ -1,34 +1,50 @@
+#include <algorithm>
 #include <command_line_params.h>
 #include <host_utils.h>
+#include "misc.h"
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
+void setGaugeParam(QudaGaugeParam &gauge_param)
 {
+  gauge_param.type = QUDA_SU3_LINKS;
+
   gauge_param.X[0] = xdim;
   gauge_param.X[1] = ydim;
   gauge_param.X[2] = zdim;
   gauge_param.X[3] = tdim;
 
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.tadpole_coeff = 1.0;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-
   gauge_param.cpu_prec = cpu_prec;
   gauge_param.cuda_prec = cuda_prec;
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
+  gauge_param.cuda_prec_sloppy = cuda_prec;
+  gauge_param.cuda_prec_precondition = cuda_prec;
 
   gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_sloppy = link_recon;
+  gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_refinement_sloppy = link_recon;
 
+  gauge_param.anisotropy = 1.0;
+  gauge_param.tadpole_coeff = 1.0;
+
+  gauge_param.ga_pad = 0;
+  gauge_param.mom_ga_pad = 0;
+  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+}
+
+void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
+{
+  setGaugeParam(gauge_param);
+  gauge_param.anisotropy = anisotropy;
+  gauge_param.type = QUDA_WILSON_LINKS;
+  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
+  gauge_param.t_boundary = fermion_t_boundary;
+
+  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
   gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_precondition;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
   gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
 
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon_precondition;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
 
   int pad_size = 0;
   // For multi-GPU, ga_pad must be large enough to store a time-slice
@@ -37,9 +53,47 @@ void setWilsonGaugeParam(QudaGaugeParam &gauge_param)
   int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
   int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
   int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
+#endif
+  gauge_param.ga_pad = pad_size;
+}
+
+void setStaggeredGaugeParam(QudaGaugeParam &gauge_param)
+{
+  setGaugeParam(gauge_param);
+
+  gauge_param.cuda_prec_sloppy = prec_sloppy;
+  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
+  gauge_param.cuda_prec_precondition = prec_precondition;
+  gauge_param.reconstruct_sloppy = link_recon_sloppy;
+  gauge_param.reconstruct_precondition = link_recon;
+  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
+
+  // For HISQ, this must always be set to 1.0, since the tadpole
+  // correction is baked into the coefficients for the first fattening.
+  // The tadpole doesn't mean anything for the second fattening
+  // since the input fields are unitarized.
+  gauge_param.tadpole_coeff = 1.0;
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    gauge_param.scale = -1.0 / 24.0;
+    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
+  } else {
+    gauge_param.scale = 1.0;
+  }
+
+  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
+  gauge_param.t_boundary = fermion_t_boundary;
+  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
+  gauge_param.type = QUDA_WILSON_LINKS;
+
+  int pad_size = 0;
+#ifdef MULTI_GPU
+  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
+  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
+  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
+  pad_size = std::max({x_face_size, y_face_size, z_face_size, t_face_size});
 #endif
   gauge_param.ga_pad = pad_size;
 }
@@ -298,6 +352,7 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.num_setup_iter[i] = num_setup_iter[i];
     mg_param.setup_tol[i] = setup_tol[i];
     mg_param.setup_maxiter[i] = setup_maxiter[i];
+    mg_param.setup_maxiter_refresh[i] = setup_maxiter_refresh[i];
 
     // Basis to use for CA-CGN(E/R) setup
     mg_param.setup_ca_basis[i] = setup_ca_basis[i];
@@ -625,55 +680,6 @@ void setContractInvertParam(QudaInvertParam &inv_param)
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 }
 
-void setStaggeredQDPGaugeParam(QudaGaugeParam &gauge_param)
-{
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_sloppy = prec_sloppy;
-  gauge_param.cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  gauge_param.cuda_prec_precondition = prec_precondition;
-
-  gauge_param.anisotropy = 1.0;
-
-  // For HISQ, this must always be set to 1.0, since the tadpole
-  // correction is baked into the coefficients for the first fattening.
-  // The tadpole doesn't mean anything for the second fattening
-  // since the input fields are unitarized.
-  gauge_param.tadpole_coeff = 1.0;
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    gauge_param.scale = -1.0 / 24.0;
-    if (eps_naik != 0) { gauge_param.scale *= (1.0 + eps_naik); }
-  } else {
-    gauge_param.scale = 1.0;
-  }
-  gauge_param.gauge_order = QUDA_MILC_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-  gauge_param.staggered_phase_type = QUDA_STAGGERED_PHASE_MILC;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-  gauge_param.type = QUDA_WILSON_LINKS;
-
-  int pad_size = 0;
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  pad_size = MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-#endif
-  gauge_param.ga_pad = pad_size;
-}
-
 void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
 {
   // Solver params
@@ -819,11 +825,6 @@ void setStaggeredInvertParam(QudaInvertParam &inv_param)
   inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
   inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
 
-  int tmpint = MAX(ydim * zdim * tdim, xdim * zdim * tdim);
-  tmpint = MAX(tmpint, xdim * ydim * tdim);
-  tmpint = MAX(tmpint, xdim * ydim * zdim);
-
-  // inv_param.sp_pad = tmpint;
   inv_param.sp_pad = 0;
 }
 
@@ -976,15 +977,15 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
 
     if (i == 0) { // top-level treatment
       if (coarse_solve_type[0] != solve_type)
-        errorQuda("Mismatch between top-level MG solve type %d and outer solve type %d", coarse_solve_type[0],
-                  solve_type);
+        errorQuda("Mismatch between top-level MG solve type %s and outer solve type %s",
+                  get_solve_str(coarse_solve_type[0]), get_solve_str(solve_type));
 
       if (solve_type == QUDA_DIRECT_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       } else if (solve_type == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", solve_type);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(solve_type));
       }
 
     } else {
@@ -994,7 +995,7 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
       } else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
         mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
       } else {
-        errorQuda("Unexpected solve_type = %d\n", coarse_solve_type[i]);
+        errorQuda("Unexpected solve_type = %s\n", get_solve_str(coarse_solve_type[i]));
       }
     }
 
@@ -1109,7 +1110,7 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.matpc_type = matpc_type;
 
   if (inv_type != QUDA_EIGCG_INVERTER && inv_type != QUDA_INC_EIGCG_INVERTER && inv_type != QUDA_GMRESDR_INVERTER)
-    errorQuda("Unknown deflated solver type %d.", inv_type);
+    errorQuda("Requested solver %s is not a deflated solver type", get_solver_str(inv_type));
 
   //! For deflated solvers only:
   inv_param.inv_type = inv_type;
@@ -1167,7 +1168,6 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
 
 void setDeflationParam(QudaEigParam &df_param)
 {
-
   df_param.import_vectors = QUDA_BOOLEAN_FALSE;
   df_param.run_verify = QUDA_BOOLEAN_FALSE;
 
@@ -1186,7 +1186,6 @@ void setDeflationParam(QudaEigParam &df_param)
 
 void setQudaStaggeredInvTestParams()
 {
-
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     if (test_type != 0) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }
 
@@ -1252,7 +1251,6 @@ void setQudaStaggeredInvTestParams()
 
 void setQudaStaggeredEigTestParams()
 {
-
   if (dslash_type == QUDA_LAPLACE_DSLASH) {
     // LAPLACE operator path, only DIRECT solves feasible.
     if (test_type != 0) { errorQuda("Test type %d is not supported for the Laplace operator.\n", test_type); }

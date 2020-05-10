@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 #include <quda.h>
 #include <quda_internal.h>
@@ -22,8 +23,6 @@
 // google test frame work
 #include <gtest/gtest.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 using namespace quda;
 
 const QudaParity parity = QUDA_EVEN_PARITY; // even or odd?
@@ -37,7 +36,7 @@ cudaColorSpinorField *cudaSpinor, *cudaSpinorOut, *tmp1=0, *tmp2=0;
 
 void *hostGauge[4], *hostClover, *hostCloverInv;
 
-Dirac *dirac = NULL;
+Dirac *dirac = nullptr;
 
 QudaDagType not_dagger;
 
@@ -55,29 +54,14 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       {"M5inv", dslash_test_type::M5inv},
                                                       {"Dslash4pre", dslash_test_type::Dslash4pre}};
 
-double getTolerance(QudaPrecision prec)
+void init(int argc, char **argv)
 {
-  switch (prec) {
-  case QUDA_QUARTER_PRECISION: return 1e-1;
-  case QUDA_HALF_PRECISION: return 1e-3;
-  case QUDA_SINGLE_PRECISION: return 1e-4;
-  case QUDA_DOUBLE_PRECISION: return 1e-11;
-  case QUDA_INVALID_PRECISION: return 1.0;
-  }
-  return 1.0;
-}
-
-void init(int argc, char **argv) {
-
-  cuda_prec = prec;
+  initQuda(device);
 
   gauge_param = newQudaGaugeParam();
   inv_param = newQudaInvertParam();
 
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
+  setWilsonGaugeParam(gauge_param);
 
   if (dslash_type == QUDA_ASQTAD_DSLASH || dslash_type == QUDA_STAGGERED_DSLASH) {
     errorQuda("Asqtad not supported.  Please try staggered_dslash_test instead");
@@ -92,80 +76,15 @@ void init(int argc, char **argv) {
 
   setSpinorSiteSize(24);
 
-  gauge_param.anisotropy = 1.0;
-
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_ANTI_PERIODIC_T;
-
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  inv_param.kappa = 0.1;
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = epsilon;
-    inv_param.twist_flavor = twist_flavor;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ) {
-    inv_param.m5 = -1.5;
-    kappa5 = 0.5/(5 + inv_param.m5);
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH ) {
-    inv_param.m5 = -1.5;
-    kappa5 = 0.5/(5 + inv_param.m5);
-    for(int k = 0; k < Lsdim; k++)
-    {
-      // b5[k], c[k] values are chosen for arbitrary values,
-      // but the difference of them are same as 1.0
-      inv_param.b_5[k] = 1.50; // + 0.5*k;
-      inv_param.c_5[k] = 0.50; // - 0.5*k;
-    }
-  }
-
-  inv_param.mu = mu;
-  inv_param.mass = mass;
-  inv_param.Ls = (inv_param.twist_flavor != QUDA_TWIST_NONDEG_DOUBLET) ? Ls : 2;
+  setInvertParam(inv_param);
+  inv_param.dagger = dagger ? QUDA_DAG_YES : QUDA_DAG_NO;
+  not_dagger = dagger ? QUDA_DAG_NO : QUDA_DAG_YES;
 
   inv_param.solve_type = (dtest_type == dslash_test_type::Mat || dtest_type == dslash_test_type::MatDagMat) ?
     QUDA_DIRECT_SOLVE :
     QUDA_DIRECT_PC_SOLVE;
-  inv_param.matpc_type = matpc_type;
-  inv_param.dagger = dagger;
-  not_dagger = (QudaDagType)((dagger + 1)%2);
 
-  inv_param.cpu_prec = cpu_prec;
-  if (inv_param.cpu_prec != gauge_param.cpu_prec) {
-    errorQuda("Gauge and spinor CPU precisions must match");
-  }
-  inv_param.cuda_prec = cuda_prec;
-
-  inv_param.input_location = QUDA_CPU_FIELD_LOCATION;
-  inv_param.output_location = QUDA_CPU_FIELD_LOCATION;
-
-#ifndef MULTI_GPU // free parameter for single GPU
-  gauge_param.ga_pad = 0;
-#else // must be this one c/b face for multi gpu
-  int x_face_size = gauge_param.X[1]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int y_face_size = gauge_param.X[0]*gauge_param.X[2]*gauge_param.X[3]/2;
-  int z_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[3]/2;
-  int t_face_size = gauge_param.X[0]*gauge_param.X[1]*gauge_param.X[2]/2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;    
-#endif
-  inv_param.sp_pad = 0;
-  inv_param.cl_pad = 0;
-
-  //inv_param.sp_pad = xdim*ydim*zdim/2;
-  //inv_param.cl_pad = 24*24*24;
-
-  inv_param.gamma_basis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS; // test code only supports DeGrand-Rossi Basis
-  inv_param.dirac_order = QUDA_DIRAC_ORDER;
-
-  if(dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
+  if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -176,7 +95,7 @@ void init(int argc, char **argv) {
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
     }
-  } else if(dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -188,9 +107,7 @@ void init(int argc, char **argv) {
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", static_cast<int>(dtest_type));
     }
-  }
-  else
-  {
+  } else {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::MatPC: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
@@ -201,23 +118,18 @@ void init(int argc, char **argv) {
     }
   }
 
-  inv_param.dslash_type = dslash_type;
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
-      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.clover_cpu_prec = cpu_prec;
-    inv_param.clover_cuda_prec = cuda_prec;
-    inv_param.clover_order = QUDA_PACKED_CLOVER_ORDER;
-    inv_param.clover_coeff = clover_coeff;
-    hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-    hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
-  }
+  if (inv_param.cpu_prec != gauge_param.cpu_prec) errorQuda("Gauge and spinor CPU precisions must match");
 
   // construct input fields
   for (int dir = 0; dir < 4; dir++) hostGauge[dir] = malloc((size_t)V * gauge_site_size * gauge_param.cpu_prec);
 
+  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH
+      || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+    hostClover = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+    hostCloverInv = malloc((size_t)V * clover_site_size * inv_param.clover_cpu_prec);
+  }
+
   ColorSpinorParam csParam;
-  
   csParam.nColor = 3;
   csParam.nSpin = 4;
   csParam.nDim = 4;
@@ -234,7 +146,7 @@ void init(int argc, char **argv) {
     csParam.pc_type = QUDA_4D_PC;
   }
 
-//ndeg_tm    
+  // ndeg_tm
   if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
     csParam.twistFlavor = inv_param.twist_flavor;
     csParam.nDim = (inv_param.twist_flavor == QUDA_TWIST_SINGLET) ? 4 : 5;
@@ -261,27 +173,16 @@ void init(int argc, char **argv) {
   spinorRef = new cpuColorSpinorField(csParam);
   spinorTmp = new cpuColorSpinorField(csParam);
 
+  spinor->Source(QUDA_RANDOM_SOURCE);
+
   csParam.x[0] = gauge_param.X[0];
-  
-  printfQuda("Randomizing fields... ");
-
-  constructHostGaugeField(hostGauge, gauge_param, argc_copy, argv_copy);
-  loadGaugeQuda(hostGauge, &gauge_param);
-
-  if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
-      || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
-    constructHostCloverField(hostClover, hostCloverInv, inv_param);
-    // Load the clover terms to the device
-    loadCloverQuda(hostClover, hostCloverInv, &inv_param);
-  }
-
-  printfQuda("done.\n"); fflush(stdout);
-  
-  initQuda(device);
 
   // set verbosity prior to loadGaugeQuda
   setVerbosity(verbosity);
   inv_param.verbosity = verbosity;
+
+  printfQuda("Randomizing fields... ");
+  constructHostGaugeField(hostGauge, gauge_param, argc, argv);
 
   printfQuda("Sending gauge field to GPU\n");
   loadGaugeQuda(hostGauge, &gauge_param);
@@ -289,11 +190,13 @@ void init(int argc, char **argv) {
   if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH
       || dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     if (compute_clover) printfQuda("Computing clover field on GPU\n");
-    else printfQuda("Sending clover field to GPU\n");
+    else {
+      printfQuda("Sending clover field to GPU\n");
+      constructHostCloverField(hostClover, hostCloverInv, inv_param);
+    }
     inv_param.compute_clover = compute_clover;
     inv_param.return_clover = compute_clover;
-    inv_param.compute_clover_inverse = compute_clover;
-    inv_param.return_clover_inverse = compute_clover;
+    inv_param.compute_clover_inverse = true;
     inv_param.return_clover_inverse = true;
 
     loadCloverQuda(hostClover, hostCloverInv, &inv_param);
@@ -302,13 +205,7 @@ void init(int argc, char **argv) {
   if (!transfer) {
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
-    csParam.setPrecision(inv_param.cuda_prec);
-    if (csParam.Precision() == QUDA_DOUBLE_PRECISION ) {
-      csParam.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
-    } else {
-      /* Single and half */
-      csParam.fieldOrder = QUDA_FLOAT4_FIELD_ORDER;
-    }
+    csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
 
     if (inv_param.solution_type == QUDA_MAT_SOLUTION || inv_param.solution_type == QUDA_MATDAG_MAT_SOLUTION) {
       csParam.siteSubset = QUDA_FULL_SITE_SUBSET;
@@ -353,12 +250,12 @@ void init(int argc, char **argv) {
     
 }
 
-void end() {
+void end()
+{
   if (!transfer) {
-    if(dirac != NULL)
-    {
+    if (dirac != nullptr) {
       delete dirac;
-      dirac = NULL;
+      dirac = nullptr;
     }
     delete cudaSpinor;
     delete cudaSpinorOut;
@@ -379,7 +276,6 @@ void end() {
     free(hostCloverInv);
   }
   endQuda();
-
 }
 
 struct DslashTime {
@@ -406,7 +302,7 @@ DslashTime dslashCUDA(int niter) {
 
   for (int i = 0; i < niter; i++) {
 
-    gettimeofday(&tstart, NULL);
+    gettimeofday(&tstart, nullptr);
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH){
       switch (dtest_type) {
@@ -534,7 +430,7 @@ DslashTime dslashCUDA(int niter) {
       }
     }
 
-    gettimeofday(&tstop, NULL);
+    gettimeofday(&tstop, nullptr);
     long ds = tstop.tv_sec - tstart.tv_sec;
     long dus = tstop.tv_usec - tstart.tv_usec;
     double elapsed = ds + 0.000001*dus;
@@ -564,11 +460,10 @@ DslashTime dslashCUDA(int niter) {
   return dslash_time;
 }
 
-void dslashRef() {
-
+void dslashRef()
+{
   // compare to dslash reference implementation
   printfQuda("Calculating reference implementation...");
-  fflush(stdout);
 
   if (dslash_type == QUDA_WILSON_DSLASH) {
     switch (dtest_type) {
@@ -625,7 +520,6 @@ void dslashRef() {
     }
   } else if (dslash_type == QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH) {
     printfQuda("HASENBUCH_TWIST Test: kappa=%lf mu=%lf\n", inv_param.kappa, inv_param.mu);
-    fflush(stdout);
     switch (dtest_type) {
     case dslash_test_type::Dslash:
       // My dslash should be the same as the clover dslash
@@ -924,7 +818,6 @@ void dslashRef() {
   printfQuda("done.\n");
 }
 
-
 void display_test_info()
 {
   printfQuda("running the following test:\n");
@@ -963,9 +856,7 @@ int main(int argc, char **argv)
   // command line options
   auto app = make_app();
   app->add_option("--test", dtest_type, "Test method")->transform(CLI::CheckedTransformer(dtest_type_map));
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
+
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -973,6 +864,10 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   display_test_info();
 

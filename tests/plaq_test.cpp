@@ -8,24 +8,13 @@
 #include <host_utils.h>
 #include <command_line_params.h>
 #include <dslash_reference.h>
-//#include "misc.h"
 
 #include <qio_field.h>
-
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-// QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-// QudaPrecision &cuda_prec = prec;
-// QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
@@ -67,9 +56,6 @@ int main(int argc, char **argv)
 {
 
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {

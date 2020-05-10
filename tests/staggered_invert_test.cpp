@@ -6,15 +6,8 @@
 
 // QUDA headers
 #include <quda.h>
-#include <quda_internal.h>
-#include <dirac_quda.h>
-#include <dslash_quda.h>
-#include <invert_quda.h>
-#include <util_quda.h>
-#include <blas_quda.h>
+#include <color_spinor_field.h>
 #include <gauge_field.h>
-#include <unitarization_links.h>
-#include <random_quda.h>
 
 // External headers
 #include <misc.h>
@@ -130,31 +123,26 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  if (test_type < 0 || test_type > 6) { errorQuda("Test type %d is outside the valid range.\n", test_type); }
-
-  // Set some default values for precisions and solve types
-  // if none are passed through the command line
-  setQudaDefaultPrecs();
-  if (inv_multigrid) {
-    setQudaDefaultMgSolveTypes();
-    reliable_delta = 1e-4;
-  }
+  // Set values for precisions via the command line.
+  setQudaPrecisions();
 
   // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   initRand();
 
-  // Only these fermions are supported in this file
+  // Only these fermions are supported in this file. Ensure a reasonable default,
+  // ensure that the default is improved staggered
   if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH && dslash_type != QUDA_LAPLACE_DSLASH) {
-    printfQuda("dslash_type %d not supported\n", dslash_type);
-    exit(0);
+    printfQuda("dslash_type %s not supported, defaulting to %s\n", get_dslash_str(dslash_type),
+               get_dslash_str(QUDA_ASQTAD_DSLASH));
+    dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
-  // Need to add support for LAPLACE MG
+  // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
     if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
-      printfQuda("dslash_type %d not supported\n", dslash_type);
+      printfQuda("dslash_type %s not supported for multigrid preconditioner\n", get_dslash_str(dslash_type));
       exit(0);
     }
   }
@@ -167,30 +155,36 @@ int main(int argc, char **argv)
   // Set QUDA internal parameters
   QudaGaugeParam gauge_param = newQudaGaugeParam();
   QudaInvertParam inv_param = newQudaInvertParam();
-  setStaggeredQDPGaugeParam(gauge_param);
-  if (inv_multigrid) {
-    setStaggeredMGInvertParam(inv_param);
-  } else
-    setStaggeredInvertParam(inv_param);
+  setStaggeredGaugeParam(gauge_param);
+  if (!inv_multigrid) setStaggeredInvertParam(inv_param);
 
   QudaInvertParam mg_inv_param = newQudaInvertParam();
   QudaMultigridParam mg_param = newQudaMultigridParam();
+  QudaEigParam mg_eig_param[mg_levels];
 
   if (inv_multigrid) {
+
+    // Set some default values for MG solve types
+    setQudaMgSolveTypes();
+
+    setStaggeredMGInvertParam(inv_param);
+    // Set sub structures
     mg_param.invert_param = &mg_inv_param;
-    QudaEigParam mg_eig_param[mg_levels];
     // Since the top level is just a unitary rotation, we manually
     // set mg_eig[0] to false (and throw a warning if a user set it to true)
-    if (mg_eig[0] && inv_multigrid) {
+    if (mg_eig[0]) {
       printfQuda("Warning: Cannot specify near-null vectors for top level.\n");
       mg_eig[0] = false;
     }
-    for (int i = 0; i < mg_levels; i++) {
-      mg_param.eig_param[i] = &mg_eig_param[i];
-      mg_eig_param[i] = newQudaEigParam();
-      setMultigridEigParam(mg_eig_param[i], i);
+    for (int i = 1; i < mg_levels; i++) {
+      if (mg_eig[i]) {
+        mg_eig_param[i] = newQudaEigParam();
+        setMultigridEigParam(mg_eig_param[i], i);
+        mg_param.eig_param[i] = &mg_eig_param[i];
+      } else {
+        mg_param.eig_param[i] = nullptr;
+      }
     }
-
     setStaggeredMultigridParam(mg_param);
   }
 
@@ -213,9 +207,9 @@ int main(int argc, char **argv)
   // Staggered Gauge construct START
   //-----------------------------------------------------------------------------------
   // Allocate host staggered gauge fields
-  void *qdp_inlink[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *qdp_fatlink[4] = {nullptr, nullptr, nullptr, nullptr};
-  void *qdp_longlink[4] = {nullptr, nullptr, nullptr, nullptr};
+  void* qdp_inlink[4] = {nullptr,nullptr,nullptr,nullptr};
+  void* qdp_fatlink[4] = {nullptr,nullptr,nullptr,nullptr};
+  void* qdp_longlink[4] = {nullptr,nullptr,nullptr,nullptr};
   void *milc_fatlink = nullptr;
   void *milc_longlink = nullptr;
   GaugeField *cpuFat = nullptr;
@@ -278,11 +272,11 @@ int main(int argc, char **argv)
 
   // Staggered vector construct START
   //-----------------------------------------------------------------------------------
-  ColorSpinorField *in;
-  ColorSpinorField *out;
-  ColorSpinorField *ref;
-  ColorSpinorField *tmp;
-  ColorSpinorParam cs_param;
+  quda::ColorSpinorField *in;
+  quda::ColorSpinorField *out;
+  quda::ColorSpinorField *ref;
+  quda::ColorSpinorField *tmp;
+  quda::ColorSpinorParam cs_param;
   constructStaggeredTestSpinorParam(&cs_param, &inv_param, &gauge_param);
   in = quda::ColorSpinorField::Create(cs_param);
   out = quda::ColorSpinorField::Create(cs_param);
@@ -324,7 +318,7 @@ int main(int argc, char **argv)
     for (int k = 0; k < Nsrc; k++) {
       quda::spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
       if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-      printQudaInvertParam(&inv_param);
+
       invertQuda(out->V(), in->V(), &inv_param);
 
       time[k] = inv_param.secs;

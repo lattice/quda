@@ -10,7 +10,7 @@
 #include "gauge_field.h"
 #include "host_utils.h"
 #include <command_line_params.h>
-//#include "llfat_reference.h"
+
 #include "misc.h"
 #include "util_quda.h"
 #include "llfat_quda.h"
@@ -36,7 +36,6 @@ static double svd_rel_error  = 1e-4;
 static double svd_abs_error  = 1e-4;
 static double max_allowed_error = 1e-11;
 
-// static QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
 static QudaGaugeFieldOrder gauge_order = QUDA_MILC_GAUGE_ORDER;
 
 cpuGaugeField *cpuFatLink, *cpuULink, *cudaResult;
@@ -254,9 +253,6 @@ int main(int argc, char **argv)
   xdim=ydim=zdim=tdim=8;
 
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
@@ -264,6 +260,10 @@ int main(int argc, char **argv)
   }
 
   initComms(argc, argv, gridsize_from_cmdline);
+
+  // Ensure gtest prints only from rank 0
+  ::testing::TestEventListeners &listeners = ::testing::UnitTest::GetInstance()->listeners();
+  if (comm_rank() != 0) { delete listeners.Release(listeners.default_result_printer()); }
 
   display_test_info();
   int num_failures = unitarize_link_test(test_rc);

@@ -151,7 +151,10 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_BUILD_ALL_PROGRAMS ON CACHE BOOL "do not build programs by default")
+set(QUDA_BUILD_ALL_PROGRAMS OFF CACHE BOOL "do not build programs by default")
+set(QUDA_INSTALL_ALL_TESTS ON CACHE BOOL "install tests by default")
+set(QUDA_INSTALL_ALL_PROGRAMS OFF CACHE BOOL "do not install programs by default")
+
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
@@ -204,7 +207,9 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_BUILD_ALL_PROGRAMS)
+mark_as_advanced(QUDA_INSTALL_ALL_PRGRAMS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
 mark_as_advanced(QUDA_FLOAT8)
@@ -303,7 +308,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -328,7 +333,7 @@ set(
 enable_language(CXX)
 
 # define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING "Flags used by the C compiler during regular development builds.")
+set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING -DDEVEL"Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
     "-Wall -O3 -Werror -Wno-error=unused-private-field"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
@@ -541,7 +546,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
@@ -799,6 +804,10 @@ if(QUDA_COVDEV)
   add_definitions(-DGPU_COVDEV)
 endif(QUDA_COVDEV)
 
+if(QUDA_TEX AND QUDA_FLOAT8)
+  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
+endif()
+
 # define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
@@ -831,7 +840,7 @@ endif(QUDA_VERBOSE_BUILD)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "${QUDA_NVCC_FLAGS} -lineinfo -DDEVEL -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
@@ -948,10 +957,10 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-# add tests, programs, and quda library
+# add tests, utils, reference, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
 add_subdirectory(utils)
-add_subdirectory(host_reference)
 add_subdirectory(programs)
+add_subdirectory(host_reference)
 add_subdirectory(doc)
