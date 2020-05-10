@@ -4,6 +4,8 @@
 #include <quda.h>
 #include <quda_internal.h>
 
+#include <cuda.h>
+
 void display_driver_info();
 
 void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
