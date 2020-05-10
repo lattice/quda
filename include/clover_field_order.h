@@ -472,33 +472,33 @@ namespace quda {
         }
 
         /**
-	 * @brief Returns the L2 norm suared of the field
-	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
-	 * @return L1 norm
-	 */
-	__host__ double norm2(int dim=-1, bool global=true) const {
+         * @brief Returns the L2 norm suared of the field
+         * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
+         * @return L1 norm
+         */
+        __host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
           if (global) comm_allreduce(&nrm2);
           return nrm2;
         }
 
         /**
-	 * @brief Returns the Linfinity norm of the field
-	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
-	 * @return Linfinity norm
-	 */
-	__host__ double abs_max(int dim=-1, bool global=true) const {
+         * @brief Returns the Linfinity norm of the field
+         * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
+         * @return Linfinity norm
+         */
+        __host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
           return absmax;
         }
 
         /**
-	 * @brief Returns the minimum absolute value of the field
-	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
-	 * @return Minimum norm
-	 */
-	__host__ double abs_min(int dim=-1, bool global=true) const {
+         * @brief Returns the minimum absolute value of the field
+         * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
+         * @return Minimum norm
+         */
+        __host__ double abs_min(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
                                                     minimum<Float>());
           if (global) comm_allreduce_min(&absmax);
@@ -739,13 +739,13 @@ namespace quda {
             backup_norm_h = safe_malloc(norm_bytes);
             qudaMemcpy(backup_norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
           }
-          checkCudaError();
         }
 
         /**
            @brief Restore the field from the host after tuning
         */
-        void load() {
+        void load()
+        {
           qudaMemcpy(clover, backup_h, bytes, qudaMemcpyHostToDevice);
           host_free(backup_h);
           backup_h = nullptr;
@@ -754,14 +754,14 @@ namespace quda {
             host_free(backup_norm_h);
             backup_norm_h = nullptr;
           }
-          checkCudaError();
         }
 
-	size_t Bytes() const {
-	  size_t bytes = length*sizeof(Float);
+        size_t Bytes() const
+        {
+          size_t bytes = length*sizeof(Float);
           if (isFixed<Float>::value) bytes += 2 * sizeof(norm_type);
           return bytes;
-	}
+        }
       };
 
     /**

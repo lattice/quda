@@ -727,7 +727,7 @@ namespace quda {
         active_tunable = &tunable;
         best_time = FLT_MAX;
 
-	if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
+        if (verbosity >= QUDA_DEBUG_VERBOSE) printfQuda("PreTune %s\n", key.name);
 	tunable.preTune();
 
         qudaEventCreate(&start);
@@ -748,10 +748,8 @@ namespace quda {
           tunable.apply(0); // do initial call in case we need to jit compile for these parameters or if policy tuning
           if (verbosity >= QUDA_DEBUG_VERBOSE) {
             printfQuda("About to call tunable.apply block=(%d,%d,%d) grid=(%d,%d,%d) shared_bytes=%d aux=(%d,%d,%d)\n",
-		       param.block.x, param.block.y, param.block.z,
-		       param.grid.x, param.grid.y, param.grid.z,
-		       param.shared_bytes,
-		       param.aux.x, param.aux.y, param.aux.z);
+                       param.block.x, param.block.y, param.block.z, param.grid.x, param.grid.y, param.grid.z,
+                       param.shared_bytes, param.aux.x, param.aux.y, param.aux.z);
           }
 
           qudaEventRecord(start, 0);

@@ -553,7 +553,7 @@ namespace quda {
         if (!comm_peer2peer_enabled(0, dim) || !comm_peer2peer_enabled(1, dim)) qudaDeviceSynchronize();
 
         // if we pass a stream to sendStart then we must ensure that stream is synchronized
-	for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
+        for (int dir=0; dir<2; dir++) sendStart(dim, dir, &streams[dir]);
 	for (int dir=0; dir<2; dir++) commsComplete(dim, dir);
 
 	for (int dir=0; dir<2; dir++) {
@@ -697,8 +697,8 @@ namespace quda {
         } else {
           void *buffer = create_gauge_buffer(src.Bytes(), src.Order(), src.Geometry());
           size_t ghost_bytes[8];
-          int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2*nColor*nColor;
-	  for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
+          int srcNinternal = src.Reconstruct() != QUDA_RECONSTRUCT_NO ? src.Reconstruct() : 2 * nColor * nColor;
+          for (int d=0; d<geometry; d++) ghost_bytes[d] = nFace * surface[d%4] * srcNinternal * src.Precision();
 	  void **ghost_buffer = (nFace > 0) ? create_ghost_buffer(ghost_bytes, src.Order(), geometry) : nullptr;
 
 	  if (src.Order() == QUDA_QDP_GAUGE_ORDER) {

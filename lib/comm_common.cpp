@@ -248,9 +248,9 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
           int accessRank[2] = {};
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    qudaDeviceGetP2PAttribute(&accessRank[0], qudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    qudaDeviceGetP2PAttribute(&accessRank[1], qudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-	  }
+            qudaDeviceGetP2PAttribute(&accessRank[0], qudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+            qudaDeviceGetP2PAttribute(&accessRank[1], qudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+          }
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self

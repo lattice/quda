@@ -187,7 +187,6 @@ namespace quda {
   void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream,
                           const char *func, const char *file, const char *line);
 
-
   /**
      @brief Wrapper around qudaMemset or driver API equivalent
      with no tuning
@@ -199,15 +198,14 @@ namespace quda {
 
   /**
      @brief Wrapper around qudaMemsetAsync or driver API equivalent
-     with no tuning 
+     with no tuning
      @param[out] dst Destination pointer
      @param[in] val value to set
      @param[in] bytes Size of transfer in bytes
   */
   void qudaMemsetAsyncNoTune_(void *dst, int val, size_t count, const qudaStream_t &stream, const char *func,
-                        const char *file, const char *line);
+                              const char *file, const char *line);
 
-  
   /**
      @brief Wrapper around qudaLaunchKernel
      @param[in] func Device function symbol
@@ -216,7 +214,7 @@ namespace quda {
      @param[in] args Arguments
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
-  */  
+  */
   qudaError_t qudaLaunchKernel_(const void *func_arg, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
                                 qudaStream_t stream, const char *func, const char *file, const char *line);
 
@@ -425,15 +423,15 @@ namespace quda {
   /**
      @brief Wrapper around qudaPointerGetAttributes
   */
-  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func,
-                                                  const char *file, const char *line);
+  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func, const char *file,
+                                        const char *line);
 
   /**
      @brief Wrapper around qudaDeviceGetP2PAttribute
   */
-  qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice, const char *func,
-					 const char *file, const char *line);
-  
+  qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice,
+                                         const char *func, const char *file, const char *line);
+
 #if CUDA_VERSION >= 9000
   /**
      @brief Wrapper around qudaFuncSetAttribute
@@ -504,13 +502,13 @@ namespace quda {
 
 // START Memset
 //-------------------------------------------------------------------------------------
-#define qudaMemset(dst, val, count)					\
+#define qudaMemset(dst, val, count)                                                                                    \
   ::quda::qudaMemset_(dst, val, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemsetAsync(dst, val, count, stream)			\
+#define qudaMemsetAsync(dst, val, count, stream)                                                                       \
   ::quda::qudaMemsetAsync_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemsetNoTune(dst, val, count)				\
+#define qudaMemsetNoTune(dst, val, count)                                                                              \
   ::quda::qudaMemsetNoTune_(dst, val, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-#define qudaMemsetAsyncNoTune(dst, val, count, stream)			\
+#define qudaMemsetAsyncNoTune(dst, val, count, stream)                                                                 \
   ::quda::qudaMemsetAsyncNoTune_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaMemset2D(dst, val, pitch, width, height)                                                                   \
@@ -600,11 +598,12 @@ namespace quda {
 
 // START Misc
 //-------------------------------------------------------------------------------------
-#define qudaPointerGetAttribute(attributes, ptr)			\
+#define qudaPointerGetAttribute(attributes, ptr)                                                                       \
   ::quda::qudaPointerGetAttributes_(attributes, ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice)	\
-  ::quda::qudaDeviceGetP2PAttribute_(value, attr, srcDevice, dstDevice, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice)                                                   \
+  ::quda::qudaDeviceGetP2PAttribute_(value, attr, srcDevice, dstDevice, __func__, quda::file_name(__FILE__),           \
+                                     __STRINGIFY__(__LINE__));
 
 #define qudaGetLastError() ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
@@ -615,7 +614,7 @@ namespace quda {
   ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), \
                             __STRINGIFY__(__LINE__));
 #if CUDA_VERSION >= 9000
-#define qudaFuncSetAttribute(func, attr, value)				\
+#define qudaFuncSetAttribute(func, attr, value)                                                                        \
   ::quda::qudaFuncSetAttribute_(func, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 #endif
 
