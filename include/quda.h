@@ -1363,6 +1363,12 @@ extern "C" {
                       double* timeinfo);
 
   /**
+   * @brief Hack for Callat
+   */
+  void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
+		       QudaInvertParam inv_param, const int X[4], int t_size);
+
+  /**
    * @brief Flush the chronological history for the given index
    * @param[in] index Index for which we are flushing
    */
