@@ -3,6 +3,8 @@
 // XXX: Load different header for different archs.
 #include <mma_tensor_op/hmma_m16n16k16_sm70.cuh>
 
+#define USE_GMEM_MMA_PIPELINING
+
 namespace quda
 {
   namespace mma
@@ -45,8 +47,10 @@ namespace quda
       SmemAccessor smem_real;
       SmemAccessor smem_imag;
 
+#ifdef USE_GMEM_MMA_PIPELINING
       half2 reg_real[m_dim * n_dim];
       half2 reg_imag[m_dim * n_dim];
+#endif
 
       const int y;
       const int z;
@@ -59,6 +63,7 @@ namespace quda
       {
       }
 
+#ifdef USE_GMEM_MMA_PIPELINING
       template <int matrix_n, bool transpose, class GmemAccessor>
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
@@ -115,6 +120,59 @@ namespace quda
           }
         }
       }
+#else
+      template <int matrix_n, bool transpose, class GmemAccessor>
+      __device__ inline void g2s(const GmemAccessor &gmem, int m_offset, int n_offset)
+      {
+        auto p = gmem.data();
+        auto scale_inv = gmem.scale_inv;
+        constexpr bool fixed = GmemAccessor::fixed;
+#pragma unroll
+        for (int n = 0; n < n_dim; n++) {
+#pragma unroll
+          for (int m = 0; m < m_dim; m++) {
+            const int n_idx_smem = n * n_stride + y;
+            const int m_idx_smem = m * m_stride_pack + z;
+
+            const int n_idx = n_idx_smem + n_offset;
+            const int m_idx = m_idx_smem + m_offset;
+
+            if (transpose == dagger) {
+              auto xx = p[(m_idx + 0) * matrix_n + n_idx];
+              auto yy = p[(m_idx + 1) * matrix_n + n_idx];
+
+              if (fixed) {
+                smem_real.vector_load(m_idx_smem, n_idx_smem,
+                                      __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real()));
+                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                      __floats2half2_rn(scale_inv_conj * xx.imag(), scale_inv_conj * yy.imag()));
+              } else {
+                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+xx.real(), +yy.real()));
+                smem_imag.vector_load(
+                  m_idx_smem, n_idx_smem,
+                  __floats2half2_rn(dagger ? -xx.imag() : +xx.imag(), dagger ? -yy.imag() : +yy.imag()));
+              }
+            } else {
+              using store_type = typename GmemAccessor::store_type;
+              using store_vector_type = typename VectorType<store_type, 4>::type;
+              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * matrix_n + m_idx]);
+
+              if (fixed) {
+                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(scale_inv * v.x, scale_inv * v.z));
+                auto scale_inv_conj = dagger ? -scale_inv : scale_inv;
+                smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                      __floats2half2_rn(scale_inv_conj * v.y, scale_inv_conj * v.w));
+              } else {
+                smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(+v.x, +v.z));
+                smem_imag.vector_load(m_idx_smem, n_idx_smem,
+                                      __floats2half2_rn(dagger ? -v.y : +v.y, dagger ? -v.w : +v.w));
+              }
+            }
+          }
+        }
+      }
+#endif
     };
 
     template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
@@ -177,6 +235,7 @@ namespace quda
       constexpr bool a_transpose = false;
       constexpr bool b_transpose = true;
 
+#ifdef USE_GMEM_MMA_PIPELINING
       aa_loader.g2r<N, a_transpose>(aa, m_offset, 0);
       aa_loader.r2s();
 
@@ -184,14 +243,22 @@ namespace quda
       bb_loader.r2s();
 
       __syncthreads();
+#endif
 
 #pragma unroll 1
       for (int bk = 0; bk < N; bk += bK) {
 
+#ifdef USE_GMEM_MMA_PIPELINING
         if (bk + bK < N) {
           aa_loader.g2r<N, a_transpose>(aa, m_offset, bk + bK);
           bb_loader.g2r<N, b_transpose>(bb, n_offset, bk + bK);
         }
+#else
+        __syncthreads();
+        aa_loader.g2s<N, a_transpose>(aa, m_offset, bk);
+        bb_loader.g2s<N, b_transpose>(bb, n_offset, bk);
+        __syncthreads();
+#endif
 
 #pragma unroll
         for (int c = 0; c < warp_cycle; c++) {
@@ -225,6 +292,7 @@ namespace quda
           }
         }
 
+#ifdef USE_GMEM_MMA_PIPELINING
         if (bk + bK < N) {
           __syncthreads();
 
@@ -233,6 +301,7 @@ namespace quda
 
           __syncthreads();
         }
+#endif
       }
 
       // wrap up!

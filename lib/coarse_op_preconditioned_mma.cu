@@ -27,10 +27,7 @@ namespace quda
       {
         return 2l * arg.Y.VolumeCB() * 8 * n * n * (8 * n - 2);
       } // 8 from dir, 8 from complexity,
-      long long bytes() const
-      {
-        return 2l * (arg.Xinv.Bytes() + arg.Y.Bytes() + !compute_max_only * arg.Yhat.Bytes());
-      }
+      long long bytes() const { return 2l * (arg.Xinv.Bytes() + arg.Y.Bytes() + !compute_max_only * arg.Yhat.Bytes()); }
 
       unsigned int minThreads() const { return arg.Y.VolumeCB(); }
       bool tuneGridDim() const { return false; } // don't tune the grid dimension
@@ -75,12 +72,12 @@ namespace quda
         constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
         tp.shared_bytes = shared_bytes;
         static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
-        
+
         constexpr int t_m = Arg::M / bM;
         constexpr int t_n = Arg::N / bN;
 
         tp.grid = dim3(minThreads() * t_m * t_n, 2, 4);
-        
+
         // int shared_bytes = sharedBytesPerBlock(tp);
         if (compute_max_only) {
           auto kernel = mma::CalculateYhatGPU<true, Arg, N, bM, bN, bK, block_y, block_z>;
@@ -141,6 +138,7 @@ namespace quda
             case   3: launch_kernel<128, 128, 128,  32,   8,  64>(tp, stream); break;
             case   4: launch_kernel<128, 128, 128,  32,  16,  32>(tp, stream); break;
             case   5: launch_kernel<128, 128, 128,  32,  32,  32>(tp, stream); break;
+            case   6: launch_kernel<128, 128, 128,   8,   8,  64>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
             }
           } else if (arg.M == 192) {
@@ -183,7 +181,7 @@ namespace quda
         switch (arg.M) {
         case  48: max_aux = 5; break;
         case  64: max_aux = 7; break;
-        case 128: max_aux = 5; break;
+        case 128: max_aux = 6; break;
         case 192: max_aux = 3; break;
         default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
         }
@@ -372,8 +370,8 @@ namespace quda
       case 64: calculateYhat<storeFloat, Float, 64>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN4
 #ifdef NSPIN1
-      case 128: calculateYhat<storeFloat,Float,128>(Yhat, Xinv, Y, X); break;
-      case 192: calculateYhat<storeFloat,Float,192>(Yhat, Xinv, Y, X); break;
+      case 128: calculateYhat<storeFloat, Float, 128>(Yhat, Xinv, Y, X); break;
+      case 192: calculateYhat<storeFloat, Float, 192>(Yhat, Xinv, Y, X); break;
 #endif // NSPIN1
       default: errorQuda("Unsupported number of coarse dof %d\n", Y.Ncolor()); break;
       }
