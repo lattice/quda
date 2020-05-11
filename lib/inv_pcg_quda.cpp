@@ -33,6 +33,7 @@ namespace quda
 
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
+    inner.pipeline = true;
 
     inner.maxiter = outer.maxiter_precondition;
     if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
@@ -192,6 +193,8 @@ namespace quda
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     blas::flops = 0;
+
+    PrintStats("PCG", k, r2, b2, heavy_quark_res);
 
     const int maxResIncrease = param.max_res_increase; // check if we reached the limit of our tolerance
     const int maxResIncreaseTotal = param.max_res_increase_total;
