@@ -555,12 +555,9 @@ namespace quda {
 	  } else {
 
 	    if ( (j+1)%Np == 0 ) {
-	      const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	      for (int i=0; i<Np; i++) alpha_[i] = alpha[i];
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::caxpy(alpha_.get(), p, x_);
-	      blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
+	      blas::axpy(alpha, p, x_);
 	    }
 
 	    //p[(k+1)%Np] = r + beta * p[k%Np]
@@ -592,14 +589,11 @@ namespace quda {
       } else {
 
 	{
-	  const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	  for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	  std::vector<ColorSpinorField*> x_;
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::caxpy(alpha_.get(), p_, x_);
-	  blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
+	  blas::axpy(alpha, p_, x_);
 	}
 
         blas::copy(x, xSloppy); // nop when these pointers alias
@@ -730,14 +724,11 @@ namespace quda {
 
       // if we have converged and need to update any trailing solutions
       if (converged && steps_since_reliable > 0 && (j+1)%Np != 0 ) {
-	const auto alpha_ = std::unique_ptr<Complex[]>(new Complex[Np]);
-	for (int i=0; i<=j; i++) alpha_[i] = alpha[i];
 	std::vector<ColorSpinorField*> x_;
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::caxpy(alpha_.get(), p_, x_);
-	blas::flops -= 4*j*xSloppy.RealLength(); // correct for over flop count since using caxpy
+	blas::axpy(alpha, p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j
