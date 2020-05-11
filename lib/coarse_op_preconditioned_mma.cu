@@ -72,9 +72,7 @@ namespace quda
         tp.block.x = 1;
         tp.block.y = block_y;
         tp.block.z = block_z;
-        constexpr int bM_pad = bM + pad_size(bM);
-        constexpr int bN_pad = bN + pad_size(bN);
-        constexpr int shared_bytes = ((bM_pad + 2) * bK + (bN_pad + 2) * bK) * 2 * sizeof(half);
+        constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
         tp.shared_bytes = shared_bytes;
         static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
         
@@ -129,66 +127,27 @@ namespace quda
             case   1: launch_kernel< 64,  64,  64,  16,   8,  32>(tp, stream); break;
             case   2: launch_kernel< 64,  64,  64,  16,  16,  16>(tp, stream); break;
             case   3: launch_kernel< 64,  64,  64,  16,  16,  32>(tp, stream); break;
-            case   4: launch_kernel< 64,  64,  64,  32,  32,   8>(tp, stream); break;
-            case   5: launch_kernel< 64,  64,  64,  32,   8,  32>(tp, stream); break;
-            case   6: launch_kernel< 64,  64,  64,  32,  16,  16>(tp, stream); break;
-            case   7: launch_kernel< 64,  64,  64,  32,  32,  16>(tp, stream); break;
-            case   8: launch_kernel< 64,  64,  64,  32,  16,  32>(tp, stream); break;
-            case   9: launch_kernel< 64,  64,  64,  64,  64,   4>(tp, stream); break;
-            case  10: launch_kernel< 64,  64,  64,  64,  32,   8>(tp, stream); break;
-            case  11: launch_kernel< 64,  64,  64,  64,   8,  32>(tp, stream); break;
-            case  12: launch_kernel< 64,  64,  64,  64,  16,  16>(tp, stream); break;
-            case  13: launch_kernel< 64,  64,  64,  64,  64,   8>(tp, stream); break;
-            case  14: launch_kernel< 64,  64,  64,  64,  32,  16>(tp, stream); break;
-            case  15: launch_kernel< 64,  64,  64,  64,  16,  32>(tp, stream); break;
+            case   4: launch_kernel< 64,  64,  64,  32,  16,  32>(tp, stream); break;
+            case   5: launch_kernel< 64,  64,  64,  64,  64,   8>(tp, stream); break;
+            case   6: launch_kernel< 64,  64,  64,  64,  32,  16>(tp, stream); break;
+            case   7: launch_kernel< 64,  64,  64,  64,  16,  32>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 64", tp.aux.x);
             }
           } else if (arg.M == 128) {
             switch (tp.aux.x) {
-            case   0: launch_kernel<128,  64,  64,  16,  16,  32>(tp, stream); break;
-            case   1: launch_kernel<128,  64,  64,  32,  32,  16>(tp, stream); break;
-            case   2: launch_kernel<128,  64,  64,  32,  16,  32>(tp, stream); break;
-            case   3: launch_kernel<128,  64,  64,  64,  64,   8>(tp, stream); break;
-            case   4: launch_kernel<128,  64,  64,  64,  32,  16>(tp, stream); break;
-            case   5: launch_kernel<128,  64,  64,  64,  16,  32>(tp, stream); break;
-            case   6: launch_kernel<128, 128, 128,   8,   8,  64>(tp, stream); break;
-            case   7: launch_kernel<128, 128, 128,  16,   8,  64>(tp, stream); break;
-            case   8: launch_kernel<128, 128, 128,  16,  16,  32>(tp, stream); break;
-            case   9: launch_kernel<128, 128, 128,  16,  16,  64>(tp, stream); break;
-            case  10: launch_kernel<128, 128, 128,  32,  32,  16>(tp, stream); break;
-            case  11: launch_kernel<128, 128, 128,  32,   8,  64>(tp, stream); break;
-            case  12: launch_kernel<128, 128, 128,  32,  16,  32>(tp, stream); break;
-            case  13: launch_kernel<128, 128, 128,  32,  32,  32>(tp, stream); break;
-            case  14: launch_kernel<128, 128, 128,  32,  16,  64>(tp, stream); break;
-            case  15: launch_kernel<128, 128, 128,  64,  64,   8>(tp, stream); break;
-            case  16: launch_kernel<128, 128, 128,  64,  32,  16>(tp, stream); break;
-            case  17: launch_kernel<128, 128, 128,  64,   8,  64>(tp, stream); break;
-            case  18: launch_kernel<128, 128, 128,  64,  16,  32>(tp, stream); break;
-            case  19: launch_kernel<128, 128, 128,  64,  64,  16>(tp, stream); break;
-            case  20: launch_kernel<128, 128, 128,  64,  32,  32>(tp, stream); break;
-            case  21: launch_kernel<128, 128, 128,  64,  16,  64>(tp, stream); break;
+            case   0: launch_kernel<128, 128, 128,  16,   8,  64>(tp, stream); break;
+            case   1: launch_kernel<128, 128, 128,  16,  16,  32>(tp, stream); break;
+            case   2: launch_kernel<128, 128, 128,  32,  32,  16>(tp, stream); break;
+            case   3: launch_kernel<128, 128, 128,  32,   8,  64>(tp, stream); break;
+            case   4: launch_kernel<128, 128, 128,  32,  16,  32>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 128", tp.aux.x);
             }
           } else if (arg.M == 192) {
             switch (tp.aux.x) {
-            case   0: launch_kernel<192,  64,  64,   8,   8,  32>(tp, stream); break;
-            case   1: launch_kernel<192,  64,  64,  16,   8,  32>(tp, stream); break;
-            case   2: launch_kernel<192,  64,  64,  16,  16,  16>(tp, stream); break;
-            case   3: launch_kernel<192,  64,  64,  16,  16,  32>(tp, stream); break;
-            case   4: launch_kernel<192,  64,  64,  32,  32,   8>(tp, stream); break;
-            case   5: launch_kernel<192,  64,  64,  32,   8,  32>(tp, stream); break;
-            case   6: launch_kernel<192,  64,  64,  32,  16,  16>(tp, stream); break;
-            case   7: launch_kernel<192,  64,  64,  32,  32,  16>(tp, stream); break;
-            case   8: launch_kernel<192,  64,  64,  32,  16,  32>(tp, stream); break;
-            case   9: launch_kernel<192,  96,  96,   8,   8,  48>(tp, stream); break;
-            case  10: launch_kernel<192,  96,  96,  12,   6,  48>(tp, stream); break;
-            case  11: launch_kernel<192,  96,  96,  12,  12,  24>(tp, stream); break;
-            case  12: launch_kernel<192,  96,  96,  12,  12,  48>(tp, stream); break;
-            case  13: launch_kernel<192,  96,  96,  16,   8,  48>(tp, stream); break;
-            case  14: launch_kernel<192,  96,  96,  16,  16,  24>(tp, stream); break;
-            case  15: launch_kernel<192,  96,  96,  32,   8,  48>(tp, stream); break;
-            case  16: launch_kernel<192,  96,  96,  32,  32,  12>(tp, stream); break;
-            case  17: launch_kernel<192,  96,  96,  32,  16,  24>(tp, stream); break;
+            case   0: launch_kernel<192,  64,  64,  32,  32,   8>(tp, stream); break;
+            case   1: launch_kernel<192,  64,  64,  32,   8,  32>(tp, stream); break;
+            case   2: launch_kernel<192,  64,  64,  32,  16,  16>(tp, stream); break;
+            case   3: launch_kernel<192,  64,  64,  32,  16,  32>(tp, stream); break;
             default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 192", tp.aux.x);
             }
           }
@@ -219,13 +178,15 @@ namespace quda
       virtual bool advanceAux(TuneParam &param) const
       {
         int max_aux;
+        // clang-format off
         switch (arg.M) {
-        case 48: max_aux = 5; break;
-        case 64: max_aux = 15; break;
-        case 128: max_aux = 21; break;
-        case 192: max_aux = 17; break;
+        case  48: max_aux = 5; break;
+        case  64: max_aux = 7; break;
+        case 128: max_aux = 4; break;
+        case 192: max_aux = 3; break;
         default: errorQuda("Unsupported number of coarse dof %d\n", arg.M);
         }
+        // clang-format on
 
         if (param.aux.x < max_aux) {
           param.aux.x++;

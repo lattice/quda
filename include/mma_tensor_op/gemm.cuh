@@ -7,6 +7,11 @@ namespace quda
 {
   namespace mma
   {
+    constexpr int shared_memory_bytes(int bM, int bN, int bK)
+    {
+      return (bM + pad_size(bM) + bN + pad_size(bN)) * bK * 2 * sizeof(half);
+    }
+
     template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
 
       T *ptr;
