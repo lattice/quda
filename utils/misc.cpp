@@ -130,6 +130,7 @@ const char *get_dslash_str(QudaDslashType type)
   case QUDA_DOMAIN_WALL_DSLASH: ret = "domain-wall"; break;
   case QUDA_DOMAIN_WALL_4D_DSLASH: ret = "domain_wall_4d"; break;
   case QUDA_MOBIUS_DWF_DSLASH: ret = "mobius"; break;
+  case QUDA_MOBIUS_DWF_EOFA_DSLASH: ret = "mobius-eofa"; break;
   case QUDA_LAPLACE_DSLASH: ret = "laplace"; break;
   default: ret = "unknown"; break;
   }
