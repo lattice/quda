@@ -58,6 +58,9 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 void mdw_m5_eofa_ref(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
                      double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision);
 
+void mdw_m5inv_eofa_ref(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
+                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision);
+
 #ifdef __cplusplus
 }
 #endif
