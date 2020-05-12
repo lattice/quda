@@ -210,6 +210,22 @@ const char *get_matpc_str(QudaMatPCType type)
   return ret;
 }
 
+const char *get_solution_str(QudaSolutionType type)
+{
+  const char *ret;
+
+  switch (type) {
+  case QUDA_MAT_SOLUTION: ret = "mat"; break;
+  case QUDA_MATDAG_MAT_SOLUTION: ret = "mat-dag-mat"; break;
+  case QUDA_MATPC_SOLUTION: ret = "mat-pc"; break;
+  case QUDA_MATPCDAG_MATPC_SOLUTION: ret = "mat-pc-dag-mat-pc"; break;
+  case QUDA_MATPCDAG_MATPC_SHIFT_SOLUTION: ret = "mat-pc-dag-mat-pc-shift"; break;
+  default: fprintf(stderr, "Error: invalid solution type %d\n", type); exit(1);
+  }
+
+  return ret;
+}
+
 const char *get_solve_str(QudaSolveType type)
 {
   const char *ret;
