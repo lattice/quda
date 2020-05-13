@@ -538,6 +538,7 @@ namespace quda {
     }
     m5inv_fac = 0.5 / (1. + factor);                           // 0.5 for the spin project factor
     sherman_morrison_fac = -0.5 / (1. + sherman_morrison_fac); // 0.5 for the spin project factor
+
   }
 
   // Specify the EOFA specific parameters

@@ -107,6 +107,7 @@ void init(int argc, char **argv)
     }
   } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     switch (dtest_type) {
+    case dslash_test_type::Dslash: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     case dslash_test_type::M5:
     case dslash_test_type::M5inv: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
     default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", static_cast<int>(dtest_type));
@@ -413,19 +414,25 @@ DslashTime dslashCUDA(int niter) {
       }
     } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
       switch (dtest_type) {
+      case dslash_test_type::Dslash:
+        if (transfer) {
+          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
+        } else {
+          static_cast<DiracMobiusPCEofa *>(dirac)->full_dslash(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
       case dslash_test_type::M5: // The test for EOFA
         if (transfer) {
-          errorQuda("(transfer == true) version NOT yet available!\n");
+          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
           static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::M5inv:
         if (transfer) {
-          errorQuda("(transfer == true) version NOT yet available!\n");
+          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*tmp1, *cudaSpinor);
-          static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *tmp1);
+          static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       default: errorQuda("Undefined test type(=%d)\n", static_cast<int>(dtest_type));
@@ -867,7 +874,11 @@ void dslashRef()
                       (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
                       inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
       break;
-    case dslash_test_type::M5inv: spinorRef->copy(*spinor); break;
+    case dslash_test_type::M5inv:
+      mdw_m5inv_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
     default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
     }
     free(kappa_b);
