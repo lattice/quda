@@ -21,7 +21,8 @@ namespace quda
     inner.tol = outer.tol_precondition;
     inner.delta = 1e-20;                            // no reliable updates within the inner solver
 
-    inner.precision = outer.precision_precondition; // preconditioners are uni-precision solvers
+    // most preconditioners are uni-precision solvers, with CG being an exception
+    inner.precision = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
@@ -34,6 +35,9 @@ namespace quda
     inner.inv_type_precondition = QUDA_INVALID_INVERTER;
     inner.is_preconditioner = true; // used to tell the inner solver it is an inner solver
     inner.pipeline = true;
+
+    inner.schwarz_type = outer.schwarz_type;
+    inner.global_reduction = inner.schwarz_type == QUDA_INVALID_SCHWARZ ? true : false;
 
     inner.maxiter = outer.maxiter_precondition;
     if (outer.inv_type_precondition == QUDA_CA_GCR_INVERTER) {
@@ -149,16 +153,14 @@ namespace quda
 
     if (K) {
       csParam.create = QUDA_COPY_FIELD_CREATE;
-      csParam.setPrecision(param.precision_precondition);
+      csParam.setPrecision(Kparam.precision);
 #ifdef FLOAT8
       csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
 #endif
       rPre = new cudaColorSpinorField(rSloppy, csParam);
       // Create minvrPre
       minvrPre = new cudaColorSpinorField(*rPre);
-      commGlobalReductionSet(false);
       (*K)(*minvrPre, *rPre);
-      commGlobalReductionSet(true);
       *minvrSloppy = *minvrPre;
       p = new cudaColorSpinorField(*minvrSloppy);
     } else {
@@ -236,9 +238,7 @@ namespace quda
           r_new_Minvr_old = reDotProduct(rSloppy, *minvrSloppy);
           *rPre = rSloppy;
 
-          commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          commGlobalReductionSet(true);
 
           // can fuse these two kernels
           *minvrSloppy = *minvrPre;
@@ -283,10 +283,7 @@ namespace quda
 
         if (K) {
           *rPre = rSloppy;
-          commGlobalReductionSet(false);
           (*K)(*minvrPre, *rPre);
-          commGlobalReductionSet(true);
-
           *minvrSloppy = *minvrPre;
 
           rMinvr = reDotProduct(rSloppy, *minvrSloppy);

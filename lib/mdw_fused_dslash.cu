@@ -751,7 +751,7 @@ namespace quda
       instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,
                                             type);
 #else
-      errorQuda("Domain wall dslash WITH tensor cores has not been built");
+      errorQuda("Domain wall dslash with tensor cores has not been built");
 #endif
     }
   } // namespace mobius_tensor_core

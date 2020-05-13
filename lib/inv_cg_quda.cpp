@@ -220,6 +220,8 @@ namespace quda {
 
   void CG::operator()(ColorSpinorField &x, ColorSpinorField &b, ColorSpinorField *p_init, double r2_old_init)
   {
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(false);
+
     if (checkLocation(x, b) != QUDA_CUDA_FIELD_LOCATION)
       errorQuda("Not supported");
     if (checkPrecision(x, b) != param.precision)
@@ -344,7 +346,7 @@ namespace quda {
     double beta = 0.0;
 
     // for alternative reliable updates
-    if(alternative_reliable){
+    if (alternative_reliable) {
       // estimate norm for reliable updates
       mat(r, b, y, tmp3);
       Anorm = sqrt(blas::norm2(r)/b2);
@@ -770,6 +772,8 @@ namespace quda {
 
       profile.TPSTOP(QUDA_PROFILE_EPILOGUE);
     }
+
+    if (param.is_preconditioner && param.global_reduction == false) commGlobalReductionSet(true);
   }
 
 // use BlockCGrQ algortithm or BlockCG (with / without GS, see BLOCKCG_GS option)
