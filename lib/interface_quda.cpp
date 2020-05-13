@@ -5856,6 +5856,11 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   Complex sinks[cuda_quark_param.nSpin * t_size];
   evecProjectQuda(*quda_quark[0], *quda_evec[0], t_size, sinks);
   time_lsp += clock();
+
+  // Copy data from device to host
+  *quark[0] = *quda_quark[0];
+
+
   saveTuneCache(true);
   
   printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);

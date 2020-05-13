@@ -80,14 +80,28 @@ namespace quda
   template <typename Float, int nColor, int tx2>
   void evecProject(const ColorSpinorField &x, const ColorSpinorField &y, Float *result)
   {
+    double timer = -clock();
     EvecProjectArg<Float, nColor, tx2> arg(x, y);
     EvecProjectCompute<Float, EvecProjectArg<Float, nColor, tx2>> evec_project(arg, x, y);
-    
+    timer += clock();
+    printfQuda("time1 = %e\n", timer/CLOCKS_PER_SEC);
+
+    timer = -clock();
     evec_project.apply(0);
     qudaDeviceSynchronize();
-    
+    timer += clock();
+    printfQuda("time2 = %e\n", timer/CLOCKS_PER_SEC);
+
+    timer = -clock();
     comm_allreduce_array((double*)arg.result_h, 4*tx2);
+    timer += clock();
+    printfQuda("time3 = %e\n", timer/CLOCKS_PER_SEC);
+
+    timer = -clock();
     for(int i=0; i<4*tx2; i++) result[i] = ((double*)arg.result_h)[i];
+    timer += clock();
+    printfQuda("time4 = %e\n", timer/CLOCKS_PER_SEC);
+
   }
   
   void evecProjectQuda(const ColorSpinorField &x, const ColorSpinorField &y, const int t_dim_size, void *result)
