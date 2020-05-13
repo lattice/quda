@@ -129,7 +129,7 @@ if(QUDA_DIRAC_STAGGERED)
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
-  
+
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -144,7 +144,7 @@ if(QUDA_DIRAC_WILSON
   QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-  
+
 if(QUDA_MULTIGRID)
   add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
@@ -367,7 +367,7 @@ foreach(pol IN LISTS DSLASH_POLICIES)
       set_tests_properties(dslash_clover_hasenbusch_twist-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
     endif()
   endif()
-  
+
   if(QUDA_DIRAC_TWISTED_MASS)
     add_test(NAME dslash_twisted-mass-sym-policy${pol2}
              COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
@@ -483,6 +483,8 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+
+
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
@@ -506,7 +508,18 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
-    if(polenv)
+
+    # MdagM local operator
+    add_test(NAME dslash_mobius_local-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type mobius
+                     --test MatPCDagMatPCLocal
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --Lsdim 4
+                     --gtest_output=xml:dslash_mobius_local{pol2}.xml)
+
+     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-asym-policy${pol2}
                            PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})
       set_tests_properties(dslash_mobius-asym-policy${pol2} PROPERTIES ENVIRONMENT QUDA_ENABLE_DSLASH_POLICY=${pol})

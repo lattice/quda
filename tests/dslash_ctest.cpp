@@ -57,6 +57,7 @@ CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_typ
                                                       {"MatPC", dslash_test_type::MatPC},
                                                       {"Mat", dslash_test_type::Mat},
                                                       {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
+                                                      {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
                                                       {"MatDagMat", dslash_test_type::MatDagMat},
                                                       {"M5", dslash_test_type::M5},
                                                       {"M5inv", dslash_test_type::M5inv},
@@ -120,6 +121,7 @@ void init(int precision, QudaReconstructType link_recon)
     case dslash_test_type::M5inv:
     case dslash_test_type::MatPC: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
     case dslash_test_type::Mat: inv_param.solution_type = QUDA_MAT_SOLUTION; break;
+    case dslash_test_type::MatPCDagMatPCLocal:
     case dslash_test_type::MatPCDagMatPC: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", static_cast<int>(dtest_type));
@@ -216,6 +218,11 @@ void init(int precision, QudaReconstructType link_recon)
     csParam.gammaBasis = QUDA_UKQCD_GAMMA_BASIS;
     csParam.pad = inv_param.sp_pad;
     csParam.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
+#ifdef FLOAT8
+    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) {
+      csParam.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+    }
+#endif
 
     if (dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH || dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
       csParam.siteSubset = QUDA_PARITY_SITE_SUBSET;
@@ -414,6 +421,13 @@ DslashTime dslashCUDA(int niter)
           MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
         } else {
           dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPCDagMatPCLocal:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       default: errorQuda("Test type %s not support for current Dslash", get_string(dtest_type_map, dtest_type).c_str());
@@ -836,6 +850,11 @@ void dslashRef() {
       mdw_mat(spinorRef->V(), hostGauge, spinorTmp->V(), kappa_b, kappa_c, not_dagger, gauge_param.cpu_prec,
               gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
       break;
+    case dslash_test_type::MatPCDagMatPCLocal:
+      // reference for MdagM local operator
+      mdw_mdagm_local(spinorRef->V(), hostGauge, spinor->V(), kappa_b, kappa_c, inv_param.matpc_type,
+                      gauge_param.cpu_prec, gauge_param, inv_param.mass, inv_param.b_5, inv_param.c_5);
+      break;
     default: printf("Test type not supported for domain wall\n"); exit(-1);
     }
     free(kappa_b);
@@ -886,10 +905,18 @@ protected:
   bool skip()
   {
     QudaReconstructType recon = static_cast<QudaReconstructType>(::testing::get<1>(GetParam()));
+
     if ((QUDA_PRECISION & getPrecision(::testing::get<0>(GetParam()))) == 0
         || (QUDA_RECONSTRUCT & getReconstructNibble(recon)) == 0) {
       return true;
     }
+
+    if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal
+        && (::testing::get<0>(GetParam()) == 2 || ::testing::get<0>(GetParam()) == 3)) {
+      warningQuda("Only fixed precision supported for MatPCDagMatPCLocal operator, skipping...");
+      return true;
+    }
+
     return false;
   }
 
@@ -952,6 +979,8 @@ TEST_P(DslashTest, verify)
   }
   double deviation = pow(10, -(double)(cpuColorSpinorField::Compare(*spinorRef, *spinorOut)));
   double tol = getTolerance(inv_param.cuda_prec);
+  // If we are using tensor core we tolerate a greater deviation
+  if (dslash_type == QUDA_MOBIUS_DWF_DSLASH && dtest_type == dslash_test_type::MatPCDagMatPCLocal) tol *= 10;
   if (gauge_param.reconstruct == QUDA_RECONSTRUCT_8 && inv_param.cuda_prec >= QUDA_HALF_PRECISION)
     tol *= 10; // if recon 8, we tolerate a greater deviation
 
