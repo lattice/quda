@@ -244,7 +244,6 @@ namespace
                                                            {"bicgstab", QUDA_BICGSTAB_INVERTER},
                                                            {"gcr", QUDA_GCR_INVERTER},
                                                            {"pcg", QUDA_PCG_INVERTER},
-                                                           {"mspcg", QUDA_MSPCG_INVERTER},
                                                            {"mpcg", QUDA_MPCG_INVERTER},
                                                            {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
                                                            {"mr", QUDA_MR_INVERTER},

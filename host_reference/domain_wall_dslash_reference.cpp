@@ -394,8 +394,8 @@ void axpby_ssp_project(sFloat *z, sFloat a, sFloat *x, sFloat b, sFloat *y, int 
 }
 
 template <typename sFloat>
-void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sFloat m5, sFloat b,
-                     sFloat c, sFloat mq1, sFloat mq2, sFloat mq3, int eofa_pm, sFloat eofa_norm, sFloat eofa_shift)
+void mdw_eofa_m5_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sFloat m5, sFloat b,
+                     sFloat c, sFloat mq1, sFloat mq2, sFloat mq3, int eofa_pm, sFloat eofa_shift)
 {
   // res: the output spinor field
   // spinorField: the input spinor field
@@ -403,8 +403,12 @@ void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
   // daggerBit: dagger or not
   // mferm: m_f
 
-  sFloat alpha = b + c;                                             // alpha = b+c
-  sFloat kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
+  sFloat alpha = b + c;
+  sFloat eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+    / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
+    / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
+
+  sFloat kappa = 0.5 * (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.);
 
   constexpr int spinor_size = 4 * 3 * 2;
   for (int i = 0; i < V5h; i++) {
@@ -434,33 +438,28 @@ void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
   std::vector<sFloat> shift_coeffs(Ls);
 
   // Construct Mooee_shift
-  int idx(0);
-  sFloat N = ((eofa_pm == 1) ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
+  sFloat N = (eofa_pm ? 1.0 : -1.0) * (2.0 * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1.0, Ls) + mq1 * std::pow(alpha - 1.0, Ls));
+
   // For the kappa preconditioning
+  int idx = 0;
   N *= 1. / (b * (m5 + 4.) + 1.);
-  printfQuda("eofa_norm(k) = %+16.12e\n", eofa_norm);
-  printfQuda("N            = %+16.12e\n", N);
-  printfQuda("b            = %+16.12e\n", b);
-  printfQuda("m5           = %+16.12e\n", m5);
   for (int s = 0; s < Ls; s++) {
-    idx = (eofa_pm == 1) ? (s) : (Ls - 1 - s);
+    idx = eofa_pm ? (s) : (Ls - 1 - s);
     shift_coeffs[idx] = N * std::pow(-1.0, s) * std::pow(alpha - 1.0, s) / std::pow(alpha + 1.0, Ls + s + 1);
-    printfQuda("shift_coeffs[%02d] = %+16.12e\n", idx, shift_coeffs[idx]);
   }
 
-  // printfQuda("dagger = %d, eofa_pm = %d\n", daggerBit, eofa_pm);
   // The eofa part.
   for (int idx_cb_4d = 0; idx_cb_4d < Vh; idx_cb_4d++) {
     for (int s = 0; s < Ls; s++) {
       if (daggerBit == 0) {
-        if (eofa_pm == 1) {
+        if (eofa_pm) {
           axpby_ssp_project<true>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, s, Ls - 1);
         } else {
           axpby_ssp_project<false>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, s, 0);
         }
       } else {
-        if (eofa_pm == 1) {
+        if (eofa_pm) {
           axpby_ssp_project<true>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, Ls - 1, s);
         } else {
           axpby_ssp_project<false>(res, (sFloat)1., res, shift_coeffs[s], spinorField, idx_cb_4d, 0, s);
@@ -470,19 +469,15 @@ void mdw_m5_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit
   }
 }
 
-void mdw_m5_eofa_ref(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
-                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
+void mdw_eofa_m5(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
+                 double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
-  double alpha = b + c;
-  double eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
-    / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
-    / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_m5_eofa_ref<double>((double *)res, (double *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
-                            eofa_pm, eofa_norm, eofa_shift);
+    mdw_eofa_m5_ref<double>((double *)res, (double *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
+                            eofa_pm, eofa_shift);
   } else {
-    mdw_m5_eofa_ref<float>((float *)res, (float *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
-                           eofa_pm, eofa_norm, eofa_shift);
+    mdw_eofa_m5_ref<float>((float *)res, (float *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
+                           eofa_pm, eofa_shift);
   }
   return;
 }
@@ -683,8 +678,8 @@ void mdslashReference_5th_inv(sFloat *res, sFloat *spinorField, int oddBit, int 
 }
 
 template <typename sFloat>
-void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sFloat m5, sFloat b,
-                     sFloat c, sFloat mq1, sFloat mq2, sFloat mq3, int eofa_pm, sFloat eofa_norm, sFloat eofa_shift)
+void mdw_eofa_m5inv_ref(sFloat *res, sFloat *spinorField, int oddBit, int daggerBit, sFloat mferm, sFloat m5, sFloat b,
+                        sFloat c, sFloat mq1, sFloat mq2, sFloat mq3, int eofa_pm, sFloat eofa_shift)
 {
   // res: the output spinor field
   // spinorField: the input spinor field
@@ -692,7 +687,10 @@ void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
   // daggerBit: dagger or not
   // mferm: m_f
 
-  sFloat alpha = b + c;                                              // alpha = b+c
+  sFloat alpha = b + c;
+  sFloat eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
+    / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
+    / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
   sFloat kappa5 = (c * (4. + m5) - 1.) / (b * (4. + m5) + 1.); // alpha = b+c
 
   using sComplex = double _Complex;
@@ -703,7 +701,7 @@ void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
   std::vector<sFloat> eofa_y(Ls);
 
   mdslashReference_5th_inv(res, spinorField, oddBit, daggerBit, mferm, kappa_array.data());
-  
+
   // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
   // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
   sFloat N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
@@ -713,8 +711,7 @@ void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
   // There is one -1 from N for eofa_pm = minus, thus the u_- here is actually -u_- in the document
   // It turns out this actually simplies things.
   for (int s = 0; s < Ls; s++) {
-    eofa_u[eofa_pm ? s : Ls - 1 - s]
-      = N * std::pow(-1., s) * std::pow(alpha - 1., s) / std::pow(alpha + 1., Ls + s + 1);
+    eofa_u[eofa_pm ? s : Ls - 1 - s] = N * std::pow(-1., s) * std::pow(alpha - 1., s) / std::pow(alpha + 1., Ls + s + 1);
   }
 
   sFloat sherman_morrison_fac;
@@ -758,14 +755,14 @@ void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
         sFloat t = 2.0 * sherman_morrison_fac;
         if (daggerBit == 0) {
           t *= eofa_x[s] * eofa_y[sp];
-          if (eofa_pm == 1) {
+          if (eofa_pm) {
             axpby_ssp_project<true>(res, (sFloat)1., res, t, spinorField, idx_cb_4d, s, sp);
           } else {
             axpby_ssp_project<false>(res, (sFloat)1., res, t, spinorField, idx_cb_4d, s, sp);
           }
         } else {
           t *= eofa_y[s] * eofa_x[sp];
-          if (eofa_pm == 1) {
+          if (eofa_pm) {
             axpby_ssp_project<true>(res, (sFloat)1., res, t, spinorField, idx_cb_4d, s, sp);
           } else {
             axpby_ssp_project<false>(res, (sFloat)1., res, t, spinorField, idx_cb_4d, s, sp);
@@ -776,19 +773,15 @@ void mdw_m5inv_eofa_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
   }
 }
 
-void mdw_m5inv_eofa_ref(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
-                     double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
+void mdw_eofa_m5inv(void *res, void *spinorField, int oddBit, int daggerBit, double mferm, double m5, double b, double c,
+                    double mq1, double mq2, double mq3, int eofa_pm, double eofa_shift, QudaPrecision precision)
 {
-  double alpha = b + c;
-  double eofa_norm = alpha * (mq3 - mq2) * std::pow(alpha + 1., 2 * Ls)
-    / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
-    / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
   if (precision == QUDA_DOUBLE_PRECISION) {
-    mdw_m5inv_eofa_ref<double>((double *)res, (double *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
-                            eofa_pm, eofa_norm, eofa_shift);
+    mdw_eofa_m5inv_ref<double>((double *)res, (double *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
+                               eofa_pm, eofa_shift);
   } else {
-    mdw_m5inv_eofa_ref<float>((float *)res, (float *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
-                           eofa_pm, eofa_norm, eofa_shift);
+    mdw_eofa_m5inv_ref<float>((float *)res, (float *)spinorField, oddBit, daggerBit, mferm, m5, b, c, mq1, mq2, mq3,
+                              eofa_pm, eofa_shift);
   }
   return;
 }
@@ -1055,6 +1048,50 @@ void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double
   free(tmp);
 }
 
+void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision precision, QudaGaugeParam &gauge_param,
+                  double mferm, double m5, double b, double c, double mq1, double mq2, double mq3, int eofa_pm,
+                  double eofa_shift)
+{
+
+  void *tmp = malloc(V5h * spinor_site_size * precision);
+
+  using sComplex = double _Complex;
+
+  std::vector<sComplex> b_array(Ls, b);
+  std::vector<sComplex> c_array(Ls, c);
+
+  auto b5 = b_array.data();
+  auto c5 = c_array.data();
+
+  auto kappa_b = 0.5 / (b * (4. + m5) + 1.);
+
+  void *inEven = in;
+  void *inOdd = (char *)in + V5h * spinor_site_size * precision;
+  void *outEven = out;
+  void *outOdd = (char *)out + V5h * spinor_site_size * precision;
+
+  mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
+  dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
+  // mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
+  mdw_eofa_m5(tmp, inOdd, 1, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+
+  for (int xs = 0; xs < Ls; xs++) {
+    cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b,
+          (char *)outOdd + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+  }
+
+  mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
+  dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
+  // mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
+  mdw_eofa_m5(tmp, inEven, 0, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+
+  for (int xs = 0; xs < Ls; xs++) {
+    cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b,
+          (char *)outEven + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+  }
+
+  free(tmp);
+}
 //
 void dw_matdagmat(void *out, void **gauge, void *in, double kappa, int dagger_bit, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm)
 {
@@ -1198,6 +1235,85 @@ void mdw_matpc(void *out, void **gauge, void *in, double _Complex *kappa_b, doub
   free(kappa5);
   free(kappa2);
   free(kappa_mdwf);
+}
+
+void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type, int dagger, QudaPrecision precision,
+                    QudaGaugeParam &gauge_param, double mferm, double m5, double b, double c, double mq1, double mq2,
+                    double mq3, int eofa_pm, double eofa_shift)
+{
+  void *tmp = malloc(V5h * spinor_site_size * precision);
+
+  using sComplex = double _Complex;
+
+  std::vector<sComplex> kappa2_array(Ls, -0.25 / (b * (4. + m5) + 1.) / (b * (4. + m5) + 1.));
+  std::vector<sComplex> b_array(Ls, b);
+  std::vector<sComplex> c_array(Ls, c);
+
+  auto kappa2 = kappa2_array.data();
+  auto b5 = b_array.data();
+  auto c5 = c_array.data();
+
+  int odd_bit = (matpc_type == QUDA_MATPC_ODD_ODD || matpc_type == QUDA_MATPC_ODD_ODD_ASYMMETRIC) ? 1 : 0;
+  bool symmetric = (matpc_type == QUDA_MATPC_EVEN_EVEN || matpc_type == QUDA_MATPC_ODD_ODD) ? true : false;
+  QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
+
+  if (symmetric && !dagger) {
+    mdw_dslash_4_pre(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5inv(tmp, out, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    for (int xs = 0; xs < Ls; xs++) {
+      cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+    }
+  } else if (symmetric && dagger) {
+    mdw_eofa_m5inv(tmp, in, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
+    for (int xs = 0; xs < Ls; xs++) {
+      cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+    }
+  } else if (!symmetric && !dagger) {
+    mdw_dslash_4_pre(out, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5inv(out, tmp, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5(tmp, in, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
+    for (int xs = 0; xs < Ls; xs++) {
+      cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+    }
+  } else if (!symmetric && dagger) {
+    dslash_4_4d(out, gauge, in, parity[0], dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
+    dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_eofa_m5(tmp, in, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+    // mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
+    for (int xs = 0; xs < Ls; xs++) {
+      cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
+            (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
+    }
+  } else {
+    errorQuda("Unsupported matpc_type=%d dagger=%d", matpc_type, dagger);
+  }
+
+  free(tmp);
 }
 
 // helper for creating extended gauge fields

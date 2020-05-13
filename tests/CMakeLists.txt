@@ -483,7 +483,14 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
-
+    add_test(NAME dslash_mobius_eofa-sym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type mobius-eofa
+                     --test MatPCDagMatPC
+                     --matpc even-even
+                     --dim 2 4 6 8
+                     --Lsdim 4
+                     --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     if(polenv)
       set_tests_properties(dslash_domain-wall-4d-sym-policy${pol2}
@@ -508,6 +515,14 @@ foreach(pol IN LISTS DSLASH_POLICIES)
                      --dim 2 4 6 8
                      --Lsdim 4
                      --gtest_output=xml:dslash_mobius_test_pol${pol2}.xml)
+    add_test(NAME dslash_mobius_eofa-asym-policy${pol2}
+             COMMAND ${QUDA_CTEST_LAUNCH} $<TARGET_FILE:dslash_ctest> ${MPIEXEC_POSTFLAGS}
+                     --dslash-type mobius-eofa
+                     --test MatPCDagMatPC
+                     --matpc even-even-asym
+                     --dim 2 4 6 8
+                     --Lsdim 4
+                     --gtest_output=xml:dslash_mobius_eofa_test_pol${pol2}.xml)
 
     # MdagM local operator
     add_test(NAME dslash_mobius_local-policy${pol2}

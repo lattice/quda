@@ -101,7 +101,6 @@ namespace quda {
 #endif
       break;
     case QUDA_PCG_INVERTER:
-    case QUDA_MSPCG_INVERTER:
       report("PCG");
       solver = new PreconCG(mat, matSloppy, matPrecon, param, profile);
       break;

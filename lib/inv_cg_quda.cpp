@@ -559,12 +559,12 @@ namespace quda {
 	    if ( (j+1)%Np == 0 ) {
 	      std::vector<ColorSpinorField*> x_;
 	      x_.push_back(&xSloppy);
-	      blas::axpy(alpha, p, x_);
-	    }
+              blas::axpy(alpha, p, x_);
+            }
 
-	    //p[(k+1)%Np] = r + beta * p[k%Np]
-	    blas::xpayz(rSloppy, beta, *p[j], *p[(j+1)%Np]);
-	  }
+            // p[(k+1)%Np] = r + beta * p[k%Np]
+            blas::xpayz(rSloppy, beta, *p[j], *p[(j + 1) % Np]);
+          }
 	}
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) {
@@ -595,8 +595,8 @@ namespace quda {
 	  x_.push_back(&xSloppy);
 	  std::vector<ColorSpinorField*> p_;
 	  for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	  blas::axpy(alpha, p_, x_);
-	}
+          blas::axpy(alpha, p_, x_);
+        }
 
         blas::copy(x, xSloppy); // nop when these pointers alias
 
@@ -730,7 +730,7 @@ namespace quda {
 	x_.push_back(&xSloppy);
 	std::vector<ColorSpinorField*> p_;
 	for (int i=0; i<=j; i++) p_.push_back(p[i]);
-	blas::axpy(alpha, p_, x_);
+        blas::axpy(alpha, p_, x_);
       }
 
       j = steps_since_reliable == 0 ? 0 : (j+1)%Np; // if just done a reliable update then reset j

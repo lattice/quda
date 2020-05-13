@@ -1574,8 +1574,7 @@ namespace quda {
       if (inv_param->Ls > QUDA_MAX_DWF_LS) {
         errorQuda("Length of Ls dimension %d greater than QUDA_MAX_DWF_LS %d", inv_param->Ls, QUDA_MAX_DWF_LS);
       }
-      if (!pc) { errorQuda("EOFA ONLY support even-odd preconditioned dslash, for now. :( \n"); }
-      diracParam.type = QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC;
+      diracParam.type = pc ? QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC : QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC;
       diracParam.Ls = inv_param->Ls;
       if (sizeof(Complex) != sizeof(double _Complex)) {
         errorQuda("Irreconcilable difference between interface and internal complex number conventions");
@@ -3730,7 +3729,7 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
         }
 
         if (false) { // experimenting with Minimum residual extrapolation
-	  // only perform MRE using current and previously refined solutions
+                     // only perform MRE using current and previously refined solutions
 #ifdef REFINE_INCREASING_MASS
 	  const int nRefine = i+1;
 #else
@@ -3767,12 +3766,12 @@ void invertMultiShiftQuda(void **_hp_x, void *_hp_b, QudaInvertParam *param)
 	    delete q[j];
 	    delete z[j];
 	  }
-	}
+        }
 
-	SolverParam solverParam(refineparam);
-	solverParam.iter = 0;
-	solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
-	solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
+        SolverParam solverParam(refineparam);
+        solverParam.iter = 0;
+        solverParam.use_init_guess = QUDA_USE_INIT_GUESS_YES;
+        solverParam.tol = (param->tol_offset[i] > 0.0 ?  param->tol_offset[i] : iter_tol); // set L2 tolerance
 	solverParam.tol_hq = param->tol_hq_offset[i]; // set heavy quark tolerance
         solverParam.delta = param->reliable_delta_refinement;
 

@@ -22,11 +22,13 @@ namespace quda
     inner.delta = 1e-20;                            // no reliable updates within the inner solver
 
     // most preconditioners are uni-precision solvers, with CG being an exception
-    inner.precision = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
+    inner.precision
+      = outer.inv_type_precondition == QUDA_CG_INVERTER ? outer.precision_sloppy : outer.precision_precondition;
     inner.precision_sloppy = outer.precision_precondition;
 
     // this sets a fixed iteration count if we're using the MR solver
-    inner.residual_type = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
+    inner.residual_type
+      = (outer.inv_type_precondition == QUDA_MR_INVERTER) ? QUDA_INVALID_RESIDUAL : QUDA_L2_RELATIVE_RESIDUAL;
 
     inner.iter = 0;
     inner.gflops = 0;
@@ -253,7 +255,7 @@ namespace quda
       } else { // reliable update
 
         axpy(alpha, *p, xSloppy); // xSloppy += alpha*p
-        xpy(xSloppy, y); // y += x
+        xpy(xSloppy, y);          // y += x
         // Now compute r
         mat(r, y, x); // x is just a temporary here
         r2 = xmyNorm(b, r);

@@ -92,7 +92,7 @@ void init(int argc, char **argv)
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
     default: errorQuda("Test type %d not defined QUDA_DOMAIN_WALL_4D_DSLASH\n", static_cast<int>(dtest_type));
     }
-  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+  } else if (dslash_type == QUDA_MOBIUS_DWF_DSLASH || dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
     switch (dtest_type) {
     case dslash_test_type::Dslash:
     case dslash_test_type::M5:
@@ -103,14 +103,7 @@ void init(int argc, char **argv)
     case dslash_test_type::MatPCDagMatPCLocal:
     case dslash_test_type::MatPCDagMatPC: inv_param.solution_type = QUDA_MATPCDAG_MATPC_SOLUTION; break;
     case dslash_test_type::MatDagMat: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
-    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_DSLASH\n", static_cast<int>(dtest_type));
-    }
-  } else if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
-    switch (dtest_type) {
-    case dslash_test_type::Dslash: inv_param.solution_type = QUDA_MATDAG_MAT_SOLUTION; break;
-    case dslash_test_type::M5:
-    case dslash_test_type::M5inv: inv_param.solution_type = QUDA_MATPC_SOLUTION; break;
-    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_EOFA_DSLASH\n", static_cast<int>(dtest_type));
+    default: errorQuda("Test type %d not defined on QUDA_MOBIUS_DWF_(EOFA_)DSLASH\n", static_cast<int>(dtest_type));
     }
   } else {
     switch (dtest_type) {
@@ -246,7 +239,6 @@ void init(int argc, char **argv)
     printfQuda("Source: CPU = %e, CUDA = %e\n", cpu_norm, cuda_norm);
 
     bool pc = (dtest_type != dslash_test_type::Mat && dtest_type != dslash_test_type::MatDagMat);
-    if (dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) { pc = true; }
 
     DiracParam diracParam;
     setDiracParam(diracParam, &inv_param, pc);
@@ -416,23 +408,55 @@ DslashTime dslashCUDA(int niter) {
       switch (dtest_type) {
       case dslash_test_type::Dslash:
         if (transfer) {
-          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
+          errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->full_dslash(*cudaSpinorOut, *cudaSpinor);
+          static_cast<DiracMobiusPCEofa *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
         }
         break;
-      case dslash_test_type::M5: // The test for EOFA
+      case dslash_test_type::M5:
         if (transfer) {
-          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
+          errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
           static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
         }
         break;
+      case dslash_test_type::Dslash4pre:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          static_cast<DiracMobiusPCEofa *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+        }
+        break;
       case dslash_test_type::M5inv:
         if (transfer) {
-          dslashQuda_mobius_eofa(spinorOut->V(), spinor->V(), &inv_param, parity, dtest_type);
+          errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
           static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPC:
+      case dslash_test_type::Mat:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+          // MatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->M(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPCDagMatPC:
+      case dslash_test_type::MatDagMat:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+          // MatDagMatQuda(spinorOut->V(), spinor->V(), &inv_param);
+        } else {
+          dirac->MdagM(*cudaSpinorOut, *cudaSpinor);
+        }
+        break;
+      case dslash_test_type::MatPCDagMatPCLocal:
+        if (transfer) {
+          errorQuda("(transfer == true) version NOT yet available!\n");
+        } else {
+          dirac->MdagMLocal(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       default: errorQuda("Undefined test type(=%d)\n", static_cast<int>(dtest_type));
@@ -869,15 +893,49 @@ void dslashRef()
       kappa_mdwf[xs] = -kappa_5[xs];
     }
     switch (dtest_type) {
+    case dslash_test_type::Dslash:
+      dslash_4_4d(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param,
+                  inv_param.mass);
+      break;
     case dslash_test_type::M5:
-      mdw_m5_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
-                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      mdw_eofa_m5(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                  (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2, inv_param.mq3,
+                  inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case dslash_test_type::Dslash4pre:
+      mdw_dslash_4_pre(spinorRef->V(), hostGauge, spinor->V(), parity, dagger, gauge_param.cpu_prec, gauge_param,
+                       inv_param.mass, inv_param.b_5, inv_param.c_5, true);
       break;
     case dslash_test_type::M5inv:
-      mdw_m5inv_eofa_ref(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
-                      (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
-                      inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      mdw_eofa_m5inv(spinorRef->V(), spinor->V(), parity, dagger, inv_param.mass, inv_param.m5,
+                     (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                     inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift, gauge_param.cpu_prec);
+      break;
+    case dslash_test_type::Mat:
+      mdw_eofa_mat(spinorRef->V(), hostGauge, spinor->V(), dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass,
+                   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatDagMat:
+      mdw_eofa_mat(spinorTmp->V(), hostGauge, spinor->V(), dagger, gauge_param.cpu_prec, gauge_param, inv_param.mass,
+                   inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]), inv_param.mq1, inv_param.mq2,
+                   inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      mdw_eofa_mat(spinorRef->V(), hostGauge, spinorTmp->V(), not_dagger, gauge_param.cpu_prec, gauge_param,
+                   inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                   inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatPC:
+      mdw_eofa_matpc(spinorRef->V(), hostGauge, spinor->V(), inv_param.matpc_type, dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      break;
+    case dslash_test_type::MatPCDagMatPC:
+      mdw_eofa_matpc(spinorTmp->V(), hostGauge, spinor->V(), inv_param.matpc_type, dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
+      mdw_eofa_matpc(spinorRef->V(), hostGauge, spinorTmp->V(), inv_param.matpc_type, not_dagger, gauge_param.cpu_prec,
+                     gauge_param, inv_param.mass, inv_param.m5, (__real__ inv_param.b_5[0]), (__real__ inv_param.c_5[0]),
+                     inv_param.mq1, inv_param.mq2, inv_param.mq3, inv_param.eofa_pm, inv_param.eofa_shift);
       break;
     default: printf("Test type not supported for Mobius domain wall EOFA\n"); exit(-1);
     }

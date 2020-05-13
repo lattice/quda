@@ -144,7 +144,7 @@ namespace quda
       auto Ls = arg.Ls;
 
       { // forwards direction
-        const Vector in = cache.load(threadIdx.x, (s + 1) % Ls, parity);
+        const Vector in = cache.load(threadIdx.x, (s + 1) % Ls, 0);
         constexpr int proj_dir = dagger ? +1 : -1;
         if (s == Ls - 1) {
           out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
@@ -154,7 +154,7 @@ namespace quda
       }
 
       { // backwards direction
-        const Vector in = cache.load(threadIdx.x, (s + Ls - 1) % Ls, parity);
+        const Vector in = cache.load(threadIdx.x, (s + Ls - 1) % Ls, 0);
         constexpr int proj_dir = dagger ? -1 : +1;
         if (s == 0) {
           out += (-arg.m_f * in.project(4, proj_dir)).reconstruct(4, proj_dir);
@@ -165,7 +165,7 @@ namespace quda
 
       if (type == M5_EOFA) {
         const eofa_coeff<real> *eofa_coeffs = get_eofa_coeff<real>();
-        Vector diagonal = cache.load(threadIdx.x, s, parity);
+        Vector diagonal = cache.load(threadIdx.x, s, 0);
         out = (static_cast<real>(0.5) * arg.kappa) * out + diagonal; // 1 + kappa*D5; the 0.5 for spin projection
 
         constexpr int proj_dir = pm ? +1 : -1;
@@ -177,7 +177,7 @@ namespace quda
           if (s == (pm ? Ls - 1 : 0)) {
             for (int sp = 0; sp < Ls; sp++) {
               out += (static_cast<real>(0.5) * eofa_coeffs->u[sp])
-                * cache.load(threadIdx.x, sp, parity).project(4, proj_dir).reconstruct(4, proj_dir);
+                * cache.load(threadIdx.x, sp, 0).project(4, proj_dir).reconstruct(4, proj_dir);
             }
           }
         } else {
@@ -185,7 +185,7 @@ namespace quda
           // axpby_ssp_pplus(chi, one, chi, shift_coeffs[s], psi, s, Ls-1);
           // axpby_ssp_pminus(chi, one, chi, shift_coeffs[s], psi, s, 0);
           out += (static_cast<real>(0.5) * eofa_coeffs->u[s])
-            * cache.load(threadIdx.x, pm ? Ls - 1 : 0, parity).project(4, proj_dir).reconstruct(4, proj_dir);
+            * cache.load(threadIdx.x, pm ? Ls - 1 : 0, 0).project(4, proj_dir).reconstruct(4, proj_dir);
         }
 
         if (xpay) { // really axpy
@@ -279,7 +279,7 @@ namespace quda
       }
     }
 
-    template <typename storage_type, int nColor, typename Arg> class Dslash5 : public TunableVectorYZ
+    template <typename storage_type, int nColor, typename Arg> class Dslash5 : public Tunable
     {
     protected:
       Arg &arg;
@@ -326,6 +326,11 @@ namespace quda
         return 2 * nSpin * nColor * sizeof(typename mapper<storage_type>::type);
       }
 
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const
+      {
+        return 0; 
+      }
+
       // overloaded to return max dynamic shared memory if doing shared-memory
       // inverse
       unsigned int maxSharedBytesPerBlock() const
@@ -333,12 +338,12 @@ namespace quda
         if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
           return maxDynamicSharedBytesPerBlock();
         } else {
-          return TunableVectorYZ::maxSharedBytesPerBlock();
+          return Tunable::maxSharedBytesPerBlock();
         }
       }
 
     public:
-      Dslash5(Arg &arg, const ColorSpinorField &meta) : TunableVectorYZ(arg.Ls, arg.nParity), arg(arg), meta(meta)
+      Dslash5(Arg &arg, const ColorSpinorField &meta) : arg(arg), meta(meta)
       {
         strcpy(aux, meta.AuxString());
         if (arg.dagger) strcat(aux, ",Dagger");
@@ -413,20 +418,38 @@ namespace quda
         }
       }
 
+      bool advanceBlockDim(TuneParam &param) const
+      {
+        const unsigned int max_threads = maxBlockSize(param);
+        const unsigned int max_shared = maxSharedBytesPerBlock();
+        bool ret;
+
+        param.block.x += blockStep();
+        int nthreads = param.block.x*param.block.y*param.block.z;
+        if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
+            || sharedBytesPerBlock(param) > max_shared) {
+          resetBlockDim(param);
+          ret = false;
+        } else {
+          ret = true;
+        }
+
+        return ret;
+      }
+
       void initTuneParam(TuneParam &param) const
       {
-        TunableVectorYZ::initTuneParam(param);
+        Tunable::initTuneParam(param);
         param.block.y = arg.Ls; // Ls must be contained in the block
         param.grid.y = 1;
+        param.block.z = 1;
+        param.grid.z = arg.nParity;
         param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
       void defaultTuneParam(TuneParam &param) const
       {
-        TunableVectorYZ::defaultTuneParam(param);
-        param.block.y = arg.Ls; // Ls must be contained in the block
-        param.grid.y = 1;
-        param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
+        initTuneParam(param);
       }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }

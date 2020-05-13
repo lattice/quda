@@ -710,41 +710,39 @@ public:
       */
       bool zMobius;
 
-  public:
-    DiracMobius(const DiracParam &param);
-    DiracMobius(const DiracMobius &dirac);
-    virtual ~DiracMobius();
-    DiracMobius& operator=(const DiracMobius &dirac);
+      double mobius_kappa_b;
+      double mobius_kappa_c;
+      double mobius_kappa;
 
-    void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
-    void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+    public:
+      DiracMobius(const DiracParam &param);
+      // DiracMobius(const DiracMobius &dirac);
+      // virtual ~DiracMobius();
+      // DiracMobius& operator=(const DiracMobius &dirac);
 
-    void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
-    void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
-			const ColorSpinorField &x, const double &k) const;
-    void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in,
-		     const QudaParity parity, const ColorSpinorField &x, const double &k) const;
+      void Dslash4(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+      void Dslash4pre(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
+      void Dslash5(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity) const;
 
-    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
-    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+      void Dslash4Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                       const ColorSpinorField &x, const double &k) const;
+      void Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                          const ColorSpinorField &x, const double &k) const;
+      void Dslash5Xpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
+                       const ColorSpinorField &x, const double &k) const;
 
-    virtual void prepare(ColorSpinorField* &src, ColorSpinorField* &sol,
-			 ColorSpinorField &x, ColorSpinorField &b,
-			 const QudaSolutionType) const;
-    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
-			     const QudaSolutionType) const;
+      virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+      virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+      virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                           const QudaSolutionType) const;
+      virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
-  // 4d Even-odd preconditioned Mobius domain wall
+  // 4d even-odd preconditioned Mobius domain wall
   class DiracMobiusPC : public DiracMobius {
 
   protected:
-    double kappa_b;
-    double kappa_c;
-    double m5inv_fac = 0.;
-    std::vector<double> m5inv_plus, m5inv_minus;
     cudaGaugeField *extended_gauge;
 
   private:
@@ -767,13 +765,13 @@ public:
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
   };
 
-  // 4d Even-odd preconditioned Mobius domain wall with EOFA
-  class DiracMobiusPCEofa : public DiracMobiusPC
+  // Full Mobius EOFA
+  class DiracMobiusEofa : public DiracMobius
   {
 
   protected:
-  private:
     // The EOFA parameters
+    double m5inv_fac = 0.;
     double sherman_morrison_fac = 0.;
     double eofa_shift;
     int eofa_pm;
@@ -785,13 +783,26 @@ public:
     double eofa_y[QUDA_MAX_DWF_LS];
 
   public:
-    DiracMobiusPCEofa(const DiracParam &param);
-    DiracMobiusPCEofa(const DiracMobiusPC &dirac);
-    virtual ~DiracMobiusPCEofa();
-    DiracMobiusPCEofa &operator=(const DiracMobiusPC &dirac);
+    DiracMobiusEofa(const DiracParam &param);
 
     void m5_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x, double a = -1.) const;
+
+    virtual void M(ColorSpinorField &out, const ColorSpinorField &in) const;
+    virtual void MdagM(ColorSpinorField &out, const ColorSpinorField &in) const;
+
+    virtual void prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x, ColorSpinorField &b,
+                         const QudaSolutionType) const;
+    virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+  };
+
+  // 4d Even-odd preconditioned Mobius domain wall with EOFA
+  class DiracMobiusPCEofa : public DiracMobiusEofa
+  {
+
+  public:
+    DiracMobiusPCEofa(const DiracParam &param);
+
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
                          double a = -1.) const;
