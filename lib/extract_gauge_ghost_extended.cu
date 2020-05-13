@@ -443,7 +443,13 @@ namespace quda {
 #endif
     } else if (u.Precision() == QUDA_HALF_PRECISION) {
 #if QUDA_PRECISION & 2
-      extractGhostEx(u, dim, R, (short**)ghost, extract);      
+      extractGhostEx(u, dim, R, (short**)ghost, extract);
+#else
+      errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
+#endif
+    } else if (u.Precision() == QUDA_QUARTER_PRECISION) {
+#if QUDA_PRECISION & 1
+      extractGhostEx(u, dim, R, (char**)ghost, extract);
 #else
       errorQuda("QUDA_PRECISION=%d does not enable half precision", QUDA_PRECISION);
 #endif
