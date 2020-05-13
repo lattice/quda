@@ -526,10 +526,11 @@ namespace quda
 
       long long bytes() const
       {
-        const long long dim[4] = {arg.dim[0], arg.dim[1], arg.dim[2], arg.dim[3]};
-        const long long b_m0 = ((dim[0] - 0) * (dim[1] - 0) * (dim[2] - 0) * (dim[3] - 0) / 2) * arg.Ls * (24 * 2 + 4);
-        const long long b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * arg.Ls * (24 * 2 + 4);
-        const long long b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * arg.Ls * (24 * 2 + 4);
+        auto site_size = arg.Ls * (2ll * meta.Nspin() * meta.Ncolor() * meta.Precision() + sizeof(float));
+        auto dim = arg.dim;
+        auto b_m0 = ((dim[0] - 0) * (dim[1] - 0) * (dim[2] - 0) * (dim[3] - 0) / 2) * site_size;
+        auto b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * site_size;
+        auto b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * site_size;
         switch (arg.type) {
         case 0: return b_m1 + b_m2 + arg.U.Bytes();
         case 1: return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
@@ -541,9 +542,7 @@ namespace quda
         return 0ll;
       }
 
-      bool tuneGridDim() const { return true; }
       bool tuneAuxDim() const { return true; }
-      bool tuneSharedBytes() const { return true; }
 
       int blockStep() const { return 16; }
       int blockMin() const { return 16; }
