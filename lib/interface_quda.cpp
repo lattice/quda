@@ -5808,7 +5808,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 }
 
 void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
-		     QudaInvertParam inv_param, const int X[4], int t_size)
+		     QudaInvertParam inv_param, const int X[4])
 {
   // Parameter object describing the sources and smeared quarks
   ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
@@ -5852,18 +5852,18 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order
   double time_lsp = -clock();
-  //int t_size = comm_dim(3) * t_size;
-  Complex sinks[cuda_quark_param.nSpin * t_size];
-  evecProjectQuda(*quda_quark[0], *quda_evec[0], t_size, sinks);
+
+  // Value of first t coord on this rank.
+  int t_start = X[3] * comm_coord(3); 
+  
+  Complex sinks[cuda_quark_param.nSpin * X[3]];
+  evecProjectQuda(*quda_quark[0], *quda_evec[0], t_start, sinks);
   time_lsp += clock();
 
-  // Copy data from device to host
-  *quark[0] = *quda_quark[0];
-
-
-  saveTuneCache(true);
-  
-  printfQuda("LSP time = %e\n", time_lsp/CLOCKS_PER_SEC);
+  for(int i=0; i<cuda_quark_param.nSpin * X[3]; i++) {
+    //printfQuda("elem %d = (%.16e,%.16e)\n", i, sinks[i].real(), sinks[i].imag());
+    ((Complex*)host_sinks)[i] = sinks[i];
+  }
 
   // Clean up memory allocations
   delete quark[0];

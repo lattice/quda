@@ -1,5 +1,4 @@
 #pragma once
-
 #include <color_spinor_field_order.h>
 #include <index_helper.cuh>
 #include <quda_matrix.h>
@@ -11,11 +10,11 @@
 namespace quda
 {
 
-  template <typename Float_, int nColor_, int tx2_> struct EvecProjectArg :
-    //public ReduceArg<vector_type<double, t_>>
-    public ReduceArg<double4>
+  template <typename Float_, int nColor_, int t_> struct EvecProjectArg :
+    public ReduceArg<double2>
   {
     int threads; // number of active threads required
+    int E[4]; // extended grid dimensions
     int X[4]; // true grid dimensions
     int border[4];
     
@@ -23,7 +22,7 @@ namespace quda
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
     
-    static constexpr int t = tx2_/2;
+    static constexpr int t = t_;
     static constexpr int nSpinX = 4;
     static constexpr int nSpinY = 1;
     static constexpr bool spin_project = true;
@@ -35,17 +34,19 @@ namespace quda
 
     F4 x_vec;
     F1 y_vec;
+    int t_dim_start;
     
-    EvecProjectArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec) :
-      //ReduceArg<vector_type<double, t_>>(),
-      ReduceArg<double4>(),
+    EvecProjectArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec, const int t_dim_start) :
+      ReduceArg<double2>(),
       threads(x_vec.VolumeCB()),
       x_vec(x_vec),
-      y_vec(y_vec)
+      y_vec(y_vec),
+      t_dim_start(t_dim_start)
     {
       int R = 0;
       for (int dir=0; dir<4; ++dir){
         border[dir] = x_vec.R()[dir];
+	E[dir] = x_vec.X()[dir];
         X[dir] = x_vec.X()[dir] - border[dir]*2;
         R += border[dir];
       }
@@ -66,9 +67,10 @@ namespace quda
     typedef ColorSpinor<real, nColor, nSpinX> Vector4;
     typedef ColorSpinor<real, nColor, nSpinY> Vector1;
 
-    double4 res_local[t*2];
-    for(int i=0; i<t*2; i++) {
-      res_local[i].x = res_local[i].y = res_local[i].z = res_local[i].w = 0.0;
+    double2 res_local[t*nSpinX];
+    for(int i=0; i<t*nSpinX; i++) {
+      res_local[i].x = 0.0;
+      res_local[i].y = 0.0;
     }
     
     int x[4];
@@ -92,32 +94,21 @@ namespace quda
       }
 
       // Place color contracted data in local array for reduction
-#pragma unroll
-      for(int i=0; i<t; i++) {
+      for(int i=arg.t_dim_start; i<arg.t_dim_start + t; i++) {
 	if(x[3] == i) {
-	  // mup (mu prime) runs from 0 to 1. Each iteration of mup deals with two
-	  // spin values. We are using a double4 data type
-	  // to speed up reduction, so we do some fancy indexing.
-#pragma unroll	  
-	  for (int mup = 0; mup < nSpinX/2; mup++) {
-	    // mu = 0,2
-	    res_local[i*2 + mup].x += res[2*mup  ].x; 
-	    res_local[i*2 + mup].y += res[2*mup  ].y;
-	    // mu = 1,3
-	    res_local[i*2 + mup].z += res[2*mup+1].x;
-	    res_local[i*2 + mup].w += res[2*mup+1].y;
+	  //#pragma unroll	  
+	  for (int mu = 0; mu < nSpinX; mu++) {
 	    
-	    // test data makes it easy to ensure that
-	    // the kernel is behaving correctly
-	    //res_local[i*2 + mup].x += 1.0*(mup+1);
-	    //res_local[i*2 + mup].y += 2.0*(mup+1);
-	    //res_local[i*2 + mup].z += 3.0*(mup+1);
-	    //res_local[i*2 + mup].w += 4.0*(mup+1);
+	    res_local[i*nSpinX + mu].x = res[mu].x; 
+	    res_local[i*nSpinX + mu].y = res[mu].y;
+	    
+	    //res_local[i*nSpinX + mu].x = 1.0*(i+1)*(mu+1); 
+	    //res_local[i*nSpinX + mu].y = 2.0*(i+1)*(mu+1);	    
 	  }
 	}
       }
       idx_cb += blockDim.x * gridDim.x;
     }
-    for(int i=0; i<2*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
+    for(int i=0; i<nSpinX*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
   }
 } // namespace quda
