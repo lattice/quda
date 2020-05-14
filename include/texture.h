@@ -164,7 +164,7 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   void restore(char **norm_h, size_t norm_bytes)
   {
     if (norm_bytes > 0) {
-      qudaMemcpy(norm, *norm_h, norm_bytes, qudaMemcpyHostToDevice);
+      qudaMemcpyNoTune(norm, *norm_h, norm_bytes, qudaMemcpyHostToDevice);
       delete[] * norm_h;
       *norm_h = 0;
     }
@@ -464,7 +464,7 @@ public:
 #ifndef USE_TEXTURE_OBJECTS
       StoreType *spinor = ST::tex.Spinor();
 #endif
-      qudaMemcpy(spinor, *spinor_h, bytes, qudaMemcpyHostToDevice);
+      qudaMemcpyNoTune(spinor, *spinor_h, bytes, qudaMemcpyHostToDevice);
       SN::restore(norm_h, norm_bytes);
       delete[] * spinor_h;
       *spinor_h = 0;
