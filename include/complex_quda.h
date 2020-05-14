@@ -20,12 +20,9 @@
 
 #pragma once
 
-//#include <math.h>
-
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <qudaComplex.h>
 
 namespace quda {
   namespace gauge {
