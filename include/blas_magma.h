@@ -2,7 +2,6 @@
 #define _BLAS_MAGMA_H
 
 #include <quda_backend.h>
-#include <quda_backend.h>
 #include <string>
 #include <complex>
 #include <qudaComplex.h>

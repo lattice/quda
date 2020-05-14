@@ -322,7 +322,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -862,7 +862,7 @@ endif(QUDA_VERBOSE_BUILD)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "${QUDA_NVCC_FLAGS} -lineinfo -DDEVEL -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
