@@ -15,8 +15,8 @@
 
 // this file has some workarounds to allow compilation using nvrtc of kernels that include this file
 #ifdef __CUDACC_RTC__
-#define QUresult bool
-#define QUDA_SUCCESS true
+#define CUresult bool
+#define CUDA_SUCCESS true
 #endif
 
 namespace quda {
