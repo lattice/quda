@@ -137,6 +137,16 @@ namespace quda
 	}
 	break;
 
+      case 12 :
+	if (x.Precision() == QUDA_SINGLE_PRECISION) {
+	  evecProject<float, 3, 12>(x, y, t_dim_start, (float*)result);
+	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
+	  evecProject<double, 3, 12>(x, y, t_dim_start, (double*)result);
+	} else {
+	  errorQuda("Precision %d not supported", x.Precision());
+	}
+	break;
+
       case 16 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
 	  evecProject<float, 3, 16>(x, y, t_dim_start, (float*)result);
