@@ -4,7 +4,6 @@
 #include <sys/time.h>
 
 #include <quda_backend.h>
-#include <quda_backend.h>
 
 #include "quda.h"
 #include "gauge_field.h"

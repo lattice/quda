@@ -1,4 +1,4 @@
-# basic setup for cmake
+# Basic setup for cmake
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
 if(POLICY CMP0074)

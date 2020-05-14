@@ -3,13 +3,11 @@
 #include <string.h>
 #include <sys/time.h>
 #include <quda_backend.h>
-#include <quda_backend.h>
 
 #include "quda.h"
 #include "gauge_field.h"
 #include "host_utils.h"
 #include <command_line_params.h>
-//#include "llfat_reference.h"
 #include "misc.h"
 #include "util_quda.h"
 #include "malloc_quda.h"

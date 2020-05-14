@@ -3,7 +3,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <quda_backend.h>
-#include <quda_backend.h>
 
 #include "quda.h"
 #include "host_utils.h"

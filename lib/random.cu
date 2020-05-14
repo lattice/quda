@@ -144,7 +144,7 @@ namespace quda
 
   /*! @brief Restore CURAND array states initialization */
   void RNG::restore() {
-    qudaMemcpy(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
+    qudaMemcpyNoTune(state, backup_state, size * sizeof(cuRNGState), qudaMemcpyHostToDevice);
     host_free(backup_state);
   }
 
