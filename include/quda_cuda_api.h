@@ -3,8 +3,8 @@
 #ifndef __CUDACC_RTC__
 // This header includes all the CUDA data types
 #include <quda_target_api.h> 
-//#include <quda_cuda_api.h>
 #include <cuda_profiler_api.h>
+
 /**
    @file quda_cuda_api.h
 
@@ -15,12 +15,12 @@
 namespace quda {
 
   /**
-     @brief Wrapper around qudaGetErrorString
+     @brief Wrapper around cudaGetErrorString
   */
   const char *qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaGetLastError
+     @brief Wrapper around cudaGetLastError
   */
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
 
@@ -36,7 +36,7 @@ namespace quda {
                              const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
+     @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
      @param[out] dst Destination pointer
@@ -48,7 +48,7 @@ namespace quda {
                    const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpy used for calls where tuning
+     @brief Wrapper around cudaMemcpy used for calls where tuning
      should be disabled. Do not call directly, rather call macro below
      which will grab the location of the call.
      @param[out] dst Destination pointer
@@ -60,7 +60,7 @@ namespace quda {
                          const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpyAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
@@ -72,7 +72,7 @@ namespace quda {
                         const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpyAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
      where no tuning should take place.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
@@ -84,7 +84,7 @@ namespace quda {
                               const char *func, const char *file, const char *line);
 
   /**
-   @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
+   @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
    call directly, rather call macro below which will grab the
    location of the call.
    @param[out] dst Destination pointer
@@ -99,7 +99,7 @@ namespace quda {
                      qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
-   @brief Wrapper around qudaMemcpy where no tuning should take place.
+   @brief Wrapper around cudaMemcpy where no tuning should take place.
    Do not call directly, rather call macro below which will grab the
    location of the call.
    @param[out] dst Destination pointer
@@ -114,7 +114,7 @@ namespace quda {
                            qudaMemcpyKind kind, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
@@ -130,7 +130,7 @@ namespace quda {
                           const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      where no tuning should take place.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
@@ -146,7 +146,7 @@ namespace quda {
                                 const char *line);
 
   /**
-     @brief Wrapper around qudaMemset or driver API equivalent
+     @brief Wrapper around cudaMemset or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] val value to set
@@ -155,7 +155,7 @@ namespace quda {
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemsetAsync or driver API equivalent
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] val value to set
@@ -165,7 +165,7 @@ namespace quda {
                         const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemset2D or driver API equivalent
+     @brief Wrapper around cudaMemset2D or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] pitch Destination pitch
@@ -177,7 +177,7 @@ namespace quda {
                      const char *line);
 
   /**
-     @brief Wrapper around qudaMemset2DAsync or driver API equivalent
+     @brief Wrapper around cudaMemset2DAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] pitch Destination pitch
@@ -189,7 +189,7 @@ namespace quda {
                           const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemset or driver API equivalent
+     @brief Wrapper around cudaMemset or driver API equivalent
      with no tuning
      @param[out] dst Destination pointer
      @param[in] val value to set
@@ -198,7 +198,7 @@ namespace quda {
   void qudaMemsetNoTune_(void *dst, int val, size_t count, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemsetAsync or driver API equivalent
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
      with no tuning
      @param[out] dst Destination pointer
      @param[in] val value to set
@@ -208,7 +208,7 @@ namespace quda {
                               const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaLaunchKernel
+     @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol
      @param[in] gridDim Grid dimensions
      @param[in] blockDim Block dimensions
@@ -220,14 +220,14 @@ namespace quda {
                                 qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventCreate
+     @brief Wrapper around cudaEventCreate
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventCreateWithFlags
+     @brief Wrapper around cudaEventCreateWithFlags
      @param[in] event Event we are querying
      @return Status of event query
   */
@@ -235,21 +235,21 @@ namespace quda {
                                         const char *line);
 
   /**
-     @brief Wrapper around qudaEventDestroy
+     @brief Wrapper around cudaEventDestroy
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventQuery
+     @brief Wrapper around cudaEventQuery
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventRecord
+     @brief Wrapper around cudaEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
   */
@@ -257,7 +257,7 @@ namespace quda {
                                const char *line);
 
   /**
-     @brief Wrapper around qudaEventElapsedTime
+     @brief Wrapper around cudaEventElapsedTime
      @param[out] ms Time in ms
      @param[in,out] start Start event we are recording
      @param[in,out] end End event we are recording
@@ -266,13 +266,13 @@ namespace quda {
                                     const char *line);
 
   /**
-     @brief Wrapper around qudaEventSynchronize
+     @brief Wrapper around cudaEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
   */
   qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaStreamWaitEvent
+     @brief Wrapper around cudaStreamWaitEvent
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
@@ -281,19 +281,19 @@ namespace quda {
                                    const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaStreamSynchronize or quStreamSynchronize
+     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
      @param[in] stream Stream which we are synchronizing
   */
   qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
-   @brief Wrapper around qudaStreamCreate or quStreamCreate
+   @brief Wrapper around cudaStreamCreate or cuStreamCreate
    @param[in] stream Stream which we are creating
 */
   qudaError_t qudaStreamCreate_(qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
-   @brief Wrapper around qudaStreamDestroy or quStreamDestroy
+   @brief Wrapper around cudaStreamDestroy or cuStreamDestroy
    @param[in] stream Stream which we are destroying
 */
   qudaError_t qudaStreamDestroy_(qudaStream_t &stream, const char *func, const char *file, const char *line);
@@ -347,7 +347,7 @@ namespace quda {
   qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize
+     @brief Wrapper around cudaDeviceCount
   */
   qudaError_t qudaGetDeviceCount_(int *count, const char *func, const char *file, const char *line);
 
@@ -422,13 +422,13 @@ namespace quda {
   qudaError_t qudaMemFree_(void *ptr, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaPointerGetAttributes
+     @brief Wrapper around cudaPointerGetAttributes
   */
   qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func, const char *file,
                                         const char *line);
 
   /**
-     @brief Wrapper around qudaDeviceGetP2PAttribute
+     @brief Wrapper around cudaDeviceGetP2PAttribute
   */
   qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice,
                                          const char *func, const char *file, const char *line);
@@ -445,7 +445,7 @@ namespace quda {
 
 #if CUDA_VERSION >= 9000
   /**
-     @brief Wrapper around qudaFuncSetAttribute
+     @brief Wrapper around cudaFuncSetAttribute
      @param[in] func Function for which we are setting the attribute
      @param[in] attr Attribute to set
      @param[in] value Value to set
