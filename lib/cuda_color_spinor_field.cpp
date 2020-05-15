@@ -697,9 +697,8 @@ namespace quda {
       if (src.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
         // special case where we use mapped memory to read/write directly from application's array
         void *src_d;
-        qudaError_t error = qudaHostGetDevicePointer(&src_d, const_cast<void *>(src.V()), 0);
-        if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
-        copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
+	qudaHostGetDevicePointer(&src_d, const_cast<void *>(src.V()), 0);
+	copyGenericColorSpinor(*this, src, QUDA_CUDA_FIELD_LOCATION, v, src_d);
       } else {
         void *Src=nullptr, *srcNorm=nullptr, *buffer=nullptr;
         if (!zeroCopy) {
@@ -712,8 +711,7 @@ namespace quda {
           buffer = pool_pinned_malloc(src.Bytes()+src.NormBytes());
           memcpy(buffer, src.V(), src.Bytes());
           memcpy(static_cast<char*>(buffer)+src.Bytes(), src.Norm(), src.NormBytes());
-          qudaError_t error = qudaHostGetDevicePointer(&Src, buffer, 0);
-          if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+	  qudaHostGetDevicePointer(&Src, buffer, 0);
           srcNorm = static_cast<char*>(Src) + src.Bytes();
         }
 
@@ -746,8 +744,7 @@ namespace quda {
       if (dest.FieldOrder() == QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER) {
 	// special case where we use zero-copy memory to read/write directly from application's array
 	void *dest_d;
-        qudaError_t error = qudaHostGetDevicePointer(&dest_d, const_cast<void *>(dest.V()), 0);
-        if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField field");
+	qudaHostGetDevicePointer(&dest_d, const_cast<void *>(dest.V()), 0);
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dest_d, v);
       } else {
         void *dst = nullptr, *dstNorm = nullptr, *buffer = nullptr;
@@ -757,9 +754,8 @@ namespace quda {
           dstNorm = static_cast<char*>(dst) + dest.Bytes();
         } else {
           buffer = pool_pinned_malloc(dest.Bytes()+dest.NormBytes());
-          qudaError_t error = qudaHostGetDevicePointer(&dst, buffer, 0);
-          if (error != qudaSuccess) errorQuda("Failed to get device pointer for ColorSpinorField");
-          dstNorm = static_cast<char*>(dst)+dest.Bytes();
+	  qudaHostGetDevicePointer(&dst, buffer, 0);
+	  dstNorm = static_cast<char*>(dst)+dest.Bytes();
         }
 
         copyGenericColorSpinor(dest, *this, QUDA_CUDA_FIELD_LOCATION, dst, 0, dstNorm, 0);

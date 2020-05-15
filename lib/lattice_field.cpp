@@ -19,6 +19,9 @@ namespace quda {
   MsgHandle* LatticeField::mh_recv_p2p_fwd[2][QUDA_MAX_DIM] { };
   MsgHandle* LatticeField::mh_recv_p2p_back[2][QUDA_MAX_DIM] { };
 
+  // FIXME: IPC is very CUDA specific, and likely should be better
+  // abstracted so it's not exposed at the physics level like this.
+  // Ok for now though. -- KC
   qudaEvent_t LatticeField::ipcCopyEvent[2][2][QUDA_MAX_DIM];
   qudaEvent_t LatticeField::ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
