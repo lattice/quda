@@ -410,28 +410,28 @@ DslashTime dslashCUDA(int niter) {
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4(*cudaSpinorOut, *cudaSpinor, parity);
         }
         break;
       case dslash_test_type::M5:
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
+          static_cast<DiracMobiusEofaPC *>(dirac)->m5_eofa(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::Dslash4pre:
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
+          static_cast<DiracMobiusEofaPC *>(dirac)->Dslash4pre(*cudaSpinorOut, *cudaSpinor, parity);
         }
         break;
       case dslash_test_type::M5inv:
         if (transfer) {
           errorQuda("(transfer == true) version NOT yet available!\n");
         } else {
-          static_cast<DiracMobiusPCEofa *>(dirac)->m5inv_eofa(*cudaSpinorOut, *cudaSpinor);
+          static_cast<DiracMobiusEofaPC *>(dirac)->m5inv_eofa(*cudaSpinorOut, *cudaSpinor);
         }
         break;
       case dslash_test_type::MatPC:

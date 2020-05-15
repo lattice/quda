@@ -2,19 +2,11 @@
 #include <color_spinor_field_order.h>
 #include <dslash_quda.h>
 #include <index_helper.cuh>
-#include <dslash_quda.h>
 
 #include <include/kernels/dslash_domain_wall_m5.cuh>
 
 namespace quda
 {
-
-  /*
-    FIXME
-    - check dagger operators are correct - there might need to be a
-    shift by 1 in which coefficients are used and conjugation of coefficients
-    - use kappa notation and not b/c for consistency with other codes and sanity
-  */
 
   template <typename Float, int nColor, typename Arg> class Dslash5 : public TunableVectorYZ
   {

@@ -702,8 +702,6 @@ void mdw_eofa_m5inv_ref(sFloat *res, sFloat *spinorField, int oddBit, int dagger
 
   mdslashReference_5th_inv(res, spinorField, oddBit, daggerBit, mferm, kappa_array.data());
 
-  // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
-  // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
   sFloat N = (eofa_pm ? +1. : -1.) * (2. * eofa_shift * eofa_norm)
     * (std::pow(alpha + 1., Ls) + mq1 * std::pow(alpha - 1., Ls)) / (b * (m5 + 4.) + 1.);
 
@@ -1072,7 +1070,6 @@ void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision p
 
   mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
   dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
-  // mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
   mdw_eofa_m5(tmp, inOdd, 1, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
 
   for (int xs = 0; xs < Ls; xs++) {
@@ -1082,7 +1079,6 @@ void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision p
 
   mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
   dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
-  // mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
   mdw_eofa_m5(tmp, inEven, 0, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
 
   for (int xs = 0; xs < Ls; xs++) {
@@ -1261,22 +1257,18 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
     mdw_dslash_4_pre(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
     mdw_eofa_m5inv(tmp, out, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     for (int xs = 0; xs < Ls; xs++) {
       cxpay((char *)in + precision * Vh * spinor_site_size * xs, kappa2[xs],
             (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
     }
   } else if (symmetric && dagger) {
     mdw_eofa_m5inv(tmp, in, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(tmp, gauge, in, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     for (int xs = 0; xs < Ls; xs++) {
@@ -1287,11 +1279,9 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
     mdw_dslash_4_pre(out, gauge, in, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm);
     mdw_eofa_m5inv(out, tmp, parity[1], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm, kappa_mdwf);
     mdw_dslash_4_pre(tmp, gauge, out, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     dslash_4_4d(out, gauge, tmp, parity[1], dagger, precision, gauge_param, mferm);
     mdw_eofa_m5(tmp, in, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for (int xs = 0; xs < Ls; xs++) {
       cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
             (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
@@ -1300,11 +1290,9 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
     dslash_4_4d(out, gauge, in, parity[0], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm, b5, c5, true);
     mdw_eofa_m5inv(out, tmp, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5_inv(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, kappa_mdwf);
     dslash_4_4d(tmp, gauge, out, parity[1], dagger, precision, gauge_param, mferm);
     mdw_dslash_4_pre(out, gauge, tmp, parity[0], dagger, precision, gauge_param, mferm, b5, c5, true);
     mdw_eofa_m5(tmp, in, parity[0], dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
-    // mdw_dslash_5(tmp, gauge, in, parity[0], dagger, precision, gauge_param, mferm, kappa5, true);
     for (int xs = 0; xs < Ls; xs++) {
       cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, kappa2[xs],
             (char *)out + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);

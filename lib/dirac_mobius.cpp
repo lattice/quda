@@ -24,10 +24,15 @@ namespace quda {
     }
 
     if (getVerbosity() > QUDA_VERBOSE) {
-      if (zMobius)
+      if (zMobius) {
         printfQuda("%s: Detected variable or complex cofficients: using zMobius\n", __func__);
-      else
+      } else {
         printfQuda("%s: Detected fixed real cofficients: using regular Mobius\n", __func__);
+      }
+    }
+    
+    if (zMobius) {
+      errorQuda("zMobius has NOT been fully tested in QUDA.\n");
     }
   }
 
@@ -82,7 +87,7 @@ namespace quda {
 
     ApplyDomainWall4D(out, in, *gauge, k, m5, b_5, c_5, x, parity, dagger, commDim, profile);
 
-    flops += (1320LL + 48LL) * (long long)in.Volume();
+    flops += 1320LL * (long long)in.Volume();
   }
 
   void DiracMobius::Dslash4preXpay(ColorSpinorField &out, const ColorSpinorField &in, const QudaParity parity,
@@ -97,7 +102,8 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += (72LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+
+    flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   // The xpay operator bakes in a factor of kappa_b^2
@@ -113,14 +119,14 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += (96LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   void DiracMobius::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     checkFullSpinor(out, in);
 
-    // FIXME broken for variable coefficients
+    // zMobius breaks the following code. Refer to the zMobius check in DiracMobius::DiracMobius(param)
     double mobius_kappa_b = 0.5 / (b_5[0].real() * (4.0 + m5) + 1.0);
 
     // cannot use Xpay variants since it will scale incorrectly for this operator
@@ -407,7 +413,7 @@ namespace quda {
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1
-      const long long hop = 7ll * 8ll;            // 8 for eight directions, 7 comes from Peter/Grid's count
+      const long long hop = 7ll * 8ll;            // 8 for eight directions
 
       long long vol;
       long long halo_vol;
@@ -462,8 +468,6 @@ namespace quda {
       / (std::pow(alpha + 1., Ls) + mq2 * std::pow(alpha - 1., Ls))
       / (std::pow(alpha + 1., Ls) + mq3 * std::pow(alpha - 1., Ls));
 
-    // Following the Grid implementation of MobiusEOFAFermion<Impl>::SetCoefficientsPrecondShiftOps()
-    // QUDA uses the kappa preconditioning: there is a (2.*kappa_b)^-1 difference here.
     double N = (eofa_pm ? +1. : -1.) * (2. * this->eofa_shift * eofa_norm)
       * (std::pow(alpha + 1., Ls) + this->mq1 * std::pow(alpha - 1., Ls)) / (b * (m5 + 4.) + 1.);
 
@@ -522,7 +526,9 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += (48LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+
+    // 96 = 48 + 48, the second 48 from EOFA
+    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   void DiracMobiusEofa::m5_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
@@ -541,7 +547,9 @@ namespace quda {
     long long Ls = in.X(4);
     long long bulk = (Ls - 2) * (in.Volume() / Ls);
     long long wall = 2 * in.Volume() / Ls;
-    flops += (96LL + 48LL) * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
+
+    // 144 = 96 + 48, the 48 from EOFA
+    flops += 144LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall;
   }
 
   void DiracMobiusEofa::M(ColorSpinorField &out, const ColorSpinorField &in) const
@@ -568,7 +576,9 @@ namespace quda {
     long long wall = 2 * in.Volume() / Ls;
     flops += 72LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall; // pre
     flops += 1320LL * (long long)in.Volume();                            // dslash4
-    flops += 48LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall; // dslash5
+
+    // 96 = 48 + 48, the second 48 from EOFA
+    flops += 96LL * (long long)in.Volume() + 96LL * bulk + 120LL * wall; // dslash5
 
     deleteTmp(&tmp, reset);
   }
@@ -601,9 +611,9 @@ namespace quda {
     // do nothing
   }
 
-  DiracMobiusPCEofa::DiracMobiusPCEofa(const DiracParam &param) : DiracMobiusEofa(param) {}
+  DiracMobiusEofaPC::DiracMobiusEofaPC(const DiracParam &param) : DiracMobiusEofa(param) {}
 
-  void DiracMobiusPCEofa::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracMobiusEofaPC::m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
 
@@ -615,10 +625,10 @@ namespace quda {
                                eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
 
     long long Ls = in.X(4);
-    flops += (144LL * Ls + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
+    flops += (192LL * Ls + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
   }
 
-  void DiracMobiusPCEofa::m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
+  void DiracMobiusEofaPC::m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,
                                           double a) const
   {
     if (in.Ndim() != 5 || out.Ndim() != 5) errorQuda("Wrong number of dimensions\n");
@@ -633,11 +643,11 @@ namespace quda {
                                eofa_y, sherman_morrison_fac, dagger, M5INV_EOFA);
 
     long long Ls = in.X(4);
-    flops += (144LL * Ls + 48LL + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
+    flops += (192LL * Ls + 48LL + 96LL) * (long long)in.Volume() + 3LL * Ls * (Ls - 1LL);
   }
 
   // Apply the even-odd preconditioned mobius DWF EOFA operator
-  void DiracMobiusPCEofa::M(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracMobiusEofaPC::M(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset1 = newTmp(&tmp1, in);
 
@@ -680,7 +690,7 @@ namespace quda {
     deleteTmp(&tmp1, reset1);
   }
 
-  void DiracMobiusPCEofa::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
+  void DiracMobiusEofaPC::prepare(ColorSpinorField *&src, ColorSpinorField *&sol, ColorSpinorField &x,
                                   ColorSpinorField &b, const QudaSolutionType solType) const
   {
     // we desire solution to preconditioned system
@@ -721,7 +731,7 @@ namespace quda {
         Dslash4Xpay(*src, *tmp1, QUDA_ODD_PARITY, b.Odd(), 1.0);
         sol = &(x.Odd());
       } else {
-        errorQuda("MatPCType %d not valid for DiracMobiusPCEofa", matpcType);
+        errorQuda("MatPCType %d not valid for DiracMobiusEofaPC", matpcType);
       }
       // here we use final solution to store parity solution and parity source
       // b is now up for grabs if we want
@@ -729,7 +739,7 @@ namespace quda {
     }
   }
 
-  void DiracMobiusPCEofa::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
+  void DiracMobiusEofaPC::reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType solType) const
   {
     if (solType == QUDA_MATPC_SOLUTION || solType == QUDA_MATPCDAG_MATPC_SOLUTION) { return; }
 
@@ -754,7 +764,7 @@ namespace quda {
     deleteTmp(&tmp1, reset1);
   }
 
-  void DiracMobiusPCEofa::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
+  void DiracMobiusEofaPC::MdagM(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     bool reset = newTmp(&tmp2, in);
     M(*tmp2, in);
@@ -763,7 +773,7 @@ namespace quda {
   }
 
   void
-  DiracMobiusPCEofa::full_dslash(ColorSpinorField &out,
+  DiracMobiusEofaPC::full_dslash(ColorSpinorField &out,
                                  const ColorSpinorField &in) const // ye = Mee * xe + Meo * xo, yo = Moo * xo + Moe * xe
   {
     checkFullSpinor(out, in);

@@ -252,10 +252,12 @@ namespace quda
 
     /**
     -> Everything should be understood in a 4d checkboarding sense.
+      Given index in the shrinked block, calculate the coordinate in the shrinked block,
+      then shift the coordinate to the un-shrinked coordinate, e.g. (0,0,4,1) -> (2,2,6,3) with shift = (2,2,2,2)
     */
     template <class T>
     __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const T shrinked_dim[4],
-                                                          const int shift[4], int parity) // s is the 5d stuff,
+                                                          const int shift[4], int parity)
     {
       int aux[4];
       aux[0] = shrinked_index * 2;

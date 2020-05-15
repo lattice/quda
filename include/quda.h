@@ -112,7 +112,7 @@ extern "C" {
 
     /**<
      * The following specifies the EOFA parameters. Notation follows arXiv:1706.05843
-     * eofa_shift: the "\beta" in the paper, or the "shift" in Grid implementation
+     * eofa_shift: the "\beta" in the paper
      * eofa_pm: plus or minus for the EOFA operator
      * mq1, mq2, mq3 are the three masses corresponds to Hasenbusch mass spliting.
      * As far as I know mq1 is always the same as "mass" but it's here just for consistence.

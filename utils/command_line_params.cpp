@@ -447,9 +447,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
-  quda_app->add_option("--precon-schwarz-type", precon_schwarz_type, "Whether to use Schwarz preconditionering")
+  quda_app->add_option("--precon-schwarz-type", precon_schwarz_type, "The type of Schwarz preconditioning to use (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
-  quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle, "Whether to use Schwarz preconditionering");
+  quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle, "The number of Schwarz cycles to apply per smoother application (default=1)");
 
   CLI::TransformPairs<int> rank_order_map {{"col", 0}, {"row", 1}};
   quda_app
@@ -756,7 +756,7 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
 
   quda_app->add_mgoption(
     opgroup, "--mg-schwarz-type", mg_schwarz_type, CLI::Validator(),
-    "Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)")
+    "The type of preconditioning to use (requires MR smoother and GCR setup solver) (default=invalid)")
     ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
   quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
                          "The number of Schwarz cycles to apply per smoother application (default=1)");

@@ -11,15 +11,16 @@
 #if (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 #include <mma.h>
 
-// The `mma.sync` PTX is only available with or after CUDA 10.1
+// The `mma.sync` PTX is only available with CUDA 10.1 or after
 #if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ >= 1) || (__CUDACC_VER_MAJOR__ > 10))                         \
-  && (__COMPUTE_CAPABILITY__ < 750)
+  && (__COMPUTE_CAPABILITY__ == 700)
 #define USE_MMA_SYNC // rather than using wmma
 #include <mma_tensor_op/mma_m16n16k16_sm70.cuh>
 #endif
 
 namespace quda
 {
+  constexpr int warp_size = 32;
 
   template <class T> struct TensorCoreSharedMemory {
     __device__ inline operator T *()
@@ -51,7 +52,7 @@ namespace quda
       int offset_m = x * 4;
       float value = generic[x * Ls + threadIdx.y]; // Assuming the input matrix is row major
 
-      // exp = 0 means we are on the diagonal.
+      // exponent = 0 means we are on the diagonal.
       sm_a[(offset_k + 0) * (M_sm) + (offset_m + 0)] = value;
       sm_a[(offset_k + 1) * (M_sm) + (offset_m + 1)] = value;
       sm_a[(offset_k + 2) * (M_sm) + (offset_m + 2)] = value;
@@ -112,21 +113,21 @@ namespace quda
           factorL = mm[threadIdx.y * Ls + x];
         }
       } else {
-        int exp;
+        int exponent;
         if (dagger) {
-          exp = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          factorR = inv * powf(k, __int2float_rn(exp)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+          exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
+          factorR = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
         } else {
-          exp = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          factorR = inv * powf(k, __int2float_rn(exp)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+          exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
+          factorR = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
         }
 
         if (dagger) {
-          exp = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
-          factorL = inv * powf(k, __int2float_rn(exp)) * (x < threadIdx.y ? -arg.m_f : 1.f);
+          exponent = x < threadIdx.y ? Ls - threadIdx.y + x : x - threadIdx.y;
+          factorL = inv * powf(k, __int2float_rn(exponent)) * (x < threadIdx.y ? -arg.m_f : 1.f);
         } else {
-          exp = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
-          factorL = inv * powf(k, __int2float_rn(exp)) * (x > threadIdx.y ? -arg.m_f : 1.f);
+          exponent = x > threadIdx.y ? Ls - x + threadIdx.y : threadIdx.y - x;
+          factorL = inv * powf(k, __int2float_rn(exponent)) * (x > threadIdx.y ? -arg.m_f : 1.f);
         }
       }
 
@@ -167,23 +168,23 @@ namespace quda
 
     while (x < Ls) {
       int offset_m = x * 2;
-      int exp = x - threadIdx.y;
+      int exponent = x - threadIdx.y;
       float factorR, factorL;
 
       if (dagger) {
-        factorR = (exp == -1 ? 1.f : (exp == +Ls - 1 ? -arg.m_f : 0.f));
+        factorR = (exponent == -1 ? 1.f : (exponent == +Ls - 1 ? -arg.m_f : 0.f));
       } else {
-        factorR = (exp == +1 ? 1.f : (exp == -Ls + 1 ? -arg.m_f : 0.f));
+        factorR = (exponent == +1 ? 1.f : (exponent == -Ls + 1 ? -arg.m_f : 0.f));
       }
 
       if (dagger) {
-        factorL = (exp == +1 ? 1.f : (exp == -Ls + 1 ? -arg.m_f : 0.f));
+        factorL = (exponent == +1 ? 1.f : (exponent == -Ls + 1 ? -arg.m_f : 0.f));
       } else {
-        factorL = (exp == -1 ? 1.f : (exp == +Ls - 1 ? -arg.m_f : 0.f));
+        factorL = (exponent == -1 ? 1.f : (exponent == +Ls - 1 ? -arg.m_f : 0.f));
       }
 
-      // exp = 0 means we are on the diagonal.
-      float RpL = exp == 0 ? arg.alpha * (factorR + factorL) + b : arg.alpha * (factorR + factorL);
+      // exponent = 0 means we are on the diagonal.
+      float RpL = exponent == 0 ? arg.alpha * (factorR + factorL) + b : arg.alpha * (factorR + factorL);
       float RmL = arg.alpha * (factorR - factorL);
 
       half2 *A = reinterpret_cast<half2 *>(sm_a);
@@ -415,7 +416,7 @@ namespace quda
     constexpr int tm_dim = M / WMMA_M;
     constexpr int tn_dim = N / WMMA_N;
 
-    constexpr int total_warp = BlockDimX * Ls / 32;
+    constexpr int total_warp = BlockDimX * Ls / warp_size;
 
     static_assert((tm_dim * tn_dim) % total_warp == 0, "(tm_dim*tn_dim)%%total_warp==0\n");
     static_assert(tn_dim % (tm_dim * tn_dim / total_warp) == 0, "tn_dim%%(tm_dim*tn_dim/total_warp)==0\n");

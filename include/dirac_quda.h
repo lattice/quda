@@ -797,11 +797,11 @@ public:
   };
 
   // 4d Even-odd preconditioned Mobius domain wall with EOFA
-  class DiracMobiusPCEofa : public DiracMobiusEofa
+  class DiracMobiusEofaPC : public DiracMobiusEofa
   {
 
   public:
-    DiracMobiusPCEofa(const DiracParam &param);
+    DiracMobiusEofaPC(const DiracParam &param);
 
     void m5inv_eofa(ColorSpinorField &out, const ColorSpinorField &in) const;
     void m5inv_eofa_xpay(ColorSpinorField &out, const ColorSpinorField &in, const ColorSpinorField &x,

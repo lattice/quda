@@ -186,7 +186,7 @@ void dslashQuda_mobius_eofa(void *h_out, void *h_in, QudaInvertParam *inv_param,
   DiracParam diracParam;
   setDiracParam(diracParam, inv_param, pc);
 
-  DiracMobiusPCEofa dirac(diracParam); // create the Dirac operator
+  DiracMobiusEofaPC dirac(diracParam); // create the Dirac operator
   switch (test_type) {
   case dslash_test_type::MatPC: dirac.M(out, in); break;
   case dslash_test_type::M5: dirac.m5_eofa(out, in); break;

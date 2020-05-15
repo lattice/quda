@@ -491,7 +491,13 @@ namespace quda {
     M5INV_EOFA
   };
 
-  enum MdwfFusedDslashType { // the details are too complicated to describe here.
+  enum MdwfFusedDslashType {
+    /**
+      Applying the following five kernels in the order of 4-0-1-2-3 is equivalent to applying
+      the full even-odd preconditioned symmetric MdagM operator:
+      op = (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)^dag
+            * (1 - M5inv * D4 * D5pre * M5inv * D4 * D5pre)
+    */
     dslash4_dslash5pre_dslash5inv = 0,
     dslash4_dslash5inv_dslash5invdag = 1,
     dslash4dag_dslash5predag_dslash5invdag = 2,
