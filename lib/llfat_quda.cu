@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <cstdio>
 #include <quda_internal.h>
 #include <gauge_field.h>

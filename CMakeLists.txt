@@ -25,10 +25,10 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
-if(DEFINED ENV{QUDA_BACKEND})
-  set(DEFBACKEND $ENV{QUDA_BACKEND})
+if(DEFINED ENV{QUDA_TARGET})
+  set(DEFTARGET $ENV{QUDA_TARGET})
 else()
-  set(DEFBACKEND "CUDA")
+  set(DEFTARGET "CUDA")
 endif()
 
 if(GIT_FOUND)
@@ -74,16 +74,16 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-# Backend type
-set(VALID_BACKEND_TYPES CUDA HIP)
-set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
-set_property(CACHE QUDA_BACKEND_TYPE PROPERTY STRINGS CUDA HIP)
+# Target type
+set(VALID_TARGET_TYPES CUDA HIP)
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of backend, options are: ${VALID_TARGET_TYPES}")
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
 
-string(TOUPPER ${QUDA_BACKEND_TYPE} CHECK_BACKEND_TYPE)
-list(FIND VALID_BACKEND_TYPES ${CHECK_BACKEND_TYPE} BACKEND_TYPE_VALID)
+string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
+list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
 
-if(BACKEND_TYPE_VALID LESS 0)
-  message(SEND_ERROR "Please specify a valid QUDA_BACKEND_TYPE type! Valid backend types are:" "${VALID_BACKEND_TYPES}")
+if(TARGET_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid backend types are:" "${VALID_TARGET_TYPES}")
 endif()
 
 #
@@ -685,11 +685,11 @@ endif()
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 # Set backend preprocessor flags
-if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
-  add_definitions(-DCUDA_BACKEND)
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_definitions(-DCUDA_TARGET)
 endif()
-if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
-  add_definitions(-DHIP_BACKEND)
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  add_definitions(-DHIP_TARGET)
 endif()
 
 if(QUDA_SSTEP)

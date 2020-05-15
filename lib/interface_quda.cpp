@@ -40,7 +40,7 @@
 #include <nvml.h>
 #endif
 
-#include <quda_backend.h>
+#include <quda_target.h>
 
 #include <ks_force_quda.h>
 
@@ -73,8 +73,6 @@
 #include <contract_quda.h>
 
 #include <momentum.h>
-
-#include <quda_profiler_api.h>
 
 using namespace quda;
 
@@ -288,14 +286,14 @@ static void profilerStart(const char *f) {
   static int target_count = 0;
   static unsigned int i = 0;
   if (do_not_profile_quda){
-    cudaProfilerStop();
+    qudaProfilerStop();
     printfQuda("Stopping profiling in QUDA\n");
   } else {
     if (enable) {
       if (i < target_list.size() && target_count++ == target_list[i]) {
         enable_profiler = true;
         printfQuda("Starting profiling for %s\n", f);
-        cudaProfilerStart();
+        qudaProfilerStart();
       i++; // advance to next target
     }
   }
@@ -304,12 +302,12 @@ static void profilerStart(const char *f) {
 
 static void profilerStop(const char *f) {
   if(do_not_profile_quda){
-    cudaProfilerStart();
+    qudaProfilerStart();
   } else {
 
     if (enable_profiler) {
       printfQuda("Stopping profiling for %s\n", f);
-      cudaProfilerStop();
+      qudaProfilerStop();
       enable_profiler = false;
     }
   }

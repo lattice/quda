@@ -2,7 +2,7 @@
 #include <string.h>
 #include <iostream>
 #include <random_quda.h>
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <quda_internal.h>
 
 #include <comm_quda.h>

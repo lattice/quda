@@ -1,7 +1,7 @@
 #ifndef _BLAS_MAGMA_H
 #define _BLAS_MAGMA_H
 
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <string>
 #include <complex>
 #include <qudaComplex.h>

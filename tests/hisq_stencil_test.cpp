@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <quda_backend.h>
+#include <quda_target.h>
 
 #include "quda.h"
 #include "gauge_field.h"

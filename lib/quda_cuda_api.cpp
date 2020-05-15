@@ -798,6 +798,16 @@ namespace quda {
     return cudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice);
   }
 
+  qudaError_t qudaProfilerStart_(const char *func, const char *file, const char *line)
+  {
+    return cudaProfilerStart();
+  }
+
+  qudaError_t qudaProfilerStop_(const char *func, const char *file, const char *line)
+  {
+    return cudaProfilerStop();
+  }
+  
 #if (CUDA_VERSION >= 9000)
   qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
                                     const char *file, const char *line)

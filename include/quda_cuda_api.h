@@ -1,9 +1,10 @@
 #pragma once
 
 #ifndef __CUDACC_RTC__
-#include <quda_backend_api.h>
-#include <quda_cuda_api.h>
-
+// This header includes all the CUDA data types
+#include <quda_target_api.h> 
+//#include <quda_cuda_api.h>
+#include <cuda_profiler_api.h>
 /**
    @file quda_cuda_api.h
 
@@ -431,6 +432,16 @@ namespace quda {
   */
   qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice,
                                          const char *func, const char *file, const char *line);
+  
+  /**
+     @brief Wrapper around cudaProfileStart
+  */
+  qudaError_t qudaProfilerStart_(const char *func, const char *file, const char *line);
+  
+  /**
+     @brief Wrapper around cudaProfileStop
+  */
+  qudaError_t qudaProfilerStop_(const char *func, const char *file, const char *line);
 
 #if CUDA_VERSION >= 9000
   /**
@@ -613,6 +624,13 @@ namespace quda {
 #define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream)                                         \
   ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), \
                             __STRINGIFY__(__LINE__));
+
+#define qudaProfilerStart()						\
+  ::quda::qudaProfilerStart_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaProfilerStop()						\
+  ::quda::qudaProfilerStop_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
 #if CUDA_VERSION >= 9000
 #define qudaFuncSetAttribute(func, attr, value)                                                                        \
   ::quda::qudaFuncSetAttribute_(func, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));

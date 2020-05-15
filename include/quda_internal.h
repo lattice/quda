@@ -1,7 +1,6 @@
-#ifndef _QUDA_INTERNAL_H
-#define _QUDA_INTERNAL_H
+#pragma once
 
-#include <quda_backend_api.h>
+#include <quda_target_api.h>
 #include <string>
 #include <complex>
 #include <vector>
@@ -141,5 +140,3 @@ namespace quda {
 
 #include <timer.h>
 
-
-#endif // _QUDA_INTERNAL_H

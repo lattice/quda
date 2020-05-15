@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
 #include <tune_quda.h>

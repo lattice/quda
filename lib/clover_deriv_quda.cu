@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <quda_backend.h>
+#include <quda_target.h>
 
 #include <tune_quda.h>
 #include <gauge_field.h>
