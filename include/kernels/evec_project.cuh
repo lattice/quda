@@ -43,14 +43,7 @@ namespace quda
       y_vec(y_vec),
       t_dim_start(t_dim_start)
     {
-      int R = 0;
-      for (int dir=0; dir<4; ++dir){
-        border[dir] = x_vec.R()[dir];
-	E[dir] = x_vec.X()[dir];
-        X[dir] = x_vec.X()[dir] - border[dir]*2;
-        R += border[dir];
-      }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
+      for (int dir=0; dir<4; ++dir) X[dir] = x_vec.X()[dir];
     }
   };
 
