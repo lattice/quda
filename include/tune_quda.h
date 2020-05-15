@@ -226,12 +226,6 @@ namespace quda {
       case 3:
       case 5:
       case 6: return 48 * 1024;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 96 * 1024;
-        case 2: return 96 * 1024;
-        case 5: return 64 * 1024;
-        }
       default:
         warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
                     deviceProp.major, deviceProp.minor);
