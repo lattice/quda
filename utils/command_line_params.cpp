@@ -58,6 +58,8 @@ QudaInverterType inv_type;
 bool inv_deflate = false;
 bool inv_multigrid = false;
 QudaInverterType precon_type = QUDA_INVALID_INVERTER;
+QudaSchwarzType precon_schwarz_type = QUDA_INVALID_SCHWARZ;
+int precon_schwarz_cycle = 1;
 int multishift = 1;
 bool verify_results = true;
 bool low_mode_check = false;
@@ -125,8 +127,8 @@ quda::mgarray<double> coarse_solver_ca_lambda_min = {};
 quda::mgarray<double> coarse_solver_ca_lambda_max = {};
 bool generate_nullspace = true;
 bool generate_all_levels = true;
-quda::mgarray<QudaSchwarzType> schwarz_type = {};
-quda::mgarray<int> schwarz_cycle = {};
+quda::mgarray<QudaSchwarzType> mg_schwarz_type = {};
+quda::mgarray<int> mg_schwarz_cycle = {};
 
 // we only actually support 4 here currently
 quda::mgarray<std::array<int, 4>> geo_block_size = {};
@@ -240,7 +242,8 @@ namespace
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
-  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"cg", QUDA_CG_INVERTER},
+  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"invalid", QUDA_INVALID_INVERTER},
+                                                           {"cg", QUDA_CG_INVERTER},
                                                            {"bicgstab", QUDA_BICGSTAB_INVERTER},
                                                            {"gcr", QUDA_GCR_INVERTER},
                                                            {"pcg", QUDA_PCG_INVERTER},
@@ -270,6 +273,10 @@ namespace
                                                     {"single", QUDA_SINGLE_PRECISION},
                                                     {"half", QUDA_HALF_PRECISION},
                                                     {"quarter", QUDA_QUARTER_PRECISION}};
+
+  CLI::TransformPairs<QudaSchwarzType> schwarz_type_map {{"invalid", QUDA_INVALID_SCHWARZ},
+                                                         {"additive", QUDA_ADDITIVE_SCHWARZ},
+                                                         {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -440,6 +447,9 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
 
   quda_app->add_option("--precon-type", precon_type, "The type of solver to use (default none (=unspecified)).")
     ->transform(CLI::QUDACheckedTransformer(inverter_type_map));
+  quda_app->add_option("--precon-schwarz-type", precon_schwarz_type, "Whether to use Schwarz preconditionering")
+    ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app->add_option("--precon-schwarz-cycle", precon_schwarz_cycle, "Whether to use Schwarz preconditionering");
 
   CLI::TransformPairs<int> rank_order_map {{"col", 0}, {"row", 1}};
   quda_app
@@ -744,11 +754,12 @@ void add_multigrid_option_group(std::shared_ptr<QUDAApp> quda_app)
   opgroup->add_option("--mg-pre-orth", pre_orthonormalize,
                       "If orthonormalize the vector before inverting in the setup of multigrid (default false)");
 
-  quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", schwarz_cycle, CLI::PositiveNumber,
-                         "The number of Schwarz cycles to apply per smoother application (default=1)");
   quda_app->add_mgoption(
-    opgroup, "--mg-schwarz-type", schwarz_type, CLI::Validator(),
-    "Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)");
+    opgroup, "--mg-schwarz-type", mg_schwarz_type, CLI::Validator(),
+    "Whether to use Schwarz preconditioning (requires MR smoother and GCR setup solver) (default false)")
+    ->transform(CLI::QUDACheckedTransformer(schwarz_type_map));
+  quda_app->add_mgoption(opgroup, "--mg-schwarz-cycle", mg_schwarz_cycle, CLI::PositiveNumber,
+                         "The number of Schwarz cycles to apply per smoother application (default=1)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-size", setup_ca_basis_size, CLI::PositiveNumber,
                          "The basis size to use for CA-CG setup of multigrid (default 4)");
   quda_app->add_mgoption(opgroup, "--mg-setup-ca-basis-type", setup_ca_basis, CLI::QUDACheckedTransformer(ca_basis_map),

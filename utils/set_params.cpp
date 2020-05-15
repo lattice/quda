@@ -207,8 +207,8 @@ void setInvertParam(QudaInvertParam &inv_param)
   // domain decomposition preconditioner parameters
   inv_param.inv_type_precondition = precon_type;
 
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.verbosity_precondition = mg_verbosity[0];
@@ -405,13 +405,13 @@ void setMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_solve_type[i] = smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+    mg_param.smoother_schwarz_type[i] = mg_schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.global_reduction[i] = (mg_schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
-    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
+    mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -618,8 +618,8 @@ void setMultigridInvertParam(QudaInvertParam &inv_param)
   inv_param.maxiter = niter;
   inv_param.reliable_delta = reliable_delta;
 
-  // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  // domain decomposition preconditioner is disabled when using MG
+  inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -748,8 +748,8 @@ void setStaggeredMGInvertParam(QudaInvertParam &inv_param)
     inv_param.tol_hq_offset[i] = inv_param.tol_hq;
   }
 
-  // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
+  // domain decomposition preconditioner is disabled when using MG
+  inv_param.schwarz_type = QUDA_INVALID_SCHWARZ;
   inv_param.precondition_cycle = 1;
   inv_param.tol_precondition = 1e-1;
   inv_param.maxiter_precondition = 1;
@@ -928,13 +928,13 @@ void setStaggeredMultigridParam(QudaMultigridParam &mg_param)
     mg_param.smoother_solve_type[i] = smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
-    mg_param.smoother_schwarz_type[i] = schwarz_type[i];
+    mg_param.smoother_schwarz_type[i] = mg_schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.global_reduction[i] = (mg_schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
-    mg_param.smoother_schwarz_cycle[i] = schwarz_cycle[i];
+    mg_param.smoother_schwarz_cycle[i] = mg_schwarz_cycle[i];
 
     // Set set coarse_grid_solution_type: this defines which linear
     // system we are solving on a given level
@@ -1162,8 +1162,8 @@ void setDeflatedInvertParam(QudaInvertParam &inv_param)
   inv_param.reliable_delta = 1e-1;
 
   // domain decomposition preconditioner parameters
-  inv_param.schwarz_type = QUDA_ADDITIVE_SCHWARZ;
-  inv_param.precondition_cycle = 1;
+  inv_param.schwarz_type = precon_schwarz_type;
+  inv_param.precondition_cycle = precon_schwarz_cycle;
   inv_param.tol_precondition = tol_precondition;
   inv_param.maxiter_precondition = maxiter_precondition;
   inv_param.omega = 1.0;

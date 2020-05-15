@@ -1741,7 +1741,7 @@ namespace quda {
     setDiracParam(diracParam, &param, pc_solve);
     setDiracSloppyParam(diracSloppyParam, &param, pc_solve);
     // eigCG and deflation need 2 sloppy precisions and do not use Schwarz
-    bool comms_flag = (param.inv_type == QUDA_INC_EIGCG_INVERTER || param.eig_param) ? true : false;
+    bool comms_flag = (param.schwarz_type != QUDA_INVALID_SCHWARZ) ? false : true;
     setDiracPreParam(diracPreParam, &param, pc_solve, comms_flag);
 
     d = Dirac::create(diracParam); // create the Dirac operator
