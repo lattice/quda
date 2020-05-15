@@ -171,6 +171,7 @@ namespace quda {
       if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
       return max_blocks_per_sm;
 #else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
 	return 8;
@@ -209,7 +210,7 @@ namespace quda {
     }
 
     /**
-     * @brief Returns the maximum dynamics shared memory per block.
+     * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
@@ -219,6 +220,7 @@ namespace quda {
       if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
       return max_shared_bytes;
 #else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
       case 3:
