@@ -117,9 +117,12 @@ endif()
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
   set_target_properties(quda_cpp PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-  cuda_add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  add_library(quda SHARED $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  if(CUDAToolkit_FOUND)
+   target_link_libraries(quda INTERFACE CUDA::cudart_static)
+  endif()
 else()
-  cuda_add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
+  add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
 
 # include_directories
@@ -161,9 +164,8 @@ if(QUDA_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_TOOLS)
-  add_definitions(-DGPU_UNITARIZE)
+  target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
+  target_compile_definitions(quda_cpp PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
   target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
@@ -198,7 +200,7 @@ endif()
 if(QUDA_QDPJIT)
   target_link_libraries(quda
                         INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-                                  ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+                                  ${QMP_LIB} MPI::MPI_C)
 endif()
 
 if(QUDA_QMP)
@@ -206,11 +208,11 @@ if(QUDA_QMP)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
   endif()
-  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} MPI::MPI_C)
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda INTERFACE ${MPI_CXX_LIBRARIES})
+  target_link_libraries(quda INTERFACE MPI::MPI_C)
 endif()
 
 if(QUDA_MAGMA)
@@ -243,7 +245,7 @@ endif()
 
 # malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
 # version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-target_link_libraries(quda PUBLIC ${CUDA_cuda_LIBRARY})
+target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY} )
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if(QUDA_DOWNLOAD_EIGEN)

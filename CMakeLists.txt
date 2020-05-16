@@ -410,7 +410,6 @@ endif()
 if(QUDA_MPI)
   add_definitions(-DMPI_COMMS)
   set(COMM_OBJS comm_mpi.cpp)
-  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
 endif()
 
 if(QUDA_DOWNLOAD_USQCD)
@@ -857,7 +856,13 @@ set(CMAKE_CUDA_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
 
 # CUDA Wrapper for finding libs etc
-find_package(CUDAWrapper)
+enable_language(CUDA)
+if(CMAKE_VERSION VERSION_LESS 3.17)
+  find_package(CUDAWrapper)
+else()
+  #for cmake 3.17+ we rely on
+  find_package(CUDAToolkit)
+endif()
 
 # We need threads
 find_package(Threads REQUIRED)
@@ -875,10 +880,10 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
 endif()
-file(STRINGS ${CUDA_TOOLKIT_INCLUDE}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
-string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CUDA_VERSIONLONG})
+# file(STRINGS ${CUDAToolkit_INCLUDE_DIR}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
+# string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+# string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
+set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -900,7 +905,7 @@ set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
 
-if(${CUDA_VERSION} STREQUAL "10.2")
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
   set(CMAKE_CUDA_FLAGS
       "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
 endif()

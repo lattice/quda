@@ -1,4 +1,4 @@
-include_directories(../utils)
+
 
 # enable utils build a common library for all utils
 add_library(
@@ -13,6 +13,9 @@ add_library(
   gauge_force_reference.cpp
   hisq_force_reference2.cpp
   staggered_dslash_reference.cpp)
+
+target_include_directories(quda_reference PUBLIC .)
+target_include_directories(quda_reference PRIVATE ../utils)
 
 # if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
 # add_dependencies(quda_reference QMP) endif()

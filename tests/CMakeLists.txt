@@ -1,11 +1,12 @@
 #TODO: we might be able to clean that up a bit and have the include directories propagate with the libs
-include_directories(. googletest/include googletest ../utils ../host_reference)
+include_directories(.  ../utils ../host_reference)
 
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
+target_include_directories(quda_test PUBLIC googletest/include googletest)
 
 # need to check why this is here ...
 if(QUDA_QDPJIT)
