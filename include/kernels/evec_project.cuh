@@ -13,9 +13,6 @@ namespace quda
   template <typename Float, int nColor_> struct EvecProjectArg 
   {
     int threads; // number of active threads required
-    //int E[4]; // extended grid dimensions
-    //int X[4]; // true grid dimensions
-    //int border[4];
     
     static constexpr int nColor = nColor_;
     static_assert(nColor == 3, "Only nColor=3 enabled at this time");
@@ -34,7 +31,6 @@ namespace quda
     // 2x2 matrix will store the 4 spins.
     // We use it because it has a nice save method    
     matrix_field<complex<Float>, 2> s;
-    //complex<Float> s;
     
     EvecProjectArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec, complex<Float> *s) :
       threads(x_vec.VolumeCB()),
@@ -42,17 +38,6 @@ namespace quda
       y_vec(y_vec),
       s(s, x_vec.VolumeCB())
     {
-      /*
-      int R = 0;
-      for (int dir=0; dir<4; ++dir){
-        border[dir] = x_vec.R()[dir];
-	E[dir] = x_vec.X()[dir];
-        X[dir] = x_vec.X()[dir] - border[dir]*2;
-        R += border[dir];
-      }
-      threads = X[0]*X[1]*X[2]*X[3]/2;
-      */
-      //for (int dir=0; dir<4; ++dir) X[dir] = x_vec.X()[dir];
     }
   };
 
@@ -87,6 +72,3 @@ namespace quda
     arg.s.save(res, idx_cb, parity);
   }
 }
-
-
-

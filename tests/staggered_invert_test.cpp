@@ -231,6 +231,19 @@ int main(int argc, char **argv)
   reorderQDPtoMILC(milc_fatlink, qdp_fatlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
   reorderQDPtoMILC(milc_longlink, qdp_longlink, V, gauge_site_size, gauge_param.cpu_prec, gauge_param.cpu_prec);
 
+  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
+  // This needs to be called before `loadFatLongGaugeQuda` because this routine also loads the
+  // gauge fields with different parameters.
+  double plaq[3];
+  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
+  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+
+  if (dslash_type == QUDA_ASQTAD_DSLASH) {
+    // Compute fat link plaquette
+    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
+    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
+  }
+
   // Create ghost gauge fields in case of multi GPU builds.
 #ifdef MULTI_GPU
 
@@ -250,16 +263,6 @@ int main(int argc, char **argv)
 
   loadFatLongGaugeQuda(milc_fatlink, milc_longlink, gauge_param);
 
-  // Compute plaquette. Routine is aware that the gauge fields already have the phases on them.
-  double plaq[3];
-  computeStaggeredPlaquetteQDPOrder(qdp_inlink, plaq, gauge_param, dslash_type);
-  printfQuda("Computed plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-
-  if (dslash_type == QUDA_ASQTAD_DSLASH) {
-    // Compute fat link plaquette
-    computeStaggeredPlaquetteQDPOrder(qdp_fatlink, plaq, gauge_param, dslash_type);
-    printfQuda("Computed fat link plaquette is %e (spatial = %e, temporal = %e)\n", plaq[0], plaq[1], plaq[2]);
-  }
   // Staggered Gauge construct END
   //-----------------------------------------------------------------------------------
 
