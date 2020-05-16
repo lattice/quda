@@ -5855,16 +5855,25 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
 
   // Value of first t coord on this rank.
   int t_start = X[3] * comm_coord(3); 
+
+  size_t data_bytes = quda_quark[0]->Nspin() * quda_quark[0]->Volume() * 2 * quda_quark[0]->Precision();
+  void *device_sinks = pool_device_malloc(data_bytes);
   
-  Complex sinks[cuda_quark_param.nSpin * X[3]];
-  evecProjectQuda(*quda_quark[0], *quda_evec[0], t_start, sinks);
+  //Complex sinks[cuda_quark_param.nSpin * X[3]];
+  evecProjectQuda(*quda_quark[0], *quda_evec[0], device_sinks);
   time_lsp += clock();
+  //qudaMemcpy(host_sinks, device_sinks, data_bytes, cudaMemcpyDeviceToHost);
+  pool_device_free(device_sinks);
 
-  for(int i=0; i<cuda_quark_param.nSpin * X[3]; i++) {
-    //printfQuda("elem %d = (%.16e,%.16e)\n", i, sinks[i].real(), sinks[i].imag());
-    ((Complex*)host_sinks)[i] = sinks[i];
+  //for(int i=t_start; i<(t_start + X[3]); i++) {
+  for(int i=t_start; i<(t_start + X[3]); i+=24) {
+    //for(int i=0; i<X[3]; i++) {
+    for(int s=0; s<cuda_quark_param.nSpin; s++) {
+      //printf("t = %d, s = %d : (%.16e,%.16e)\n", i, s, sinks[i*4+s].real(), sinks[i*4+s].imag());
+      //((Complex*)host_sinks)[i] = sinks[i];
+    }
   }
-
+  
   // Clean up memory allocations
   delete quark[0];
   delete quda_quark[0];
