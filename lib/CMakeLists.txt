@@ -212,7 +212,8 @@ if(QUDA_QMP)
 endif()
 
 if(QUDA_MPI)
-  target_link_libraries(quda INTERFACE MPI::MPI_C)
+  target_link_libraries(quda PUBLIC MPI::MPI_C)
+  target_link_libraries(quda_cpp PUBLIC MPI::MPI_C)
 endif()
 
 if(QUDA_MAGMA)
