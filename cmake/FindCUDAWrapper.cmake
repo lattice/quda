@@ -17,10 +17,10 @@ find_path(CUDAToolkit_INCLUDE_DIR
   PATH_SUFFIXES include ../include
   NO_DEFAULT_PATH
   )
-mark_as_advanced(CUDA_TOOLKIT_INCLUDE)
+mark_as_advanced(CUDAToolkit_INCLUDE_DIR)
 set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
   "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
-set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_INCLUDE})
+set(CUDA_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIR})
 
 
 # # Setup CUDA_LIBRARIES
