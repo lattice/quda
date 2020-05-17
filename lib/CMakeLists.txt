@@ -1,5 +1,13 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
+if(QUDA_MPI)
+  set(COMM_OBJS comm_mpi.cpp)
+endif()
+
+if(QUDA_QMP)
+  set(COMM_OBJS comm_qmp.cpp)
+endif()
+
 set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
@@ -124,12 +132,16 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+target_link_libraries(quda PRIVATE quda_meta)
+target_link_libraries(quda_cpp PRIVATE quda_meta)
 
 # include_directories
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda_cpp PRIVATE .)
+target_include_directories(quda_cpp SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
+target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 
@@ -203,18 +215,9 @@ if(QUDA_QDPJIT)
                                   ${QMP_LIB} MPI::MPI_C)
 endif()
 
-if(QUDA_QMP)
-  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    add_dependencies(quda QMP)
-    add_dependencies(quda_cpp QMP)
-  endif()
-  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} MPI::MPI_C)
-endif()
 
-if(QUDA_MPI)
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
-  target_link_libraries(quda_cpp PUBLIC MPI::MPI_C)
-endif()
+
+
 
 if(QUDA_MAGMA)
   target_link_libraries(quda PRIVATE ${MAGMA})
@@ -272,7 +275,7 @@ add_custom_command(TARGET quda PRE_LINK
                                                ${CMAKE_CURRENT_BINARY_DIR}/libquda.so)
 
 install(TARGETS quda EXPORT qudaTargets LIBRARY DESTINATION lib ARCHIVE DESTINATION lib INCLUDES DESTINATION include)
-
+install(TARGETS quda_meta EXPORT qudaTargets LIBRARY DESTINATION lib ARCHIVE DESTINATION lib INCLUDES DESTINATION include)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/qudaConfigVersion.cmake"

@@ -235,6 +235,9 @@ mark_as_advanced(QUDA_JITIFY)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
+#######################################################################################################################
+add_library(quda_meta INTERFACE)
+
 # ######################################################################################################################
 # everything below here is processing the setup
 # ######################################################################################################################
@@ -283,7 +286,6 @@ else()
       )
   endif()
 endif()
-include_directories(SYSTEM ${EIGEN_INCLUDE_DIRS})
 # Now we hopefully found some way to get eigen to work
 
 # Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -351,7 +353,7 @@ enable_language(C)
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
 
 if(QUDA_MPI OR QUDA_QMP)
-  add_definitions(-DMULTI_GPU)
+  target_compile_definitions(quda_meta INTERFACE MULTI_GPU)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC
   # environment variables
   if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
@@ -407,9 +409,10 @@ if(QUDA_MPI AND QUDA_QMP)
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
+
 if(QUDA_MPI)
-  add_definitions(-DMPI_COMMS)
-  set(COMM_OBJS comm_mpi.cpp)
+  target_link_libraries(quda_meta INTERFACE MPI::MPI_C)
+  target_compile_definitions(quda_meta INTERFACE MPI_COMMS)
 endif()
 
 if(QUDA_DOWNLOAD_USQCD)
@@ -472,12 +475,10 @@ if(QUDA_QMP)
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
     set(QUDA_QMP_LIBS ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
-
-  add_definitions(-DQMP_COMMS)
-
-  include_directories(SYSTEM ${QUDA_QMPHOME}/include)
-  include_directories(SYSTEM ${MPI_CXX_INCLUDE_PATH})
-  set(COMM_OBJS comm_qmp.cpp)
+  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_QMPHOME}/include)
+  target_link_libraries(quda_meta INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
+  target_compile_definitions(quda_meta QMP_COMMS)
+  target_link_libraries(quda_meta INTERFACE MPI::MPI_C)
 endif()
 
 if(QUDA_QIO)

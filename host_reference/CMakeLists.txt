@@ -16,6 +16,7 @@ add_library(
 
 target_include_directories(quda_reference PUBLIC .)
 target_include_directories(quda_reference PRIVATE ../utils)
+target_link_libraries(quda_reference PRIVATE quda)
 
 # if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
 # add_dependencies(quda_reference QMP) endif()
