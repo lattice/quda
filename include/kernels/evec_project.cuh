@@ -68,7 +68,6 @@ namespace quda
 	res(mu,nu) = innerProduct(y, x, 0, mu*2 + nu);
       }
     } 
-    //arg.s.save[idx_cb + parity * arg.threads] = res;
-    arg.s.save(res, idx_cb, parity);
+    arg.s.save(res, idx_cb, parity);    
   }
 }
