@@ -5810,6 +5810,9 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
 void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
 		     QudaInvertParam inv_param, const int X[4])
 {
+  profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
+  profileSinkProject.TPSTART(QUDA_PROFILE_INIT);
+
   // Parameter object describing the sources and smeared quarks
   ColorSpinorParam cpu_quark_param(host_quark, inv_param, X, false, QUDA_CPU_FIELD_LOCATION);
   cpu_quark_param.gammaBasis = QUDA_DEGRAND_ROSSI_GAMMA_BASIS;
@@ -5835,8 +5838,6 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   cuda_quark_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
   std::vector<ColorSpinorField *> quda_quark;
   quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
-  // Copy data from host to device
-  *quda_quark[0] = *quark[0];
 
   // Create device vectors for evecs
   ColorSpinorParam cuda_evec_param(cpu_evec_param);
@@ -5846,37 +5847,33 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   cuda_evec_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_evec;
   quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
+  profileSinkProject.TPSTOP(QUDA_PROFILE_INIT);  
+
   // Copy data from host to device
+  profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
   *quda_evec[0] = *evec[0];
-  
+  *quda_quark[0] = *quark[0];
+  profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
+
   // We now perfrom the projection onto the eigenspace. The data
-  // is placed in host_sinks in i, X, Y, Z, T, spin order
-  double time_lsp = -clock();
+  // is placed in host_sinks in i, X, Y, Z, T, spin order 
+  profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
+  evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
-  // Value of first t coord on this rank.
-  int t_start = X[3] * comm_coord(3); 
-
-  size_t data_bytes = quda_quark[0]->Nspin() * quda_quark[0]->Volume() * 2 * quda_quark[0]->Precision();
-  void *device_sinks = pool_device_malloc(data_bytes);
-  
-  //Complex sinks[cuda_quark_param.nSpin * X[3]];
-  evecProjectQuda(*quda_quark[0], *quda_evec[0], device_sinks);
-  time_lsp += clock();
-  //qudaMemcpy(host_sinks, device_sinks, data_bytes, cudaMemcpyDeviceToHost);
-  pool_device_free(device_sinks);
-
-  //for(int i=t_start; i<(t_start + X[3]); i++) {
-  for(int i=t_start; i<(t_start + X[3]); i+=24) {
-    //for(int i=0; i<X[3]; i++) {
-    for(int s=0; s<cuda_quark_param.nSpin; s++) {
-      //printf("t = %d, s = %d : (%.16e,%.16e)\n", i, s, sinks[i*4+s].real(), sinks[i*4+s].imag());
-      //((Complex*)host_sinks)[i] = sinks[i];
+  // Eyeball the data.
+  for(int i=0; i<2; i++) {
+    for(int s=0; s<2; s++) {
+      printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + i, s, ((complex<double>*)&host_sinks)[i].real(), ((complex<double>*)&host_sinks)[i].imag());
     }
   }
-  
+
   // Clean up memory allocations
+  profileSinkProject.TPSTART(QUDA_PROFILE_FREE);
   delete quark[0];
   delete quda_quark[0];
   delete evec[0];
   delete quda_evec[0];
+  profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
+  profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
 }
