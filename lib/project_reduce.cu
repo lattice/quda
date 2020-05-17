@@ -26,7 +26,7 @@ namespace quda
     ProjectReduceCompute(Arg &arg, const complex<Float> *contractions) :
       TunableLocalParity(),
       arg(arg),
-      contractions(contractions),
+      contractions(contractions)
     {
       strcat(aux, "project_reduce,");
       strcat(aux, x.AuxString());
@@ -80,7 +80,7 @@ namespace quda
   void projectReduce(Float *result, complex<Float> *contractions)
   {
     double timer = -clock();
-    ProjectReduceArg<Float, t> arg(result, contractions);
+    ProjectReduceArg<Float, t> arg(contractions);
     ProjectReduceCompute<Float, ProjectReduceArg<Float, t>> project_reduce(contractions);
     timer += clock();
     //printfQuda("time1 = %e\n", timer/CLOCKS_PER_SEC);
@@ -112,7 +112,7 @@ namespace quda
       if (prec == QUDA_SINGLE_PRECISION) {
 	projectReduce<float, 24>((float*)result, (complex<float>*)contractions);
       } else if (prec == QUDA_DOUBLE_PRECISION) {
-	projectReduce<float, 24>((double*)result, (complex<double>*)contractions);
+	projectReduce<double, 24>((double*)result, (complex<double>*)contractions);
       } else {
 	errorQuda("Precision %d not supported", prec);
       }

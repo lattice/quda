@@ -17,8 +17,9 @@ namespace quda
 
     static constexpr int t = t_;
     static constexpr int nSpin = 4;
-    
-    EvecProjectArg(complex<Float> *s) :
+
+    complex<Float> *s;
+    ProjectReduceArg(complex<Float> *s) :
       threads(x_vec.VolumeCB()),
       s(s, x_vec.VolumeCB())
     {
