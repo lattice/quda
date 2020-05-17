@@ -231,6 +231,9 @@ static TimeProfile profilePhase("staggeredPhaseQuda");
 //!< Profiler for contractions
 static TimeProfile profileContract("contractQuda");
 
+//!< Profiler for sink projection
+static TimeProfile profileSinkProject("sinkProjectQuda");
+
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
 
@@ -1543,6 +1546,7 @@ void endQuda(void)
     profileStaggeredForce.Print();
     profileHISQForce.Print();
     profileContract.Print();
+    profileSinkProject.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -5858,8 +5862,9 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order 
   profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], host_sinks);
-  //evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  complex<double> sinks[quda_quark[0]->Nspin() * X[3]];
+  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], sinks);
+  //evecProjectQuda(*quda_quark[0], *quda_evec[0], sinks);
   profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Eyeball the data.

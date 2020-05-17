@@ -86,14 +86,16 @@ namespace quda
       // Place color contracted data in local array for reduction
       for (int mu = 0; mu < nSpinX; mu++) {
 	
-	//res_local[x[3]*nSpinX + mu].x = res[mu].x; 
-	//res_local[x[3]*nSpinX + mu].y = res[mu].y;
+	//res_local[x[3]*nSpinX + mu].x += res[mu].x; 
+	//res_local[x[3]*nSpinX + mu].y += res[mu].y;
 	
+	// Fake data to test veracity 
 	res_local[x[3]*nSpinX + mu].x = 1.0*(x[3]+1)*(mu+1); 
 	res_local[x[3]*nSpinX + mu].y = 2.0*(x[3]+1)*(mu+1);	    
       }
       idx_cb += blockDim.x * gridDim.x;
     }
-    for(int i=0; i<nSpinX*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
+    //for(int i=0; i<nSpinX*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
+    for(int i=0; i<nSpinX*t; i++) reduce<blockSize>(arg, res_local[i]);
   }
 } // namespace quda
