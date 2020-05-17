@@ -5858,7 +5858,8 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order 
   profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  //evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
   profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Eyeball the data.
