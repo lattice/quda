@@ -86,9 +86,9 @@ int main(int argc, char **argv)
   }
 
   // Perform GPU evec projection
-  for(int i=0; i<1000; i++) {
+  for (int i=0; i<niter; i++) {
     laphSinkProject(spinorX, spinorY, d_result, inv_param, X);
-    if(i==999) {
+    if (i==niter-1) {
       // Eyeball the data.
       for(int t=0; t<X[3]; t++) {
 	for(int s=0; s<4; s++) {
