@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -18,14 +18,29 @@ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 find_package(Git)
+find_package(PythonInterp)
 
-# by default we will build RELASE
+# by default we will build DEVEL
 if(DEFINED ENV{QUDA_BUILD_TYPE})
   set(DEFBUILD $ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
+set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
+set(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
 
+string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
+list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
+
+if(BUILD_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
+
+
+#
+# PROJECT is QUDA
+#
 if(GIT_FOUND)
   execute_process(COMMAND ${GIT_EXECUTABLE} show
                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -47,30 +62,9 @@ if(GIT_FOUND)
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                     OUTPUT_VARIABLE GITVERSION
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    # ~~~
-    #     IF(GITCOUNT EQUAL 0)
-    #       SET(DEFBUILD "RELEASE")
-    #     ELSE()
-    #       SET(DEFBUILD "DEVEL")
-    #     ENDIF()
-    # ~~~
   endif()
 endif(GIT_FOUND)
 
-set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
-set(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
-set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
-
-string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
-list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
-
-if(BUILD_TYPE_VALID LESS 0)
-  message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
-endif()
-
-#
-# PROJECT is QUDA
-#
 project("QUDA" VERSION 1.0.0 LANGUAGES)
 
 message(STATUS "")
@@ -228,7 +222,7 @@ mark_as_advanced(QUDA_INTERFACE_NVTX)
 
 mark_as_advanced(QUDA_SSTEP)
 mark_as_advanced(QUDA_USE_EIGEN)
-mark_as_advanced(QUDA_BLOCKSOVER)
+mark_as_advanced(QUDA_BLOCKSOLVER)
 mark_as_advanced(QUDA_CXX_STANDARD)
 
 mark_as_advanced(QUDA_JITIFY)
@@ -238,54 +232,6 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 #######################################################################################################################
 add_library(quda_meta INTERFACE)
 
-# ######################################################################################################################
-# everything below here is processing the setup
-# ######################################################################################################################
-# we need to check for some packages
-find_package(PythonInterp)
-
-# ######################################################################################################################
-# QUDA depends on Eigen this part makes sure we can download eigen if it is not found
-if(QUDA_DOWNLOAD_EIGEN)
-  set(EIGEN_VERSION 3.3.7)
-
-  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_SHA 9f13cf90dedbe3e52a19f43000d71fdf72e986beb9a5436dddcd61ff9d77a3ce)
-  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
-    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
-  endif()
-  file(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
-  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
-  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
-  if(${EIGEN_DOWNLOADED_CODE})
-    message(
-      SEND_ERROR
-        "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again."
-      )
-  endif()
-
-  include(ExternalProject)
-  ExternalProject_Add(Eigen
-                      URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
-                      URL_HASH SHA256=${EIGEN_SHA}
-                      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
-                      CONFIGURE_COMMAND ""
-                      BUILD_COMMAND
-                      COMMAND ""
-                      INSTALL_COMMAND "")
-  ExternalProject_Get_Property(Eigen source_dir)
-  set(EIGEN_INCLUDE_DIRS ${source_dir})
-else()
-  # fall back to using find_package
-  find_package(Eigen QUIET)
-  if(NOT EIGEN_FOUND)
-    message(
-      FATAL_ERROR
-        "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
-      )
-  endif()
-endif()
 # Now we hopefully found some way to get eigen to work
 
 # Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
@@ -329,6 +275,7 @@ set(
 
 enable_language(CXX)
 
+
 # define C FLAGS
 set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING -DDEVEL"Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
@@ -347,10 +294,99 @@ set(CMAKE_C_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
-# do all the build definitions
-#
+find_package(Threads REQUIRED)
 
-set(CMAKE_EXE_LINKER_FLAGS_SANITIZE ${CMAKE_EXE_LINKER_FLAGS_SANITIZE} "-fsanitize=address,undefined")
+# define FORTRAN FLAGS
+set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
+if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
+  set(BUILD_FORTRAN_INTERFACE ON)
+  enable_language(Fortran)
+endif()
+
+# define LINKER FLAGS
+set(CMAKE_EXE_LINKER_FLAGS_SANITIZE "-fsanitize=address,undefined" CACHE STRING "Flags used by the linker during sanitizer debug builds.")
+
+# define CUDA flags 
+set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
+set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
+set(CMAKE_CUDA_STANDARD_REQUIRED True)
+mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
+
+set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
+    "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
+set(CMAKE_CUDA_FLAGS_DEVEL
+    "-g -lineinfo -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
+set(CMAKE_CUDA_FLAGS_STRICT
+    "${CMAKE_CUDA_FLAGS_DEVEL}"
+    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
+set(CMAKE_CUDA_FLAGS_RELEASE
+    "-O3 -w"
+    CACHE STRING "Flags used by the CUDA compiler during release builds.")
+set(CMAKE_CUDA_FLAGS_HOSTDEBUG
+    "-g -lineinfo "
+    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
+set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
+    "-G "
+    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
+set(CMAKE_CUDA_FLAGS_DEBUG
+    "-g -G"
+    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
+set(CMAKE_CUDA_FLAGS_SANITIZE
+    "-g -lineinfo -Xcompiler -fsanitize=address,-fsanitize=undefined"
+    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
+
+# CUDA Wrapper for finding libs etc
+enable_language(CUDA)
+if(CMAKE_VERSION VERSION_LESS 3.17)
+  find_package(CUDAWrapper)
+else()
+  #for cmake 3.17+ we rely on
+  find_package(CUDAToolkit)
+endif()
+
+
+# ######################################################################################################################
+# QUDA depends on Eigen this part makes sure we can download eigen if it is not found
+if(QUDA_DOWNLOAD_EIGEN)
+  set(EIGEN_VERSION 3.3.7)
+  set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  set(EIGEN_SHA 9f13cf90dedbe3e52a19f43000d71fdf72e986beb9a5436dddcd61ff9d77a3ce)
+  if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
+    message(STATUS "Checking for Eigen tarball and downloading if necessary.")
+  endif()
+  file(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
+  list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
+  if(${EIGEN_DOWNLOADED_CODE})
+    message(
+      SEND_ERROR
+        "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again."
+      )
+  endif()
+
+  include(ExternalProject)
+  ExternalProject_Add(Eigen
+                      URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
+                      URL_HASH SHA256=${EIGEN_SHA}
+                      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
+                      CONFIGURE_COMMAND ""
+                      BUILD_COMMAND
+                      COMMAND ""
+                      INSTALL_COMMAND "")
+  ExternalProject_Get_Property(Eigen source_dir)
+  set(EIGEN_INCLUDE_DIRS ${source_dir})
+else()
+  # fall back to using find_package
+  find_package(Eigen QUIET)
+  if(NOT EIGEN_FOUND)
+    message(
+      FATAL_ERROR
+        "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
+      )
+  endif()
+endif()
 
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda_meta INTERFACE MULTI_GPU)
@@ -382,8 +418,11 @@ if(QUDA_MPI OR QUDA_QMP)
     enable_language(Fortran)
   endif()
   find_package(MPI)
-else()
-  set(COMM_OBJS comm_single.cpp)
+  if(QUDA_MPI AND QUDA_QMP)
+  message(
+    WARNING
+      "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+  endif()
 endif()
 
 if(QUDA_QDPJIT)
@@ -401,12 +440,6 @@ if(QUDA_QDPJIT)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
-
-if(QUDA_MPI AND QUDA_QMP)
-  message(
-    WARNING
-      "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
 
@@ -477,7 +510,7 @@ if(QUDA_QMP)
   endif()
   target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_QMPHOME}/include)
   target_link_libraries(quda_meta INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
-  target_compile_definitions(quda_meta QMP_COMMS)
+  target_compile_definitions(quda_meta INTERFACE QMP_COMMS)
   target_link_libraries(quda_meta INTERFACE MPI::MPI_C)
 endif()
 
@@ -543,8 +576,8 @@ if(QUDA_QIO)
   add_definitions(-DHAVE_QIO)
   set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
-  include_directories(SYSTEM ${QUDA_QIOHOME}/include)
-  include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
+  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_QIOHOME}/include)
+  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_LIMEHOME}/include)
 endif()
 
 if(QUDA_MAGMA)
@@ -572,7 +605,7 @@ endif(QUDA_MAGMA)
 # This selects arpack or parpack for Multi GPU
 if(QUDA_ARPACK)
   enable_language(Fortran)
-  add_definitions(-DARPACK_LIB)
+  target_compile_definitions(quda_meta ARPACK_LIB)
 
   if(QUDA_MPI OR QUDA_QMP)
     set(ARPACK_MPI ON)
@@ -651,28 +684,26 @@ if(QUDA_ARPACK)
   endif()
 endif(QUDA_ARPACK)
 
-# set which precisions to enable
-add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
-
-if(QUDA_FAST_COMPILE_REDUCE)
-add_definitions(-DQUDA_FAST_COMPILE_REDUCE)
+#BACKWARDS
+if(QUDA_BACKWARDS)
+  include(FetchContent)
+  FetchContent_Declare(
+      backward-cpp
+      GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
+      GIT_TAG v1.4
+      GIT_SHALLOW ON
+  )
+  FetchContent_GetProperties(backward-cpp)
+  if(NOT backward-cpp_POPULATED)
+    FetchContent_Populate(backward-cpp)
+  endif()
+  include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-if(QUDA_FAST_COMPILE_DSLASH)
-add_definitions(-DQUDA_FAST_COMPILE_DSLASH)
-endif()
-
-# set which precisions to enable
-add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-
+### MOVRE AWAY
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
-
-if(QUDA_MULTIGRID)
-  add_definitions(-DCUBLAS_LIB)
-  add_definitions(-DGPU_MULTIGRID)
-endif(QUDA_MULTIGRID)
 
 if(QUDA_BLOCKSOLVER)
   add_definitions(-DBLOCKSOLVER)
@@ -686,44 +717,6 @@ endif()
 if(QUDA_USE_EIGEN)
   add_definitions(-DEIGEN)
 endif()
-
-if(QUDA_DIRAC_WILSON)
-  add_definitions(-DGPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_WILSON)
-
-if(QUDA_DIRAC_DOMAIN_WALL)
-  add_definitions(-DGPU_DOMAIN_WALL_DIRAC)
-endif(QUDA_DIRAC_DOMAIN_WALL)
-
-if(QUDA_DIRAC_STAGGERED)
-  add_definitions(-DGPU_STAGGERED_DIRAC)
-endif(QUDA_DIRAC_STAGGERED)
-
-if(QUDA_DIRAC_CLOVER)
-  add_definitions(-DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
-endif(QUDA_DIRAC_CLOVER)
-
-if(QUDA_DIRAC_TWISTED_MASS)
-  add_definitions(-DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC)
-endif(QUDA_DIRAC_TWISTED_MASS)
-
-if(QUDA_DIRAC_TWISTED_CLOVER)
-  add_definitions(-DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_TWISTED_MASS_DIRAC -DGPU_WILSON_DIRAC
-                  -DGPU_GAUGE_TOOLS)
-endif(QUDA_DIRAC_TWISTED_CLOVER)
-
-if(QUDA_DIRAC_CLOVER_HASENBUSCH)
-  add_definitions(-DGPU_CLOVER_HASENBUSCH_TWIST -DGPU_TWISTED_CLOVER_DIRAC -DGPU_CLOVER_DIRAC -DGPU_WILSON_DIRAC
-                  -DGPU_GAUGE_TOOLS)
-endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
-
-if(QUDA_DIRAC_NDEG_TWISTED_MASS)
-  add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
-endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
-
-if(QUDA_DIRAC_STAGGERED)
-  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE)
-endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
@@ -803,70 +796,6 @@ if(QUDA_TEX AND QUDA_FLOAT8)
   message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
 endif()
 
-# define FORTRAN FLAGS
-set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
-
-# derive whether we need to build the fortran interface
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
-  set(BUILD_FORTRAN_INTERFACE ON)
-  enable_language(Fortran)
-endif()
-
-# CUDA stuff
-
-set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
-set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
-set(CMAKE_CUDA_STANDARD_REQUIRED True)
-mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
-
-# NVCC FLAGS independent off build type
-
-set(QUDA_NVCC_FLAGS "-ftz=true -prec-div=false -prec-sqrt=false")
-set(CMAKE_CUDA_FLAGS
-    "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr"
-    CACHE STRING "Flags used by the CUDA compiler" FORCE)
-if(QUDA_VERBOSE_BUILD)
-  set(CMAKE_CUDA_FLAGS
-      "-Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr --ptxas-options=-v"
-      CACHE STRING "Flags used by the CUDA compiler" FORCE)
-endif(QUDA_VERBOSE_BUILD)
-
-# define CUDA flags when CMake >= 3.8
-set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
-    "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
-set(CMAKE_CUDA_FLAGS_DEVEL
-    "${QUDA_NVCC_FLAGS} -lineinfo -DDEVEL -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
-    CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
-set(CMAKE_CUDA_FLAGS_STRICT
-    "${CMAKE_CUDA_FLAGS_DEVEL}"
-    CACHE STRING "Flags used by the CUDA compiler during strict jenkins builds.")
-set(CMAKE_CUDA_FLAGS_RELEASE
-    "${QUDA_NVCC_FLAGS} -O3 -w"
-    CACHE STRING "Flags used by the CUDA compiler during release builds.")
-set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG"
-    CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "${QUDA_NVCC_FLAGS} -G -DDEVICE_DEBUG"
-    CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
-set(CMAKE_CUDA_FLAGS_DEBUG
-    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -DDEVICE_DEBUG -G"
-    CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
-set(CMAKE_CUDA_FLAGS_SANITIZE
-    "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined"
-    CACHE STRING "Flags used by the C++ compiler during sanitizer debug builds.")
-
-# CUDA Wrapper for finding libs etc
-enable_language(CUDA)
-if(CMAKE_VERSION VERSION_LESS 3.17)
-  find_package(CUDAWrapper)
-else()
-  #for cmake 3.17+ we rely on
-  find_package(CUDAToolkit)
-endif()
-
-# We need threads
-find_package(Threads REQUIRED)
 
 # COMPILER OPTIONS and BUILD types
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -876,14 +805,13 @@ include_directories(lib)
 # if(QUDA_JITIFY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 # endif()
+#END MOVE AWAY
+
 
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
 endif()
-# file(STRINGS ${CUDAToolkit_INCLUDE_DIR}/cuda.h CUDA_VERSIONLONG REGEX "\#define CUDA_VERSION")
-# string(REPLACE "\#define CUDA_VERSION " "" CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
-# string(STRIP CUDA_VERSIONLONG ${CUDA_VERSIONLONG})
 set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
 
 # this allows simplified running of clang-tidy
@@ -906,10 +834,6 @@ set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
 
-if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  set(CMAKE_CUDA_FLAGS
-      "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
-endif()
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
@@ -938,25 +862,8 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
 
-set(BUILDNAME ${HASH})
+#enable ctest
 include(CTest)
-
-
-
-if(QUDA_BACKWARDS)
-  include(FetchContent)
-  FetchContent_Declare(
-      backward-cpp
-      GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
-      GIT_TAG v1.4
-      GIT_SHALLOW ON
-  )
-  FetchContent_GetProperties(backward-cpp)
-  if(NOT backward-cpp_POPULATED)
-    FetchContent_Populate(backward-cpp)
-  endif()
-  include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
-endif()
 
 # add tests, utils, reference, and quda library
 add_subdirectory(lib)

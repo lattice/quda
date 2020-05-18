@@ -1,5 +1,7 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
+set(COMM_OBJS comm_single.cpp)
+
 if(QUDA_MPI)
   set(COMM_OBJS comm_mpi.cpp)
 endif()
@@ -132,18 +134,39 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
-target_link_libraries(quda PRIVATE quda_meta)
-target_link_libraries(quda_cpp PRIVATE quda_meta)
+
+# set up QUDA compile options
+target_compile_definitions(quda PUBLIC
+                              $<$<CONFIG:DEVEL>:DEVEL>
+                              $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG>
+                              $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
+                              $<$<CONFIG:DEBUG>:HOST_DEBUGDEVICE_DEBUG>
+                              $<$<CONFIG:SANITIZE>:HOST_DEBUG>)
+
+target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: -ftz=true -prec-div=false -prec-sqrt=false>)
+target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: -Wno-deprecated-gpu-targets -arch=${QUDA_GPU_ARCH} --expt-relaxed-constexpr>)
+if(QUDA_VERBOSE_BUILD)
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-v>)
+endif(QUDA_VERBOSE_BUILD)
+
+# workaround for 10.2
+if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:"-Xcicc \"--Xllc -dag-vectorize-ops=1\"">)
+endif()
+
+# target_link_libraries(quda PUBLIC quda_meta)
+target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
+target_link_libraries(quda_cpp PUBLIC quda_meta)
+target_link_libraries(quda PUBLIC quda_meta)
 
 # include_directories
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
-target_include_directories(quda_cpp SYSTEM PRIVATE ../include/externals)
-target_include_directories(quda_cpp PRIVATE .)
-target_include_directories(quda_cpp SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
-
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
+target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
+
+
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -171,13 +194,48 @@ endif()
 
 target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
 
+if(QUDA_DIRAC_WILSON)
+  target_compile_definitions(quda PUBLIC DGPU_WILSON_DIRAC)
+endif(QUDA_DIRAC_WILSON)
+
+if(QUDA_DIRAC_DOMAIN_WALL)
+  target_compile_definitions(quda PUBLIC GPU_DOMAIN_WALL_DIRAC)
+endif(QUDA_DIRAC_DOMAIN_WALL)
+
+if(QUDA_DIRAC_STAGGERED)
+  target_compile_definitions(quda PUBLIC GPU_STAGGERED_DIRAC GPU_FATLINK GPU_UNITARIZE)
+endif(QUDA_DIRAC_STAGGERED)
+
+if(QUDA_DIRAC_CLOVER)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER)
+
+if(QUDA_DIRAC_TWISTED_MASS)
+  target_compile_definitions(quda PUBLIC GPU_TWISTED_MASS_DIRAC GPU_WILSON_DIRAC)
+endif(QUDA_DIRAC_TWISTED_MASS)
+
+if(QUDA_DIRAC_TWISTED_CLOVER)
+  target_compile_definitions(quda PUBLIC GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_TWISTED_MASS_DIRAC GPU_WILSON_DIRAC
+                  GPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_TWISTED_CLOVER)
+
+if(QUDA_DIRAC_CLOVER_HASENBUSCH)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_HASENBUSCH_TWIST GPU_TWISTED_CLOVER_DIRAC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC
+                  GPU_GAUGE_TOOLS)
+endif(QUDA_DIRAC_CLOVER_HASENBUSCH)
+
+if(QUDA_DIRAC_NDEG_TWISTED_MASS)
+  target_compile_definitions(quda PUBLIC GPU_NDEG_TWISTED_MASS_DIRAC)
+endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
+
 if(QUDA_MULTIGRID)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
+  target_compile_definitions(quda PRIVATE CUBLAS_LIB)
+  target_compile_definitions(quda GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
   target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
-  target_compile_definitions(quda_cpp PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
   target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
@@ -216,7 +274,20 @@ if(QUDA_QDPJIT)
 endif()
 
 
+# set which precisions to enable
+target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
+target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
+if(QUDA_FAST_COMPILE_REDUCE)
+target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_DSLASH)
+endif()
+
+# set which precisions to enable
+target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 
 if(QUDA_MAGMA)
