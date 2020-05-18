@@ -5867,16 +5867,8 @@ void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_si
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order 
   profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], (double*)host_sinks);
+  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], reinterpret_cast<std::complex<double>*>(host_sinks));
   profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  // Eyeball the data.
-  for(int t=0; t<X[3]; t++) {
-    for(int s=0; s<3; s++) {
-      //printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
-      //s, ((complex<double>*)host_sinks)[t*4 + s].real(), ((complex<double>*)host_sinks)[t*4 + s].imag());
-    }
-  }
 
   // Clean up memory allocations
   profileSinkProject.TPSTART(QUDA_PROFILE_FREE);

@@ -71,8 +71,8 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_precondition = prec;
 
   size_t data_size = cpu_prec;
-  void *spinorX = malloc(V * 2 * 4 * 3 * data_size);
-  void *spinorY = malloc(V * 2 * 1 * 3 * data_size);
+  void *spinorX = pinned_malloc(V * 2 * 4 * 3 * data_size);
+  void *spinorY = pinned_malloc(V * 2 * 1 * 3 * data_size);
   double _Complex *d_result = (double _Complex*)malloc(4 * X[3] * sizeof(double _Complex));
   
   {
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
     if(i==999) {
       // Eyeball the data.
       for(int t=0; t<X[3]; t++) {
-	for(int s=0; s<3; s++) {
+	for(int s=0; s<4; s++) {
 	  printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
 		 s, ((complex<double>*)d_result)[t*4 + s].real(), ((complex<double>*)d_result)[t*4 + s].imag());
 	}
@@ -99,8 +99,8 @@ int main(int argc, char **argv)
     }
   }
 
-  free(spinorX);
-  free(spinorY);
+  host_free(spinorX);
+  host_free(spinorY);
   free(d_result);
 
   // finalize the QUDA library

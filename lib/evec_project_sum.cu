@@ -20,7 +20,7 @@ namespace quda
   private:
     bool tuneSharedBytes() const { return false; }
     bool tuneGridDim() const { return false; } // Don't tune the grid dimensions.
-    unsigned int minThreads() const { return arg.threads; }
+    unsigned int minThreads() const { return arg.threads; } // this is equal to 3-d volume
 
   public:
     EvecProjectSumCompute(Arg &arg, const ColorSpinorField &x, const ColorSpinorField &y) :
@@ -41,14 +41,13 @@ namespace quda
       if (x.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	for (int i=0; i<2*x.Nspin()*x.X(3); i++) ((double*)arg.result_h)[i] = 0.0; 
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-        tp.grid.z = x.X(3);
 
 #ifdef JITIFY
-        std::string function_name = "quda::spin";
+        std::string function_name = "quda::computeEvecProjectSum";
 	
         using namespace jitify::reflection;
         jitify_error = program->kernel(function_name)
-	  .instantiate(Type<Float>(), Type<Arg>())
+	  .instantiate((int)tp.block.x, Type<Arg>())
 	  .configure(tp.grid, tp.block, tp.shared_bytes, stream)
 	  .launch(arg);
 #else
@@ -59,6 +58,16 @@ namespace quda
       }
     }
     
+    void initTuneParam(TuneParam &param) const {
+      TunableLocalParity::initTuneParam(param);
+      param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
+    }
+
+    void defaultTuneParam(TuneParam &param) const {
+      TunableLocalParity::defaultTuneParam(param);
+      param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
+    }
+
     TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(*this).name(), aux); }
 
     void preTune() {}
@@ -77,17 +86,18 @@ namespace quda
   };
   
   template <typename Float, int nColor>
-  void evecProjectSum(const ColorSpinorField &x, const ColorSpinorField &y, double *result)
+  void evecProjectSum(const ColorSpinorField &x, const ColorSpinorField &y, std::complex<double> *result)
   {
     EvecProjectSumArg<Float, nColor> arg(x, y);
     EvecProjectSumCompute<decltype(arg)> evec_project_sum(arg, x, y);
     evec_project_sum.apply(0);
     qudaDeviceSynchronize();
 
-    for (int i=0; i<2*x.Nspin()*x.X(3); i++) result[i] = ((Float*)arg.result_h)[i];
+    double *res = (double*)arg.result_h;
+    for (int i=0; i<x.Nspin()*x.X(3); i++) result[i] = std::complex<double>(res[2*i], res[2*i+1]);
   }
   
-  void evecProjectSumQuda(const ColorSpinorField &x, const ColorSpinorField &y, double *result)
+  void evecProjectSumQuda(const ColorSpinorField &x, const ColorSpinorField &y, std::complex<double> *result)
   {
     checkPrecision(x, y);
     

@@ -15,7 +15,6 @@ namespace quda
   {
     int threads; // number of active threads required
     int X[4]; // true grid dimensions
-    int vol_3d;
 
     using Float = Float_;
     static constexpr int nColor = nColor_;
@@ -35,14 +34,12 @@ namespace quda
     
     EvecProjectSumArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec) :
       ReduceArg<double2>(),
-      threads(x_vec.VolumeCB() / x_vec.X(3)),
-      vol_3d(1),
+      threads(x_vec.VolumeCB() / x_vec.X(3)), // the thread-x dimension is only for 3-d space 
       x_vec(x_vec),
       y_vec(y_vec)
     {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = x_vec.X()[dir];
-        if (dir < 3) vol_3d *= X[dir];	
       }
     }
   };
@@ -63,44 +60,29 @@ namespace quda
     double2 res[nSpinX];
     for (int i=0; i<nSpinX; i++) res[i] = make_double2(0.0, 0.0);
 
-    Vector4 x_vec_local;
-    Vector1 y_vec_local;
-
     int loop = 0;  
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
 
       // Divide by two for checkerboard
-      int idx_cb = t * (arg.vol_3d/2) + xyz;
+      int idx_cb = t * arg.threads + xyz;
 
       // Get vector data for this spacetime point
-      x_vec_local = arg.x_vec(idx_cb, parity);
-      y_vec_local = arg.y_vec(idx_cb, parity);
+      Vector4 x_vec_local = arg.x_vec(idx_cb, parity);
+      Vector1 y_vec_local = arg.y_vec(idx_cb, parity);
      
       // Compute the inner product over colour
       for (int mu = 0; mu < nSpinX; mu++) {
 	auto res_ = innerProduct(y_vec_local, x_vec_local, 0, mu);
 
-	// Validation data
-        //res[mu].x += (t+1)*1.0*(mu+1);
-        //res[mu].y += (t+1)*2.0*(mu+1);
-	
 	// Real data
         res[mu].x += res_.real();
         res[mu].y += res_.imag();
-
-	/*
-	  printf("t=%d xzy=%d parity=%d loop-%d idx_cb=%d mu=%d ... (%e,%e) (%e,%e) (%e,%e)\n", 
-	  t, xyz, parity, loop, idx_cb, mu, 
-	  res_.real(), res_.imag(),
-	  x_vec_local(mu).real(), x_vec_local(mu).imag(),
-	  y_vec_local(mu).real(), y_vec_local(mu).imag());
-	*/
       }      
       xyz += blockDim.x * gridDim.x;
       loop++;
     }
-    
+
     for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
   }
 
