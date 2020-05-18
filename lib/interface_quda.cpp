@@ -5811,7 +5811,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
+void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_sinks,
 		     QudaInvertParam inv_param, const int X[4])
 {
   profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
