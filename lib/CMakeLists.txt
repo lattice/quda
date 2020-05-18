@@ -215,6 +215,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
+if(THREADS_FOUND AND TARGET Threads::Threads)
+  if(THREADS_HAVE_PTHREAD_ARG)
+    set_property(TARGET Threads::Threads
+                 PROPERTY INTERFACE_COMPILE_OPTIONS "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler -pthread>"
+                                                    "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-pthread>")
+  endif()
+endif()
+
 target_link_libraries(quda PUBLIC Threads::Threads)
 
 if(QUDA_MPI OR QUDA_QMP)
