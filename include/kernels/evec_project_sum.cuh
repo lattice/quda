@@ -72,8 +72,6 @@ namespace quda
       // Compute spacetime and local coords to query t coord
       getCoords(x, idx_cb, arg.X, parity);
       
-      if(x[3] >= t) printf("x[3] = %d\n", x[3]);
-      
       // Get vector data for this spacetime point
       x_vec_local = arg.x_vec(idx_cb, parity);
       y_vec_local = arg.y_vec(idx_cb, parity);
@@ -86,16 +84,15 @@ namespace quda
       // Place color contracted data in local array for reduction
       for (int mu = 0; mu < nSpinX; mu++) {
 	
-	//res_local[x[3]*nSpinX + mu].x += res[mu].x; 
-	//res_local[x[3]*nSpinX + mu].y += res[mu].y;
+	res_local[x[3]*nSpinX + mu].x += res[mu].x; 
+	res_local[x[3]*nSpinX + mu].y += res[mu].y;
 	
 	// Fake data to test veracity 
-	res_local[x[3]*nSpinX + mu].x = 1.0*(x[3]+1)*(mu+1); 
-	res_local[x[3]*nSpinX + mu].y = 2.0*(x[3]+1)*(mu+1);	    
+	//res_local[x[3]*nSpinX + mu].x = 1.0*(x[3]+1)*(mu+1); 
+	//res_local[x[3]*nSpinX + mu].y = 2.0*(x[3]+1)*(mu+1);	    
       }
       idx_cb += blockDim.x * gridDim.x;
     }
-    //for(int i=0; i<nSpinX*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
-    for(int i=0; i<nSpinX*t; i++) reduce<blockSize>(arg, res_local[i]);
+    for(int i=0; i<nSpinX*t; i++) reduce2d<blockSize, 2>(arg, res_local[i], i);
   }
 } // namespace quda
