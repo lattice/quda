@@ -178,8 +178,11 @@ target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFIN
 target_include_directories(quda SYSTEM PRIVATE ../include/externals)
 target_include_directories(quda PRIVATE .)
 target_include_directories(quda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(quda SYSTEM PUBLIC ${CUDA_INCLUDE_DIRS})
-include_directories(quda PUBLIC ../include)
+target_include_directories(quda SYSTEM PUBLIC ${CUDA_INCLUDE_DIRS})
+target_include_directories(quda PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
+  $<INSTALL_INTERFACE:include/>  
+)
 if(QUDA_JITIFY)
   include_directories(quda PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
@@ -188,6 +191,7 @@ endif()
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
 target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
+target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 
 # COMPILER OPTIONS and BUILD types
 
