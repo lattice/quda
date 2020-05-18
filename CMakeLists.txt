@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -191,12 +191,11 @@ set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
 set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
 set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
 set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requested by QUDA_ARPACK")
-
+set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
-set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
-
+# mark as advanced
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
 mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
@@ -229,11 +228,19 @@ mark_as_advanced(QUDA_JITIFY)
 
 mark_as_advanced(QUDA_ARPACK_LOGGING)
 
-#######################################################################################################################
-add_library(quda_meta INTERFACE)
+# some checks for invalid combinations
 
-# Now we hopefully found some way to get eigen to work
+if(QUDA_TEX AND QUDA_FLOAT8)
+  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
+endif()
 
+if(QUDA_MPI AND QUDA_QMP)
+message(
+  WARNING
+    "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+endif()
+
+## COMPILER FLAGS 
 # Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
@@ -389,7 +396,6 @@ else()
 endif()
 
 if(QUDA_MPI OR QUDA_QMP)
-  target_compile_definitions(quda_meta INTERFACE MULTI_GPU)
   # if we are using MPI and no MPI_<LANG>_COMPILER was specified on the command line check for MPICXX and MPICC
   # environment variables
   if((NOT MPI_CXX_COMPILER) AND DEFINED ENV{MPICXX})
@@ -418,19 +424,19 @@ if(QUDA_MPI OR QUDA_QMP)
     enable_language(Fortran)
   endif()
   find_package(MPI)
-  if(QUDA_MPI AND QUDA_QMP)
-  message(
-    WARNING
-      "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
-  endif()
 endif()
+
+if(QUDA_DOWNLOAD_USQCD)
+  find_program(MAKE_EXE NAMES gmake nmake make)
+  find_program(INSTALL_EXE NAMES install)
+  find_program(AUTORECONF_EXE NAMES autoreconf)
+endif()
+
 
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()
-  add_definitions(-DUSE_QDPJIT)
-  include_directories(SYSTEM ${QUDA_QDPJITHOME}/include)
   execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
                   OUTPUT_VARIABLE QDP_LDFLAGS
                   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -440,18 +446,6 @@ if(QUDA_QDPJIT)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
-endif()
-
-
-if(QUDA_MPI)
-  target_link_libraries(quda_meta INTERFACE MPI::MPI_C)
-  target_compile_definitions(quda_meta INTERFACE MPI_COMMS)
-endif()
-
-if(QUDA_DOWNLOAD_USQCD)
-  find_program(MAKE_EXE NAMES gmake nmake make)
-  find_program(INSTALL_EXE NAMES install)
-  find_program(AUTORECONF_EXE NAMES autoreconf)
 endif()
 
 if(QUDA_QMP)
@@ -508,10 +502,6 @@ if(QUDA_QMP)
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
     set(QUDA_QMP_LIBS ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
-  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_QMPHOME}/include)
-  target_link_libraries(quda_meta INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
-  target_compile_definitions(quda_meta INTERFACE QMP_COMMS)
-  target_link_libraries(quda_meta INTERFACE MPI::MPI_C)
 endif()
 
 if(QUDA_QIO)
@@ -537,8 +527,6 @@ if(QUDA_QIO)
                         LOG_INSTALL ON
                         LOG_BUILD ON
                         LOG_DOWNLOAD ON
-                        # LOG_MERGED_STDOUTERR ON
-                        # LOG_OUTPUT_ON_FAILURE ON
                         )
     ExternalProject_Get_Property(QIO INSTALL_DIR)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
@@ -573,12 +561,7 @@ if(QUDA_QIO)
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
-  add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
-
-  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_QIOHOME}/include)
-  target_include_directories(quda_meta SYSTEM INTERFACE ${QUDA_LIMEHOME}/include)
-endif()
+ endif()
 
 if(QUDA_MAGMA)
   add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
@@ -605,7 +588,6 @@ endif(QUDA_MAGMA)
 # This selects arpack or parpack for Multi GPU
 if(QUDA_ARPACK)
   enable_language(Fortran)
-  target_compile_definitions(quda_meta ARPACK_LIB)
 
   if(QUDA_MPI OR QUDA_QMP)
     set(ARPACK_MPI ON)
@@ -615,23 +597,13 @@ if(QUDA_ARPACK)
 
   if(QUDA_DOWNLOAD_ARPACK)
     include(GNUInstallDirs)
-
     ExternalProject_Add(ARPACK-NG
                         GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
                         GIT_TAG 3.7.0
                         GIT_SHALLOW YES
                         PREFIX arpack-ng
-                        # CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER}  <SOURCE_DIR>/configure --with-
-                        # qmp-comms-type=MPI --prefix=<INSTALL_DIR>
                         CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                         CMAKE_GENERATOR "Unix Makefiles"
-                        # BUILD_COMMAND  make
-                        # INSTALL_COMMAND make install
-                        # LOG_INSTALL ON
-                        # LOG_BUILD ON
-                        # LOG_DOWNLOAD ON
-                        # LOG_MERGED_STDOUTERR ON
-                        # LOG_OUTPUT_ON_FAILURE ON
                         )
     ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
     set(QUDA_ARPACK_HOME ${INSTALL_DIR})
@@ -639,20 +611,16 @@ if(QUDA_ARPACK)
     add_dependencies(arpack-ng ARPACK-NG)
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
-    # target_link_libraries(arpack-ng INTERFACE  -L${QUDA_ARPACK_HOME}/lib -larpack)
     target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
     set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
     set_target_properties(arpack-ng
                           PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
     if(QUDA_MPI OR QUDA_QMP)
       add_library(parpack-ng STATIC IMPORTED)
-      # target_link_libraries(arpack-ng INTERFACE -L${QUDA_ARPACK_HOME}/lib -lparpack)
       target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
       set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
       set_target_properties(parpack-ng
                             PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
-      # include_directories(SYSTEM ${QUDA_ARPACK_HOME}/PARPACK/SRC/MPI) include_directories(SYSTEM
-      # ${QUDA_ARPACK_HOME}/PARPACK/UTIL/MPI)
     endif()
     
   else(QUDA_DOWNLOAD_ARPACK)
@@ -676,12 +644,6 @@ if(QUDA_ARPACK)
       endif()
     endif()
   endif(QUDA_DOWNLOAD_ARPACK)
-
-  if(QUDA_ARPACK_LOGGING)
-    # ARPACK-NG does not suppport logging - we must warn the user
-    message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
-    add_definitions(-DARPACK_LOGGING)
-  endif()
 endif(QUDA_ARPACK)
 
 #BACKWARDS
@@ -700,133 +662,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-### MOVRE AWAY
-if(QUDA_SSTEP)
-  add_definitions(-DSSTEP)
-endif()
-
-if(QUDA_BLOCKSOLVER)
-  add_definitions(-DBLOCKSOLVER)
-endif()
-
-if(QUDA_JITIFY)
-  add_definitions(-DJITIFY)
-  find_package(LibDL)
-endif()
-
-if(QUDA_USE_EIGEN)
-  add_definitions(-DEIGEN)
-endif()
-
-if(QUDA_FORCE_GAUGE)
-  add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_GAUGE)
-
-if(QUDA_FORCE_HISQ)
-  add_definitions(-DGPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
-endif(QUDA_FORCE_HISQ)
-
-if(QUDA_GAUGE_TOOLS)
-  add_definitions(-DGPU_GAUGE_TOOLS)
-endif(QUDA_GAUGE_TOOLS)
-
-if(QUDA_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_ALG)
-  add_definitions(-DGPU_GAUGE_TOOLS)
-  add_definitions(-DGPU_UNITARIZE)
-endif(QUDA_GAUGE_ALG)
-
-if(QUDA_MPI_NVTX)
-  list(APPEND COMM_OBJS nvtx_pmpi.c)
-  set(QUDA_NVTX ON)
-endif(QUDA_MPI_NVTX)
-
-if(QUDA_INTERFACE_NVTX)
-  add_definitions(-DINTERFACE_NVTX)
-  set(QUDA_NVTX ON)
-endif(QUDA_INTERFACE_NVTX)
-
-if(QUDA_NVTX)
-  find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
-  if(NVTX3)
-    add_definitions(-DQUDA_NVTX_VERSION=3)
-  endif(NVTX3)
-endif(QUDA_NVTX)
-
-if(QUDA_INTERFACE_QDP)
-  add_definitions(-DBUILD_QDP_INTERFACE)
-endif(QUDA_INTERFACE_QDP)
-
-if(QUDA_INTERFACE_MILC)
-  add_definitions(-DBUILD_MILC_INTERFACE)
-endif(QUDA_INTERFACE_MILC)
-
-if(QUDA_INTERFACE_CPS)
-  add_definitions(-DBUILD_CPS_INTERFACE)
-endif(QUDA_INTERFACE_CPS)
-
-if(QUDA_INTERFACE_QDPJIT)
-  add_definitions(-DBUILD_QDPJIT_INTERFACE)
-endif(QUDA_INTERFACE_QDPJIT)
-
-if(QUDA_INTERFACE_BQCD)
-  add_definitions(-DBUILD_BQCD_INTERFACE)
-endif(QUDA_INTERFACE_BQCD)
-
-if(QUDA_INTERFACE_TIFR)
-  add_definitions(-DBUILD_TIFR_INTERFACE)
-endif(QUDA_INTERFACE_TIFR)
-
-if(QUDA_NUMA_NVML)
-  add_definitions(-DNUMA_NVML)
-  set(NUMA_AFFINITY_OBJS numa_affinity.cpp)
-  find_package(NVML REQUIRED)
-  include_directories(SYSTEM NVML_INCLUDE_DIR)
-endif(QUDA_NUMA_NVML)
-
-if(QUDA_CONTRACT)
-  add_definitions(-DGPU_CONTRACT)
-endif(QUDA_CONTRACT)
-
-if(QUDA_COVDEV)
-  add_definitions(-DGPU_COVDEV)
-endif(QUDA_COVDEV)
-
-if(QUDA_TEX AND QUDA_FLOAT8)
-  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
-endif()
-
-
-# COMPILER OPTIONS and BUILD types
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
-include_directories(include)
-include_directories(lib)
-# if(QUDA_JITIFY)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-# endif()
-#END MOVE AWAY
-
-
-# QUDA_HASH for tunecache
-if(NOT GITVERSION)
-  set(GITVERSION ${PROJECT_VERSION})
-endif()
-set(HASH cpu_arch=${CPU_ARCH},gpu_arch=${QUDA_GPU_ARCH},cuda_version=${CMAKE_CUDA_COMPILER_VERSION})
-
 # this allows simplified running of clang-tidy
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-endif()
-
-# build up git version add -debug to GITVERSION if we build with debug options enabled
-string(REGEX MATCH [Dd][Ee][Bb][Uu][Gg] DEBUG_BUILD ${CMAKE_BUILD_TYPE})
-if(DEBUG_BUILD)
-  if(GITVERSION)
-    set(GITVERSION ${GITVERSION}-debug)
-  else()
-    set(GITVERSION debug)
-  endif()
 endif()
 
 # GPU ARCH
@@ -861,6 +699,8 @@ mark_as_advanced(CMAKE_C_FLAGS_HOSTDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_DEVICEDEBUG)
 mark_as_advanced(CMAKE_C_FLAGS_SANITIZE)
 mark_as_advanced(CMAKE_F_FLAGS)
+
+mark_as_advanced(CMAKE_EXE_LINKER_FLAGS_SANITIZE)
 
 #enable ctest
 include(CTest)
