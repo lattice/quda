@@ -77,7 +77,7 @@ namespace quda
   };
   
   template <typename Float, int nColor, int t>
-  void evecProjectSum(const ColorSpinorField &x, const ColorSpinorField &y, Float *result)
+  void evecProjectSum(const ColorSpinorField &x, const ColorSpinorField &y, double *result)
   {
     EvecProjectSumArg<Float, nColor, t> arg(x, y);
     EvecProjectSumCompute<Float, EvecProjectSumArg<Float, nColor, t>> evec_project_sum(arg, x, y);
@@ -87,7 +87,7 @@ namespace quda
     for(int i=0; i<2*x.Nspin()*t; i++) result[i] = ((Float*)arg.result_h)[i];
   }
   
-  void evecProjectSumQuda(const ColorSpinorField &x, const ColorSpinorField &y, void *result)
+  void evecProjectSumQuda(const ColorSpinorField &x, const ColorSpinorField &y, double *result)
   {
     checkPrecision(x, y);
     
@@ -101,9 +101,9 @@ namespace quda
       switch(t_dim_size) {
       case 4 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 4>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 4>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 4>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 4>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -111,9 +111,9 @@ namespace quda
 
       case 8 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 8>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 8>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 8>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 8>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -121,9 +121,9 @@ namespace quda
 
       case 12 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 12>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 12>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 12>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 12>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -131,9 +131,9 @@ namespace quda
 
       case 16 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 16>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 16>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 16>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 16>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -141,9 +141,9 @@ namespace quda
 
       case 24 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 24>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 24>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 24>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 24>(x, y, result);
 	  printfQuda("Double prec!\n");
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
@@ -152,9 +152,9 @@ namespace quda
 
       case 32 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 32>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 32>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 32>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 32>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -162,9 +162,9 @@ namespace quda
 
       case 48 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 48>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 48>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 48>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 48>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -173,9 +173,9 @@ namespace quda
 
       case 64 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 64>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 64>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 64>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 64>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}
@@ -183,9 +183,9 @@ namespace quda
 
       case 96 :
 	if (x.Precision() == QUDA_SINGLE_PRECISION) {
-	  evecProjectSum<float, 3, 96>(x, y, (float*)result);
+	  evecProjectSum<float, 3, 96>(x, y, result);
 	} else if (x.Precision() == QUDA_DOUBLE_PRECISION) {
-	  evecProjectSum<double, 3, 96>(x, y, (double*)result);
+	  evecProjectSum<double, 3, 96>(x, y, result);
 	} else {
 	  errorQuda("Precision %d not supported", x.Precision());
 	}

@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <complex.h>
 
 #include <util_quda.h>
 #include <host_utils.h>
@@ -69,10 +70,10 @@ int main(int argc, char **argv)
   inv_param.cuda_prec_sloppy = prec;
   inv_param.cuda_prec_precondition = prec;
 
-  size_t data_size = (prec == QUDA_DOUBLE_PRECISION) ? sizeof(double) : sizeof(float);
+  size_t data_size = cpu_prec;
   void *spinorX = malloc(V * 2 * 4 * 3 * data_size);
   void *spinorY = malloc(V * 2 * 1 * 3 * data_size);
-  void *d_result = malloc(2 * 4 * X[3] * data_size);
+  double _Complex *d_result = (double _Complex*)malloc(4 * X[3] * sizeof(double _Complex));
 
   {
     quda::RNG rng(X, 1234);
@@ -90,7 +91,6 @@ int main(int argc, char **argv)
   free(spinorX);
   free(spinorY);
   free(d_result);
-
 
   // finalize the QUDA library
   endQuda();

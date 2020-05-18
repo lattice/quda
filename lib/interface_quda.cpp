@@ -5811,7 +5811,7 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
+void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_sinks,
 		     QudaInvertParam inv_param, const int X[4])
 {
   profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
@@ -5839,7 +5839,7 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   ColorSpinorParam cuda_quark_param(cpu_quark_param);
   cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_quark_param.setPrecision(cpu_quark_param.Precision(), cpu_quark_param.Precision(), true);
+  cuda_quark_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   std::vector<ColorSpinorField *> quda_quark;
   quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
 
@@ -5847,7 +5847,7 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   ColorSpinorParam cuda_evec_param(cpu_evec_param);
   cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_evec_param.setPrecision(cpu_evec_param.Precision(), cpu_evec_param.Precision(), true);
+  cuda_evec_param.setPrecision(inv_param.cuda_prec, inv_param.cuda_prec, true);
   cuda_evec_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_evec;
   quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
@@ -5859,17 +5859,22 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   *quda_quark[0] = *quark[0];
   profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
 
+  // check we are safe to cast into a Complex (= std::complex<double>)
+  if (sizeof(Complex) != sizeof(double _Complex)) {
+    errorQuda("Irreconcilable difference between interface and internal complex number conventions");
+  }
+
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order 
   profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], host_sinks);
-  //evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], (double*)host_sinks);
   profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Eyeball the data.
-  for(int i=0; i<2; i++) {
+  for(int t=0; t<X[3]; t++) {
     for(int s=0; s<2; s++) {
-      printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + i, s, ((complex<double>*)&host_sinks)[i].real(), ((complex<double>*)&host_sinks)[i].imag());
+      printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
+             s, ((complex<double>*)host_sinks)[t*4 + s].real(), ((complex<double>*)host_sinks)[t*4 + s].imag());
     }
   }
 
