@@ -215,7 +215,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-target_link_libraries(quda INTERFACE ${CMAKE_THREAD_LIBS_INIT} ${QUDA_LIBS})
+target_link_libraries(quda PUBLIC Threads::Threads)
 
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda PUBLIC MULTI_GPU)
