@@ -169,7 +169,7 @@ endif(QUDA_VERBOSE_BUILD)
 
 # workaround for 10.2
 if(${CMAKE_CUDA_COMPILER_VERSION} VERSION_GREATER_EQUAL "10.2" AND ${CMAKE_CUDA_COMPILER_VERSION} VERSION_LESS "10.3")
-  target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:"-Xcicc \"--Xllc -dag-vectorize-ops=1\"">)
+  target_compile_options(quda PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL: -Xcicc \"--Xllc -dag-vectorize-ops=1\" " >)
 endif()
 
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
@@ -219,19 +219,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-if(THREADS_FOUND AND TARGET Threads::Threads)
-  if(THREADS_HAVE_PTHREAD_ARG)
-    set_property(TARGET Threads::Threads
-                 PROPERTY INTERFACE_COMPILE_OPTIONS "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler -pthread>"
-                                                    "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-pthread>")
-  endif()
-endif()
-
-target_link_libraries(quda PUBLIC Threads::Threads)
-
 if(QUDA_MPI OR QUDA_QMP)
   target_compile_definitions(quda PUBLIC MULTI_GPU)
 endif()
+
+# fix up MPI INTERFACE_COMPILE OPTIONS of cmake < 3.13 for nvcc compatibility
+# if(CMAKE_VERSION VERSION_LESS "3.13")
+#   message(WARNING "Using cmake ${CMAKE_VERSION} -- patching MPI compile options. Consider upgrade to cmake 3.14 or later")
+#   get_target_property(MPIPTHREAD_ORIG MPI::MPI_C INTERFACE_COMPILE_OPTIONS)
+#   string(REPLACE "-pthread" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >-pthread" MPIPTHREAD ${MPIPTHREAD_ORIG})
+#   set_property(TARGET MPI::MPI_C PROPERTY INTERFACE_COMPILE_OPTIONS ${MPIPTHREAD})
+#   # set_property(TARGET quda PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+# endif()
 
 if(QUDA_MPI)
   target_link_libraries(quda PUBLIC MPI::MPI_C)

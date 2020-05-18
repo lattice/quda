@@ -9,11 +9,11 @@ add_library(quda_test STATIC googletest/src/gtest-all.cc)
 target_include_directories(quda_test PUBLIC googletest/include googletest)
 
 # need to check why this is here ...
-if(QUDA_QDPJIT)
-  target_link_libraries(quda
-                        INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-                                  ${QMP_LIB} ${MPI_CXX_LIBRARIES})
-endif()
+# if(QUDA_QDPJIT)
+#   target_link_libraries(quda
+#                         INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
+#                                   ${QMP_LIB} ${MPI_CXX_LIBRARIES})
+# endif()
 
 if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)

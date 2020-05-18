@@ -1,5 +1,5 @@
 # basic setup for cmake
-cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -301,7 +301,7 @@ set(CMAKE_C_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
-find_package(Threads REQUIRED)
+# find_package(Threads REQUIRED)
 
 # define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
