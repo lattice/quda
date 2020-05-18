@@ -65,14 +65,25 @@ namespace quda
 
     Vector4 x_vec_local;
     Vector1 y_vec_local;
-    
+
+    /*    
+    x[3] = blockIdx.z;
+    xyz = threadIdx.x * blockIdx.x * blockdim.x;
+    // compute x[0], x[1], x[2] directly from xyz = (x[2] * X[1] + x[1]) * X[0] + x[0]
+    // now compute global e/o indices idx_cb and parity
+    int idx_cb = linkIndex(x, X);
+    int parity = (x[0] + x[1] + x[2] + x[3]) & 1;
+    */
+    int loop = 0;  
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
-
+      
       // we now have a coordinate in 3-d space, and a t coordinate
       // need to find the corresponding 4-d coordinate for this
       // I suspect this isn't quite correct
-      int idx_cb = t * arg.vol_3d + xyz;
+      int idx_cb = t * (arg.vol_3d/2) + xyz;
+
+      printf("t=%d xzy=%d parity=%d loop=%d ... idx_cb=%d\n", t, xyz, parity, loop, idx_cb);
 
       // Get vector data for this spacetime point
       x_vec_local = arg.x_vec(idx_cb, parity);
@@ -88,6 +99,7 @@ namespace quda
       }
 
       xyz += blockDim.x * gridDim.x;
+      loop++;
     }
 
     //for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
