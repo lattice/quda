@@ -74,20 +74,14 @@ int main(int argc, char **argv)
   void *spinorY = malloc(V * 2 * 1 * 3 * data_size);
   void *d_result = malloc(2 * 4 * X[3] * data_size);
 
-  if (prec == QUDA_SINGLE_PRECISION) {
-    for (int i = 0; i < V * 2 * 4 * 3; i++) {
-      ((float *)spinorX)[i] = rand() / (float)RAND_MAX;
-    }
-    for (int i = 0; i < V * 2 * 1 * 3; i++) {
-      ((float *)spinorY)[i] = rand() / (float)RAND_MAX;
-    }
-  } else {
-    for (int i = 0; i < V * 2 * 4 * 3; i++) {
-      ((double *)spinorX)[i] = rand() / (double)RAND_MAX;
-    }
-    for (int i = 0; i < V * 2 * 1 * 3; i++) {
-      ((double *)spinorY)[i] = rand() / (double)RAND_MAX;
-    }
+  {
+    quda::RNG rng(X, 1234);
+    rng.Init();
+
+    constructRandomSpinorSource(spinorX, 4, 3, inv_param.cpu_prec, X, rng);
+    constructRandomSpinorSource(spinorY, 1, 3, inv_param.cpu_prec, X, rng);
+
+    rng.Release();
   }
 
   // Perform GPU evec projection

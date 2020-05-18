@@ -46,6 +46,14 @@ class RNG {
    */
   RNG(const LatticeFieldParam &param, unsigned long long seedin);
 
+  /**
+     @brief Constructor that just requires the local grid dimensions
+     @param[in] param The local size of the grid (full field only, not
+     single parity)
+     @param[in] seed Seed to initialize the RNG
+   */
+  RNG(const int X[], unsigned long long seedin);
+
   /*! free array */
   void Release();
 
