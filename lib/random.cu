@@ -116,6 +116,24 @@ namespace quda {
 #endif
   }
 
+  RNG::RNG(const int X[], unsigned long long seedin) : seed(seedin), size(1), size_cb(1)
+  {
+    state = nullptr;
+    for (int i = 0; i < 4; i++) {
+      this->X[i] = X[i];
+      this->size *= X[i];
+    }
+    size_cb = size / 2;
+
+#if defined(XORWOW)
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateXORWOW\n");
+#elif defined(RG32k3a)
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+#else
+    if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Using curandStateMRG32k3a\n");
+#endif
+  }
+
   /**
      @brief Initialize CURAND RNG states
   */
