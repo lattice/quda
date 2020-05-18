@@ -238,7 +238,7 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-  target_include_directories(quda_meta SYSTEM PUBLIC ${QUDA_QMPHOME}/include)
+  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QMPHOME}/include)
   target_link_libraries(quda PUBLIC ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC MPI::MPI_C)
