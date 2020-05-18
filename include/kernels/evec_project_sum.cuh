@@ -81,14 +81,17 @@ namespace quda
       // Compute the inner product over color
       for (int mu = 0; mu < nSpinX; mu++) {
 	auto res_ = innerProduct(y_vec_local, x_vec_local, 0, mu);
-        res[mu].x += res_.real();
-        res[mu].y += res_.imag();
+        res[mu].x += (t+1)*1.0*(mu+1);
+        res[mu].y += (t+1)*2.0*(mu+1);
+        //res[mu].x += res_.real();
+        //res[mu].y += res_.imag();
       }
 
       xyz += blockDim.x * gridDim.x;
     }
 
-    for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
+    //for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
+    for (int i=0; i<1; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
   }
 
 } // namespace quda

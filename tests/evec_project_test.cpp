@@ -73,8 +73,8 @@ int main(int argc, char **argv)
   size_t data_size = cpu_prec;
   void *spinorX = malloc(V * 2 * 4 * 3 * data_size);
   void *spinorY = malloc(V * 2 * 1 * 3 * data_size);
-  double _Complex *d_result = (double _Complex*)malloc(4 * X[3] * sizeof(double _Complex));
-
+  void *d_result = malloc(4 * X[3] * data_size);
+  
   {
     quda::RNG rng(X, 1234);
     rng.Init();

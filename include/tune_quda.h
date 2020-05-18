@@ -86,7 +86,6 @@ namespace quda {
 
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
-    virtual unsigned int tuneBlockDimMultiple() const { return 0; }
     virtual bool tuneGridDim() const { return true; }
     virtual bool tuneAuxDim() const { return false; }
     virtual bool tuneSharedBytes() const { return true; }
@@ -147,7 +146,7 @@ namespace quda {
       param.block.x += blockStep();
       int nthreads = param.block.x*param.block.y*param.block.z;
       if (param.block.x > max_threads || sharedBytesPerThread() * nthreads > max_shared
-	  || sharedBytesPerBlock(param) > max_shared || tuneBlockDimMultiple()%param.block.x != 0) {
+	  || sharedBytesPerBlock(param) > max_shared) {
 	resetBlockDim(param);
 	ret = false;
       } else {
