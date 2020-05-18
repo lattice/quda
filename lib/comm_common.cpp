@@ -791,7 +791,7 @@ const char *comm_config_string()
   if (!config_init) {
     strcpy(config_string, ",p2p=");
     strcat(config_string, std::to_string(comm_peer2peer_enabled_global()).c_str());
-    if (enable_p2p_max_access_rank != -1) {
+    if (enable_p2p_max_access_rank != std::numeric_limits<int>::max()) {
       strcat(config_string, ",p2p_max_access_rank=");
       strcat(config_string, std::to_string(enable_p2p_max_access_rank).c_str());
     }
