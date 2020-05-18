@@ -5839,7 +5839,7 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   ColorSpinorParam cuda_quark_param(cpu_quark_param);
   cuda_quark_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_quark_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_quark_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  cuda_quark_param.setPrecision(cpu_quark_param.Precision(), cpu_quark_param.Precision(), true);
   std::vector<ColorSpinorField *> quda_quark;
   quda_quark.push_back(ColorSpinorField::Create(cuda_quark_param));
 
@@ -5847,7 +5847,7 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   ColorSpinorParam cuda_evec_param(cpu_evec_param);
   cuda_evec_param.location = QUDA_CUDA_FIELD_LOCATION;
   cuda_evec_param.create = QUDA_ZERO_FIELD_CREATE;
-  cuda_evec_param.setPrecision(inv_param.cpu_prec, inv_param.cpu_prec, true);
+  cuda_evec_param.setPrecision(cpu_evec_param.Precision(), cpu_evec_param.Precision(), true);
   cuda_evec_param.nSpin = 1;
   std::vector<ColorSpinorField *> quda_evec;
   quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
@@ -5862,9 +5862,8 @@ void laphSinkProject(void *host_quark, void *host_evec, void *host_sinks,
   // We now perfrom the projection onto the eigenspace. The data
   // is placed in host_sinks in i, X, Y, Z, T, spin order 
   profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  complex<double> sinks[quda_quark[0]->Nspin() * X[3]];
-  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], sinks);
-  //evecProjectQuda(*quda_quark[0], *quda_evec[0], sinks);
+  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], host_sinks);
+  //evecProjectQuda(*quda_quark[0], *quda_evec[0], host_sinks);
   profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   // Eyeball the data.
