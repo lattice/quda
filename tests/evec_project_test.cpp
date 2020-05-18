@@ -86,7 +86,18 @@ int main(int argc, char **argv)
   }
 
   // Perform GPU evec projection
-  laphSinkProject(spinorX, spinorY, d_result, inv_param, X);
+  for(int i=0; i<1000; i++) {
+    laphSinkProject(spinorX, spinorY, d_result, inv_param, X);
+    if(i==999) {
+      // Eyeball the data.
+      for(int t=0; t<X[3]; t++) {
+	for(int s=0; s<3; s++) {
+	  printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
+		 s, ((complex<double>*)d_result)[t*4 + s].real(), ((complex<double>*)d_result)[t*4 + s].imag());
+	}
+      }      
+    }
+  }
 
   free(spinorX);
   free(spinorY);

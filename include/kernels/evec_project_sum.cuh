@@ -42,7 +42,7 @@ namespace quda
     {
       for (int dir=0; dir<4; ++dir) {
         X[dir] = x_vec.X()[dir];
-        if (dir < 3) vol_3d *= X[dir];
+        if (dir < 3) vol_3d *= X[dir];	
       }
     }
   };
@@ -66,44 +66,42 @@ namespace quda
     Vector4 x_vec_local;
     Vector1 y_vec_local;
 
-    /*    
-    x[3] = blockIdx.z;
-    xyz = threadIdx.x * blockIdx.x * blockdim.x;
-    // compute x[0], x[1], x[2] directly from xyz = (x[2] * X[1] + x[1]) * X[0] + x[0]
-    // now compute global e/o indices idx_cb and parity
-    int idx_cb = linkIndex(x, X);
-    int parity = (x[0] + x[1] + x[2] + x[3]) & 1;
-    */
     int loop = 0;  
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
-      
-      // we now have a coordinate in 3-d space, and a t coordinate
-      // need to find the corresponding 4-d coordinate for this
-      // I suspect this isn't quite correct
-      int idx_cb = t * (arg.vol_3d/2) + xyz;
 
-      printf("t=%d xzy=%d parity=%d loop=%d ... idx_cb=%d\n", t, xyz, parity, loop, idx_cb);
+      // Divide by two for checkerboard
+      int idx_cb = t * (arg.vol_3d/2) + xyz;
 
       // Get vector data for this spacetime point
       x_vec_local = arg.x_vec(idx_cb, parity);
       y_vec_local = arg.y_vec(idx_cb, parity);
      
-      // Compute the inner product over color
+      // Compute the inner product over colour
       for (int mu = 0; mu < nSpinX; mu++) {
 	auto res_ = innerProduct(y_vec_local, x_vec_local, 0, mu);
-        res[mu].x += (t+1)*1.0*(mu+1);
-        res[mu].y += (t+1)*2.0*(mu+1);
-        //res[mu].x += res_.real();
-        //res[mu].y += res_.imag();
-      }
 
+	// Validation data
+        //res[mu].x += (t+1)*1.0*(mu+1);
+        //res[mu].y += (t+1)*2.0*(mu+1);
+	
+	// Real data
+        res[mu].x += res_.real();
+        res[mu].y += res_.imag();
+
+	/*
+	  printf("t=%d xzy=%d parity=%d loop-%d idx_cb=%d mu=%d ... (%e,%e) (%e,%e) (%e,%e)\n", 
+	  t, xyz, parity, loop, idx_cb, mu, 
+	  res_.real(), res_.imag(),
+	  x_vec_local(mu).real(), x_vec_local(mu).imag(),
+	  y_vec_local(mu).real(), y_vec_local(mu).imag());
+	*/
+      }      
       xyz += blockDim.x * gridDim.x;
       loop++;
     }
-
-    //for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
-    for (int i=0; i<1; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
+    
+    for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
   }
 
 } // namespace quda

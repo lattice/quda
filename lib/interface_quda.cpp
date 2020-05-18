@@ -5872,9 +5872,9 @@ void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_si
 
   // Eyeball the data.
   for(int t=0; t<X[3]; t++) {
-    for(int s=0; s<2; s++) {
-      printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
-             s, ((complex<double>*)host_sinks)[t*4 + s].real(), ((complex<double>*)host_sinks)[t*4 + s].imag());
+    for(int s=0; s<3; s++) {
+      //printf("elem (%d,%d) = (%.16e,%.16e)\n", X[3] * comm_coord(3) + t,
+      //s, ((complex<double>*)host_sinks)[t*4 + s].real(), ((complex<double>*)host_sinks)[t*4 + s].imag());
     }
   }
 
