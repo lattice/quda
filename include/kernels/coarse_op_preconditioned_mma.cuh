@@ -62,9 +62,9 @@ namespace quda
 
         const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
-        auto aa = arg.Y.Ghost(d, 1 - parity, ghost_idx);
-        auto bb = arg.Xinv(0, parity, x_cb);
-        auto cc = arg.Yhat.Ghost(d, 1 - parity, ghost_idx);
+        auto aa = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
+        auto bb = arg.Xinv.wrap(0, parity, x_cb);
+        auto cc = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -75,9 +75,9 @@ namespace quda
 
         const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-        auto aa = arg.Y(d, 1 - parity, back_idx);
-        auto bb = arg.Xinv(0, parity, x_cb);
-        auto cc = arg.Yhat(d, 1 - parity, back_idx);
+        auto aa = arg.Y.wrap(d, 1 - parity, back_idx);
+        auto bb = arg.Xinv.wrap(0, parity, x_cb);
+        auto cc = arg.Yhat.wrap(d, 1 - parity, back_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -87,9 +87,9 @@ namespace quda
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
 
-        auto aa = arg.Xinv(0, parity, x_cb);
-        auto bb = arg.Y(d + 4, parity, x_cb);
-        auto cc = arg.Yhat(d + 4, parity, x_cb);
+        auto aa = arg.Xinv.wrap(0, parity, x_cb);
+        auto bb = arg.Y.wrap(d + 4, parity, x_cb);
+        auto cc = arg.Yhat.wrap(d + 4, parity, x_cb);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;

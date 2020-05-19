@@ -190,7 +190,21 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
 #endif
         } else {
 #if 1
+          for (int s_col = 0; s_col < fineSpin; s_col++) {
+            // here instead of fineColor x coarseColor x fineColor,
+            // we do (fineColor * fineSpin) x coarseColor x fineColor
+            // TODO: Need to have accessor methods in the corresponding color spinor fields.
+            auto aa = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, /** s = */ 0, s_col, 0, 0);
+            auto bb = Wacc.Ghost(dim, 1, (parity + 1) & 1, y_cb, s_col);
+            auto cc = arg.UV(parity, x_cb, s_col * fineSpin);
 
+            constexpr bool a_dagger = false;
+            constexpr bool b_dagger = false;
+            constexpr bool compute_max_only = false;
+
+            perform_mma<Arg::M * fineSpin, Arg::N, Arg::K, bM * fineSpin, bN, bK, block_y, block_z, a_dagger, b_dagger,
+                        compute_max_only>(aa, bb, cc, m, n);
+          }
 #else
           for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
             for (int s_col = 0; s_col < fineSpin; s_col++) {
@@ -231,8 +245,8 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
             // we do (fineColor * fineSpin) x coarseColor x fineColor
             // TODO: Need to have accessor methods in the corresponding color spinor fields.
             auto aa = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, /** s = */ 0, s_col, 0, 0);
-            auto bb = Wacc(0, 0, (parity + 1) & 1, y_cb, s_col, 0, 0);
-            auto cc = arg.UV(0, 0, parity, x_cb, s_col * fineSpin + /** s = */ 0, 0, 0);
+            auto bb = Wacc((parity + 1) & 1, y_cb, s_col);
+            auto cc = arg.UV(parity, x_cb, s_col * fineSpin);
 
             constexpr bool a_dagger = false;
             constexpr bool b_dagger = false;
@@ -258,8 +272,9 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
 #endif
         }
       }
-
+#if 0
       for (int s = 0; s < uvSpin; s++) UV[s].saveCS(arg.UV, 0, 0, parity, x_cb, s, i0, j0);
+#endif
     } // computeUV
 
     template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>

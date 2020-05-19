@@ -557,11 +557,18 @@ namespace quda {
 	}
       }
 
-      __device__ __host__ inline const auto operator()(int d, int parity, int x) const
-      {
-        return fieldorder_wrapper<Float, storeFloat>(u, ((parity * volumeCB + x) * geometry + d) * nColor * nColor,
-                                                     scale, scale_inv);
+      __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
+	    {
+        return fieldorder_wrapper<Float,storeFloat>
+	        (u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
       }
+
+      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
+	    {
+        return fieldorder_wrapper<Float,storeFloat>
+	        (u, (((parity * volumeCB + x) * geometry + d) * nColor + row) * nColor + col, scale, scale_inv);
+      }
+
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
 	{ return fieldorder_wrapper<Float,storeFloat>
@@ -657,10 +664,14 @@ namespace quda {
 	}
       }
 
-      __device__ __host__ inline const auto operator()(int d, int parity, int x) const
+      __device__ __host__ inline const auto wrap(int d, int parity, int x, int row, int col) const
       {
-        return fieldorder_wrapper<Float, storeFloat>(ghost[d], parity * ghostOffset[d] + x * nColor * nColor, scale,
-                                                     scale_inv);
+        return fieldorder_wrapper<Float,storeFloat>(ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
+      }
+
+      __device__ __host__ inline auto wrap(int d, int parity, int x, int row, int col)
+      {
+        return fieldorder_wrapper<Float,storeFloat>(ghost[d], parity * ghostOffset[d] + (x * nColor + row) * nColor + col, scale, scale_inv);
       }
 
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int d, int parity, int x, int row, int col)
@@ -927,7 +938,15 @@ namespace quda {
           return accessor(d, parity, x, row, col);
         }
 
-        __device__ __host__ const auto operator()(int d, int parity, int x) const { return accessor(d, parity, x); }
+        __device__ __host__ const auto wrap(int d, int parity, int x) const
+        {
+          return accessor.wrap(d, parity, x, 0, 0);
+        }
+
+        __device__ __host__ auto wrap(int d, int parity, int x)
+        {
+          return accessor.wrap(d, parity, x, 0, 0);
+        }
 
         /**
          * Writable complex-member accessor function
@@ -937,8 +956,7 @@ namespace quda {
          * @param row row index
          * @param c column index
          */
-        __device__ __host__ fieldorder_wrapper<Float, storeFloat> operator()(int d, int parity, int x, int row = 0,
-                                                                             int col = 0)
+        __device__ __host__ fieldorder_wrapper<Float, storeFloat> operator()(int d, int parity, int x, int row, int col)
         {
           return accessor(d, parity, x, row, col);
         }
@@ -966,9 +984,19 @@ namespace quda {
          * @param row row index
          * @param c column index
          */
-        __device__ __host__ fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int row = 0, int col = 0)
+        __device__ __host__ fieldorder_wrapper<Float, storeFloat> Ghost(int d, int parity, int x, int row, int col)
         {
           return ghostAccessor(d, parity, x, row, col);
+        }
+
+        __device__ __host__ const auto wrap_ghost(int d, int parity, int x) const
+        {
+          return ghostAccessor.wrap(d, parity, x, 0, 0);
+        }
+
+        __device__ __host__ auto wrap_ghost(int d, int parity, int x)
+        {
+          return ghostAccessor.wrap(d, parity, x, 0, 0);
         }
 
         /**
@@ -997,8 +1025,18 @@ namespace quda {
 	 * @param c_col col color index
 	 */
 	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()
-	  (int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
-	  return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+    (int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
+    return (*this)(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+  }
+
+  __device__ __host__ inline const auto wrap(int d, int parity, int x, int s_row, int s_col) const
+  {
+	  return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+	}
+
+  __device__ __host__ inline auto wrap(int d, int parity, int x, int s_row, int s_col)
+  {
+	  return accessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
 	}
 
     	/**
@@ -1029,6 +1067,16 @@ namespace quda {
 	__device__ __host__ inline fieldorder_wrapper<Float,storeFloat>
 	  Ghost(int d, int parity, int x, int s_row, int s_col, int c_row, int c_col) {
 	  return Ghost(d, parity, x, s_row*nColorCoarse + c_row, s_col*nColorCoarse + c_col);
+	}
+
+  __device__ __host__ inline const auto wrap_ghost(int d, int parity, int x, int s_row, int s_col) const
+  {
+	  return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
+	}
+
+  __device__ __host__ inline auto wrap_ghost(int d, int parity, int x, int s_row, int s_col)
+  {
+	  return ghostAccessor.wrap(d, parity, x, s_row * nColorCoarse, s_col * nColorCoarse);
 	}
 
         template <typename theirFloat>

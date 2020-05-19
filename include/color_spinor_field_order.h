@@ -248,6 +248,12 @@ namespace quda {
     {
       return parity * offset_cb + ((x_cb * nSpin + s) * nColor + c) * nVec + v;
     }
+
+      __device__ __host__ inline int wrap_index(int parity, int x_cb, int s) const
+      {
+        return parity * offset_cb + (x_cb * nSpin + s) * nColor * nVec;
+      }
+
     };
 
     template<typename Float, int nSpin, int nColor, int nVec>
@@ -263,6 +269,10 @@ namespace quda {
       GhostAccessorCB() : ghostOffset{ } { }
       __device__ __host__ inline int index(int dim, int dir, int parity, int x_cb, int s, int c, int v) const
       { return parity*ghostOffset[dim] + ((x_cb*nSpin+s)*nColor+c)*nVec+v; }
+
+      __device__ __host__ inline int wrap_index(int dim, int dir, int parity, int x_cb, int s) const
+      { return parity * ghostOffset[dim] + (x_cb * nSpin + s) * nColor * nVec; }
+
     };
 
     template<int nSpin, int nColor, int nVec, int N>
@@ -398,6 +408,10 @@ namespace quda {
       v[idx].imag(storeFloat(round(scale * a)));
     }
   }
+
+  __device__ __host__ inline auto data() { return &v[idx]; }
+
+  __device__ __host__ inline const auto data() const { return &v[idx]; }
 
   /**
      @brief negation operator
@@ -592,7 +606,6 @@ namespace quda {
 #endif
       }
 
-
       /**
        * Writable complex-member accessor function.  The last
        * parameter n is only used for indexed into the packed
@@ -604,6 +617,25 @@ namespace quda {
        */
       __device__ __host__ inline fieldorder_wrapper<Float,storeFloat> operator()(int parity, int x_cb, int s, int c, int n=0)
   { return fieldorder_wrapper<Float,storeFloat>(v, accessor.index(parity,x_cb,s,c,n), scale, scale_inv); }
+
+      /**
+       * Writable complex-member accessor function.  The last
+       * parameter n is only used for indexed into the packed
+       * null-space vectors.
+       * @param x 1-d checkerboard site index
+       * @param s spin index
+       * @param c color index
+       * @param v vector number
+       */
+      __device__ __host__ inline const auto wrap(int parity, int x_cb, int s) const
+      {
+        return fieldorder_wrapper<Float,storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+      }
+
+      __device__ __host__ inline auto wrap(int parity, int x_cb, int s)
+      {
+        return fieldorder_wrapper<Float,storeFloat>(v, accessor.wrap_index(parity, x_cb, s), scale, scale_inv);
+      }
 
 #ifndef DISABLE_GHOST
       /**
@@ -659,6 +691,18 @@ namespace quda {
               block_float_ghost ? ghost_scale/max : ghost_scale,
               block_float_ghost ? ghost_scale_inv*max : ghost_scale_inv);
 
+      }
+
+      __device__ __host__ inline const auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s) const
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
+      }
+
+      __device__ __host__ inline auto wrap_ghost(int dim, int dir, int parity, int x_cb, int s)
+      {
+        const int idx = ghostAccessor.wrap_index(dim, dir, parity, x_cb, s);
+        return fieldorder_wrapper<Float, ghostFloat>(ghost[2 * dim + dir], idx, ghost_scale, ghost_scale_inv);
       }
 
       /**
