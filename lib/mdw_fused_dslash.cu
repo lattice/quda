@@ -125,8 +125,9 @@ namespace quda
 
         if (nParity == 2) { errorQuda("nParity = 2 NOT supported, yet.\n"); }
 
-        // if (!in.isNative() || !out.isNative())
-        //   errorQuda("Unsupported field order out=%d in=%d\n", out.FieldOrder(), in.FieldOrder());
+        if (b_5[0] != b_5[1] || b_5[0].imag() != 0) {
+          errorQuda("zMobius is NOT supported yet.\n");
+        }
 
         b = b_5[0].real();
         c = c_5[0].real();
@@ -279,10 +280,10 @@ namespace quda
     }
 
     /**
-      @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha*M5inv operator
-      The kernels type(type_) will be specified in some documentations.
+      @brief Tensor core kernel for applying Wilson hopping term and then the beta + alpha * M5inv operator
+      The integer kernel types corresponds to the enum MdwfFusedDslashType.
     */
-    template <int block_dim_x, int minBlocksPerMultiprocessor, bool reload, class Arg, int type_>
+    template <int block_dim_x, int minBlocksPerMultiprocessor, bool reload, class Arg, int type>
     __global__ void __launch_bounds__(block_dim_x *Arg::Ls, minBlocksPerMultiprocessor) fused_tensor_core(Arg arg)
     {
       using storage_type = typename Arg::storage_type;
@@ -310,23 +311,23 @@ namespace quda
       // This is for type == 1 ONLY.
       half *sm_a_black = sm_a + M * M_sm;
 
-      if (type_ == 0) {
+      if (type == 0) {
         if (arg.small_kappa) {
           construct_matrix_a_d5<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
         } else {
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
         }
-      } else if (type_ == 2) {
+      } else if (type == 2) {
         if (arg.small_kappa) {
           construct_matrix_a_d5<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger =  true
         } else {
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = false
         }
-      } else if (type_ == 1) {
+      } else if (type == 1) {
         construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger = false
-      } else if (type_ == 3) {
+      } else if (type == 3) {
         construct_matrix_a_d5<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger =  true
-      } else if (type_ == 4) {
+      } else if (type == 4) {
         construct_matrix_a_d5<block_dim_x, Ls, M_sm, false, Arg>(arg, sm_a); // dagger =  true
       }
       __syncthreads();
@@ -381,7 +382,7 @@ namespace quda
         }
       }
 #endif
-      if (type_ == 1) {
+      if (type == 1) {
         arg.alpha = 1.;
         if (!reload) {                                                           // in the preload case we preload ...
           construct_matrix_a_m5inv<block_dim_x, Ls, M_sm, true, Arg>(arg, sm_a); // dagger = true
@@ -420,17 +421,17 @@ namespace quda
         Vector in_vec;
         if (!idle) {
           // the Wilson hopping terms
-          if (type_ == 0) {
+          if (type == 0) {
             apply_wilson_5d<storage_type, false, true, true>(in_vec, x, arg, threadIdx.y); // dagger = false; halo = true
-          } else if (type_ == 2) {
+          } else if (type == 2) {
             apply_wilson_5d<storage_type, true, false, false>(in_vec, x, arg,
                                                               threadIdx.y); // dagger =  true; halo = false
-          } else if (type_ == 1) {
+          } else if (type == 1) {
             apply_wilson_5d<storage_type, false, true, false>(in_vec, x, arg, threadIdx.y); // dagger = false; halo = true
-          } else if (type_ == 3) {
+          } else if (type == 3) {
             apply_wilson_5d<storage_type, true, false, false>(in_vec, x, arg,
                                                               threadIdx.y); // dagger =  true; halo = false
-          } else if (type_ == 4) {
+          } else if (type == 4) {
             int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
             in_vec = arg.in(sid_shift, explicit_parity);
           }
@@ -446,7 +447,7 @@ namespace quda
 #endif
         __syncthreads();
 
-        if (type_ == 1) {
+        if (type == 1) {
           Vector aux_in_vec;
           int sid_back;
           bool center = false;
@@ -467,7 +468,7 @@ namespace quda
 #endif
           __syncthreads();
 
-        } else if (type_ == 3) {
+        } else if (type == 3) {
           Vector aux_in_vec;
           int sid_shift = threadIdx.y * arg.volume_4d_cb_shift + s4_shift;
           if (!idle) { aux_in_vec = arg.x(sid_shift, explicit_parity); }
@@ -475,9 +476,9 @@ namespace quda
           if (!idle) { arg.out(sid_shift, explicit_parity) = aux_in_vec; }
         }
 
-        if (type_ == 3) {
+        if (type == 3) {
 
-        } else if (type_ == 1) {
+        } else if (type == 1) {
           if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0]); }
         } else {
           if (!idle) { store_matrix_c<storage_type, N_sm>(arg.out, sm_b, sid, smem_scale[0] * arg.m_scale); }
@@ -703,6 +704,8 @@ namespace quda
                         bool dagger, int parity, int shift[4], int halo_shift[4], MdwfFusedDslashType type)
       {
         // switch for Ls
+        // Only mutiple of 4 are supported since tensor core MMA only supports multiple of 16 shapes and we get a
+        // factor of 4 for free.
         switch (in.X(4)) {
         case 4: {
           FusedDslashArg<storage_type, recon, 4> arg(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift,

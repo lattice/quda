@@ -812,8 +812,10 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
 
+  CLI::TransformPairs<int> eofa_pm_map { {"plus", 1}, {"minus", 0} };
   opgroup->add_option("--eofa-pm", eofa_pm,
-                      "Set to evalute plus (non-zero values) or minus (zero) EOFA operator (default 1)");
+                      "Set to evalute \"plus\" or \"minus\" EOFA operator (default plus)")
+                      ->transform(CLI::QUDACheckedTransformer(eofa_pm_map));
   opgroup->add_option("--eofa-shift", eofa_shift, "Set the shift for the EOFA operator (default -0.12345)");
   opgroup->add_option("--eofa-mq1", eofa_mq1, "Set mq1 for EOFA operator (default 1.0)");
   opgroup->add_option("--eofa-mq2", eofa_mq1, "Set mq2 for EOFA operator (default 0.085)");

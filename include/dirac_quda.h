@@ -743,7 +743,7 @@ public:
   class DiracMobiusPC : public DiracMobius {
 
   protected:
-    cudaGaugeField *extended_gauge;
+    mutable cudaGaugeField *extended_gauge;
 
   private:
   public:

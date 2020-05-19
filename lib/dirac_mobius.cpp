@@ -178,26 +178,23 @@ namespace quda {
     // do nothing
   }
 
-  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param)
+  DiracMobiusPC::DiracMobiusPC(const DiracParam &param) : DiracMobius(param), extended_gauge(nullptr)
   {
-    const int R[] = {2, 2, 2, 2};
-    extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+    // do nothing
   }
 
-  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac)
+  DiracMobiusPC::DiracMobiusPC(const DiracMobiusPC &dirac) : DiracMobius(dirac), extended_gauge(nullptr)
   {
-    const int R[] = {2, 2, 2, 2};
-    extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+    // do nothing
   }
 
-  DiracMobiusPC::~DiracMobiusPC() { delete extended_gauge; }
+  DiracMobiusPC::~DiracMobiusPC() { if(extended_gauge) delete extended_gauge; }
 
   DiracMobiusPC &DiracMobiusPC::operator=(const DiracMobiusPC &dirac)
   {
     if (&dirac != this) {
       DiracMobius::operator=(dirac);
-      const int R[] = {2, 2, 2, 2};
-      extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+      extended_gauge = nullptr;
     }
 
     return *this;
@@ -370,6 +367,11 @@ namespace quda {
   void DiracMobiusPC::MdagMLocal(ColorSpinorField &out, const ColorSpinorField &in) const
   {
     if (zMobius) { errorQuda("DiracMobiusPC::MdagMLocal doesn't currently support zMobius.\n"); }
+
+    if (extended_gauge == nullptr) {
+      const int R[] = {2, 2, 2, 2};
+      extended_gauge = createExtendedGauge(*gauge, R, profile, true);
+    }
 
     checkDWF(in, out);
     // checkParitySpinor(in, out);
