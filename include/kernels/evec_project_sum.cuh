@@ -60,11 +60,10 @@ namespace quda
     double2 res[nSpinX];
     for (int i=0; i<nSpinX; i++) res[i] = make_double2(0.0, 0.0);
 
-    int loop = 0;  
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
 
-      // Divide by two for checkerboard
+      // arg.threads is the parity timeslice volume 
       int idx_cb = t * arg.threads + xyz;
 
       // Get vector data for this spacetime point
@@ -80,7 +79,6 @@ namespace quda
         res[mu].y += res_.imag();
       }      
       xyz += blockDim.x * gridDim.x;
-      loop++;
     }
 
     for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
