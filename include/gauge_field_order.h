@@ -22,11 +22,11 @@
 #include <type_traits>
 #include <limits>
 #include <atomic.cuh>
-#include <thrust_helper.cuh>
 #include <gauge_field.h>
 #include <index_helper.cuh>
 #include <trove_helper.cuh>
 #include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -443,26 +443,20 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
         int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          for (int d=lower; d<upper; d++) {
-            thrust::device_ptr<complex<storeFloat> > ptr(u[d]);
-            result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+2*volumeCB*nColor*nColor, h, result, r);
-          }
-        } else {
-          for (int d=lower; d<upper; d++) {
-            result = thrust::transform_reduce(thrust::seq, u[d], u[d]+2*volumeCB*nColor*nColor, h, result, r);
-          }
-        }
-        return result;
+        int ndim = (dim == -1 ? geometry : 1);
+        std::vector<double> result(ndim);
+        std::vector<complex<storeFloat> *> v(ndim);
+        for (int d = 0; d < ndim; d++) v[d] = u[d + lower];
+        ::quda::transform_reduce(location, result, v, 2 * volumeCB * nColor * nColor, h, init, r);
+        double total = init;
+        for (auto &res : result) total = r(total, res);
+        return total;
       }
-
     };
 
     template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
@@ -588,32 +582,18 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
-                                            ptr+(0*geometry+lower)*volumeCB*nColor*nColor,
-                                            ptr+(0*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
-                                            ptr+(1*geometry+lower)*volumeCB*nColor*nColor,
-                                            ptr+(1*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-        } else {
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+(0*geometry+lower)*volumeCB*nColor*nColor,
-                                            u+(0*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-          result  = thrust::transform_reduce(thrust::seq,
-                                             u+(1*geometry+lower)*volumeCB*nColor*nColor,
-                                             u+(1*geometry+upper)*volumeCB*nColor*nColor, h, result, r);
-        }
-        return result;
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int start = dim == -1 ? 0 : dim;
+        int count = (dim == -1 ? geometry : 1) * volumeCB * nColor * nColor; // items per parity
+        std::vector<double> result = {init, init};
+        std::vector<decltype(u)> v = {u + (0 * geometry + start) * volumeCB * nColor * nColor,
+                                      u + (1 * geometry + start) * volumeCB * nColor * nColor};
+        ::quda::transform_reduce(location, result, v, count, h, init, r);
+        return r(result[0], result[1]);
       }
-
     };
 
     template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
@@ -786,32 +766,17 @@ namespace quda {
 #endif
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, reducer r, double init) const {
-	if (dim >= geometry) errorQuda("Request dimension %d exceeds dimensionality of the field %d", dim, geometry);
-        int lower = (dim == -1) ? 0 : dim;
-        int upper = (dim == -1) ? geometry : dim+1;
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(u);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
-                                            ptr+0*offset_cb+lower*stride*nColor*nColor,
-                                            ptr+0*offset_cb+upper*stride*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::cuda::par(alloc),
-                                            ptr+1*offset_cb+lower*stride*nColor*nColor,
-                                            ptr+1*offset_cb+upper*stride*nColor*nColor, h, result, r);
-        } else {
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+0*offset_cb+lower*stride*nColor*nColor,
-                                            u+0*offset_cb+upper*stride*nColor*nColor, h, result, r);
-          result = thrust::transform_reduce(thrust::seq,
-                                            u+1*offset_cb+lower*stride*nColor*nColor,
-                                            u+1*offset_cb+upper*stride*nColor*nColor, h, result, r);
-        }
-        return result;
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, int dim, helper h, double init, reducer r) const
+      {
+        if (dim >= geometry) errorQuda("Requested dimension %d exceeds dimensionality of the field %d", dim, geometry);
+        int start = (dim == -1) ? 0 : dim;
+        int count = (dim == -1 ? geometry : 1) * stride * nColor * nColor;
+        std::vector<double> result = {init, init};
+        std::vector<decltype(u)> v = {u + 0 * offset_cb + start * count, u + 1 * offset_cb + start * count};
+        ::quda::transform_reduce(location, result, v, count, h, init, r);
+        return r(result[0], result[1]);
       }
-
     };
 
     template<typename Float, int nColor, bool native_ghost, typename storeFloat, bool use_tex>
@@ -1068,49 +1033,49 @@ namespace quda {
 	 * @return L1 norm
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
-	  double nrm1 = accessor.transform_reduce(location, dim, abs_<double,storeFloat>(accessor.scale_inv),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          double nrm1 = accessor.transform_reduce(location, dim, abs_<double, storeFloat>(accessor.scale_inv), 0.0,
+                                                  plus<double>());
+          if (global) comm_allreduce(&nrm1);
+          return nrm1;
+        }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm squared of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return L2 norm squared
 	 */
 	__host__ double norm2(int dim=-1, bool global=true) const {
-	  double nrm2 = accessor.transform_reduce(location, dim, square_<double,storeFloat>(accessor.scale_inv),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+          double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
+                                                  plus<double>());
+          if (global) comm_allreduce(&nrm2);
+          return nrm2;
+        }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field in a given dimension
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Linfinity norm
 	 */
 	__host__ double abs_max(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, dim, abs_<Float,storeFloat>(accessor.scale_inv),
-                                                    thrust::maximum<Float>(), 0.0);
-	  if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+          double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
+                                                    maximum<Float>());
+          if (global) comm_allreduce_max(&absmax);
+          return absmax;
+        }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
 	 * @return Minimum norm
 	 */
 	__host__ double abs_min(int dim=-1, bool global=true) const {
-	  double absmin = accessor.transform_reduce(location, dim, abs_<Float,storeFloat>(accessor.scale_inv),
-                                                    thrust::minimum<Float>(), std::numeric_limits<double>::max());
-	  if (global) comm_allreduce_min(&absmin);
-	  return absmin;
-	}
+          double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
+                                                    std::numeric_limits<double>::max(), minimum<Float>());
+          if (global) comm_allreduce_min(&absmin);
+          return absmin;
+        }
 
-	/** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
+        /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
 	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
       };
 
