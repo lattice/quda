@@ -87,6 +87,7 @@ namespace quda {
     // override this if a specific thread count is required (e.g., if not grid size tuning)
     virtual unsigned int minThreads() const { return 1; }
     virtual bool tuneGridDim() const { return true; }
+    virtual bool staticGridDim() const { return false; }
     virtual bool tuneAuxDim() const { return false; }
     virtual bool tuneSharedBytes() const { return true; }
     
@@ -152,7 +153,7 @@ namespace quda {
       } else {
 	ret = true;
       }
-      if (!tuneGridDim()) 
+      if (!tuneGridDim() && !staticGridDim()) 
 
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
       
