@@ -10,8 +10,10 @@
 namespace quda
 {
 
+  using spinor = vector_type<double2,4>;
+
   template <typename Float_, int nColor_> struct EvecProjectSumArg :
-    public ReduceArg<double2>
+    public ReduceArg<spinor>
   {
     int threads; // number of active threads required
     int X[4]; // true grid dimensions
@@ -33,7 +35,7 @@ namespace quda
     F1 y_vec;
     
     EvecProjectSumArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec) :
-      ReduceArg<double2>(),
+      ReduceArg<spinor>(),
       threads(x_vec.VolumeCB() / x_vec.X(3)), // the thread-x dimension is only for 3-d space 
       x_vec(x_vec),
       y_vec(y_vec)
@@ -57,8 +59,7 @@ namespace quda
     typedef ColorSpinor<real, nColor, nSpinX> Vector4;
     typedef ColorSpinor<real, nColor, nSpinY> Vector1;
 
-    double2 res[nSpinX];
-    for (int i=0; i<nSpinX; i++) res[i] = make_double2(0.0, 0.0);
+    spinor res;
 
     // the while loop is restricted to the same time slice
     while (xyz < arg.threads) {
@@ -81,7 +82,7 @@ namespace quda
       xyz += blockDim.x * gridDim.x;
     }
 
-    for (int i=0; i<nSpinX; i++) reduce2d<blockSize, 2>(arg, res[i], t * nSpinX + i);
+    reduce2d<blockSize, 2>(arg, res, t);
   }
 
 } // namespace quda
