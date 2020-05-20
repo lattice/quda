@@ -396,22 +396,22 @@ namespace quda {
     QudaParity parity[2] = {static_cast<QudaParity>((1 + odd_bit) % 2), static_cast<QudaParity>((0 + odd_bit) % 2)};
     if (out.Precision() == QUDA_HALF_PRECISION || out.Precision() == QUDA_QUARTER_PRECISION) {
       mobius_tensor_core::apply_fused_dslash(*unextended_tmp2, in, *extended_gauge, *unextended_tmp2, in, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift0, shift0, dslash5pre);
+                                             c_5, dagger, parity[1], shift0, shift0, MdwfFusedDslashType::D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *unextended_tmp2, *extended_gauge, *extended_tmp2,
                                              *unextended_tmp2, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift2,
-                                             dslash4_dslash5pre_dslash5inv);
+                                             MdwfFusedDslashType::D4_D5INV_D5PRE);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp1, *extended_tmp2, *extended_gauge, *unextended_tmp1, in,
                                              mass, m5, b_5, c_5, dagger, parity[1], shift0, shift1,
-                                             dslash4_dslash5inv_dslash5invdag);
+                                             MdwfFusedDslashType::D4_D5INV_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(*extended_tmp2, *extended_tmp1, *extended_gauge, *extended_tmp2,
                                              *extended_tmp1, mass, m5, b_5, c_5, dagger, parity[0], shift1, shift1,
-                                             dslash4dag_dslash5predag_dslash5invdag);
+                                             MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG);
 
       mobius_tensor_core::apply_fused_dslash(out, *extended_tmp2, *extended_gauge, out, *unextended_tmp1, mass, m5, b_5,
-                                             c_5, dagger, parity[1], shift2, shift2, dslash4dag_dslash5predag);
+                                             c_5, dagger, parity[1], shift2, shift2, MdwfFusedDslashType::D4DAG_D5PREDAG);
 
       const long long Ls = in.X(4);
       const long long mat = 2ll * 4ll * Ls - 1ll; // (multiplicaiton-add) * (spin) * Ls - 1

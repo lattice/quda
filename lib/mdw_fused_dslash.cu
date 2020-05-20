@@ -138,8 +138,8 @@ namespace quda
         fac_inv
           = 0.5 / (1. + std::pow(kappa, (int)Ls) * m_f); // 0.5 to normalize the (1 +/- gamma5) in the chiral projector.
         switch (type) {
-        case dslash4_dslash5pre_dslash5inv:
-        case dslash4dag_dslash5predag_dslash5invdag:
+        case MdwfFusedDslashType::D4_D5INV_D5PRE:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
           if (small_kappa) {
             m_scale = b;
             alpha = (c - b * kappa) / (2. * b);
@@ -150,20 +150,20 @@ namespace quda
             beta = -1. / (1. + (kappa * b) / c);
           }
           break;
-        case dslash4_dslash5inv_dslash5invdag:
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
           m_scale = -0.25 / ((b * (4. + m_5) + 1.) * (b * (4. + m_5) + 1.)); // -kappa_b^2
           break;
-        case dslash4dag_dslash5predag:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG:
           m_scale = -0.25 / ((b * (4. + m_5) + 1.) * (b * (4. + m_5) + 1.)) * b; // -kappa_b^2
           alpha = c / (2. * b); // 2 to compensate for the spin projection
           beta = 1.;
           break;
-        case 4:
+        case MdwfFusedDslashType::D5PRE:
           m_scale = b;
           alpha = c / (2. * b);
           beta = 1.;
           break;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", type);
+        default: errorQuda("Unknown MdwfFusedDslashType");
         }
       }
     };
@@ -508,20 +508,20 @@ namespace quda
 
         long long flops_ = 0;
         switch (arg.type) {
-        case 0:
+        case MdwfFusedDslashType::D4_D5INV_D5PRE:
           flops_ = volume_4d_cb_halo_shift * 6ll * 4ll * arg.Ls * hop + arg.volume_4d_cb_shift * 24ll * arg.Ls * mat;
           break;
-        case 1:
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
           flops_
             = volume_4d_cb_halo_shift * 6ll * 4ll * arg.Ls * hop + arg.volume_4d_cb_shift * 24ll * arg.Ls * 2ll * mat;
           break;
-        case 2:
-        case 3:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG:
           flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * arg.Ls
             * (hop + mat); // for 2 and 3 we don't have the halo complication.
           break;
-        case 4: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * arg.Ls * (mat); break;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        case MdwfFusedDslashType::D5PRE: flops_ = arg.volume_4d_cb_shift * 6ll * 4ll * arg.Ls * (mat); break;
+        default: errorQuda("Unknown MdwfFusedDslashType");
         }
 
         return flops_;
@@ -535,12 +535,12 @@ namespace quda
         auto b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * site_size;
         auto b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * site_size;
         switch (arg.type) {
-        case 0: return b_m1 + b_m2 + arg.U.Bytes();
-        case 1: return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
-        case 2: return b_m1 + b_m0 + arg.U.Bytes();
-        case 3: return 2 * b_m2 + b_m1 + arg.U.Bytes();
-        case 4: return 2 * b_m0;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        case MdwfFusedDslashType::D4_D5INV_D5PRE:           return b_m1 + b_m2 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:        return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:  return b_m1 + b_m0 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4DAG_D5PREDAG:           return 2 * b_m2 + b_m1 + arg.U.Bytes();
+        case MdwfFusedDslashType::D5PRE:                    return 2 * b_m0;
+        default: errorQuda("Unknown MdwfFusedDslashType");
         }
         return 0ll;
       }
@@ -561,7 +561,7 @@ namespace quda
         const int b_size = (param.block.y * 4) * (param.block.x * 6 + sm_n_pad_size());
         // (Ls*4) by (Ls*4), (Ls*4) by (volume_4d*6 + 16)
         if (param.aux.x == 1) { // aux.x == 1 --> reload == true
-          if (arg.type == 1) {
+          if (arg.type == MdwfFusedDslashType::D4_D5INV_D5INVDAG) {
             return (a_size * 2 + b_size) * sizeof(half) + 128;
           } else {
             return (a_size + b_size) * sizeof(half) + 128;
@@ -602,29 +602,29 @@ namespace quda
         //        if (arg.xpay) strcat(aux,",xpay");
         char config[512];
         switch (arg.type) {
-        case dslash4_dslash5pre_dslash5inv:
+        case MdwfFusedDslashType::D4_D5INV_D5PRE:
           sprintf(config, ",f0,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
                   arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
           strcat(aux, config);
           break;
-        case dslash4dag_dslash5predag_dslash5invdag:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:
           sprintf(config, ",f2,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
           strcat(aux, config);
           break;
-        case dslash4_dslash5inv_dslash5invdag:
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:
           sprintf(config, ",f1,shift%d,%d,%d,%d,halo%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2],
                   arg.shift[3], arg.halo_shift[0], arg.halo_shift[1], arg.halo_shift[2], arg.halo_shift[3]);
           strcat(aux, config);
           break;
-        case dslash4dag_dslash5predag:
+        case MdwfFusedDslashType::D4DAG_D5PREDAG:
           sprintf(config, ",f3,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
           strcat(aux, config);
           break;
-        case 4:
+        case MdwfFusedDslashType::D5PRE:
           sprintf(config, ",f4,shift%d,%d,%d,%d", arg.shift[0], arg.shift[1], arg.shift[2], arg.shift[3]);
           strcat(aux, config);
           break;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        default: errorQuda("Unknown MdwfFusedDslashType");
         }
       }
 
@@ -671,12 +671,12 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {
-        case 0: apply<0>(tp, arg, stream); break;
-        case 1: apply<1>(tp, arg, stream); break;
-        case 2: apply<2>(tp, arg, stream); break;
-        case 3: apply<3>(tp, arg, stream); break;
-        case 4: apply<4>(tp, arg, stream); break;
-        default: errorQuda("Unknown MdwfFusedDslashType %d", arg.type);
+        case MdwfFusedDslashType::D4_D5INV_D5PRE:           apply<0>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:        apply<1>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:  apply<2>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG:           apply<3>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D5PRE:                    apply<4>(tp, arg, stream); break;
+        default: errorQuda("Unknown MdwfFusedDslashType");
         }
       }
 
