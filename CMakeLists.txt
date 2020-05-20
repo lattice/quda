@@ -347,10 +347,6 @@ set(CMAKE_C_FLAGS_SANITIZE
 
 enable_language(C)
 
-# define FORTRAN FLAGS
-set(CMAKE_F_FLAGS
-    -std=c99
-    CACHE STRING "Fortran Flags")
 if(QUDA_INTERFACE_TIFR
    OR QUDA_INTERFACE_BQCD
    OR QUDA_ARPACK)
