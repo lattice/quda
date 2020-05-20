@@ -135,8 +135,8 @@ endif()
 add_library(quda_cpp OBJECT ${QUDA_OBJS})
 
 # add comms and QIO
-target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,comm_mpi.cpp,comm_single.cpp>
-               $<$<BOOL:${QUDA_QMP}>:comm_qmp.cpp>)
+target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,comm_mpi.cpp,$<IF:$<BOOL:${QUDA_QMP}>,comm_qmp.cpp,comm_single.cpp>>)
+
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
@@ -355,8 +355,12 @@ if(QUDA_MPI)
 endif()
 
 if(QUDA_QMP)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QMPHOME}/include)
-  target_link_libraries(quda PUBLIC ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS})
+  if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+    add_dependencies(quda QMP)
+    add_dependencies(quda_cpp QMP)
+  endif()
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
+  target_link_libraries(quda INTERFACE ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS})
   target_compile_definitions(quda PUBLIC QMP_COMMS)
   target_link_libraries(quda PUBLIC MPI::MPI_C)
 endif()
@@ -367,14 +371,14 @@ if(QUDA_QIO)
     add_dependencies(quda_cpp QIO)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QIOHOME}/include)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_LIMEHOME}/include)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_LIMEHOME}/include>)
   target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
 endif()
 
 if(QUDA_QDPJIT)
   target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QDPJITHOME}/include)
+  target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QDPJITHOME}/include>)
   target_link_libraries(
     quda
     INTERFACE ${QDP_LDFLAGS}
@@ -425,8 +429,8 @@ if(QUDA_MAGMA)
 endif()
 
 # set which precisions to enable
-target_compile_definitions(quda PRIVATE QUDA_PRECISION=${QUDA_PRECISION})
-target_compile_definitions(quda PRIVATE QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
+target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 if(QUDA_FAST_COMPILE_REDUCE)
   target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
