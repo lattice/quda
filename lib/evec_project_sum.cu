@@ -19,18 +19,15 @@ namespace quda
 
   private:
     bool tuneSharedBytes() const { return false; }
-    bool staticGridDim() const { return true; } // Maintain grid dims set in this class.
     unsigned int minThreads() const { return arg.threads; } // this is equal to 3-d volume
 
     void initTuneParam(TuneParam &param) const {
       TunableLocalParity::initTuneParam(param);
-      param.block.y = 2;
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
 
     void defaultTuneParam(TuneParam &param) const {
       TunableLocalParity::defaultTuneParam(param);
-      param.block.y = 2;
       param.grid.z = x.X(3); // T dimension is mapped to different blocks in the Z dimension
     }
 
