@@ -184,7 +184,7 @@ target_include_directories(quda PUBLIC
   $<INSTALL_INTERFACE:include/>  
 )
 if(QUDA_JITIFY)
-  include_directories(quda PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+  target_include_directories(quda PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 endif()
 
 
