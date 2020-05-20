@@ -61,7 +61,7 @@ namespace quda {
       }
     }
 
-    void initReduce()
+    size_t reduceBufferSize()
     {
       /* we have these different reductions to cater for:
 
@@ -76,15 +76,19 @@ namespace quda {
            maximum number of blocks = 2 x SM count
       */
 
-      const int reduce_size = 4 * sizeof(QudaSumFloat);
-      const int max_reduce_blocks = 2*deviceProp.multiProcessorCount;
-
-      const int max_reduce = 2 * max_reduce_blocks * reduce_size;
-      const int max_multi_reduce = 2 * QUDA_MAX_MULTI_REDUCE * max_reduce_blocks * reduce_size;
+      int reduce_size = 4 * sizeof(QudaSumFloat);
+      int max_reduce = 2 * reduce_size;
+      int max_multi_reduce = 2 * QUDA_MAX_MULTI_REDUCE * reduce_size;
+      int max_reduce_blocks = 2 * deviceProp.multiProcessorCount;
 
       // reduction buffer size
-      size_t bytes = max_reduce > max_multi_reduce ? max_reduce : max_multi_reduce;
+      size_t bytes = max_reduce_blocks * std::max(max_reduce, max_multi_reduce);
+      return bytes;
+    }
 
+    void initReduce()
+    {
+      auto bytes = reduceBufferSize();
       if (!d_reduce) d_reduce = (QudaSumFloat *) device_malloc(bytes);
 
       // these arrays are actually oversized currently (only needs to be QudaSumFloat3)

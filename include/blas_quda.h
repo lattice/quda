@@ -14,6 +14,9 @@ namespace quda {
     void init();
     void end(void);
 
+    /** returns the reduce buffer size allocated */
+    size_t reduceBufferSize();
+
     void* getDeviceReduceBuffer();
     void* getMappedHostReduceBuffer();
     void* getHostReduceBuffer();

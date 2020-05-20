@@ -17,9 +17,9 @@ namespace quda
     const ColorSpinorField &x;
     const ColorSpinorField &y;
 
-  private:
     bool tuneSharedBytes() const { return false; }
     unsigned int minThreads() const { return arg.threads; } // this is equal to 3-d volume
+    bool tuneGridDim() const { return true; }
 
     void initTuneParam(TuneParam &param) const {
       TunableLocalParity::initTuneParam(param);

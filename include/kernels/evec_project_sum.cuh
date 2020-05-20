@@ -1,16 +1,13 @@
 #pragma once
+
 #include <color_spinor_field_order.h>
-#include <index_helper.cuh>
-#include <quda_matrix.h>
 #include <complex_quda.h>
-#include <matrix_field.h>
-#include <index_helper.cuh>
 #include <cub_helper.cuh>
 
 namespace quda
 {
 
-  using spinor = vector_type<double2,4>;
+  using spinor = vector_type<complex<double>,4>;
 
   template <typename Float_, int nColor_> struct EvecProjectSumArg :
     public ReduceArg<spinor>
@@ -35,7 +32,7 @@ namespace quda
     F1 y_vec;
     
     EvecProjectSumArg(const ColorSpinorField &x_vec, const ColorSpinorField &y_vec) :
-      ReduceArg<spinor>(),
+      ReduceArg<spinor>(nSpinX * x_vec.X(3)), // pass the number of elements being reduced
       threads(x_vec.VolumeCB() / x_vec.X(3)), // the thread-x dimension is only for 3-d space 
       x_vec(x_vec),
       y_vec(y_vec)
@@ -73,11 +70,7 @@ namespace quda
      
       // Compute the inner product over colour
       for (int mu = 0; mu < nSpinX; mu++) {
-	auto res_ = innerProduct(y_vec_local, x_vec_local, 0, mu);
-
-	// Real data
-        res[mu].x += res_.real();
-        res[mu].y += res_.imag();
+	res[mu] += innerProduct(y_vec_local, x_vec_local, 0, mu);
       }      
       xyz += blockDim.x * gridDim.x;
     }
