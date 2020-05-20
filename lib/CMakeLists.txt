@@ -444,9 +444,12 @@ endif()
 # set which precisions to enable
 target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
+if(QUDA_OPENMP)
+  target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 if(QUDA_MAGMA)
-  target_link_libraries(quda PRIVATE ${MAGMA})
+  target_link_libraries(quda PUBLIC MAGMA::MAGMA)
 endif()
 
 if(QUDA_ARPACK)

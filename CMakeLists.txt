@@ -258,26 +258,26 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
+    "-g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
+    "-O3 -Wall -Werror ${CLANG_NOERROR}"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
-    "${OpenMP_CXX_FLAGS} -O3 -w ${CXX_OPT} "
+    "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
-  "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined ${CLANG_FORCE_COLOR}"
+  "$-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined ${CLANG_FORCE_COLOR}"
   CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -563,26 +563,32 @@ if(QUDA_QIO)
   endif()
  endif()
 
-if(QUDA_MAGMA)
-  add_definitions(-DMAGMA_LIB -DADD_ -DMAGMA_SETAFFINITY -DGPUSHMEM=300 -DHAVE_CUBLAS -DMAGMA_LIB)
+if(QUDA_OPENMP)
   find_package(OpenMP)
+endif()
+
+if(QUDA_MAGMA)
+  add_library(MAGMA::MAGMA INTERFACE IMPORTED)
+  target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
   if("${QUDA_MAGMAHOME}" STREQUAL "")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(MAGMA magma)
-    include_directories(SYSTEM ${MAGMA_INCLUDEDIR})
+    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${MAGMA_INCLUDEDIR})
     message("${MAGMA_INCLUDEDIR}")
     find_library(MAGMA ${MAGMA_LIBRARIES} PATH ${MAGMA_LIBRARY_DIRS})
   else()
     # prefer static library
     find_library(MAGMA libmagma.a magma ${QUDA_MAGMAHOME}/lib/)
     # append additional libraries required by magma
-    list(APPEND MAGMA ${CUDA_cublas_LIBRARY})
-    list(APPEND MAGMA ${CUDA_cusparse_LIBRARY})
-    list(APPEND MAGMA ${QUDA_MAGMA_LIBS})
+    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cublas_LIBRARY})
+    target_link_libraries(MAGMA::MAGMA INTERFACE ${CUDA_cusparse_LIBRARY})
+    target_link_libraries(MAGMA::MAGMA INTERFACE ${QUDA_MAGMA_LIBS})
     # and any additional OpenMP linker flags
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_CXX_FLAGS}")
-    include_directories(SYSTEM ${QUDA_MAGMAHOME}/include)
+    target_include_directories(MAGMA::MAGMA SYSTEM INTERFACE ${QUDA_MAGMAHOME}/include)
   endif()
+  target_link_libraries(MAGMA::MAGMA INTERFACE ${MAGMA})
+  find_package(OpenMP)
+  target_link_libraries(MAGMA::MAGMA INTERFACE OpenMP::OpenMP_CXX)
 endif(QUDA_MAGMA)
 
 # This selects arpack or parpack for Multi GPU
