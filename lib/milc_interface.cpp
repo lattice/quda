@@ -1926,7 +1926,9 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
     // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
-    updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    //updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    printfQuda("Performing thin update.\n");
+    thinUpdateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
     invalidate_quda_mg = false;
   }
 

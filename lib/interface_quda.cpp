@@ -2546,6 +2546,7 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
+
   bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
@@ -2591,6 +2592,56 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   bool refresh = true;
   mg->mg->reset(refresh);
 
+  setOutputPrefix("");
+
+  // cache is written out even if a long benchmarking job gets interrupted
+  saveTuneCache();
+
+  profileInvert.TPSTOP(QUDA_PROFILE_PREAMBLE);
+  profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
+
+  popVerbosity();
+
+  profilerStop(__func__);
+}
+
+void thinUpdateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
+{
+  profilerStart(__func__);
+
+  pushVerbosity(mg_param->invert_param->verbosity);
+
+  profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
+  profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
+
+  auto *mg = static_cast<multigrid_solver*>(mg_);
+  checkMultigridParam(mg_param);
+
+  QudaInvertParam *param = mg_param->invert_param;
+  // check the gauge fields have been created and set the precision as needed
+  checkGauge(param);
+
+  // for reporting level 1 is the fine level but internally use level 0 for indexing
+  // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
+  // setOutputPrefix(prefix);
+  setOutputPrefix("MG level 1 (GPU): "); //fix me
+
+  // FIXME: also update mass, kappa, mu based on MG param
+
+  // FIXME: assumes gauge parameters haven't changed.
+  // These routines will set gauge = gaugeFat for DiracImprovedStaggered
+  mg->d->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+  mg->dSmooth->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+  if (mg->dSmoothSloppy != mg->dSmooth) {
+    if (param->overlap) {
+      mg->dSmoothSloppy->updateFields(gaugeExtended, gaugeFatExtended, gaugeLongExtended, cloverPrecondition);
+    } else {
+      mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition, cloverPrecondition);
+    }
+  }
+  // These changes are propagated internally by use of references, pointers, etc, so
+  // no further updates are needed.
+  
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted

@@ -317,13 +317,25 @@ int main(int argc, char **argv)
       copyExtendedGauge(*gauge, *gaugeEx, QUDA_CUDA_FIELD_LOCATION);
       loadGaugeQuda(gauge->Gauge_p(), &gauge_param);
 
+      if (dslash_type == QUDA_CLOVER_WILSON_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        constructHostCloverField(clover, clover_inv, inv_param);
+
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+        // Load the clover terms to the device
+        loadCloverQuda(clover, clover_inv, &inv_param);
+        // Restore actual solve_type we want to do
+        inv_param.solve_type = solve_type;
+      }
+
       // Recompute Gauge Observables
       gaugeObservablesQuda(&obs_param);
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // Update the multigrid operator for new gauge and clover fields
-      if (inv_multigrid) updateMultigridQuda(mg_preconditioner, &mg_param);
+      if (inv_multigrid) thinUpdateMultigridQuda(mg_preconditioner, &mg_param);
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {
@@ -392,6 +404,19 @@ int main(int argc, char **argv)
         // Multiply by -1.0 to emulate twist switch
         inv_param.mu = -1.0 * mu + 0.01 * step;
         if (inv_multigrid) mg_param.invert_param->mu = inv_param.mu;
+      }
+
+      // as needed to bake in mu
+      if (dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
+        constructHostCloverField(clover, clover_inv, inv_param);
+
+        if (mg_param.smoother_solve_type[0] == QUDA_DIRECT_PC_SOLVE || solve_type == QUDA_DIRECT_PC_SOLVE) {
+          inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+        }
+        // Load the clover terms to the device
+        loadCloverQuda(clover, clover_inv, &inv_param);
+        // Restore actual solve_type we want to do
+        inv_param.solve_type = solve_type;
       }
 
       printfQuda("step=%d plaquette = %g topological charge = %g, mass = %g kappa = %g, mu = %g\n", step,
