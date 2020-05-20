@@ -335,7 +335,7 @@ int main(int argc, char **argv)
                  obs_param.plaquette[0], obs_param.qcharge, inv_param.mass, inv_param.kappa, inv_param.mu);
 
       // Update the multigrid operator for new gauge and clover fields
-      if (inv_multigrid) thinUpdateMultigridQuda(mg_preconditioner, &mg_param);
+      if (inv_multigrid) updateMultigridQuda(mg_preconditioner, &mg_param);
       invertQuda(spinorOut, spinorIn, &inv_param);
 
       if (inv_multigrid && inv_param.iter == inv_param.maxiter) {

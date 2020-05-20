@@ -376,7 +376,7 @@ namespace quda {
   class DiracClover : public DiracWilson {
 
   protected:
-    cudaCloverField &clover;
+    cudaCloverField *clover;
     void checkParitySpinor(const ColorSpinorField &, const ColorSpinorField &) const;
     void initConstants();
 
@@ -412,8 +412,7 @@ namespace quda {
      */
     virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
-      printf("Clover pointer: %lu\n", (size_t)clover_in);
-      clover = *(clover_in);
+      clover = clover_in;
     }
 
     /**
@@ -1061,8 +1060,8 @@ public:
   class DiracImprovedStaggered : public Dirac {
 
   protected:
-    cudaGaugeField &fatGauge;
-    cudaGaugeField &longGauge;
+    cudaGaugeField *fatGauge;
+    cudaGaugeField *longGauge;
 
   public:
     DiracImprovedStaggered(const DiracParam &param);
@@ -1087,8 +1086,8 @@ public:
 
     virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
-      fatGauge = *fat_gauge_in;
-      longGauge = *long_gauge_in;
+      fatGauge = fat_gauge_in;
+      longGauge = long_gauge_in;
     }
 
     /**
