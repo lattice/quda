@@ -152,6 +152,9 @@ if(QUDA_BUILD_SHAREDLIB)
 else()
   add_library(quda STATIC $<TARGET_OBJECTS:quda_cpp> ${QUDA_CU_OBJS})
 endif()
+# malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
+# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
+target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY} )
 
 # set up QUDA compile options
 target_compile_definitions(quda PUBLIC
@@ -183,9 +186,7 @@ target_include_directories(quda PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/>
   $<INSTALL_INTERFACE:include/>  
 )
-if(QUDA_JITIFY)
-  target_include_directories(quda PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
-endif()
+
 
 
 target_include_directories(quda SYSTEM PRIVATE ${EIGEN_INCLUDE_DIRS})
@@ -219,46 +220,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-if(QUDA_MPI OR QUDA_QMP)
-  target_compile_definitions(quda PUBLIC MULTI_GPU)
-endif()
 
-# fix up MPI INTERFACE_COMPILE OPTIONS of cmake < 3.13 for nvcc compatibility
-# if(CMAKE_VERSION VERSION_LESS "3.13")
-#   message(WARNING "Using cmake ${CMAKE_VERSION} -- patching MPI compile options. Consider upgrade to cmake 3.14 or later")
-#   get_target_property(MPIPTHREAD_ORIG MPI::MPI_C INTERFACE_COMPILE_OPTIONS)
-#   string(REPLACE "-pthread" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >-pthread" MPIPTHREAD ${MPIPTHREAD_ORIG})
-#   set_property(TARGET MPI::MPI_C PROPERTY INTERFACE_COMPILE_OPTIONS ${MPIPTHREAD})
-#   # set_property(TARGET quda PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-# endif()
 
-if(QUDA_MPI)
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
-  target_compile_definitions(quda PUBLIC MPI_COMMS)
-endif()
 
-if(QUDA_QMP)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QMPHOME}/include)
-  target_link_libraries(quda PUBLIC ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
-  target_compile_definitions(quda PUBLIC QMP_COMMS)
-  target_link_libraries(quda PUBLIC MPI::MPI_C)
-endif()
-
-if(QUDA_QIO)
-  target_compile_definitions(quda PUBLIC HAVE_QIO)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QIOHOME}/include)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_LIMEHOME}/include)
-endif()
-
-if(QUDA_ARPACK)
-  target_compile_definitions(quda PRIVATE ARPACK_LIB)
-  if(QUDA_ARPACK_LOGGING)
-  # ARPACK-NG does not suppport logging - we must warn the user
-  message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
-  target_compile_definitions(ARPACK_LOGGING)
-endif()
-endif()
-
+## QUDA FEATURES
 if(QUDA_DIRAC_WILSON)
   target_compile_definitions(quda PUBLIC DGPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_WILSON)
@@ -304,57 +269,12 @@ if(QUDA_GAUGE_ALG)
   target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
-if(QUDA_JITIFY)
-  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
-  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
-endif()
-
-if(QUDA_NVTX)
-  if(NOT NVTX3)
-    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
-  endif()
-endif(QUDA_NVTX)
-
-if(QUDA_BACKWARDS)
-  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
-  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
-  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
-  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
-  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
-  target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
-endif()
-
-if(QUDA_QIO)
-  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    add_dependencies(quda QIO)
-    add_dependencies(quda_cpp QIO)
-  endif()
-  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
-endif()
-
-if(QUDA_QDPJIT)
-  target_compile_definitions(quda PUBLIC USE_QDPJIT)
-  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QDPJITHOME}/include)
-  target_link_libraries(quda
-                        INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-                                  ${QMP_LIB} MPI::MPI_C)
-endif()
-
 if(QUDA_SSTEP)
   target_compile_definitions(quda PUBLIC SSTEP)
 endif()
 
 if(QUDA_BLOCKSOLVER)
   target_compile_definitions(quda PUBLIC BLOCKSOLVER)
-endif()
-
-if(QUDA_JITIFY)
-  target_compile_definitions(quda PUBLIC JITIFY)
-  find_package(LibDL)
-endif()
-
-if(QUDA_USE_EIGEN)
-  target_compile_definitions(quda PUBLIC EIGEN)
 endif()
 
 if(QUDA_FORCE_GAUGE)
@@ -372,23 +292,6 @@ endif(QUDA_GAUGE_TOOLS)
 if(QUDA_GAUGE_ALG)
   target_compile_definitions(quda PUBLIC GPU_GAUGE_ALG GPU_GAUGE_TOOLS GPU_UNITARIZE)
 endif(QUDA_GAUGE_ALG)
-
-if(QUDA_MPI_NVTX)
-  list(APPEND COMM_OBJS nvtx_pmpi.c)
-  set(QUDA_NVTX ON)
-endif(QUDA_MPI_NVTX)
-
-if(QUDA_INTERFACE_NVTX)
-  target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
-  set(QUDA_NVTX ON)
-endif(QUDA_INTERFACE_NVTX)
-
-if(QUDA_NVTX)
-  find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
-  if(NVTX3)
-    target_compile_definitions(QUDA_NVTX_VERSION=3)
-  endif(NVTX3)
-endif(QUDA_NVTX)
 
 if(QUDA_INTERFACE_QDP)
   target_compile_definitions(quda PUBLIC BUILD_QDP_INTERFACE)
@@ -414,13 +317,6 @@ if(QUDA_INTERFACE_TIFR)
   target_compile_definitions(quda PUBLIC BUILD_TIFR_INTERFACE)
 endif(QUDA_INTERFACE_TIFR)
 
-if(QUDA_NUMA_NVML)
-  target_compile_definitions(quda PRIVATE NUMA_NVML)
-  target_sources(quda_cpp PRIVATE numa_affinity.cpp)
-  find_package(NVML REQUIRED)
-  target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
-endif(QUDA_NUMA_NVML)
-
 if(QUDA_CONTRACT)
   target_compile_definitions(quda PUBLIC GPU_CONTRACT)
 endif(QUDA_CONTRACT)
@@ -429,30 +325,50 @@ if(QUDA_COVDEV)
   target_compile_definitions(quda PUBLIC GPU_COVDEV)
 endif(QUDA_COVDEV)
 
-# set which precisions to enable
-target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
-target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
-if(QUDA_FAST_COMPILE_REDUCE)
-target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_REDUCE)
+## MULTI GPU AND USQCD
+if(QUDA_MPI OR QUDA_QMP)
+  target_compile_definitions(quda PUBLIC MULTI_GPU)
 endif()
 
-if(QUDA_FAST_COMPILE_DSLASH)
-  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_DSLASH)
+if(QUDA_MPI)
+  target_link_libraries(quda PUBLIC MPI::MPI_C)
+  target_compile_definitions(quda PUBLIC MPI_COMMS)
 endif()
 
-# set which precisions to enable
-target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
-
-if(QUDA_OPENMP)
-  target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+if(QUDA_QMP)
+  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QMPHOME}/include)
+  target_link_libraries(quda PUBLIC ${QUDA_QMP_LDFLAGS} ${QUDA_QMP_LIBS} )
+  target_compile_definitions(quda PUBLIC QMP_COMMS)
+  target_link_libraries(quda PUBLIC MPI::MPI_C)
 endif()
 
-if(QUDA_MAGMA)
-  target_link_libraries(quda PUBLIC MAGMA::MAGMA)
+if(QUDA_QIO)
+  if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+    add_dependencies(quda QIO)
+    add_dependencies(quda_cpp QIO)
+  endif()
+  target_compile_definitions(quda PUBLIC HAVE_QIO)
+  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QIOHOME}/include)
+  target_include_directories(quda SYSTEM PUBLIC ${QUDA_LIMEHOME}/include)
+  target_link_libraries(quda INTERFACE ${QUDA_QIO_LDFLAGS} ${QUDA_QIO_LIBS})
+endif()
+
+if(QUDA_QDPJIT)
+  target_compile_definitions(quda PUBLIC USE_QDPJIT)
+  target_include_directories(quda SYSTEM PUBLIC ${QUDA_QDPJITHOME}/include)
+  target_link_libraries(quda
+                        INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
+                                  ${QMP_LIB} MPI::MPI_C)
 endif()
 
 if(QUDA_ARPACK)
+  target_compile_definitions(quda PRIVATE ARPACK_LIB)
+  if(QUDA_ARPACK_LOGGING)
+    # ARPACK-NG does not suppport logging - we must warn the user
+    message(WARNING "Specifying QUDA_ARPACK_LOGGING with ARPACK-NG package will cause link failures. Please ensure that QUDA_ARPACK_LOGGING=OFF if downloading ARPACK-NG or using system installed ARPACK-NG")
+    target_compile_definitions(ARPACK_LOGGING)
+  endif()
   if(QUDA_DOWNLOAD_ARPACK)
     target_link_libraries(quda PUBLIC arpack-ng)
     target_link_libraries(quda_cpp PUBLIC arpack-ng)
@@ -468,17 +384,78 @@ if(QUDA_ARPACK)
   endif()
 endif()
 
+if(QUDA_USE_EIGEN)
+  target_compile_definitions(quda PUBLIC EIGEN)
+endif()
+
+if(QUDA_OPENMP)
+  target_link_libraries(quda PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+if(QUDA_MAGMA)
+  target_link_libraries(quda PUBLIC MAGMA::MAGMA)
+endif()
+
+# set which precisions to enable
+target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
+target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+
+if(QUDA_FAST_COMPILE_REDUCE)
+  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_DSLASH)
+endif()
+
+if(QUDA_JITIFY)
+  target_compile_definitions(quda PUBLIC JITIFY)
+  find_package(LibDL)
+  target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
+  target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
+  target_include_directories(quda PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+endif()
+
+if(QUDA_MPI_NVTX)
+  target_sources(quda_cpp PRIVATE nvtx_pmpi.c)
+  set(QUDA_NVTX ON)
+endif(QUDA_MPI_NVTX)
+
+if(QUDA_INTERFACE_NVTX)
+  target_compile_definitions(quda PRIVATE INTERFACE_NVTX)
+  set(QUDA_NVTX ON)
+endif(QUDA_INTERFACE_NVTX)
+
+if(QUDA_NVTX)
+  find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
+  if(NVTX3)
+    target_compile_definitions(QUDA_NVTX_VERSION=3)
+  else()
+    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
+  endif(NVTX3)
+endif(QUDA_NVTX)
+
+if(QUDA_BACKWARDS)
+  target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE comm_common.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS ${BACKWARD_DEFINITIONS})
+  set_property(SOURCE malloc.cpp APPEND PROPERTY COMPILE_DEFINITIONS QUDA_BACKWARDSCPP)
+  target_link_libraries(quda PUBLIC ${BACKWARD_LIBRARIES})
+endif()
+
+if(QUDA_NUMA_NVML)
+  target_compile_definitions(quda PRIVATE NUMA_NVML)
+  target_sources(quda_cpp PRIVATE numa_affinity.cpp)
+  find_package(NVML REQUIRED)
+  target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
+  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
+endif(QUDA_NUMA_NVML)
+
 if(QUDA_NVML)
   target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
 endif()
 
-if(QUDA_NUMA_NVML)
-  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
-endif()
-
-# malloc.cpp uses both the driver and runtime api So we need to find the CUDA_CUDA_LIBRARY (driver api) or the stub
-# version for cmake 3.8 and later this has been integrated into  FindCUDALibs.cmake
-target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY} )
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
 if(QUDA_DOWNLOAD_EIGEN)

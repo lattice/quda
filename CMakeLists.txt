@@ -258,26 +258,26 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
+    "-g -O3 -Wall -DDEVEL"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
-    "-O3 -Wall -Werror ${CLANG_NOERROR}"
+    "-O3 -Wall -Werror"
     CACHE STRING "Flags used by the C++ compiler during strict jenkins builds.")
 set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG "
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
-  "$-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined ${CLANG_FORCE_COLOR}"
+  "$-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
   CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
@@ -301,7 +301,6 @@ set(CMAKE_C_FLAGS_SANITIZE
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
-# find_package(Threads REQUIRED)
 
 # define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
@@ -432,7 +431,6 @@ if(QUDA_DOWNLOAD_USQCD)
   find_program(AUTORECONF_EXE NAMES autoreconf)
 endif()
 
-
 if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
@@ -467,8 +465,6 @@ if(QUDA_QMP)
                         LOG_INSTALL ON
                         LOG_BUILD ON
                         LOG_DOWNLOAD ON
-                        # LOG_MERGED_STDOUTERR ON
-                        # LOG_OUTPUT_ON_FAILURE ON
                         )
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
