@@ -1,21 +1,18 @@
 # enable utils build a common library for all utils
 add_library(
   quda_utils STATIC
-  misc.cpp
-  face_gauge.cpp
-  host_utils.cpp
-  staggered_host_utils.cpp
-  host_blas.cpp
   command_line_params.cpp
+  face_gauge.cpp
+  host_blas.cpp
+  host_utils.cpp
   llfat_utils.cpp
+  misc.cpp
+  set_params.cpp
   staggered_gauge_utils.cpp
-  set_params.cpp)
+  staggered_host_utils.cpp)
 
 target_include_directories(quda_utils PUBLIC .)
 target_link_libraries(quda_utils PRIVATE quda)
-
-# if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
-# add_dependencies(quda_utils QMP) endif()
 
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD

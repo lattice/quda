@@ -1,25 +1,20 @@
-
-
 # enable utils build a common library for all utils
 add_library(
   quda_reference STATIC
-  covdev_reference.cpp
-  dslash_test_helpers.cpp
-  hisq_force_reference.cpp
-  dslash_reference.cpp
-  wilson_dslash_reference.cpp
   clover_reference.cpp
+  covdev_reference.cpp
   domain_wall_dslash_reference.cpp
+  dslash_reference.cpp
+  dslash_test_helpers.cpp
   gauge_force_reference.cpp
+  hisq_force_reference.cpp
   hisq_force_reference2.cpp
-  staggered_dslash_reference.cpp)
+  staggered_dslash_reference.cpp
+  wilson_dslash_reference.cpp)
 
 target_include_directories(quda_reference PUBLIC .)
 target_include_directories(quda_reference PRIVATE ../utils)
 target_link_libraries(quda_reference PRIVATE quda)
-
-# if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QUDA_QMPHOME)
-# add_dependencies(quda_reference QMP) endif()
 
 if(QUDA_QIO
    AND QUDA_DOWNLOAD_USQCD
