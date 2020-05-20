@@ -163,7 +163,7 @@ target_link_libraries(quda PUBLIC ${CUDA_cuda_driver_LIBRARY})
 # set up QUDA compile options
 target_compile_definitions(
   quda
-  PUBLIC
+  PRIVATE
   $<$<CONFIG:DEVEL>:DEVEL>
   $<$<CONFIG:HOSTDEBUG>:HOST_DEBUG>
   $<$<CONFIG:DEVICEDEBUG>:DEVICE_DEBUG>
@@ -201,7 +201,7 @@ target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
 if(${QUDA_PROPAGATE_CXX_FLAGS})
   target_compile_options(
     quda
-    PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
+    PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
            $<$<CONFIG:DEVEL>:-Xcompiler
            ${CMAKE_CXX_FLAGS_DEVEL}>
            $<$<CONFIG:STRICT>:-Xcompiler
@@ -221,7 +221,7 @@ endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field
                                          -Wno-error=unused-function>)
-  target_compile_options(quda PUBLIC $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
+  target_compile_options(quda PRIVATE $<$<COMPILE_LANGUAGE:CUDA>: "SHELL:-Xcompiler -Wno-error=unused-private-field"
                                      "SHELL:-Xcompiler -Wno-error=unused-function" >)
 
   # this is a hack to get colored diagnostics back when using Ninja and clang
@@ -232,7 +232,7 @@ endif()
 
 # QUDA FEATURES
 if(QUDA_DIRAC_WILSON)
-  target_compile_definitions(quda PUBLIC DGPU_WILSON_DIRAC)
+  target_compile_definitions(quda PUBLIC GPU_WILSON_DIRAC)
 endif(QUDA_DIRAC_WILSON)
 
 if(QUDA_DIRAC_DOMAIN_WALL)
@@ -244,7 +244,7 @@ if(QUDA_DIRAC_STAGGERED)
 endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_DIRAC_CLOVER)
-  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC -DGPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_CLOVER_DIRAC GPU_WILSON_DIRAC GPU_GAUGE_TOOLS)
 endif(QUDA_DIRAC_CLOVER)
 
 if(QUDA_DIRAC_TWISTED_MASS)
@@ -289,19 +289,19 @@ if(QUDA_GAUGE_ALG)
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_SSTEP)
-  target_compile_definitions(quda PUBLIC SSTEP)
+  target_compile_definitions(quda PRIVATE SSTEP)
 endif()
 
 if(QUDA_BLOCKSOLVER)
-  target_compile_definitions(quda PUBLIC BLOCKSOLVER)
+  target_compile_definitions(quda PRIVATE BLOCKSOLVER)
 endif()
 
 if(QUDA_FORCE_GAUGE)
-  target_compile_definitions(quda PUBLIC GPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_GAUGE_FORCE GPU_GAUGE_TOOLS)
 endif(QUDA_FORCE_GAUGE)
 
 if(QUDA_FORCE_HISQ)
-  target_compile_definitions(quda PUBLIC GPU_HISQ_FORCE -DGPU_STAGGERED_OPROD -DGPU_GAUGE_TOOLS)
+  target_compile_definitions(quda PUBLIC GPU_HISQ_FORCE GPU_STAGGERED_OPROD GPU_GAUGE_TOOLS)
 endif(QUDA_FORCE_HISQ)
 
 if(QUDA_GAUGE_TOOLS)
@@ -413,7 +413,7 @@ if(QUDA_ARPACK)
 endif()
 
 if(QUDA_USE_EIGEN)
-  target_compile_definitions(quda PUBLIC EIGEN)
+  target_compile_definitions(quda PRIVATE EIGEN)
 endif()
 
 if(QUDA_OPENMP)
@@ -425,19 +425,19 @@ if(QUDA_MAGMA)
 endif()
 
 # set which precisions to enable
-target_compile_definitions(quda PUBLIC QUDA_PRECISION=${QUDA_PRECISION})
-target_compile_definitions(quda PUBLIC QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+target_compile_definitions(quda PRIVATE QUDA_PRECISION=${QUDA_PRECISION})
+target_compile_definitions(quda PRIVATE QUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 if(QUDA_FAST_COMPILE_REDUCE)
-  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_REDUCE)
+  target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_REDUCE)
 endif()
 
 if(QUDA_FAST_COMPILE_DSLASH)
-  target_compile_definitions(quda PUBLIC QUDA_FAST_COMPILE_DSLASH)
+  target_compile_definitions(quda PRIVATE QUDA_FAST_COMPILE_DSLASH)
 endif()
 
 if(QUDA_JITIFY)
-  target_compile_definitions(quda PUBLIC JITIFY)
+  target_compile_definitions(quda PRIVATE JITIFY)
   find_package(LibDL)
   target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
   target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
@@ -460,7 +460,7 @@ if(QUDA_NVTX)
     PATHS ${CUDA_TOOLKIT_INCLUDE}
     NO_DEFAULT_PATH)
   if(NVTX3)
-    target_compile_definitions(QUDA_NVTX_VERSION=3)
+    target_compile_definitions(quda PRIVATE QUDA_NVTX_VERSION=3)
   else()
     target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
   endif(NVTX3)
@@ -492,11 +492,11 @@ if(QUDA_NUMA_NVML)
   target_sources(quda_cpp PRIVATE numa_affinity.cpp)
   find_package(NVML REQUIRED)
   target_include_directories(quda PRIVATE SYSTEM NVML_INCLUDE_DIR)
-  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
+  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
 endif(QUDA_NUMA_NVML)
 
 if(QUDA_NVML)
-  target_link_libraries(quda PRIVATE ${NVML_LIBRARY})
+  target_link_libraries(quda PUBLIC ${NVML_LIBRARY})
 endif()
 
 # if we did not find Eigen but downloaded it we need to add it as dependency so the download is done first
