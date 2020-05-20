@@ -26,9 +26,27 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
-set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
-set(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
-set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
+set(VALID_BUILD_TYPES
+    DEVEL
+    RELEASE
+    STRICT
+    DEBUG
+    HOSTDEBUG
+    DEVICEDEBUG
+    SANITIZE)
+set(CMAKE_BUILD_TYPE
+    "${DEFBUILD}"
+    CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
+set_property(
+  CACHE CMAKE_BUILD_TYPE
+  PROPERTY STRINGS
+           DEVEL
+           RELEASE
+           STRICT
+           DEBUG
+           HOSTDEBUG
+           DEVICEDEBUG
+           SANITIZE)
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
 list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
@@ -37,35 +55,41 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
-
 #
 # PROJECT is QUDA
 #
 if(GIT_FOUND)
-  execute_process(COMMAND ${GIT_EXECUTABLE} show
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                  RESULT_VARIABLE IS_GIT_REPOSIITORY
-                  OUTPUT_QUIET ERROR_QUIET)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} show
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    RESULT_VARIABLE IS_GIT_REPOSIITORY
+    OUTPUT_QUIET ERROR_QUIET)
   if(${IS_GIT_REPOSIITORY} EQUAL 0)
-    execute_process(COMMAND ${GIT_EXECUTABLE} describe --abbrev=0
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    OUTPUT_VARIABLE GITTAG
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} describe --abbrev=0
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE GITTAG
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     # we use git rev-list and pipe that through wc here. Newer git versions support --count as option to rev-list but
     # that might not always be available
-    execute_process(COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    COMMAND wc -l
-                    OUTPUT_VARIABLE GITCOUNT
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${GIT_EXECUTABLE} describe --long  --dirty
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    OUTPUT_VARIABLE GITVERSION
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} rev-list ${GITTAG}..HEAD
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      COMMAND wc -l
+      OUTPUT_VARIABLE GITCOUNT
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} describe --long --dirty
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      OUTPUT_VARIABLE GITVERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif()
 endif(GIT_FOUND)
 
-project("QUDA" VERSION 1.0.0 LANGUAGES)
+project(
+  "QUDA"
+  VERSION 1.0.0
+  LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -92,106 +116,124 @@ set(QUDA_GPU_ARCH
     CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
 # build options
-set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
-set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
-set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
-set(QUDA_DIRAC_STAGGERED ON CACHE BOOL "build staggered Dirac operators")
-set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
-set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
-set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
-set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
-set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
-set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
-set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
-set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
-set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
-set(QUDA_COVDEV OFF CACHE BOOL "build code for covariant derivative")
+option(QUDA_DIRAC_WILSON "build Wilson Dirac operators" CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
+option(QUDA_DIRAC_CLOVER "build clover Dirac operators" ON)
+option(QUDA_DIRAC_DOMAIN_WALL "build domain wall Dirac operators" ON)
+option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ON)
+option(QUDA_DIRAC_TWISTED_MASS "build twisted mass Dirac operators" ON)
+option(QUDA_DIRAC_TWISTED_CLOVER "build twisted clover Dirac operators" ON)
+option(QUDA_DIRAC_CLOVER_HASENBUSCH "build clover Hasenbusch twist operators" ON)
+option(QUDA_DIRAC_NDEG_TWISTED_MASS "build non-degenerate twisted mass Dirac operators" ON)
+option(QUDA_FORCE_GAUGE "build code for (1-loop Symanzik) gauge force" OFF)
+option(QUDA_FORCE_HISQ "build code for hisq fermion force" OFF)
+option(QUDA_GAUGE_TOOLS "build auxiliary gauge-field tools" OFF)
+option(QUDA_GAUGE_ALG "build gauge-fixing and pure-gauge algorithms" OFF)
+option(QUDA_CONTRACT "build code for bilinear contraction" OFF)
+option(QUDA_COVDEV "build code for covariant derivative" OFF)
 # Dynamic inversion saves memory but decreases the flops
-set(QUDA_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
-set(QUDA_QIO OFF CACHE BOOL "build QIO code for binary I/O")
+option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clover" OFF)
+option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
-set(QUDA_QMP OFF CACHE BOOL "set to 'yes' to build the QMP multi-GPU code")
-set(QUDA_MPI OFF CACHE BOOL "set to 'yes' to build the MPI multi-GPU code")
+option(QUDA_QMP "set to 'yes' to build the QMP multi-GPU code" OFF)
+option(QUDA_MPI "set to 'yes' to build the MPI multi-GPU code" OFF)
 
-# BLAS library
-set(QUDA_MAGMA OFF CACHE BOOL "build magma interface")
+# Magma library
+option(QUDA_MAGMA "build magma interface" OFF)
 
 # ARPACK
-set(QUDA_ARPACK OFF CACHE BOOL "build arpack interface")
-set(QUDA_ARPACK_LOGGING OFF CACHE BOOL "enable ARPACK logging (not availible for NG)")
+option(QUDA_ARPACK "build arpack interface" OFF)
+option(QUDA_ARPACK_LOGGING "enable ARPACK logging (not availible for NG)" OFF)
 
 # Interface options
-set(QUDA_INTERFACE_QDP ON CACHE BOOL "build qdp interface")
-set(QUDA_INTERFACE_MILC ON CACHE BOOL "build milc interface")
-set(QUDA_INTERFACE_CPS OFF CACHE BOOL "build cps interface")
-set(QUDA_INTERFACE_QDPJIT OFF CACHE BOOL "build qdpjit interface")
-set(QUDA_INTERFACE_BQCD OFF CACHE BOOL "build bqcd interface")
-set(QUDA_INTERFACE_TIFR OFF CACHE BOOL "build tifr interface")
+option(QUDA_INTERFACE_QDP "build qdp interface" ON)
+option(QUDA_INTERFACE_MILC "build milc interface" ON)
+option(QUDA_INTERFACE_CPS "build cps interface" OFF)
+option(QUDA_INTERFACE_QDPJIT "build qdpjit interface" OFF)
+option(QUDA_INTERFACE_BQCD "build bqcd interface" OFF)
+option(QUDA_INTERFACE_TIFR "build tifr interface" OFF)
 
 # QDPJIT
-set(QUDA_QDPJIT OFF CACHE BOOL "build QDP-JIT support?")
-set(QUDA_QDPJITHOME "" CACHE PATH "path to QDPJIT installation")
+option(QUDA_QDPJIT "build QDP-JIT support?" OFF)
 
 # Locations for QIO / QMP
-set(QUDA_QIOHOME "" CACHE PATH "path to QIO")
-set(QUDA_QMPHOME "" CACHE PATH "path to QMP")
-set(QUDA_LIMEHOME "" CACHE PATH "path to LIME")
-set(QUDA_ARPACK_HOME "" CACHE PATH "path to arpack / parpack")
-set(QUDA_MAGMAHOME "" CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
-set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link against magma")
+set(QUDA_QIOHOME
+    ""
+    CACHE PATH "path to QIO")
+set(QUDA_QMPHOME
+    ""
+    CACHE PATH "path to QMP")
+set(QUDA_LIMEHOME
+    ""
+    CACHE PATH "path to LIME")
+set(QUDA_QDPJITHOME
+    ""
+    CACHE PATH "path to QDPJIT installation")
+set(QUDA_ARPACK_HOME
+    ""
+    CACHE PATH "path to arpack / parpack")
+set(QUDA_MAGMAHOME
+    ""
+    CACHE PATH "path to MAGMA, if not set, pkg-config will be attempted")
+set(QUDA_MAGMA_LIBS
+    ""
+    CACHE STRING "additional linker flags required to link against magma")
 
 # ######################################################################################################################
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
-set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
-set(QUDA_INSTALL_ALL_TESTS ON CACHE BOOL "install tests by default")
+option(QUDA_BUILD_ALL_TESTS "build tests by default" ON)
+option(QUDA_INSTALL_ALL_TESTS "install tests by default" ON)
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
   set(DEFSHARED "OFF")
 endif()
-set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
-set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
-set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
-set(QUDA_FLOAT8 OFF CACHE BOOL "enable float-8 ordered fixed-point fields?")
-set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version")
-set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity")
-set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
-set(QUDA_MAX_MULTI_BLAS_N "4" CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
+option(QUDA_BUILD_SHAREDLIB "build quda as a shared lib" ${DEFSHARED})
+option(QUDA_PROPAGATE_CXX_FLAGS "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)" ON)
+option(QUDA_TEX "enable texture reads?" ON)
+option(QUDA_FLOAT8"enable float-8 ordered fixed-point fields?" OFF)
+option(QUDA_NVML "use NVML to report CUDA graphics driver version" OFF)
+option(QUDA_NUMA_NVML "experimental use of NVML to set numa affinity" OFF)
+option(QUDA_VERBOSE_BUILD "display kernel register useage" OFF)
+set(QUDA_MAX_MULTI_BLAS_N
+    "4"
+    CACHE STRING "maximum value to initialize template for multi-blas /-reduce")
 
 set(QUDA_PRECISION
     "14"
     CACHE STRING "which precisions to instantiate in QUDA (4-bit number - double, single, half, char)")
-set(QUDA_RECONSTRUCT "7" CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
+set(QUDA_RECONSTRUCT
+    "7"
+    CACHE STRING "which reconstructs to instantiate in QUDA (3-bit number - 18, 13/12, 9/8)")
 
 # Set CTest options
-set(QUDA_CTEST_SEP_DSLASH_POLICIES
-    OFF
-    CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
+option(QUDA_CTEST_SEP_DSLASH_POLICIES "Test Dslash policies separately in ctest instead of only autotuning them." OFF)
 
-set(QUDA_FAST_COMPILE_REDUCE OFF CACHE BOOL "enable fast compilation in blas and reduction kernels (single warp per reduction)")
-set(QUDA_FAST_COMPILE_DSLASH OFF CACHE BOOL "enable fast compilation in dslash kernels (~20% perf impact)")
+option(QUDA_FAST_COMPILE_REDUCE "enable fast compilation in blas and reduction kernels (single warp per reduction)" OFF)
+option(QUDA_FAST_COMPILE_DSLASH "enable fast compilation in dslash kernels (~20% perf impact)" OFF)
 
-set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
-set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
+option(QUDA_OPENMP "enable OpenMP" OFF)
+set(QUDA_CXX_STANDARD
+    14
+    CACHE STRING "set the CXX Standard (14 or 17)")
 set_property(CACHE QUDA_CXX_STANDARD PROPERTY STRINGS 14 17)
 
 option(QUDA_BACKWARDS "Enable stacktrace generation using backwards-cpp")
 
 # NVTX options
-set(QUDA_MPI_NVTX OFF CACHE BOOL "add nvtx markup to MPI API calls for the visual profiler")
-set(QUDA_INTERFACE_NVTX OFF CACHE BOOL "add nvtx markup to interface calls for the visual profiler")
+option(QUDA_MPI_NVTX "add NVTX markup to MPI API calls" OFF)
+option(QUDA_INTERFACE_NVTX "add NVTC markup to interface calls" OFF)
 
 # features in development
-set(QUDA_SSTEP OFF CACHE BOOL "build s-step linear solvers")
-set(QUDA_MULTIGRID OFF CACHE BOOL "build multigrid solvers")
-set(QUDA_BLOCKSOLVER OFF CACHE BOOL "build block solvers")
-set(QUDA_USE_EIGEN OFF CACHE BOOL "use EIGEN library (where optional)")
-set(QUDA_DOWNLOAD_EIGEN ON CACHE BOOL "Download Eigen")
-set(QUDA_DOWNLOAD_USQCD OFF CACHE BOOL "Download USQCD software as requested by QUDA_QMP / QUDA_QIO")
-set(QUDA_DOWNLOAD_ARPACK OFF CACHE BOOL "Download ARPACK-NG software as requested by QUDA_ARPACK")
-set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
+option(QUDA_SSTEP "build s-step linear solvers" OFF)
+option(QUDA_MULTIGRID "build multigrid solvers" OFF)
+option(QUDA_BLOCKSOLVER "build block solvers" OFF)
+option(QUDA_USE_EIGEN "use EIGEN library (where optional)" OFF)
+option(QUDA_DOWNLOAD_EIGEN "Download Eigen" ON)
+option(QUDA_DOWNLOAD_USQCD "Download USQCD software as requested by QUDA_QMP / QUDA_QIO" OFF)
+option(QUDA_DOWNLOAD_ARPACK "Download ARPACK-NG software as requested by QUDA_ARPACK" OFF)
+option(QUDA_JITIFY "build QUDA using Jitify" OFF)
 
 option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 
@@ -231,17 +273,16 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # some checks for invalid combinations
 
 if(QUDA_TEX AND QUDA_FLOAT8)
-  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
+  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
-message(
-  WARNING
-    "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
+  message(
+    WARNING
+      "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 
-## COMPILER FLAGS 
-# Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
+# COMPILER FLAGS Linux: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Mac: CMAKE_HOST_SYSTEM_PROCESSOR "x86_64" Power:
 # CMAKE_HOST_SYSTEM_PROCESSOR "ppc64le"
 
 # We need to use different optimization flags depending on whether we are on x86 or power Note: This only applies to the
@@ -258,7 +299,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "-g -O3 -Wall -DDEVEL"
+    "-g -O3 -Wall"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "-O3 -Wall -Werror"
@@ -267,53 +308,65 @@ set(CMAKE_CXX_FLAGS_RELEASE
     "-O3 -w ${CXX_OPT} "
     CACHE STRING "Flags used by the C++ compiler during release builds.")
 set(CMAKE_CXX_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "-Wall -Wno-unknown-pragmas -DDEVICE_DEBUG"
+    "-Wall -Wno-unknown-pragmas"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG "
+    "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
-set(
-  CMAKE_CXX_FLAGS_SANITIZE
-  "$-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
-  CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
+set(CMAKE_CXX_FLAGS_SANITIZE
+    "$-Wall -Wno-unknown-pragmas -g -fno-inline -fsanitize=address,undefined"
+    CACHE STRING "Flags used by the C++ compiler during santizer debug builds.")
 
 enable_language(CXX)
 
-
 # define C FLAGS
-set(CMAKE_C_FLAGS_DEVEL "-Wall -g -O3" CACHE STRING -DDEVEL"Flags used by the C compiler during regular development builds.")
+set(CMAKE_C_FLAGS_DEVEL
+    "-Wall -g -O3"
+    CACHE STRING "Flags used by the C compiler during regular development builds.")
 set(CMAKE_C_FLAGS_STRICT
     "-Wall -O3 -Werror -Wno-error=unused-private-field"
     CACHE STRING "Flags used by the C compiler during strict jenkins builds.")
-set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING "Flags used by the C compiler during release builds.")
+set(CMAKE_C_FLAGS_RELEASE
+    "-Wall -O3 -w"
+    CACHE STRING "Flags used by the C compiler during release builds.")
 set(CMAKE_C_FLAGS_HOSTDEBUG
-    "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
+    "-Wall -Wno-unknown-pragmas -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall -DDEVICE_DEBUG" CACHE STRING "Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG
+    "-Wall"
+    CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG"
+    "-Wall -g -fno-inline"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
-    "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
+    "-Wall -g -fno-inline -fsanitize=address,undefined"
     CACHE STRING "Flags used by the C compiler during sanitizer debug builds.")
 
 enable_language(C)
 
 # define FORTRAN FLAGS
-set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
-if(QUDA_INTERFACE_TIFR OR QUDA_INTERFACE_BQCD OR QUDA_ARPACK)
+set(CMAKE_F_FLAGS
+    -std=c99
+    CACHE STRING "Fortran Flags")
+if(QUDA_INTERFACE_TIFR
+   OR QUDA_INTERFACE_BQCD
+   OR QUDA_ARPACK)
   set(BUILD_FORTRAN_INTERFACE ON)
   enable_language(Fortran)
 endif()
 
 # define LINKER FLAGS
-set(CMAKE_EXE_LINKER_FLAGS_SANITIZE "-fsanitize=address,undefined" CACHE STRING "Flags used by the linker during sanitizer debug builds.")
+set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
+    "-fsanitize=address,undefined"
+    CACHE STRING "Flags used by the linker during sanitizer debug builds.")
 
-# define CUDA flags 
-set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "Host compiler to be used by nvcc")
+# define CUDA flags
+set(CMAKE_CUDA_HOST_COMPILER
+    "${CMAKE_CXX_COMPILER}"
+    CACHE FILEPATH "Host compiler to be used by nvcc")
 set(CMAKE_CUDA_STANDARD ${QUDA_CXX_STANDARD})
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 mark_as_advanced(CMAKE_CUDA_HOST_COMPILER)
@@ -330,10 +383,10 @@ set(CMAKE_CUDA_FLAGS_RELEASE
     "-O3 -w"
     CACHE STRING "Flags used by the CUDA compiler during release builds.")
 set(CMAKE_CUDA_FLAGS_HOSTDEBUG
-    "-g -lineinfo "
+    "-g -lineinfo"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "-G "
+    "-G"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G"
@@ -347,10 +400,9 @@ enable_language(CUDA)
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDAWrapper)
 else()
-  #for cmake 3.17+ we rely on
+  # for cmake 3.17+ we rely on
   find_package(CUDAToolkit)
 endif()
-
 
 # ######################################################################################################################
 # QUDA depends on Eigen this part makes sure we can download eigen if it is not found
@@ -362,25 +414,29 @@ if(QUDA_DOWNLOAD_EIGEN)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
   endif()
-  file(DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION} EXPECTED_HASH SHA256=${EIGEN_SHA} STATUS EIGEN_DOWNLOADED)
+  file(
+    DOWNLOAD ${EIGEN_URL} ${EIGEN_DOWNLOAD_LOCATION}
+    EXPECTED_HASH SHA256=${EIGEN_SHA}
+    STATUS EIGEN_DOWNLOADED)
   list(GET EIGEN_DOWNLOADED 0 EIGEN_DOWNLOADED_CODE)
   list(GET EIGEN_DOWNLOADED 1 EIGEN_DOWNLOADED_MSG)
   if(${EIGEN_DOWNLOADED_CODE})
     message(
       SEND_ERROR
         "Could not download Eigen automatically (${EIGEN_DOWNLOADED_MSG}). Please download eigen from ${EIGEN_URL} and save it to ${EIGEN_DOWNLOAD_LOCATION} and try running cmake again."
-      )
+    )
   endif()
 
   include(ExternalProject)
-  ExternalProject_Add(Eigen
-                      URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
-                      URL_HASH SHA256=${EIGEN_SHA}
-                      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
-                      CONFIGURE_COMMAND ""
-                      BUILD_COMMAND
-                      COMMAND ""
-                      INSTALL_COMMAND "")
+  ExternalProject_Add(
+    Eigen
+    URL ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2
+    URL_HASH SHA256=${EIGEN_SHA}
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/externals/eigen/
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND
+    COMMAND ""
+    INSTALL_COMMAND "")
   ExternalProject_Get_Property(Eigen source_dir)
   set(EIGEN_INCLUDE_DIRS ${source_dir})
 else()
@@ -390,7 +446,7 @@ else()
     message(
       FATAL_ERROR
         "QUDA requires Eigen (http://eigen.tuxfamily.org). Please either set EIGEN_INCLUDE_DIRS to path to eigen3 include directory, e.g. /usr/local/include/eigen3 or set QUDA_DOWNLOAD_EIGEN to ON to enable automatic download of the necessary components."
-      )
+    )
   endif()
 endif()
 
@@ -416,7 +472,7 @@ if(QUDA_MPI OR QUDA_QMP)
   if(mpimessage)
     message(
       "Found MPIFORT/MPICC/MPICXX environment variables. If this is not what you want please use -DMPI_<LANG>_COMPILER and consult the cmake FindMPI documentation."
-      )
+    )
   endif()
   # we need to enable Fortran if we want to detect MPI_Fortran_COMPILER
   if(QUDA_ARPACK)
@@ -435,68 +491,87 @@ if(QUDA_QDPJIT)
   if(NOT QUDA_QMP)
     message(WARNING "Specifying QUDA_QDPJIT requires use of QUDA_QMP. Please set QUDA_QMP=ON and set QUDA_QMPHOME.")
   endif()
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
-                  OUTPUT_VARIABLE QDP_LDFLAGS
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
-                  OUTPUT_VARIABLE QDP_LIBS
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --ldflags
+    OUTPUT_VARIABLE QDP_LDFLAGS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${QUDA_QDPJITHOME}/bin/qdp \+\+-config --libs
+    OUTPUT_VARIABLE QDP_LIBS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   find_library(QDP_LIB qdp PATH ${QUDA_QDPJITHOME}/lib)
   find_library(QIO_LIB qio ${QUDA_QDPJITHOME}/lib/)
   find_library(LIME_LIB lime ${QUDA_QDPJITHOME}/lib/)
 endif()
 
 if(QUDA_QMP)
-  find_library (QMP_FOUND qmp HINTS ${QUDA_QMPHOME}/lib NO_DEFAULT_PATH)
+  find_library(
+    QMP_FOUND qmp
+    HINTS ${QUDA_QMPHOME}/lib
+    NO_DEFAULT_PATH)
   mark_as_advanced(QMP_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
+  set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS ${QMP_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
-    ExternalProject_Add(QMP
-                        GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-2
-                        GIT_SHALLOW YES
-                        PREFIX usqcd
-                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
-                                          "INSTALL=${INSTALL_EXE} -C"
-                                          --with-qmp-comms-type=MPI
-                                          --prefix=<INSTALL_DIR>
-                        BUILD_COMMAND ${MAKE_EXE}
-                        INSTALL_COMMAND ${MAKE_EXE} install
-                        LOG_INSTALL ON
-                        LOG_BUILD ON
-                        LOG_DOWNLOAD ON
-                        )
+    ExternalProject_Add(
+      QMP
+      GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
+      GIT_TAG qmp2-5-2
+      GIT_SHALLOW YES
+      PREFIX usqcd
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
+                        --with-qmp-comms-type=MPI --prefix=<INSTALL_DIR>
+      BUILD_COMMAND ${MAKE_EXE}
+      INSTALL_COMMAND ${MAKE_EXE} install
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON)
 
     ExternalProject_Get_Property(QMP INSTALL_DIR)
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QMPHOME ${INSTALL_DIR} CACHE PATH "path to QMP" FORCE)
+    set_property(
+      DIRECTORY
+      APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set(QUDA_QMPHOME
+        ${INSTALL_DIR}
+        CACHE PATH "path to QMP" FORCE)
     set(QUDA_QMP_LDFLAGS
         "-L${QUDA_QMPHOME}/lib"
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS "-lqmp" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
-    ExternalProject_Add_Step(QMP reconf
-                             COMMAND ${AUTORECONF_EXE} -fi
-                             WORKING_DIRECTORY <SOURCE_DIR>
-                             DEPENDERS configure
-                             DEPENDEES download)
+    set(QUDA_QMP_LIBS
+        "-lqmp"
+        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    ExternalProject_Add_Step(
+      QMP reconf
+      COMMAND ${AUTORECONF_EXE} -fi
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download)
 
   else()
     if("${QUDA_QMPHOME}" STREQUAL "")
       message(FATAL_ERROR "QUDA_QMPHOME must be defined if QUDA_QMP is ON and QUDA_DOWNLOAD_USQCD is OFF")
     endif()
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags
-                    OUTPUT_VARIABLE QUDA_QMP_CFLAGS
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags
-                    OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs
-                    OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --cflags
+      OUTPUT_VARIABLE QUDA_QMP_CFLAGS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --ldflags
+      OUTPUT_VARIABLE QUDA_QMP_LDFLAGS_INTERNAL
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QMPHOME}/bin/qmp-config --libs
+      OUTPUT_VARIABLE QUDA_QMP_LIBS_INTERNAL
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(QUDA_QMP_LDFLAGS
         ${QUDA_QMP_LDFLAGS_INTERNAL}
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QMP_LIBS ${QUDA_QMP_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    set(QUDA_QMP_LIBS
+        ${QUDA_QMP_LIBS_INTERNAL}
+        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
 endif()
 
@@ -504,60 +579,79 @@ if(QUDA_QIO)
   if(NOT QUDA_QMP)
     message(FATAL_ERROR "Use of QIO (via QUDA_QIO=ON) requires QMP. Please set QUDA_QMP=ON.")
   endif()
-  find_library (QIO_FOUND qio HINTS ${QUDA_QIOHOME}/lib NO_DEFAULT_PATH)
+  find_library(
+    QIO_FOUND qio
+    HINTS ${QUDA_QIOHOME}/lib
+    NO_DEFAULT_PATH)
   mark_as_advanced(QIO_FOUND)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
+  set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS ${QIO_FOUND})
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
-    ExternalProject_Add(QIO
-                        GIT_REPOSITORY https://github.com/usqcd-software/qio.git
-                        GIT_TAG qio2-5-0
-                        GIT_SHALLOW YES
-                        PREFIX usqcd
-                        CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
-                                          "INSTALL=${INSTALL_EXE} -C"
-                                          --with-qmp=${QUDA_QMPHOME}
-                                          --prefix=<INSTALL_DIR>
-                        BUILD_COMMAND make
-                        INSTALL_COMMAND make install
-                        DEPENDS QMP
-                        LOG_INSTALL ON
-                        LOG_BUILD ON
-                        LOG_DOWNLOAD ON
-                        )
+    ExternalProject_Add(
+      QIO
+      GIT_REPOSITORY https://github.com/usqcd-software/qio.git
+      GIT_TAG qio2-5-0
+      GIT_SHALLOW YES
+      PREFIX usqcd
+      CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure "INSTALL=${INSTALL_EXE} -C"
+                        --with-qmp=${QUDA_QMPHOME} --prefix=<INSTALL_DIR>
+      BUILD_COMMAND make
+      INSTALL_COMMAND make install
+      DEPENDS QMP
+      LOG_INSTALL ON
+      LOG_BUILD ON
+      LOG_DOWNLOAD ON)
     ExternalProject_Get_Property(QIO INSTALL_DIR)
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
-    set(QUDA_QIOHOME ${INSTALL_DIR} CACHE PATH "path to QIO" FORCE)
-    set(QUDA_LIMEHOME ${INSTALL_DIR} CACHE PATH "path to LIME" FORCE)
-    ExternalProject_Add_Step(QIO reconf
-                             COMMAND ${AUTORECONF_EXE} -fi
-                             WORKING_DIRECTORY <SOURCE_DIR>
-                             DEPENDERS configure
-                             DEPENDEES download)
+    set_property(
+      DIRECTORY
+      APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS ${INSTALL_DIR})
+    set(QUDA_QIOHOME
+        ${INSTALL_DIR}
+        CACHE PATH "path to QIO" FORCE)
+    set(QUDA_LIMEHOME
+        ${INSTALL_DIR}
+        CACHE PATH "path to LIME" FORCE)
+    ExternalProject_Add_Step(
+      QIO reconf
+      COMMAND ${AUTORECONF_EXE} -fi
+      WORKING_DIRECTORY <SOURCE_DIR>
+      DEPENDERS configure
+      DEPENDEES download)
     set(QUDA_QIO_LDFLAGS
         "-L${QUDA_QIOHOME}/lib"
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS "-lqio -llime" CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    set(QUDA_QIO_LIBS
+        "-lqio -llime"
+        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
 
   else()
     if("${QUDA_QIOHOME}" STREQUAL "" OR "${QUDA_LIMEHOME}" STREQUAL "")
       message(
         FATAL_ERROR "QUDA_QIOHOME and QUDA_LIMEHOME must be defined when QUDA_QIO is ON and QUDA_DOWNLOAD_USQCD is OFF")
     endif()
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags
-                    OUTPUT_VARIABLE QUDA_QIO_CFLAGS
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags
-                    OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs
-                    OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QIOHOME}/bin/qio-config --cflags
+      OUTPUT_VARIABLE QUDA_QIO_CFLAGS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QIOHOME}/bin/qio-config --ldflags
+      OUTPUT_VARIABLE QUDA_QIO_LDFLAGS_INTERNAL
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${QUDA_QIOHOME}/bin/qio-config --libs
+      OUTPUT_VARIABLE QUDA_QIO_LIBS_INTERNAL
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(QUDA_QIO_LDFLAGS
         ${QUDA_QIO_LDFLAGS_INTERNAL}
         CACHE STRING "LDFLAGS for QMP - should be derived from qmp-config --ldflags")
-    set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
+    set(QUDA_QIO_LIBS
+        ${QUDA_QIO_LIBS_INTERNAL}
+        CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
- endif()
+endif()
 
 if(QUDA_OPENMP)
   find_package(OpenMP)
@@ -565,7 +659,14 @@ endif()
 
 if(QUDA_MAGMA)
   add_library(MAGMA::MAGMA INTERFACE IMPORTED)
-  target_compile_definitions(MAGMA::MAGMA INTERFACE MAGMA_LIB ADD_ MAGMA_SETAFFINITY GPUSHMEM=300 HAVE_CUBLAS)
+  target_compile_definitions(
+    MAGMA::MAGMA
+    INTERFACE
+    MAGMA_LIB
+    ADD_
+    MAGMA_SETAFFINITY
+    GPUSHMEM=300
+    HAVE_CUBLAS)
   if("${QUDA_MAGMAHOME}" STREQUAL "")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(MAGMA magma)
@@ -599,14 +700,14 @@ if(QUDA_ARPACK)
 
   if(QUDA_DOWNLOAD_ARPACK)
     include(GNUInstallDirs)
-    ExternalProject_Add(ARPACK-NG
-                        GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
-                        GIT_TAG 3.7.0
-                        GIT_SHALLOW YES
-                        PREFIX arpack-ng
-                        CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                        CMAKE_GENERATOR "Unix Makefiles"
-                        )
+    ExternalProject_Add(
+      ARPACK-NG
+      GIT_REPOSITORY https://github.com/opencollab/arpack-ng.git
+      GIT_TAG 3.7.0
+      GIT_SHALLOW YES
+      PREFIX arpack-ng
+      CMAKE_ARGS -DMPI=${ARPACK_MPI} -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      CMAKE_GENERATOR "Unix Makefiles")
     ExternalProject_Get_Property(ARPACK-NG INSTALL_DIR)
     set(QUDA_ARPACK_HOME ${INSTALL_DIR})
     add_library(arpack-ng STATIC IMPORTED)
@@ -615,16 +716,16 @@ if(QUDA_ARPACK)
     find_package(LAPACK REQUIRED)
     target_link_libraries(arpack-ng INTERFACE ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
     set_target_properties(arpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-    set_target_properties(arpack-ng
-                          PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
+    set_target_properties(arpack-ng PROPERTIES IMPORTED_LOCATION
+                                               ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libarpack.a)
     if(QUDA_MPI OR QUDA_QMP)
       add_library(parpack-ng STATIC IMPORTED)
       target_link_libraries(parpack-ng INTERFACE arpack-ng MPI::MPI_Fortran)
       set_target_properties(parpack-ng PROPERTIES IMPORTED_LINK_INTERFACE_LANGUAGES Fortran)
-      set_target_properties(parpack-ng
-                            PROPERTIES IMPORTED_LOCATION ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
+      set_target_properties(parpack-ng PROPERTIES IMPORTED_LOCATION
+                                                  ${QUDA_ARPACK_HOME}/${CMAKE_INSTALL_LIBDIR}/libparpack.a)
     endif()
-    
+
   else(QUDA_DOWNLOAD_ARPACK)
     find_package(PkgConfig REQUIRED)
 
@@ -635,7 +736,7 @@ if(QUDA_ARPACK)
     else()
       find_library(ARPACK ${ARPACK_LIBRARIES} PATH ${ARPACK_LIBRARY_DIRS})
     endif()
-   
+
     # Link the parallel library if required
     if(QUDA_MPI OR QUDA_QMP)
       pkg_check_modules(PARPACK QUIET parpack)
@@ -648,15 +749,14 @@ if(QUDA_ARPACK)
   endif(QUDA_DOWNLOAD_ARPACK)
 endif(QUDA_ARPACK)
 
-#BACKWARDS
+# BACKWARDS
 if(QUDA_BACKWARDS)
   include(FetchContent)
   FetchContent_Declare(
-      backward-cpp
-      GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
-      GIT_TAG v1.4
-      GIT_SHALLOW ON
-  )
+    backward-cpp
+    GIT_REPOSITORY https://github.com/lattice/backward-cpp.git
+    GIT_TAG v1.4
+    GIT_SHALLOW ON)
   FetchContent_GetProperties(backward-cpp)
   if(NOT backward-cpp_POPULATED)
     FetchContent_Populate(backward-cpp)
@@ -673,7 +773,6 @@ endif()
 set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
-
 
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
@@ -704,7 +803,7 @@ mark_as_advanced(CMAKE_F_FLAGS)
 
 mark_as_advanced(CMAKE_EXE_LINKER_FLAGS_SANITIZE)
 
-#enable ctest
+# enable ctest
 include(CTest)
 
 # add tests, utils, reference, and quda library
