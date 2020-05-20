@@ -2626,18 +2626,23 @@ void thinUpdateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
-  // FIXME: also update mass, kappa, mu based on MG param
+  // FIXME: add support for updating kappa, mu as appropriate
 
   // FIXME: assumes gauge parameters haven't changed.
   // These routines will set gauge = gaugeFat for DiracImprovedStaggered
   mg->d->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+  mg->d->setMass(param->mass);
+
   mg->dSmooth->updateFields(gaugeSloppy, gaugeFatSloppy, gaugeLongSloppy, cloverSloppy);
+  mg->dSmooth->setMass(param->mass);
+
   if (mg->dSmoothSloppy != mg->dSmooth) {
     if (param->overlap) {
       mg->dSmoothSloppy->updateFields(gaugeExtended, gaugeFatExtended, gaugeLongExtended, cloverPrecondition);
     } else {
       mg->dSmoothSloppy->updateFields(gaugePrecondition, gaugeFatPrecondition, gaugeLongPrecondition, cloverPrecondition);
     }
+    mg->dSmoothSloppy->setMass(param->mass);
   }
   // These changes are propagated internally by use of references, pointers, etc, so
   // no further updates are needed.
