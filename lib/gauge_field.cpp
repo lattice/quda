@@ -169,23 +169,7 @@ namespace quda {
     staggeredPhaseApplied = false;
   }
 
-  bool GaugeField::isNative() const {
-    if (precision == QUDA_DOUBLE_PRECISION) {
-      if (order  == QUDA_FLOAT2_GAUGE_ORDER) return true;
-    } else if (precision == QUDA_SINGLE_PRECISION || precision == QUDA_HALF_PRECISION
-        || precision == QUDA_QUARTER_PRECISION) {
-      if (reconstruct == QUDA_RECONSTRUCT_NO) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_12 || reconstruct == QUDA_RECONSTRUCT_13) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9) {
-	if (order == QUDA_FLOAT4_GAUGE_ORDER) return true;
-      } else if (reconstruct == QUDA_RECONSTRUCT_10) {
-	if (order == QUDA_FLOAT2_GAUGE_ORDER) return true;
-      }
-    }
-    return false;
-  }
+  bool GaugeField::isNative() const { return gauge::isNative(order, precision, reconstruct); }
 
   void GaugeField::exchange(void **ghost_link, void **link_sendbuf, QudaDirection dir) const {
     MsgHandle *mh_send[4];
@@ -217,10 +201,10 @@ namespace quda {
 	if (comm_dim_partitioned(i)) {
 	  send[i] = pool_pinned_malloc(bytes[i]);
 	  receive[i] = pool_pinned_malloc(bytes[i]);
-	  qudaMemcpy(send[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToHost);
-	} else {
-	  if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToDevice);
-	}
+          qudaMemcpy(send[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToHost);
+        } else {
+          if (no_comms_fill) qudaMemcpy(ghost_link[i], link_sendbuf[i], bytes[i], qudaMemcpyDeviceToDevice);
+        }
       }
     }
 
@@ -253,9 +237,9 @@ namespace quda {
     if (Location() == QUDA_CUDA_FIELD_LOCATION) {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
-	qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
-	pool_pinned_free(send[i]);
-	pool_pinned_free(receive[i]);
+        qudaMemcpy(ghost_link[i], receive[i], bytes[i], qudaMemcpyHostToDevice);
+        pool_pinned_free(send[i]);
+        pool_pinned_free(receive[i]);
       }
     }
 

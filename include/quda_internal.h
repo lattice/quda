@@ -1,7 +1,6 @@
-#ifndef _QUDA_INTERNAL_H
-#define _QUDA_INTERNAL_H
+#pragma once
 
-#include <quda_backend_api.h>
+#include <quda_target_api.h>
 #include <string>
 #include <complex>
 #include <vector>
@@ -55,14 +54,34 @@ extern "C" {
     void *field; /**< Pointer to a ColorSpinorField */
   };
 
-  extern qudaDeviceProp deviceProp;  
+  extern qudaDeviceProp deviceProp;
   extern qudaStream_t *streams;
- 
+
 #ifdef __cplusplus
 }
 #endif
 
 namespace quda {
+
+  struct alignas(8) char8 {
+    char4 x;
+    char4 y;
+  };
+
+  struct alignas(16) short8 {
+    short4 x;
+    short4 y;
+  };
+
+  struct alignas(32) float8 {
+    float4 x;
+    float4 y;
+  };
+
+  struct alignas(64) double8 {
+    double4 x;
+    double4 y;
+  };
 
   typedef std::complex<double> Complex;
 
@@ -75,9 +94,11 @@ namespace quda {
   template<> struct fixedMaxValue<short>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short2>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<short4>{ static constexpr float value = 32767.0f; };
+  template<> struct fixedMaxValue<short8>{ static constexpr float value = 32767.0f; };
   template<> struct fixedMaxValue<char>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char2>{ static constexpr float value = 127.0f; };
   template<> struct fixedMaxValue<char4>{ static constexpr float value = 127.0f; };
+  template<> struct fixedMaxValue<char8>{ static constexpr float value = 127.0f; };
 
   template <typename T> struct fixedInvMaxValue {
     static constexpr float value = 3.402823e+38f;
@@ -91,6 +112,9 @@ namespace quda {
   template <> struct fixedInvMaxValue<short4> {
     static constexpr float value = 3.0518509476e-5f;
   };
+  template <> struct fixedInvMaxValue<short8> {
+    static constexpr float value = 3.0518509476e-5f;
+  };
   template <> struct fixedInvMaxValue<char> {
     static constexpr float value = 7.874015748031e-3f;
   };
@@ -98,6 +122,9 @@ namespace quda {
     static constexpr float value = 7.874015748031e-3f;
   };
   template <> struct fixedInvMaxValue<char4> {
+    static constexpr float value = 7.874015748031e-3f;
+  };
+  template <> struct fixedInvMaxValue<char8> {
     static constexpr float value = 7.874015748031e-3f;
   };
 
@@ -113,5 +140,3 @@ namespace quda {
 
 #include <timer.h>
 
-
-#endif // _QUDA_INTERNAL_H

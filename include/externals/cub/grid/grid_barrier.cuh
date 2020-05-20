@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -153,9 +153,9 @@ public:
     /**
      * DeviceFrees and resets the progress counters
      */
-    qudaError_t HostReset()
+    cudaError_t HostReset()
     {
-        qudaError_t retval = qudaSuccess;
+        cudaError_t retval = cudaSuccess;
         if (d_sync)
         {
             CubDebug(retval = cudaFree(d_sync));
@@ -179,9 +179,9 @@ public:
      * Sets up the progress counters for the next kernel launch (lazily
      * allocating and initializing them if necessary)
      */
-    qudaError_t Setup(int sweep_grid_size)
+    cudaError_t Setup(int sweep_grid_size)
     {
-        qudaError_t retval = qudaSuccess;
+        cudaError_t retval = cudaSuccess;
         do {
             size_t new_sync_bytes = sweep_grid_size * sizeof(SyncFlag);
             if (new_sync_bytes > sync_bytes)
@@ -195,7 +195,7 @@ public:
 
                 // Allocate and initialize to zero
                 if (CubDebug(retval = cudaMalloc((void**) &d_sync, sync_bytes))) break;
-                if (CubDebug(retval = qudaMemset(d_sync, 0, new_sync_bytes))) break;
+                if (CubDebug(retval = cudaMemset(d_sync, 0, new_sync_bytes))) break;
             }
         } while (0);
 

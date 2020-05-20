@@ -29,7 +29,7 @@ namespace quda {
   };
 
   template<typename real, typename Arg> // Gauss
-  __device__ __host__ inline void genGauss(Arg &arg, quRNGState& localState, int parity, int x_cb, int s, int c) {
+  __device__ __host__ inline void genGauss(Arg &arg, cuRNGState& localState, int parity, int x_cb, int s, int c) {
     real phi = 2.0*M_PI*Random<real>(localState);
     real radius = Random<real>(localState);
     radius = sqrt(-1.0 * log(radius));
@@ -37,7 +37,7 @@ namespace quda {
   }
 
   template<typename real, typename Arg> // Uniform
-  __device__ __host__ inline void genUniform(Arg &arg, quRNGState& localState, int parity, int x_cb, int s, int c) {
+  __device__ __host__ inline void genUniform(Arg &arg, cuRNGState& localState, int parity, int x_cb, int s, int c) {
     real x = Random<real>(localState);
     real y = Random<real>(localState);
     arg.v(parity, x_cb, s, c) = complex<real>(x, y);
@@ -51,7 +51,7 @@ namespace quda {
       for (int x_cb = 0; x_cb < arg.volumeCB; x_cb++) {
         for (int s = 0; s < Ns; s++) {
           for (int c = 0; c < Nc; c++) {
-            quRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
+            cuRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
             if (type == QUDA_NOISE_GAUSS)
               genGauss<real>(arg, localState, parity, x_cb, s, c);
             else if (type == QUDA_NOISE_UNIFORM)
@@ -73,7 +73,7 @@ namespace quda {
     int parity = blockIdx.y * blockDim.y + threadIdx.y;
     if (parity >= arg.nParity) return;
 
-    quRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
+    cuRNGState localState = arg.rng.State()[parity * arg.volumeCB + x_cb];
     for (int s=0; s<Ns; s++) {
       for (int c=0; c<Nc; c++) {
         if (type == QUDA_NOISE_GAUSS) genGauss<real>(arg, localState, parity, x_cb, s, c);

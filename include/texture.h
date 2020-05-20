@@ -2,19 +2,20 @@
 
 #ifdef USE_TEXTURE_OBJECTS
 
+#include <texture_helper.cuh>
+
 template <typename OutputType, typename InputType> class Texture
 {
   typedef typename quda::mapper<InputType>::type RegType;
 
   private:
-  qudaTextureObject_t spinor;
+    qudaTextureObject_t spinor;
 
   public:
   Texture() : spinor(0) {}
   Texture(const cudaColorSpinorField *x, bool use_ghost = false)
     : spinor(use_ghost ? x->GhostTex() : x->Tex()) { }
   Texture(const Texture &tex) : spinor(tex.spinor) { }
-  ~Texture() { }
 
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -24,7 +25,7 @@ template <typename OutputType, typename InputType> class Texture
   __device__ inline OutputType fetch(unsigned int idx) const
   {
     OutputType rtn;
-    copyFloatN(rtn, tex1Dfetch<RegType>(spinor, idx));
+    copyFloatN(rtn, tex1Dfetch_<RegType>(spinor, idx));
     return rtn;
   }
 
@@ -38,10 +39,10 @@ __device__ inline double2 fetch_double2(int4 v)
 { return make_double2(__hiloint2double(v.y, v.x), __hiloint2double(v.w, v.z)); }
 
 template <> __device__ inline double2 Texture<double2, double2>::fetch(unsigned int idx) const
-{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ double2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 template <> __device__ inline float2 Texture<float2, double2>::fetch(unsigned int idx) const
-{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch<int4>(spinor, idx))); return out; }
+{ float2 out; copyFloatN(out, fetch_double2(tex1Dfetch_<int4>(spinor, idx))); return out; }
 
 #else // !USE_TEXTURE_OBJECTS - use direct reads
 
@@ -59,7 +60,6 @@ template <typename OutputType, typename InputType> class Texture
   {
   }
   Texture(const Texture &tex) : spinor(tex.spinor) {}
-  ~Texture() {}
 
   Texture& operator=(const Texture &tex) {
     if (this != &tex) spinor = tex.spinor;
@@ -100,13 +100,13 @@ template <typename RegType, typename InterType, typename StoreType> void checkTy
     errorQuda("Precision of register (%lu) and intermediate (%lu) types must match\n", (unsigned long)reg_size,
         (unsigned long)inter_size);
 
-  if (vecLength<InterType>() != vecLength<StoreType>()) {
+  if (vec_length<InterType>::value != vec_length<StoreType>::value) {
     errorQuda("Vector lengths intermediate and register types must match\n");
   }
 
-  if (vecLength<RegType>() == 0) errorQuda("Vector type not supported\n");
-  if (vecLength<InterType>() == 0) errorQuda("Vector type not supported\n");
-  if (vecLength<StoreType>() == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<RegType>::value == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<InterType>::value == 0) errorQuda("Vector type not supported\n");
+  if (vec_length<StoreType>::value == 0) errorQuda("Vector type not supported\n");
 }
 
 template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm {
@@ -137,8 +137,6 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
     cb_norm_offset = x.NormBytes() / (2 * sizeof(float));
   }
 
-  virtual ~SpinorNorm() {}
-
   __device__ inline float load_norm(const int i, const int parity = 0) const { return norm[cb_norm_offset * parity + i]; }
 
   template <int M> __device__ inline float store_norm(InterType x[M], int i, int parity)
@@ -157,20 +155,20 @@ template <typename RegType, typename StoreType, bool is_fixed> struct SpinorNorm
   {
     if (norm_bytes > 0) {
       *norm_h = new char[norm_bytes];
-      qudaMemcpy(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpyNoTune(*norm_h, norm, norm_bytes, qudaMemcpyDeviceToHost);
     }
-    checkQudaError();
+    checkCudaError();
   }
 
   // restore the field from the host
   void restore(char **norm_h, size_t norm_bytes)
   {
     if (norm_bytes > 0) {
-      qudaMemcpy(norm, *norm_h, norm_bytes, qudaMemcpyHostToDevice);
+      qudaMemcpyNoTune(norm, *norm_h, norm_bytes, qudaMemcpyHostToDevice);
       delete[] * norm_h;
       *norm_h = 0;
     }
-    checkQudaError();
+    checkCudaError();
   }
 
   float *Norm() { return norm; }
@@ -285,8 +283,6 @@ public:
 #endif
     checkTypes<RegType, InterType, StoreType>();
   }
-
-  virtual ~SpinorTexture() {}
 
   __device__ inline void load(RegType x[], const int i, const int parity = 0) const
   {
@@ -425,8 +421,6 @@ public:
 #endif
   }
 
-  ~Spinor() {}
-
   // default store used for simple fields
   __device__ inline void save(RegType x[], int i, const int parity = 0)
   {
@@ -457,9 +451,9 @@ public:
       StoreType *spinor = ST::tex.Spinor();
 #endif
       *spinor_h = new char[bytes];
-      qudaMemcpy(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
+      qudaMemcpyNoTune(*spinor_h, spinor, bytes, qudaMemcpyDeviceToHost);
       SN::backup(norm_h, norm_bytes);
-      checkQudaError();
+      checkCudaError();
     }
   }
 
@@ -470,11 +464,11 @@ public:
 #ifndef USE_TEXTURE_OBJECTS
       StoreType *spinor = ST::tex.Spinor();
 #endif
-      qudaMemcpy(spinor, *spinor_h, bytes, qudaMemcpyHostToDevice);
+      qudaMemcpyNoTune(spinor, *spinor_h, bytes, qudaMemcpyHostToDevice);
       SN::restore(norm_h, norm_bytes);
       delete[] * spinor_h;
       *spinor_h = 0;
-      checkQudaError();
+      checkCudaError();
     }
   }
 

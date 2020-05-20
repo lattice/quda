@@ -162,7 +162,7 @@ namespace quda {
       } else {
         errorQuda("Undefined phase type");
       }
-      checkQudaError();
+      checkCudaError();
     }
   };
 

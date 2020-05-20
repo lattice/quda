@@ -1,8 +1,8 @@
 #include <blas_magma.h>
 #include <string.h>
 
-#include <util_quda.h>
 #include <quda_internal.h>
+#include <util_quda.h>
 
 #ifdef MAGMA_LIB
 
@@ -23,8 +23,8 @@
 
   template<typename magmaFloat> void magma_gesv(void *sol, const int ldn, const int n, void *Mat, const int ldm)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gesv, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_gesv, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t *ipiv;
     magma_int_t err, info;
@@ -72,8 +72,8 @@
 
   template<typename magmaFloat> void magma_geev(void *Mat, const int m, const int ldm, void *vr, void *evalues, const int ldv)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_geev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_geev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info;
 
@@ -132,8 +132,8 @@
 
   template<typename  magmaFloat> void magma_gels(void *Mat, void *c, int rows, int cols, int ldm)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_gels, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info, lwork;
     void *hwork_ = nullptr;
@@ -197,8 +197,8 @@
 
  template<typename magmaFloat> void magma_heev(void *Mat, const int m, const int ldm, void *evalues)
   {
-    cudaPointerAttributes ptr_attr;
-    if(cudaPointerGetAttributes(&ptr_attr, Mat) == cudaErrorInvalidValue) errorQuda("In magma_heev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
+    qudaPointerAttributes ptr_attr;
+    if(qudaPointerGetAttributes(&ptr_attr, Mat) == qudaErrorInvalidValue) errorQuda("In magma_heev, a pointer was not allocated in, mapped by or registered with current CUDA context.\n");
 
     magma_int_t err, info;
 

@@ -2,10 +2,10 @@
 #include <quda_internal.h>
 #include <lattice_field.h>
 #include <color_spinor_field.h>
-#ifdef DEVELOP_ONEAPI
+#ifndef DPCPP_DEVELOP
 #include <gauge_field.h>
 #include <clover_field.h>
-#endif //ONEAPI
+#endif //DPCPP
 
 namespace quda {
 
@@ -252,13 +252,13 @@ namespace quda {
 	  ghost_pinned_send_buffer_h[b] = mapped_malloc(ghost_bytes);
 
 	  // set the matching device-mapped pointer
-	  qudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
+          qudaHostGetDevicePointer(&ghost_pinned_send_buffer_hd[b], ghost_pinned_send_buffer_h[b], 0);
 
-	  // pinned buffer used for receiving
-	  ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
+          // pinned buffer used for receiving
+          ghost_pinned_recv_buffer_h[b] = mapped_malloc(ghost_bytes);
 
-	  // set the matching device-mapped pointer
-	  qudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
+          // set the matching device-mapped pointer
+          qudaHostGetDevicePointer(&ghost_pinned_recv_buffer_hd[b], ghost_pinned_recv_buffer_h[b], 0);
         }
 
         initGhostFaceBuffer = true;
@@ -375,7 +375,7 @@ namespace quda {
     } // loop over dimension
 
     initComms = true;
-    checkQudaError();
+    checkCudaError();
   }
 
   void LatticeField::destroyComms()
@@ -406,7 +406,7 @@ namespace quda {
       comm_barrier();
 
       initComms = false;
-      checkQudaError();
+      checkCudaError();
     }
 
   }
@@ -454,7 +454,7 @@ namespace quda {
 	}
       }
 
-      checkQudaError();
+      checkCudaError();
 
       // open the remote memory handles and set the send ghost pointers
       for (int dim=0; dim<4; ++dim) {
@@ -464,14 +464,13 @@ namespace quda {
 	for (int dir=0; dir<num_dir; ++dir) {
 	  if (!comm_peer2peer_enabled(dir,dim)) continue;
 	  void **ghostDest = &(ghost_remote_send_buffer_d[b][dim][dir]);
-	  cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim],
-			       qudaIpcMemLazyEnablePeerAccess);
-	}
-	if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
+          cudaIpcOpenMemHandle(ghostDest, ipcRemoteGhostDestHandle[b][dir][dim], qudaIpcMemLazyEnablePeerAccess);
+        }
+        if (num_dir == 1) ghost_remote_send_buffer_d[b][dim][1] = ghost_remote_send_buffer_d[b][dim][0];
       }
     } // buffer index
 
-    checkQudaError();
+    checkCudaError();
 
     // handles for obtained events
     qudaIpcEventHandle_t ipcRemoteEventHandle[2][2][QUDA_MAX_DIM];
@@ -496,15 +495,14 @@ namespace quda {
 	  // now send
           qudaIpcEventHandle_t ipcLocalEventHandle;
           if (comm_peer2peer_enabled(dir,dim)) {
-	    qudaEventCreateWithFlags(&ipcCopyEvent[b][dir][dim], qudaEventDisableTiming | qudaEventInterprocess);
-	    cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
+            qudaEventCreateWithFlags(&ipcCopyEvent[b][dir][dim], qudaEventDisableTiming | qudaEventInterprocess);
+            cudaIpcGetEventHandle(&ipcLocalEventHandle, ipcCopyEvent[b][dir][dim]);
 
-	    sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp,
-						    sizeof(ipcLocalEventHandle));
-	  }
+            sendHandle = comm_declare_send_relative(&ipcLocalEventHandle, dim, disp, sizeof(ipcLocalEventHandle));
+          }
 
-	  if (receiveHandle) comm_start(receiveHandle);
-	  if (sendHandle) comm_start(sendHandle);
+          if (receiveHandle) comm_start(receiveHandle);
+          if (sendHandle) comm_start(sendHandle);
 
 	  if (receiveHandle) comm_wait(receiveHandle);
 	  if (sendHandle) comm_wait(sendHandle);
@@ -516,7 +514,7 @@ namespace quda {
       }
     }
 
-    checkQudaError();
+    checkCudaError();
 
     for (int dim=0; dim<4; ++dim) {
       if (comm_dim(dim)==1) continue;
@@ -549,7 +547,7 @@ namespace quda {
 	}
       }
     }
-    checkQudaError();
+    checkCudaError();
 
     initIPCComms = true;
     ghost_field_reset = false;
@@ -558,7 +556,7 @@ namespace quda {
   void LatticeField::destroyIPCComms() {
 
     if (!initIPCComms) return;
-    checkQudaError();
+    checkCudaError();
 
     // ensure that all processes bring down their communicators
     // synchronously so that we don't end up in an undefined state
@@ -573,26 +571,26 @@ namespace quda {
       for (int b=0; b<2; b++) {
 	if (comm_peer2peer_enabled(1,dim)) {
 	  if (mh_send_p2p_fwd[b][dim] || mh_recv_p2p_fwd[b][dim]) {
-	    qudaEventDestroy(ipcCopyEvent[b][1][dim]);
-	    // only close this handle if it doesn't alias the back ghost
-	    if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
-	  }
+            qudaEventDestroy(ipcCopyEvent[b][1][dim]);
+            // only close this handle if it doesn't alias the back ghost
+            if (num_dir == 2) cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][1]);
+          }
           if (mh_send_p2p_fwd[b][dim]) comm_free(mh_send_p2p_fwd[b][dim]);
           if (mh_recv_p2p_fwd[b][dim]) comm_free(mh_recv_p2p_fwd[b][dim]);
         }
 
 	if (comm_peer2peer_enabled(0,dim)) {
 	  if (mh_send_p2p_back[b][dim] || mh_recv_p2p_back[b][dim]) {
-	    qudaEventDestroy(ipcCopyEvent[b][0][dim]);
-	    cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
-	  }
+            qudaEventDestroy(ipcCopyEvent[b][0][dim]);
+            cudaIpcCloseMemHandle(ghost_remote_send_buffer_d[b][dim][0]);
+          }
           if (mh_send_p2p_back[b][dim]) comm_free(mh_send_p2p_back[b][dim]);
           if (mh_recv_p2p_back[b][dim]) comm_free(mh_recv_p2p_back[b][dim]);
         }
       } // buffer
     } // iterate over dim
 
-    checkQudaError();
+    checkCudaError();
 
     // local take down complete - now synchronize to ensure globally complete
     qudaDeviceSynchronize();
@@ -611,11 +609,13 @@ namespace quda {
     return (qudaSuccess == cudaEventQuery(ipcRemoteCopyEvent[bufferIndex][dir][dim]) ? true : false);
   }
 
-  const qudaEvent_t& LatticeField::getIPCCopyEvent(int dir, int dim) const {
+  const qudaEvent_t &LatticeField::getIPCCopyEvent(int dir, int dim) const
+  {
     return ipcCopyEvent[bufferIndex][dir][dim];
   }
 
-  const qudaEvent_t& LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const {
+  const qudaEvent_t &LatticeField::getIPCRemoteCopyEvent(int dir, int dim) const
+  {
     return ipcRemoteCopyEvent[bufferIndex][dir][dim];
   }
 
@@ -663,18 +663,18 @@ namespace quda {
   QudaFieldLocation LatticeField::Location() const { 
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (
-#ifdef DEVELOP_ONEAPI		    
-	typeid(*this)==typeid(cudaCloverField) || 
+#ifndef DPCPP_DEVELOP
+        typeid(*this)==typeid(cudaCloverField) || 
 	typeid(*this)==typeid(cudaGaugeField) ||
-#endif //ONEAPI	
-	typeid(*this)==typeid(cudaColorSpinorField )) {
+#endif //DPCPP
+	typeid(*this)==typeid(cudaColorSpinorField)) {
       location = QUDA_CUDA_FIELD_LOCATION; 
     } else if (
-#ifdef DEVELOP_ONEAPI		    
-	       typeid(*this)==typeid(cpuCloverField) || 
+#ifndef DPCPP_DEVELOP
+               typeid(*this)==typeid(cpuCloverField) || 
 	       typeid(*this)==typeid(cpuGaugeField) ||
-#endif //ONEAPI	       
-	       typeid(*this)==typeid(cpuColorSpinorField )) {
+#endif
+	       typeid(*this)==typeid(cpuColorSpinorField)) {
       location = QUDA_CPU_FIELD_LOCATION;
     } else {
       errorQuda("Unknown field %s, so cannot determine location", typeid(*this).name());
@@ -695,7 +695,7 @@ namespace quda {
       const ColorSpinorField &csField = static_cast<const ColorSpinorField&>(*this);
       if (csField.FieldOrder() == 2 || csField.FieldOrder() == 4)
 	return static_cast<int>(csField.FieldOrder());
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP
     } else if (typeid(*this) == typeid(const cudaGaugeField)) {
       const GaugeField &gField = static_cast<const GaugeField&>(*this);
       if (gField.Order() == 2 || gField.Order() == 4)
@@ -704,7 +704,7 @@ namespace quda {
       const CloverField &cField = static_cast<const CloverField&>(*this);
       if (cField.Order() == 2 || cField.Order() == 4)
 	return static_cast<int>(cField.Order());
-#endif //ONEAPI      
+#endif //DPCPP
     }
 
     errorQuda("Unsupported field type");

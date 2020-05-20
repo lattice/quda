@@ -148,7 +148,7 @@ private:
     errorQuda("Clover Dirac operator has not been built!");
 #endif
 
-    checkQudaError();
+    checkCudaError();
     return;
   } // computeCloverForce
 

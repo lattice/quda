@@ -15,7 +15,7 @@ namespace quda {
   // Forward declare: MG Transfer Class
   class Transfer;
 
-  // Forward declar: Dirac Op Base Class
+  // Forward declare: Dirac Op Base Class
   class Dirac;
 
   // Params for Dirac operator
@@ -51,6 +51,7 @@ namespace quda {
     // for multigrid only
     Transfer *transfer; 
     Dirac *dirac;
+    bool need_bidirectional; // whether or not we need to force a bi-directional build
 
     // Default constructor
     DiracParam() :
@@ -66,7 +67,8 @@ namespace quda {
       epsilon(0.0),
       tmp1(0),
       tmp2(0),
-      halo_precision(QUDA_INVALID_PRECISION)
+      halo_precision(QUDA_INVALID_PRECISION),
+      need_bidirectional(false)
     {
       for (int i=0; i<QUDA_MAX_DIM; i++) commDim[i] = 1;
     }
@@ -90,7 +92,6 @@ namespace quda {
         printfQuda(
             "b_5[%d] = %e %e \t c_5[%d] = %e %e\n", i, b_5[i].real(), b_5[i].imag(), i, c_5[i].real(), c_5[i].imag());
     }
-
   };
 
   // This is a free function:
@@ -258,6 +259,9 @@ namespace quda {
     /** Flips value of daggered */
     void flipDagger() const { dagger = (dagger == QUDA_DAG_YES) ? QUDA_DAG_NO : QUDA_DAG_YES; }
 
+    /** @return is operator hermitian */
+    virtual bool hermitian() const { return false; }
+
     /**
      * @brief Create the coarse operator (virtual parent)
      *
@@ -275,6 +279,15 @@ namespace quda {
 
     QudaPrecision HaloPrecision() const { return halo_precision; }
     void setHaloPrecision(QudaPrecision halo_precision_) const { halo_precision = halo_precision_; }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      the gauge field and temporary spinors to the CPU or GPU
+      as requested. Overloads may also grab a clover term
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full Wilson
@@ -392,6 +405,15 @@ namespace quda {
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned clover
@@ -443,6 +465,17 @@ namespace quda {
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass=0., double mu=0., double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full clover with Hasenbusch Twist
@@ -856,6 +889,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned twisted mass with a clover term
@@ -900,6 +942,17 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (gauge, clover, temporary spinors).
+      Will only grab the inverse clover unless the clover field
+      is needed for asymmetric preconditioning
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Full staggered
@@ -971,6 +1024,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   // Full staggered
@@ -1024,6 +1079,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, double kappa, double mass, double mu = 0.,
                         double mu_factor = 0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (fat+long links, temporary spinors)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // Even-odd preconditioned staggered
@@ -1045,6 +1109,8 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1059,6 +1125,7 @@ public:
     double mu_factor;
     const Transfer *transfer; /** restrictor / prolongator defined here */
     const Dirac *dirac; /** Parent Dirac operator */
+    const bool need_bidirectional; /** Whether or not to force a bi-directional build */
 
     mutable cpuGaugeField *Y_h; /** CPU copy of the coarse link field */
     mutable cpuGaugeField *X_h; /** CPU copy of the coarse clover term */
@@ -1210,6 +1277,14 @@ public:
      */
     void createPreconditionedCoarseOp(GaugeField &Yhat, GaugeField &Xinv, const GaugeField &Y, const GaugeField &X);
 
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (X, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   /**
@@ -1257,6 +1332,15 @@ public:
      */
     void createCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
 			double kappa, double mass, double mu, double mu_factor=0.) const;
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields (Xhat, Y)
+      to the CPU or GPU as requested
+      @param[in] mem_space Memory space we are prefetching to
+      @param[in] stream Which stream to run the prefetch in (default 0)
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
 
@@ -1285,6 +1369,7 @@ public:
 			 const QudaSolutionType) const;
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1305,6 +1390,7 @@ public:
 		 ColorSpinorField &x, ColorSpinorField &b,
 		 const QudaSolutionType) const;
     void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
+    virtual bool hermitian() const { return true; }
   };
 
   /**
@@ -1381,6 +1467,8 @@ public:
 	      Type() == typeid(DiracImprovedStaggered).name()) ? true : false;
     }
 
+    virtual bool hermitian() const { return dirac->hermitian(); }
+
     const Dirac *Expose() const { return dirac; }
 
     //! Shift term added onto operator (M/M^dag M/M M^dag + shift)
@@ -1447,8 +1535,6 @@ public:
     DiracMdagM(const Dirac &d) : DiracMatrix(d) { }
     DiracMdagM(const Dirac *d) : DiracMatrix(d) { }
 
-    
-
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const
     {
       dirac->MdagM(out, in);
@@ -1478,6 +1564,8 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
   /* Gloms onto a DiracMatrix and provides an operator() forward to its MMdag method */
@@ -1516,6 +1604,8 @@ public:
     {
       return 2*dirac->getStencilSteps(); // 2 for M and M dagger
     }
+
+    virtual bool hermitian() const { return true; } // normal op is always Hermitian
   };
 
   /* Gloms onto a DiracMatrix and provides an  operator() for its Mdag method */
@@ -1594,6 +1684,27 @@ public:
       return mat.getStencilSteps(); 
     }
   };
+
+  /**
+   * Create the Dirac operator
+   * @param[in/out] d        User prec
+   * @param[in/out] dSloppy  Sloppy prec
+   * @param[in/out] dPre     Preconditioner prec
+   * @param[in] param        Invert param container
+   * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, QudaInvertParam &param, const bool pc_solve);
+
+  /**
+   * Create the Dirac operator
+   * @param[in/out] d        User prec
+   * @param[in/out] dSloppy  Sloppy prec
+   * @param[in/out] dPre     Preconditioner prec
+   * @param[in] dRef         Refine prec (EigCG and deflation)
+   * @param[in] param        Invert param container
+   * @param[in] pc_solve     Whether or not to perform an even/odd preconditioned solve
+   */
+  void createDirac(Dirac *&d, Dirac *&dSloppy, Dirac *&dPre, Dirac *&dRef, QudaInvertParam &param, const bool pc_solve);
 
 } // namespace quda
 

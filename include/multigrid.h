@@ -226,7 +226,7 @@ namespace quda {
     /** Residual vector */
     ColorSpinorField *r;
 
-    /** Projected source vector for preconditioned syste, else just points to source */
+    /** Projected source vector for preconditioned system, else just points to source */
     ColorSpinorField *b_tilde;
 
     /** Coarse residual vector */
@@ -298,6 +298,11 @@ public:
     virtual ~MG();
 
     /**
+       @return MG can solve non-Hermitian systems
+     */
+    bool hermitian() { return false; };
+
+    /**
        @brief This method resets the solver, e.g., when a parameter has changed such as the mass.
        @param Whether we are refreshing the null-space components or just updating the operators
      */
@@ -334,12 +339,17 @@ public:
     void destroyCoarseSolver();
 
     /**
-       This method verifies the correctness of the MG method.  It checks:
+       @brief Verify the correctness of the MG method, optionally recursively
+       starting from the top down.
+       @details This method verifies the correctness of the MG method.  It checks:
        1. Null-space vectors are exactly preserved: v_k = P R v_k
        2. Any coarse vector is exactly preserved on the fine grid: eta_c = R P eta_c
        3. The emulated coarse Dirac operator matches the native one: D_c = R D P
+       4. The preconditioned operator was correctly formulated: \hat{D}_c - X^{-1} D_c
+       5. The normal operator is indeed normal: im(<x|D^\dag D|x>) < epsilon
+       @param recursively[in] Whether or not to recursively verify coarser levels, default false
      */
-    void verify();
+    void verify(bool recursively = false);
 
     /**
        This applies the V-cycle to the residual vector returning the residual vector
@@ -455,10 +465,13 @@ public:
      operator we are constructing the coarse grid operator from.  If
      matpc==QUDA_MATPC_INVALID then we assume the operator is not
      even-odd preconditioned and we coarsen the full operator.
+     @param need_bidirectional[in] Whether or not we need to force a bi-directional
+     build, even if the given level isn't preconditioned---if any previous level is
+     preconditioned, we've violated that symmetry.
    */
-  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T,
-		      const GaugeField &gauge, const GaugeField &clover, const GaugeField &cloverInv,
-		      double kappa, double mu, double mu_factor, QudaDiracType dirac, QudaMatPCType matpc);
+  void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
 
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field

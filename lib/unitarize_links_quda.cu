@@ -2,14 +2,12 @@
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <gauge_field.h>
 #include <gauge_field_order.h>
-
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <unitarization_links.h>
-
 #include <su3_project.cuh>
 #include <index_helper.cuh>
 #include <instantiate.h>
@@ -290,7 +288,7 @@ namespace {
 	} else {
 	  errorQuda("Unsupported precision\n");
 	}
-	if (isUnitary(link,max_error) == false) {
+	if (link.isUnitary(max_error) == false) {
 	  printf("Unitarity failure\n");
 	  printf("site index = %u,\t direction = %d\n", i, dir);
 	  printLink(link);
@@ -323,7 +321,7 @@ namespace {
     v = tmp;
     unitarizeLinkMILC<double>(result, v, arg);
     if (arg.check_unitarization) {
-      if (isUnitary(result,arg.max_error) == false) atomicAdd(arg.fails, 1);
+      if (result.isUnitary(arg.max_error) == false) atomicAdd(arg.fails, 1);
     }
     tmp = result;
 
@@ -347,7 +345,7 @@ namespace {
     {
       apply(0);
       qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-      checkQudaError();
+      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
@@ -414,7 +412,7 @@ namespace {
     polarSu3<real>(u, arg.tol);
 
     // count number of failures
-    if (isUnitary(u, arg.tol) == false) {
+    if (u.isUnitary(arg.tol) == false) {
       atomicAdd(arg.fails, 1);
     }
 
@@ -437,7 +435,7 @@ namespace {
     {
       apply(0);
       qudaDeviceSynchronize();
-      checkQudaError();
+      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {
@@ -457,14 +455,14 @@ namespace {
   };
 
   void projectSU3(GaugeField &u, double tol, int *fails) {
-#ifdef GPU_UNITARIZE
+#ifdef GPU_GAUGE_TOOLS
     // check the the field doesn't have staggered phases applied
     if (u.StaggeredPhaseApplied())
       errorQuda("Cannot project gauge field with staggered phases applied");
 
-    instantiate<ProjectSU3, ReconstructNone>(u, tol, fails);
+    instantiate<ProjectSU3, ReconstructWilson>(u, tol, fails);
 #else
-    errorQuda("Unitarization has not been built");
+    errorQuda("Gauge tools have not been built");
 #endif
   }
 

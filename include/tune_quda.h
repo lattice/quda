@@ -1,5 +1,4 @@
-#ifndef _TUNE_QUDA_H
-#define _TUNE_QUDA_H
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -8,9 +7,17 @@
 #include <cfloat>
 #include <stdarg.h>
 #include <map>
+#include <algorithm>
+#include <typeinfo>
 
 #include <tune_key.h>
 #include <quda_internal.h>
+
+// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
+#ifdef __CUDACC_RTC__
+#define CUresult bool
+#define CUDA_SUCCESS true
+#endif
 
 namespace quda {
 
@@ -46,6 +53,7 @@ namespace quda {
       return *this;
     }
 
+#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -53,13 +61,16 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
+#endif
   };
 
+#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
+#endif
 
   class Tunable {
 
@@ -169,7 +180,10 @@ namespace quda {
         case 2: return 32;
         case 5: return 16;
         }
-      default: errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor); return 0;
+      default:
+        warningQuda("Unknown SM architecture %d.%d - assuming limit of 32 blocks per SM\n",
+                    deviceProp.major, deviceProp.minor);
+        return 32;
       }
     }
 
@@ -182,10 +196,10 @@ namespace quda {
     template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func) const
     {
 #if CUDA_VERSION >= 9000
-      qudaFuncSetAttribute(
-          (const void *)func, qudaFuncAttributePreferredSharedMemoryCarveout, (int)qudaSharedmemCarveoutMaxShared);
-      qudaFuncSetAttribute(
-          (const void *)func, qudaFuncAttributeMaxDynamicSharedMemorySize, maxDynamicSharedBytesPerBlock());
+      qudaFuncSetAttribute((const void *)func, qudaFuncAttributePreferredSharedMemoryCarveout,
+                           (int)qudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute((const void *)func, qudaFuncAttributeMaxDynamicSharedMemorySize,
+                           maxDynamicSharedBytesPerBlock());
 #endif
     }
 
@@ -210,8 +224,9 @@ namespace quda {
         case 5: return 64 * 1024;
         }
       default:
-	errorQuda("Unknown SM architecture %d.%d\n", deviceProp.major, deviceProp.minor);
-	return 0;
+        warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
+                    deviceProp.major, deviceProp.minor);
+        return 48 * 1024;
       }
     }
 
@@ -265,10 +280,13 @@ namespace quda {
     char aux[TuneKey::aux_n];
 
     int writeAuxString(const char *format, ...) {
+      int n = 0;
+#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
-      int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
+      if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+#endif
       return n;
     }
 
@@ -281,6 +299,7 @@ namespace quda {
     */
     bool tuned()
     {
+#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -288,6 +307,9 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
+#else
+      return true;
+#endif
     }
 
   public:
@@ -299,22 +321,24 @@ namespace quda {
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
+#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
-      {
-	std::stringstream ps;
-	ps << param;
-	return ps.str();
-      }
+    {
+      std::stringstream ps;
+      ps << param;
+      return ps.str();
+    }
 
     virtual std::string perfString(float time) const
-      {
-	float gflops = flops() / (1e9 * time);
-	float gbytes = bytes() / (1e9 * time);
-	std::stringstream ss;
-	ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
-	ss << gbytes << " GB/s";
-	return ss.str();
-      }
+    {
+      float gflops = flops() / (1e9 * time);
+      float gbytes = bytes() / (1e9 * time);
+      std::stringstream ss;
+      ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
+      ss << gbytes << " GB/s";
+      return ss.str();
+    }
+#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {
@@ -344,7 +368,7 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
+      if (tuneGridDim()) param.grid.x = maxGridSize(); // don't set y and z in case derived initTuneParam has
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
@@ -388,7 +412,7 @@ namespace quda {
     }
 
     QUresult jitifyError() const { return jitify_error; }
-    QUresult& jitifyError() { return jitify_error; }
+    QUresult &jitifyError() { return jitify_error; }
   };
 
   
@@ -597,6 +621,10 @@ namespace quda {
 
 } // namespace quda
 
-#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
+// undo jit-safe modifications
+#ifdef __CUDACC_RTC__
+#undef QUresult
+#undef QUDA_SUCCESS
+#endif
 
-#endif // _TUNE_QUDA_H
+#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

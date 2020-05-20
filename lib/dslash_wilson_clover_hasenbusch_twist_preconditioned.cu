@@ -131,7 +131,7 @@ namespace quda
         in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkQudaError();
+      checkCudaError();
     }
   };
 
@@ -286,9 +286,9 @@ namespace quda
         in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkQudaError();
+      checkCudaError();
 
-      checkQudaError();
+      checkCudaError();
     }
   };
 
@@ -300,16 +300,6 @@ namespace quda
                                                  int parity, bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_CLOVER_HASENBUSCH_TWIST
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U, A);
-
-    // check all locations match
-    checkLocation(out, in, U, A);
-
     instantiate<WilsonCloverHasenbuschTwistPCClovInvApply>(out, in, U, A, a, b, x, parity, dagger, comm_override,
                                                            profile);
 #else

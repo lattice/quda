@@ -36,16 +36,22 @@ namespace quda
 
     CovDevArg(ColorSpinorField &out, const ColorSpinorField &in, const GaugeField &U, int mu, int parity, bool dagger,
               const int *comm_override) :
-
       DslashArg<Float, nDim>(in, U, parity, dagger, false, 1, spin_project, comm_override),
       out(out),
       in(in),
       U(U),
       mu(mu)
     {
+      if (in.V() == out.V()) errorQuda("Aliasing pointers");
+      checkOrder(out, in);        // check all orders match
+      checkPrecision(out, in, U); // check all precisions match
+      checkLocation(out, in, U);  // check all locations match
       if (!out.isNative() || !in.isNative() || !U.isNative())
         errorQuda("Unsupported field order colorspinor(in)=%d gauge=%d combination\n", in.FieldOrder(), U.FieldOrder());
+      pushKernelPackT(true); // non-spin projection requires kernel packing
     }
+
+    virtual ~CovDevArg() { popKernelPackT(); }
   };
 
   /**
@@ -54,15 +60,15 @@ namespace quda
      @param[out] out The out result field
      @param[in,out] arg Parameter struct
      @param[in] U The gauge field
-     @param[in] coord Site coordinate
+     @param[in] coord Site coordinate struct
      @param[in] x_cb The checker-boarded site index. This is a 4-d index only
      @param[in] parity The site parity
      @param[in] idx Thread index (equal to face index for exterior kernels)
      @param[in] thread_dim Which dimension this thread corresponds to (fused exterior only)
 
   */
-  template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Arg, typename Vector>
-  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, int coord[Arg::nDim], int x_cb, int parity,
+  template <int nParity, bool dagger, KernelType kernel_type, int mu, typename Coord, typename Arg, typename Vector>
+  __device__ __host__ inline void applyCovDev(Vector &out, Arg &arg, Coord &coord, int parity,
                                               int idx, int thread_dim, bool &active)
   {
     typedef typename mapper<typename Arg::Float>::type real;
@@ -73,10 +79,10 @@ namespace quda
 
     if (mu < 4) { // Forward gather - compute fwd offset for vector fetch
 
-      const int fwd_idx = getNeighborIndexCB<Arg::nDim>(coord, d, +1, arg.dc);
+      const int fwd_idx = getNeighborIndexCB(coord, d, +1, arg.dc);
       const bool ghost = (coord[d] + 1 >= arg.dim[d]) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
 
-      const Link U = arg.U(d, x_cb, parity);
+      const Link U = arg.U(d, coord.x_cb, parity);
 
       if (doHalo<kernel_type>(d) && ghost) {
 
@@ -84,7 +90,6 @@ namespace quda
         const Vector in = arg.in.Ghost(d, 1, ghost_idx, their_spinor_parity);
 
         out += U * in;
-
       } else if (doBulk<kernel_type>() && !ghost) {
 
         const Vector in = arg.in(fwd_idx, their_spinor_parity);
@@ -93,7 +98,7 @@ namespace quda
 
     } else { // Backward gather - compute back offset for spinor and gauge fetch
 
-      const int back_idx = getNeighborIndexCB<Arg::nDim>(coord, d, -1, arg.dc);
+      const int back_idx = getNeighborIndexCB(coord, d, -1, arg.dc);
       const int gauge_idx = back_idx;
 
       const bool ghost = (coord[d] - 1 < 0) && isActive<kernel_type>(active, thread_dim, d, coord, arg);
@@ -133,45 +138,44 @@ namespace quda
       // which dimension is thread working on (fused kernel only)
       int thread_dim;
 
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type, Arg>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type, Arg>(arg, idx, s, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
       Vector out;
 
       switch (arg.mu) { // ensure that mu is known to compiler for indexing in applyCovDev (avoid register spillage)
       case 0:
-        applyCovDev<nParity, dagger, kernel_type, 0>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 0>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 1:
-        applyCovDev<nParity, dagger, kernel_type, 1>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 1>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 2:
-        applyCovDev<nParity, dagger, kernel_type, 2>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 2>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 3:
-        applyCovDev<nParity, dagger, kernel_type, 3>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 3>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 4:
-        applyCovDev<nParity, dagger, kernel_type, 4>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 4>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 5:
-        applyCovDev<nParity, dagger, kernel_type, 5>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 5>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 6:
-        applyCovDev<nParity, dagger, kernel_type, 6>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 6>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       case 7:
-        applyCovDev<nParity, dagger, kernel_type, 7>(out, arg, coord, x_cb, parity, idx, thread_dim, active);
+        applyCovDev<nParity, dagger, kernel_type, 7>(out, arg, coord, parity, idx, thread_dim, active);
         break;
       }
 
-      if (kernel_type != INTERIOR_KERNEL) {
-        Vector x = arg.out(x_cb, my_spinor_parity);
+      if (kernel_type != INTERIOR_KERNEL && active) {
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out += x;
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

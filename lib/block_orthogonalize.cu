@@ -1,28 +1,15 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
 #include <uint_to_char.h>
-#include <typeinfo>
 #include <vector>
 #include <assert.h>
-
-// ensure compatibilty with C++11
-#if __cplusplus >= 201402L
 #include <utility>
-#else
-#include <integer_sequence.hpp> // C++11 version of this C++14 feature
-#endif
 
 #include <launch_kernel.cuh>
-
 #include <jitify_helper.cuh>
-
-#ifdef GPU_MULTIGRID
 #include <kernels/block_orthogonalize.cuh>
-#endif
 
 namespace quda {
-
-#ifdef GPU_MULTIGRID
 
   using namespace quda::colorspinor;
 
@@ -61,7 +48,7 @@ namespace quda {
 
         if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-        create_jitify_program("kernels/block_orthogonalize.cuh");
+          create_jitify_program("kernels/block_orthogonalize.cuh");
 #endif
         }
       strcat(aux, compile_type_str(V));
@@ -87,8 +74,6 @@ namespace quda {
       int chiralBlocks = (nSpin==1) ? 2 : V.Nspin() / spinBlockSize; //always 2 for staggered.
       nBlock = (V.Volume()/geoBlockSize) * chiralBlocks;
       }
-
-    virtual ~BlockOrtho() { }
 
     /**
        @brief Helper function for expanding the std::vector into a
@@ -224,120 +209,102 @@ namespace quda {
     BlockOrtho<double, vFloat, bFloat, nSpin, spinBlockSize, nColor, coarseSpin, nVec> ortho(
       V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
     ortho.apply(0);
-    checkQudaError();
+    checkCudaError();
   }
 
-  template <typename vFloat, typename bFloat, int nSpin, int spinBlockSize>
+  template <typename vFloat, typename bFloat>
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
-                          const int *coarse_to_fine, const int *geo_bs, const int n_block_ortho)
+                          const int *coarse_to_fine, const int *geo_bs, int spin_bs, int n_block_ortho)
   {
-
     const int Nvec = B.size();
     if (V.Ncolor()/Nvec == 3) {
-
+      if (V.Nspin() != 4) errorQuda("Unexpected nSpin = %d", V.Nspin());
+#ifdef NSPIN4
+      constexpr int nSpin = 4;
+      if (spin_bs != 2) errorQuda("Unexpected spin block size = %d", spin_bs);
+      constexpr int spinBlockSize = 2;
       constexpr int nColor = 3;
+
       if (Nvec == 6) { // for Wilson free field
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
                                                                             geo_bs, n_block_ortho);
       } else if (Nvec == 24) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 24>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
-#ifdef NSPIN4
       } else if (Nvec == 32) {
         BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 32>(V, B, fine_to_coarse, coarse_to_fine,
                                                                              geo_bs, n_block_ortho);
-      } else if (Nvec == 48) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 48>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                             geo_bs, n_block_ortho);
-#endif // NSPIN4
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
-#ifdef NSPIN4
-    } else if (V.Ncolor()/Nvec == 6) {
-
-      constexpr int nColor = 6;
-      if (Nvec == 6) {
-        BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
-                                                                            geo_bs, n_block_ortho);
       } else {
         errorQuda("Unsupported nVec %d\n", Nvec);
       }
 #endif // NSPIN4
-    } else if (V.Ncolor()/Nvec == 24) {
 
-      constexpr int nColor = 24;
-      if (Nvec == 24) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,24>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+    } else { // Nc != 3
+      if (V.Nspin() != 2) errorQuda("Unexpected nSpin = %d", V.Nspin());
+      constexpr int nSpin = 2;
+      if (spin_bs != 1) errorQuda("Unexpected spin block size = %d", spin_bs);
+      constexpr int spinBlockSize = 1;
+
 #ifdef NSPIN4
-      } else if (Nvec == 32) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+      if (V.Ncolor()/Nvec == 6) {
+        constexpr int nColor = 6;
+        if (Nvec == 6) {
+          BlockOrthogonalize<vFloat, bFloat, nSpin, spinBlockSize, nColor, 6>(V, B, fine_to_coarse, coarse_to_fine,
+                                                                              geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+      } else
 #endif // NSPIN4
-#ifdef NSPIN1
-      } else if (Nvec == 64) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-      } else if (Nvec == 96) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-#endif // NSPIN1
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
+      if (V.Ncolor()/Nvec == 24) {
+        constexpr int nColor = 24;
+        if (Nvec == 24) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,24>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #ifdef NSPIN4
-    } else if (V.Ncolor()/Nvec == 32) {
-
-      constexpr int nColor = 32;
-      if (Nvec == 32) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
+        } else if (Nvec == 32) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif // NSPIN4
 #ifdef NSPIN1
-    } else if (V.Ncolor()/Nvec == 64) {
-
-      constexpr int nColor = 64;
-      if (Nvec == 64) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-      } else if (Nvec == 96) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
-    } else if (V.Ncolor()/Nvec == 96) {
-
-      constexpr int nColor = 96;
-      if (Nvec == 96) {
-        BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-      } else {
-        errorQuda("Unsupported nVec %d\n", Nvec);
-      }
+        } else if (Nvec == 64) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else if (Nvec == 96) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
 #endif // NSPIN1
-    } else {
-      errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
-    }
-  }
-
-  template <typename vFloat, typename bFloat>
-  void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
-                          const int *coarse_to_fine, const int *geo_bs, const int spin_bs, const int n_block_ortho)
-  {
-    if(V.Nspin() ==2 && spin_bs == 1) { //coarsening coarse fermions w/ chirality.
-      BlockOrthogonalize<vFloat, bFloat, 2, 1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
 #ifdef NSPIN4
-    } else if (V.Nspin() == 4 && spin_bs == 2) { // coarsening Wilson-like fermions.
-      BlockOrthogonalize<vFloat, bFloat, 4, 2>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-#endif
-#if 0 // not needed until we add Laplace MG. Not necessary for staggered MG Lanczos.
-//#ifdef NSPIN1
-    } else if (V.Nspin() == 1 && spin_bs == 1) { // coarsening Laplace-like operators.
-      BlockOrthogonalize<vFloat, bFloat, 1, 1>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
-#endif
-    } else {
-      errorQuda("Unsupported nSpin %d and spinBlockSize %d combination.\n", V.Nspin(), spin_bs);
-    }
+      } else if (V.Ncolor()/Nvec == 32) {
+        constexpr int nColor = 32;
+        if (Nvec == 32) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,32>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+#endif // NSPIN4
+#ifdef NSPIN1
+      } else if (V.Ncolor()/Nvec == 64) {
+        constexpr int nColor = 64;
+        if (Nvec == 64) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,64>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else if (Nvec == 96) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+      } else if (V.Ncolor()/Nvec == 96) {
+        constexpr int nColor = 96;
+        if (Nvec == 96) {
+          BlockOrthogonalize<vFloat,bFloat,nSpin,spinBlockSize,nColor,96>(V, B, fine_to_coarse, coarse_to_fine, geo_bs, n_block_ortho);
+        } else {
+          errorQuda("Unsupported nVec %d\n", Nvec);
+        }
+#endif // NSPIN1
+      } else {
+        errorQuda("Unsupported nColor %d\n", V.Ncolor()/Nvec);
+      }
+    } // Nc != 3
   }
-
-#endif // GPU_MULTIGRID
 
   void BlockOrthogonalize(ColorSpinorField &V, const std::vector<ColorSpinorField *> &B, const int *fine_to_coarse,
                           const int *coarse_to_fine, const int *geo_bs, const int spin_bs, const int n_block_ortho)

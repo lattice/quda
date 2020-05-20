@@ -65,7 +65,7 @@ namespace quda
         in.getDslashConstant().volume_4d_cb, in.getDslashConstant().ghostFaceCB, profile);
       policy.apply(0);
 
-      checkQudaError();
+      checkCudaError();
     }
   };
 
@@ -74,16 +74,6 @@ namespace quda
                             TimeProfile &profile)
   {
 #ifdef GPU_NDEG_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, x, U);
-
-    // check all locations match
-    checkLocation(out, in, x, U);
-
     instantiate<NdegTwistedMassApply>(out, in, U, a, b, c, x, parity, dagger, comm_override, profile);
 #else
     errorQuda("Non-degenerate twisted-mass dslash has not been built");

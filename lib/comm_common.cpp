@@ -5,8 +5,6 @@
 #include <comm_quda.h>
 #include <csignal>
 
-#include <quda_backend_api.h>
-
 #ifdef QUDA_BACKWARDSCPP
 #include "backward.hpp"
 namespace backward {
@@ -244,15 +242,15 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 	  int canAccessPeer[2];
-	  qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-	  qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+          qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+          qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-	  int accessRank[2] = { };
+          int accessRank[2] = {};
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-	  }
+            qudaDeviceGetP2PAttribute(&accessRank[0], qudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+            qudaDeviceGetP2PAttribute(&accessRank[1], qudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+          }
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self
@@ -283,7 +281,7 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
   peer2peer_present = comm_peer2peer_enabled_global();
 
-  checkQudaErrorNoSync();
+  checkCudaErrorNoSync();
   return;
 }
 
@@ -411,8 +409,8 @@ void comm_set_neighbor_ranks(Topology *topo){
   }
      
   for(int d=0; d<4; ++d){
-    int pos_displacement[4] = {0,0,0,0};
-    int neg_displacement[4] = {0,0,0,0};
+    int pos_displacement[QUDA_MAX_DIM] = { };
+    int neg_displacement[QUDA_MAX_DIM] = { };
     pos_displacement[d] = +1;
     neg_displacement[d] = -1;
     neighbor_rank[0][d] = comm_rank_displaced(topology, neg_displacement);
@@ -472,7 +470,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
 				       void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
-  checkQudaError(); // check and clear error state first
+  checkCudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
@@ -487,11 +485,7 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    qudaError_t err = qudaMemcpy(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
-    if (err != qudaSuccess) {
-      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
-      errorQuda("aborting with error %s", cudaGetErrorString(err));
-    }
+    qudaMemcpyNoTune(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -509,7 +503,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
 					  void *buffer, int dim, int dir, size_t nbytes)
 {
 #ifdef HOST_DEBUG
-  checkQudaError(); // check and clear error state first
+  checkCudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
@@ -521,7 +515,7 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaMemset(buffer, 0, nbytes);
+    qudaMemsetNoTune(buffer, 0, nbytes);
   }
 #endif
 
@@ -538,7 +532,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
 					       void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
-  checkQudaError(); // check and clear error state first
+  checkCudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by doing a memcpy from it
@@ -555,7 +549,7 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    //!!! NOT DEFINED qudaError_t err = qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
+    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
     device_free(tmp);
   }
 #endif
@@ -574,7 +568,7 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
 						  void *buffer, int dim, int dir, size_t blksize, int nblocks, size_t stride)
 {
 #ifdef HOST_DEBUG
-  checkQudaError(); // check and clear error state first
+  checkCudaError(); // check and clear error state first
 
   if (isHost(buffer)) {
     // test this memory allocation is ok by filling it
@@ -617,20 +611,20 @@ void comm_dim_partitioned_set(int dim)
   manual_set_partition[dim] = 1;
 #endif
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
-           comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 void comm_dim_partitioned_reset(){
   for (int i = 0; i < QUDA_MAX_DIM; i++) manual_set_partition[i] = 0;
 
-  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0), comm_dim_partitioned(1),
-           comm_dim_partitioned(2), comm_dim_partitioned(3));
+  snprintf(partition_string, 16, ",comm=%d%d%d%d", comm_dim_partitioned(0),
+           comm_dim_partitioned(1), comm_dim_partitioned(2), comm_dim_partitioned(3));
 }
 
 int comm_dim_partitioned(int dim)
 {
-  return (manual_set_partition[dim] || (comm_dim(dim) > 1));
+  return (manual_set_partition[dim] || (default_topo && comm_dim(dim) > 1));
 }
 
 int comm_partitioned()

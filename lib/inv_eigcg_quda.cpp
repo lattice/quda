@@ -189,13 +189,13 @@ namespace quda {
      Complex *evecm = static_cast<Complex*>( args.ritzVecs.data());
      double  *evalm = static_cast<double *>( args.Tmvals.data());
 
-     cudaHostRegister(static_cast<void *>(evecm), m*m*sizeof(Complex),  qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(evecm), m * m * sizeof(Complex), qudaHostRegisterDefault);
      magma_Xheev(evecm, m, m, evalm, sizeof(Complex));
      //Solve m-1 dim eigenproblem:
      DenseMatrix ritzVecsm1(args.Tm);
      Complex *evecm1 = static_cast<Complex*>( ritzVecsm1.data());
 
-     cudaHostRegister(static_cast<void *>(evecm1), m*m*sizeof(Complex),  qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(evecm1), m * m * sizeof(Complex), qudaHostRegisterDefault);
      magma_Xheev(evecm1, (m-1), m, evalm, sizeof(Complex));
      // fill 0s in mth element of old evecs:
      for(int l = 1; l <= m ; l++) evecm1[l*m-1] = 0.0 ;
@@ -267,8 +267,8 @@ namespace quda {
   }
 
 
-  IncEigCG::IncEigCG(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), matPrecon(matPrecon), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
+  IncEigCG::IncEigCG(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matPrecon, param, profile), K(nullptr), Kparam(param), Vm(nullptr), r_pre(nullptr), p_pre(nullptr), eigcg_args(nullptr), profile(profile), init(false)
   {
 
     if (2 * param.nev >= param.m)

@@ -37,7 +37,8 @@ extern "C" {
   typedef enum QudaGaugeFieldOrder_s {
     QUDA_FLOAT_GAUGE_ORDER = 1,
     QUDA_FLOAT2_GAUGE_ORDER = 2,  // no reconstruct and double precision
-    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 and 12 reconstruct half and single
+    QUDA_FLOAT4_GAUGE_ORDER = 4,  // 8 reconstruct single, and 12 reconstruct single, half, quarter
+    QUDA_FLOAT8_GAUGE_ORDER = 8,  // 8 reconstruct half and quarter
     QUDA_NATIVE_GAUGE_ORDER,      // used to denote one of the above types in a trait, not used directly
     QUDA_QDP_GAUGE_ORDER,         // expect *gauge[mu], even-odd, spacetime, row-column color
     QUDA_QDPJIT_GAUGE_ORDER,      // expect *gauge[mu], even-odd, complex-column-row-spacetime
@@ -131,9 +132,10 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
-    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
-    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
+    QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS,     // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver (not implemented)
     QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
 
@@ -348,13 +350,14 @@ extern "C" {
 
   // Degree of freedom ordering
   typedef enum QudaFieldOrder_s {
-    QUDA_FLOAT_FIELD_ORDER = 1, // spin-color-complex-space
-    QUDA_FLOAT2_FIELD_ORDER = 2, // (spin-color-complex)/2-space-(spin-color-complex)%2
-    QUDA_FLOAT4_FIELD_ORDER = 4, // (spin-color-complex)/4-space-(spin-color-complex)%4
-    QUDA_SPACE_SPIN_COLOR_FIELD_ORDER, // CPS/QDP++ ordering
-    QUDA_SPACE_COLOR_SPIN_FIELD_ORDER, // QLA ordering (spin inside color)
-    QUDA_QDPJIT_FIELD_ORDER, // QDP field ordering (complex-color-spin-spacetime)
-    QUDA_QOP_DOMAIN_WALL_FIELD_ORDER, // QOP domain-wall ordering
+    QUDA_FLOAT_FIELD_ORDER = 1,               // spin-color-complex-space
+    QUDA_FLOAT2_FIELD_ORDER = 2,              // (spin-color-complex)/2-space-(spin-color-complex)%2
+    QUDA_FLOAT4_FIELD_ORDER = 4,              // (spin-color-complex)/4-space-(spin-color-complex)%4
+    QUDA_FLOAT8_FIELD_ORDER = 8,              // (spin-color-complex)/8-space-(spin-color-complex)%8
+    QUDA_SPACE_SPIN_COLOR_FIELD_ORDER,        // CPS/QDP++ ordering
+    QUDA_SPACE_COLOR_SPIN_FIELD_ORDER,        // QLA ordering (spin inside color)
+    QUDA_QDPJIT_FIELD_ORDER,                  // QDP field ordering (complex-color-spin-spacetime)
+    QUDA_QOP_DOMAIN_WALL_FIELD_ORDER,         // QOP domain-wall ordering
     QUDA_PADDED_SPACE_SPIN_COLOR_FIELD_ORDER, // TIFR RHMC ordering
     QUDA_INVALID_FIELD_ORDER = QUDA_INVALID_ENUM
   } QudaFieldOrder;
@@ -453,10 +456,14 @@ extern "C" {
   } QudaSetupType;
 
   typedef enum QudaBoolean_s {
-    QUDA_BOOLEAN_NO = 0,
-    QUDA_BOOLEAN_YES = 1,
+    QUDA_BOOLEAN_FALSE = 0,
+    QUDA_BOOLEAN_TRUE = 1,
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
+
+  // define these for backwards compatibility
+#define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
+#define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
 
   typedef enum QudaDirection_s {
     QUDA_BACKWARDS = -1,
@@ -518,6 +525,12 @@ extern "C" {
     QUDA_CONTRACT_GAMMA_S34 = 15,
     QUDA_CONTRACT_GAMMA_INVALID = QUDA_INVALID_ENUM
   } QudaContractGamma;
+
+  typedef enum QudaWFlowType_s {
+    QUDA_WFLOW_TYPE_WILSON,
+    QUDA_WFLOW_TYPE_SYMANZIK,
+    QUDA_WFLOW_TYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaWFlowType;
 
   // Allows to choose an appropriate external library
   typedef enum QudaExtLibType_s {

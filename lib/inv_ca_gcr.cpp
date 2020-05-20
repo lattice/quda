@@ -4,12 +4,9 @@
 
 namespace quda {
 
-  CAGCR::CAGCR(DiracMatrix &mat, DiracMatrix &matSloppy, DiracMatrix &matPrecon, SolverParam &param,
+  CAGCR::CAGCR(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, SolverParam &param,
                TimeProfile &profile) :
-    Solver(param, profile),
-    mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
+    Solver(mat, matSloppy, matPrecon, param, profile),
     matMdagM(matPrecon.Expose()),
     init(false),
     use_source(param.preserve_source == QUDA_PRESERVE_SOURCE_NO && param.precision == param.precision_sloppy

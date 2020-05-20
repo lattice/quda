@@ -5,11 +5,11 @@
 #include <color_spinor_field.h>
 #include <blas_quda.h>
 
-#include <test_util.h>
-#include <test_params.h>
+#include <host_utils.h>
+#include <command_line_params.h>
 
 // include because of nasty globals used in the tests
-#include <dslash_util.h>
+#include <dslash_reference.h>
 
 // google test
 #include <gtest/gtest.h>
@@ -29,7 +29,9 @@ int Ncolor;
 void setPrec(ColorSpinorParam &param, QudaPrecision precision, int order = 0)
 {
   param.setPrecision(precision);
-  if (order == 1) {
+  if (order == 2) {
+    param.fieldOrder = QUDA_FLOAT8_FIELD_ORDER;
+  } else if (order == 1) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
   } else if (Nspin == 1 || Nspin == 2 || precision == QUDA_DOUBLE_PRECISION) {
     param.fieldOrder = QUDA_FLOAT2_FIELD_ORDER;
@@ -55,7 +57,7 @@ void display_test_info()
 int Nprec = 4;
 
 const char *prec_str[] = {"quarter", "half", "single", "double"};
-const char *order_str[] = {"default", "float2"};
+const char *order_str[] = {"default", "float2", "float8"};
 
 // For googletest names must be non-empty, unique, and may only contain ASCII
 // alphanumeric characters or underscore
@@ -111,7 +113,7 @@ bool is_site_unroll(int kernel) { return std::string(names[kernel]).find("HeavyQ
 
 bool skip_kernel(int precision, int kernel, int order)
 {
-#ifdef DEVELOP_ONEAPI	
+#ifndef DPCPP_DEVELOP	
 #else	
   if (prec == QUDA_HALF_PRECISION || prec == QUDA_QUARTER_PRECISION) return true;
 #endif
@@ -250,7 +252,7 @@ void initFields(int prec, int order)
   case 2:
     setPrec(param, QUDA_SINGLE_PRECISION, order);
     high_aux_prec = QUDA_DOUBLE_PRECISION;
-#ifdef DEVELOP_ONEAPI
+#ifndef DPCPP_DEVELOP
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
 #else
@@ -261,7 +263,7 @@ void initFields(int prec, int order)
   case 3:
     setPrec(param, QUDA_DOUBLE_PRECISION, order);
     high_aux_prec = QUDA_SINGLE_PRECISION;
-#ifdef DEVELOP_ONEAPI   
+#ifndef DPCPP_DEVELOP   
     mid_aux_prec = QUDA_HALF_PRECISION;
     low_aux_prec = QUDA_QUARTER_PRECISION;
 #else
@@ -278,7 +280,7 @@ void initFields(int prec, int order)
   if ( (mid_aux_prec != QUDA_DOUBLE_PRECISION) && !(mid_aux_prec & QUDA_PRECISION) ) mid_aux_prec = getPrecision(prec);
   if ( (low_aux_prec != QUDA_DOUBLE_PRECISION) && !(low_aux_prec & QUDA_PRECISION) ) low_aux_prec = getPrecision(prec);
 
-  checkQudaError();
+  //checkQudaError();
 
   vD = new cudaColorSpinorField(param);
   wD = new cudaColorSpinorField(param);
@@ -313,7 +315,7 @@ void initFields(int prec, int order)
   lD = new cudaColorSpinorField(param);
 
   // check for successful allocation
-  checkQudaError();
+  //checkQudaError();
 
   // only do copy if not doing half precision with mg
   bool flag = !(param.nSpin == 2 &&
@@ -532,15 +534,15 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 34:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i=0; i < niter; ++i) blas::caxpy(A, *xmD,* ymD);
-#endif //DEVELOP_ONEAPI     
+#endif //DPCPP_DEVELOP     
       break;
 
     case 35:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i=0; i < niter; ++i) blas::axpyBzpcx((double*)A, xmD->Components(), zmD->Components(), (double*)B, *yD, (double*)C);
-#endif //DEVELOP_ONEAPI      
+#endif //DPCPP_DEVELOP      
       break;
 
     case 36:
@@ -552,33 +554,33 @@ double benchmark(int kernel, const int niter) {
       break;
 
     case 38:      
-#ifdef DEVELOP_ONEAPI     
+#ifndef DPCPP_DEVELOP     
       for (int i=0; i < niter; ++i) blas::cDotProduct(A2, xmD->Components(), xmD->Components());
- #endif //DEVELOP_ONEAPI     
+ #endif //DPCPP_DEVELOP     
       break;
 
     case 39:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i=0; i < niter; ++i) blas::cDotProduct(A, xmD->Components(), ymD->Components());
- #endif //DEVELOP_ONEAPI    
+ #endif //DPCPP_DEVELOP    
       break;
 
     case 40:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
- #endif //DEVELOP_ONEAPI    
+ #endif //DPCPP_DEVELOP    
       break;
 
     case 41:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i=0; i < niter; ++i) blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
- #endif //DEVELOP_ONEAPI    
+ #endif //DPCPP_DEVELOP    
       break;
 
     case 42:
-#ifdef DEVELOP_ONEAPI      
+#ifndef DPCPP_DEVELOP      
       for (int i = 0; i < niter; ++i) blas::axpy(Ar, xmD->Components(), ymD->Components());
- #endif //DEVELOP_ONEAPI    
+ #endif //DPCPP_DEVELOP    
       break;
 
     default:
@@ -918,7 +920,7 @@ double test(int kernel) {
     break;
 
   case 34:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
@@ -933,11 +935,11 @@ double test(int kernel) {
       error+= fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error/= Msrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 35:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) {
       xmD->Component(i) = *(xmH[i]);
       zmD->Component(i) = *(zmH[i]);
@@ -956,7 +958,7 @@ double test(int kernel) {
       //error+= fabs(blas::norm2((zmD->Component(i))) - blas::norm2(*(zmH[i]))) / blas::norm2(*(zmH[i]));
     }
     error/= Nsrc;   
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 36:
@@ -978,7 +980,7 @@ double test(int kernel) {
     break;
 
   case 38:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     blas::cDotProduct(A2, xmD->Components(), xmD->Components());
     error = 0.0;
@@ -989,11 +991,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Nsrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 39:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
     blas::cDotProduct(A, xmD->Components(), ymD->Components());
@@ -1005,11 +1007,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Msrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 40:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     blas::reDotProduct((double*)A2, xmD->Components(), xmD->Components());
     error = 0.0;
@@ -1020,11 +1022,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Nsrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 41:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i=0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i=0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
     blas::reDotProduct((double*)A, xmD->Components(), ymD->Components());
@@ -1036,11 +1038,11 @@ double test(int kernel) {
       }
     }
     error /= Nsrc*Msrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   case 42:
-#ifdef DEVELOP_ONEAPI    
+#ifndef DPCPP_DEVELOP    
     for (int i = 0; i < Nsrc; i++) xmD->Component(i) = *(xmH[i]);
     for (int i = 0; i < Msrc; i++) ymD->Component(i) = *(ymH[i]);
 
@@ -1054,7 +1056,7 @@ double test(int kernel) {
       error += fabs(blas::norm2((ymD->Component(i))) - blas::norm2(*(ymH[i]))) / blas::norm2(*(ymH[i]));
     }
     error /= Msrc;
-#endif //DEVELOP_ONEAPI    
+#endif //DPCPP_DEVELOP    
     break;
 
   default:

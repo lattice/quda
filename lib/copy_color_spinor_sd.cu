@@ -1,4 +1,4 @@
-#include "copy_color_spinor.cuh"
+#include <copy_color_spinor.cuh>
 
 namespace quda {
   

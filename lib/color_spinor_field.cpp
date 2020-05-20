@@ -192,9 +192,10 @@ namespace quda {
     this->suggested_parity = suggested_parity;
 
     precision = Prec;
+    // Copy all data in X
+    for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = X[d];
     volume = 1;
     for (int d=0; d<nDim; d++) {
-      x[d] = X[d];
       volume *= x[d];
     }
     volumeCB = siteSubset == QUDA_PARITY_SITE_SUBSET ? volume : volume/2;
@@ -488,13 +489,13 @@ namespace quda {
 	  recv_fwd[i] = static_cast<char*>(total_recv) + offset;
 	  offset += bytes[i];
 	  if (fine_grained_memcpy) {
-	    qudaMemcpy(send_back[i], sendbuf[2*i + 0], bytes[i], qudaMemcpyDeviceToHost);
-	    qudaMemcpy(send_fwd[i],  sendbuf[2*i + 1], bytes[i], qudaMemcpyDeviceToHost);
-	  }
-	} else if (no_comms_fill) {
-	  qudaMemcpy(ghost[2*i+1], sendbuf[2*i+0], bytes[i], qudaMemcpyDeviceToDevice);
-	  qudaMemcpy(ghost[2*i+0], sendbuf[2*i+1], bytes[i], qudaMemcpyDeviceToDevice);
-	}
+            qudaMemcpy(send_back[i], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToHost);
+            qudaMemcpy(send_fwd[i], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToHost);
+          }
+        } else if (no_comms_fill) {
+          qudaMemcpy(ghost[2 * i + 1], sendbuf[2 * i + 0], bytes[i], qudaMemcpyDeviceToDevice);
+          qudaMemcpy(ghost[2 * i + 0], sendbuf[2 * i + 1], bytes[i], qudaMemcpyDeviceToDevice);
+        }
       }
       if (!fine_grained_memcpy && total_bytes) {
 	// find first non-zero pointer
@@ -505,7 +506,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
+        qudaMemcpy(total_send, send_ptr, total_bytes, qudaMemcpyDeviceToHost);
       }
     }
 
@@ -538,9 +539,9 @@ namespace quda {
       for (int i=0; i<nDimComms; i++) {
 	if (!comm_dim_partitioned(i)) continue;
 	if (fine_grained_memcpy) {
-	  qudaMemcpy(ghost[2*i+0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
-	  qudaMemcpy(ghost[2*i+1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
-	}
+          qudaMemcpy(ghost[2 * i + 0], recv_back[i], bytes[i], qudaMemcpyHostToDevice);
+          qudaMemcpy(ghost[2 * i + 1], recv_fwd[i], bytes[i], qudaMemcpyHostToDevice);
+        }
       }
 
       if (!fine_grained_memcpy && total_bytes) {
@@ -552,7 +553,7 @@ namespace quda {
 	    break;
 	  }
 	}
-	qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
+        qudaMemcpy(ghost_ptr, total_recv, total_bytes, qudaMemcpyHostToDevice);
       }
 
       if (total_bytes) {

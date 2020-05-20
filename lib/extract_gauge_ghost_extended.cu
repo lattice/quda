@@ -1,6 +1,7 @@
 #include <quda_internal.h>
 #include <tune_quda.h>
 #include <gauge_field_order.h>
+#include <quda_matrix.h>
 
 namespace quda {
 
@@ -54,26 +55,26 @@ namespace quda {
   template <typename Float, int length, int dim, typename Arg>
   __device__ __host__ void extractor(Arg &arg, int dir, int a, int b, 
 				     int c, int d, int g, int parity) {
-    typename mapper<Float>::type u[length];
     int srcIdx = (a*arg.fBody[dim][0] + b*arg.fBody[dim][1] + 
 		  c*arg.fBody[dim][2] + d*arg.fBody[dim][3]) >> 1;
     
     int dstIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
 		  c*arg.fBuf[dim][2] + (d-(dir?arg.X[dim]:arg.R[dim]))*arg.fBuf[dim][3]) >> 1;
     
+    Matrix<complex<typename mapper<Float>::type>, Ncolor(length)> u;
+
     // load the ghost element from the bulk
-    arg.order.load(u, srcIdx, g, parity); 
+    u = arg.order(g, srcIdx, parity); 
 
     // need dir dependence in write
     // srcIdx is used here to determine boundary condition
-    arg.order.saveGhostEx(u, dstIdx, srcIdx, dir, dim, g, (parity+arg.localParity[dim])&1, arg.R);
+    arg.order.saveGhostEx(u.data, dstIdx, srcIdx, dir, dim, g, (parity+arg.localParity[dim])&1, arg.R);
   }
 
 
   template <typename Float, int length, int dim, typename Arg>
   __device__ __host__ void injector(Arg &arg, int dir, int a, int b, 
 				    int c, int d, int g, int parity) {
-    typename mapper<Float>::type u[length];
     int srcIdx = (a*arg.fBuf[dim][0] + b*arg.fBuf[dim][1] + 
 		  c*arg.fBuf[dim][2] + (d-dir*(arg.X[dim]+arg.R[dim]))*arg.fBuf[dim][3]) >> 1;
     
@@ -82,11 +83,13 @@ namespace quda {
 
     int oddness = (parity+arg.localParity[dim])&1;
     
+    Matrix<complex<typename mapper<Float>::type>, Ncolor(length)> u;
+
     // need dir dependence in read
     // dstIdx is used here to determine boundary condition
-    arg.order.loadGhostEx(u, srcIdx, dstIdx, dir, dim, g, oddness, arg.R);
+    arg.order.loadGhostEx(u.data, srcIdx, dstIdx, dir, dim, g, oddness, arg.R);
     
-    arg.order.save(u, dstIdx, g, parity); // save the ghost element into the bulk
+    arg.order(g, dstIdx, parity) = u; // save the ghost element into the bulk
   }
   
   /**
@@ -94,9 +97,8 @@ namespace quda {
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  void extractGhostEx(ExtractGhostExArg<Order,nDim,dim> arg) {  
-    typedef typename mapper<Float>::type RegType;
-
+  void extractGhostEx(ExtractGhostExArg<Order,nDim,dim> arg)
+  {
     for (int parity=0; parity<2; parity++) {
 
       // the following 4-way loop means this is specialized for 4 dimensions 
@@ -139,9 +141,8 @@ namespace quda {
      NB This routines is specialized to four dimensions
   */
   template <typename Float, int length, int nDim, int dim, typename Order, bool extract>
-  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg) {  
-    typedef typename mapper<Float>::type RegType;
-
+  __global__ void extractGhostExKernel(ExtractGhostExArg<Order,nDim,dim> arg)
+  {
     // parallelize over parity and dir using block or grid 
     /*for (int parity=0; parity<2; parity++) {*/
     {
@@ -321,7 +322,7 @@ namespace quda {
       errorQuda("Invalid dim=%d", dim);
     }
 
-    checkQudaError();
+    checkCudaError();
   }
 
   /** This is the template driver for extractGhost */

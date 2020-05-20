@@ -29,6 +29,8 @@ namespace quda
       a(a),
       b(dagger ? -0.5 * b : 0.5 * b) // factor of 0.5 comes from basis transform
     {
+      checkPrecision(U, A);
+      checkLocation(U, A);
     }
   };
 
@@ -55,19 +57,18 @@ namespace quda
       bool active
         = kernel_type == EXTERIOR_KERNEL_ALL ? false : true; // is thread active (non-trival for fused kernel only)
       int thread_dim;                                        // which dimension is thread working on (fused kernel only)
-      int coord[Arg::nDim];
-      int x_cb = getCoords<QUDA_4D_PC, kernel_type>(coord, arg, idx, parity, thread_dim);
+      auto coord = getCoords<QUDA_4D_PC, kernel_type>(arg, idx, 0, parity, thread_dim);
 
       const int my_spinor_parity = nParity == 2 ? parity : 0;
 
       Vector out;
 
       // defined in dslash_wilson.cuh
-      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, x_cb, 0, parity, idx, thread_dim, active);
+      applyWilson<nParity, dagger, kernel_type>(out, arg, coord, parity, idx, thread_dim, active);
 
       if (kernel_type != INTERIOR_KERNEL && active) {
         // if we're not the interior kernel, then we must sum the partial
-        Vector x = arg.out(x_cb, my_spinor_parity);
+        Vector x = arg.out(coord.x_cb, my_spinor_parity);
         out += x;
       }
 
@@ -80,7 +81,7 @@ namespace quda
         for (int chirality = 0; chirality < 2; chirality++) {
 
           const complex<real> b(0.0, chirality == 0 ? static_cast<real>(arg.b) : -static_cast<real>(arg.b));
-          Mat A = arg.A(x_cb, parity, chirality);
+          Mat A = arg.A(coord.x_cb, parity, chirality);
           HalfVector chi = out.chiral_project(chirality);
           chi = A * chi + b * chi;
 
@@ -91,7 +92,7 @@ namespace quda
             chi = cholesky.backward(cholesky.forward(chi));
             tmp += static_cast<real>(0.25) * chi.chiral_reconstruct(chirality);
           } else {
-            Mat A2inv = arg.A2inv(x_cb, parity, chirality);
+            Mat A2inv = arg.A2inv(coord.x_cb, parity, chirality);
             chi = A2inv * chi;
             tmp += static_cast<real>(2.0) * chi.chiral_reconstruct(chirality);
           }
@@ -100,14 +101,14 @@ namespace quda
         tmp.toNonRel(); // switch back to non-chiral basis
 
         if (xpay) {
-          Vector x = arg.x(x_cb, my_spinor_parity);
+          Vector x = arg.x(coord.x_cb, my_spinor_parity);
           out = x + arg.a * tmp;
         } else {
           out = arg.a * tmp;
         }
       }
 
-      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(x_cb, my_spinor_parity) = out;
+      if (kernel_type != EXTERIOR_KERNEL_ALL || active) arg.out(coord.x_cb, my_spinor_parity) = out;
     }
   };
 

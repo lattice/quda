@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -329,6 +329,17 @@ struct DipatchHistogram
     // Tuning policies
     //---------------------------------------------------------------------
 
+    template <int NOMINAL_ITEMS_PER_THREAD>
+    struct TScale
+    {
+        enum
+        {
+            V_SCALE = (sizeof(SampleT) + sizeof(int) - 1) / sizeof(int),
+            VALUE   = CUB_MAX((NOMINAL_ITEMS_PER_THREAD / NUM_ACTIVE_CHANNELS / V_SCALE), 1)
+        };
+    };
+
+
     /// SM11
     struct Policy110
     {
@@ -380,7 +391,7 @@ struct DipatchHistogram
         // HistogramSweepPolicy
         typedef AgentHistogramPolicy<
                 128,
-                (NUM_CHANNELS == 1) ? 8 : 7,
+                TScale<8>::VALUE,
                 BLOCK_LOAD_DIRECT,
                 LOAD_LDG,
                 true,
@@ -394,13 +405,13 @@ struct DipatchHistogram
     {
         // HistogramSweepPolicy
         typedef AgentHistogramPolicy<
-                256,
-                8,
+                384,
+                TScale<16>::VALUE,
                 BLOCK_LOAD_DIRECT,
                 LOAD_LDG,
                 true,
                 SMEM,
-                true>
+                false>
             HistogramSweepPolicy;
     };
 
@@ -440,7 +451,7 @@ struct DipatchHistogram
      */
     template <typename KernelConfig>
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t InitConfigs(
+    static cudaError_t InitConfigs(
         int             ptx_version,
         KernelConfig    &histogram_sweep_config)
     {
@@ -492,12 +503,12 @@ struct DipatchHistogram
 
         template <typename BlockPolicy>
         CUB_RUNTIME_FUNCTION __forceinline__
-        qudaError_t Init()
+        cudaError_t Init()
         {
             block_threads               = BlockPolicy::BLOCK_THREADS;
             pixels_per_thread           = BlockPolicy::PIXELS_PER_THREAD;
 
-            return qudaSuccess;
+            return cudaSuccess;
         }
     };
 
@@ -515,7 +526,7 @@ struct DipatchHistogram
         typename                            DeviceHistogramInitKernelT,                     ///< Function type of cub::DeviceHistogramInitKernel
         typename                            DeviceHistogramSweepKernelT>                    ///< Function type of cub::DeviceHistogramSweepKernel
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t PrivatizedDispatch(
+    static cudaError_t PrivatizedDispatch(
         void*                               d_temp_storage,                                 ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                             temp_storage_bytes,                             ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SampleIteratorT                     d_samples,                                      ///< [in] The pointer to the input sequence of sample items. The samples from different channels are assumed to be interleaved (e.g., an array of 32-bit pixels where each pixel consists of four RGBA 8-bit samples).
@@ -531,7 +542,7 @@ struct DipatchHistogram
         DeviceHistogramInitKernelT          histogram_init_kernel,                          ///< [in] Kernel function pointer to parameterization of cub::DeviceHistogramInitKernel
         DeviceHistogramSweepKernelT         histogram_sweep_kernel,                         ///< [in] Kernel function pointer to parameterization of cub::DeviceHistogramSweepKernel
         KernelConfig                        histogram_sweep_config,                         ///< [in] Dispatch parameters that match the policy that \p histogram_sweep_kernel was compiled for
-        qudaStream_t                        stream,                                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                        stream,                                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                                debug_synchronous)                              ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
     #ifndef CUB_RUNTIME_ENABLED
@@ -541,7 +552,7 @@ struct DipatchHistogram
 
     #else
 
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get device ordinal
@@ -577,7 +588,7 @@ struct DipatchHistogram
             int blocks_per_col      = (blocks_per_row > 0) ?
                                         int(CUB_MIN(histogram_sweep_occupancy / blocks_per_row, num_rows)) :
                                         0;
-            int num_threadblocks    = blocks_per_row * blocks_per_col;
+            int num_thread_blocks   = blocks_per_row * blocks_per_col;
 
             dim3 sweep_grid_dims;
             sweep_grid_dims.x = (unsigned int) blocks_per_row;
@@ -590,7 +601,7 @@ struct DipatchHistogram
             size_t      allocation_sizes[NUM_ALLOCATIONS];
 
             for (int CHANNEL = 0; CHANNEL < NUM_ACTIVE_CHANNELS; ++CHANNEL)
-                allocation_sizes[CHANNEL] = size_t(num_threadblocks) * (num_privatized_levels[CHANNEL] - 1) * sizeof(CounterT);
+                allocation_sizes[CHANNEL] = size_t(num_thread_blocks) * (num_privatized_levels[CHANNEL] - 1) * sizeof(CounterT);
 
             allocation_sizes[NUM_ALLOCATIONS - 1] = GridQueue<int>::AllocationSize();
 
@@ -692,21 +703,21 @@ struct DipatchHistogram
      * Dispatch routine for HistogramRange, specialized for sample types larger than 8bit
      */
     CUB_RUNTIME_FUNCTION
-    static qudaError_t DispatchRange(
-        void*               d_temp_storage,                            ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t&             temp_storage_bytes,                        ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
+    static cudaError_t DispatchRange(
+        void*               d_temp_storage,                                ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t&             temp_storage_bytes,                            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SampleIteratorT     d_samples,                                  ///< [in] The pointer to the multi-channel input sequence of data samples. The samples from different channels are assumed to be interleaved (e.g., an array of 32-bit pixels where each pixel consists of four RGBA 8-bit samples).
-        CounterT*           d_output_histograms[NUM_ACTIVE_CHANNELS],  ///< [out] The pointers to the histogram counter output arrays, one for each active channel.  For channel<sub><em>i</em></sub>, the allocation length of <tt>d_histograms[i]</tt> should be <tt>num_output_levels[i]</tt> - 1.
+        CounterT*           d_output_histograms[NUM_ACTIVE_CHANNELS],      ///< [out] The pointers to the histogram counter output arrays, one for each active channel.  For channel<sub><em>i</em></sub>, the allocation length of <tt>d_histograms[i]</tt> should be <tt>num_output_levels[i]</tt> - 1.
         int                 num_output_levels[NUM_ACTIVE_CHANNELS],     ///< [in] The number of boundaries (levels) for delineating histogram samples in each active channel.  Implies that the number of bins for channel<sub><em>i</em></sub> is <tt>num_output_levels[i]</tt> - 1.
         LevelT              *d_levels[NUM_ACTIVE_CHANNELS],             ///< [in] The pointers to the arrays of boundaries (levels), one for each active channel.  Bin ranges are defined by consecutive boundary pairings: lower sample value boundaries are inclusive and upper sample value boundaries are exclusive.
         OffsetT             num_row_pixels,                             ///< [in] The number of multi-channel pixels per row in the region of interest
         OffsetT             num_rows,                                   ///< [in] The number of rows in the region of interest
         OffsetT             row_stride_samples,                         ///< [in] The number of samples between starts of consecutive rows in the region of interest
-        qudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous,                          ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
         Int2Type<false>     is_byte_sample)                             ///< [in] Marker type indicating whether or not SampleT is a 8b type
     {
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get PTX version
@@ -800,7 +811,7 @@ struct DipatchHistogram
      * Dispatch routine for HistogramRange, specialized for 8-bit sample types (computes 256-bin privatized histograms and then reduces to user-specified levels)
      */
     CUB_RUNTIME_FUNCTION
-    static qudaError_t DispatchRange(
+    static cudaError_t DispatchRange(
         void*               d_temp_storage,                             ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,                         ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SampleIteratorT     d_samples,                                  ///< [in] The pointer to the multi-channel input sequence of data samples. The samples from different channels are assumed to be interleaved (e.g., an array of 32-bit pixels where each pixel consists of four RGBA 8-bit samples).
@@ -810,11 +821,11 @@ struct DipatchHistogram
         OffsetT             num_row_pixels,                             ///< [in] The number of multi-channel pixels per row in the region of interest
         OffsetT             num_rows,                                   ///< [in] The number of rows in the region of interest
         OffsetT             row_stride_samples,                         ///< [in] The number of samples between starts of consecutive rows in the region of interest
-        qudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous,                          ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
         Int2Type<true>      is_byte_sample)                             ///< [in] Marker type indicating whether or not SampleT is a 8b type
     {
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get PTX version
@@ -882,7 +893,7 @@ struct DipatchHistogram
      * Dispatch routine for HistogramEven, specialized for sample types larger than 8-bit
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t DispatchEven(
+    static cudaError_t DispatchEven(
         void*               d_temp_storage,                            ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,                        ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SampleIteratorT     d_samples,                                  ///< [in] The pointer to the input sequence of sample items. The samples from different channels are assumed to be interleaved (e.g., an array of 32-bit pixels where each pixel consists of four RGBA 8-bit samples).
@@ -893,11 +904,11 @@ struct DipatchHistogram
         OffsetT             num_row_pixels,                             ///< [in] The number of multi-channel pixels per row in the region of interest
         OffsetT             num_rows,                                   ///< [in] The number of rows in the region of interest
         OffsetT             row_stride_samples,                         ///< [in] The number of samples between starts of consecutive rows in the region of interest
-        qudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous,                          ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
         Int2Type<false>     is_byte_sample)                             ///< [in] Marker type indicating whether or not SampleT is a 8b type
     {
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get PTX version
@@ -994,7 +1005,7 @@ struct DipatchHistogram
      * Dispatch routine for HistogramEven, specialized for 8-bit sample types (computes 256-bin privatized histograms and then reduces to user-specified levels)
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t DispatchEven(
+    static cudaError_t DispatchEven(
         void*               d_temp_storage,                            ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&             temp_storage_bytes,                        ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         SampleIteratorT     d_samples,                                  ///< [in] The pointer to the input sequence of sample items. The samples from different channels are assumed to be interleaved (e.g., an array of 32-bit pixels where each pixel consists of four RGBA 8-bit samples).
@@ -1005,11 +1016,11 @@ struct DipatchHistogram
         OffsetT             num_row_pixels,                             ///< [in] The number of multi-channel pixels per row in the region of interest
         OffsetT             num_rows,                                   ///< [in] The number of rows in the region of interest
         OffsetT             row_stride_samples,                         ///< [in] The number of samples between starts of consecutive rows in the region of interest
-        qudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t        stream,                                     ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                debug_synchronous,                          ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
         Int2Type<true>      is_byte_sample)                             ///< [in] Marker type indicating whether or not SampleT is a 8b type
     {
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get PTX version

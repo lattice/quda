@@ -207,7 +207,7 @@ namespace quda {
     {
       apply(0);
       qudaDeviceSynchronize();
-      checkQudaError();
+      checkCudaError();
     }
 
     void apply(const qudaStream_t &stream) {

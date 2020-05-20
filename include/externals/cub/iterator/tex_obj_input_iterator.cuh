@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -145,7 +145,7 @@ private:
 
     T*                  ptr;
     difference_type     tex_offset;
-    qudaTextureObject_t tex_obj;
+    cudaTextureObject_t tex_obj;
 
 public:
 
@@ -159,31 +159,31 @@ public:
 
     /// Use this iterator to bind \p ptr with a texture reference
     template <typename QualifiedT>
-    qudaError_t BindTexture(
-        QualifiedT      *ptr,               ///< Native pointer to wrap that is aligned to qudaDeviceProp::textureAlignment
+    cudaError_t BindTexture(
+        QualifiedT      *ptr,               ///< Native pointer to wrap that is aligned to cudaDeviceProp::textureAlignment
         size_t          bytes = size_t(-1),         ///< Number of bytes in the range
         size_t          tex_offset = 0)     ///< OffsetT (in items) from \p ptr denoting the position of the iterator
     {
         this->ptr = const_cast<typename RemoveQualifiers<QualifiedT>::Type *>(ptr);
         this->tex_offset = tex_offset;
 
-        qudaChannelFormatDesc   channel_desc = cudaCreateChannelDesc<TextureWord>();
-        qudaResourceDesc        res_desc;
-        qudaTextureDesc         tex_desc;
-        memset(&res_desc, 0, sizeof(qudaResourceDesc));
-        memset(&tex_desc, 0, sizeof(qudaTextureDesc));
-        res_desc.resType                = qudaResourceTypeLinear;
+        cudaChannelFormatDesc   channel_desc = cudaCreateChannelDesc<TextureWord>();
+        cudaResourceDesc        res_desc;
+        cudaTextureDesc         tex_desc;
+        memset(&res_desc, 0, sizeof(cudaResourceDesc));
+        memset(&tex_desc, 0, sizeof(cudaTextureDesc));
+        res_desc.resType                = cudaResourceTypeLinear;
         res_desc.res.linear.devPtr      = this->ptr;
         res_desc.res.linear.desc        = channel_desc;
         res_desc.res.linear.sizeInBytes = bytes;
-        tex_desc.readMode               = qudaReadModeElementType;
-        return qudaCreateTextureObject(&tex_obj, &res_desc, &tex_desc, NULL);
+        tex_desc.readMode               = cudaReadModeElementType;
+        return cudaCreateTextureObject(&tex_obj, &res_desc, &tex_desc, NULL);
     }
 
     /// Unbind this iterator from its texture reference
-    qudaError_t UnbindTexture()
+    cudaError_t UnbindTexture()
     {
-        return qudaDestroyTextureObject(tex_obj);
+        return cudaDestroyTextureObject(tex_obj);
     }
 
     /// Postfix increment

@@ -11,7 +11,6 @@
 #include <cub_helper.cuh>
 #include <index_helper.cuh>
 
-
 #ifndef PI
 #define PI    3.1415926535897932384626433832795    // pi
 #endif
@@ -35,9 +34,6 @@ namespace quda {
     }
   };
 
-
-
-
   template<typename Float, typename Gauge, int NCOLORS>
   __global__ void compute_InitGauge_ColdStart(InitGaugeColdArg<Gauge> arg){
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -49,8 +45,7 @@ namespace quda {
     }
     Matrix<complex<Float>,NCOLORS> U;
     setIdentity(&U);
-    for ( int d = 0; d < 4; d++ )
-      arg.dataOr.save((Float*)(U.data),idx, d, parity);
+    for ( int d = 0; d < 4; d++ ) arg.dataOr(d, idx, parity) = U;
   }
 
 
@@ -82,7 +77,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_ColdStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //qudaDeviceSynchronize();
     }
 
@@ -111,7 +106,7 @@ namespace quda {
     InitGaugeColdArg<Gauge> initarg(dataOr, data);
     InitGaugeCold<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkQudaError();
+    checkCudaError();
   }
 
 
@@ -238,14 +233,14 @@ namespace quda {
     @return four real numbers of the SU(2) matrix
  */
   template <class T>
-  __device__ static inline Matrix<T,2> randomSU2(quRNGState& localState){
+  __device__ static inline Matrix<T,2> randomSU2(cuRNGState& localState){
     Matrix<T,2> a;
     T aabs, ctheta, stheta, phi;
     a(0,0) = Random<T>(localState, (T)-1.0, (T)1.0);
     aabs = sqrt( 1.0 - a(0,0) * a(0,0));
     ctheta = Random<T>(localState, (T)-1.0, (T)1.0);
     phi = PII * Random<T>(localState);
-    stheta = ( Random<T>(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
+    stheta = ( curand(&localState) & 1 ? 1 : -1 ) * sqrt( (T)1.0 - ctheta * ctheta );
     a(0,1) = aabs * stheta * cos( phi );
     a(1,0) = aabs * stheta * sin( phi );
     a(1,1) = aabs * ctheta;
@@ -302,7 +297,7 @@ namespace quda {
     @return SU(Nc) matrix
  */
   template <class Float, int NCOLORS>
-  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( quRNGState& localState ){
+  __device__ inline Matrix<complex<Float>,NCOLORS> randomize( cuRNGState& localState ){
     Matrix<complex<Float>,NCOLORS> U;
 
     for ( int i = 0; i < NCOLORS; i++ )
@@ -330,9 +325,9 @@ namespace quda {
     for ( int dr = 0; dr < 4; ++dr ) X[dr] = arg.X[dr];
     for ( int dr = 0; dr < 4; ++dr ) X[dr] += 2 * arg.border[dr];
     int id = idx;
-    quRNGState localState = arg.rngstate.State()[ id ];
+    cuRNGState localState = arg.rngstate.State()[ id ];
   #else
-    quRNGState localState = arg.rngstate.State()[ idx ];
+    cuRNGState localState = arg.rngstate.State()[ idx ];
   #endif
     for ( int parity = 0; parity < 2; parity++ ) {
     #ifdef MULTI_GPU
@@ -343,7 +338,7 @@ namespace quda {
       for ( int d = 0; d < 4; d++ ) {
         Matrix<complex<Float>,NCOLORS> U;
         U = randomize<Float, NCOLORS>(localState);
-        arg.dataOr.save((Float*)(U.data),idx, d, parity);
+        arg.dataOr(d, idx, parity) = U;
       }
     }
   #ifdef MULTI_GPU
@@ -386,7 +381,7 @@ namespace quda {
 
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_InitGauge_HotStart<Float, Gauge, NCOLORS><< < tp.grid,tp.block >> > (arg);
+      compute_InitGauge_HotStart<Float, Gauge, NCOLORS> <<< tp.grid,tp.block >>> (arg);
       //qudaDeviceSynchronize();
     }
 
@@ -418,7 +413,7 @@ namespace quda {
     InitGaugeHotArg<Gauge> initarg(dataOr, data, rngstate);
     InitGaugeHot<Float, Gauge, NCOLORS> init(initarg);
     init.apply(0);
-    checkQudaError();
+    checkCudaError();
     qudaDeviceSynchronize();
 
     data.exchangeExtendedGhost(data.R(),false);

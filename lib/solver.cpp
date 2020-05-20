@@ -10,7 +10,11 @@ namespace quda {
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating a %s solver\n", type);
   }
 
-  Solver::Solver(SolverParam &param, TimeProfile &profile) :
+  Solver::Solver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
+                 SolverParam &param, TimeProfile &profile) :
+    mat(mat),
+    matSloppy(matSloppy),
+    matPrecon(matPrecon),
     param(param),
     profile(profile),
     node_parity(0),
@@ -33,8 +37,8 @@ namespace quda {
   }
 
   // solver factory
-  Solver* Solver::create(SolverParam &param, DiracMatrix &mat, DiracMatrix &matSloppy,
-			 DiracMatrix &matPrecon, TimeProfile &profile)
+  Solver* Solver::create(SolverParam &param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
+			 const DiracMatrix &matPrecon, TimeProfile &profile)
   {
     Solver *solver = nullptr;
 
@@ -141,21 +145,21 @@ namespace quda {
       break;
     case QUDA_CG3_INVERTER:
       report("CG3");
-      solver = new CG3(mat, matSloppy, param, profile);
+      solver = new CG3(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NE_INVERTER:
       report("CG3NE");
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NE(mat, matSloppy, matPrecon, param, profile);
       break;
     case QUDA_CG3NR_INVERTER:
       report("CG3NR");
-      // CG3NR is included in CG3NE
-      solver = new CG3NE(mat, matSloppy, param, profile);
+      solver = new CG3NR(mat, matSloppy, matPrecon, param, profile);
       break;
     default:
       errorQuda("Invalid solver type %d", param.inv_type);
     }
 
+    if (!mat.hermitian() && solver->hermitian()) errorQuda("Cannot solve non-Hermitian system with Hermitian solver");
     return solver;
   }
 

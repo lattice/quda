@@ -1,4 +1,4 @@
-# basic setup for cmake
+# Basic setup for cmake
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
 if(POLICY CMP0074)
@@ -25,10 +25,17 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
+<<<<<<< HEAD
 if(DEFINED ENV{QUDA_BACKEND})
   set(DEFBACKEND $ENV{QUDA_BACKEND})
 else()
   set(DEFBACKEND "CUDA")
+=======
+if(DEFINED ENV{QUDA_TARGET})
+  set(DEFTARGET $ENV{QUDA_TARGET})
+else()
+  set(DEFTARGET "CUDA")
+>>>>>>> feature/cuda-backend-2
 endif()
 
 if(GIT_FOUND)
@@ -62,6 +69,7 @@ if(GIT_FOUND)
   endif()
 endif(GIT_FOUND)
 
+# Build type
 set(VALID_BUILD_TYPES DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
 set(CMAKE_BUILD_TYPE "${DEFBUILD}" CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS DEVEL RELEASE STRICT DEBUG HOSTDEBUG DEVICEDEBUG SANITIZE)
@@ -73,6 +81,7 @@ if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
 endif()
 
+<<<<<<< HEAD
 # Backend type
 set(VALID_BACKEND_TYPES CUDA HIP)
 set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
@@ -91,12 +100,24 @@ if(${QUDA_BACKEND_TYPE} STREQUAL "CUDA")
 endif()
 if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
   add_definitions(-DHIP_BACKEND)
+=======
+# Target type
+set(VALID_TARGET_TYPES CUDA HIP)
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of backend, options are: ${VALID_TARGET_TYPES}")
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+
+string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
+list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
+
+if(TARGET_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid backend types are:" "${VALID_TARGET_TYPES}")
+>>>>>>> feature/cuda-backend-2
 endif()
 
 #
 # PROJECT is QUDA
 #
-project("QUDA" VERSION 0.9.0 LANGUAGES)
+project("QUDA" VERSION 1.0.0 LANGUAGES)
 
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} ${PROJECT_VERSION} (${GITVERSION}) **")
@@ -109,6 +130,7 @@ message(STATUS "Backend type: ${QUDA_BACKEND_TYPE}")
 # ######################################################################################################################
 # QUDA OPTIONS likely to be changed by users
 # ######################################################################################################################
+# Build options
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
@@ -123,7 +145,6 @@ set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
     CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
-# build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
@@ -132,8 +153,6 @@ set(QUDA_DIRAC_TWISTED_MASS ON CACHE BOOL "build twisted mass Dirac operators")
 set(QUDA_DIRAC_TWISTED_CLOVER ON CACHE BOOL "build twisted clover Dirac operators")
 set(QUDA_DIRAC_CLOVER_HASENBUSCH ON CACHE BOOL "build clover Hasenbusch twist operators")
 set(QUDA_DIRAC_NDEG_TWISTED_MASS ON CACHE BOOL "build non-degenerate twisted mass Dirac operators")
-set(QUDA_LINK_ASQTAD OFF CACHE BOOL "build code for computing asqtad fat links")
-set(QUDA_LINK_HISQ OFF CACHE BOOL "build code for computing hisq fat links")
 set(QUDA_FORCE_GAUGE OFF CACHE BOOL "build code for (1-loop Symanzik) gauge force")
 set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
@@ -179,6 +198,7 @@ set(QUDA_MAGMA_LIBS "" CACHE STRING "additional linker flags required to link ag
 # QUDA ADVANCED OPTIONS that ususally should not be changed by users
 # ######################################################################################################################
 set(QUDA_BUILD_ALL_TESTS ON CACHE BOOL "build tests by default")
+set(QUDA_INSTALL_ALL_TESTS ON CACHE BOOL "install tests by default")
 if(DEFINED ENV{QUDA_BUILD_SHAREDLIB})
   set(DEFSHARED $ENV{QUDA_BUILD_SHAREDLIB})
 else()
@@ -187,6 +207,7 @@ endif()
 set(QUDA_BUILD_SHAREDLIB ${DEFSHARED} CACHE BOOL "build quda as a shared lib")
 set(QUDA_PROPAGATE_CXX_FLAGS ON CACHE BOOL "propagate CXX_FLAGS to CUDA host compiler (for cmake >= 3.8)")
 set(QUDA_TEX ON CACHE BOOL "enable texture reads?")
+set(QUDA_FLOAT8 OFF CACHE BOOL "enable float-8 ordered fixed-point fields?")
 set(QUDA_NVML OFF CACHE BOOL "use NVML to report CUDA graphics driver version")
 set(QUDA_NUMA_NVML OFF CACHE BOOL "experimental use of NVML to set numa affinity")
 set(QUDA_VERBOSE_BUILD OFF CACHE BOOL "display kernel register useage")
@@ -202,7 +223,8 @@ set(QUDA_CTEST_SEP_DSLASH_POLICIES
     OFF
     CACHE BOOL "Test Dslash policies separately in ctest instead of only autotuning them.")
 
-set(QUDA_REDUCE_SINGLE_WARP OFF CACHE BOOL "enable single warp per CTA for reduction kernels to reduce compile time")
+set(QUDA_FAST_COMPILE_REDUCE OFF CACHE BOOL "enable fast compilation in blas and reduction kernels (single warp per reduction)")
+set(QUDA_FAST_COMPILE_DSLASH OFF CACHE BOOL "enable fast compilation in dslash kernels (~20% perf impact)")
 
 set(QUDA_OPENMP OFF CACHE BOOL "enable OpenMP")
 set(QUDA_CXX_STANDARD 14 CACHE STRING "set the CXX Standard (14 or 17)")
@@ -229,9 +251,12 @@ option(QUDA_GENERATE_DOXYGEN "generate doxygen documentation")
 set(QUDA_JITIFY OFF CACHE BOOL "build QUDA using Jitify")
 
 mark_as_advanced(QUDA_BUILD_ALL_TESTS)
+mark_as_advanced(QUDA_INSTALL_ALL_TESTS)
 mark_as_advanced(QUDA_PROPAGATE_CXX_FLAGS)
 mark_as_advanced(QUDA_TEX)
-mark_as_advanced(QUDA_REDUCE_SINGLE_WARP)
+mark_as_advanced(QUDA_FLOAT8)
+mark_as_advanced(QUDA_FAST_COMPILE_REDUCE)
+mark_as_advanced(QUDA_FAST_COMPILE_DSLASH)
 mark_as_advanced(QUDA_NVML)
 mark_as_advanced(QUDA_NUMA_NVML)
 mark_as_advanced(QUDA_VERBOSE_BUILD)
@@ -269,7 +294,8 @@ if(QUDA_DOWNLOAD_EIGEN)
   set(EIGEN_VERSION 3.3.7)
 
   set(EIGEN_DOWNLOAD_LOCATION ${CMAKE_SOURCE_DIR}/externals/eigen/${EIGEN_VERSION}.tar.bz2)
-  set(EIGEN_URL http://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
+  # Use https as some systems will not allow connections to http
+  set(EIGEN_URL https://bitbucket.org/eigen/eigen/get/${EIGEN_VERSION}.tar.bz2)
   set(EIGEN_SHA 9f13cf90dedbe3e52a19f43000d71fdf72e986beb9a5436dddcd61ff9d77a3ce)
   if(NOT EXISTS ${EIGEN_DOWNLOAD_LOCATION})
     message(STATUS "Checking for Eigen tarball and downloading if necessary.")
@@ -325,7 +351,7 @@ endif()
 set(CMAKE_CXX_STANDARD ${QUDA_CXX_STANDARD})
 # define CXX FLAGS
 set(CMAKE_CXX_FLAGS_DEVEL
-    "${OpenMP_CXX_FLAGS} -g -O3 -Wall ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -g -O3 -Wall -DDEVEL ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during regular development builds.")
 set(CMAKE_CXX_FLAGS_STRICT
     "${OpenMP_CXX_FLAGS} -O3 -Wall -Werror ${CLANG_NOERROR}"
@@ -337,10 +363,10 @@ set(CMAKE_CXX_FLAGS_HOSTDEBUG
     "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CXX_FLAGS_DEVICEDEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CXX_FLAGS_DEBUG
-    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG ${CLANG_FORCE_COLOR}"
+    "${OpenMP_CXX_FLAGS} -Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG ${CLANG_FORCE_COLOR}"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(
   CMAKE_CXX_FLAGS_SANITIZE
@@ -358,9 +384,9 @@ set(CMAKE_C_FLAGS_RELEASE "-Wall -O3 -w" CACHE STRING "Flags used by the C compi
 set(CMAKE_C_FLAGS_HOSTDEBUG
     "-Wall -Wno-unknown-pragmas -g -fno-inline -DHOST_DEBUG"
     CACHE STRING "Flags used by the C compiler during host-debug builds.")
-set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall" CACHE STRING "Flags used by the C compiler during device-debug builds.")
+set(CMAKE_C_FLAGS_DEVICEDEBUG "-Wall -DDEVICE_DEBUG" CACHE STRING "Flags used by the C compiler during device-debug builds.")
 set(CMAKE_C_FLAGS_DEBUG
-    "-Wall -g -fno-inline -DHOST_DEBUG"
+    "-Wall -g -fno-inline -DHOST_DEBUG -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C compiler during full (host+device) debug builds.")
 set(CMAKE_C_FLAGS_SANITIZE
     "-Wall -g -fno-inline -DHOST_DEBUG -fsanitize=address,undefined"
@@ -448,7 +474,7 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     ExternalProject_Add(QMP
                         GIT_REPOSITORY https://github.com/usqcd-software/qmp.git
-                        GIT_TAG qmp2-5-1
+                        GIT_TAG qmp2-5-2
                         GIT_SHALLOW YES
                         PREFIX usqcd
                         CONFIGURE_COMMAND CC=${MPI_C_COMPILER} CXX=${MPI_CXX_COMPILER} <SOURCE_DIR>/configure
@@ -563,7 +589,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)
@@ -676,12 +702,24 @@ endif(QUDA_ARPACK)
 # set which precisions to enable
 add_definitions(-DQUDA_PRECISION=${QUDA_PRECISION})
 
-if(QUDA_REDUCE_SINGLE_WARP)
-add_definitions(-DQUDA_REDUCE_SINGLE_WARP)
+if(QUDA_FAST_COMPILE_REDUCE)
+add_definitions(-DQUDA_FAST_COMPILE_REDUCE)
+endif()
+
+if(QUDA_FAST_COMPILE_DSLASH)
+add_definitions(-DQUDA_FAST_COMPILE_DSLASH)
 endif()
 
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
+
+# Set backend preprocessor flags
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_definitions(-DCUDA_TARGET)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  add_definitions(-DHIP_TARGET)
+endif()
 
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
@@ -739,13 +777,9 @@ if(QUDA_DIRAC_NDEG_TWISTED_MASS)
   add_definitions(-DGPU_NDEG_TWISTED_MASS_DIRAC)
 endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 
-if(QUDA_LINK_ASQTAD)
-  add_definitions(-DGPU_FATLINK -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_ASQTAD)
-
-if(QUDA_LINK_HISQ)
-  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE -DGPU_GAUGE_TOOLS)
-endif(QUDA_LINK_HISQ)
+if(QUDA_DIRAC_STAGGERED)
+  add_definitions(-DGPU_FATLINK -DGPU_UNITARIZE)
+endif(QUDA_DIRAC_STAGGERED)
 
 if(QUDA_FORCE_GAUGE)
   add_definitions(-DGPU_GAUGE_FORCE -DGPU_GAUGE_TOOLS)
@@ -763,7 +797,6 @@ if(QUDA_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_ALG)
   add_definitions(-DGPU_GAUGE_TOOLS)
   add_definitions(-DGPU_UNITARIZE)
-  list(APPEND QUDA_LIBS ${CUDA_cufft_LIBRARY} ${CUDA_curand_LIBRARY})
 endif(QUDA_GAUGE_ALG)
 
 if(QUDA_MPI_NVTX)
@@ -780,8 +813,6 @@ if(QUDA_NVTX)
   find_path(NVTX3 "nvtx3/nvToolsExt.h" PATHS ${CUDA_TOOLKIT_INCLUDE} NO_DEFAULT_PATH)
   if(NVTX3)
     add_definitions(-DQUDA_NVTX_VERSION=3)
-  else(NVTX)
-    list(APPEND QUDA_LIBS ${CUDA_nvToolsExt_LIBRARY})
   endif(NVTX3)
 endif(QUDA_NVTX)
 
@@ -824,6 +855,10 @@ if(QUDA_COVDEV)
   add_definitions(-DGPU_COVDEV)
 endif(QUDA_COVDEV)
 
+if(QUDA_TEX AND QUDA_FLOAT8)
+  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8" )
+endif()
+
 # define FORTRAN FLAGS
 set(CMAKE_F_FLAGS -std=c99 CACHE STRING "Fortran Flags")
 
@@ -856,7 +891,7 @@ endif(QUDA_VERBOSE_BUILD)
 set(CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS
     "-Wno-unknown-pragmas,-Wno-unused-function,-Wno-unused-local-typedef,-Wno-unused-private-field")
 set(CMAKE_CUDA_FLAGS_DEVEL
-    "${QUDA_NVCC_FLAGS} -lineinfo -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
+    "${QUDA_NVCC_FLAGS} -lineinfo -DDEVEL -g -O3 -Xcompiler ${CMAKE_CUDA_DISABLE_XCOMPILER_WARNINGS}"
     CACHE STRING "Flags used by the CUDA compiler during regular development builds.")
 set(CMAKE_CUDA_FLAGS_STRICT
     "${CMAKE_CUDA_FLAGS_DEVEL}"
@@ -868,10 +903,10 @@ set(CMAKE_CUDA_FLAGS_HOSTDEBUG
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during host-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEVICEDEBUG
-    "${QUDA_NVCC_FLAGS} -G"
+    "${QUDA_NVCC_FLAGS} -G -DDEVICE_DEBUG"
     CACHE STRING "Flags used by the C++ compiler during device-debug builds.")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -G"
+    "${QUDA_NVCC_FLAGS} -g -DHOST_DEBUG -DDEVICE_DEBUG -G"
     CACHE STRING "Flags used by the C++ compiler during full (host+device) debug builds.")
 set(CMAKE_CUDA_FLAGS_SANITIZE
     "${QUDA_NVCC_FLAGS} -g -lineinfo -DHOST_DEBUG -Xcompiler -fsanitize=address,-fsanitize=undefined"
@@ -921,6 +956,11 @@ set(GITVERSION ${GITVERSION}-${QUDA_GPU_ARCH})
 string(REGEX REPLACE sm_ "" COMP_CAP ${QUDA_GPU_ARCH})
 set(COMP_CAP "${COMP_CAP}0")
 
+if(${CUDA_VERSION} STREQUAL "10.2")
+  set(CMAKE_CUDA_FLAGS
+      "${CMAKE_CUDA_FLAGS} -Xcicc \"--Xllc -dag-vectorize-ops=1\"")
+endif()
+
 # make the compiler flags an advanced option for all user defined build types (cmake defined build types are advanced by
 # default )
 mark_as_advanced(CMAKE_CUDA_FLAGS_DEVEL)
@@ -968,7 +1008,9 @@ if(QUDA_BACKWARDS)
   include(${backward-cpp_SOURCE_DIR}/BackwardConfig.cmake)
 endif()
 
-# add tests and quda library
+# add tests, utils, reference, and quda library
 add_subdirectory(lib)
 add_subdirectory(tests)
+add_subdirectory(utils)
+add_subdirectory(host_reference)
 add_subdirectory(doc)

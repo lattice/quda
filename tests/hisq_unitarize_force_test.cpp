@@ -3,8 +3,8 @@
 #include <cstring>
 
 #include <quda.h>
-#include "test_util.h"
-#include <test_params.h>
+#include "host_utils.h"
+#include <command_line_params.h>
 #include "gauge_field.h"
 #include "misc.h"
 #include "hisq_force_reference.h"
@@ -133,7 +133,7 @@ static void hisq_force_test()
   fermion_force::setUnitarizeForceConstants(unitarize_eps, hisq_force_filter, max_det_error, allow_svd, svd_only, svd_rel_err, svd_abs_err);
 
   int* num_failures_dev;
-  if(cudaMalloc(&num_failures_dev, sizeof(int)) != qudaSuccess){
+  if (cudaMalloc(&num_failures_dev, sizeof(int)) != qudaSuccess) {
     errorQuda("cudaMalloc failed for num_failures_dev\n");
   }
   qudaMemset(num_failures_dev, 0, sizeof(int));
@@ -150,7 +150,8 @@ static void hisq_force_test()
   
   printfQuda("Comparing CPU and GPU results\n");
   for(int dir=0; dir<4; ++dir){
-    int res = compare_floats(((char**)cpuReference->Gauge_p())[dir], ((char**)cpuResult->Gauge_p())[dir], cpuReference->Volume()*gaugeSiteSize, accuracy, gaugeParam.cpu_prec);
+    int res = compare_floats(((char **)cpuReference->Gauge_p())[dir], ((char **)cpuResult->Gauge_p())[dir],
+                             cpuReference->Volume() * gauge_site_size, accuracy, gaugeParam.cpu_prec);
 #ifdef MULTI_GPU
     comm_allreduce_int(&res);
     res /= comm_size();

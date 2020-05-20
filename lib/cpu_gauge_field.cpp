@@ -173,7 +173,7 @@ namespace quda {
     if (link_direction != QUDA_LINK_BACKWARDS)
       errorQuda("link_direction = %d not supported", link_direction);
 
-    void *recv[QUDA_MAX_DIM];
+    void *recv[2*QUDA_MAX_DIM];
     for (int d=0; d<nDim; d++) recv[d] = safe_malloc(nFace*surface[d]*nInternal*precision);
 
     // communicate between nodes
@@ -278,11 +278,10 @@ namespace quda {
 	if (!src.isNative()) errorQuda("Only native order is supported");
 	void *buffer = pool_pinned_malloc(src.Bytes());
 	// this copies over both even and odd
-	qudaMemcpy(buffer, static_cast<const cudaGaugeField&>(src).Gauge_p(),
-		   src.Bytes(), qudaMemcpyDeviceToHost);
+        qudaMemcpy(buffer, static_cast<const cudaGaugeField &>(src).Gauge_p(), src.Bytes(), qudaMemcpyDeviceToHost);
 
-	copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
-	pool_pinned_free(buffer);
+        copyGenericGauge(*this, src, QUDA_CPU_FIELD_LOCATION, gauge, buffer);
+        pool_pinned_free(buffer);
 
       } else { // else on the GPU
 
@@ -301,18 +300,19 @@ namespace quda {
 
 	if (order == QUDA_QDP_GAUGE_ORDER) {
 	  for (int d=0; d<geometry; d++) {
-	    qudaMemcpy(((void**)gauge)[d], ((void**)buffer)[d], bytes/geometry, qudaMemcpyDeviceToHost);
-	  }
-	} else {
-	  qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
-	}
+            qudaMemcpy(((void **)gauge)[d], ((void **)buffer)[d], bytes / geometry, qudaMemcpyDeviceToHost);
+          }
+        } else {
+          qudaMemcpy(gauge, buffer, bytes, qudaMemcpyHostToDevice);
+        }
 
-	if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD && nFace)
-	  for (int d=0; d<geometry; d++)
-	    qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
+        if (order > 4 && ghostExchange == QUDA_GHOST_EXCHANGE_PAD && src.GhostExchange() == QUDA_GHOST_EXCHANGE_PAD
+            && nFace)
+          for (int d = 0; d < geometry; d++)
+            qudaMemcpy(Ghost()[d], ghost_buffer[d], ghost_bytes[d], qudaMemcpyDeviceToHost);
 
-	free_gauge_buffer(buffer, order, geometry);
-	if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
+        free_gauge_buffer(buffer, order, geometry);
+        if (nFace > 0) free_ghost_buffer(ghost_buffer, order, geometry);
       }
 
     } else if (typeid(src) == typeid(cpuGaugeField)) {
@@ -329,7 +329,7 @@ namespace quda {
       exchangeGhost(geometry == QUDA_VECTOR_GEOMETRY ? QUDA_LINK_BACKWARDS : QUDA_LINK_BIDIRECTIONAL);
     }
 
-    checkQudaError();
+    checkCudaError();
   }
 
   void cpuGaugeField::setGauge(void **gauge_)
@@ -379,7 +379,11 @@ namespace quda {
   }
 
   void cpuGaugeField::zero() {
-    memset(gauge, 0, bytes);
+    if (order != QUDA_QDP_GAUGE_ORDER) {
+      memset(gauge, 0, bytes);
+    } else {
+      for (int g=0; g<geometry; g++) memset(gauge[g], 0, volume * nInternal * precision);
+    }
   }
 
 /*template <typename Float>

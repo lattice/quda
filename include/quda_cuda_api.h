@@ -1,8 +1,9 @@
 #pragma once
 
 #ifndef __CUDACC_RTC__
-#include <quda_backend_api.h>
-#include <quda_cuda_api.h>
+// This header includes all the CUDA data types
+#include <quda_target_api.h> 
+#include <cuda_profiler_api.h>
 
 /**
    @file quda_cuda_api.h
@@ -14,17 +15,28 @@
 namespace quda {
 
   /**
-     @brief Wrapper around qudaGetErrorString
+     @brief Wrapper around cudaGetErrorString
   */
-  const char* qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
-  
+  const char *qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line);
+
   /**
-     @brief Wrapper around qudaGetLastError
+     @brief Wrapper around cudaGetLastError
   */
   qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line);
-  
+
   /**
-     @brief Wrapper around qudaMemcpy used for auto-profiling.  Do not
+     @brief Wrapper around cudaMemPrefetchAsync Do not call directly,
+     rather call macro below which will grab the location of the call.
+     @param[in] devPtr Pointer to be prefetched
+     @param[in] count Size in bytes
+     @param[in] dstDevice Destination device to prefetch to
+     @param[in] stream Stream to enqueue prefetch operation
+  */
+  void qudaMemPrefetchAsync_(const void *devPtr, size_t count, int dstDevice, const qudaStream_t &stream,
+                             const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
      call directly, rather call macro below which will grab the
      location of the call.
      @param[out] dst Destination pointer
@@ -32,11 +44,23 @@ namespace quda {
      @param[in] count Size of transfer
      @param[in] kind Type of memory copy
   */
-  qudaError_t qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind,
-			  const char *func, const char *file, const char *line);
-  
+  void qudaMemcpy_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func, const char *file,
+                   const char *line);
+
   /**
-     @brief Wrapper around qudaMemcpyAsync or driver API equivalent
+     @brief Wrapper around cudaMemcpy used for calls where tuning
+     should be disabled. Do not call directly, rather call macro below
+     which will grab the location of the call.
+     @param[out] dst Destination pointer
+     @param[in] src Source pointer
+     @param[in] count Size of transfer
+     @param[in] kind Type of memory copy
+  */
+  void qudaMemcpyNoTune_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const char *func,
+                         const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] src Source pointer
@@ -44,24 +68,53 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, 
-			const qudaStream_t &stream, const char *func, const char *file, const char *line);
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
+                        const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemcpyToSymbolAsync or driver API equivalent
-     Potentially add auto-profiling support.
-     @param[in] symbol Device symbol address
+     @brief Wrapper around cudaMemcpyAsync or driver API equivalent
+     where no tuning should take place.
+     @param[out] dst Destination pointer
      @param[in] src Source pointer
      @param[in] count Size of transfer
-     @param[in] offset Offset from start of symbol in bytes
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpyToSymbolAsync_(const void *symbol, const void *src, size_t count, size_t offset, qudaMemcpyKind kind, 
-				const qudaStream_t &stream, const char *func, const char *file, const char *line);
-  
+  void qudaMemcpyAsyncNoTune_(void *dst, const void *src, size_t count, qudaMemcpyKind kind, const qudaStream_t &stream,
+                              const char *func, const char *file, const char *line);
+
   /**
-     @brief Wrapper around qudaMemcpy2DAsync or driver API equivalent
+   @brief Wrapper around cudaMemcpy used for auto-profiling.  Do not
+   call directly, rather call macro below which will grab the
+   location of the call.
+   @param[out] dst Destination pointer
+   @param[in] dpitch Destination pitch
+   @param[in] src Source pointer
+   @param[in] spitch Source pitch
+   @param[in] width Width in bytes
+   @param[in] height Number of rows
+   @param[in] kind Type of memory copy
+*/
+  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+                     qudaMemcpyKind kind, const char *func, const char *file, const char *line);
+
+  /**
+   @brief Wrapper around cudaMemcpy where no tuning should take place.
+   Do not call directly, rather call macro below which will grab the
+   location of the call.
+   @param[out] dst Destination pointer
+   @param[in] dpitch Destination pitch
+   @param[in] src Source pointer
+   @param[in] spitch Source pitch
+   @param[in] width Width in bytes
+   @param[in] height Number of rows
+   @param[in] kind Type of memory copy
+*/
+  void qudaMemcpy2DNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+                           qudaMemcpyKind kind, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] dpitch Destination pitch
@@ -72,12 +125,28 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, qudaMemcpyKind kind, const qudaStream_t &stream,
-                          const char *func, const char *file, const char *line);
+  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+                          qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          const char *line);
 
   /**
-     @brief Wrapper around qudaMemset or driver API equivalent
+     @brief Wrapper around cudaMemcpy2DAsync or driver API equivalent
+     where no tuning should take place.
+     @param[out] dst Destination pointer
+     @param[in] dpitch Destination pitch
+     @param[in] src Source pointer
+     @param[in] spitch Source pitch
+     @param[in] width Width in bytes
+     @param[in] height Number of rows
+     @param[in] kind Type of memory copy
+     @param[in] stream Stream to issue copy
+  */
+  void qudaMemcpy2DAsyncNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+                                qudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                                const char *line);
+
+  /**
+     @brief Wrapper around cudaMemset or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] val value to set
@@ -86,27 +155,17 @@ namespace quda {
   void qudaMemset_(void *dst, int val, size_t count, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemsetAsync or driver API equivalent
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] val value to set
      @param[in] bytes Size of transfer in bytes
   */
-  void qudaMemsetAsync_(void *dst, int val, size_t count, const qudaStream_t &stream, const char *func, const char *file, const char *line);
-  
-  /**
-     @brief Wrapper around qudaMemset2D or driver API equivalent
-     Potentially add auto-profiling support.
-     @param[out] dst Destination pointer
-     @param[in] pitch Destination pitch
-     @param[in] val value to set
-     @param[in] width Width in bytes
-     @param[in] height Number of rows
-  */
-  void qudaMemset2D_(void* dst, size_t pitch, int val, size_t width, size_t height, const char *func, const char *file, const char *line);
+  void qudaMemsetAsync_(void *dst, int val, size_t count, const qudaStream_t &stream, const char *func,
+                        const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaMemset2DAsync or driver API equivalent
+     @brief Wrapper around cudaMemset2D or driver API equivalent
      Potentially add auto-profiling support.
      @param[out] dst Destination pointer
      @param[in] pitch Destination pitch
@@ -114,10 +173,42 @@ namespace quda {
      @param[in] width Width in bytes
      @param[in] height Number of rows
   */
-  void qudaMemset2DAsync_(void* dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream, const char *func, const char *file, const char *line);
-  
+  void qudaMemset2D_(void *dst, size_t pitch, int val, size_t width, size_t height, const char *func, const char *file,
+                     const char *line);
+
   /**
-     @brief Wrapper around qudaLaunchKernel
+     @brief Wrapper around cudaMemset2DAsync or driver API equivalent
+     Potentially add auto-profiling support.
+     @param[out] dst Destination pointer
+     @param[in] pitch Destination pitch
+     @param[in] val value to set
+     @param[in] width Width in bytes
+     @param[in] height Number of rows
+  */
+  void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream,
+                          const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemset or driver API equivalent
+     with no tuning
+     @param[out] dst Destination pointer
+     @param[in] val value to set
+     @param[in] bytes Size of transfer in bytes
+  */
+  void qudaMemsetNoTune_(void *dst, int val, size_t count, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMemsetAsync or driver API equivalent
+     with no tuning
+     @param[out] dst Destination pointer
+     @param[in] val value to set
+     @param[in] bytes Size of transfer in bytes
+  */
+  void qudaMemsetAsyncNoTune_(void *dst, int val, size_t count, const qudaStream_t &stream, const char *func,
+                              const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaLaunchKernel
      @param[in] func Device function symbol
      @param[in] gridDim Grid dimensions
      @param[in] blockDim Block dimensions
@@ -125,117 +216,120 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  qudaError_t qudaLaunchKernel_(const void* func_arg, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream, const char *func, const char *file, const char *line);
+  qudaError_t qudaLaunchKernel_(const void *func_arg, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+                                qudaStream_t stream, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventCreate
+     @brief Wrapper around cudaEventCreate
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventCreateWithFlags
+     @brief Wrapper around cudaEventCreateWithFlags
      @param[in] event Event we are querying
      @return Status of event query
   */
-  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t *event, unsigned int flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t *event, unsigned int flags, const char *func, const char *file,
+                                        const char *line);
 
   /**
-     @brief Wrapper around qudaEventDestroy
+     @brief Wrapper around cudaEventDestroy
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventQuery 
+     @brief Wrapper around cudaEventQuery
      @param[in] event Event we are querying
      @return Status of event query
   */
   qudaError_t qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventRecord
+     @brief Wrapper around cudaEventRecord
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
   */
-  qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file, const char *line);
+  qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file,
+                               const char *line);
 
   /**
-     @brief Wrapper around qudaEventElapsedTime
+     @brief Wrapper around cudaEventElapsedTime
      @param[out] ms Time in ms
      @param[in,out] start Start event we are recording
      @param[in,out] end End event we are recording
   */
-  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t start, qudaEvent_t end, const char *func, const char *file, const char *line);
+  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t &start, qudaEvent_t &end, const char *func, const char *file,
+                                    const char *line);
 
   /**
-     @brief Wrapper around qudaEventSynchronize 
+     @brief Wrapper around cudaEventSynchronize
      @param[in] event Event which we are synchronizing with respect to
   */
   qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaEventSynchronize, specialised to use the driver API
-     @param[in] event Event which we are synchronizing with respect to
-  */
-  qudaError_t qudaEventSynchronizeDriver_(qudaEvent_t &event, const char *func, const char *file, const char *line);
-    
-  /**
-     @brief Wrapper around qudaStreamWaitEvent
+     @brief Wrapper around cudaStreamWaitEvent
      @param[in,out] stream Stream which we are instructing to waitç∂
      @param[in] event Event we are waiting on
      @param[in] flags Flags to pass to function
   */
-  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func,
+                                   const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaStreamWaitEvent, Driver enabled variant
-     @param[in,out] stream Stream which we are instructing to waitç∂
-     @param[in] event Event we are waiting on
-     @param[in] flags Flags to pass to function
-  */
-  qudaError_t qudaStreamWaitEventDriver_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func, const char *file, const char *line);
-
-  
-  /**
-     @brief Wrapper around qudaStreamSynchronize or 
-     @param[in] stream Stream which we are synchronizing with respect to
+     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
+     @param[in] stream Stream which we are synchronizing
   */
   qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around qudaStreamSynchronize Driver variant 
-     @param[in] stream Stream which we are synchronizing with respect to
-  */
-  qudaError_t qudaStreamSynchronizeDriver_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+   @brief Wrapper around cudaStreamCreate or cuStreamCreate
+   @param[in] stream Stream which we are creating
+*/
+  qudaError_t qudaStreamCreate_(qudaStream_t &stream, const char *func, const char *file, const char *line);
 
+  /**
+   @brief Wrapper around cudaStreamDestroy or cuStreamDestroy
+   @param[in] stream Stream which we are destroying
+*/
+  qudaError_t qudaStreamDestroy_(qudaStream_t &stream, const char *func, const char *file, const char *line);
+
+  // QUDA texture objects
   /**
      @brief Wrapper around cudaCreateTextureObject
   */
-  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t *pTexObject, const qudaResourceDesc *pResDesc, const qudaTextureDesc *pTexDesc, const qudaResourceViewDesc *pResViewDesc, const char *func, const char *file, const char *line);
-  
+  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t *pTexObject, const qudaResourceDesc *pResDesc,
+                                       const qudaTextureDesc *pTexDesc, const qudaResourceViewDesc *pResViewDesc,
+                                       const char *func, const char *file, const char *line);
+
   /**
      @brief Wrapper around cudaDestroyTextureObject
   */
-  qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file, const char *line);
-  
+  qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file,
+                                        const char *line);
+
   /**
      @brief Wrapper around cudaDestroyTextureObject
   */
-  qudaError_t qudaGetTextureObjectResourceDesc_(qudaResourceDesc* pResDesc, qudaTextureObject_t texObject, const char *func, const char *file, const char *line);
-  
-  //QUDA Device
+  qudaError_t qudaGetTextureObjectResourceDesc_(qudaResourceDesc *pResDesc, qudaTextureObject_t texObject,
+                                                const char *func, const char *file, const char *line);
+
+  // QUDA Device
   /**
      @brief Wrapper around cudaDeviceCanAccessPeer
   */
-  qudaError_t qudaDeviceCanAccessPeer_(int* canAccessPeer, int device, int peerDevice, const char *func, const char *file, const char *line);
+  qudaError_t qudaDeviceCanAccessPeer_(int *canAccessPeer, int device, int peerDevice, const char *func,
+                                       const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaDeviceGetStreamPriorityRange
   */
-  qudaError_t qudaDeviceGetStreamPriorityRange_(int* leastPriority, int* greatestPrioriy, const char *func, const char *file, const char *line);
+  qudaError_t qudaDeviceGetStreamPriorityRange_(int *leastPriority, int *greatestPrioriy, const char *func,
+                                                const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaDeviceGetStreamPriorityRange
@@ -246,16 +340,16 @@ namespace quda {
      @brief Wrapper around cudaDeviceSetCacheConfig
   */
   qudaError_t qudaDeviceSetCacheConfig_(qudaFuncCache cacheConfig, const char *func, const char *file, const char *line);
-  
+
   /**
      @brief Wrapper around cudaDeviceSynchronize
   */
   qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line);
 
   /**
-     @brief Wrapper around cudaDeviceSynchronize
+     @brief Wrapper around cudaDeviceCount
   */
-  qudaError_t qudaGetDeviceCount_(int* count, const char *func, const char *file, const char *line);
+  qudaError_t qudaGetDeviceCount_(int *count, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaSetDevice
@@ -265,33 +359,99 @@ namespace quda {
   /**
      @brief Wrapper around cudaDeviceSynchronize
   */
-  qudaError_t qudaGetDeviceProperties_(qudaDeviceProp* prop, int  device, const char *func, const char *file, const char *line);
+  qudaError_t qudaGetDeviceProperties_(qudaDeviceProp *prop, int device, const char *func, const char *file,
+                                       const char *line);
 
   /**
-     @brief Wrapper around cudaHostGetDevicePointer
+     @brief Wrapper around cudaDeviceSynchronize
   */
-  qudaError_t qudaHostGetDevicePointer_(void** pDevice, void* pHost, unsigned int flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaHostGetDevicePointer_(void **pDevice, void *pHost, unsigned int flags, const char *func,
+                                        const char *file, const char *line);
 
   /**
      @brief Call API wrapper
   */
-  qudaError_t qudaDriverGetVersion_(int* driverVersion, const char *func, const char *file, const char *line);
-  
-  qudaError_t qudaRuntimeGetVersion_(int* runtimeVersion, const char *func, const char *file, const char *line);
+  qudaError_t qudaDriverGetVersion_(int *driverVersion, const char *func, const char *file, const char *line);
+
+  qudaError_t qudaRuntimeGetVersion_(int *runtimeVersion, const char *func, const char *file, const char *line);
 
   /**
      @brief Wrapper around cudaHostRegister
   */
-  qudaError_t qudaHostRegister_(void* ptr, size_t size, unsigned int flags, const char *func, const char *file, const char *line);
+  qudaError_t qudaHostRegister_(void *ptr, size_t size, unsigned int flags, const char *func, const char *file,
+                                const char *line);
+
+  /**
+     @brief Wrapper around cudaHostUnregister
+  */
+  qudaError_t qudaHostUnregister_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaHostAlloc
+  */
+  qudaError_t qudaHostAlloc_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMallocManaged
+  */
+  qudaError_t qudaMallocManaged_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaMalloc
+  */
+  qudaError_t qudaMalloc_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaFree
+  */
+  qudaError_t qudaFree_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaFreeHost
+  */
+  qudaError_t qudaFreeHost_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cuMemAlloc
+  */
+  qudaError_t qudaMemAlloc_(void *ptr, size_t size, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cuMemFree
+  */
+  qudaError_t qudaMemFree_(void *ptr, const char *func, const char *file, const char *line);
+
+  /**
+     @brief Wrapper around cudaPointerGetAttributes
+  */
+  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes attributes, void *ptr, const char *func, const char *file,
+                                        const char *line);
+
+  /**
+     @brief Wrapper around cudaDeviceGetP2PAttribute
+  */
+  qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice,
+                                         const char *func, const char *file, const char *line);
   
+  /**
+     @brief Wrapper around cudaProfileStart
+  */
+  qudaError_t qudaProfilerStart_(const char *func, const char *file, const char *line);
+  
+  /**
+     @brief Wrapper around cudaProfileStop
+  */
+  qudaError_t qudaProfilerStop_(const char *func, const char *file, const char *line);
+
 #if CUDA_VERSION >= 9000
   /**
-     @brief Wrapper around qudaFuncSetAttribute
+     @brief Wrapper around cudaFuncSetAttribute
      @param[in] func Function for which we are setting the attribute
      @param[in] attr Attribute to set
      @param[in] value Value to set
   */
-  qudaError_t qudaFuncSetAttribute(const void* func, qudaFuncAttribute attr, int value);
+  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
+                                    const char *file, const char *line);
 #endif
 
   /**
@@ -304,161 +464,178 @@ namespace quda {
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
 
-//START Memcpy
+// START Memcpy
 //-------------------------------------------------------------------------------------
-#define qudaMemcpy(dst, src, count, kind)				\
+#define qudaMemPrefetchAsync(devPtr, count, dstDevice, stream)                                                         \
+  ::quda::qudaMemPrefetchAsync_(devPtr, count, dstDevice, stream, __func__, quda::file_name(__FILE__),                 \
+                                __STRINGIFY__(__LINE__));
+#define qudaMemcpy(dst, src, count, kind)                                                                              \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpyAsync(dst, src, count, kind, stream)			\
+#define qudaMemcpyNoTune(dst, src, count, kind)                                                                        \
+  ::quda::qudaMemcpyNoTune_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemcpyAsync(dst, src, count, kind, stream)                                                                 \
   ::quda::qudaMemcpyAsync_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream) \
-  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemcpyToSymbolAsync(symbol, src, count, offset, kind, stream) \
-  ::quda::qudaMemcpyToSymbolAsync_(symbol, src, count, offset, kind, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Memcpy
+#define qudaMemcpyAsyncNoTune(dst, src, count, kind, stream)                                                           \
+  ::quda::qudaMemcpyAsyncNoTune_(dst, src, count, kind, stream, __func__, quda::file_name(__FILE__),                   \
+                                 __STRINGIFY__(__LINE__));
+#define qudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)                                                    \
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
+                        __STRINGIFY__(__LINE__));
+#define qudaMemcpy2DNoTune(dst, dpitch, src, spitch, width, height, kind)                                              \
+  ::quda::qudaMemcpy2D_(dst, dpitch, src, spitch, width, height, kind, __func__, quda::file_name(__FILE__),            \
+                        __STRINGIFY__(__LINE__));
+#define qudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream)                                       \
+  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
+                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemcpy2DAsyncNoTune(dst, dpitch, src, spitch, width, height, kind, stream)                                 \
+  ::quda::qudaMemcpy2DAsync_(dst, dpitch, src, spitch, width, height, kind, stream, __func__,                          \
+                             quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+// END Memcpy
 //-------------------------------------------------------------------------------------
 
-#define qudaStreamSynchronize(stream)					\
-  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaStreamSynchronizeDriver(stream)					\
-  ::quda::qudaStreamSynchronizeDriver_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-
-
-
-
-
-
-
-
-
-
-
-//START Event
+// START Event
 //-------------------------------------------------------------------------------------
-#define qudaEventCreate(event)						\
+#define qudaEventCreate(event)                                                                                         \
   ::quda::qudaEventCreate_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventCreateWithFlags(event, flags)				\
+#define qudaEventCreateWithFlags(event, flags)                                                                         \
   ::quda::qudaEventCreateWithFlags_(event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventDestroy(event)						\
+#define qudaEventDestroy(event)                                                                                        \
   ::quda::qudaEventDestroy_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventQuery(event)						\
+#define qudaEventQuery(event)                                                                                          \
   ::quda::qudaEventQuery_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventRecord(event, stream)					\
+#define qudaEventRecord(event, stream)                                                                                 \
   ::quda::qudaEventRecord_(event, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventElapsedTime(ms, start, end)				\
+#define qudaEventElapsedTime(ms, start, end)                                                                           \
   ::quda::qudaEventElapsedTime_(ms, start, end, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventSynchronize(event)					\
+#define qudaEventSynchronize(event)                                                                                    \
   ::quda::qudaEventSynchronize_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaEventSynchronizeDriver(event)				\
-  ::quda::qudaEventSynchronizeDriver_(event, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaStreamWaitEvent(stream, event, flags)			\
-  ::quda::qudaStreamWaitEvent_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaStreamWaitEventDriver(stream, event, flags)			\
-  ::quda::qudaStreamWaitEventDriver_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Event
 //-------------------------------------------------------------------------------------
 
-
-
-//START Memset
+// START Memset
 //-------------------------------------------------------------------------------------
-#define qudaMemset(dst, val, count)					\
+#define qudaMemset(dst, val, count)                                                                                    \
   ::quda::qudaMemset_(dst, val, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemsetAsync(dst, val, count, stream)			\
+#define qudaMemsetAsync(dst, val, count, stream)                                                                       \
   ::quda::qudaMemsetAsync_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemsetNoTune(dst, val, count)                                                                              \
+  ::quda::qudaMemsetNoTune_(dst, val, count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemsetAsyncNoTune(dst, val, count, stream)                                                                 \
+  ::quda::qudaMemsetAsyncNoTune_(dst, val, count, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaMemset2D(dst, val, pitch, width, height)			\
+#define qudaMemset2D(dst, val, pitch, width, height)                                                                   \
   ::quda::qudaMemset2D_(dst, val, pitch, width, height, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaMemset2DAsync(dst, val, pitch, width, height, stream)	\
-  ::quda::qudaMemset2DAsync_(dst, val, pitch, width, height, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Memset
+#define qudaMemset2DAsync(dst, val, pitch, width, height, stream)                                                      \
+  ::quda::qudaMemset2DAsync_(dst, val, pitch, width, height, stream, __func__, quda::file_name(__FILE__),              \
+                             __STRINGIFY__(__LINE__));
+// END Memset
 //-------------------------------------------------------------------------------------
 
-//START Texture
+// START texture
 //-------------------------------------------------------------------------------------
-#define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc) \
-  ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDestroyTextureObject(pTexObject)				\
+#define qudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc)                                          \
+  ::quda::qudaCreateTextureObject_(pTexObject, pResDesc, pTexDesc, pResViewDesc, __func__, quda::file_name(__FILE__),  \
+                                   __STRINGIFY__(__LINE__));
+#define qudaDestroyTextureObject(pTexObject)                                                                           \
   ::quda::qudaDestroyTextureObject_(pTexObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaGetTextureObjectResourceDesc(pResDesc, texObject)		\
-  ::quda::qudaGetTextureObjectResourceDesc_(pResDesc, texObject, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Texture
+#define qudaGetTextureObjectResourceDesc(pResDesc, texObject)                                                          \
+  ::quda::qudaGetTextureObjectResourceDesc_(pResDesc, texObject, __func__, quda::file_name(__FILE__),                  \
+                                            __STRINGIFY__(__LINE__));
+// END texture
 //-------------------------------------------------------------------------------------
 
-//START Device
+// START Device
 //-------------------------------------------------------------------------------------
-#define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice)	\
-  ::quda::qudaDeviceCanAccessPeer_(canAccessPeer, device, peerDevice, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority) \
-  ::quda::qudaDeviceGetStreamPriorityRange_(leastPriority, greatestPriority, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDeviceReset()						\
-  ::quda::qudaDeviceReset_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDeviceSetCacheConfig(cacheConfig)				\
+#define qudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice)                                                     \
+  ::quda::qudaDeviceCanAccessPeer_(canAccessPeer, device, peerDevice, __func__, quda::file_name(__FILE__),             \
+                                   __STRINGIFY__(__LINE__));
+#define qudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority)                                              \
+  ::quda::qudaDeviceGetStreamPriorityRange_(leastPriority, greatestPriority, __func__, quda::file_name(__FILE__),      \
+                                            __STRINGIFY__(__LINE__));
+#define qudaDeviceReset() ::quda::qudaDeviceReset_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaDeviceSetCacheConfig(cacheConfig)                                                                          \
   ::quda::qudaDeviceSetCacheConfig_(cacheConfig, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDeviceSynchronize()						\
+#define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDeviceSynchronize()						\
+#define qudaDeviceSynchronize()                                                                                        \
   ::quda::qudaDeviceSynchronize_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaGetDeviceCount(count)					\
+#define qudaGetDeviceCount(count)                                                                                      \
   ::quda::qudaGetDeviceCount_(count, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaSetDevice(dev)						\
-  ::quda::qudaSetDevice_(dev, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaGetDeviceProperties(prop, device)				\
+#define qudaSetDevice(dev) ::quda::qudaSetDevice_(dev, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaGetDeviceProperties(prop, device)                                                                          \
   ::quda::qudaGetDeviceProperties_(prop, device, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaHostGetDevicePointer(pDevice, pHost, flags)			\
-  ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaDriverGetVersion(driverVersion)				\
+#define qudaHostGetDevicePointer(pDevice, pHost, flags)                                                                \
+  ::quda::qudaHostGetDevicePointer_(pDevice, pHost, flags, __func__, quda::file_name(__FILE__),                        \
+                                    __STRINGIFY__(__LINE__));
+#define qudaDriverGetVersion(driverVersion)                                                                            \
   ::quda::qudaDriverGetVersion_(driverVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-
-#define qudaRuntimeGetVersion(runtimeVersion)				\
+#define qudaRuntimeGetVersion(runtimeVersion)                                                                          \
   ::quda::qudaRuntimeGetVersion_(runtimeVersion, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Device
+#define qudaMallocManaged(ptr, size)                                                                                   \
+  ::quda::qudaMallocManaged_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMalloc(ptr, size)                                                                                          \
+  ::quda::qudaMalloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaFree(ptr) ::quda::qudaFree_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaFreeHost(ptr) ::quda::qudaFreeHost_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemAlloc(ptr, size)                                                                                        \
+  ::quda::qudaMemAlloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaMemFree(ptr) ::quda::qudaMemFree_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+// END Device
 //-------------------------------------------------------------------------------------
 
-//START Host
+// START Stream
 //-------------------------------------------------------------------------------------
-#define qudaHostRegister(ptr, size, flags)				\
+#define qudaStreamWaitEvent(stream, event, flags)                                                                      \
+  ::quda::qudaStreamWaitEvent_(stream, event, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamSynchronize(stream)                                                                                  \
+  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamCreate(stream)                                                                                       \
+  ::quda::qudaStreamCreate_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaStreamDestroy(stream)                                                                                      \
+  ::quda::qudaStreamDestroy_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+// END Stream
+//-------------------------------------------------------------------------------------
+
+// START Host
+//-------------------------------------------------------------------------------------
+#define qudaHostRegister(ptr, size, flags)                                                                             \
   ::quda::qudaHostRegister_(ptr, size, flags, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Host
+#define qudaHostUnregister(ptr)                                                                                        \
+  ::quda::qudaHostUnregister_(ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaHostAlloc(ptr, size)                                                                                       \
+  ::quda::qudaHostAlloc_(ptr, size, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+// END Host
 //-------------------------------------------------------------------------------------
 
-//START Misc
+// START Misc
 //-------------------------------------------------------------------------------------
-#define qudaGetLastError()						\
-  ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaPointerGetAttribute(attributes, ptr)                                                                       \
+  ::quda::qudaPointerGetAttributes_(attributes, ptr, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
-#define qudaGetErrorString(error)					\
-  ::quda::qudaGetErrorString_(error,__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#define qudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice)                                                   \
+  ::quda::qudaDeviceGetP2PAttribute_(value, attr, srcDevice, dstDevice, __func__, quda::file_name(__FILE__),           \
+                                     __STRINGIFY__(__LINE__));
 
-#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream) \
-  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
-//END Misc
+#define qudaGetLastError() ::quda::qudaGetLastError_(__func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaGetErrorString(error)                                                                                      \
+  ::quda::qudaGetErrorString_(error, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream)                                         \
+  ::quda::qudaLaunchKernel_(func_arg, gridDim, blockDim, args, sharedMem, stream, __func__, quda::file_name(__FILE__), \
+                            __STRINGIFY__(__LINE__));
+
+#define qudaProfilerStart()						\
+  ::quda::qudaProfilerStart_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#define qudaProfilerStop()						\
+  ::quda::qudaProfilerStop_( __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+
+#if CUDA_VERSION >= 9000
+#define qudaFuncSetAttribute(func, attr, value)                                                                        \
+  ::quda::qudaFuncSetAttribute_(func, attr, value, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
+#endif
+
+// END Misc
 //-------------------------------------------------------------------------------------
 #endif

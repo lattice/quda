@@ -92,7 +92,7 @@ namespace quda
         policy.apply(0);
       }
 
-      checkQudaError();
+      checkCudaError();
     }
   };
 
@@ -106,16 +106,6 @@ namespace quda
       const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_TWISTED_MASS_DIRAC
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
     // with symmetric dagger operator we must use kernel packing
     if (dagger && !asymmetric) pushKernelPackT(true);
 

@@ -19,8 +19,6 @@
 namespace quda
 {
 
-#ifdef GPU_COVDEV
-
   template <typename Arg> class CovDev : public Dslash<covDev, Arg>
   {
     using Dslash = Dslash<covDev, Arg>;
@@ -148,11 +146,9 @@ namespace quda
         in.GhostFaceCB(), profile);
       policy.apply(0);
 
-      checkQudaError();
+      checkCudaError();
     }
   };
-
-#endif
 
   // Apply the covariant derivative operator
   // out(x) = U_{\mu}(x)in(x+mu) for mu = 0...3
@@ -161,21 +157,7 @@ namespace quda
                    bool dagger, const int *comm_override, TimeProfile &profile)
   {
 #ifdef GPU_COVDEV
-    if (in.V() == out.V()) errorQuda("Aliasing pointers");
-    if (in.FieldOrder() != out.FieldOrder())
-      errorQuda("Field order mismatch in = %d, out = %d", in.FieldOrder(), out.FieldOrder());
-
-    // check all precisions match
-    checkPrecision(out, in, U);
-
-    // check all locations match
-    checkLocation(out, in, U);
-
-    pushKernelPackT(true); // non-spin projection requires kernel packing
-
     instantiate<CovDevApply>(out, in, U, mu, parity, dagger, comm_override, profile);
-
-    popKernelPackT();
 #else
     errorQuda("Covariant derivative kernels have not been built");
 #endif

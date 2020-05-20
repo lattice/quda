@@ -2,10 +2,8 @@
 #include <cstdio>
 #include <iostream>
 #include <iomanip>
-#include <quda_backend.h>
+#include <quda_target.h>
 #include <gauge_field.h>
-#include <tune_quda.h>
-
 #include <tune_quda.h>
 #include <quda_matrix.h>
 #include <gauge_field_order.h>
@@ -397,7 +395,7 @@ namespace quda {
       {
         apply(0);
         qudaDeviceSynchronize(); // need to synchronize to ensure failure write has completed
-        checkQudaError();
+        checkCudaError();
       }
 
       void apply(const qudaStream_t &stream) {

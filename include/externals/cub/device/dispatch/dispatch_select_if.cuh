@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -341,7 +341,7 @@ struct DispatchSelectIf
         typename                    ScanInitKernelPtrT,             ///< Function type of cub::DeviceScanInitKernel
         typename                    SelectIfKernelPtrT>             ///< Function type of cub::SelectIfKernelPtrT
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t Dispatch(
+    static cudaError_t Dispatch(
         void*                       d_temp_storage,                 ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                     temp_storage_bytes,             ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
@@ -351,7 +351,7 @@ struct DispatchSelectIf
         SelectOpT                   select_op,                      ///< [in] Selection operator
         EqualityOpT                 equality_op,                    ///< [in] Equality operator
         OffsetT                     num_items,                      ///< [in] Total number of input items (i.e., length of \p d_in)
-        qudaStream_t                stream,                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                stream,                         ///< [in] CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous,              ///< [in] Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
         int                         /*ptx_version*/,                ///< [in] PTX version of dispatch kernels
         ScanInitKernelPtrT          scan_init_kernel,               ///< [in] Kernel function pointer to parameterization of cub::DeviceScanInitKernel
@@ -380,7 +380,7 @@ struct DispatchSelectIf
 
 #else
 
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get device ordinal
@@ -483,7 +483,7 @@ struct DispatchSelectIf
      * Internal dispatch routine
      */
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t Dispatch(
+    static cudaError_t Dispatch(
         void*                       d_temp_storage,                 ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t&                     temp_storage_bytes,             ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
@@ -493,10 +493,10 @@ struct DispatchSelectIf
         SelectOpT                   select_op,                      ///< [in] Selection operator
         EqualityOpT                 equality_op,                    ///< [in] Equality operator
         OffsetT                     num_items,                      ///< [in] Total number of input items (i.e., length of \p d_in)
-        qudaStream_t                stream,                         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                stream,                         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous)              ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  Also causes launch configurations to be printed to the console.  Default is \p false.
     {
-        cudaError error = qudaSuccess;
+        cudaError error = cudaSuccess;
         do
         {
             // Get PTX version

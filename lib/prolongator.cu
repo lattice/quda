@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <multigrid_helper.cuh>
 
 namespace quda {
@@ -214,7 +213,7 @@ namespace quda {
       errorQuda("Unsupported V precision %d", v.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
   }
 
 
@@ -233,11 +232,12 @@ namespace quda {
 
     if (out.Ncolor() == 3) {
       const int fineColor = 3;
-      if (nVec == 4) {
-        Prolongate<Float,fineSpin,fineColor,coarseSpin,4>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 6) { // Free field Wilson
+#ifdef NSPIN4
+      if (nVec == 6) { // Free field Wilson
         Prolongate<Float,fineSpin,fineColor,coarseSpin,6>(out, in, v, fine_to_coarse, parity);
-      } else if (nVec == 24) {
+      } else
+#endif // NSPIN4
+      if (nVec == 24) {
         Prolongate<Float,fineSpin,fineColor,coarseSpin,24>(out, in, v, fine_to_coarse, parity);
 #ifdef NSPIN4
       } else if (nVec == 32) {
@@ -347,7 +347,7 @@ namespace quda {
       errorQuda("Unsupported precision %d", out.Precision());
     }
 
-    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkQudaError();
+    if (checkLocation(out, in, v) == QUDA_CUDA_FIELD_LOCATION) checkCudaError();
 #else
     errorQuda("Multigrid has not been built");
 #endif

@@ -20,12 +20,9 @@
 
 #pragma once
 
-//#include <math.h>
-
 #include <cmath>
 #include <complex>
 #include <sstream>
-//#include <qudaComplex.h>
 
 namespace quda {
   namespace gauge {
@@ -1247,7 +1244,7 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     return polar(::sqrt(abs(z)),arg(z)/ValueType(2));
   }
 
-  template <typename ValueType>
+  template <>
     __host__ __device__
     inline complex<float> sqrt(const complex<float>& z){
     return polar(::sqrtf(abs(z)),arg(z)/float(2));
@@ -1377,6 +1374,16 @@ lhs.real()*rhs.imag()+lhs.imag()*rhs.real());
     w.y += x.imag() * y.real();
     w.y += x.real() * y.imag();
     return w;
+  }
+
+  template <typename real> __host__ __device__ inline complex<real> i_(const complex<real> &a)
+  {
+    // FIXME compiler generates worse code with "optimal" code
+#if 1
+    return complex<real>(0.0, 1.0) * a;
+#else
+    return complex<real>(-a.imag(), a.real());
+#endif
   }
 
 } // end namespace quda

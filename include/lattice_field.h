@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <quda_backend.h>
+#include <quda_target.h>
 
 /**
  * @file lattice_field.h
@@ -27,7 +27,7 @@ namespace quda {
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
-#ifdef DEVELOP_ONEAPI  
+#ifndef DPCPP_DEVEL
   class EigValueSet;
   class cudaEigValueSet;
   class cpuEigValueSet;
@@ -470,12 +470,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
+    const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -642,16 +642,18 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
-    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p=NULL)
+    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+
+    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                            bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
-    { errorQuda("Not implemented"); }
-
-    virtual int commsQuery(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
@@ -668,6 +670,13 @@ namespace quda {
 
     /** @brief Restores the LatticeField */
     virtual void restore() const { errorQuda("Not implemented"); }
+
+    /**
+      @brief If managed memory and prefetch is enabled, prefetch
+      all relevant memory fields to the current device or to the CPU.
+      @param[in] mem_space Memory space we are prefetching to
+    */
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
   };
   
   /**
@@ -698,7 +707,7 @@ namespace quda {
     return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
 
-#define checkLocation(...)Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+#define checkLocation(...) Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the precision of the fields is the same.

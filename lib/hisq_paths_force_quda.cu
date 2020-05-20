@@ -1,5 +1,4 @@
 #include <utility>
-#include <typeinfo>
 #include <quda_internal.h>
 #include <gauge_field.h>
 #include <ks_improved_force.h>
@@ -845,7 +844,7 @@ namespace quda {
       instantiate<HisqStaplesForce, ReconstructNone>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, path_coeff_array);
 
       qudaDeviceSynchronize();
-      checkQudaError();
+      checkCudaError();
     }
 
     template <typename real, int nColor, QudaReconstructType reconstruct=QUDA_RECONSTRUCT_NO>
@@ -1055,7 +1054,7 @@ namespace quda {
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
         longLink.apply(0);
         qudaDeviceSynchronize();
-        checkQudaError();
+        checkCudaError();
       }
     };
 
@@ -1077,7 +1076,7 @@ namespace quda {
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
         completeForce.apply(0);
         qudaDeviceSynchronize();
-        checkQudaError();
+        checkCudaError();
       }
     };
 

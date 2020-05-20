@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -46,6 +46,8 @@ namespace cub {
 
 /**
  * \brief WarpScanShfl provides SHFL-based variants of parallel prefix scan of items partitioned across a CUDA thread warp.
+ *
+ * LOGICAL_WARP_THREADS must be a power-of-two
  */
 template <
     typename    T,                      ///< Data type being scanned
@@ -66,7 +68,7 @@ struct WarpScanShfl
         STEPS = Log2<LOGICAL_WARP_THREADS>::VALUE,
 
         /// The 5-bit SHFL mask for logically splitting warps into sub-segments starts 8-bits up
-        SHFL_C = ((-1 << STEPS) & 31) << 8,
+        SHFL_C = (CUB_WARP_THREADS(PTX_ARCH) - LOGICAL_WARP_THREADS) << 8
     };
 
     template <typename S>
@@ -86,8 +88,13 @@ struct WarpScanShfl
     // Thread fields
     //---------------------------------------------------------------------
 
+    /// Lane index in logical warp
     unsigned int lane_id;
 
+    /// Logical warp index in 32-thread physical warp
+    unsigned int warp_id;
+
+    /// 32-thread physical warp member mask of logical warp
     unsigned int member_mask;
 
     //---------------------------------------------------------------------
@@ -97,14 +104,18 @@ struct WarpScanShfl
     /// Constructor
     __device__ __forceinline__ WarpScanShfl(
         TempStorage &/*temp_storage*/)
-    :
-        lane_id(IS_ARCH_WARP ?
-            LaneId() :
-            LaneId() % LOGICAL_WARP_THREADS),
-        member_mask(IS_ARCH_WARP ?
-             0xffffffff :
-             (0xffffffff >> (32 - LOGICAL_WARP_THREADS)) << (LaneId() / LOGICAL_WARP_THREADS))
-    {}
+    {
+        lane_id = LaneId();
+        warp_id = 0;
+        member_mask = 0xffffffffu >> (CUB_WARP_THREADS(PTX_ARCH) - LOGICAL_WARP_THREADS);
+
+        if (!IS_ARCH_WARP)
+        {
+            warp_id = lane_id / LOGICAL_WARP_THREADS;
+            lane_id = lane_id % LOGICAL_WARP_THREADS;
+            member_mask = member_mask << (warp_id * LOGICAL_WARP_THREADS);
+        }
+    }
 
 
     //---------------------------------------------------------------------
@@ -387,11 +398,11 @@ struct WarpScanShfl
     template <typename _T, typename ScanOpT>
     __device__ __forceinline__ _T InclusiveScanStep(
         _T              input,              ///< [in] Calling thread's input item.
-        ScanOpT          scan_op,            ///< [in] Binary scan operator
+        ScanOpT         scan_op,            ///< [in] Binary scan operator
         int             first_lane,         ///< [in] Index of first lane in segment
         int             offset)             ///< [in] Up-offset to pull from
     {
-        _T temp = ShuffleUp(input, offset, first_lane, member_mask);
+        _T temp = ShuffleUp<LOGICAL_WARP_THREADS>(input, offset, first_lane, member_mask);
 
         // Perform scan op if from a valid peer
         _T output = scan_op(temp, input);
@@ -406,7 +417,7 @@ struct WarpScanShfl
     template <typename _T, typename ScanOpT>
     __device__ __forceinline__ _T InclusiveScanStep(
         _T              input,              ///< [in] Calling thread's input item.
-        ScanOpT          scan_op,            ///< [in] Binary scan operator
+        ScanOpT         scan_op,            ///< [in] Binary scan operator
         int             first_lane,         ///< [in] Index of first lane in segment
         int             offset,             ///< [in] Up-offset to pull from
         Int2Type<true>  /*is_small_unsigned*/)  ///< [in] Marker type indicating whether T is a small integer
@@ -427,30 +438,6 @@ struct WarpScanShfl
         return InclusiveScanStep(input, scan_op, first_lane, offset);
     }
 
-    //---------------------------------------------------------------------
-    // Templated inclusive scan iteration
-    //---------------------------------------------------------------------
-
-    template <typename _T, typename ScanOp, int STEP>
-    __device__ __forceinline__ void InclusiveScanStep(
-        _T&             input,              ///< [in] Calling thread's input item.
-        ScanOp          scan_op,            ///< [in] Binary scan operator
-        int             first_lane,         ///< [in] Index of first lane in segment
-        Int2Type<STEP>  /*step*/)               ///< [in] Marker type indicating scan step
-    {
-        input = InclusiveScanStep(input, scan_op, first_lane, 1 << STEP, Int2Type<IntegerTraits<T>::IS_SMALL_UNSIGNED>());
-
-        InclusiveScanStep(input, scan_op, first_lane, Int2Type<STEP + 1>());
-    }
-
-    template <typename _T, typename ScanOp>
-    __device__ __forceinline__ void InclusiveScanStep(
-        _T&             /*input*/,              ///< [in] Calling thread's input item.
-        ScanOp          /*scan_op*/,            ///< [in] Binary scan operator
-        int             /*first_lane*/,         ///< [in] Index of first lane in segment
-        Int2Type<STEPS> /*step*/)               ///< [in] Marker type indicating scan step
-    {}
-
 
     /******************************************************************************
      * Interface
@@ -465,7 +452,7 @@ struct WarpScanShfl
         T               input,              ///< [in] The value to broadcast
         int             src_lane)           ///< [in] Which warp lane is to do the broadcasting
     {
-        return ShuffleIndex(input, src_lane, LOGICAL_WARP_THREADS, member_mask);
+        return ShuffleIndex<LOGICAL_WARP_THREADS>(input, src_lane, member_mask);
     }
 
 
@@ -484,9 +471,6 @@ struct WarpScanShfl
 
         // Iterate scan steps
         int segment_first_lane = 0;
-
-        // Iterate scan steps
-//        InclusiveScanStep(inclusive_output, scan_op, segment_first_lane, Int2Type<0>());
 
         // Iterate scan steps
         #pragma unroll
@@ -511,7 +495,7 @@ struct WarpScanShfl
     {
         inclusive_output = input;
 
-        KeyT pred_key = ShuffleUp(inclusive_output.key, 1, 0, member_mask);
+        KeyT pred_key = ShuffleUp<LOGICAL_WARP_THREADS>(inclusive_output.key, 1, 0, member_mask);
 
         unsigned int ballot = WARP_BALLOT((pred_key != inclusive_output.key), member_mask);
 
@@ -520,9 +504,6 @@ struct WarpScanShfl
 
         // Find index of first set bit
         int segment_first_lane = CUB_MAX(0, 31 - __clz(ballot));
-
-        // Iterate scan steps
-//        InclusiveScanStep(inclusive_output.value, scan_op.op, segment_first_lane, Int2Type<0>());
 
         // Iterate scan steps
         #pragma unroll
@@ -549,7 +530,7 @@ struct WarpScanShfl
         InclusiveScan(input, inclusive_output, scan_op);
 
         // Grab aggregate from last warp lane
-        warp_aggregate = ShuffleIndex(inclusive_output, LOGICAL_WARP_THREADS - 1, LOGICAL_WARP_THREADS, member_mask);
+        warp_aggregate = ShuffleIndex<LOGICAL_WARP_THREADS>(inclusive_output, LOGICAL_WARP_THREADS - 1, member_mask);
     }
 
 
@@ -567,7 +548,7 @@ struct WarpScanShfl
         IsIntegerT              /*is_integer*/)     ///< [in]
     {
         // initial value unknown
-        exclusive = ShuffleUp(inclusive, 1, 0, member_mask);
+        exclusive = ShuffleUp<LOGICAL_WARP_THREADS>(inclusive, 1, 0, member_mask);
     }
 
     /// Update inclusive and exclusive using input and inclusive (specialized for summation of integer types)
@@ -593,7 +574,8 @@ struct WarpScanShfl
         IsIntegerT              /*is_integer*/)
     {
         inclusive = scan_op(initial_value, inclusive);
-        exclusive = ShuffleUp(inclusive, 1, 0, member_mask);
+        exclusive = ShuffleUp<LOGICAL_WARP_THREADS>(inclusive, 1, 0, member_mask);
+
         if (lane_id == 0)
             exclusive = initial_value;
     }
@@ -622,7 +604,7 @@ struct WarpScanShfl
         ScanOpT                 scan_op,
         IsIntegerT              is_integer)
     {
-        warp_aggregate = ShuffleIndex(inclusive, LOGICAL_WARP_THREADS - 1, LOGICAL_WARP_THREADS, member_mask);
+        warp_aggregate = ShuffleIndex<LOGICAL_WARP_THREADS>(inclusive, LOGICAL_WARP_THREADS - 1, member_mask);
         Update(input, inclusive, exclusive, scan_op, is_integer);
     }
 
@@ -637,7 +619,7 @@ struct WarpScanShfl
         T                       initial_value,
         IsIntegerT              is_integer)
     {
-        warp_aggregate = ShuffleIndex(inclusive, LOGICAL_WARP_THREADS - 1, LOGICAL_WARP_THREADS, member_mask);
+        warp_aggregate = ShuffleIndex<LOGICAL_WARP_THREADS>(inclusive, LOGICAL_WARP_THREADS - 1, member_mask);
         Update(input, inclusive, exclusive, scan_op, initial_value, is_integer);
     }
 

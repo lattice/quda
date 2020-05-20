@@ -92,7 +92,7 @@ namespace quda {
     @param localstate CURAND rng state
  */
   template <class T>
-  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, quRNGState& localState){
+  __device__ static inline Matrix<T,2> generate_su2_matrix_milc(T al, cuRNGState& localState){
     T xr1, xr2, xr3, xr4, d, r;
     int k;
     xr1 = Random<T>(localState);
@@ -304,7 +304,7 @@ namespace quda {
  */
   template <class Float, int NCOLORS>
   __device__ inline void heatBathSUN( Matrix<complex<Float>,NCOLORS>& U, Matrix<complex<Float>,NCOLORS> F,
-                                      quRNGState& localState, Float BetaOverNc ){
+                                      cuRNGState& localState, Float BetaOverNc ){
 
     if ( NCOLORS == 3 ) {
       //////////////////////////////////////////////////////////////////
@@ -626,36 +626,35 @@ namespace quda {
     Matrix<complex<Float>,NCOLORS> U;
     for ( int nu = 0; nu < 4; nu++ ) if ( mu != nu ) {
         int dx[4] = { 0, 0, 0, 0 };
-        Matrix<complex<Float>,NCOLORS> link;
-        arg.dataOr.load((Float*)(link.data), idx, nu, parity);
+        Matrix<complex<Float>,NCOLORS> link = arg.dataOr(nu, idx, parity);
         dx[nu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), mu, 1 - parity);
+        U = arg.dataOr(mu, linkIndexShift(x,dx,X), 1 - parity);
         link *= U;
         dx[nu]--;
         dx[mu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), nu, 1 - parity);
+        U = arg.dataOr(nu, linkIndexShift(x,dx,X), 1 - parity);
         link *= conj(U);
         staple += link;
         dx[mu]--;
         dx[nu]--;
-        arg.dataOr.load((Float*)(link.data), linkIndexShift(x,dx,X), nu, 1 - parity);
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), mu, 1 - parity);
+        link = arg.dataOr(nu, linkIndexShift(x,dx,X), 1 - parity);
+        U = arg.dataOr(mu, linkIndexShift(x,dx,X), 1 - parity);
         link = conj(link) * U;
         dx[mu]++;
-        arg.dataOr.load((Float*)(U.data), linkIndexShift(x,dx,X), nu, parity);
+        U = arg.dataOr(nu, linkIndexShift(x,dx,X), parity);
         link *= U;
         staple += link;
       }
-    arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+    U = arg.dataOr(mu, idx, parity);
     if ( HeatbathOrRelax ) {
-      quRNGState localState = arg.rngstate.State()[ id ];
+      cuRNGState localState = arg.rngstate.State()[ id ];
       heatBathSUN<Float, NCOLORS>( U, conj(staple), localState, arg.BetaOverNc );
       arg.rngstate.State()[ id ] = localState;
     }
     else{
       overrelaxationSUN<Float, NCOLORS>( U, conj(staple) );
     }
-    arg.dataOr.save((Float*)(U.data), idx, mu, parity);
+    arg.dataOr(mu, idx, parity) = U;
   }
 
 
@@ -692,7 +691,7 @@ namespace quda {
     }
     void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax ><< < tp.grid,tp.block, tp.shared_bytes, stream >> > (arg, mu, parity);
+      compute_heatBath<Float, Gauge, NCOLORS, HeatbathOrRelax > <<< tp.grid,tp.block, tp.shared_bytes, stream >>> (arg, mu, parity);
     }
 
     TuneKey tuneKey() const {
@@ -743,13 +742,13 @@ namespace quda {
       //NEED TO CHECK THIS!!!!!!
       if ( NCOLORS == 3 ) {
         long long byte = 20LL * NElems * sizeof(Float);
-        if ( HeatbathOrRelax ) byte += 2LL * sizeof(quRNGState);
+        if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
         byte *= arg.threads;
         return byte;
       }
       else{
         long long byte = 20LL * NCOLORS * NCOLORS * 2 * sizeof(Float);
-        if ( HeatbathOrRelax ) byte += 2LL * sizeof(quRNGState);
+        if ( HeatbathOrRelax ) byte += 2LL * sizeof(cuRNGState);
         byte *= arg.threads;
         return byte;
       }

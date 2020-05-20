@@ -215,7 +215,8 @@ namespace quda {
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
-    void apply(const qudaStream_t &stream) {      
+    void apply(const qudaStream_t &stream)
+    {
       static int count = 0;
 
       // on the first call do the first half of the update
@@ -242,9 +243,7 @@ namespace quda {
       }
       
       if (++count == n_update) count = 0;
-      
     }
-    
   };
 
   // this is the Worker pointer that the dslash uses to launch the shifted updates
@@ -252,8 +251,8 @@ namespace quda {
     extern Worker* aux_worker;
   } 
   
-  BiCGstabL::BiCGstabL(DiracMatrix &mat, DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
-    Solver(param, profile), mat(mat), matSloppy(matSloppy), nKrylov(param.Nkrylov), init(false)
+  BiCGstabL::BiCGstabL(const DiracMatrix &mat, const DiracMatrix &matSloppy, SolverParam &param, TimeProfile &profile) :
+    Solver(mat, matSloppy, matSloppy, param, profile), nKrylov(param.Nkrylov), init(false)
   {
     r.resize(nKrylov+1);
     u.resize(nKrylov+1);

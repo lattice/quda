@@ -68,11 +68,8 @@ namespace quda {
     }
 
     if (ndim > 4) {
-      if (geo_bs[4] != 1) {
-        geo_bs[4] = 1;
-        warningQuda(
-          "5th dimension block size is being set to 1. This is a benign side effect of staggered fermions.\n");
-      }
+      geo_bs[4] = 1;
+      warningQuda("5th dimension block size is being set to 1. This is a benign side effect of staggered fermions");
     }
 
     this->geo_bs = new int[ndim];
@@ -85,7 +82,7 @@ namespace quda {
     if (total_block_size == 1) errorQuda("Total geometric block size is 1");
 
     std::string block_str = std::to_string(geo_bs[0]);
-    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[1]);
+    for (int d = 1; d < ndim; d++) block_str += " x " + std::to_string(geo_bs[d]);
     if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Transfer: using block size %s\n", block_str.c_str());
 
     createV(B[0]->Location()); // allocate V field
@@ -189,17 +186,17 @@ namespace quda {
     case QUDA_CUDA_FIELD_LOCATION:
       if (enable_gpu) return;
       createV(location);
-      *V_d = *V_h;
+      if (!is_staggered) *V_d = *V_h;
       createTmp(location);
       fine_to_coarse_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
       coarse_to_fine_d = static_cast<int*>(pool_device_malloc(B[0]->Volume()*sizeof(int)));
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
       break;
     case QUDA_CPU_FIELD_LOCATION:
       if (enable_cpu) return;
       createV(location);
-      *V_h = *V_d;
+      if (!is_staggered) *V_h = *V_d;
       break;
     default:
       errorQuda("Unknown location %d", location);
@@ -307,9 +304,9 @@ namespace quda {
     for (unsigned int i=0; i<geo_sort.size(); i++) coarse_to_fine_h[i] = geo_sort[i].y;
 
     if (enable_gpu) {
-      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume()*sizeof(int), qudaMemcpyHostToDevice);
-      checkQudaError();
+      qudaMemcpy(fine_to_coarse_d, fine_to_coarse_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      qudaMemcpy(coarse_to_fine_d, coarse_to_fine_h, B[0]->Volume() * sizeof(int), qudaMemcpyHostToDevice);
+      checkCudaError();
     }
 
   }
@@ -337,7 +334,6 @@ namespace quda {
     ColorSpinorField *input = const_cast<ColorSpinorField*>(&in);
     ColorSpinorField *output = &out;
     initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
-
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
 
     if (is_staggered) {
@@ -378,13 +374,13 @@ namespace quda {
   }
 
   // apply the restrictor
-  void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const {
-
+  void Transfer::R(ColorSpinorField &out, const ColorSpinorField &in) const
+  {
     profile.TPSTART(QUDA_PROFILE_COMPUTE);
 
     ColorSpinorField *input = &const_cast<ColorSpinorField&>(in);
     ColorSpinorField *output = &out;
-
+    initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
     const int *fine_to_coarse = use_gpu ? fine_to_coarse_d : fine_to_coarse_h;
     const int *coarse_to_fine = use_gpu ? coarse_to_fine_d : coarse_to_fine_h;
 
@@ -393,7 +389,6 @@ namespace quda {
       flops_ += 0; // it's only a permutation
     } else {
 
-      initializeLazy(use_gpu ? QUDA_CUDA_FIELD_LOCATION : QUDA_CPU_FIELD_LOCATION);
       const ColorSpinorField *V = use_gpu ? V_d : V_h;
 
       if (use_gpu) {

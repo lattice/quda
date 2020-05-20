@@ -1,1 +1,0 @@
-../copy_color_spinor_ds.cu

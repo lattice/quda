@@ -1,4 +1,4 @@
-#include "copy_color_spinor.cuh"
+#include <copy_color_spinor.cuh>
 
 namespace quda {
   
@@ -8,7 +8,7 @@ namespace quda {
 #if QUDA_PRECISION & 4
     CopyGenericColorSpinor<3>(dst, src, location, (double*)Dst, (float*)Src);
 #else
-    //errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(), src.Precision());
+    errorQuda("QUDA_PRECISION=%d does not enable precision combination %d %d", QUDA_PRECISION, dst.Precision(), src.Precision());
 #endif
   }  
 

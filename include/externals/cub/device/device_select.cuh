@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -130,7 +130,7 @@ struct DeviceSelect
         typename                    OutputIteratorT,
         typename                    NumSelectedIteratorT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t Flagged(
+    static cudaError_t Flagged(
         void*               d_temp_storage,                ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
@@ -138,7 +138,7 @@ struct DeviceSelect
         OutputIteratorT             d_out,                          ///< [out] Pointer to the output sequence of selected data items
         NumSelectedIteratorT         d_num_selected_out,                 ///< [out] Pointer to the output total number of items selected (i.e., length of \p d_out)
         int                         num_items,                      ///< [in] Total number of input items (i.e., length of \p d_in)
-        qudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous  = false)     ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
         typedef int                     OffsetT;         // Signed integer type for global offsets
@@ -236,7 +236,7 @@ struct DeviceSelect
         typename                    NumSelectedIteratorT,
         typename                    SelectOp>
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t If(
+    static cudaError_t If(
         void*               d_temp_storage,                ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
@@ -244,7 +244,7 @@ struct DeviceSelect
         NumSelectedIteratorT         d_num_selected_out,                 ///< [out] Pointer to the output total number of items selected (i.e., length of \p d_out)
         int                         num_items,                      ///< [in] Total number of input items (i.e., length of \p d_in)
         SelectOp                    select_op,                      ///< [in] Unary selection operator
-        qudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous  = false)     ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
         typedef int                     OffsetT;         // Signed integer type for global offsets
@@ -326,14 +326,14 @@ struct DeviceSelect
         typename                    OutputIteratorT,
         typename                    NumSelectedIteratorT>
     CUB_RUNTIME_FUNCTION __forceinline__
-    static qudaError_t Unique(
+    static cudaError_t Unique(
         void*               d_temp_storage,                ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t                      &temp_storage_bytes,            ///< [in,out] Reference to size in bytes of \p d_temp_storage allocation
         InputIteratorT              d_in,                           ///< [in] Pointer to the input sequence of data items
         OutputIteratorT             d_out,                          ///< [out] Pointer to the output sequence of selected data items
         NumSelectedIteratorT         d_num_selected_out,             ///< [out] Pointer to the output total number of items selected (i.e., length of \p d_out)
         int                         num_items,                      ///< [in] Total number of input items (i.e., length of \p d_in)
-        qudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
+        cudaStream_t                stream             = 0,         ///< [in] <b>[optional]</b> CUDA stream to launch kernels within.  Default is stream<sub>0</sub>.
         bool                        debug_synchronous  = false)     ///< [in] <b>[optional]</b> Whether or not to synchronize the stream after every kernel launch to check for errors.  May cause significant slowdown.  Default is \p false.
     {
         typedef int                     OffsetT;         // Signed integer type for global offsets

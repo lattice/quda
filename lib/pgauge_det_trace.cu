@@ -63,8 +63,7 @@ __global__ void compute_Value(KernelArg<Gauge> arg){
   #endif
 #pragma unroll
     for (int mu = 0; mu < 4; mu++) {
-      Matrix<complex<Float>,NCOLORS> U;
-      arg.dataOr.load((Float*)(U.data), idx, mu, parity);
+      Matrix<complex<Float>,NCOLORS> U = arg.dataOr(mu, idx, parity);
       if(functiontype == 0) val += getDeterminant(U);
       if(functiontype == 1) val += getTrace(U);
     }
@@ -131,7 +130,7 @@ double2 computeValue( Gauge dataOr,  cudaGaugeField& data) {
   func.apply(0);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 0) printfQuda("Determinant: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
   if(getVerbosity() >= QUDA_SUMMARIZE && functiontype == 1) printfQuda("Trace: %.16e, %.16e\n", arg.getValue().x, arg.getValue().y);
-  checkQudaError();
+  checkCudaError();
   qudaDeviceSynchronize();
   if (getVerbosity() >= QUDA_SUMMARIZE){
     profileGenericFunc.TPSTOP(QUDA_PROFILE_COMPUTE);

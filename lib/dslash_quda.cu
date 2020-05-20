@@ -117,7 +117,7 @@ namespace quda {
     }
 #endif
 
-    checkQudaError();
+    checkCudaError();
 
     dslash_pack_compute = true;
     dslash_interior_compute = true;
@@ -162,7 +162,7 @@ namespace quda {
       qudaEventDestroy(dslashStart[i]);
     }
 
-    checkQudaError();
+    checkCudaError();
   }
 
   /**
@@ -419,7 +419,7 @@ namespace quda {
     TwistGamma<Float,nColor,GammaArg<Float,nColor> > gamma(arg, in);
     gamma.apply(streams[Nstream-1]);
 
-    checkQudaError();
+    checkCudaError();
   }
 
   // template on the number of colors
@@ -616,7 +616,7 @@ namespace quda {
       worker.apply(streams[Nstream - 1]);
     }
 
-    checkQudaError();
+    checkCudaError();
   }
 
   // template on the number of colors
@@ -772,7 +772,7 @@ namespace quda {
     TwistClover<Float,nSpin,nColor,decltype(arg)> worker(arg, in);
     worker.apply(streams[Nstream-1]);
 
-    checkQudaError();
+    checkCudaError();
   }
 
   // template on the number of colors

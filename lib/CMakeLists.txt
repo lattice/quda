@@ -4,14 +4,12 @@ set (QUDA_OBJS
   # cmake-format: sortable
   timer.cpp malloc.cpp
   interface_quda.cpp util_quda.cpp
-  color_spinor_field.cpp color_spinor_util.cu
+  color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp
   lattice_field.cpp
-  tune.cpp
-  blas_quda.cu reduce_quda.cu
-  random.cu
+  blas_quda.cu multi_blas_quda.cu 
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
-  copy_color_spinor.cu spinor_noise.cu
+  copy_color_spinor.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
   copy_color_spinor_dh.cu copy_color_spinor_dq.cu
   copy_color_spinor_ss.cu copy_color_spinor_sd.cu
@@ -20,8 +18,9 @@ set (QUDA_OBJS
   copy_color_spinor_hh.cu copy_color_spinor_hq.cu
   copy_color_spinor_qd.cu copy_color_spinor_qs.cu
   copy_color_spinor_qh.cu copy_color_spinor_qq.cu
-  quda_cuda_api.cpp
-  version.cpp )
+  extended_color_spinor_utilities.cu
+  quda_cuda_api.cpp checksum.cu
+  instantiate.cpp version.cpp )
 # cmake-format: on
 
 # split source into cu and cpp files
@@ -39,7 +38,7 @@ if(BUILD_FORTRAN_INTERFACE)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
-# QUDA_CU_OBJS shoudl contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
+# QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")
@@ -88,7 +87,7 @@ if(${QUDA_PROPAGATE_CXX_FLAGS})
                                 $<$<CONFIG:DEVICEDEBUG>:-Xcompiler ${CMAKE_CXX_FLAGS_DEVICEDEBUG}> >)
 endif()
 
-# some clang warnings shouds be warning even when turning warnings into errors
+# some clang warnings should be warning even when turning warnings into errors
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(quda_cpp
                          PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wno-error=unused-private-field -Wno-error=unused-function>)
@@ -108,10 +107,23 @@ if(QUDA_MULTIGRID)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
 endif(QUDA_MULTIGRID)
 
+if(QUDA_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_ALG)
+  add_definitions(-DGPU_GAUGE_TOOLS)
+  add_definitions(-DGPU_UNITARIZE)
+  target_link_libraries(quda PUBLIC ${CUDA_cufft_LIBRARY})
+endif(QUDA_GAUGE_ALG)
+
 if(QUDA_JITIFY)
   target_link_libraries(quda PUBLIC ${CUDA_nvrtc_LIBRARY})
   target_link_libraries(quda PUBLIC ${LIBDL_LIBRARIES})
 endif()
+
+if(QUDA_NVTX)
+  if(NOT NVTX3)
+    target_link_libraries(quda PUBLIC ${CUDA_nvToolsExt_LIBRARY})
+  endif()
+endif(QUDA_NVTX)
 
 if(QUDA_BACKWARDS)
   target_include_directories(quda_cpp SYSTEM PRIVATE ${backward-cpp_SOURCE_DIR})
