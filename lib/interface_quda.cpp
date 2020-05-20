@@ -5811,8 +5811,8 @@ void gaugeObservablesQuda(QudaGaugeObservableParam *param)
   profileGaugeObs.TPSTOP(QUDA_PROFILE_TOTAL);
 }
 
-void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_sinks,
-		     QudaInvertParam inv_param, const int X[4])
+void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_sinks,
+		     QudaInvertParam inv_param, unsigned int nEv, const int X[4])
 {
   profileSinkProject.TPSTART(QUDA_PROFILE_TOTAL);
   profileSinkProject.TPSTART(QUDA_PROFILE_INIT);
@@ -5832,8 +5832,11 @@ void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_si
   cpu_evec_param.nSpin = 1;
   // QUDA style wrapper around the host data
   std::vector<ColorSpinorField*> evec;
-  cpu_evec_param.v = host_evec;
-  evec.push_back(ColorSpinorField::Create(cpu_evec_param));
+  evec.reserve(nEv);
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    cpu_evec_param.v = host_evec[iEv];
+    evec.push_back(ColorSpinorField::Create(cpu_evec_param));
+  }
   
   // Create device vectors
   ColorSpinorParam cuda_quark_param(cpu_quark_param);
@@ -5853,9 +5856,8 @@ void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_si
   quda_evec.push_back(ColorSpinorField::Create(cuda_evec_param));
   profileSinkProject.TPSTOP(QUDA_PROFILE_INIT);  
 
-  // Copy data from host to device
+  // Copy quark field from host to device
   profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
-  *quda_evec[0] = *evec[0];
   *quda_quark[0] = *quark[0];
   profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
 
@@ -5864,11 +5866,23 @@ void laphSinkProject(void *host_quark, void *host_evec, double _Complex *host_si
     errorQuda("Irreconcilable difference between interface and internal complex number conventions");
   }
 
-  // We now perfrom the projection onto the eigenspace. The data
-  // is placed in host_sinks in i, X, Y, Z, T, spin order 
-  profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
-  evecProjectSumQuda(*quda_quark[0], *quda_evec[0], reinterpret_cast<std::complex<double>*>(host_sinks));
-  profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
+  std::complex<double>* hostSinkPtr = reinterpret_cast<std::complex<double>*>(host_sinks);
+
+  // Iterate over all EV and call 1x1 kernel for now
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) {
+    profileSinkProject.TPSTART(QUDA_PROFILE_H2D);
+    *quda_evec[0] = *evec[iEv];
+    profileSinkProject.TPSTOP(QUDA_PROFILE_H2D);
+
+    // We now perfrom the projection onto the eigenspace. The data
+    // is placed in host_sinks in  T, spin order 
+    profileSinkProject.TPSTART(QUDA_PROFILE_COMPUTE);
+    evecProjectSumQuda(*quda_quark[0], *quda_evec[0], hostSinkPtr);
+    profileSinkProject.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+    // Advance result pointer to next EV position
+    hostSinkPtr += 4*X[3];
+  }
 
   // Clean up memory allocations
   profileSinkProject.TPSTART(QUDA_PROFILE_FREE);

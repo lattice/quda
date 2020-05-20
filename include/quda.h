@@ -1367,8 +1367,8 @@ extern "C" {
   /**
    * @brief Hack for Callat
    */
-  void laphSinkProject(void *host_quark, void *host_evec, double_complex *host_sinks,
-		       QudaInvertParam inv_param, const int X[4]);
+  void laphSinkProject(void *host_quark, void **host_evec, double_complex *host_sinks,
+		       QudaInvertParam inv_param, unsigned int nEv, const int X[4]);
 
   /**
    * @brief Flush the chronological history for the given index
