@@ -935,7 +935,6 @@ void loadGaugeQuda(void *h_gauge, QudaGaugeParam *param)
   }
 
   saveTuneCache();
-  saveProfile();
 
   profileGauge.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -1175,7 +1174,6 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
 
   popVerbosity();
   saveTuneCache();
-  saveProfile();
 
   profileClover.TPSTOP(QUDA_PROFILE_TOTAL);
 }
@@ -2705,7 +2703,6 @@ void* newDeflationQuda(QudaEigParam *eig_param) {
 
   profileInvert.TPSTOP(QUDA_PROFILE_TOTAL);
 
-  saveProfile(__func__);
   flushProfile();
   return static_cast<void*>(defl);
 }
@@ -5331,9 +5328,6 @@ void plaqQuda(double plaq[3])
   plaq[1] = plaq3.y;
   plaq[2] = plaq3.z;
   profilePlaq.TPSTOP(QUDA_PROFILE_COMPUTE);
-
-  saveTuneCache();
-  saveProfile();
 
   profilePlaq.TPSTOP(QUDA_PROFILE_TOTAL);
 }
