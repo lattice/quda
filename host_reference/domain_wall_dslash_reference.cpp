@@ -1324,31 +1324,6 @@ static cpuGaugeField *create_extended_gauge(void **gauge, QudaGaugeParam &gauge_
   return padded_cpu;
 }
 
-inline int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4])
-{
-  return (((coordinate[3] * dim[2] + coordinate[2]) * dim[1] + coordinate[1]) * dim[0] + coordinate[0]) >> 1;
-}
-
-inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
-                                           const int shift[4], int parity) // s is the 5d stuff,
-{
-  int aux[4];
-  aux[0] = shrinked_index * 2;
-
-  for (int i = 0; i < 3; i++) { aux[i + 1] = aux[i] / shrinked_dim[i]; }
-
-  coordinate[0] = aux[0] - aux[1] * shrinked_dim[0];
-  coordinate[1] = aux[1] - aux[2] * shrinked_dim[1];
-  coordinate[2] = aux[2] - aux[3] * shrinked_dim[2];
-  coordinate[3] = aux[3];
-
-  // Find the full coordinate in the shrinked volume.
-  coordinate[0] += (parity + coordinate[3] + coordinate[2] + coordinate[1]) & 1;
-
-  // if(shrinked_index == 3691) printfQuda("coordinate[0] = %d\n", coordinate[0]);
-  for (int d = 0; d < 4; d++) { coordinate[d] += shift[d]; }
-}
-
 void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
                      QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
                      double _Complex *b5, double _Complex *c5)
