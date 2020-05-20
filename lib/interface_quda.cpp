@@ -5888,7 +5888,7 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   profileSinkProject.TPSTART(QUDA_PROFILE_FREE);
   delete quark[0];
   delete quda_quark[0];
-  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[i];
+  for (unsigned int iEv=0; iEv<nEv; ++iEv) delete evec[iEv];
   delete quda_evec[0];
   profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
   profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
