@@ -152,21 +152,26 @@ namespace quda {
         ret = true;
       }
 
-      if (!tuneGridDim()) 
+      if (!tuneGridDim())
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
 
       return ret;
     }
 
     /**
-     * @brief For some reason this can't be queried from the device
-     * properties, so here we set set this.  Based on Table 14 of the
-     * CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability)
+     * @brief Returns the maximum number of simultaneously resident
+     * blocks per SM.  We can directly query this of CUDA 11, but
+     * previously this needed to be hand coded.
      * @return The maximum number of simultaneously resident blocks per SM
      */
     unsigned int maxBlocksPerSM() const
     {
+#if CUDA_VERSION >= 11000
+      static int max_blocks_per_sm = 0;
+      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+      return max_blocks_per_sm;
+#else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
 	return 8;
@@ -185,6 +190,7 @@ namespace quda {
                     deviceProp.major, deviceProp.minor);
         return 32;
       }
+#endif
     }
 
     /**
@@ -204,30 +210,28 @@ namespace quda {
     }
 
     /**
-     * @brief This can't be correctly queried in CUDA for all
-     * architectures so here we set set this.  Based on Table 14 of
-     * the CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability).
+     * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
     {
+#if CUDA_VERSION >= 9000
+      static int max_shared_bytes = 0;
+      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
+      return max_shared_bytes;
+#else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
       case 3:
       case 5:
       case 6: return 48 * 1024;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 96 * 1024;
-        case 2: return 96 * 1024;
-        case 5: return 64 * 1024;
-        }
       default:
         warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
                     deviceProp.major, deviceProp.minor);
         return 48 * 1024;
       }
+#endif
     }
 
     /**
@@ -385,29 +389,29 @@ namespace quda {
       if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
         errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
                   param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
-      
+
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested X-dimension block size %d greater than hardware limit %d",
 		  param.block.x, deviceProp.maxThreadsDim[0]);
-      
+
       if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d",
 		  param.block.y, deviceProp.maxThreadsDim[1]);
-	
+
       if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d",
 		  param.block.z, deviceProp.maxThreadsDim[2]);
-	  
+
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d",
 		  param.grid.x, deviceProp.maxGridSize[0]);
 
       if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d",
 		  param.grid.y, deviceProp.maxGridSize[1]);
-    
+
       if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d",
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
@@ -415,7 +419,7 @@ namespace quda {
     CUresult& jitifyError() { return jitify_error; }
   };
 
-  
+
   /**
      This derived class is for algorithms that deploy parity across
      the y dimension of the thread block with no shared memory tuning.
@@ -443,7 +447,7 @@ namespace quda {
       param.block.y = 2;
       return rtn;
     }
-    
+
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
       param.block.y = 2;
@@ -455,7 +459,7 @@ namespace quda {
     }
 
   };
-  
+
   /**
      This derived class is for algorithms that deploy a vector of
      computations across the y dimension of both the threads block and

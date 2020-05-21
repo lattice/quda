@@ -276,6 +276,7 @@ extern QudaFieldLocation location_ritz;
 extern QudaMemoryType mem_type_ritz;
 
 // Parameters for the stand alone eigensolver
+extern int eig_block_size;
 extern int eig_nEv;
 extern int eig_nKr;
 extern int eig_nConv; // If unchanged, will be set to nEv
@@ -304,6 +305,7 @@ extern bool eig_io_parity_inflate;
 // The coarsest grid params are for deflation,
 // all others are for PR vectors.
 extern quda::mgarray<bool> mg_eig;
+extern quda::mgarray<int> mg_eig_block_size;
 extern quda::mgarray<int> mg_eig_nEv;
 extern quda::mgarray<int> mg_eig_nKr;
 extern quda::mgarray<int> mg_eig_batched_rotate;
