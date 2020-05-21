@@ -375,8 +375,13 @@ namespace quda {
                      QUDA_MATPC_INVALID, need_bidirectional);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+      if (use_mma) {
+        mma::CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
                      QUDA_MATPC_INVALID, need_bidirectional);
+      } else {
+        CoarseCoarseOp(Y, X, T, *(this->Y_d), *(this->X_d), *(this->Xinv_d), kappa, a, mu_factor, QUDA_COARSE_DIRAC,
+                     QUDA_MATPC_INVALID, need_bidirectional);
+      }
     }
   }
 
@@ -594,8 +599,13 @@ namespace quda {
                      matpcType, true);
     } else {
       initializeLazy(QUDA_CUDA_FIELD_LOCATION);
-      CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+      if (use_mma) {
+        mma::CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
                      matpcType, true);
+      } else {
+        CoarseCoarseOp(Y, X, T, *(this->Yhat_d), *(this->X_d), *(this->Xinv_d), kappa, a, -mu_factor, QUDA_COARSEPC_DIRAC,
+                     matpcType, true);
+      }
     }
   }
 

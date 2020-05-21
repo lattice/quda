@@ -478,6 +478,13 @@ public:
                       const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
                       QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
 
+  namespace mma
+  {
+    void CoarseCoarseOp(GaugeField &Y, GaugeField &X, const Transfer &T, const GaugeField &gauge,
+                      const GaugeField &clover, const GaugeField &cloverInv, double kappa, double mu, double mu_factor,
+                      QudaDiracType dirac, QudaMatPCType matpc, bool need_bidirectional);
+  }
+
   /**
      @brief Calculate preconditioned coarse links and coarse clover inverse field
      @param Yhat[out] Preconditioned coarse link field
