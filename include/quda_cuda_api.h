@@ -26,10 +26,19 @@ namespace quda {
   void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
 		   const char *func, const char *file, const char *line);
 
+  /**
+     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
+     @param[in] stream Stream which we are synchronizing
+  */
+  cudaError_t qudaStreamSynchronize_(cudaStream_t &stream, const char *func, const char *file, const char *line);
+  
 }
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
+
+#define qudaStreamSynchronize(stream)					\
+  ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaMemcpy(dst, src, count, kind) \
   ::quda::qudaMemcpy_(dst, src, count, kind, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
@@ -128,12 +137,6 @@ namespace quda {
      @param[in] flags Flags to pass to function
    */
   cudaError_t qudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags);
-
-  /**
-     @brief Wrapper around cudaStreamSynchronize or cuStreamSynchronize
-     @param[in] stream Stream which we are synchronizing with respect to
-   */
-  cudaError_t qudaStreamSynchronize(cudaStream_t &stream);
 
   /**
      @brief Wrapper around cudaEventSynchronize or cuEventSynchronize

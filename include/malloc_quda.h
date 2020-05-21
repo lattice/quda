@@ -1,5 +1,4 @@
-#ifndef _MALLOC_QUDA_H
-#define _MALLOC_QUDA_H
+#pragma once
 
 #include <cstdlib>
 #include <cstdint>
@@ -141,5 +140,3 @@ namespace quda {
 #define pool_pinned_malloc(size) quda::pool::pinned_malloc_(__func__, __FILE__, __LINE__, size)
 #define pool_pinned_free(ptr) quda::pool::pinned_free_(__func__, __FILE__, __LINE__, ptr)
 
-
-#endif // _MALLOC_QUDA_H

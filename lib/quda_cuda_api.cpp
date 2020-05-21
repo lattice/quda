@@ -198,6 +198,29 @@ namespace quda {
     }
   }
 
+  cudaError_t qudaStreamSynchronize_(cudaStream_t &stream, const char *func, const char *file, const char *line)
+  {
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    return error;
+
+#endif
+  }
+
+  
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
                           size_t width, size_t height, cudaMemcpyKind kind, const cudaStream_t &stream,
                           const char *func, const char *file, const char *line)
@@ -311,25 +334,6 @@ namespace quda {
     return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    return error;
-#endif
-  }
-
-  cudaError_t qudaStreamSynchronize(cudaStream_t &stream)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuStreamSynchronize returned error %s", str);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
     return error;
 #endif
   }
