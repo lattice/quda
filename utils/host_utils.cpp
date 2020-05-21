@@ -383,7 +383,7 @@ int index_4d_cb_from_coordinate_4d(const int coordinate[4], const int dim[4])
 }
 
 void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const int shrinked_dim[4],
-                                           const int shift[4], int parity)
+                                    const int shift[4], int parity)
 {
   int aux[4];
   aux[0] = shrinked_index * 2;

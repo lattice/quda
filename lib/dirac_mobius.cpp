@@ -30,10 +30,8 @@ namespace quda {
         printfQuda("%s: Detected fixed real cofficients: using regular Mobius\n", __func__);
       }
     }
-    
-    if (zMobius) {
-      errorQuda("zMobius has NOT been fully tested in QUDA.\n");
-    }
+
+    if (zMobius) { errorQuda("zMobius has NOT been fully tested in QUDA.\n"); }
   }
 
   // Modification for the 4D preconditioned Mobius domain wall operator
@@ -188,7 +186,10 @@ namespace quda {
     // do nothing
   }
 
-  DiracMobiusPC::~DiracMobiusPC() { if(extended_gauge) delete extended_gauge; }
+  DiracMobiusPC::~DiracMobiusPC()
+  {
+    if (extended_gauge) delete extended_gauge;
+  }
 
   DiracMobiusPC &DiracMobiusPC::operator=(const DiracMobiusPC &dirac)
   {

@@ -41,15 +41,15 @@ Dirac *dirac = nullptr;
 QudaDagType not_dagger;
 
 dslash_test_type dtest_type = dslash_test_type::Dslash;
-CLI::TransformPairs<dslash_test_type> dtest_type_map {{"Dslash", dslash_test_type::Dslash},
-                                                      {"MatPC", dslash_test_type::MatPC},
-                                                      {"Mat", dslash_test_type::Mat},
-                                                      {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
-                                                      {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
-                                                      {"MatDagMat", dslash_test_type::MatDagMat},
-                                                      {"M5", dslash_test_type::M5},
-                                                      {"M5inv", dslash_test_type::M5inv},
-                                                      {"Dslash4pre", dslash_test_type::Dslash4pre}};
+CLI::TransformPairs<dslash_test_type> dtest_type_map{{"Dslash", dslash_test_type::Dslash},
+                                                     {"MatPC", dslash_test_type::MatPC},
+                                                     {"Mat", dslash_test_type::Mat},
+                                                     {"MatPCDagMatPC", dslash_test_type::MatPCDagMatPC},
+                                                     {"MatPCDagMatPCLocal", dslash_test_type::MatPCDagMatPCLocal},
+                                                     {"MatDagMat", dslash_test_type::MatDagMat},
+                                                     {"M5", dslash_test_type::M5},
+                                                     {"M5inv", dslash_test_type::M5inv},
+                                                     {"Dslash4pre", dslash_test_type::Dslash4pre}};
 
 void init(int argc, char **argv)
 {

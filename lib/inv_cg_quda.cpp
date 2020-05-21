@@ -565,7 +565,7 @@ namespace quda {
             // p[(k+1)%Np] = r + beta * p[k%Np]
             blas::xpayz(rSloppy, beta, *p[j], *p[(j + 1) % Np]);
           }
-	}
+        }
 
 	if (use_heavy_quark_res && k%heavy_quark_check==0) {
 	  if (&x != &xSloppy) {
