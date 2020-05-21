@@ -1,6 +1,5 @@
 #include <tune_quda.h>
 #include <gauge_field.h>
-
 #include <jitify_helper.cuh>
 #include <kernels/field_strength_tensor.cuh>
 #include <instantiate.h>

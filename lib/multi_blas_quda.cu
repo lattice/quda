@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring> // needed for memset
-#include <typeinfo>
 
 #include <tune_quda.h>
 #include <blas_quda.h>
