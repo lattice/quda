@@ -333,6 +333,7 @@ extern "C" {
    * @param milc_fatlink Fat-link field on the host
    * @param milc_longlink Long-link field on the host
    * @param mg_pack_ptr MG preconditioner structure created by qudaSetupMultigrid
+   * @param mg_rebuild_type whether to do a full (1) or thin (0) MG rebuild
    * @param source Right-hand side source field
    * @param solution Solution spinor field
    * @param final_residual True residual
@@ -348,6 +349,7 @@ extern "C" {
       const void *const milc_fatlink,
       const void *const milc_longlink,
       void *mg_pack_ptr,
+      int mg_rebuild_type,
       void *source,
       void *solution,
       double *const final_residual,

@@ -1839,8 +1839,8 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
 
 void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
                 double target_residual, double target_fermilab_residual, const void *const fatlink,
-                const void *const longlink, void *mg_pack_ptr, void *source, void *solution, double *const final_residual,
-                double *const final_fermilab_residual, int *num_iters)
+                const void *const longlink, void *mg_pack_ptr, int mg_rebuild_type, void *source, void *solution,
+                double *const final_residual, double *const final_fermilab_residual, int *num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
@@ -1927,8 +1927,13 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
     //updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
-    printfQuda("Performing thin update.\n");
-    thinUpdateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    if (mg_rebuild_type == 1) {
+      if (verbosity >= QUDA_VERBOSE) printfQuda("Performing a full MG solver update\n");
+      updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    } else {
+      if (verbosity >= QUDA_VERBOSE) printfQuda("Performing a thin MG solver update\n");
+      thinUpdateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    }
     invalidate_quda_mg = false;
   }
 
