@@ -232,7 +232,16 @@ namespace quda
 
   __device__ inline void __half_max_abs_half2__(half &max, const half2 &input)
   {
+#if ((__CUDACC_VER_MAJOR__ == 10 && __CUDACC_VER_MINOR__ == 2) || __CUDACC_VER_MAJOR__ >= 11)
+    // For CUDA >= 10.2
     half2 lh = __habs2(input);
+#else
+    // Set the fisrt bit of the halves to 0.
+    static constexpr uint32_t maximum_mask = 0x7fff7fffu; // 0111 1111 1111 1111 0111 1111 1111 1111
+
+    uint32_t input_masked = *reinterpret_cast<const uint32_t *>(&input) & maximum_mask;
+    half2 lh = *reinterpret_cast<half2 *>(&input_masked);
+#endif
     if (__hgt(lh.x, max)) { max = lh.x; }
     if (__hgt(lh.y, max)) { max = lh.y; }
   }
