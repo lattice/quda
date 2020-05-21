@@ -14,32 +14,53 @@
 namespace quda
 {
 
+  inline __host__ __device__ float s2f_(short a_16)
+  {
+    union {
+      uint a_32;
+      float f_32;
+    };
+    a_32 = 0x4b7f8000 ^ (a_16 & 0xFFFF);
+    return f_32 - 16744448.f;
+  }
+
+  inline __host__ __device__ float c2f_(char a_8)
+  {
+#if 1
+    return static_cast<float>(a_8);
+#else
+    uint a_32 = 0x4b7fff80;
+    a_32 ^= (a_8) & 0xFFFF;
+    return reinterpret_cast<float&>(a_32) - 16777088.f;
+#endif
+  }
+
   // specializations for short-float conversion
-  inline __host__ __device__ float s2f(short a) { return static_cast<float>(a) * fixedInvMaxValue<short>::value; }
-  inline __host__ __device__ double s2d(short a) { return static_cast<double>(a) * fixedInvMaxValue<short>::value; }
+  inline __host__ __device__ float s2f(short a) { return s2f_(a) * fixedInvMaxValue<short>::value; }
+  inline __host__ __device__ double s2d(short a) { return s2f_(a) * fixedInvMaxValue<short>::value; }
 
   // specializations for char-float conversion
-  inline __host__ __device__ float c2f(char a) { return static_cast<float>(a) * fixedInvMaxValue<char>::value; }
-  inline __host__ __device__ double c2d(char a) { return static_cast<double>(a) * fixedInvMaxValue<char>::value; }
+  inline __host__ __device__ float c2f(char a) { return c2f_(a) * fixedInvMaxValue<char>::value; }
+  inline __host__ __device__ double c2d(char a) { return c2f_(a) * fixedInvMaxValue<char>::value; }
 
   // specializations for short-float conversion with additional scale factor
   inline __host__ __device__ float s2f(short a, float c)
   {
-    return static_cast<float>(a) * (fixedInvMaxValue<short>::value * c);
+    return s2f_(a) * (fixedInvMaxValue<short>::value * c);
   }
   inline __host__ __device__ double s2d(short a, double c)
   {
-    return static_cast<double>(a) * (fixedInvMaxValue<short>::value * c);
+    return s2f_(a) * (fixedInvMaxValue<short>::value * c);
   }
 
   // specializations for char-float conversion with additional scale factor
   inline __host__ __device__ float c2f(char a, float c)
   {
-    return static_cast<float>(a) * (fixedInvMaxValue<char>::value * c);
+    return c2f_(a) * (fixedInvMaxValue<char>::value * c);
   }
   inline __host__ __device__ double c2d(char a, double c)
   {
-    return static_cast<double>(a) * (fixedInvMaxValue<char>::value * c);
+    return c2f_(a) * (fixedInvMaxValue<char>::value * c);
   }
 
   template <typename FloatN> __device__ inline void copyFloatN(FloatN &a, const FloatN &b) { a = b; }
