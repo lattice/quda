@@ -1304,26 +1304,6 @@ void mdw_eofa_matpc(void *out, void **gauge, void *in, QudaMatPCType matpc_type,
   free(tmp);
 }
 
-// helper for creating extended gauge fields
-static cpuGaugeField *create_extended_gauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
-{
-  GaugeFieldParam gauge_field_param(gauge, gauge_param);
-  cpuGaugeField cpu(gauge_field_param);
-
-  gauge_field_param.ghostExchange = QUDA_GHOST_EXCHANGE_EXTENDED;
-  gauge_field_param.create = QUDA_ZERO_FIELD_CREATE;
-  for (int d = 0; d < 4; d++) {
-    gauge_field_param.x[d] += 2 * R[d];
-    gauge_field_param.r[d] = R[d];
-  }
-  cpuGaugeField *padded_cpu = new cpuGaugeField(gauge_field_param);
-
-  copyExtendedGauge(*padded_cpu, cpu, QUDA_CPU_FIELD_LOCATION);
-  padded_cpu->exchangeExtendedGhost(R, true); // Do comm to fill halo = true
-
-  return padded_cpu;
-}
-
 void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b, double _Complex *kappa_c,
                      QudaMatPCType matpc_type, QudaPrecision precision, QudaGaugeParam &gauge_param, double mferm,
                      double _Complex *b5, double _Complex *c5)
