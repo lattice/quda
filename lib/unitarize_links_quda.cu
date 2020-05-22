@@ -346,7 +346,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       DoUnitarizedLink<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }
@@ -436,7 +436,7 @@ namespace {
       checkCudaError();
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       ProjectSU3kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
     }

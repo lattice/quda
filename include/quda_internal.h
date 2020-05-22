@@ -56,7 +56,7 @@ extern "C" {
   };
 
   extern cudaDeviceProp deviceProp;  
-  extern cudaStream_t *streams;
+  extern qudaStream_t *streams;
  
 #ifdef __cplusplus
 }

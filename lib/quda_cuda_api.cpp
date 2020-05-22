@@ -95,7 +95,7 @@ namespace quda {
       strcat(aux, line);
     }
 
-    inline void apply(const cudaStream_t &stream) {
+    inline void apply(const qudaStream_t &stream) {
       tuneLaunch(*this, getTuning(), getVerbosity());
       if (copy) {
         if (async) {
@@ -168,7 +168,7 @@ namespace quda {
       errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const cudaStream_t &stream,
+  void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
                         const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
@@ -198,7 +198,7 @@ namespace quda {
     }
   }
 
-  cudaError_t qudaStreamSynchronize_(cudaStream_t &stream, const char *func, const char *file, const char *line)
+  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
@@ -222,7 +222,7 @@ namespace quda {
 
   
   void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t height, cudaMemcpyKind kind, const cudaStream_t &stream,
+                          size_t width, size_t height, cudaMemcpyKind kind, const qudaStream_t &stream,
                           const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
@@ -261,7 +261,7 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetAsync_(void *ptr, int value, size_t count, const cudaStream_t &stream, const char *func,
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
     if (count == 0) return;
@@ -271,7 +271,7 @@ namespace quda {
     if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, cudaStream_t stream)
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
@@ -300,7 +300,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaEventRecord(cudaEvent_t &event, cudaStream_t stream)
+  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
@@ -319,7 +319,7 @@ namespace quda {
 #endif
   }
 
-  cudaError_t qudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags)
+  cudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);

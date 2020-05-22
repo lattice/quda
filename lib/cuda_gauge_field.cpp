@@ -425,7 +425,7 @@ namespace quda {
     }
   }
 
-  void cudaGaugeField::sendStart(int dim, int dir, cudaStream_t* stream_p)
+  void cudaGaugeField::sendStart(int dim, int dir, qudaStream_t* stream_p)
   {
     if (!comm_dim_partitioned(dim)) return;
 
@@ -840,7 +840,7 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaGaugeField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void cudaGaugeField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
 
     if (is_prefetch_enabled() && mem_type == QUDA_MEMORY_DEVICE) {

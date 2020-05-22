@@ -512,7 +512,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, qudaStream_t *stream_p=nullptr);
 
     /**
        @brief Wait for communication to complete
@@ -615,7 +615,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {
