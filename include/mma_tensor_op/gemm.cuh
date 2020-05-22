@@ -30,7 +30,22 @@ namespace quda
       }
     };
 
-    template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
+    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_> struct MmaConfig {
+
+      static constexpr int M = M_;
+      static constexpr int N = N_;
+      static constexpr int K = K_;
+      static constexpr int lda = lda_;
+      static constexpr int ldb = ldb_;
+      static constexpr int ldc = ldc_;
+      static constexpr int bM = bM_;
+      static constexpr int bN = bN_;
+      static constexpr int bK = bK_;
+
+    };
+
+    template <int M, int N, int ldm, int ldn, class T>
+    __device__ inline auto make_smem_obj(T *ptr_)
     {
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
@@ -56,10 +71,7 @@ namespace quda
       const int z;
 
       __device__ inline GlobalMemoryLoader(SmemAccessor real_, SmemAccessor imag_) :
-        smem_real(real_),
-        smem_imag(imag_),
-        y(threadIdx.y),
-        z(threadIdx.z * 2)
+        smem_real(real_), smem_imag(imag_), y(threadIdx.y), z(threadIdx.z * 2)
       {
       }
 
@@ -175,10 +187,13 @@ namespace quda
 #endif
     };
 
-    template <int N, int bM, int bN, int bK, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only,
-              class A, class B, class C>
+    template <class Config, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only, class A, class B, class C>
     __device__ inline float perform_mma(const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
     {
+      constexpr int bM = Config::bM;
+      constexpr int bN = Config::bN;
+      constexpr int bK = Config::bK;
+
       constexpr int lda = bM + pad_size(bM);
       constexpr int ldb = bN + pad_size(bN);
 
@@ -236,27 +251,27 @@ namespace quda
       constexpr bool b_transpose = true;
 
 #ifdef USE_GMEM_MMA_PIPELINING
-      aa_loader.g2r<N, a_transpose>(aa, m_offset, 0);
+      aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, 0);
       aa_loader.r2s();
 
-      bb_loader.g2r<N, b_transpose>(bb, n_offset, 0);
+      bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, 0);
       bb_loader.r2s();
 
       __syncthreads();
 #endif
 
 #pragma unroll 1
-      for (int bk = 0; bk < N; bk += bK) {
+      for (int bk = 0; bk < Config::K; bk += bK) {
 
 #ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + bK < N) {
-          aa_loader.g2r<N, a_transpose>(aa, m_offset, bk + bK);
-          bb_loader.g2r<N, b_transpose>(bb, n_offset, bk + bK);
+        if (bk + bK < Config::K) {
+          aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, bk + bK);
+          bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, bk + bK);
         }
 #else
         __syncthreads();
-        aa_loader.g2s<N, a_transpose>(aa, m_offset, bk);
-        bb_loader.g2s<N, b_transpose>(bb, n_offset, bk);
+        aa_loader.g2s<Config::lda, a_transpose>(aa, m_offset, bk);
+        bb_loader.g2s<Config::ldb, b_transpose>(bb, n_offset, bk);
         __syncthreads();
 #endif
 
@@ -293,7 +308,7 @@ namespace quda
         }
 
 #ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + bK < N) {
+        if (bk + bK < Config::K) {
           __syncthreads();
 
           aa_loader.r2s();
@@ -319,8 +334,8 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          store_complex<N>(warp_row * WMMA_M + m_offset, warp_col * WMMA_N + n_offset, wrm, cc, op_c_real[c],
-                           op_c_imag[c]);
+          store_complex<Config::N>(warp_row * WMMA_M + m_offset, warp_col * WMMA_N + n_offset, wrm, cc, op_c_real[c],
+                                   op_c_imag[c]);
         }
       }
 

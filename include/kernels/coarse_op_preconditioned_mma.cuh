@@ -32,12 +32,7 @@ namespace quda
 
       CalculateYhatArg(const PreconditionedGauge &Yhat, const Gauge Y, const Gauge Xinv, const int *dim,
                        const int *comm_dim, int nFace) :
-        Yhat(Yhat),
-        Y(Y),
-        Xinv(Xinv),
-        nFace(nFace),
-        max_h(nullptr),
-        max_d(nullptr)
+        Yhat(Yhat), Y(Y), Xinv(Xinv), nFace(nFace), max_h(nullptr), max_d(nullptr)
       {
         for (int i = 0; i < 4; i++) {
           this->comm_dim[i] = comm_dim[i];
@@ -57,6 +52,8 @@ namespace quda
 
       real yHatMax = 0.0;
 
+      using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK>;
+
       // first do the backwards links Y^{+\mu} * X^{-\dagger}
       if (arg.comm_dim[d] && (coord[d] - arg.nFace < 0)) {
 
@@ -68,8 +65,7 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax
-          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
+        yHatMax = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
 
       } else {
 
@@ -81,8 +77,7 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax
-          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
+        yHatMax = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
@@ -93,8 +88,7 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
-        real yHatMax_
-          = perform_mma<Arg::N, bM, bN, bK, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
+        real yHatMax_ = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, m, n);
         yHatMax = fmax(yHatMax, yHatMax_);
       }
 
@@ -102,7 +96,7 @@ namespace quda
     }
 
     template <bool compute_max_only, typename Arg, int N, int bM, int bN, int bK, int block_y, int block_z>
-    __global__ void __launch_bounds__(block_y * block_z, 1) CalculateYhatGPU(Arg arg)
+    __global__ void __launch_bounds__(block_y *block_z, 1) CalculateYhatGPU(Arg arg)
     {
       int index_x = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -116,9 +110,9 @@ namespace quda
 
       if (x_cb >= arg.Y.VolumeCB()) return;
 
-      int parity = blockIdx.y; // i_parity / arg.tile.M_tiles;
+      int parity = blockIdx.y;
 
-      int d = blockIdx.z; // j_d / arg.tile.N_tiles;
+      int d = blockIdx.z;
 
       extern __shared__ half smem_ptr[];
 
