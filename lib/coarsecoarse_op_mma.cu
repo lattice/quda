@@ -49,7 +49,7 @@ namespace quda
         errorQuda("Unsupported field location %d\n", Y.Location());
       } else {
 
-#if 1
+#if 0
         constexpr QudaFieldOrder csOrder = QUDA_FLOAT2_FIELD_ORDER;
         constexpr QudaGaugeFieldOrder gOrder = QUDA_FLOAT2_GAUGE_ORDER;
         
@@ -60,7 +60,56 @@ namespace quda
         constexpr QudaFieldOrder csOrder = QUDA_SPACE_SPIN_COLOR_FIELD_ORDER;
         constexpr QudaGaugeFieldOrder gOrder = QUDA_MILC_GAUGE_ORDER;
 #endif
+        // XXX: This doesn't work for single precision since X/Yatomic are just references to X/Y.
+        GaugeFieldParam param_Y(Y);
+        GaugeFieldParam param_X(X);
+        GaugeFieldParam param_Xatomic(Xatomic);
+        GaugeFieldParam param_Yatomic(Yatomic);
 
+        ColorSpinorParam param_uv(uv);
+
+        GaugeFieldParam param_g(g);
+        GaugeFieldParam param_clover(clover);
+        GaugeFieldParam param_cloverInv(cloverInv);
+
+        param_Y.order = gOrder;
+        param_X.order = gOrder;
+        param_Xatomic.order = gOrder;
+        param_Yatomic.order = gOrder;
+
+        param_uv.fieldOrder = csOrder;
+
+        param_g.order = gOrder;
+        param_clover.order = gOrder;
+        param_cloverInv.order = gOrder;
+
+        param_Y.setPrecision(X.Precision());
+        param_X.setPrecision(Y.Precision());
+        param_Xatomic.setPrecision(Xatomic.Precision());
+        param_Yatomic.setPrecision(Yatomic.Precision());
+
+        param_uv.setPrecision(uv.Precision());
+
+        param_g.setPrecision(g.Precision());
+        param_clover.setPrecision(clover.Precision());
+        param_cloverInv.setPrecision(cloverInv.Precision());
+
+        cudaGaugeField X_(param_X);
+        cudaGaugeField Y_(param_Y);
+        cudaGaugeField Xatomic_(param_Xatomic);
+        cudaGaugeField Yatomic_(param_Yatomic);
+
+        cudaColorSpinorField uv_(param_uv);
+
+        cudaGaugeField g_(param_g);
+        cudaGaugeField clover_(param_clover);
+        cudaGaugeField cloverInv_(param_cloverInv);
+
+        g_.copy(g);
+        clover_.copy(clover);
+        cloverInv_.copy(cloverInv);
+
+        uv_.copy(uv);
         typedef typename colorspinor::FieldOrderCB<Float, fineSpin, fineColor, coarseColor, csOrder, vFloat> V;
         typedef typename colorspinor::FieldOrderCB<Float, 2 * fineSpin, fineColor, coarseColor, csOrder, vFloat> F;
         typedef typename gauge::FieldOrder<Float, fineColor * fineSpin, fineSpin, gOrder, true, vFloat> gFine;
@@ -70,21 +119,37 @@ namespace quda
 
         const ColorSpinorField &v = T.Vectors(Y.Location());
 
-        V vAccessor(const_cast<ColorSpinorField &>(v));
-        F uvAccessor(const_cast<ColorSpinorField &>(uv));
-        gFine gAccessor(const_cast<GaugeField &>(g));
-        cFine cAccessor(const_cast<GaugeField &>(clover));
-        cFine cInvAccessor(const_cast<GaugeField &>(cloverInv));
-        gCoarse yAccessor(const_cast<GaugeField &>(Y));
-        gCoarse xAccessor(const_cast<GaugeField &>(X));
-        gCoarseAtomic yAccessorAtomic(const_cast<GaugeField &>(Yatomic));
-        gCoarseAtomic xAccessorAtomic(const_cast<GaugeField &>(Xatomic));
+        ColorSpinorParam param_v(v);
+        param_v.fieldOrder = csOrder;
+        param_v.setPrecision(v.Precision());
+
+        cudaColorSpinorField v_(param_v);
+
+        v_.copy(v);
+
+        V vAccessor(const_cast<cudaColorSpinorField &>(v_));
+        F uvAccessor(const_cast<cudaColorSpinorField &>(uv_));
+        gFine gAccessor(const_cast<cudaGaugeField &>(g_));
+        cFine cAccessor(const_cast<cudaGaugeField &>(clover_));
+        cFine cInvAccessor(const_cast<cudaGaugeField &>(cloverInv_));
+        gCoarse yAccessor(const_cast<cudaGaugeField &>(Y_));
+        gCoarse xAccessor(const_cast<cudaGaugeField &>(X_));
+        gCoarseAtomic yAccessorAtomic(const_cast<cudaGaugeField &>(Yatomic_));
+        gCoarseAtomic xAccessorAtomic(const_cast<cudaGaugeField &>(Xatomic_));
 
         // create a dummy clover field to allow us to call the external clover reduction routines elsewhere
         mma::calculateY<QUDA_CUDA_FIELD_LOCATION, true, Float, fineSpin, fineColor, coarseSpin, coarseColor>(
-          yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor, cAccessor,
-          cInvAccessor, Y, X, Yatomic, Xatomic, uv, const_cast<ColorSpinorField &>(v), v, g, *dummyClover(), kappa, mu,
-          mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()), T.coarseToFine(Y.Location()));
+          yAccessor, xAccessor, yAccessorAtomic, xAccessorAtomic, uvAccessor, vAccessor, vAccessor, gAccessor,
+          cAccessor, cInvAccessor, Y_, X_, Yatomic_, Xatomic_, uv_, const_cast<cudaColorSpinorField &>(v_), v_, g_,
+          *dummyClover(), kappa, mu, mu_factor, dirac, matpc, need_bidirectional, T.fineToCoarse(Y.Location()),
+          T.coarseToFine(Y.Location()));
+
+        X.copy(X_);
+        Y.copy(Y_);
+        Xatomic.copy(Xatomic_);
+        Yatomic.copy(Yatomic_);
+
+        reinterpret_cast<cudaColorSpinorField &>(uv).copy(uv_);
       }
     }
 
