@@ -389,7 +389,7 @@ namespace quda {
   }
 
   // helper for creating extended (cpu) gauge fields
-  cpuGaugeField *create_extended_gauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R)
   {
     GaugeFieldParam gauge_field_param(gauge, gauge_param);
     cpuGaugeField cpu(gauge_field_param);

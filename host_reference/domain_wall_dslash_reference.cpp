@@ -1311,7 +1311,7 @@ void mdw_mdagm_local(void *out, void **gauge, void *in, double _Complex *kappa_b
 
   const int R[4] = {2, 2, 2, 2};
 
-  cpuGaugeField *padded_gauge = create_extended_gauge(gauge, gauge_param, R);
+  cpuGaugeField *padded_gauge = createExtendedGauge(gauge, gauge_param, R);
 
   int padded_V = 1;
   int W[4];

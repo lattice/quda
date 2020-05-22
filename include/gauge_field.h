@@ -771,7 +771,7 @@ namespace quda {
      @param R By how many do we want to extend the gauge field in each direction
      @return the pointer to the extended gauge field
   */
-  cpuGaugeField *create_extended_gauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
