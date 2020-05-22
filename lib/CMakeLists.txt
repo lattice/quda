@@ -9,7 +9,9 @@ set (QUDA_OBJS
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
-  gauge_phase.cu timer.cpp malloc.cpp
+  gauge_phase.cu timer.cpp
+  targets/${QUDA_TARGET_TYPE}/malloc.cpp
+  targets/${QUDA_TARGET_TYPE}/tune.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
@@ -27,7 +29,7 @@ set (QUDA_OBJS
   dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp tune.cpp
+  dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_staggered.cu dslash_improved_staggered.cu

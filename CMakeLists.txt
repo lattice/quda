@@ -684,10 +684,10 @@ add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
 # Set target preprocessor flags
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  add_definitions(-DCUDA_TARGET)
+  add_definitions(-DQUDA_TARGET_QUDA)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  add_definitions(-DHIP_TARGET)
+  add_definitions(-DQUDA_TARGET_HIP)
 endif()
 
 if(QUDA_SSTEP)
