@@ -27,6 +27,7 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
+    set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
 
   if(QUDA_QIO
