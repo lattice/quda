@@ -28,6 +28,17 @@ namespace quda {
     long long BatchInvertMatrix(void *Ainv, void *A, const int n, const uint64_t batch, QudaPrecision precision,
                                 QudaFieldLocation location);
 
+    /**
+       Batch GEMM
+       @param[in] A Matrix field containing the A input matrices
+       @param[in] B Matrix field containing the A input matrices
+       @param[in/out] C Matrix field containing the result, and matrix to be added
+       @param[in] cublas_param Parameter structure defining the GEMM type
+       @param[in] Location of the input/output data
+       @return Number of flops done in this computation
+    */
+    long long BatchGEMM(void *A, void* B, void* C, QudaCublasParam cublas_param, QudaFieldLocation location);
+    
   } // namespace cublas
 
 } // namespace quda

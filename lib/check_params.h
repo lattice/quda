@@ -876,6 +876,31 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #endif
 }
 
+#if defined INIT_PARAM
+QudaCublasParam newQudaCublasParam(void)
+{
+  QudaCublasParam ret;
+#elif defined CHECK_PARAM
+static void checkCublasParam(QudaCublasParam *param)
+{
+#else
+void printQudaCublasParam(QudaCublasParam *param)
+{
+  printfQuda("QUDA cublas parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+
+#else
+
+#endif
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+ 
 // clean up
 
 #undef INVALID_INT

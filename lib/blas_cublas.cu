@@ -3,8 +3,10 @@
 #include <cublas_v2.h>
 #endif
 #include <malloc_quda.h>
+#include <quda.h>
+#include <complex.h>
 
-#define FMULS_GETRF(m_, n_) ( ((m_) < (n_)) \
+#define FMULS_GETRF(m_, n_) ( ((m_) < (n_))				\
     ? (0.5 * (m_) * ((m_) * ((n_) - (1./3.) * (m_) - 1. ) + (n_)) + (2. / 3.) * (m_)) \
     : (0.5 * (n_) * ((n_) * ((m_) - (1./3.) * (n_) - 1. ) + (m_)) + (2. / 3.) * (n_)) )
 #define FADDS_GETRF(m_, n_) ( ((m_) < (n_)) \
@@ -42,14 +44,24 @@ namespace quda {
 #endif
     }
 
-    // mini kernel to set the array of pointers needed for batched cublas
+    // mini kernel to set the array of pointers needed for batched invert
     template<typename T>
-    __global__ void set_pointer(T **output_array_a, T *input_a, T **output_array_b, T *input_b, int batch_offset)
+    __global__ void set_pointer_invert(T **output_array_a, T *input_a, T **output_array_b, T *input_b, int batch_offset)
     {
       output_array_a[blockIdx.x] = input_a + blockIdx.x * batch_offset;
       output_array_b[blockIdx.x] = input_b + blockIdx.x * batch_offset;
     }
 
+    // mini kernel to set the array of pointers needed for batched gemm
+    template<typename T>
+    __global__ void set_pointer_gemm(T **output_array_a, T *input_a, int batch_offset_a, T **output_array_b, T *input_b, int batch_offset_b, T **output_array_c, T *input_c, int batch_offset_c)
+    {
+      output_array_a[blockIdx.x] = input_a + blockIdx.x * batch_offset_a;
+      output_array_b[blockIdx.x] = input_b + blockIdx.x * batch_offset_b;
+      output_array_c[blockIdx.x] = input_c + blockIdx.x * batch_offset_c;
+    }
+
+    
     // FIXME do this in pipelined fashion to reduce memory overhead.
     long long BatchInvertMatrix(void *Ainv, void* A, const int n, const uint64_t batch, QudaPrecision prec, QudaFieldLocation location)
     {
@@ -73,7 +85,7 @@ namespace quda {
 	C **A_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 	C **Ainv_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
 
-	set_pointer<C><<<batch,1>>>(A_array, (C*)A_d, Ainv_array, (C*)Ainv_d, n*n);
+	set_pointer_invert<C><<<batch,1>>>(A_array, (C*)A_d, Ainv_array, (C*)Ainv_d, n*n);
 
 	cublasStatus_t error = cublasCgetrfBatched(handle, n, A_array, n, dipiv, dinfo_array, batch);
 	flops += batch*FLOPS_CGETRF(n,n);
@@ -136,6 +148,139 @@ namespace quda {
       return flops;
     }
 
+    long long BatchGEMM(void *A_data, void* B_data, void* C_data, QudaCublasParam cublas_param, QudaFieldLocation location)
+    {
+      long long flops = 0;
+#ifdef CUBLAS_LIB
+      timeval start, stop;
+      gettimeofday(&start, NULL);
+
+      const uint64_t batch = cublas_param.batch_count;
+      uint64_t data_size = (cublas_param.type == QUDA_CUBLAS_DATATYPE_S ||
+			    cublas_param.type == QUDA_CUBLAS_DATATYPE_C) ? 4 : 8;
+
+      if(cublas_param.type == QUDA_CUBLAS_DATATYPE_C ||
+	 cublas_param.type == QUDA_CUBLAS_DATATYPE_Z) {
+	data_size *= 2;
+      }
+      
+      // Number of data in one batch of the array
+      unsigned int A_size = cublas_param.m * cublas_param.k; //A_mk
+      unsigned int B_size = cublas_param.k * cublas_param.n; //B_kn
+      unsigned int C_size = cublas_param.m * cublas_param.n; //C_mn
+      
+      // Data size of the entire array 
+      size_t sizeAarr = A_size * data_size * batch;
+      size_t sizeBarr = B_size * data_size * batch;
+      size_t sizeCarr = C_size * data_size * batch;
+
+      // If already on the device, just use the given pointer. If the data is on
+      // the host, allocate device memory and transfer
+      void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A_data : pool_device_malloc(sizeAarr);
+      void *B_d = location == QUDA_CUDA_FIELD_LOCATION ? B_data : pool_device_malloc(sizeBarr);
+      void *C_d = location == QUDA_CUDA_FIELD_LOCATION ? C_data : pool_device_malloc(sizeCarr);
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	qudaMemcpy(A_d, A_data, sizeAarr, cudaMemcpyHostToDevice);
+	qudaMemcpy(B_d, B_data, sizeBarr, cudaMemcpyHostToDevice);
+	qudaMemcpy(C_d, C_data, sizeCarr, cudaMemcpyHostToDevice);
+      }
+
+      cublasOperation_t trans_a = CUBLAS_OP_N;
+      switch(cublas_param.trans_a) {
+      case QUDA_CUBLAS_OP_N: trans_a = CUBLAS_OP_N; break;
+      case QUDA_CUBLAS_OP_T: trans_a = CUBLAS_OP_T; break;
+      case QUDA_CUBLAS_OP_C: trans_a = CUBLAS_OP_C; break;
+      default : errorQuda("Unknown QUDA_CUBLAS_OP type %d\n", cublas_param.trans_a);
+      }
+      
+      cublasOperation_t trans_b = CUBLAS_OP_N;
+      switch(cublas_param.trans_b) {
+      case QUDA_CUBLAS_OP_N: trans_b = CUBLAS_OP_N; break;
+      case QUDA_CUBLAS_OP_T: trans_b = CUBLAS_OP_T; break;
+      case QUDA_CUBLAS_OP_C: trans_b = CUBLAS_OP_C; break;
+      default : errorQuda("Unknown QUDA_CUBLAS_OP type %d\n", cublas_param.trans_b);
+      }
+            
+      if (cublas_param.type == QUDA_CUBLAS_DATATYPE_Z) {
+	
+	typedef cuDoubleComplex Z ;
+	Z **A_ptr_array = static_cast<Z**>(pool_device_malloc(batch*sizeof(Z*)));
+	Z **B_ptr_array = static_cast<Z**>(pool_device_malloc(batch*sizeof(Z*)));
+	Z **C_ptr_array = static_cast<Z**>(pool_device_malloc(batch*sizeof(Z*)));
+
+	set_pointer_gemm<Z><<<batch,1>>>(A_ptr_array, (Z*)A_d, A_size, B_ptr_array, (Z*)B_d, B_size, C_ptr_array, (Z*)C_d, C_size);
+
+	const Z alpha = make_double2((double)creal(cublas_param.alpha),
+				     (double)cimag(cublas_param.alpha));
+	
+	const Z beta  = make_double2((double)creal(cublas_param.beta),
+				     (double)cimag(cublas_param.beta));
+	
+	cublasStatus_t error = cublasZgemmBatched(handle, trans_a, trans_b, cublas_param.m,
+						  cublas_param.n, cublas_param.k, &alpha,
+						  A_ptr_array, cublas_param.lda,
+						  B_ptr_array, cublas_param.ldb, &beta,
+						  C_ptr_array, cublas_param.ldc, batch);
+	//flops += batch*FLOPS_CGETRF(n,n);
+	if (error != CUBLAS_STATUS_SUCCESS)
+	  errorQuda("\nError in cublasSgemmfBatched), error code = %d\n", error);
+	
+	pool_device_free(A_ptr_array);
+	pool_device_free(B_ptr_array);
+	pool_device_free(C_ptr_array);
+      } else if (cublas_param.type == QUDA_CUBLAS_DATATYPE_C) {
+	
+	typedef cuComplex C;
+	C **A_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
+	C **B_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
+	C **C_ptr_array = static_cast<C**>(pool_device_malloc(batch*sizeof(C*)));
+
+	set_pointer_gemm<C><<<batch,1>>>(A_ptr_array, (C*)A_d, A_size, B_ptr_array, (C*)B_d, B_size, C_ptr_array, (C*)C_d, C_size);
+
+	const C alpha = make_float2((float)creal(cublas_param.alpha),
+				    (float)cimag(cublas_param.alpha));
+	
+	const C beta  = make_float2((float)creal(cublas_param.beta),
+				    (float)cimag(cublas_param.beta));
+	
+	cublasStatus_t error = cublasCgemmBatched(handle, trans_a, trans_b, cublas_param.m,
+						  cublas_param.n, cublas_param.k, &alpha,
+						  A_ptr_array, cublas_param.lda,
+						  B_ptr_array, cublas_param.ldb, &beta,
+						  C_ptr_array, cublas_param.ldc, batch);
+	//flops += batch*FLOPS_CGETRF(n,n);
+	if (error != CUBLAS_STATUS_SUCCESS)
+	  errorQuda("\nError in cublasSgemmfBatched), error code = %d\n", error);
+	
+	pool_device_free(A_ptr_array);
+	pool_device_free(B_ptr_array);
+	pool_device_free(C_ptr_array);
+      } else {
+	errorQuda("cublasGEMM type %d not implemented\n", cublas_param.type);  	
+      }
+
+      if (location == QUDA_CPU_FIELD_LOCATION) {
+	qudaMemcpy(C_data, C_d, sizeCarr, cudaMemcpyDeviceToHost);
+	pool_device_free(A_d);
+	pool_device_free(B_d);
+	pool_device_free(C_d);
+      }
+
+      qudaDeviceSynchronize();
+      gettimeofday(&stop, NULL);
+      long ds = stop.tv_sec - start.tv_sec;
+      long dus = stop.tv_usec - start.tv_usec;
+      double time = ds + 0.000001*dus;
+      if (getVerbosity() >= QUDA_VERBOSE)
+	printfQuda("Batched matrix GEMM completed in %f seconds with GFLOPS = %f\n", time, 1e-9 * flops / time);
+#endif // CUBLAS_LIB
+      
+      return flops;
+    }
+
+
+
+    
   } // namespace cublas
 
 } // namespace quda

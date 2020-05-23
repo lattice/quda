@@ -111,6 +111,7 @@ set(QUDA_FORCE_HISQ OFF CACHE BOOL "build code for hisq fermion force")
 set(QUDA_GAUGE_TOOLS OFF CACHE BOOL "build auxiliary gauge-field tools")
 set(QUDA_GAUGE_ALG OFF CACHE BOOL "build gauge-fixing and pure-gauge algorithms")
 set(QUDA_CONTRACT OFF CACHE BOOL "build code for bilinear contraction")
+set(QUDA_CUBLAS_INTERFACE OFF CACHE BOOL "build code for host interface with cuBLAS")
 set(QUDA_COVDEV OFF CACHE BOOL "build code for covariant derivative")
 # Dynamic inversion saves memory but decreases the flops
 set(QUDA_DYNAMIC_CLOVER OFF CACHE BOOL "Dynamically invert the clover term for twisted-clover")
@@ -668,6 +669,10 @@ add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()
+
+if(QUDA_CUBLAS_INTERAFCE)
+  add_definitions(-DCUBLAS_LIB)
+endif(QUDA_CUBLAS_INTERAFCE)
 
 if(QUDA_MULTIGRID)
   add_definitions(-DCUBLAS_LIB)

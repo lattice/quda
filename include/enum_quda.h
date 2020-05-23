@@ -461,6 +461,21 @@ extern "C" {
     QUDA_BOOLEAN_INVALID = QUDA_INVALID_ENUM
   } QudaBoolean;
 
+  typedef enum QudaCublasOperation_s {
+    QUDA_CUBLAS_OP_N = 0, // No transpose
+    QUDA_CUBLAS_OP_T = 1, // Transpose only
+    QUDA_CUBLAS_OP_C = 2, // Conjugate transpose
+    QUDA_CUBLAS_OP_INVALID = QUDA_INVALID_ENUM
+  } QudaCublasOperation;
+
+  typedef enum QudaCublasDataType_s {
+    QUDA_CUBLAS_DATATYPE_S = 0,
+    QUDA_CUBLAS_DATATYPE_D = 1,
+    QUDA_CUBLAS_DATATYPE_C = 2,
+    QUDA_CUBLAS_DATATYPE_Z = 3, 
+    QUDA_CUBLAS_DATATYPE_INVALID = QUDA_INVALID_ENUM
+  } QudaCublasDataType;
+
   // define these for backwards compatibility
 #define QUDA_BOOLEAN_NO QUDA_BOOLEAN_FALSE
 #define QUDA_BOOLEAN_YES QUDA_BOOLEAN_TRUE
