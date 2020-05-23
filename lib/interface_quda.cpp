@@ -5810,9 +5810,9 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   checkCublasParam(cublas_param);
   
   // Deduce leading dimension from m,n,k and OP 
-  cublas_param->lda = (cublas_param->trans_a == QUDA_CUBLAS_OP_N) ? cublas_param->m : cublas_param->k;
-  cublas_param->ldb = (cublas_param->trans_a == QUDA_CUBLAS_OP_N) ? cublas_param->k : cublas_param->n;
-  cublas_param->ldc = (cublas_param->trans_a == QUDA_CUBLAS_OP_N) ? cublas_param->m : cublas_param->n;
+  cublas_param->lda = cublas_param->k;
+  cublas_param->ldb = cublas_param->n;
+  cublas_param->ldc = cublas_param->n;
   
   // The data in the arrays is on the host. We transfer the data to the devis here
   // for timing purposes. One can pass host pointers to the BatchGEMM function

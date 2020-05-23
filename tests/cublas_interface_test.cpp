@@ -59,9 +59,6 @@ int main(int argc, char **argv)
 
   // initialize the QUDA library
   initQuda(device);
-  int X[4] = {xdim, ydim, zdim, tdim};
-  setDims(X);
-
   //-----------------------------------------------------------------------------
 
   QudaCublasParam cublas_param = newQudaCublasParam();

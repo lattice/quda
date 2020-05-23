@@ -210,10 +210,27 @@ int measurement_interval = 5;
 
 QudaContractType contract_type = QUDA_CONTRACT_TYPE_OPEN;
 
+QudaCublasOperation cublas_trans_a = QUDA_CUBLAS_OP_N;
+QudaCublasOperation cublas_trans_b = QUDA_CUBLAS_OP_N;
+
+QudaCublasDataType cublas_data_type = QUDA_CUBLAS_DATATYPE_C;
+int cublas_m = 128;
+int cublas_k = 128;
+int cublas_n = 128;
+double cublas_alpha_real = 1.0;
+double cublas_alpha_imag = 2.0;
+double cublas_beta_real = 3.0;
+double cublas_beta_imag = 4.0;
+int cublas_batch = 512;
+
 namespace
 {
   CLI::TransformPairs<QudaCABasis> ca_basis_map {{"power", QUDA_POWER_BASIS}, {"chebyshev", QUDA_CHEBYSHEV_BASIS}};
 
+  CLI::TransformPairs<QudaCublasDataType> cublas_dt_map {{"C", QUDA_CUBLAS_DATATYPE_C}, {"Z", QUDA_CUBLAS_DATATYPE_Z}, {"S", QUDA_CUBLAS_DATATYPE_S}, {"D", QUDA_CUBLAS_DATATYPE_D}};
+
+  CLI::TransformPairs<QudaCublasOperation> cublas_op_map {{"N", QUDA_CUBLAS_OP_N}, {"T", QUDA_CUBLAS_OP_T}, {"C", QUDA_CUBLAS_OP_C}};
+  
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
 
@@ -344,11 +361,18 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--compute-fat-long", compute_fatlong,
                        "Compute the fat/long field or use random numbers (default false)");
 
-  quda_app
-    ->add_option("--contraction-type", contract_type,
-                 "Whether to leave spin elemental open, or use a gamma basis and contract on spin (default open)")
-    ->transform(CLI::QUDACheckedTransformer(contract_type_map));
-  ;
+  quda_app->add_option("--contraction-type", contract_type,
+		       "Whether to leave spin elemental open, or use a gamma basis and contract on "
+		       "spin (default open)") ->transform(CLI::QUDACheckedTransformer(contract_type_map));
+
+  quda_app->add_option("--cublas-data-type", cublas_data_type,"Whether to use single(S), double(D), and/or complex(C/Z) data types (default C)")->transform(CLI::QUDACheckedTransformer(cublas_dt_map));
+
+  quda_app->add_option("--cublas-trans-a", cublas_trans_a,"Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  quda_app->add_option("--cublas-trans-b", cublas_trans_b,"Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
+
+  
+  
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
     ->check(CLI::Range(0, 16));
