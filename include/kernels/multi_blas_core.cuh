@@ -105,7 +105,7 @@ namespace quda
           ::quda::zero(w[m]);
         }
 
-        if (l_idx == 0 || warp_size == 1) {
+        if (l_idx == 0 || warp_split == 1) {
           arg.Y[k].load(y, idx, parity);
           arg.W[k].load(w, idx, parity);
         }
