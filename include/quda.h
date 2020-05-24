@@ -691,6 +691,26 @@ extern "C" {
     void *qcharge_density; /**< Pointer to host array of length volume where the q-charge density will be copied */
   } QudaGaugeObservableParam;
 
+  typedef struct QudaCublasParam_s {
+    
+    QudaCublasOperation trans_a; /**< operation op(A) that is non- or (conj.) transpose. */ 
+    QudaCublasOperation trans_b; /**< operation op(B) that is non- or (conj.) transpose. */ 
+    int m; /**< number of rows of matrix op(A) and C.*/
+    int n; /**< number of columns of matrix op(B) and C.*/
+    int k; /**< number of columns of op(A) and rows of op(B).*/
+    int lda; /**< leading dimension of two-dimensional array used to store the matrix A.*/
+    int ldb; /**< leading dimension of two-dimensional array used to store matrix B.*/
+    int ldc; /**< leading dimension of two-dimensional array used to store matrix C.*/
+
+    double_complex alpha; /**< scalar used for multiplication. */
+    double_complex beta; /**< scalar used for multiplication. If beta==0, C does not have to be a valid input.*/
+    
+    int batch_count; /**< number of pointers contained in arrayA, arrayB and arrayC. */
+
+    QudaCublasDataType type; /**< Specifies if using S(C) or D(Z) BLAS type */
+    
+  } QudaCublasParam;
+
   /*
    * Interface functions, found in interface_quda.cpp
    */
@@ -859,6 +879,16 @@ extern "C" {
   QudaGaugeObservableParam newQudaGaugeObservableParam(void);
 
   /**
+   * A new QudaCublasParam should always be initialized immediately
+   * after it's defined (and prior to explicitly setting its members)
+   * using this function.  Typical usage is as follows:
+   *
+   *   QudaCublasParam cublas_param = newQudaCublasParam();
+   */
+  QudaCublasParam newQudaCublasParam(void);
+
+  
+  /**
    * Print the members of QudaGaugeParam.
    * @param param The QudaGaugeParam whose elements we are to print.
    */
@@ -888,6 +918,13 @@ extern "C" {
    */
   void printQudaGaugeObservableParam(QudaGaugeObservableParam *param);
 
+  /**
+   * Print the members of QudaCublasParam.
+   * @param param The QudaCublasParam whose elements we are to print.
+   */
+  void printQudaCublasParam(QudaCublasParam *param);
+  
+  
   /**
    * Load the gauge field from the host.
    * @param h_gauge Base pointer to host gauge field (regardless of dimensionality)
@@ -1364,6 +1401,8 @@ extern "C" {
                       QudaGaugeParam* param,
                       double* timeinfo);
 
+  void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *param);
+  
   /**
    * @brief Hack for Callat
    */

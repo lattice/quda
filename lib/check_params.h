@@ -876,6 +876,50 @@ void printQudaGaugeObservableParam(QudaGaugeObservableParam *param)
 #endif
 }
 
+#if defined INIT_PARAM
+QudaCublasParam newQudaCublasParam(void)
+{
+  QudaCublasParam ret;
+#elif defined CHECK_PARAM
+static void checkCublasParam(QudaCublasParam *param)
+{
+#else
+void printQudaCublasParam(QudaCublasParam *param)
+{
+  printfQuda("QUDA cublas parameters:\n");
+#endif
+
+#ifdef INIT_PARAM
+  P(trans_a, QUDA_CUBLAS_OP_N);
+  P(trans_b, QUDA_CUBLAS_OP_N);
+  P(m, 0);
+  P(n, 0);
+  P(k, 0);
+  P(lda, 0);
+  P(ldb, 0);
+  P(ldc, 0);
+  P(batch_count, 0);
+  P(type, QUDA_CUBLAS_DATATYPE_S);
+#else
+  P(trans_a, QUDA_CUBLAS_OP_INVALID);
+  P(trans_b, QUDA_CUBLAS_OP_INVALID);
+  P(m, INVALID_INT);
+  P(n, INVALID_INT);
+  P(k,INVALID_INT);
+  P(lda, INVALID_INT);
+  P(ldb, INVALID_INT);
+  P(ldc, INVALID_INT);
+  P(batch_count, INVALID_INT);
+  P(type, QUDA_CUBLAS_DATATYPE_INVALID);
+#endif
+
+
+#ifdef INIT_PARAM
+  return ret;
+#endif
+}
+
+ 
 // clean up
 
 #undef INVALID_INT

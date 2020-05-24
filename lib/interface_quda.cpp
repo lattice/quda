@@ -71,7 +71,6 @@
 
 #include <gauge_tools.h>
 #include <contract_quda.h>
-
 #include <momentum.h>
 
 
@@ -233,6 +232,9 @@ static TimeProfile profileContract("contractQuda");
 
 //!< Profiler for sink projection
 static TimeProfile profileSinkProject("sinkProjectQuda");
+
+//!< Profiler for cublas
+static TimeProfile profileCuBLAS("cublasQuda");
 
 //!< Profiler for covariant derivative
 static TimeProfile profileCovDev("covDevQuda");
@@ -1545,6 +1547,7 @@ void endQuda(void)
     profileHISQForce.Print();
     profileContract.Print();
     profileSinkProject.Print();
+    profileCuBLAS.Print();
     profileCovDev.Print();
     profilePlaq.Print();
     profileGaugeObs.Print();
@@ -5886,4 +5889,59 @@ void laphSinkProject(void *host_quark, void **host_evec, double _Complex *host_s
   delete quda_evec[0];
   profileSinkProject.TPSTOP(QUDA_PROFILE_FREE);
   profileSinkProject.TPSTOP(QUDA_PROFILE_TOTAL);
+}
+
+void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *cublas_param)
+{
+  profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
+  profileCuBLAS.TPSTART(QUDA_PROFILE_INIT);
+  checkCublasParam(cublas_param);
+    
+  // The data in the arrays is on the host. We transfer the data to the devis here
+  // for timing purposes. One can pass host pointers to the BatchGEMM function
+  // and it will handle the data movement for the user.
+
+  // Extract data from the param struct for device malloc
+  unsigned int arrayA_size = cublas_param->m * cublas_param->k; //A_mk
+  unsigned int arrayB_size = cublas_param->k * cublas_param->n; //B_kn
+  unsigned int arrayC_size = cublas_param->m * cublas_param->n; //C_mn
+  size_t data_size = (cublas_param->type == QUDA_CUBLAS_DATATYPE_D ||
+		      cublas_param->type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
+  if(cublas_param->type == QUDA_CUBLAS_DATATYPE_C || cublas_param->type == QUDA_CUBLAS_DATATYPE_Z) {
+    data_size *= 2;
+  }
+  
+  size_t A_bytes = arrayA_size * data_size * cublas_param->batch_count;
+  size_t B_bytes = arrayB_size * data_size * cublas_param->batch_count;
+  size_t C_bytes = arrayC_size * data_size * cublas_param->batch_count;  
+  void *A_d = pool_device_malloc(A_bytes);
+  void *B_d = pool_device_malloc(B_bytes);
+  void *C_d = pool_device_malloc(C_bytes);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_INIT);
+
+  // Transfer host data to device
+  profileCuBLAS.TPSTART(QUDA_PROFILE_H2D);  
+  qudaMemcpy(A_d, arrayA, A_bytes, cudaMemcpyHostToDevice);
+  qudaMemcpy(B_d, arrayB, B_bytes, cudaMemcpyHostToDevice);
+  qudaMemcpy(C_d, arrayC, C_bytes, cudaMemcpyHostToDevice);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_H2D);  
+
+  // Compute Batched GEMM
+  profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
+  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
+
+  // Copy device C array back to host
+  profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);  
+  qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_D2H);  
+
+  // Clean up
+  profileCuBLAS.TPSTART(QUDA_PROFILE_FREE);  
+  pool_device_free(A_d);
+  pool_device_free(B_d);
+  pool_device_free(C_d);
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
+  
+  profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
 }

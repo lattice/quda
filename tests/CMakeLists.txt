@@ -162,6 +162,13 @@ if(QUDA_MULTIGRID)
 
 endif()
 
+if(QUDA_CUBLAS_INTERFACE)
+  add_executable(cublas_interface_test cublas_interface_test.cpp)
+  target_link_libraries(cublas_interface_test ${TEST_LIBS})
+  quda_checkbuildtest(cublas_interface_test QUDA_BUILD_ALL_TESTS)
+  install(TARGETS cublas_interface_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
 QUDA_CHECKBUILDTEST(plaq_test QUDA_BUILD_ALL_TESTS)
