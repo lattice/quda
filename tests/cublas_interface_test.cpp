@@ -3,6 +3,7 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <complex>
 
 #include <util_quda.h>
 #include <host_utils.h>
@@ -20,6 +21,11 @@
 namespace quda
 {
   extern void setTransferGPU(bool);
+}
+
+void cublasGEMMQudaVerify(void *arrayA, void *arrayB, void *arrayCcopy, void*arrayC,
+			  QudaCublasParam *cublas_param){
+
 }
 
 void display_test_info()
@@ -62,16 +68,21 @@ int main(int argc, char **argv)
   //-----------------------------------------------------------------------------
 
   QudaCublasParam cublas_param = newQudaCublasParam();
-  cublas_param.trans_a = QUDA_CUBLAS_OP_N;
-  cublas_param.trans_b = QUDA_CUBLAS_OP_N;
-  cublas_param.m = 128;
-  cublas_param.n = 128;
-  cublas_param.k = 128;
-  cublas_param.alpha = 2.0;
-  cublas_param.beta  = 4.0;
-  cublas_param.batch_count = 1024;
+  cublas_param.trans_a = cublas_trans_a;
+  cublas_param.trans_b = cublas_trans_b;
+  cublas_param.m = cublas_mnk[0];
+  cublas_param.n = cublas_mnk[1];
+  cublas_param.k = cublas_mnk[2];
+  cublas_param.lda = cublas_leading_dims[0];
+  cublas_param.ldb = cublas_leading_dims[1];
+  cublas_param.ldc = cublas_leading_dims[2];
+  cublas_param.alpha  = (__complex__ double)cublas_alpha_re_im[0];  
+  cublas_param.beta  = (__complex__ double)cublas_beta_re_im[0];
+  cublas_param.batch_count = cublas_batch;
   cublas_param.type = (prec == QUDA_DOUBLE_PRECISION) ? QUDA_CUBLAS_DATATYPE_Z : QUDA_CUBLAS_DATATYPE_C;
-      
+
+  printQudaCublasParam(&cublas_param);
+  
   unsigned int arrayA_size = cublas_param.m * cublas_param.k; //A_mk
   unsigned int arrayB_size = cublas_param.k * cublas_param.n; //B_kn
   unsigned int arrayC_size = cublas_param.m * cublas_param.n; //C_mn
@@ -84,8 +95,7 @@ int main(int argc, char **argv)
   void *arrayA = malloc(arrayA_size * data_size * cublas_param.batch_count);
   void *arrayB = malloc(arrayB_size * data_size * cublas_param.batch_count);
   void *arrayC = malloc(arrayC_size * data_size * cublas_param.batch_count);
-
-
+  void *arrayCcopy = malloc(arrayC_size * data_size * cublas_param.batch_count);
   
   if (prec == QUDA_SINGLE_PRECISION) {
     for (unsigned int i = 0; i < arrayA_size * cublas_param.batch_count; i++) {
@@ -96,6 +106,7 @@ int main(int argc, char **argv)
     }
     for (unsigned int i = 0; i < arrayC_size * cublas_param.batch_count; i++) {
       ((float *)arrayC)[i] = rand() / (float)RAND_MAX;
+      ((float *)arrayCcopy)[i] = ((float *)arrayC)[i];
     }
   } else {
     for (unsigned int i = 0; i < arrayA_size * cublas_param.batch_count; i++) {
@@ -106,14 +117,15 @@ int main(int argc, char **argv)
     }
     for (unsigned int i = 0; i < arrayC_size * cublas_param.batch_count; i++) {
       ((double *)arrayC)[i] = rand() / (double)RAND_MAX;
+      ((double *)arrayCcopy)[i] = ((double *)arrayC)[i];
     }
   }
-
+  
   // Perform GPU GEMM Blas operation
   cublasGEMMQuda(arrayA, arrayB, arrayC, &cublas_param);
 
   if(verify_results) {
-    //cublasGEMMQudaVerify(arrayA, arrayB, arrayC, &cublas_param);
+    cublasGEMMQudaVerify(arrayA, arrayB, arrayCcopy, arrayC, &cublas_param);
   }
   
   free(arrayA);

@@ -214,13 +214,19 @@ QudaCublasOperation cublas_trans_a = QUDA_CUBLAS_OP_N;
 QudaCublasOperation cublas_trans_b = QUDA_CUBLAS_OP_N;
 
 QudaCublasDataType cublas_data_type = QUDA_CUBLAS_DATATYPE_C;
-int cublas_m = 128;
-int cublas_k = 128;
-int cublas_n = 128;
-double cublas_alpha_real = 1.0;
-double cublas_alpha_imag = 2.0;
-double cublas_beta_real = 3.0;
-double cublas_beta_imag = 4.0;
+
+std::array<int, 3> cublas_mnk = {128, 128, 128};
+auto &cublas_m = cublas_mnk[0];
+auto &cublas_n = cublas_mnk[1];
+auto &cublas_k = cublas_mnk[2];
+
+std::array<int, 3> cublas_leading_dims = {128, 128, 128};
+auto &cublas_lda = cublas_leading_dims[0];
+auto &cublas_ldb = cublas_leading_dims[1];
+auto &cublas_ldc = cublas_leading_dims[2];
+
+std::array<double, 2> cublas_alpha_re_im = {1.0, 0.0};
+std::array<double, 2> cublas_beta_re_im = {1.0, 0.0};
 int cublas_batch = 512;
 
 namespace
@@ -370,8 +376,16 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   quda_app->add_option("--cublas-trans-a", cublas_trans_a,"Whether to leave the A GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
 
   quda_app->add_option("--cublas-trans-b", cublas_trans_b,"Whether to leave the B GEMM matrix as is (N), to transpose (T) or transpose conjugate (C) (default N) ")->transform(CLI::QUDACheckedTransformer(cublas_op_map));
-
   
+  quda_app->add_option("--cublas-alpha", cublas_alpha_re_im, "Set the complex value of alpha for GEMM (default {1.0,0.0}")->expected(2);
+
+  quda_app->add_option("--cublas-beta", cublas_beta_re_im, "Set the complex value of beta for GEMM (default {1.0,0.0}")->expected(2);
+
+  quda_app->add_option("--cublas-mnk", cublas_mnk, "Set the dimensions of the A, B, and C matrices GEMM (default 128 128 128")->expected(3);
+  
+  quda_app->add_option("--cublas-leading-dims", cublas_leading_dims, "Set the leading dimensions A, B, and C matrices GEMM (default 128 128 128 ")->expected(3);
+
+  quda_app->add_option("--cublas-batch", cublas_batch, "Set the number of batches for GEMM (default 1024)");
   
   quda_app->add_flag("--dagger", dagger, "Set the dagger to 1 (default 0)");
   quda_app->add_option("--device", device, "Set the CUDA device to use (default 0, single GPU only)")
@@ -558,7 +572,7 @@ std::shared_ptr<QUDAApp> make_app(std::string app_description, std::string app_n
   auto gridsizeopt
     = quda_app
         ->add_option("--gridsize", gridsize_from_cmdline, "Set the grid size in all four dimension (default 1 1 1 1)")
-        ->expected(4);
+        ->expected(4);  
   quda_app->add_option("--xgridsize", grid_x, "Set grid size in X dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--ygridsize", grid_y, "Set grid size in Y dimension (default 1)")->excludes(gridsizeopt);
   quda_app->add_option("--zgridsize", grid_z, "Set grid size in Z dimension (default 1)")->excludes(gridsizeopt);

@@ -5808,12 +5808,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   profileCuBLAS.TPSTART(QUDA_PROFILE_TOTAL);
   profileCuBLAS.TPSTART(QUDA_PROFILE_INIT);
   checkCublasParam(cublas_param);
-  
-  // Deduce leading dimension from m,n,k and OP 
-  cublas_param->lda = cublas_param->k;
-  cublas_param->ldb = cublas_param->n;
-  cublas_param->ldc = cublas_param->n;
-  
+    
   // The data in the arrays is on the host. We transfer the data to the devis here
   // for timing purposes. One can pass host pointers to the BatchGEMM function
   // and it will handle the data movement for the user.
