@@ -11,16 +11,16 @@
 
 
 # Find the CUDA_INCLUDE_DIRS and CUDA_TOOLKIT_INCLUDE like FindCUDA does
-find_path(CUDAToolkit_INCLUDE_DIR
+find_path(CUDAToolkit_INCLUDE_DIRS
   device_functions.h # Header included in toolkit
   PATHS ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}
   PATH_SUFFIXES include ../include
   NO_DEFAULT_PATH
   )
-mark_as_advanced(CUDAToolkit_INCLUDE_DIR)
+mark_as_advanced(CUDAToolkit_INCLUDE_DIRS)
 set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
   "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
-set(CUDA_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIR})
+
 
 
 # # Setup CUDA_LIBRARIES
