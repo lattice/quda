@@ -39,14 +39,8 @@ set(CMAKE_BUILD_TYPE
     CACHE STRING "Choose the type of build, options are: ${VALID_BUILD_TYPES}")
 set_property(
   CACHE CMAKE_BUILD_TYPE
-  PROPERTY STRINGS
-           DEVEL
-           RELEASE
-           STRICT
-           DEBUG
-           HOSTDEBUG
-           DEVICEDEBUG
-           SANITIZE)
+  PROPERTY STRINGS ${VALID_BUILD_TYPES}
+ )
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CHECK_BUILD_TYPE)
 list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
@@ -116,7 +110,7 @@ set(QUDA_GPU_ARCH
     CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
 # build options
-option(QUDA_DIRAC_WILSON "build Wilson Dirac operators" CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
+option(QUDA_DIRAC_WILSON "build Wilson Dirac operators" ON)
 option(QUDA_DIRAC_CLOVER "build clover Dirac operators" ON)
 option(QUDA_DIRAC_DOMAIN_WALL "build domain wall Dirac operators" ON)
 option(QUDA_DIRAC_STAGGERED "build staggered Dirac operators" ON)
