@@ -137,8 +137,8 @@ option(QUDA_DYNAMIC_CLOVER "Dynamically invert the clover term for twisted-clove
 option(QUDA_QIO "build QIO code for binary I/O" OFF)
 
 # Multi-GPU options
-option(QUDA_QMP "set to 'yes' to build the QMP multi-GPU code" OFF)
-option(QUDA_MPI "set to 'yes' to build the MPI multi-GPU code" OFF)
+option(QUDA_QMP "build the QMP multi-GPU code" OFF)
+option(QUDA_MPI "build the MPI multi-GPU code" OFF)
 
 # Magma library
 option(QUDA_MAGMA "build magma interface" OFF)
