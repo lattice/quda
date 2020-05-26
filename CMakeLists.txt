@@ -682,16 +682,6 @@ endif()
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
-# Set target preprocessor flags
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  set(QUDA_TARGET_DIR "cuda")
-  add_definitions(-DQUDA_TARGET_QUDA)
-endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  set(QUDA_TARGET_DIR "hip")
-  add_definitions(-DQUDA_TARGET_HIP)
-endif()
-
 if(QUDA_SSTEP)
   add_definitions(-DSSTEP)
 endif()

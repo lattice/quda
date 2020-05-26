@@ -1,6 +1,14 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
 
+# Set target preprocessor flags
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  set(QUDA_TARGET_DIR "cuda")
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  set(QUDA_TARGET_DIR "hip")
+endif()
+
 set (TARGET_OBJS
   targets/${QUDA_TARGET_DIR}/malloc.cpp
   targets/${QUDA_TARGET_DIR}/tune.cpp
