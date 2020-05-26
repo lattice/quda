@@ -21,14 +21,10 @@ namespace quda
 {
 
   using namespace Eigen;
-
-  // -------------------------------
-  // Davidson-type eigensolver class
-
   // Jacobi-Davidson Method constructor
-  JD::JD(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param,
-         TimeProfile &profile) :
-    EigenSolver(mat, matSloppy, matPrecon, eig_param, profile)
+  JD::JD(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
+    //EigenSolver(mat, matSloppy, matPrecon, eig_param, profile)
+    EigenSolver(mat, eig_param, profile)
   {
     if (eig_param->spectrum != QUDA_SPECTRUM_SR_EIG)
       errorQuda("Only smallest real spectrum type (SR) can be passed to the JD solver");
@@ -44,7 +40,8 @@ namespace quda
     profile_mat_corr_eq_invs = new TimeProfile("profile_mat_corr_eq_invs");
 
     outer_prec_lab = mat.Expose()->OpPrecision();
-    inner_prec_lab = matPrecon.Expose()->OpPrecision();
+    //inner_prec_lab = matPrecon.Expose()->OpPrecision();
+    inner_prec_lab = mat.Expose()->OpPrecision();
 
     QudaInvertParam refineparam = *eig_param->invert_param;
     refineparam.cuda_prec_sloppy = eig_param->invert_param->cuda_prec_refinement_sloppy;
@@ -63,14 +60,38 @@ namespace quda
     solverParamPrec->maxiter = 5;
     solverParamPrec->tol = 1e-2;
 
-    mmPP = new DiracPrecProjCorr(matPrecon.Expose());
+    //mmPP = new DiracPrecProjCorr(matPrecon.Expose());
+    mmPP = new DiracPrecProjCorr(mat.Expose());
 
     // Solvers used in the correction equation
-    cg = new CG(const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon),
+    //cg = new CG(const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon),
+    //            *solverParam, *profile_mat_corr_eq_invs);
+    cg = new CG(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
                 *solverParam, *profile_mat_corr_eq_invs);
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
+  }
+
+  void JD::testInitGuess(ColorSpinorField *&in)
+  {
+    double norm = sqrt(blas::norm2(*in));
+    if (norm == 0) {
+      if (getVerbosity() >= QUDA_SUMMARIZE) printfQuda("Initial residual is zero. Populating with rands.\n");
+      if (in->Location() == QUDA_CPU_FIELD_LOCATION) {
+        in->Source(QUDA_RANDOM_SOURCE);
+      } else {
+        RNG *rng = new RNG(*in, 1234);
+        rng->Init();
+        spinorNoise(*in, *rng, QUDA_NOISE_UNIFORM);
+        rng->Release();
+        delete rng;
+      }
+    }
+
+    // Normalise initial guess
+    norm = sqrt(blas::norm2(*in));
+    blas::ax(1.0 / norm, *in);
   }
 
   void JD::operator()(std::vector<ColorSpinorField *> &eigSpace, std::vector<Complex> &evals)
@@ -243,13 +264,15 @@ namespace quda
         *(u_lowprec[0]) = *(u[0]);
 
         // solving the correction equation
-        invertProjMat(matPrecon, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
+        //invertProjMat(matPrecon, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
+        invertProjMat(mat, *t_lowprec[0], *r_lowprec[0], QUDA_SILENT, 1, u_lowprec);
 
         // switch back to higher precision
         *(t[0]) = *(t_lowprec[0]);
       } else {
         // solving the correction equation
-        invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
+        //invertProjMat(matPrecon, *t[0], *r[0], QUDA_SILENT, 1, u);
+        invertProjMat(mat, *t[0], *r[0], QUDA_SILENT, 1, u);
       }
 
       iter++;
@@ -314,7 +337,7 @@ namespace quda
         eigSpace[i]->setSuggestedParity(mat_parity);
         vecs_ptr.push_back(eigSpace[i]);
       }
-      saveVectors(vecs_ptr, eig_param->vec_outfile);
+      //saveVectors(vecs_ptr, eig_param->vec_outfile);
     }
 
     if (getVerbosity() >= QUDA_SUMMARIZE) {

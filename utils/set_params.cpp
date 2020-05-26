@@ -238,6 +238,8 @@ void setEigParam(QudaEigParam &eig_param)
   if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
       && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
     errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
+  } else if ((eig_type == QUDA_EIG_DAV) && (eig_spectrum != QUDA_SPECTRUM_SR_EIG)) {
+    errorQuda("Only smallest real spectrum type (SR) can be passed to Jacobi-Davidson type solver");
   }
 
   // The solver will exit when nConv extremal eigenpairs have converged
@@ -251,6 +253,12 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.block_size = eig_block_size;
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
+  if (eig_type == QUDA_EIG_DAV) {
+    eig_param.mmin = eig_mmin;
+    eig_param.mmax = eig_mmax;
+    eig_param.corr_eq_tol = eig_corr_eq_tol;
+    eig_param.corr_eq_maxiter = eig_corr_eq_maxiter;
+  }
   eig_param.tol = eig_tol;
   eig_param.batched_rotate = eig_batched_rotate;
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

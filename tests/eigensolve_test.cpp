@@ -114,6 +114,11 @@ int main(int argc, char **argv)
   eig_param.invert_param = &eig_inv_param;
   setEigParam(eig_param);
 
+  // Sanity checks
+  if (eig_param.eig_type == QUDA_EIG_DAV && eig_param.use_poly_acc) {
+    errorQuda("Jacobi-Davidson solver and Chebyshev accleration not supported.");
+  }
+
   // Initialize the QUDA library
   initQuda(device);
   display_test_info();

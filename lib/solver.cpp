@@ -172,7 +172,7 @@ namespace quda {
     bool profile_running = profile.isRunning(QUDA_PROFILE_INIT);
     if (!param.is_preconditioner && !profile_running) profile.TPSTART(QUDA_PROFILE_INIT);
 
-    eig_solve = EigenSolver::create(&param.eig_param, mat, matSloppy, matPrecon, profile);
+    eig_solve = EigenSolver::create(&param.eig_param, mat, profile);
 
     // Clone from an existing vector
     ColorSpinorParam csParam(meta);

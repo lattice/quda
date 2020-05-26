@@ -2368,7 +2368,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
@@ -2377,7 +2377,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
@@ -2386,7 +2386,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }
@@ -2395,7 +2395,7 @@ void eigensolveQuda(void **host_evecs, double _Complex *host_evals, QudaEigParam
     if (eig_param->arpack_check) {
       arpack_solve(host_evecs_, evals, m, eig_param, profileEigensolve);
     } else {
-      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, mSloppy, mPrecon, profileEigensolve);
+      EigenSolver *eig_solve = EigenSolver::create(eig_param, m, profileEigensolve);
       (*eig_solve)(kSpace, evals);
       delete eig_solve;
     }

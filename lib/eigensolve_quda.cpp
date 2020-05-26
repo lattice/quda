@@ -25,11 +25,8 @@ namespace quda
 
   // Eigensolver class
   //-----------------------------------------------------------------------------
-  EigenSolver::EigenSolver(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon,
-                           QudaEigParam *eig_param, TimeProfile &profile) :
+  EigenSolver::EigenSolver(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile) :
     mat(mat),
-    matSloppy(matSloppy),
-    matPrecon(matPrecon),
     eig_param(eig_param),
     profile(profile),
     tmp1(nullptr),
@@ -125,8 +122,7 @@ namespace quda
 
   // We bake the matrix operators mat, matSloppy, and matPrecon, and the eigensolver
   // parameters into the eigensolver.
-  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-                                   const DiracMatrix &matPrecon, TimeProfile &profile)
+  EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
   {
     EigenSolver *eig_solver = nullptr;
 
@@ -135,11 +131,11 @@ namespace quda
     case QUDA_EIG_IR_LANCZOS: errorQuda("IR Lanczos not implemented"); break;
     case QUDA_EIG_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating TR Lanczos eigensolver\n");
-      eig_solver = new TRLM(mat, matSloppy, matPrecon, eig_param, profile);
+      eig_solver = new TRLM(mat, eig_param, profile);
       break;
     case QUDA_EIG_DAV:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Jacobi-Davidson eigensolver\n");
-      eig_solver = new JD(mat, matSloppy, matPrecon, eig_param, profile);
+      eig_solver = new JD(mat, eig_param, profile);
       break;
     case QUDA_EIG_BLK_TR_LANCZOS:
       if (getVerbosity() >= QUDA_VERBOSE) printfQuda("Creating Block TR Lanczos eigensolver\n");

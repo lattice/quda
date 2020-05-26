@@ -1583,25 +1583,25 @@ namespace quda
     EigenSolver *eig_solve;
     if (!normop && !dagger) {
       DiracM *mat = new DiracM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, *mat, *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (!normop && dagger) {
       DiracMdag *mat = new DiracMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, *mat, *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && !dagger) {
       DiracMdagM *mat = new DiracMdagM(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, *mat, *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;
     } else if (normop && dagger) {
       DiracMMdag *mat = new DiracMMdag(*diracResidual);
-      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, *mat, *mat, profile);
+      eig_solve = EigenSolver::create(param.mg_global.eig_param[param.level], *mat, profile);
       (*eig_solve)(B_evecs, evals);
       delete eig_solve;
       delete mat;

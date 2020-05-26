@@ -7,6 +7,9 @@
 
 namespace quda
 {
+  // Forward declarations for the JD eigensolver
+  class GCR;
+
   // Local enum for the LU axpy block type
   enum blockType { PENCIL, LOWER_TRI, UPPER_TRI };
 
@@ -16,8 +19,6 @@ namespace quda
 
 protected:
     const DiracMatrix &mat;
-    const DiracMatrix &matSloppy;
-    const DiracMatrix &matPrecon;
     QudaEigParam *eig_param;
     TimeProfile &profile;
 
@@ -547,8 +548,7 @@ public:
        @param eig_param The eigensolver parameters
        @param profile Time Profile
     */
-    JD(const DiracMatrix &mat, const DiracMatrix &matSloppy, const DiracMatrix &matPrecon, QudaEigParam *eig_param,
-       TimeProfile &profile);
+    JD(const DiracMatrix &mat, QudaEigParam *eig_param, TimeProfile &profile);
 
     /**
        @brief Compute eigenpairs
@@ -556,6 +556,12 @@ public:
        @param[in] evals Computed eigenvalues
     */
     void operator()(std::vector<ColorSpinorField *> &kSpace, std::vector<Complex> &evals);
+
+    /**
+       @brief Test for an initial guess
+       @param[in/out] in Initial vector
+    */
+    void testInitGuess(ColorSpinorField *&in);
 
     /**
        @brief Invert a matrix of the form (I - QQdag)(M-theta*I)(I - QQdag)
