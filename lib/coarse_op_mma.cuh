@@ -51,7 +51,28 @@ namespace quda
      */
     template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
     struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
-      Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
+
+      template <int dim, int bM, int bN, int bK, int block_y, int block_z>
+      void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+      {
+        tp.block.x = 1;
+        tp.block.y = block_y;
+        tp.block.z = block_z;
+        constexpr int shared_bytes = shared_memory_bytes(bM, bN, bK);
+        tp.shared_bytes = shared_bytes;
+        static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
+
+        constexpr int t_m = 1;
+        constexpr int t_n = 1;
+
+        tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
+
+        auto kernel
+          = ComputeUVMMA<from_coarse, Float, dim, QUDA_BACKWARDS, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z, Arg>;
+        kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      }
+
+      Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, int min_threads, const cudaStream_t &stream)
       {
 #ifdef JITIFY
         using namespace jitify::reflection;
@@ -71,13 +92,16 @@ namespace quda
               ComputeUVGPU<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
                 <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
 #else
-              int shared_bytes = shared_memory_bytes(48, 64, 24);
-              ComputeUVMMA<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                // <<<{128, 12, 4}, {32, 1, 8}, 0>>>(arg);
-                <<<{128 * 32, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);
+              // clang-format off
+              switch (tp.aux.x) {
+              case 0: launch_compute_uv_kernel<   0,  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
+              case 1: launch_compute_uv_kernel<   0,  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
+              case 2: launch_compute_uv_kernel<   0,  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
+              default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
+              }
+              // clang-format on
 #endif
-            }
-            else if (arg.dim == 1)
+            } else if (arg.dim == 1)
               ComputeUVGPU<from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
                 <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
             else if (arg.dim == 2)
@@ -570,8 +594,8 @@ namespace quda
 
         if (type == COMPUTE_VUV)
           tp.shared_bytes -= sharedBytesPerBlock(tp); // shared memory is static so don't include it in launch
-        Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(arg, jitify_error, tp,
-                                                                                                type, stream);
+        Launch<location, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg>(
+          arg, jitify_error, tp, type, minThreads(), stream);
         if (type == COMPUTE_VUV) tp.shared_bytes += sharedBytesPerBlock(tp); // restore shared memory
       };
 
@@ -675,6 +699,15 @@ namespace quda
 
       bool advanceTuneParam(TuneParam &param) const
       {
+        if (type == COMPUTE_UV) {
+          if (param.aux.x < 2) {
+            param.aux.x++;
+            return true;
+          } else {
+            return false;
+          }
+        }
+
         // only do autotuning if we have device fields
         if (meta.Location() == QUDA_CUDA_FIELD_LOCATION && Y.MemType() == QUDA_MEMORY_DEVICE)
           return Tunable::advanceTuneParam(param);
