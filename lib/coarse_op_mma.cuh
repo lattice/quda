@@ -1,6 +1,9 @@
+#pragma once
+
 #include <tune_quda.h>
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>
+#include <kernels/coarse_op_kernel_mma.cuh>
 #include <uint_to_char.h>
 
 namespace quda
@@ -39,116 +42,7 @@ namespace quda
     struct Launch {
       Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, const cudaStream_t &stream)
       {
-        if (type == COMPUTE_UV) {
-          if (arg.dir == QUDA_BACKWARDS) {
-            if (arg.dim == 0)
-              quda::ComputeUVCPU<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 1)
-              quda::ComputeUVCPU<from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 2)
-              quda::ComputeUVCPU<from_coarse, Float, 2, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 3)
-              quda::ComputeUVCPU<from_coarse, Float, 3, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-          } else if (arg.dir == QUDA_FORWARDS) {
-            if (arg.dim == 0)
-              quda::ComputeUVCPU<from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 1)
-              quda::ComputeUVCPU<from_coarse, Float, 1, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 2)
-              quda::ComputeUVCPU<from_coarse, Float, 2, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 3)
-              quda::ComputeUVCPU<from_coarse, Float, 3, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-          } else {
-            errorQuda("Undefined direction %d", arg.dir);
-          }
-        } else if (type == COMPUTE_AV) {
-          if (from_coarse) errorQuda("ComputeAV should only be called from the fine grid");
-
-#if defined(GPU_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          quda::ComputeAVCPU<Float, fineSpin, fineColor, coarseColor>(arg);
-#else
-          errorQuda("Clover dslash has not been built");
-#endif
-
-        } else if (type == COMPUTE_TMAV) {
-          if (from_coarse) errorQuda("ComputeTMAV should only be called from the fine grid");
-
-#if defined(GPU_TWISTED_MASS_DIRAC) && !defined(COARSECOARSE)
-          quda::ComputeTMAVCPU<Float, fineSpin, fineColor, coarseColor>(arg);
-#else
-          errorQuda("Twisted mass dslash has not been built");
-#endif
-
-        } else if (type == COMPUTE_TMCAV) {
-          if (from_coarse) errorQuda("ComputeTMCAV should only be called from the fine grid");
-
-#if defined(GPU_TWISTED_CLOVER_DIRAC) && !defined(COARSECOARSE)
-          quda::ComputeTMCAVCPU<Float, fineSpin, fineColor, coarseColor>(arg);
-#else
-          errorQuda("Twisted clover dslash has not been built");
-#endif
-
-        } else if (type == COMPUTE_CLOVER_INV_MAX) {
-          if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
-
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          quda::ComputeCloverInvMaxCPU<Float, false>(arg);
-          double max = arg.max_h;
-          comm_allreduce_max(&max);
-          arg.max_h = max;
-#else
-          errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
-#endif
-
-        } else if (type == COMPUTE_TWISTED_CLOVER_INV_MAX) {
-          if (from_coarse) errorQuda("ComputeInvCloverMax should only be called from the fine grid");
-
-#if defined(DYNAMIC_CLOVER) && !defined(COARSECOARSE)
-          quda::ComputeCloverInvMaxCPU<Float, true>(arg);
-          double max = arg.max_h;
-          comm_allreduce_max(&max);
-          arg.max_h = max;
-#else
-          errorQuda("ComputeInvCloverMax only enabled with dynamic clover");
-#endif
-
-        } else if (type == COMPUTE_VUV) {
-          if (arg.dir == QUDA_BACKWARDS) {
-            if (arg.dim == 0)
-              quda::ComputeVUVCPU<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 1)
-              quda::ComputeVUVCPU<from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 2)
-              quda::ComputeVUVCPU<from_coarse, Float, 2, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 3)
-              quda::ComputeVUVCPU<from_coarse, Float, 3, QUDA_BACKWARDS, fineSpin, coarseSpin>(arg);
-          } else if (arg.dir == QUDA_FORWARDS) {
-            if (arg.dim == 0)
-              quda::ComputeVUVCPU<from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 1)
-              quda::ComputeVUVCPU<from_coarse, Float, 1, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 2)
-              quda::ComputeVUVCPU<from_coarse, Float, 2, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-            else if (arg.dim == 3)
-              quda::ComputeVUVCPU<from_coarse, Float, 3, QUDA_FORWARDS, fineSpin, coarseSpin>(arg);
-          } else {
-            errorQuda("Undefined direction %d", arg.dir);
-          }
-        } else if (type == COMPUTE_COARSE_CLOVER) {
-          quda::ComputeCoarseCloverCPU<from_coarse, Float, fineSpin, coarseSpin, fineColor, coarseColor>(arg);
-        } else if (type == COMPUTE_REVERSE_Y) {
-          quda::ComputeYReverseCPU<Float, coarseSpin, coarseColor>(arg);
-        } else if (type == COMPUTE_DIAGONAL) {
-          quda::AddCoarseDiagonalCPU<Float, coarseSpin, coarseColor>(arg);
-        } else if (type == COMPUTE_TMDIAGONAL) {
-          quda::AddCoarseTmDiagonalCPU<Float, coarseSpin, coarseColor>(arg);
-        } else if (type == COMPUTE_CONVERT) {
-          quda::ConvertCPU<Float, coarseSpin, coarseColor>(arg);
-        } else if (type == COMPUTE_RESCALE) {
-          quda::RescaleYCPU<Float, coarseSpin, coarseColor>(arg);
-        } else {
-          errorQuda("Undefined compute type %d", type);
-        }
+        errorQuda("MMA implementation is NOT intended for CPU.");
       }
     };
 
@@ -172,9 +66,17 @@ namespace quda
                     .launch(arg);
 #else
           if (arg.dir == QUDA_BACKWARDS) {
-            if (arg.dim == 0)
+            if (arg.dim == 0) {
+#if 0
               ComputeUVGPU<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
                 <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+#else
+              int shared_bytes = shared_memory_bytes(48, 64, 24);
+              ComputeUVMMA<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
+                // <<<{128, 12, 4}, {32, 1, 8}, 0>>>(arg);
+                <<<{128 * 32, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);
+#endif
+            }
             else if (arg.dim == 1)
               ComputeUVGPU<from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
                 <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);

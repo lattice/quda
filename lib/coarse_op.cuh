@@ -1,3 +1,5 @@
+#pragma once
+
 #include <tune_quda.h>
 #include <jitify_helper.cuh>
 #include <kernels/coarse_op_kernel.cuh>

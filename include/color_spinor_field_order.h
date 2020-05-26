@@ -365,6 +365,8 @@ namespace quda {
     */
     template <typename Float, typename storeFloat>
       struct fieldorder_wrapper {
+        using type = Float;
+        using store_type = storeFloat;
   complex<storeFloat> *v;
   const int idx;
   const Float scale;

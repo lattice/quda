@@ -1,3 +1,5 @@
+#pragma once
+
 #include <color_spinor_field_order.h>
 #include <gauge_field_order.h>
 #include <clover_field_order.h>
@@ -153,12 +155,14 @@ namespace quda
       }
     };
 
+namespace impl {
+
     /**
       Calculates the matrix UV^{s,c'}_mu(x) = \sum_c U^{c}_mu(x) * V^{s,c}_mu(x+mu)
 Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
      */
     template <bool from_coarse, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Wtype, typename Arg>
-    __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb, int i0, int j0)
+    __device__ __host__ inline void computeUV(Arg &arg, const Wtype &Wacc, int parity, int x_cb)
     {
       int coord[4];
       getCoords(coord, x_cb, arg.x_size, parity);
@@ -166,10 +170,11 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
       constexpr int uvSpin = fineSpin * (from_coarse ? 2 : 1);
       constexpr int nFace = 1;
 
-      using complex = complex<typename Arg::Float>;
       auto &tile = arg.uvTile;
-      using Ctype = decltype(make_tile_C<complex, false>(tile));
-      Ctype UV[uvSpin];
+
+      constexpr bool a_dagger = false;
+      constexpr bool b_dagger = false;
+      constexpr bool compute_max_only = false;
 
       if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
         int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
@@ -185,25 +190,33 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
               auto W = make_tile_B<complex, true>(tile);
               W.loadCS(Wacc, dim, 1, (parity + 1) & 1, ghost_idx, s, k, j0);
               UV[s].mma_nn(U, W);
-            }                                        // Fine color columns
-          }                                          // Fine spin (tensor)
+            } // Fine color columns
+          }   // Fine spin (tensor)
 #endif
         } else {
 #if 1
           for (int s_col = 0; s_col < fineSpin; s_col++) {
             // here instead of fineColor x coarseColor x fineColor,
             // we do (fineColor * fineSpin) x coarseColor x fineColor
-            // TODO: Need to have accessor methods in the corresponding color spinor fields.
-            auto aa = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, /** s = */ 0, s_col, 0, 0);
-            auto bb = Wacc.Ghost(dim, 1, (parity + 1) & 1, y_cb, s_col);
-            auto cc = arg.UV(parity, x_cb, s_col * fineSpin);
+            auto aa = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
+            auto bb = Wacc.wrap_ghost(dim, 1, (parity + 1) & 1, ghost_idx, s_col);
+            auto cc = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-            constexpr bool a_dagger = false;
-            constexpr bool b_dagger = false;
-            constexpr bool compute_max_only = false;
+            constexpr int M = tile.m * fineSpin;
+            constexpr int N = tile.n;
+            constexpr int K = tile.k;
 
-            perform_mma<Arg::M * fineSpin, Arg::N, Arg::K, bM * fineSpin, bN, bK, block_y, block_z, a_dagger, b_dagger,
-                        compute_max_only>(aa, bb, cc, m, n);
+            constexpr int bM = M;
+            constexpr int bN = N;
+            constexpr int bK = K;
+
+            constexpr int lda = K * fineSpin;
+            constexpr int ldb = N;
+            constexpr int ldc = N;
+
+            using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+
+            perform_mma<Config,  8,  8, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, 0, 0);
           }
 #else
           for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -216,9 +229,9 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
                 U.load(arg.U, dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, s, s_col, i0, k);
 
                 UV[s_col * fineSpin + s].mma_nn(U, W);
-              }                                      // which chiral block
-            }                                        // Fine color columns
-          }                                          // Fine Spin
+              } // which chiral block
+            }   // Fine color columns
+          }     // Fine Spin
 #endif
         } // from_coarse
       } else {
@@ -235,8 +248,8 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
               auto W = make_tile_B<complex, false>(tile);
               W.loadCS(Wacc, 0, 0, (parity + 1) & 1, y_cb, s, k, j0);
               UV[s].mma_nn(U, W);
-            }                                        // Fine color columns
-          }                                          // Fine Spin
+            } // Fine color columns
+          }   // Fine Spin
 #endif
         } else {
 #if 1
@@ -244,16 +257,25 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
             // here instead of fineColor x coarseColor x fineColor,
             // we do (fineColor * fineSpin) x coarseColor x fineColor
             // TODO: Need to have accessor methods in the corresponding color spinor fields.
-            auto aa = arg.U(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, /** s = */ 0, s_col, 0, 0);
-            auto bb = Wacc((parity + 1) & 1, y_cb, s_col);
-            auto cc = arg.UV(parity, x_cb, s_col * fineSpin);
+            auto aa = arg.U.wrap(dim + (dir == QUDA_FORWARDS ? 4 : 0), parity, x_cb, 0, s_col);
+            auto bb = Wacc.wrap((parity + 1) & 1, y_cb, s_col);
+            auto cc = arg.UV.wrap(parity, x_cb, s_col * fineSpin);
 
-            constexpr bool a_dagger = false;
-            constexpr bool b_dagger = false;
-            constexpr bool compute_max_only = false;
+            constexpr int M = tile.m * fineSpin;
+            constexpr int N = tile.n;
+            constexpr int K = tile.k;
 
-            perform_mma<Arg::M * fineSpin, Arg::N, Arg::K, bM * fineSpin, bN, bK, block_y, block_z, a_dagger, b_dagger,
-                        compute_max_only>(aa, bb, cc, m, n);
+            constexpr int bM = M;
+            constexpr int bN = N;
+            constexpr int bK = K;
+
+            constexpr int lda = K * fineSpin;
+            constexpr int ldb = N;
+            constexpr int ldc = N;
+
+            using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+
+            perform_mma<Config,  8,  8, a_dagger, b_dagger, compute_max_only>(aa, bb, cc, 0, 0);
           }
 #else
           for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -277,26 +299,21 @@ Where: mu = dir, s = fine spin, c' = coarse color, c = fine color
 #endif
     } // computeUV
 
+} // namespace impl
+
+
     template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin, typename Arg>
-    __global__ void ComputeUVGPU(Arg arg)
+    __global__ void ComputeUVMMA(Arg arg)
     {
       int x_cb = blockDim.x * blockIdx.x + threadIdx.x;
       if (x_cb >= arg.fineVolumeCB) return;
 
-      int ic_parity = blockDim.y * blockIdx.y + threadIdx.y; // parity and tiled fine color
-      if (ic_parity >= 2 * arg.uvTile.M_tiles) return;
-      int ic = ic_parity % arg.uvTile.M_tiles;
-      int parity = ic_parity / arg.uvTile.M_tiles;
-
-      int jc = blockDim.z * blockIdx.z + threadIdx.z; // tiled coarse color
-      if (jc >= arg.uvTile.N_tiles) return;
+      int parity = blockIdx.y;
 
       if (dir == QUDA_FORWARDS) // only for preconditioned clover is V != AV
-        computeUV<from_coarse, dim, dir, fineSpin, coarseSpin>(arg, arg.V, parity, x_cb, ic * arg.uvTile.M,
-                                                               jc * arg.uvTile.N);
+        impl::computeUV<from_coarse, dim, dir, fineSpin, coarseSpin>(arg, arg.V, parity, x_cb);
       else
-        computeUV<from_coarse, dim, dir, fineSpin, coarseSpin>(arg, arg.AV, parity, x_cb, ic * arg.uvTile.M,
-                                                               jc * arg.uvTile.N);
+        impl::computeUV<from_coarse, dim, dir, fineSpin, coarseSpin>(arg, arg.AV, parity, x_cb);
     }
 
   } // namespace mma
