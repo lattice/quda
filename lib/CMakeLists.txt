@@ -1,7 +1,14 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
+
+set (TARGET_OBJS
+  targets/${QUDA_TARGET_DIR}/malloc.cpp
+  targets/${QUDA_TARGET_DIR}/tune.cpp
+)  
+
 set (QUDA_OBJS
   # cmake-format: sortable
+  ${TARGET_OBJS}
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
@@ -10,8 +17,6 @@ set (QUDA_OBJS
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp
-  targets/${QUDA_TARGET_DIR}/malloc.cpp
-  targets/${QUDA_TARGET_DIR}/tune.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
