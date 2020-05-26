@@ -1,6 +1,3 @@
-# TODO: we might be able to clean that up a bit and have the include directories propagate with the libs
-# include_directories(.  ../utils ../host_reference)
-
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 

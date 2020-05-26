@@ -5,11 +5,6 @@
 # wrapper calls to help port cuda_add_executable / cuda_add_library over to
 # the new cmake cuda first class support
 
-# FindCUDAWrapper.cmake
-
-#Very important the first step is to enable the CUDA language.
-
-
 # Find the CUDA_INCLUDE_DIRS and CUDA_TOOLKIT_INCLUDE like FindCUDA does
 find_path(CUDAToolkit_INCLUDE_DIRS
   device_functions.h # Header included in toolkit
@@ -20,39 +15,5 @@ find_path(CUDAToolkit_INCLUDE_DIRS
 mark_as_advanced(CUDAToolkit_INCLUDE_DIRS)
 set(CUDA_TOOLKIT_TARGET_DIR_INTERNAL "${CUDA_TOOLKIT_TARGET_DIR}" CACHE INTERNAL
   "This is the value of the last time CUDA_TOOLKIT_TARGET_DIR was set successfully." FORCE)
-
-
-
-# # Setup CUDA_LIBRARIES
-# set(CUDA_LIBRARIES ${CMAKE_CUDA_IMPLICIT_LINK_LIBRARIES})
-# if(APPLE)
-#   # We need to add the default path to the driver (libcuda.dylib) as an rpath, so that
-#   # the static cuda runtime can find it at runtime.
-#   list(APPEND CUDA_LIBRARIES -Wl,-rpath,/usr/local/cuda/lib)
-# endif()
-
-# # wrapper for cuda_add_library
-# # Issues:
-# #
-# function(cuda_add_library)
-#   add_library(${ARGV})
-#   target_include_directories(${ARGV0} PUBLIC
-#                              ${CUDA_INCLUDE_DIRS})
-#   target_link_libraries(${ARGV0} PUBLIC ${CUDA_LIBRARIES})
-#   set_target_properties(${ARGV0} PROPERTIES LINKER_LANGUAGE CUDA)
-# endfunction()
-
-
-# # wrapper for cuda_add_library
-# # Issues:
-# #
-# function(cuda_add_executable)
-#   add_executable(${ARGV})
-#   target_include_directories(${ARGV0} PUBLIC
-#                              ${CUDA_INCLUDE_DIRS})
-#   target_link_libraries(${ARGV0}  ${CUDA_LIBRARIES})
-#   set_target_properties(${ARGV0} PROPERTIES LINKER_LANGUAGE CUDA)
-# endfunction()
-
 
 find_package(CUDALibs)
