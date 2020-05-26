@@ -450,6 +450,8 @@ extern "C" {
     int max_restarts;
     /** For the Ritz rotation, the maximal number of extra vectors the solver may allocate **/
     int batched_rotate;
+    /** For block method solvers, the block size **/
+    int block_size;
 
     /** In the test function, cross check the device result against ARPACK **/
     QudaBoolean arpack_check;
@@ -486,6 +488,11 @@ extern "C" {
 
     /** Filename prefix for where to save the null-space vectors */
     char vec_outfile[256];
+
+    /** Whether to inflate single-parity eigen-vector I/O to a full
+        field (e.g., enabling this is required for compatability with
+        MILC I/O) */
+    QudaBoolean io_parity_inflate;
 
     /** The Gflops rate of the eigensolver setup */
     double gflops;
@@ -1018,8 +1025,7 @@ extern "C" {
    *               storage
    * @param parity The destination parity of the field
    */
-  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param,
-      QudaParity parity);
+  void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity);
 
   /**
    * Apply the clover operator or its inverse.

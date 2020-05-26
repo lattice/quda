@@ -5,16 +5,16 @@ set (QUDA_OBJS
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
   coarse_op.cu coarsecoarse_op.cu
   coarse_op_preconditioned.cu staggered_coarse_op.cu
-  eigensolve_quda.cpp eig_trlm_quda.cpp eig_jacdav_quda.cpp
-  quda_arpack_interface.cpp multigrid.cpp transfer.cpp
-  block_orthogonalize.cu inv_bicgstab_quda.cpp
+  eig_trlm.cpp eig_block_trlm.cpp eig_jacdav_quda.cpp vector_io.cpp
+  eigensolve_quda.cpp quda_arpack_interface.cpp
+  multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
   gauge_phase.cu timer.cpp malloc.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
   laplace.cu gauge_laplace.cpp gauge_observable.cpp
-  inv_cg3_quda.cpp inv_cg3ne_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
+  inv_cg3_quda.cpp inv_ca_gcr.cpp inv_ca_cg.cpp
   inv_gcr_quda.cpp inv_mr_quda.cpp inv_sd_quda.cpp inv_xsd_quda.cpp
   inv_pcg_quda.cpp inv_mre.cpp interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
@@ -91,7 +91,7 @@ if(BUILD_FORTRAN_INTERFACE)
   set_source_files_properties(quda_fortran.F90 PROPERTIES OBJECT_OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/quda_fortran.mod)
 endif()
 
-# QUDA_CU_OBJS shoudl contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
+# QUDA_CU_OBJS should contain all cuda files now QUDA_OBJS all c, cpp, fortran sources
 
 # if we have a git version make version.cpp depend on git head so that it is rebuild if the git sha changed
 if(${CMAKE_BUILD_TYPE} STREQUAL "DEVEL")

@@ -11,11 +11,11 @@
 #include <convert.h>
 #include <clover_field.h>
 #include <complex_quda.h>
-#include <thrust_helper.cuh>
 #include <quda_matrix.h>
 #include <color_spinor.h>
 #include <trove_helper.cuh>
 #include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -177,8 +177,8 @@ namespace quda {
 	return dummy;
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double i) const
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double i, reducer r) const
       {
         return 0.0;
       }
@@ -222,21 +222,13 @@ namespace quda {
 
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
-        } else {
-          // just use offset_cb, since factor of two from parity is equivalent to complexity
-          complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
-          result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
-        }
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      {
+        // just use offset_cb, since factor of two from parity is equivalent to complexity
+        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
         return 2.0 * result; // factor of two is normalization
       }
-
     };
 
     template<int N>
@@ -287,21 +279,13 @@ namespace quda {
 
       }
 
-      template<typename helper, typename reducer>
-        __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const {
-        double result = init;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<Float> > ptr(reinterpret_cast<complex<Float>*>(a));
-          result = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+offset_cb, h, result, r);
-        } else {
-          // just use offset_cb, since factor of two from parity is equivalent to complexity
-          complex<Float> *ptr = reinterpret_cast<complex<Float>*>(a);
-          result = thrust::transform_reduce(thrust::seq, ptr, ptr+offset_cb, h, result, r);
-        }
+      template <typename helper, typename reducer>
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
+      {
+        // just use offset_cb, since factor of two from parity is equivalent to complexity
+        double result = ::quda::transform_reduce(location, reinterpret_cast<complex<Float> *>(a), offset_cb, h, init, r);
         return 2.0 * result; // factor of two is normalization
       }
-
     };
 
     template<typename Float, int nColor, int nSpin> 
@@ -343,7 +327,7 @@ namespace quda {
       }
 
       template <typename helper, typename reducer>
-      __host__ double transform_reduce(QudaFieldLocation location, helper h, reducer r, double init) const
+      __host__ double transform_reduce(QudaFieldLocation location, helper h, double init, reducer r) const
       {
         errorQuda("Not implemented");
 	return 0.0;
@@ -482,48 +466,44 @@ namespace quda {
 	 * @return L1 norm
 	 */
 	__host__ double norm1(int dim=-1, bool global=true) const {
-          double nrm1 = accessor.transform_reduce(location, abs_<double,Float>(),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm1);
-	  return nrm1;
-	}
+          double nrm1 = accessor.transform_reduce(location, abs_<double, Float>(), 0.0, plus<double>());
+          if (global) comm_allreduce(&nrm1);
+          return nrm1;
+        }
 
-	/**
+        /**
 	 * @brief Returns the L2 norm suared of the field
 	 * @param[in] dim Which dimension we are taking the norm of (dummy for clover)
 	 * @return L1 norm
 	 */
 	__host__ double norm2(int dim=-1, bool global=true) const {
-          double nrm2 = accessor.transform_reduce(location, square_<double,Float>(),
-                                                  thrust::plus<double>(), 0.0);
-	  if (global) comm_allreduce(&nrm2);
-	  return nrm2;
-	}
+          double nrm2 = accessor.transform_reduce(location, square_<double, Float>(), 0.0, plus<double>());
+          if (global) comm_allreduce(&nrm2);
+          return nrm2;
+        }
 
-	/**
+        /**
 	 * @brief Returns the Linfinity norm of the field
 	 * @param[in] dim Which dimension we are taking the Linfinity norm of (dummy for clover)
 	 * @return Linfinity norm
 	 */
 	__host__ double abs_max(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, abs_<Float,Float>(),
-                                                    thrust::maximum<Float>(), 0.0);
-	  if (global) comm_allreduce_max(&absmax);
-	  return absmax;
-	}
+          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), 0.0, maximum<Float>());
+          if (global) comm_allreduce_max(&absmax);
+          return absmax;
+        }
 
-	/**
+        /**
 	 * @brief Returns the minimum absolute value of the field
 	 * @param[in] dim Which dimension we are taking the minimum abs of (dummy for clover)
 	 * @return Minimum norm
 	 */
 	__host__ double abs_min(int dim=-1, bool global=true) const {
-	  double absmax = accessor.transform_reduce(location, abs_<Float,Float>(),
-                                                    thrust::minimum<Float>(), std::numeric_limits<double>::max());
-	  if (global) comm_allreduce_min(&absmax);
-	  return absmax;
-	}
-
+          double absmax = accessor.transform_reduce(location, abs_<Float, Float>(), std::numeric_limits<double>::max(),
+                                                    minimum<Float>());
+          if (global) comm_allreduce_min(&absmax);
+          return absmax;
+        }
       };
 
     /**

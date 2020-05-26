@@ -5,27 +5,16 @@
 #include <string.h>
 
 #include <util_quda.h>
-#include <test_util.h>
-#include <test_params.h>
-#include <dslash_util.h>
-#include "misc.h"
+#include <host_utils.h>
+#include <command_line_params.h>
+#include <dslash_reference.h>
 
 #include <qio_field.h>
-
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
 
 // In a typical application, quda.h is the only QUDA header required.
 #include <quda.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
 
 void setGaugeParam(QudaGaugeParam &gauge_param)
 {
@@ -67,16 +56,13 @@ int main(int argc, char **argv)
 {
 
   auto app = make_app();
-  // add_eigen_option_group(app);
-  // add_deflation_option_group(app);
-  // add_multigrid_option_group(app);
   try {
     app->parse(argc, argv);
   } catch (const CLI::ParseError &e) {
     return app->exit(e);
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -85,11 +71,6 @@ int main(int argc, char **argv)
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  size_t gSize = gauge_param.cpu_prec;
-
-  void *gauge[4];
-
-  for (int dir = 0; dir < 4; dir++) { gauge[dir] = malloc(V * gaugeSiteSize * gSize); }
 
   initQuda(device);
 
@@ -98,16 +79,14 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
 
-  bool load_gauge = strcmp(latfile, "");
-  // load in the command line supplied gauge field
-  if (load_gauge) {
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  }
-
-  loadGaugeQuda(gauge, &gauge_param);
-
-  if (!load_gauge) gaussGaugeQuda(1234, gaussian_sigma);
+  // Allocate host side memory for the gauge field.
+  //----------------------------------------------------------------------------
+  void *gauge[4];
+  // Allocate space on the host (always best to allocate and free in the same scope)
+  for (int dir = 0; dir < 4; dir++) gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
 
   double plaq[3];
   plaqQuda(plaq);
