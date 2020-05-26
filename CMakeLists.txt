@@ -275,12 +275,12 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # some checks for invalid combinations
 
 if(QUDA_TEX AND QUDA_FLOAT8)
-  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
+  message(SEND_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
   message(
-    WARNING
+    SEND_ERROR
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 

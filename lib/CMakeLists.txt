@@ -280,7 +280,7 @@ endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 if(QUDA_MULTIGRID)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE CUBLAS_LIB)
-  target_compile_definitions(quda GPU_MULTIGRID)
+  target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
