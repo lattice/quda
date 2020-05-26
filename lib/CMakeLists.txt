@@ -9,11 +9,6 @@ if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   set(QUDA_TARGET_DIR "hip")
 endif()
 
-set (TARGET_OBJS
-  targets/${QUDA_TARGET_DIR}/malloc.cpp
-  targets/${QUDA_TARGET_DIR}/tune.cpp
-)  
-
 set (QUDA_OBJS
   # cmake-format: sortable
   ${TARGET_OBJS}
@@ -128,6 +123,11 @@ target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
 endif()
+
+target_sources(quda_cpp PUBLIC
+  targets/${QUDA_TARGET_DIR}/malloc.cpp
+  targets/${QUDA_TARGET_DIR}/tune.cpp
+)
 
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
