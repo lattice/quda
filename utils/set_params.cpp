@@ -253,6 +253,7 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  eig_param.block_size = eig_block_size;
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
   eig_param.tol = eig_tol;
@@ -281,6 +282,7 @@ void setEigParam(QudaEigParam &eig_param)
 
   strcpy(eig_param.vec_infile, eig_vec_infile);
   strcpy(eig_param.vec_outfile, eig_vec_outfile);
+  eig_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setMultigridParam(QudaMultigridParam &mg_param)
@@ -636,6 +638,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
     errorQuda("Only real spectrum type (LR or SR) can be passed to the a Lanczos type solver");
   }
 
+  mg_eig_param.block_size = mg_eig_block_size[level];
   mg_eig_param.nEv = mg_eig_nEv[level];
   mg_eig_param.nKr = mg_eig_nKr[level];
   mg_eig_param.nConv = nvec[level];
@@ -660,7 +663,7 @@ void setMultigridEigParam(QudaEigParam &mg_eig_param, int level)
   // Give empty strings, Multigrid will handle IO.
   strcpy(mg_eig_param.vec_infile, "");
   strcpy(mg_eig_param.vec_outfile, "");
-
+  mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE;
   strcpy(mg_eig_param.QUDA_logfile, eig_QUDA_logfile);
 }
 
@@ -1187,6 +1190,7 @@ void setDeflationParam(QudaEigParam &df_param)
   // set file i/o parameters
   strcpy(df_param.vec_infile, eig_vec_infile);
   strcpy(df_param.vec_outfile, eig_vec_outfile);
+  df_param.io_parity_inflate = eig_io_parity_inflate ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 }
 
 void setQudaStaggeredInvTestParams()

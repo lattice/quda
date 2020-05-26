@@ -86,7 +86,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+  set(QUDA_DEFAULT_GPU_ARCH sm_70)
 endif()
 if(NOT QUDA_GPU_ARCH)
   message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
@@ -95,8 +95,8 @@ message(STATUS "")
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
-    CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
-set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
+    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
 # build options
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
@@ -541,7 +541,7 @@ if(QUDA_QIO)
     set(QUDA_QIO_LIBS ${QUDA_QIO_LIBS_INTERNAL} CACHE STRING "LIBS for QMP - should be derived from qmp-config --libs")
   endif()
   add_definitions(-DHAVE_QIO)
-  set(QIO_UTIL qio_util.cpp qio_field.cpp layout_hyper.c)
+  set(QIO_UTIL qio_field.cpp layout_hyper.cpp)
 
   include_directories(SYSTEM ${QUDA_QIOHOME}/include)
   include_directories(SYSTEM ${QUDA_LIMEHOME}/include)

@@ -197,6 +197,8 @@ namespace quda {
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
+      } else {
+        x[4] = 1;
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
@@ -246,6 +248,7 @@ namespace quda {
     {
       siteSubset = cpuParam.siteSubset;
       fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+      for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
     }
 
     /**
