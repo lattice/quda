@@ -12,7 +12,7 @@
 using namespace quda;
 
 extern qudaStream_t *stream;
-  
+
 /**************************************************************
  * Staple exchange routine
  * used in fat link computation
