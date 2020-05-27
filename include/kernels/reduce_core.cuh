@@ -32,9 +32,7 @@ namespace quda
           V(V),
           r(r),
           length(length)
-      {
-        ;
-      }
+      {; }
     };
 
     /**
@@ -97,32 +95,28 @@ namespace quda
     /**
        Return the L1 norm of x
     */
-    template <typename ReduceType> __device__ __host__ ReduceType norm1_(const double2 &a)
+    template <typename ReduceType, typename T> __device__ __host__ ReduceType norm1_(const typename VectorType<T, 2>::type &a)
     {
       return (ReduceType)sqrt(a.x * a.x + a.y * a.y);
     }
 
-    template <typename ReduceType> __device__ __host__ ReduceType norm1_(const float2 &a)
-    {
-      return (ReduceType)sqrt(a.x * a.x + a.y * a.y);
-    }
-
-    template <typename ReduceType> __device__ __host__ ReduceType norm1_(const float4 &a)
+    template <typename ReduceType, typename T> __device__ __host__ ReduceType norm1_(const typename VectorType<T, 4>::type &a)
     {
       return (ReduceType)sqrt(a.x * a.x + a.y * a.y) + (ReduceType)sqrt(a.z * a.z + a.w * a.w);
     }
 
-    template <typename ReduceType> __device__ __host__ ReduceType norm1_(const float8 &a)
+    template <typename ReduceType, typename T> __device__ __host__ ReduceType norm1_(const typename VectorType<T, 8>::type &a)
     {
       return norm1_<ReduceType>(a.x) + norm1_<ReduceType>(a.y);
     }
 
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Norm1 : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      using real = typename scalar<Float2>::type;
       Norm1(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        sum += norm1_<ReduceType>(x);
+        sum += norm1_<ReduceType, real>(x);
       }
       static int streams() { return 1; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -131,19 +125,13 @@ namespace quda
     /**
        Return the L2 norm of x
     */
-    template <typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const double2 &a)
+    template <typename ReduceType, typename T> __device__ __host__ void norm2_(ReduceType &sum, const typename VectorType<T, 2>::type &a)
     {
       sum += (ReduceType)a.x * (ReduceType)a.x;
       sum += (ReduceType)a.y * (ReduceType)a.y;
     }
 
-    template <typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float2 &a)
-    {
-      sum += (ReduceType)a.x * (ReduceType)a.x;
-      sum += (ReduceType)a.y * (ReduceType)a.y;
-    }
-
-    template <typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float4 &a)
+    template <typename ReduceType, typename T> __device__ __host__ void norm2_(ReduceType &sum, const typename VectorType<T, 4>::type &a)
     {
       sum += (ReduceType)a.x * (ReduceType)a.x;
       sum += (ReduceType)a.y * (ReduceType)a.y;
@@ -151,7 +139,7 @@ namespace quda
       sum += (ReduceType)a.w * (ReduceType)a.w;
     }
 
-    template <typename ReduceType> __device__ __host__ void norm2_(ReduceType &sum, const float8 &a)
+    template <typename ReduceType, typename T> __device__ __host__ void norm2_(ReduceType &sum, const typename VectorType<T, 8>::type &a)
     {
       norm2_(sum, a.x);
       norm2_(sum, a.y);
@@ -160,9 +148,10 @@ namespace quda
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Norm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
       Norm2(const Float2 &a, const Float2 &b) { ; }
+      using real = typename scalar<Float2>::type;
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        norm2_<ReduceType>(sum, x);
+        norm2_<ReduceType,real>(sum, x);
       }
       static int streams() { return 1; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -171,19 +160,15 @@ namespace quda
     /**
        Return the real dot product of x and y
     */
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const double2 &a, const double2 &b)
+    template <typename ReduceType, typename T> __device__ __host__ void dot_(ReduceType &sum, const typename VectorType<T, 2>::type &a,
+                                                                             const typename VectorType<T, 2>::type &b)
     {
       sum += (ReduceType)a.x * (ReduceType)b.x;
       sum += (ReduceType)a.y * (ReduceType)b.y;
     }
 
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float2 &a, const float2 &b)
-    {
-      sum += (ReduceType)a.x * (ReduceType)b.x;
-      sum += (ReduceType)a.y * (ReduceType)b.y;
-    }
-
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float4 &a, const float4 &b)
+    template <typename ReduceType, typename T> __device__ __host__ void dot_(ReduceType &sum, const typename VectorType<T, 4>::type &a,
+                                                                             const typename VectorType<T, 4>::type &b)
     {
       sum += (ReduceType)a.x * (ReduceType)b.x;
       sum += (ReduceType)a.y * (ReduceType)b.y;
@@ -191,7 +176,8 @@ namespace quda
       sum += (ReduceType)a.w * (ReduceType)b.w;
     }
 
-    template <typename ReduceType> __device__ __host__ void dot_(ReduceType &sum, const float8 &a, const float8 &b)
+    template <typename ReduceType, typename T> __device__ __host__ void dot_(ReduceType &sum, const typename VectorType<T, 8>::type &a,
+                                                                             const typename VectorType<T, 8>::type &b)
     {
       dot_(sum, a.x, b.x);
       dot_(sum, a.y, b.y);
@@ -199,10 +185,11 @@ namespace quda
 
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Dot : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      using real = typename scalar<Float2>::type;
       Dot(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        dot_<ReduceType>(sum, x, y);
+        dot_<ReduceType, real>(sum, x, y);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 2; }   //! flops per element
@@ -214,13 +201,14 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct axpbyzNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
-      axpbyzNorm2(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      using real = typename scalar<Float2>::type;
+      const real a;
+      const real b;
+      axpbyzNorm2(const Float2 &a, const Float2 &b) : a(a.x), b(b.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        z = a.x * x + b.x * y;
-        norm2_<ReduceType>(sum, z);
+        z = a * x + b * y;
+        norm2_<ReduceType, real>(sum, z);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -232,12 +220,13 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct AxpyReDot : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      AxpyReDot(const Float2 &a, const Float2 &b) : a(a) { ; }
+      using real = typename scalar<Float2>::type;
+      const real a;
+      AxpyReDot(const Float2 &a, const Float2 &b) : a(a.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        y += a.x * x;
-        dot_<ReduceType>(sum, x, y);
+        y += a * x;
+        dot_<ReduceType, real>(sum, x, y);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -246,21 +235,17 @@ namespace quda
     /**
        Functor to perform the operation y += a * x  (complex-valued)
     */
-    __device__ __host__ void Caxpy_(const double2 &a, const double2 &x, double2 &y)
+    template <typename T>
+    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 2>::type &x, typename VectorType<T, 2>::type &y)
     {
       y.x += a.x * x.x;
       y.x -= a.y * x.y;
       y.y += a.y * x.x;
       y.y += a.x * x.y;
     }
-    __device__ __host__ void Caxpy_(const float2 &a, const float2 &x, float2 &y)
-    {
-      y.x += a.x * x.x;
-      y.x -= a.y * x.y;
-      y.y += a.y * x.x;
-      y.y += a.x * x.y;
-    }
-    __device__ __host__ void Caxpy_(const float2 &a, const float4 &x, float4 &y)
+
+    template <typename T>
+    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 4>::type &x, typename VectorType<T, 4>::type &y)
     {
       y.x += a.x * x.x;
       y.x -= a.y * x.y;
@@ -271,10 +256,12 @@ namespace quda
       y.w += a.y * x.z;
       y.w += a.x * x.w;
     }
-    __device__ __host__ void Caxpy_(const float2 &a, const float8 &x, float8 &y)
+
+    template <typename T>
+    __device__ __host__ void caxpy_(const complex<T> &a, const typename VectorType<T, 8>::type &x, typename VectorType<T, 8>::type &y)
     {
-      Caxpy_(a, x.x, y.x);
-      Caxpy_(a, x.y, y.y);
+      caxpy_(a, x.x, y.x);
+      caxpy_(a, x.y, y.y);
     }
 
     /**
@@ -283,12 +270,13 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct caxpyNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
+      using real = typename scalar<Float2>::type;
+      const complex<real> a;
       caxpyNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        Caxpy_(a, x, y);
-        norm2_<ReduceType>(sum, y);
+        caxpy_(a, x, y);
+        norm2_<ReduceType, real>(sum, y);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -302,13 +290,14 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct caxpyxmaznormx : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
+      using real = typename scalar<Float2>::type;
+      const complex<real> a;
       caxpyxmaznormx(const Float2 &a, const Float2 &b) : a(a) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        Caxpy_(a, x, y);
-        Caxpy_(-a, z, x);
-        norm2_<ReduceType>(sum, x);
+        caxpy_(a, x, y);
+        caxpy_(-a, z, x);
+        norm2_<ReduceType, real>(sum, x);
       }
       static int streams() { return 5; } //! total number of input and output streams
       static int flops() { return 10; }  //! flops per element
@@ -322,15 +311,16 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct cabxpyzaxnorm : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
-      cabxpyzaxnorm(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
+      using real = typename scalar<Float2>::type;
+      const real a;
+      const complex<real> b;
+      cabxpyzaxnorm(const Float2 &a, const Float2 &b) : a(a.x), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        x *= a.x;
-        Caxpy_(b, x, y);
+        x *= a;
+        caxpy_(b, x, y);
         z = y;
-        norm2_<ReduceType>(sum, z);
+        norm2_<ReduceType, real>(sum, z);
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 10; }  //! flops per element
@@ -339,7 +329,8 @@ namespace quda
     /**
        Returns complex-valued dot product of x and y
     */
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const double2 &a, const double2 &b)
+    template <typename ReduceType, typename T>
+    __device__ __host__ void cdot_(ReduceType &sum, const typename VectorType<T, 2>::type &a, const typename VectorType<T, 2>::type &b)
     {
       typedef typename scalar<ReduceType>::type scalar;
       sum.x += (scalar)a.x * (scalar)b.x;
@@ -348,16 +339,8 @@ namespace quda
       sum.y -= (scalar)a.y * (scalar)b.x;
     }
 
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float2 &a, const float2 &b)
-    {
-      typedef typename scalar<ReduceType>::type scalar;
-      sum.x += (scalar)a.x * (scalar)b.x;
-      sum.x += (scalar)a.y * (scalar)b.y;
-      sum.y += (scalar)a.x * (scalar)b.y;
-      sum.y -= (scalar)a.y * (scalar)b.x;
-    }
-
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float4 &a, const float4 &b)
+    template <typename ReduceType, typename T>
+    __device__ __host__ void cdot_(ReduceType &sum, const typename VectorType<T, 4>::type &a, const typename VectorType<T, 4>::type &b)
     {
       typedef typename scalar<ReduceType>::type scalar;
       sum.x += (scalar)a.x * (scalar)b.x;
@@ -370,7 +353,8 @@ namespace quda
       sum.y -= (scalar)a.w * (scalar)b.z;
     }
 
-    template <typename ReduceType> __device__ __host__ void cdot_(ReduceType &sum, const float8 &a, const float8 &b)
+    template <typename ReduceType, typename T>
+    __device__ __host__ void cdot_(ReduceType &sum, const typename VectorType<T, 8>::type &a, const typename VectorType<T, 8>::type &b)
     {
       cdot_(sum, a.x, b.x);
       cdot_(sum, a.y, b.y);
@@ -378,10 +362,11 @@ namespace quda
 
     template <typename ReduceType, typename Float2, typename FloatN>
     struct Cdot : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      using real = typename scalar<Float2>::type;
       Cdot(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        cdot_<ReduceType>(sum, x, y);
+        cdot_<ReduceType, real>(sum, x, y);
       }
       static int streams() { return 2; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
@@ -394,12 +379,13 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct caxpydotzy : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
+      using real = typename scalar<Float2>::type;
+      const complex<real> a;
       caxpydotzy(const Float2 &a, const Float2 &b) : a(a) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        Caxpy_(a, x, y);
-        cdot_<ReduceType>(sum, z, y);
+        caxpy_(a, x, y);
+        cdot_<ReduceType, real>(sum, z, y);
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -412,10 +398,10 @@ namespace quda
     template <typename ReduceType, typename InputType>
     __device__ __host__ void cdotNormA_(ReduceType &sum, const InputType &a, const InputType &b)
     {
-      typedef typename scalar<ReduceType>::type scalar;
-      typedef typename vector<scalar, 2>::type vec2;
-      cdot_<ReduceType>(sum, a, b);
-      norm2_<scalar>(sum.z, a);
+      using real = typename scalar<InputType>::type;
+      using scalar = typename scalar<ReduceType>::type;
+      cdot_<ReduceType, real>(sum, a, b);
+      norm2_<scalar, real>(sum.z, a);
     }
 
     /**
@@ -425,10 +411,10 @@ namespace quda
     template <typename ReduceType, typename InputType>
     __device__ __host__ void cdotNormB_(ReduceType &sum, const InputType &a, const InputType &b)
     {
-      typedef typename scalar<ReduceType>::type scalar;
-      typedef typename vector<scalar, 2>::type vec2;
-      cdot_<ReduceType>(sum, a, b);
-      norm2_<scalar>(sum.z, b);
+      using real = typename scalar<InputType>::type;
+      using scalar = typename scalar<ReduceType>::type;
+      cdot_<ReduceType, real>(sum, a, b);
+      norm2_<scalar, real>(sum.z, b);
     }
 
     template <typename ReduceType, typename Float2, typename FloatN>
@@ -448,14 +434,15 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct caxpbypzYmbwcDotProductUYNormY_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      Float2 b;
+      using real = typename scalar<Float2>::type;
+      const complex<real> a;
+      const complex<real> b;
       caxpbypzYmbwcDotProductUYNormY_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        Caxpy_(a, x, z);
-        Caxpy_(b, y, z);
-        Caxpy_(-b, w, y);
+        caxpy_(a, x, z);
+        caxpy_(b, y, z);
+        caxpy_(-b, w, y);
         cdotNormB_<ReduceType>(sum, v, y);
       }
       static int streams() { return 7; } //! total number of input and output streams
@@ -470,14 +457,15 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct axpyCGNorm2 : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a) { ; }
+      using real = typename scalar<Float2>::type;
+      using scalar = typename scalar<ReduceType>::type;
+      const real a;
+      axpyCGNorm2(const Float2 &a, const Float2 &b) : a(a.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        typedef typename scalar<ReduceType>::type scalar;
-        FloatN z_new = z + a.x * x;
-        norm2_<scalar>(sum.x, z_new);
-        dot_<scalar>(sum.y, z_new, z_new - z);
+        FloatN z_new = z + a * x;
+        norm2_<scalar, real>(sum.x, z_new);
+        dot_<scalar, real>(sum.y, z_new, z_new - z);
         z = z_new;
       }
       static int streams() { return 3; } //! total number of input and output streams
@@ -497,11 +485,10 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct HeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      typedef typename scalar<ReduceType>::type real;
-      Float2 a;
-      Float2 b;
+      using real = typename scalar<Float2>::type;
+      using scalar = typename scalar<ReduceType>::type;
       ReduceType aux;
-      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux {} { ; }
+      HeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : aux {} { ; }
 
       __device__ __host__ void pre()
       {
@@ -511,8 +498,8 @@ namespace quda
 
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        norm2_<real>(aux.x, x);
-        norm2_<real>(aux.y, y);
+        norm2_<scalar, real>(aux.x, x);
+        norm2_<scalar, real>(aux.y, y);
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
@@ -536,11 +523,10 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct xpyHeavyQuarkResidualNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      typedef typename scalar<ReduceType>::type real;
-      Float2 a;
-      Float2 b;
+      using real = typename scalar<Float2>::type;
+      using scalar = typename scalar<ReduceType>::type;
       ReduceType aux;
-      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : a(a), b(b), aux {} { ; }
+      xpyHeavyQuarkResidualNorm_(const Float2 &a, const Float2 &b) : aux {} { ; }
 
       __device__ __host__ void pre()
       {
@@ -550,8 +536,8 @@ namespace quda
 
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        norm2_<real>(aux.x, x + y);
-        norm2_<real>(aux.y, z);
+        norm2_<scalar, real>(aux.x, x + y);
+        norm2_<scalar, real>(aux.y, z);
       }
 
       //! sum the solution and residual norms, and compute the heavy-quark norm
@@ -574,13 +560,14 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct tripleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      using real = typename scalar<Float2>::type;
+      using scalar = typename scalar<ReduceType>::type;
       tripleCGReduction_(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        typedef typename scalar<ReduceType>::type scalar;
-        norm2_<scalar>(sum.x, x);
-        norm2_<scalar>(sum.y, y);
-        dot_<scalar>(sum.z, y, z);
+        norm2_<scalar, real>(sum.x, x);
+        norm2_<scalar, real>(sum.y, y);
+        dot_<scalar, real>(sum.z, y, z);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element
@@ -595,14 +582,15 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct quadrupleCGReduction_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
+      using real = typename scalar<Float2>::type;
+      using scalar = typename scalar<ReduceType>::type;
       quadrupleCGReduction_(const Float2 &a, const Float2 &b) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        typedef typename scalar<ReduceType>::type scalar;
-        norm2_<scalar>(sum.x, x);
-        norm2_<scalar>(sum.y, y);
-        dot_<scalar>(sum.z, y, z);
-        norm2_<scalar>(sum.w, w);
+        norm2_<scalar, real>(sum.x, x);
+        norm2_<scalar, real>(sum.y, y);
+        dot_<scalar, real>(sum.z, y, z);
+        norm2_<scalar, real>(sum.w, w);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 8; }   //! flops per element
@@ -618,15 +606,16 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct quadrupleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      using real = typename scalar<Float2>::type;
+      const real a;
+      quadrupleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
         z = x;
         w = y;
-        x += a.x * y;
-        y -= a.x * v;
-        norm2_<ReduceType>(sum, y);
+        x += a * y;
+        y -= a * v;
+        norm2_<ReduceType, real>(sum, y);
       }
       static int streams() { return 6; } //! total number of input and output streams
       static int flops() { return 6; }   //! flops per element check if it's right
@@ -644,18 +633,19 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct quadrupleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a, b;
-      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmpx {}, tmpy {};
+      using real = typename scalar<Float2>::type;
+      const real a;
+      const real b;
+      quadrupleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a.x), b(b.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        tmpx = x;
-        tmpy = y;
-        x = b.x * (x + a.x * y) + b.y * z;
-        y = b.x * (y - a.x * v) + b.y * w;
+        auto tmpx = x;
+        auto tmpy = y;
+        x = b * (x + a * y) + b * z;
+        y = b * (y - a * v) + b * w;
         z = tmpx;
         w = tmpy;
-        norm2_<ReduceType>(sum, y);
+        norm2_<ReduceType, real>(sum, y);
       }
       static int streams() { return 7; } //! total number of input and output streams
       static int flops() { return 16; }  //! flops per element check if it's right
@@ -669,13 +659,14 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct doubleCG3InitNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a;
-      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a) { ; }
+      using real = typename scalar<Float2>::type;
+      const real a;
+      doubleCG3InitNorm_(const Float2 &a, const Float2 &b) : a(a.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
         y = x;
-        x -= a.x * z;
-        norm2_<ReduceType>(sum, x);
+        x -= a * z;
+        norm2_<ReduceType, real>(sum, x);
       }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 5; }   //! flops per element
@@ -690,15 +681,16 @@ namespace quda
     */
     template <typename ReduceType, typename Float2, typename FloatN>
     struct doubleCG3UpdateNorm_ : public ReduceFunctor<ReduceType, Float2, FloatN> {
-      Float2 a, b;
-      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a), b(b) { ; }
-      FloatN tmp {};
+      using real = typename scalar<Float2>::type;
+      const real a;
+      const real b;
+      doubleCG3UpdateNorm_(const Float2 &a, const Float2 &b) : a(a.x), b(b.x) { ; }
       __device__ __host__ void operator()(ReduceType &sum, FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
       {
-        tmp = x;
-        x = b.x * (x - a.x * z) + b.y * y;
+        auto tmp = x;
+        x = b * (x - a * z) + b * y;
         y = tmp;
-        norm2_<ReduceType>(sum, x);
+        norm2_<ReduceType, real>(sum, x);
       }
       static int streams() { return 4; } //! total number of input and output streams
       static int flops() { return 9; }   //! flops per element

@@ -114,36 +114,37 @@ namespace quda
     /**
        Base class from which all reduction functors should derive.
     */
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN> struct MultiReduceFunctor {
-      typedef Float2 type;
+    template <int NXZ, typename ReduceType, typename T, typename FloatN> struct MultiReduceFunctor {
+      using type = T;
       static constexpr bool reducer = true;
+      static constexpr bool coeff_mul  = false;
       int NYW;
       MultiReduceFunctor(int NYW) : NYW(NYW) {}
 
-      __device__ __host__ inline Float2 a(int i, int j) const
+      __device__ __host__ inline T a(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Amatrix_d)[i * NYW + j];
+        return reinterpret_cast<T *>(Amatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Amatrix_h)[i * NYW + j];
+        return reinterpret_cast<T *>(Amatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 b(int i, int j) const
+      __device__ __host__ inline T b(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Bmatrix_d)[i * NYW + j];
+        return reinterpret_cast<T *>(Bmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Bmatrix_h)[i * NYW + j];
+        return reinterpret_cast<T *>(Bmatrix_h)[i * NYW + j];
 #endif
       }
 
-      __device__ __host__ inline Float2 c(int i, int j) const
+      __device__ __host__ inline T c(int i, int j) const
       {
 #ifdef __CUDA_ARCH__
-        return reinterpret_cast<Float2 *>(Cmatrix_d)[i * NYW + j];
+        return reinterpret_cast<T *>(Cmatrix_d)[i * NYW + j];
 #else
-        return reinterpret_cast<Float2 *>(Cmatrix_h)[i * NYW + j];
+        return reinterpret_cast<T *>(Cmatrix_h)[i * NYW + j];
 #endif
       }
 
@@ -183,14 +184,13 @@ namespace quda
       sum += (ReduceType)a.w * (ReduceType)b.w;
     }
 
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct Dot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <int NXZ, typename ReduceType, typename real, typename FloatN>
+    struct Dot : public MultiReduceFunctor<NXZ, ReduceType, real, FloatN> {
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      Dot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      using MultiReduceFunctor<NXZ, ReduceType, real, FloatN>::NYW;
+      Dot(int NYW) :
+        MultiReduceFunctor<NXZ, ReduceType, real, FloatN>(NYW)
       {
       }
       __device__ __host__ void operator()(
@@ -236,14 +236,13 @@ namespace quda
       sum.y -= (scalar)a.w * (scalar)b.z;
     }
 
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct Cdot : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <int NXZ, typename ReduceType, typename real, typename FloatN>
+    struct Cdot : public MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN> {
       static constexpr bool use_z = false;
       static constexpr bool use_w = false;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      Cdot(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      using MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN>::NYW;
+      Cdot(int NYW) :
+        MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN>(NYW)
       {
       }
       __device__ __host__ inline void operator()(
@@ -255,14 +254,13 @@ namespace quda
       static int flops() { return 4; }   //! flops per element
     };
 
-    template <int NXZ, typename ReduceType, typename Float2, typename FloatN>
-    struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN> {
+    template <int NXZ, typename ReduceType, typename real, typename FloatN>
+    struct CdotCopy : public MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN> {
       static constexpr bool use_z = false;
       static constexpr bool use_w = true;
-      typedef typename scalar<Float2>::type real;
-      using MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>::NYW;
-      CdotCopy(const coeff_array<Complex> &a, const coeff_array<Complex> &b, const coeff_array<Complex> &c, int NYW) :
-        MultiReduceFunctor<NXZ, ReduceType, Float2, FloatN>(NYW)
+      using MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN>::NYW;
+      CdotCopy(int NYW) :
+        MultiReduceFunctor<NXZ, ReduceType, complex<real>, FloatN>(NYW)
       {
       }
       __device__ __host__ inline void operator()(

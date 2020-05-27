@@ -80,12 +80,12 @@ namespace quda
                                 - sizeof(int)                                                 // functor NYW member
                                 - sizeof(int)                                                 // length parameter
                                 - (!Functor::use_w ? sizeof(SpinorW *) : 0)   // subtract pointer if not using W
-                                - (Functor::reducer ? 3 * sizeof(void *) : 0) // reduction buffers
+                                - (Functor::reducer ? sizeof(ReduceArg<void*>) : 0) // reduction buffers
                                 - 16) // there seems to be 16 bytes other argument space we need
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      constexpr int coeff_size = MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::type));
+      constexpr int coeff_size = Functor::coeff_mul ? MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::type)) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
@@ -113,13 +113,17 @@ namespace quda
        statically allocated with length NXZ, we can statically compute how
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
+       @tparam write Structure type that determines what is being written
+
+       @param[in] scalar_width Width of the scalar that we're
+       multiplying by (1 = real, 2 = complex)
     */
     template <typename write>
-    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, bool reduce)
+    inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, int scalar_width, bool reduce)
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
-      size_t scalar_size = 2 * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
+      size_t scalar_size = scalar_width * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
       NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
       size_t spinor_x_size
         = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
@@ -137,12 +141,12 @@ namespace quda
                       - sizeof(int)                                    // functor NYW member
                       - sizeof(int)                                    // length parameter
                       - (!use_w ? sizeof(void *) : 0)                  // subtract dummy pointer if not using W
-                      - (reduce ? 3 * sizeof(void *) : 0)              // reduction buffers
+                      - (reduce ? sizeof(ReduceArg<void*>) : 0)              // reduction buffers
                       - 16) // there seems to be 16 bytes other argument space we need
         / (spinor_y_size + (use_w ? spinor_w_size : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      int coeff_size = MAX_MATRIX_SIZE / (NXZ * scalar_size);
+      int coeff_size = scalar_width > 0 ? MAX_MATRIX_SIZE / (NXZ * scalar_size) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }

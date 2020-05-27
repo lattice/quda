@@ -77,7 +77,6 @@ namespace quda {
 
   private:
     typedef typename scalar<FloatN>::type Float;
-    typedef typename vector<Float, 2>::type Float2;
     static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Reducer>();
     const int NYW;
     int nParity;
@@ -247,17 +246,16 @@ namespace quda {
         std::vector<ColorSpinorField *> &w, int length)
     {
       typedef typename scalar<RegType>::type Float;
-      typedef typename vector<Float, 2>::type Float2;
-      typedef vector<Float, 2> vec2;
 
       const int NYW = y.size();
-      Reducer<NXZ, ReduceType, Float2, RegType> r(a, b, c, NYW);
+      Reducer<NXZ, ReduceType, Float, RegType> r(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, write, decltype(r)>();
 
       memset(result, 0, NXZ * NYW * sizeof(doubleN));
 
+      constexpr int scalar_width = decltype(r)::coeff_mul ? sizeof(typename decltype(r)::type) / sizeof(Float) : 0;
       const int NYW_max_check
-        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), r.use_z, r.use_w, true);
+        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), r.use_z, r.use_w, scalar_width, true);
 
       if (!is_valid_NXZ(NXZ, true))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
@@ -265,8 +263,8 @@ namespace quda {
       if (NXZ * NYW > QUDA_MAX_MULTI_REDUCE)
         errorQuda("NXZ * NYW = %d exceeds maximum number of reductions %d", NXZ * NYW, QUDA_MAX_MULTI_REDUCE);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-      if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
+      if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
+        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
       const int N_MIN = NXZ < NYW ? NXZ : NYW;
       for (int i = 0; i < N_MIN; i++) {
@@ -279,17 +277,17 @@ namespace quda {
         }
       }
 
+      using coeff_t = typename decltype(r)::type;
+      size_t len = MAX_MATRIX_SIZE / sizeof(coeff_t);
 #ifdef JITIFY
       // need to get constants pointer from jitify instance
       if (a.data || b.data || c.data) errorQuda("Constant memory buffer support not enabled with jitify yet");
 #endif
 
       if (a.data) {
-        Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
-        // since the kernel doesn't know the width of them matrix at compile
-        // time we stride it and copy the padded matrix to GPU
+        coeff_t A[len];
         for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+          for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
 
         cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
@@ -297,11 +295,9 @@ namespace quda {
       }
 
       if (b.data) {
-        Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
-        // since the kernel doesn't know the width of them matrix at compile
-        // time we stride it and copy the padded matrix to GPU
+        coeff_t B[len];
         for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+          for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
 
         cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
@@ -309,11 +305,9 @@ namespace quda {
       }
 
       if (c.data) {
-        Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
-        // since the kernel doesn't know the width of them matrix at compile
-        // time we stride it and copy the padded matrix to GPU
+        coeff_t C[len];
         for (int i = 0; i < NXZ; i++)
-          for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+          for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
 
         cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
@@ -618,10 +612,10 @@ namespace quda {
           if (j_idx < i_idx) { return; }
         }
 
-        coeff_array<Complex> a, b, c;
+        coeff_array<T> a, b, c;
 
         if (x.size() <= tile_size.x && is_valid_NXZ(x.size(), true)) {
-          switch (x.size()) { // COMMENT HERE FOR COMPILE TIME
+          switch (x.size()) {
           case 1:
             multiReduce<1, doubleN, ReduceType, ReducerDiagonal, writeDiagonal, ReducerOffDiagonal, writeOffDiagonal, false>(
               tmp_dot, a, b, c, x, y, z, w, i_idx, j_idx);
@@ -871,7 +865,7 @@ namespace quda {
       uint2 max_tile_size;
 
     public:
-      TileSizeTune(T *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false,
+      TileSizeTune(T *result, vec &x, vec &y, vec &z, vec &w, int coeff_width, bool hermitian, bool Anorm = false,
                    bool nested_policy = false) :
         result(result),
         x(x),
@@ -881,7 +875,7 @@ namespace quda {
         hermitian(hermitian),
         Anorm(Anorm)
       {
-        NYW_max = max_YW_size<writeDiagonal>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
+        NYW_max = max_YW_size<writeDiagonal>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, true);
         max_tile_size = make_uint2(1, 1);
 
         strcpy(aux, nested_policy ? "nested_policy," : "policy,");
@@ -1039,6 +1033,7 @@ namespace quda {
       typedef std::vector<ColorSpinorField *> vec;
       T *result;
       vec &x, &y, &z, &w;
+      int coeff_width;
       bool hermitian;
       bool Anorm;
 
@@ -1046,12 +1041,13 @@ namespace quda {
       unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
     public:
-      TransposeTune(T *result, vec &x, vec &y, vec &z, vec &w, bool hermitian, bool Anorm = false) :
+      TransposeTune(T *result, vec &x, vec &y, vec &z, vec &w, int coeff_width, bool hermitian, bool Anorm = false) :
         result(result),
         x(x),
         y(y),
         z(z),
         w(w),
+        coeff_width(coeff_width),
         hermitian(hermitian),
         Anorm(Anorm)
       {
@@ -1081,20 +1077,20 @@ namespace quda {
           // multiReduce_recurse directly now for 1-d multi
           // reductions, but I'll keep this code here for now
           if (x.size() == 1) {
-            TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+            TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
             tile.apply(0);
           } else if (y.size() == 1) {
-            TileTuner tile(result, y, z, w, z, hermitian, Anorm, true);
+            TileTuner tile(result, y, z, w, z, coeff_width, hermitian, Anorm, true);
             tile.apply(0);
           } else {
 
             { // tune regular inner product
-              TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+              TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
               tile.apply(0);
             }
 
             { // tune transpose inner product
-              TileTuner tile(result, y, z, w, z, hermitian, Anorm, true);
+              TileTuner tile(result, y, z, w, z, coeff_width, hermitian, Anorm, true);
               tile.apply(0);
             }
           }
@@ -1111,13 +1107,13 @@ namespace quda {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         if (tp.aux.x == 0) {
-          TileTuner tile(result, x, y, z, w, hermitian, Anorm, true);
+          TileTuner tile(result, x, y, z, w, coeff_width, hermitian, Anorm, true);
           tile.apply(stream);
         } else if (tp.aux.x == 1) {
-          Complex *result_trans = new Complex[x.size() * y.size()];
+          T *result_trans = new T[x.size() * y.size()];
 
           // swap (x<->y and w<-z> when doing transpose calculation)
-          TileTuner tile(result_trans, y, x, w, z, hermitian, Anorm, true);
+          TileTuner tile(result_trans, y, x, w, z, coeff_width, hermitian, Anorm, true);
           tile.apply(stream);
 
           // tranpose the result if we are doing the transpose calculation
@@ -1177,9 +1173,10 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       double *result_tmp = new double[x.size() * y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
+      int coeff_width = 0;
 
       if (x.size() == 1) {
-        int NYW_max = max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
+        int NYW_max = max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
         multiReduce_recurse<double, QudaSumFloat, Dot, write_, Dot, write_>(result_tmp, x, y, x, y, 0, 0, false,
@@ -1189,13 +1186,13 @@ namespace quda {
         double *result_trans = new double[x.size() * y.size()];
 
         // swap (x<->y and w<-z> when doing transpose calculation)
-        int NXZ_max = max_YW_size<write_>(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, true);
+        int NXZ_max = max_YW_size<write_>(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x[0]->Ncolor() == 3 ? 32 : NXZ_max} ));
         multiReduce_recurse<double, QudaSumFloat, Dot, write_, Dot, write_>(result_trans, y, x, y, x, 0, 0, false,
                                                                             max_tile_size);
 
-        // tranpose the result if we are doing the transpose calculation
+        // transpose the result if we are doing the transpose calculation
         const auto xlen = x.size();
         const auto ylen = y.size();
         for (unsigned int j = 0; j < xlen; j++)
@@ -1204,9 +1201,8 @@ namespace quda {
         delete[] result_trans;
 
       } else {
-        TileSizeTune<double, QudaSumFloat, Dot, write_, Dot, write_, double> tile(result_tmp, x, y, x, y, false);
-        // tile.apply(0);//
-        tile.apply(*(blas::getStream()));
+        TransposeTune<double, QudaSumFloat, Dot, write_, Dot, write_, double> tile(result_tmp, x, y, x, y, coeff_width, false);
+        tile.apply(0);
       }
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1230,9 +1226,10 @@ namespace quda {
       if (x.size() == 0 || y.size() == 0) errorQuda("vector.size() == 0");
       Complex *result_tmp = new Complex[x.size() * y.size()];
       for (unsigned int i = 0; i < x.size() * y.size(); i++) result_tmp[i] = 0.0;
+      int coeff_width = 0;
 
       if (x.size() == 1) {
-        int NYW_max = max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, true);
+        int NYW_max = max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NYW_max, (int)y.size(), x[0]->Ncolor() == 3 ? 32 : NYW_max} ));
         multiReduce_recurse<double2, QudaSumFloat2, Cdot, write_, Cdot, write_>(result_tmp, x, y, x, y, 0, 0, false,
@@ -1242,13 +1239,13 @@ namespace quda {
         Complex *result_trans = new Complex[x.size() * y.size()];
 
         // swap (x<->y and w<-z> when doing transpose calculation)
-        int NXZ_max = max_YW_size<write_>(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, true);
+        int NXZ_max = max_YW_size<write_>(y.size(), y[0]->Precision(), x[0]->Precision(), false, false, coeff_width, true);
         // if fine-grid then we set max tile size to 32 to avoid unnecessary tuning
         uint2 max_tile_size = make_uint2(1, std::min( {NXZ_max, (int)x.size(), x[0]->Ncolor() == 3 ? 32 : NXZ_max} ));
         multiReduce_recurse<double2, QudaSumFloat2, Cdot, write_, Cdot, write_>(result_trans, y, x, y, x, 0, 0, false,
                                                                                 max_tile_size);
 
-        // tranpose the result if we are doing the transpose calculation
+        // transpose the result if we are doing the transpose calculation
         const auto xlen = x.size();
         const auto ylen = y.size();
         for (unsigned int j = 0; j < xlen; j++)
@@ -1257,7 +1254,7 @@ namespace quda {
         delete[] result_trans;
 
       } else {
-        TransposeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex> trans(result_tmp, x, y, x, y, false);
+        TransposeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex> trans(result_tmp, x, y, x, y, coeff_width, false);
         trans.apply(0);
       }
 
@@ -1286,8 +1283,9 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex> tile(
-        result_tmp, x, y, x, y, true, false); // last false is b/c L2 norm
+      int coeff_width = 0;
+      TileSizeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex>
+        tile(result_tmp, x, y, x, y, coeff_width, true, false); // last false is b/c L2 norm
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products
@@ -1316,7 +1314,8 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
-      TileSizeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex> tile(result_tmp, x, y, x, y, true,
+      int coeff_width = 0;
+      TileSizeTune<double2, QudaSumFloat2, Cdot, write_, Cdot, write_, Complex> tile(result_tmp, x, y, x, y, coeff_width, true,
                                                                                      true); // last true is b/c A norm
       tile.apply(0);
 
@@ -1331,7 +1330,7 @@ namespace quda {
         for (unsigned int i = j; i < ylen; i++) {
           result[j*ylen+i] = result_tmp[i*xlen + j];
           result[i*ylen+j] = conj(result_tmp[i*xlen + j]);
-  }
+        }
 
       delete[] result_tmp;
     }
@@ -1351,8 +1350,9 @@ namespace quda {
       Complex* result_tmp = new Complex[x.size()*y.size()];
       for (unsigned int i = 0; i < x.size()*y.size(); i++) result_tmp[i] = 0.0;
 
+      int coeff_width = 0;
       // When recursing, only the diagonal tiles will do the copy, the rest just do the outer product
-      TileSizeTune<double2,QudaSumFloat2,CdotCopy,write_,Cdot,write_,Complex > tile(result_tmp, x, y, x, y, true);
+      TileSizeTune<double2,QudaSumFloat2,CdotCopy,write_,Cdot,write_,Complex > tile(result_tmp, x, y, x, y, coeff_width, true);
       tile.apply(0);
 
       // do a single multi-node reduction only once we have computed all local dot products

@@ -21,8 +21,6 @@ namespace quda {
     {
 
   private:
-    typedef typename scalar<FloatN>::type Float;
-    typedef typename vector<Float, 2>::type Float2;
     static constexpr int NYW_max = max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
     const int NYW;
     int max_warp_split;
@@ -103,36 +101,35 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        typedef typename scalar<FloatN>::type Float;
-        typedef typename vector<Float, 2>::type Float2;
-
+        using coeff_t = typename decltype(arg.f)::type;
+        size_t len = MAX_MATRIX_SIZE / sizeof(coeff_t);
 #ifdef JITIFY
         using namespace jitify::reflection;
         auto instance = program->kernel("quda::blas::multiBlasKernel")
                           .instantiate(Type<FloatN>(), M, NXZ, tp.aux.x, Type<decltype(arg)>());
 
         if (a.data) {
-          Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t A[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
 
           auto Amatrix_d = instance.get_constant_ptr("quda::blas::Amatrix_d");
           cuMemcpyHtoDAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), stream);
         }
 
         if (b.data) {
-          Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t B[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
 
           auto Bmatrix_d = instance.get_constant_ptr("quda::blas::Bmatrix_d");
           cuMemcpyHtoDAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), stream);
         }
 
         if (c.data) {
-          Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t C[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(Complex(c.data[NYW * i + j]);
           auto Cmatrix_d = instance.get_constant_ptr("quda::blas::Cmatrix_d");
           cuMemcpyHtoDAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), stream);
         }
@@ -142,23 +139,23 @@ namespace quda {
         tp.block.x /= tp.aux.x; // restore block size
 #else
         if (a.data) {
-          Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t A[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) A[NYW * i + j] = coeff_t(a.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (b.data) {
-          Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t B[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) B[NYW * i + j] = coeff_t(b.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (c.data) {
-          Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
+          coeff_t C[len];
           for (int i = 0; i < NXZ; i++)
-            for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
+            for (int j = 0; j < NYW; j++) C[NYW * i + j] = coeff_t(c.data[NYW * i + j]);
           cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
@@ -248,23 +245,22 @@ namespace quda {
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
     {
       typedef typename scalar<RegType>::type Float;
-      typedef typename vector<Float, 2>::type Float2;
-      typedef vector<Float, 2> vec2;
 
       const int NYW = y.size();
       // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
       constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
-      Functor<NXZ, Float2, RegType> f(NYW);
+      Functor<NXZ, Float, RegType> f(NYW);
       constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, write, decltype(f)>();
+      constexpr int scalar_width = sizeof(typename decltype(f)::type) / sizeof(Float);
       const int NYW_max_check
-        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, false);
+        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
 
       if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
       if (NYW_max != NYW_max_check) errorQuda("Runtime %d and compile time %d limits disagree", NYW_max, NYW_max_check);
       if (NYW > NYW_max) errorQuda("NYW exceeds max size (%d > %d)", NYW, NYW_max);
-      if (NXZ * NYW * sizeof(Float2) > MAX_MATRIX_SIZE)
-        errorQuda("Coefficient matrix exceeds max size (%lu > %d)", NXZ * NYW * sizeof(Float2), MAX_MATRIX_SIZE);
+      if (NXZ * NYW * scalar_width > MAX_MATRIX_SIZE)
+        errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
       Spinor<RegType, StoreType, M> X[NXZ];
       Spinor<RegType, yType, M, write::Y> Y[NYW_max];
@@ -678,11 +674,11 @@ namespace quda {
 
     template <template <int MXZ, typename Float, typename FloatN> class Functor, typename T>
     void axpy_recurse(const T *a_, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
-                      const range &range_x, const range &range_y, int upper)
+                      const range &range_x, const range &range_y, int upper, int coeff_width)
     {
       using write_ = write<0, 1, 0, 0>;
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, false)) {
+      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, false)) {
         // We need to split up 'a' carefully since it's row-major.
         T *tmpmajor = new T[x.size() * y.size()];
         T *tmpmajor0 = &tmpmajor[0];
@@ -703,8 +699,8 @@ namespace quda {
             tmpmajor1[count1++] = a_[count++];
         }
 
-        axpy_recurse<Functor>(tmpmajor0, x, y0, range_x, range(range_y.first, range_y.first + y0.size()), upper);
-        axpy_recurse<Functor>(tmpmajor1, x, y1, range_x, range(range_y.first + y0.size(), range_y.second), upper);
+        axpy_recurse<Functor>(tmpmajor0, x, y0, range_x, range(range_y.first, range_y.first + y0.size()), upper, coeff_width);
+        axpy_recurse<Functor>(tmpmajor1, x, y1, range_x, range(range_y.first + y0.size(), range_y.second), upper, coeff_width);
 
         delete[] tmpmajor;
       } else {
@@ -727,8 +723,8 @@ namespace quda {
           std::vector<ColorSpinorField *> x0(x.begin(), x.begin() + x.size() / 2);
           std::vector<ColorSpinorField *> x1(x.begin() + x.size() / 2, x.end());
 
-          axpy_recurse<Functor>(a0, x0, y, range(range_x.first, range_x.first + x0.size()), range_y, upper);
-          axpy_recurse<Functor>(a1, x1, y, range(range_x.first + x0.size(), range_x.second), range_y, upper);
+          axpy_recurse<Functor>(a0, x0, y, range(range_x.first, range_x.first + x0.size()), range_y, upper, coeff_width);
+          axpy_recurse<Functor>(a1, x1, y, range(range_x.first + x0.size(), range_x.second), range_y, upper, coeff_width);
         }
       } // end if (y.size() > max_YW_size())
     }
@@ -736,7 +732,7 @@ namespace quda {
     void caxpy(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
-      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), 0);
+      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), 0, 2);
     }
 
     void caxpy_U(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -747,7 +743,7 @@ namespace quda {
       {
         errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
-      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), 1);
+      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), 1, 2);
     }
 
     void caxpy_L(const Complex *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -758,7 +754,7 @@ namespace quda {
       {
         errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block caxpy instead");
       }
-      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), -1);
+      axpy_recurse<multicaxpy_>(a_, x, y, range(0,x.size()), range(0,y.size()), -1, 2);
     }
 
     void caxpy(const Complex *a, ColorSpinorField &x, ColorSpinorField &y) { caxpy(a, x.Components(), y.Components()); }
@@ -774,7 +770,7 @@ namespace quda {
       // if greater than max single-kernel size, recurse
       using write_ = write<0, 0, 0, 1>;
 
-      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, false)) {
+      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, 2, false)) {
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -877,7 +873,7 @@ namespace quda {
     {
       using write_ = write<0, 1, 0, 1>;
 
-      if (y_.size() <= (size_t)max_YW_size<write_>(1, z_.Precision(), y_[0]->Precision(), false, true, false)) {
+      if (y_.size() <= (size_t)max_YW_size<write_>(1, z_.Precision(), y_[0]->Precision(), false, true, 1, false)) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -954,7 +950,7 @@ namespace quda {
     void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
-      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 0);
+      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 0, 1);
     }
 
     void axpy_U(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -963,9 +959,9 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block caxpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
+        errorQuda("An optimal block axpy_U with non-square 'a' has not yet been implemented. Use block axpy instead");
       }
-      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 1);
+      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
     void axpy_L(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
@@ -974,9 +970,9 @@ namespace quda {
       //                                         which lets us skip some tiles.
       if (x.size() != y.size())
       {
-        errorQuda("An optimal block caxpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
+        errorQuda("An optimal block axpy_L with non-square 'a' has not yet been implemented. Use block axpy instead");
       }
-      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), -1);
+      axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), -1, 1);
     }
 
     // Composite field version
