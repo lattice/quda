@@ -34,6 +34,16 @@ namespace quda
       COMPUTE_INVALID
     };
 
+    template <typename F> inline void setMaxDynamicSharedBytesPerBlock(F *func)
+    {
+#if CUDA_VERSION >= 9000
+      qudaFuncSetAttribute((const void *)func, cudaFuncAttributePreferredSharedMemoryCarveout,
+                           (int)cudaSharedmemCarveoutMaxShared);
+      qudaFuncSetAttribute((const void *)func, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                           deviceProp.sharedMemPerBlockOptin);
+#endif
+    }
+
     /**
       @brief Launcher for CPU instantiations of coarse-link construction
      */
@@ -52,7 +62,7 @@ namespace quda
     template <bool from_coarse, typename Float, int fineSpin, int fineColor, int coarseSpin, int coarseColor, typename Arg>
     struct Launch<QUDA_CUDA_FIELD_LOCATION, from_coarse, Float, fineSpin, fineColor, coarseSpin, coarseColor, Arg> {
 
-      template <int dim, int bM, int bN, int bK, int block_y, int block_z>
+      template <int dim, QudaDirection dir, int bM, int bN, int bK, int block_y, int block_z>
       void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
       {
         tp.block.x = 1;
@@ -62,14 +72,53 @@ namespace quda
         tp.shared_bytes = shared_bytes;
         static_assert(shared_bytes <= 96 * 1024, "too much shared memory");
 
+        // TODO: Fix the split M/N.
         constexpr int t_m = 1;
         constexpr int t_n = 1;
 
         tp.grid = dim3(min_threads * t_m * t_n, 2, 1);
 
-        auto kernel
-          = ComputeUVMMA<from_coarse, Float, dim, QUDA_BACKWARDS, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z, Arg>;
+        auto kernel = ComputeUVMMA<from_coarse, Float, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z, Arg>;
+        setMaxDynamicSharedBytesPerBlock(kernel);
         kernel<<<tp.grid, tp.block, tp.shared_bytes, stream>>>(arg);
+      }
+
+      template <int bM, int bN, int bK, int block_y, int block_z>
+      void launch_compute_uv_kernel(TuneParam &tp, const Arg &arg, int min_threads, const cudaStream_t &stream)
+      {
+        if (arg.dir == QUDA_BACKWARDS) {
+          switch (arg.dim) {
+          case 0:
+            launch_compute_uv_kernel<0, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 1:
+            launch_compute_uv_kernel<1, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 2:
+            launch_compute_uv_kernel<2, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 3:
+            launch_compute_uv_kernel<3, QUDA_BACKWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
+          }
+        } else {
+          switch (arg.dim) {
+          case 0:
+            launch_compute_uv_kernel<0, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 1:
+            launch_compute_uv_kernel<1, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 2:
+            launch_compute_uv_kernel<2, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          case 3:
+            launch_compute_uv_kernel<3, QUDA_FORWARDS, bM, bN, bK, block_y, block_z>(tp, arg, min_threads, stream);
+            break;
+          default: errorQuda("arg.dim(=%d) is NOT supported.", arg.dim);
+          }
+        }
       }
 
       Launch(Arg &arg, CUresult &error, TuneParam &tp, ComputeType type, int min_threads, const cudaStream_t &stream)
@@ -86,44 +135,14 @@ namespace quda
                     .configure(tp.grid, tp.block, tp.shared_bytes, stream)
                     .launch(arg);
 #else
-          if (arg.dir == QUDA_BACKWARDS) {
-            if (arg.dim == 0) {
-#if 0
-              ComputeUVGPU<from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-#else
-              // clang-format off
-              switch (tp.aux.x) {
-              case 0: launch_compute_uv_kernel<   0,  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
-              case 1: launch_compute_uv_kernel<   0,  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
-              case 2: launch_compute_uv_kernel<   0,  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
-              default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
-              }
-              // clang-format on
-#endif
-            } else if (arg.dim == 1)
-              ComputeUVGPU<from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            else if (arg.dim == 2)
-              ComputeUVGPU<from_coarse, Float, 2, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            else if (arg.dim == 3)
-              ComputeUVGPU<from_coarse, Float, 3, QUDA_BACKWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-          } else if (arg.dir == QUDA_FORWARDS) {
-            if (arg.dim == 0)
-              ComputeUVGPU<from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            else if (arg.dim == 1)
-              ComputeUVGPU<from_coarse, Float, 1, QUDA_FORWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            else if (arg.dim == 2)
-              ComputeUVGPU<from_coarse, Float, 2, QUDA_FORWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
-            else if (arg.dim == 3)
-              ComputeUVGPU<from_coarse, Float, 3, QUDA_FORWARDS, fineSpin, coarseSpin>
-                <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+          // clang-format off
+          switch (tp.aux.x) {
+          case 0: launch_compute_uv_kernel<  48,  64,  24,   8,   8>(tp, arg, min_threads, stream); break;
+          case 1: launch_compute_uv_kernel<  48,  64,  24,  12,   8>(tp, arg, min_threads, stream); break;
+          case 2: launch_compute_uv_kernel<  48,  64,  24,  24,   8>(tp, arg, min_threads, stream); break;
+          default: errorQuda("tp.aux.x(=%d) is NOT supported by N = 48", tp.aux.x);
           }
+          // clang-format on
 #endif
 
         } else if (type == COMPUTE_AV) {
