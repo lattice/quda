@@ -3,7 +3,7 @@
 #include <dslash_quda.h>
 #include <index_helper.cuh>
 
-#include <include/kernels/dslash_domain_wall_m5.cuh>
+#include <kernels/dslash_domain_wall_m5.cuh>
 
 namespace quda
 {
