@@ -3,7 +3,7 @@
 #include <dslash_quda.h>
 #include <index_helper.cuh>
 
-#include <include/kernels/dslash_mobius_eofa.cuh>
+#include <kernels/dslash_mobius_eofa.cuh>
 
 namespace quda
 {
