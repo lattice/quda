@@ -12,14 +12,6 @@
 using namespace quda;
 
 extern qudaStream_t *stream;
-<<<<<<< HEAD
-<<<<<<< HEAD:tests/face_gauge.cpp
-=======
->>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
-  
-=======
-
->>>>>>> feature/cuda-backend-2:utils/face_gauge.cpp
 /**************************************************************
  * Staple exchange routine
  * used in fat link computation

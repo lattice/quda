@@ -33,13 +33,12 @@ namespace quda {
      @param[in] stream Stream which we are synchronizing
   */
   cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line);
-  
 }
 
 #define STRINGIFY__(x) #x
 #define __STRINGIFY__(x) STRINGIFY__(x)
 
-#define qudaStreamSynchronize(stream)					\
+#define qudaStreamSynchronize(stream)                                                                                  \
   ::quda::qudaStreamSynchronize_(stream, __func__, quda::file_name(__FILE__), __STRINGIFY__(__LINE__));
 
 #define qudaMemcpy(dst, src, count, kind) \
@@ -83,9 +82,9 @@ namespace quda {
      @param[in] kind Type of memory copy
      @param[in] stream Stream to issue copy
   */
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
-                          size_t width, size_t hieght, cudaMemcpyKind kind, const qudaStream_t &stream,
-                          const char *func, const char *file, const char *line);
+  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t hieght,
+                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
+                          const char *line);
 
   /**
      @brief Wrapper around cudaMemset or driver API equivalent.
@@ -116,7 +115,8 @@ namespace quda {
      @param[in] sharedMem Shared memory requested per thread block
      @param[in] stream Stream identifier
   */
-  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream);
+  cudaError_t qudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
+                               qudaStream_t stream);
 
   /**
      @brief Wrapper around cudaEventQuery or cuEventQuery
@@ -130,7 +130,7 @@ namespace quda {
      @param[in,out] event Event we are recording
      @param[in,out] stream Stream where to record the event
    */
-  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream=0);
+  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream = 0);
 
   /**
      @brief Wrapper around cudaEventRecord or cuEventRecord
