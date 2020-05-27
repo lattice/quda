@@ -100,15 +100,15 @@ namespace quda {
 
      em(args.m-1) = norm( args.H(args.m, args.m-1) );
 
-     qudaHostRegister(static_cast<void *>(cH.data()), args.m * args.m * sizeof(Complex), qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(cH.data()), args.m*args.m*sizeof(Complex), cudaHostRegisterDefault);
      magma_Xgesv(static_cast<void*>(em.data()), args.m, args.m, static_cast<void*>(cH.data()), args.m, sizeof(Complex));
-     qudaHostUnregister(cH.data());
+     cudaHostUnregister(cH.data());
 
      Gk.col(args.m-1) += em;
 
-     qudaHostRegister(static_cast<void *>(Gk.data()), args.m * args.m * sizeof(Complex), qudaHostRegisterDefault);
+     cudaHostRegister(static_cast<void *>(Gk.data()), args.m*args.m*sizeof(Complex), cudaHostRegisterDefault);
      magma_Xgeev(static_cast<void*>(Gk.data()), args.m, args.m, static_cast<void*>(harVecs.data()), static_cast<void*>(harVals.data()), args.m, sizeof(Complex));
-     qudaHostUnregister(Gk.data());
+     cudaHostUnregister(Gk.data());
 
      std::vector<SortedEvals> sorted_evals;
      sorted_evals.reserve(args.m);
@@ -164,10 +164,9 @@ namespace quda {
        Complex *ctemp = static_cast<Complex*> (args.ritzVecs.col(0).data());
        memcpy(ctemp, args.c, (args.m+1)*sizeof(Complex));
 
-       qudaHostRegister(static_cast<void *>(Htemp.data()), (args.m + 1) * args.m * sizeof(Complex),
-                        qudaHostRegisterDefault);
+       cudaHostRegister(static_cast<void*>(Htemp.data()), (args.m+1)*args.m*sizeof(Complex), cudaHostRegisterDefault);
        magma_Xgels(static_cast<void*>(Htemp.data()), ctemp, args.m+1, args.m, args.m+1, sizeof(Complex));
-       qudaHostUnregister(Htemp.data());
+       cudaHostUnregister(Htemp.data());
 
        memcpy(args.eta.data(), ctemp, args.m*sizeof(Complex));
        memset(ctemp, 0, (args.m+1)*sizeof(Complex));

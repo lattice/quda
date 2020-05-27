@@ -10,9 +10,9 @@
 //#define API_PROFILE
 
 #ifdef API_PROFILE
-#define PROFILE(f, idx)                                                                                                \
-  apiTimer.TPSTART(idx);                                                                                               \
-  f;                                                                                                                   \
+#define PROFILE(f, idx)                                 \
+  apiTimer.TPSTART(idx);				\
+  f;                                                    \
   apiTimer.TPSTOP(idx);
 #else
 #define PROFILE(f, idx) f;
@@ -95,7 +95,7 @@ namespace quda {
       strcat(aux, line);
     }
 
-    inline void apply(const cudaStream_t &stream) {
+    inline void apply(const qudaStream_t &stream) {
       tuneLaunch(*this, getTuning(), getVerbosity());
       if (copy) {
         if (async) {
@@ -158,33 +158,14 @@ namespace quda {
     long long bytes() const { return kind == cudaMemcpyDeviceToDevice ? 2*count : count; }
   };
 
-  void qudaMemPrefetchAsync_(const void *devPtr, size_t count, int dstDevice, const cudaStream_t &stream,
-                             const char *func, const char *file, const char *line)
-  {
-    if (count == 0) return;
-    cudaError_t error = cudaMemPrefetchAsync(devPtr, count, dstDevice, stream);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func, const char *file,
-                   const char *line)
-  {
+  void qudaMemcpy_(void *dst, const void *src, size_t count, cudaMemcpyKind kind,
+                   const char *func, const char *file, const char *line) {
     if (count == 0) return;
     QudaMem copy(dst, src, count, kind, false, func, file, line);
     copy.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpyNoTune_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const char *func,
-                         const char *file, const char *line)
-  {
-    if (count == 0) return;
-    cudaError_t error = cudaMemcpy(dst, src, count, kind);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
   void qudaMemcpyAsync_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
@@ -217,49 +198,32 @@ namespace quda {
     }
   }
 
-  void qudaMemcpyAsyncNoTune_(void *dst, const void *src, size_t count, cudaMemcpyKind kind, const qudaStream_t &stream,
-                              const char *func, const char *file, const char *line)
+  cudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
   {
-    if (count == 0) return;
-
 #ifdef USE_DRIVER_API
-    switch (kind) {
-    case cudaMemcpyDeviceToHost:
-      PROFILE(cuMemcpyDtoHAsync(dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2H_ASYNC);
-      break;
-    case cudaMemcpyHostToDevice:
-      PROFILE(cuMemcpyHtoDAsync((CUdeviceptr)dst, src, count, stream), QUDA_PROFILE_MEMCPY_H2D_ASYNC);
-      break;
-    case cudaMemcpyDeviceToDevice:
-      PROFILE(cuMemcpyDtoDAsync((CUdeviceptr)dst, (CUdeviceptr)src, count, stream), QUDA_PROFILE_MEMCPY_D2D_ASYNC);
-      break;
-    default: errorQuda("Unsupported cuMemcpyTypeAsync %d", kind);
+    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
     }
+    return cudaErrorUnknown;
 #else
-    cudaMemcpyAsync(dst, src, count, kind, stream);
+    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
+    if (error != cudaSuccess && !activeTuning())
+      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    return error;
+
 #endif
   }
 
-  void qudaMemcpy2D_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                     cudaMemcpyKind kind, const char *func, const char *file, const char *line)
-  {
-    PROFILE(cudaError_t error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind),
-            kind == cudaMemcpyDeviceToHost ? QUDA_PROFILE_MEMCPY_D2H_2D : QUDA_PROFILE_MEMCPY_H2D_2D);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpy2DNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                           cudaMemcpyKind kind, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                          cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                          const char *line)
+  
+  void qudaMemcpy2DAsync_(void *dst, size_t dpitch, const void *src, size_t spitch,
+                          size_t width, size_t height, cudaMemcpyKind kind, const qudaStream_t &stream,
+                          const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
     CUDA_MEMCPY2D param;
@@ -288,167 +252,74 @@ namespace quda {
 #endif
   }
 
-  void qudaMemcpy2DAsyncNoTune_(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width, size_t height,
-                                cudaMemcpyKind kind, const qudaStream_t &stream, const char *func, const char *file,
-                                const char *line)
-  {
-#ifdef USE_DRIVER_API
-    CUDA_MEMCPY2D param;
-    param.srcPitch = spitch;
-    param.srcY = 0;
-    param.srcXInBytes = 0;
-    param.dstPitch = dpitch;
-    param.dstY = 0;
-    param.dstXInBytes = 0;
-    param.WidthInBytes = width;
-    param.Height = height;
-
-    switch (kind) {
-    case cudaMemcpyDeviceToHost:
-      param.srcDevice = (CUdeviceptr)src;
-      param.srcMemoryType = CU_MEMORYTYPE_DEVICE;
-      param.dstHost = dst;
-      param.dstMemoryType = CU_MEMORYTYPE_HOST;
-      break;
-    default: errorQuda("Unsupported cuMemcpyType2DAsync %d", kind);
-    }
-    cuMemcpy2DAsync(&param, stream);
-#else
-    cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
-#endif
-  }
-
-  qudaError_t qudaGetLastError_(const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaGetLastError();
-    return error;
-  }
-
-  const char *qudaGetErrorString_(qudaError_t &error, const char *func, const char *file, const char *line)
-  {
-    return cudaGetErrorString(error);
-  }
-
-  void qudaMemset_(void *dst, int value, size_t count, const char *func, const char *file, const char *line)
+  void qudaMemset_(void *ptr, int value, size_t count, const char *func, const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem set(dst, value, count, false, func, file, line);
+    QudaMem set(ptr, value, count, false, func, file, line);
     set.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetNoTune_(void *dst, int value, size_t count, const char *func, const char *file, const char *line)
-  {
-    if (count == 0) return;
-    cudaError_t error = cudaMemset(dst, value, count);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemsetAsync_(void *dst, int value, size_t count, const qudaStream_t &stream, const char *func,
+  void qudaMemsetAsync_(void *ptr, int value, size_t count, const qudaStream_t &stream, const char *func,
                         const char *file, const char *line)
   {
     if (count == 0) return;
-    QudaMem copy(dst, value, count, true, func, file, line);
+    QudaMem copy(ptr, value, count, true, func, file, line);
     copy.apply(0);
     cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    if (error != cudaSuccess) errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
   }
 
-  void qudaMemsetAsyncNoTune_(void *dst, int value, size_t count, const qudaStream_t &stream, const char *func,
-                              const char *file, const char *line)
+  cudaError_t qudaLaunchKernel(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem, qudaStream_t stream)
   {
-    if (count == 0) return;
-    cudaError_t error = cudaMemsetAsync(dst, value, count, stream);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemset2D_(void *dst, size_t pitch, int val, size_t width, size_t height, const char *func, const char *file,
-                     const char *line)
-  {
-    if (pitch == 0) return;
-    cudaError_t error = cudaMemset2D(dst, pitch, val, width, height);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  void qudaMemset2DAsync_(void *dst, size_t pitch, int val, size_t width, size_t height, const qudaStream_t &stream,
-                          const char *func, const char *file, const char *line)
-  {
-    if (pitch == 0) return;
-    cudaError_t error = cudaMemset2DAsync(dst, pitch, val, width, height, stream);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-  }
-
-  qudaError_t qudaLaunchKernel_(const void *func_arg, dim3 gridDim, dim3 blockDim, void **args, size_t sharedMem,
-                                qudaStream_t stream, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error;
     // no driver API variant here since we have C++ functions
-    PROFILE(error = cudaLaunchKernel(func_arg, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
-    if (error != cudaSuccess && !activeTuning() && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
+    PROFILE(cudaError_t error = cudaLaunchKernel(func, gridDim, blockDim, args, sharedMem, stream), QUDA_PROFILE_LAUNCH_KERNEL);
+    if (error != cudaSuccess && !activeTuning()) errorQuda("(CUDA) %s", cudaGetErrorString(error));
     return error;
   }
 
-  qudaError_t qudaEventCreate_(qudaEvent_t *event, const char *func, const char *file, const char *line)
+  cudaError_t qudaEventQuery(cudaEvent_t &event)
   {
-    cudaError_t error = cudaEventCreate((CUevent *)event);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    case CUDA_ERROR_NOT_READY: // this is the only return value care about
+      return cudaErrorNotReady;
+    default:
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventQuery returned error %s", str);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaEventQuery(event), QUDA_PROFILE_EVENT_QUERY);
     return error;
+#endif
   }
 
-  qudaError_t qudaEventCreateWithFlags_(qudaEvent_t *event, unsigned int flags, const char *func, const char *file,
-                                        const char *line)
+  cudaError_t qudaEventRecord(cudaEvent_t &event, qudaStream_t stream)
   {
-    cudaError_t error = cudaEventCreateWithFlags((CUevent *)event, flags);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+#ifdef USE_DRIVER_API
+    PROFILE(CUresult error = cuEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
+    switch (error) {
+    case CUDA_SUCCESS:
+      return cudaSuccess;
+    default: // should always return successful
+      const char *str;
+      cuGetErrorName(error, &str);
+      errorQuda("cuEventrecord returned error %s", str);
+    }
+    return cudaErrorUnknown;
+#else
+    PROFILE(cudaError_t error = cudaEventRecord(event, stream), QUDA_PROFILE_EVENT_RECORD);
     return error;
+#endif
   }
 
-  qudaError_t qudaEventDestroy_(qudaEvent_t &event, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaEventDestroy((CUevent)event);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaEventQuery_(qudaEvent_t &event, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaEventQuery(event);
-    if (error != cudaSuccess && !activeTuning())
-      if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-        warningQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaEventRecord_(qudaEvent_t &event, qudaStream_t stream, const char *func, const char *file,
-                               const char *line)
-  {
-    cudaError_t error = cudaEventRecord(event, stream);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaEventElapsedTime_(float *ms, qudaEvent_t &start, qudaEvent_t &end, const char *func, const char *file,
-                                    const char *line)
-  {
-    cudaError_t error = cudaEventElapsedTime(ms, start, end);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaStreamWaitEvent_(qudaStream_t stream, qudaEvent_t event, unsigned int flags, const char *func,
-                                   const char *file, const char *line)
+  cudaError_t qudaStreamWaitEvent(qudaStream_t stream, cudaEvent_t event, unsigned int flags)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
@@ -458,80 +329,16 @@ namespace quda {
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("(CUDA) cuStreamWaitEvent returned error %s\n (%s:%s in %s())\n", str, file, line, func);
+      errorQuda("cuStreamWaitEvent returned error %s", str);
     }
     return cudaErrorUnknown;
 #else
     PROFILE(cudaError_t error = cudaStreamWaitEvent(stream, event, flags), QUDA_PROFILE_STREAM_WAIT_EVENT);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
     return error;
 #endif
   }
 
-  qudaError_t qudaStreamSynchronize_(qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("(CUDA) cuStreamSynchronize returned error %s\n (%s:%s in %s())\n", str, file, line, func);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(cudaError_t error = cudaStreamSynchronize(stream), QUDA_PROFILE_STREAM_SYNCHRONIZE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-
-#endif
-  }
-
-  qudaError_t qudaStreamCreate_(qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamCreate(&stream, 0), QUDA_PROFILE_STREAM_CREATE);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuStreamSynchronize returned error %s", str);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(cudaError_t error = cudaStreamCreate(stream), QUDA_PROFILE_STREAM_CREATE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-#endif
-  }
-
-  qudaError_t qudaStreamDestroy_(qudaStream_t &stream, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuStreamDestroy(stream), QUDA_PROFILE_STREAM_DESTROY);
-    switch (error) {
-    case CUDA_SUCCESS:
-      return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuStreamSynchronize returned error %s", str);
-    }
-    return cudaErrorUnknown;
-#else
-    PROFILE(cudaError_t error = cudaStreamDestroy(stream), QUDA_PROFILE_STREAM_DESTROY);
-    return error;
-#endif
-  }
-
-  qudaError_t qudaEventSynchronize_(qudaEvent_t &event, const char *func, const char *file, const char *line)
+  cudaError_t qudaEventSynchronize(cudaEvent_t &event)
   {
 #ifdef USE_DRIVER_API
     PROFILE(CUresult error = cuEventSynchronize(event), QUDA_PROFILE_EVENT_SYNCHRONIZE);
@@ -550,272 +357,32 @@ namespace quda {
 #endif
   }
 
-  qudaError_t qudaCreateTextureObject_(qudaTextureObject_t *pTexObject, const qudaResourceDesc *pResDesc,
-                                       const qudaTextureDesc *pTexDesc, const qudaResourceViewDesc *pResViewDesc,
-                                       const char *func, const char *file, const char *line)
-  {
-    cudaError_t error;
-    PROFILE(error = cudaCreateTextureObject(pTexObject, pResDesc, pTexDesc, pResViewDesc),
-            QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDestroyTextureObject_(qudaTextureObject_t pTexObject, const char *func, const char *file,
-                                        const char *line)
+  cudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
   {
 #ifdef USE_DRIVER_API
-    PROFILE(CUresult error = cuTexObjectDestroy(pTexObject), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    PROFILE(CUresult error = cuCtxSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
     switch (error) {
     case CUDA_SUCCESS:
       return cudaSuccess;
     default: // should always return successful
       const char *str;
       cuGetErrorName(error, &str);
-      errorQuda("cuTexObjectDestroy returned error %s (%s:%s in %s())", str, file, line, func);
+      errorQuda("cuCtxSynchronize returned error %s (%s:%s in %s())\n", str, file, line, func);
     }
     return cudaErrorUnknown;
 #else
-    PROFILE(cudaError_t error = cuTexObjectDestroy(pTexObject), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
+    PROFILE(cudaError_t error = cudaDeviceSynchronize(), QUDA_PROFILE_DEVICE_SYNCHRONIZE);
+    if (error != cudaSuccess)
+      errorQuda("(CUDA) %s\n (%s:%s in %s())\n", cudaGetErrorString(error), file, line, func);
     return error;
 #endif
   }
 
-  qudaError_t qudaGetTextureObjectResourceDesc_(qudaResourceDesc *pResDesc, qudaTextureObject_t texObject,
-                                                const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaGetTextureObjectResourceDesc(pResDesc, texObject);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDeviceCanAccessPeer_(int *canAccessPeer, int device, int peerDevice, const char *func,
-                                       const char *file, const char *line)
-  {
-    cudaError_t error = cudaDeviceCanAccessPeer(canAccessPeer, device, peerDevice);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDeviceGetStreamPriorityRange_(int *leastPriority, int *greatestPriority, const char *func,
-                                                const char *file, const char *line)
-  {
-    cudaError_t error = cudaDeviceGetStreamPriorityRange(leastPriority, greatestPriority);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDeviceReset_(const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaDeviceReset();
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDeviceSetCacheConfig_(qudaFuncCache cacheConfig, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaDeviceSetCacheConfig(cacheConfig);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDeviceSynchronize_(const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaDeviceSynchronize();
-    if (getVerbosity() >= QUDA_DEBUG_VERBOSE)
-      printfQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaSetDevice_(int dev, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaSetDevice(dev);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaGetDeviceCount_(int *count, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaGetDeviceCount(count);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaGetDeviceProperties_(qudaDeviceProp *prop, int device, const char *func, const char *file,
-                                       const char *line)
-  {
-    cudaError_t error = cudaGetDeviceProperties(prop, device);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaHostGetDevicePointer_(void **pDevice, void *pHost, unsigned int flags, const char *func,
-                                        const char *file, const char *line)
-  {
-    cudaError_t error = cudaHostGetDevicePointer(pDevice, pHost, flags);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaDriverGetVersion_(int *driverVersion, const char *func, const char *file, const char *line)
-  {
-    cudaDriverGetVersion(driverVersion);
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaRuntimeGetVersion_(int *runtimeVersion, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaRuntimeGetVersion(runtimeVersion);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaHostRegister_(void *ptr, size_t size, unsigned int flags, const char *func, const char *file,
-                                const char *line)
-  {
-    cudaError_t error = cudaHostRegister(ptr, size, flags);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to register pinned memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
-                size, file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaHostUnregister_(void *ptr, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaHostUnregister(ptr);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to unregister pinned memory (%s:%s in %s())", cudaGetErrorString(error), file, line,
-                func);
-    return error;
-  }
-
-  qudaError_t qudaFreeHost_(void *ptr, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaFreeHost(ptr);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to free host memory (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaFree_(void *ptr, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaFree(ptr);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to free device memory (%s:%s in %s())", cudaGetErrorString(error), file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaMalloc_(void *ptr, size_t size, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaMalloc(&ptr, size);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
-                size, file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaMallocManaged_(void *ptr, size_t size, const char *func, const char *file, const char *line)
-  {
-    cudaError_t error = cudaMallocManaged(&ptr, size);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n Failed to allocate device memory of size %zu (%s:%s in %s())", cudaGetErrorString(error),
-                size, file, line, func);
-    return error;
-  }
-
-  qudaError_t qudaMemAlloc_(void *ptr, size_t size, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    CUresult error = cuMemAlloc((CUdeviceptr *)&ptr, size);
-    switch (error) {
-    case CUDA_SUCCESS: return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuMemAlloc returned error %s (%s:%s in %s())", str, file, line, func);
-    }
-    return cudaErrorUnknown;
-#else
-    errorQuda("qudaMemAlloc may only be called when USE_DRIVER_API is defined. (%s:%s in %s())", str, file, line, func);
-    return cudaErrorUnknown;
-#endif
-  }
-
-  qudaError_t qudaMemFree_(void *ptr, const char *func, const char *file, const char *line)
-  {
-#ifdef USE_DRIVER_API
-    CUresult error = cuMemFree((CUdeviceptr)ptr);
-    switch (error) {
-    case CUDA_SUCCESS: return cudaSuccess;
-    default: // should always return successful
-      const char *str;
-      cuGetErrorName(error, &str);
-      errorQuda("cuMemFree returned error %s (%s:%s in %s())", str, file, line, func);
-    }
-    return cudaErrorUnknown;
-#else
-    errorQuda("qudaMemFree may only be called when USE_DRIVER_API is defined. (%s:%s in %s())", str, file, line, func);
-    return cudaErrorUnknown;
-#endif
-  }
-
-  qudaError_t qudaHostAlloc_(void **ptr, size_t size, unsigned int flags, const char *func, const char *file,
-                             const char *line)
-  {
-    cudaError_t error = cudaHostAlloc(&ptr, size, flags);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n failed of size %zu (%s:%s in %s())", cudaGetErrorString(error), size, file, line, func);
-    return error;
-  }
-
-  // Returns attributes about a specified pointer.
-  qudaError_t qudaPointerGetAttributes_(cudaPointerAttributes *attributes, const void *ptr, const char *func,
-                                        const char *file, const char *line)
-  {
-    return cudaPointerGetAttributes(attributes, ptr);
-  }
-
-  // Queries attributes of the link between two devices.
-  qudaError_t qudaDeviceGetP2PAttribute_(int *value, enum cudaDeviceP2PAttr attr, int srcDevice, int dstDevice,
-                                         const char *func, const char *file, const char *line)
-  {
-    return cudaDeviceGetP2PAttribute(value, attr, srcDevice, dstDevice);
-  }
-
-  qudaError_t qudaProfilerStart_(const char *func, const char *file, const char *line)
-  {
-    return cudaProfilerStart();
-  }
-
-  qudaError_t qudaProfilerStop_(const char *func, const char *file, const char *line)
-  {
-    return cudaProfilerStop();
-  }
-  
 #if (CUDA_VERSION >= 9000)
-  qudaError_t qudaFuncSetAttribute_(const void *func, qudaFuncAttribute attr, int value, const char *func_actual,
-                                    const char *file, const char *line)
+  cudaError_t qudaFuncSetAttribute(const void* func, cudaFuncAttribute attr, int value)
   {
     // no driver API variant here since we have C++ functions
     PROFILE(cudaError_t error = cudaFuncSetAttribute(func, attr, value), QUDA_PROFILE_FUNC_SET_ATTRIBUTE);
-    if (error != cudaSuccess && !activeTuning())
-      errorQuda("(CUDA) %s\n (%s:%s in %s())", cudaGetErrorString(error), file, line, func_actual);
     return error;
   }
 #endif

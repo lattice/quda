@@ -145,21 +145,21 @@ namespace quda {
           Float2 A[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
-          qudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, qudaMemcpyHostToDevice, stream);
+          cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (b.data) {
           Float2 B[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
-          qudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, qudaMemcpyHostToDevice, stream);
+          cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         if (c.data) {
           Float2 C[MAX_MATRIX_SIZE / sizeof(Float2)];
           for (int i = 0; i < NXZ; i++)
             for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
-          qudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, qudaMemcpyHostToDevice, stream);
+          cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice, stream);
         }
 
         tp.block.x *= tp.aux.x; // include warp-split factor

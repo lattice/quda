@@ -226,7 +226,7 @@ namespace quda {
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
 #endif
-
+#ifndef DPCPP_DEVELOP
         } else if (x.Precision() == QUDA_HALF_PRECISION) {
 
 #if QUDA_PRECISION & 2
@@ -312,7 +312,7 @@ namespace quda {
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
 #endif
-
+#endif //DPCPP
         } else {
           errorQuda("precision=%d is not supported\n", x.Precision());
         }
@@ -374,7 +374,7 @@ namespace quda {
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
 #endif
-
+#ifndef DPCPP_DEVELOP
         } else if (x.Precision() == QUDA_HALF_PRECISION) {
 
 #if QUDA_PRECISION & 2
@@ -515,7 +515,7 @@ namespace quda {
 #else
           errorQuda("QUDA_PRECISION=%d does not enable precision %d", QUDA_PRECISION, x.Precision());
 #endif
-
+#endif //DPCPP
         } else {
           errorQuda("Not implemented for this precision combination %d %d", x.Precision(), y.Precision());
         }
@@ -658,12 +658,15 @@ namespace quda {
 
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z) {
+#ifndef DPCPP_DEVELOP
       uni_blas<caxpyxmaz_, 1, 1>(
           make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, y);
+#endif //DPCPP
     }
 
     void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
 		     ColorSpinorField &y, ColorSpinorField &z) {
+#ifndef DPCPP_DEVELOP
       if (!commAsyncReduction())
 	errorQuda("This kernel requires asynchronous reductions to be set");
       if (x.Location() == QUDA_CPU_FIELD_LOCATION)
@@ -671,10 +674,12 @@ namespace quda {
 
       uni_blas<caxpyxmazMR_, 1, 1>(
           make_double2(REAL(a), IMAG(a)), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, x, y);
+#endif //DPCPP
     }
 
     void tripleCGUpdate(double a, double b, ColorSpinorField &x,
 			ColorSpinorField &y, ColorSpinorField &z, ColorSpinorField &w) {
+#ifndef DPCPP_DEVELOP
       if (x.Precision() != y.Precision()) {
       // call hacked mixed precision kernel
       mixed_blas<tripleCGUpdate_, 0, 1, 1, 1>(
@@ -683,16 +688,21 @@ namespace quda {
         uni_blas<tripleCGUpdate_, 0, 1, 1, 1>(
             make_double2(a, 0.0), make_double2(b, 0.0), make_double2(0.0, 0.0), x, y, z, w, y);
       }
+#endif //DPCPP
     }
 
     void doubleCG3Init(double a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+#ifndef DPCPP_DEVELOP
       uni_blas<doubleCG3Init_, 1, 1, 0, 0>(
           make_double2(a, 0.0), make_double2(0.0, 0.0), make_double2(0.0, 0.0), x, y, z, z, y);
+#endif //DPCPP
     }
 
     void doubleCG3Update(double a, double b, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+#ifndef DPCPP_DEVELOP
       uni_blas<doubleCG3Update_, 1, 1, 0, 0>(
           make_double2(a, 0.0), make_double2(b, 1.0 - b), make_double2(0.0, 0.0), x, y, z, z, y);
+#endif //DPCPP
     }
 
   } // namespace blas

@@ -804,8 +804,8 @@ namespace quda {
       const AllocInt norm_offset;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<real, N>::type TexVector;
-      qudaTextureObject_t tex;
-      qudaTextureObject_t texNorm;
+      cudaTextureObject_t tex;
+      cudaTextureObject_t texNorm;
 #endif
       int volumeCB;
       int faceVolumeCB[4];
@@ -1067,7 +1067,7 @@ namespace quda {
   void save() {
     if (backup_h) errorQuda("Already allocated host backup");
     backup_h = safe_malloc(bytes);
-    qudaMemcpyNoTune(backup_h, field, bytes, qudaMemcpyDeviceToHost);
+    cudaMemcpy(backup_h, field, bytes, cudaMemcpyDeviceToHost);
     checkCudaError();
   }
 
@@ -1075,7 +1075,7 @@ namespace quda {
      @brief Restore the field from the host after tuning
   */
   void load() {
-    qudaMemcpyNoTune(field, backup_h, bytes, qudaMemcpyHostToDevice);
+    cudaMemcpy(field, backup_h, bytes, cudaMemcpyHostToDevice);
     host_free(backup_h);
     backup_h = nullptr;
     checkCudaError();

@@ -313,12 +313,12 @@ namespace quda {
 
     void preTune() {
       saveOut = new char[out.Bytes()];
-      qudaMemcpyNoTune(saveOut, out.V(), out.Bytes(), qudaMemcpyDeviceToHost);
+      cudaMemcpy(saveOut, out.V(), out.Bytes(), cudaMemcpyDeviceToHost);
     }
 
     void postTune()
     {
-      qudaMemcpyNoTune(out.V(), saveOut, out.Bytes(), qudaMemcpyHostToDevice);
+      cudaMemcpy(out.V(), saveOut, out.Bytes(), cudaMemcpyHostToDevice);
       delete[] saveOut;
     }
 
@@ -654,8 +654,7 @@ namespace quda {
 
    virtual ~DslashCoarsePolicyTune() { setPolicyTuning(false); }
 
-   inline void apply(const qudaStream_t &stream)
-   {
+   inline void apply(const qudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= (int)policies.size()) errorQuda("Requested policy that is outside of range");

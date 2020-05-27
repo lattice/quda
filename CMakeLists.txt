@@ -26,16 +26,22 @@ else()
   set(DEFBUILD "DEVEL")
 endif()
 <<<<<<< HEAD
+<<<<<<< HEAD
 if(DEFINED ENV{QUDA_BACKEND})
   set(DEFBACKEND $ENV{QUDA_BACKEND})
 else()
   set(DEFBACKEND "CUDA")
 =======
+=======
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 if(DEFINED ENV{QUDA_TARGET})
   set(DEFTARGET $ENV{QUDA_TARGET})
 else()
   set(DEFTARGET "CUDA")
+<<<<<<< HEAD
 >>>>>>> feature/cuda-backend-2
+=======
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 endif()
 
 if(GIT_FOUND)
@@ -82,6 +88,7 @@ if(BUILD_TYPE_VALID LESS 0)
 endif()
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Backend type
 set(VALID_BACKEND_TYPES CUDA HIP)
 set(QUDA_BACKEND_TYPE "${DEFBACKEND}" CACHE STRING "Choose the type of backend, options are: ${VALID_BACKEND_TYPES}")
@@ -104,14 +111,23 @@ if(${QUDA_BACKEND_TYPE} STREQUAL "HIP")
 # Target type
 set(VALID_TARGET_TYPES CUDA HIP)
 set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of backend, options are: ${VALID_TARGET_TYPES}")
+=======
+# Target type
+set(VALID_TARGET_TYPES CUDA HIP)
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
 
 if(TARGET_TYPE_VALID LESS 0)
+<<<<<<< HEAD
   message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid backend types are:" "${VALID_TARGET_TYPES}")
 >>>>>>> feature/cuda-backend-2
+=======
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 endif()
 
 #
@@ -134,7 +150,7 @@ message(STATUS "Backend type: ${QUDA_BACKEND_TYPE}")
 if(DEFINED ENV{QUDA_GPU_ARCH})
   set(QUDA_DEFAULT_GPU_ARCH $ENV{QUDA_GPU_ARCH})
 else()
-  set(QUDA_DEFAULT_GPU_ARCH sm_35)
+  set(QUDA_DEFAULT_GPU_ARCH sm_70)
 endif()
 if(NOT QUDA_GPU_ARCH)
   message(STATUS "Building QUDA for GPU ARCH " "${QUDA_DEFAULT_GPU_ARCH}")
@@ -143,8 +159,14 @@ message(STATUS "")
 
 set(QUDA_GPU_ARCH
     ${QUDA_DEFAULT_GPU_ARCH}
+<<<<<<< HEAD
     CACHE STRING "set the GPU architecture (sm_20, sm_21, sm_30, sm_35, sm_37, sm_50, sm_52, sm_60, sm_70, sm_75)")
 set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_20 sm_21 sm_30 sm_35 sm_37 sm_50 sm_52 sm_60 sm_70 sm_75)
+=======
+    CACHE STRING "set the GPU architecture (sm_35, sm_37, sm_60, sm_70, sm_80)")
+set_property(CACHE QUDA_GPU_ARCH PROPERTY STRINGS sm_35 sm_37 sm_60 sm_70 sm_80)
+# build options
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 set(QUDA_DIRAC_WILSON ON CACHE BOOL "build Wilson Dirac operators")
 set(QUDA_DIRAC_CLOVER ON CACHE BOOL "build clover Dirac operators")
 set(QUDA_DIRAC_DOMAIN_WALL ON CACHE BOOL "build domain wall Dirac operators")
@@ -713,12 +735,23 @@ endif()
 # set which precisions to enable
 add_definitions(-DQUDA_RECONSTRUCT=${QUDA_RECONSTRUCT})
 
+<<<<<<< HEAD
 # Set backend preprocessor flags
 if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
   add_definitions(-DCUDA_TARGET)
 endif()
 if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
   add_definitions(-DHIP_TARGET)
+=======
+# Set target preprocessor flags
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  set(QUDA_TARGET_DIR "cuda")
+  add_definitions(-DQUDA_TARGET_QUDA)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  set(QUDA_TARGET_DIR "hip")
+  add_definitions(-DQUDA_TARGET_HIP)
+>>>>>>> 4950f6002df509bbe180f90c85acdb1f246e09df
 endif()
 
 if(QUDA_SSTEP)

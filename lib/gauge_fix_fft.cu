@@ -9,7 +9,7 @@
 #include <cub_helper.cuh>
 #include <index_helper.cuh>
 
-#include <quda_fft.h>
+#include <cufft.h>
 
 #ifdef GPU_GAUGE_ALG
 #include <CUFFT_Plans.h>
@@ -387,7 +387,7 @@ namespace quda {
     public:
     GaugeFixINVPSP(GaugeFixArg<Float> &arg)
       : arg(arg){
-      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   qudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_mult_norm_2D<Float>,   cudaFuncCachePreferL1);
     }
     ~GaugeFixINVPSP () {
     }
@@ -550,7 +550,7 @@ namespace quda {
     GaugeFixNEW(Gauge & dataOr, GaugeFixArg<Float> &arg, Float alpha)
       : dataOr(dataOr), arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   qudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO_NEW<Float, Gauge>,   cudaFuncCachePreferL1);
     }
     ~GaugeFixNEW () { }
 
@@ -659,7 +659,7 @@ namespace quda {
     GaugeFix_GX(GaugeFixArg<Float> &arg, Float alpha)
       : arg(arg) {
       half_alpha = alpha * 0.5;
-      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   qudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_GX<Elems, Float>,   cudaFuncCachePreferL1);
     }
     ~GaugeFix_GX () {
     }
@@ -773,7 +773,7 @@ namespace quda {
     public:
     GaugeFix(Gauge & dataOr, GaugeFixArg<Float> &arg)
       : dataOr(dataOr), arg(arg) {
-      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   qudaFuncCachePreferL1);
+      cudaFuncSetCacheConfig( kernel_gauge_fix_U_EO<Elems, Float, Gauge>,   cudaFuncCachePreferL1);
     }
     ~GaugeFix () { }
 
@@ -969,9 +969,9 @@ namespace quda {
                                svd_rel_error, svd_abs_error);
     int num_failures = 0;
     int* num_failures_dev = static_cast<int*>(pool_device_malloc(sizeof(int)));
-    qudaMemset(num_failures_dev, 0, sizeof(int));
+    cudaMemset(num_failures_dev, 0, sizeof(int));
     unitarizeLinks(data, data, num_failures_dev);
-    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), qudaMemcpyDeviceToHost);
+    qudaMemcpy(&num_failures, num_failures_dev, sizeof(int), cudaMemcpyDeviceToHost);
 
     pool_device_free(num_failures_dev);
     if ( num_failures > 0 ) {

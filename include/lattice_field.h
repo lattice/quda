@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <quda_target.h>
+#include <quda_cuda_api.h>
 
 /**
  * @file lattice_field.h
@@ -23,11 +23,11 @@ namespace quda {
 
   // Forward declaration of all children
   class LatticeField;
-
+#ifndef DPCPP_DEVEL
   class ColorSpinorField;
   class cudaColorSpinorField;
   class cpuColorSpinorField;
-#ifndef DPCPP_DEVEL
+  
   class EigValueSet;
   class cudaEigValueSet;
   class cpuEigValueSet;
@@ -43,7 +43,7 @@ namespace quda {
   class CloverField;
   class cudaCloverField;
   class cpuCloverField;
-#endif
+#endif //DPCPP
   struct LatticeFieldParam {
 
   protected:
@@ -363,10 +363,10 @@ namespace quda {
     static int buffer_recv_p2p_back[2][QUDA_MAX_DIM];
 
     /** Local copy of event used for peer-to-peer synchronization */
-    static qudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Remote copy of event used for peer-to-peer synchronization */
-    static qudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
+    static cudaEvent_t ipcRemoteCopyEvent[2][2][QUDA_MAX_DIM];
 
     /** Whether we have initialized communication for this field */
     bool initComms;
@@ -470,12 +470,12 @@ namespace quda {
     /**
        Handle to local copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t &getIPCCopyEvent(int dir, int dim) const;
+    const cudaEvent_t& getIPCCopyEvent(int dir, int dim) const;
 
     /**
        Handle to remote copy event used for peer-to-peer synchronization
     */
-    const qudaEvent_t &getIPCRemoteCopyEvent(int dir, int dim) const;
+    const cudaEvent_t& getIPCRemoteCopyEvent(int dir, int dim) const;
 
     /**
        Static variable that is determined which ghost buffer we are using
@@ -642,18 +642,16 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
-    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
-
-    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                            bool gdr_recv = true)
+    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p=NULL)
     { errorQuda("Not implemented"); }
 
-    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
+    virtual void commsStart(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    { errorQuda("Not implemented"); }
+
+    virtual int commsQuery(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
-                           bool gdr_recv = true)
+    virtual void commsWait(int nFace, int dir, int dagger=0, qudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)

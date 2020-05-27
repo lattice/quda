@@ -218,8 +218,8 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 
     // first check that the local GPU supports UVA
     const int gpuid = comm_gpuid();
-    qudaDeviceProp prop;
-    qudaGetDeviceProperties(&prop, gpuid);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, gpuid);
     if(!prop.unifiedAddressing) return;
 
     comm_set_neighbor_ranks();
@@ -242,15 +242,15 @@ void comm_peer2peer_init(const char* hostname_recv_buf)
 	if (!strncmp(hostname, &hostname_recv_buf[128*neighbor_rank], 128)) {
 	  int neighbor_gpuid = gpuid_recv_buf[neighbor_rank];
 	  int canAccessPeer[2];
-          qudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
-          qudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[0], gpuid, neighbor_gpuid);
+	  cudaDeviceCanAccessPeer(&canAccessPeer[1], neighbor_gpuid, gpuid);
 
-          int accessRank[2] = {};
+	  int accessRank[2] = { };
 #if CUDA_VERSION >= 8000  // this was introduced with CUDA 8
 	  if (canAccessPeer[0]*canAccessPeer[1] != 0) {
-            qudaDeviceGetP2PAttribute(&accessRank[0], qudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
-            qudaDeviceGetP2PAttribute(&accessRank[1], qudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
-          }
+	    cudaDeviceGetP2PAttribute(&accessRank[0], cudaDevP2PAttrPerformanceRank, gpuid, neighbor_gpuid);
+	    cudaDeviceGetP2PAttribute(&accessRank[1], cudaDevP2PAttrPerformanceRank, neighbor_gpuid, gpuid);
+	  }
 #endif
 
 	  // enable P2P if we can access the peer or if peer is self
@@ -446,8 +446,8 @@ inline bool isHost(const void *buffer)
   CUmemorytype memType;
   void *attrdata[] = {(void *)&memType};
   CUpointer_attribute attributes[2] = {CU_POINTER_ATTRIBUTE_MEMORY_TYPE};
-  QUresult err = cuPointerGetAttributes(1, attributes, attrdata, (QUdeviceptr)buffer);
-  if (err != QUDA_SUCCESS) {
+  CUresult err = cuPointerGetAttributes(1, attributes, attrdata, (CUdeviceptr)buffer);
+  if (err != CUDA_SUCCESS) {
     const char *str;
     cuGetErrorName(err, &str);
     errorQuda("cuPointerGetAttributes returned error %s", str);
@@ -485,7 +485,11 @@ MsgHandle *comm_declare_send_relative_(const char *func, const char *file, int l
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(nbytes);
-    qudaMemcpyNoTune(tmp, buffer, nbytes, qudaMemcpyDeviceToDevice);
+    cudaError_t err = cudaMemcpy(tmp, buffer, nbytes, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
     device_free(tmp);
   }
 #endif
@@ -515,7 +519,11 @@ MsgHandle *comm_declare_receive_relative_(const char *func, const char *file, in
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaMemsetNoTune(buffer, 0, nbytes);
+    cudaError_t err = cudaMemset(buffer, 0, nbytes);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, nbytes=%zu)\n", file, line, func, dim, dir, nbytes);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
   }
 #endif
 
@@ -549,7 +557,12 @@ MsgHandle *comm_declare_strided_send_relative_(const char *func, const char *fil
   } else {
     // test this memory allocation is ok by doing a memcpy from it
     void *tmp = device_malloc(blksize*nblocks);
-    qudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, qudaMemcpyDeviceToDevice);
+    cudaError_t err = cudaMemcpy2D(tmp, blksize, buffer, stride, blksize, nblocks, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
     device_free(tmp);
   }
 #endif
@@ -582,7 +595,12 @@ MsgHandle *comm_declare_strided_receive_relative_(const char *func, const char *
     }
   } else {
     // test this memory allocation is ok by doing a memset
-    qudaMemset2D(buffer, stride, 0, blksize, nblocks);
+    cudaError_t err = cudaMemset2D(buffer, stride, 0, blksize, nblocks);
+    if (err != cudaSuccess) {
+      printfQuda("ERROR: buffer failed (%s:%d in %s(), dim=%d, dir=%d, blksize=%zu nblocks=%d stride=%zu)\n",
+		 file, line, func, dim, dir, blksize, nblocks, stride);
+      errorQuda("aborting with error %s", cudaGetErrorString(err));
+    }
   }
 #endif
 
@@ -663,7 +681,7 @@ bool comm_gdr_blacklist() {
       std::stringstream blacklist_list(blacklist_env);
 
       int device_count;
-      qudaGetDeviceCount(&device_count);
+      cudaGetDeviceCount(&device_count);
 
       int excluded_device;
       while (blacklist_list >> excluded_device) {
@@ -702,7 +720,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
   }
 
   int device_count;
-  qudaGetDeviceCount(&device_count);
+  cudaGetDeviceCount(&device_count);
   if (device_count == 0) { errorQuda("No CUDA devices found"); }
   if (gpuid >= device_count) {
     char *enable_mps_env = getenv("QUDA_ENABLE_MPS");
@@ -735,7 +753,7 @@ void comm_init_common(int ndim, const int *dims, QudaCommsMap rank_from_coords, 
 
       int device;
       int deviceCount;
-      qudaGetDeviceCount(&deviceCount);
+      cudaGetDeviceCount(&deviceCount);
       while (device_list_raw >> device) {
         // check this is a valid policy choice
         if (device < 0) { errorQuda("Invalid CUDA_VISIBLE_DEVICE ordinal %d", device); }

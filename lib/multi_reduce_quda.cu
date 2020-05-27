@@ -13,7 +13,7 @@ namespace quda {
   namespace blas {
 
     qudaStream_t* getStream();
-    qudaEvent_t* getReduceEvent();
+    cudaEvent_t* getReduceEvent();
     bool getFastReduce();
     void initFastReduce(int words);
     void completeFastReduce(int32_t words);
@@ -50,13 +50,13 @@ namespace quda {
             completeFastReduce(words);
           } else {
             qudaEventRecord(*getReduceEvent(), stream);
-            while (qudaSuccess != cudaEventQuery(*getReduceEvent())) {}
+            while (cudaSuccess != qudaEventQuery(*getReduceEvent())) {}
           }
         } else
 #endif
         {
           qudaMemcpy(getHostReduceBuffer(), getMappedHostReduceBuffer(), tp.grid.z * sizeof(ReduceType) * NXZ * arg.NYW,
-              qudaMemcpyDeviceToHost);
+              cudaMemcpyDeviceToHost);
         }
       }
 
@@ -291,7 +291,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) A[NYW * i + j] = make_Float2<Float2>(Complex(a.data[NYW * i + j]));
 
-        qudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, qudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Amatrix_d, A, NXZ * NYW * sizeof(decltype(A[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
         Amatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(a.data));
       }
@@ -303,7 +303,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) B[NYW * i + j] = make_Float2<Float2>(Complex(b.data[NYW * i + j]));
 
-        qudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, qudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Bmatrix_d, B, NXZ * NYW * sizeof(decltype(B[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
         Bmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(b.data));
       }
@@ -315,7 +315,7 @@ namespace quda {
         for (int i = 0; i < NXZ; i++)
           for (int j = 0; j < NYW; j++) C[NYW * i + j] = make_Float2<Float2>(Complex(c.data[NYW * i + j]));
 
-        qudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, qudaMemcpyHostToDevice,
+        cudaMemcpyToSymbolAsync(Cmatrix_d, C, NXZ * NYW * sizeof(decltype(C[0])), 0, cudaMemcpyHostToDevice,
                                 *getStream());
         Cmatrix_h = reinterpret_cast<signed char *>(const_cast<T *>(c.data));
       }

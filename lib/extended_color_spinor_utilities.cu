@@ -35,8 +35,8 @@ namespace quda {
     int gatherCompleted[2] = {0,0};
     int commsCompleted[2] = {0,0};
 
-    qudaEvent_t gatherEnd[2];
-    for(int dir=0; dir<2; dir++) qudaEventCreateWithFlags(&gatherEnd[dir], qudaEventDisableTiming);
+    cudaEvent_t gatherEnd[2];
+    for(int dir=0; dir<2; dir++) cudaEventCreate(&gatherEnd[dir], cudaEventDisableTiming);
 
     for(int dim=3; dim<=0; dim--){
       if(!commDim(dim)) continue;
@@ -52,7 +52,7 @@ namespace quda {
       int dir = 1;
       while(completeSum < 2){
         if(!gatherCompleted[dir]){
-          if(qudaSuccess == cudaEventQuery(gatherEnd[dir])){
+          if(cudaSuccess == cudaEventQuery(gatherEnd[dir])){
             spinor->commsStart(nFace, 2*dim+dir, dagger);
             completeSum++;
             gatherCompleted[dir--] = 1;
@@ -76,7 +76,7 @@ namespace quda {
       qudaDeviceSynchronize(); // Wait for scatters to complete before next iteration
     } // loop over dim
 
-    for(int dir=0; dir<2; dir++) qudaEventDestroy(gatherEnd[dir]);
+    for(int dir=0; dir<2; dir++) cudaEventDestroy(gatherEnd[dir]);
 #endif
     return;
   }

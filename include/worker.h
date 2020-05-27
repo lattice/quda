@@ -8,6 +8,7 @@ namespace quda {
     Worker() { }
     virtual ~Worker() { }
     virtual void apply(const qudaStream_t &stream) = 0;
+    
   };
 
 };

@@ -165,8 +165,8 @@ namespace quda {
   void PGaugeExchangeFree(){
 #ifdef MULTI_GPU
     if ( comm_dim_partitioned(0) || comm_dim_partitioned(1) || comm_dim_partitioned(2) || comm_dim_partitioned(3) ) {
-      qudaStreamDestroy(GFStream[0]);
-      qudaStreamDestroy(GFStream[1]);
+      cudaStreamDestroy(GFStream[0]);
+      cudaStreamDestroy(GFStream[1]);
       for ( int d = 0; d < 4; d++ ) {
         if ( commDimPartitioned(d)) {
           comm_free(mh_send_fwd[d]);
@@ -216,8 +216,8 @@ namespace quda {
         faceVolumeCB[i] = faceVolume[i] / 2;
       }
 
-      qudaStreamCreate(&GFStream[0]);
-      qudaStreamCreate(&GFStream[1]);
+      cudaStreamCreate(&GFStream[0]);
+      cudaStreamCreate(&GFStream[1]);
       for ( int d = 0; d < 4; d++ ) {
         if ( !commDimPartitioned(d)) continue;
         // store both parities and directions in each
@@ -271,8 +271,8 @@ namespace quda {
 	(faceVolumeCB[d], dataexarg, reinterpret_cast<complex<Float>*>(sendg_d[d]), parity, d, dir, data.R()[d]);
 
     #ifndef GPU_COMMS
-      qudaMemcpyAsync(send[d], send_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[0]);
-      qudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], qudaMemcpyDeviceToHost, GFStream[1]);
+      cudaMemcpyAsync(send[d], send_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[0]);
+      cudaMemcpyAsync(sendg[d], sendg_d[d], bytes[d], cudaMemcpyDeviceToHost, GFStream[1]);
     #endif
       qudaStreamSynchronize(GFStream[0]);
       comm_start(mh_send_fwd[d]);
@@ -282,7 +282,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_back[d]);
-      qudaMemcpyAsync(recv_d[d], recv[d], bytes[d], qudaMemcpyHostToDevice, GFStream[0]);
+      cudaMemcpyAsync(recv_d[d], recv[d], bytes[d], cudaMemcpyHostToDevice, GFStream[0]);
     #endif
       #ifdef GPU_COMMS
       comm_wait(mh_recv_back[d]);
@@ -292,7 +292,7 @@ namespace quda {
 
     #ifndef GPU_COMMS
       comm_wait(mh_recv_fwd[d]);
-      qudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], qudaMemcpyHostToDevice, GFStream[1]);
+      cudaMemcpyAsync(recvg_d[d], recvg[d], bytes[d], cudaMemcpyHostToDevice, GFStream[1]);
     #endif
 
       #ifdef GPU_COMMS

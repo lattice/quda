@@ -61,7 +61,7 @@ namespace quda {
       size_t size = 2*n*n*prec*batch;
       void *A_d = location == QUDA_CUDA_FIELD_LOCATION ? A : pool_device_malloc(size);
       void *Ainv_d = location == QUDA_CUDA_FIELD_LOCATION ? Ainv : pool_device_malloc(size);
-      if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, qudaMemcpyHostToDevice);
+      if (location == QUDA_CPU_FIELD_LOCATION) qudaMemcpy(A_d, A, size, cudaMemcpyHostToDevice);
 
       int *dipiv = static_cast<int*>(pool_device_malloc(batch*n*sizeof(int)));
       int *dinfo_array = static_cast<int*>(pool_device_malloc(batch*sizeof(int)));
@@ -81,7 +81,7 @@ namespace quda {
 	if (error != CUBLAS_STATUS_SUCCESS)
 	  errorQuda("\nError in LU decomposition (cublasCgetrfBatched), error code = %d\n", error);
 
-	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), qudaMemcpyDeviceToHost);
+	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), cudaMemcpyDeviceToHost);
 	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
 	    errorQuda("%lu argument had an illegal value or another error occured, such as memory allocation failed", i);
@@ -96,7 +96,7 @@ namespace quda {
 	if (error != CUBLAS_STATUS_SUCCESS)
 	  errorQuda("\nError in matrix inversion (cublasCgetriBatched), error code = %d\n", error);
 
-	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), qudaMemcpyDeviceToHost);
+	qudaMemcpy(info_array, dinfo_array, batch*sizeof(int), cudaMemcpyDeviceToHost);
 
 	for (uint64_t i=0; i<batch; i++) {
 	  if (info_array[i] < 0) {
@@ -114,7 +114,7 @@ namespace quda {
       }
 
       if (location == QUDA_CPU_FIELD_LOCATION) {
-	qudaMemcpy(Ainv, Ainv_d, size, qudaMemcpyDeviceToHost);
+	qudaMemcpy(Ainv, Ainv_d, size, cudaMemcpyDeviceToHost);
 	pool_device_free(Ainv_d);
 	pool_device_free(A_d);
       }

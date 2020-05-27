@@ -843,7 +843,7 @@ namespace quda {
       QudaPrecision precision = checkPrecision(oprod, link, newOprod);
       instantiate<HisqStaplesForce, ReconstructNone>(Pmu, P3, P5, Pnumu, Qmu, Qnumu, newOprod, oprod, link, path_coeff_array);
 
-      qudaDeviceSynchronize();
+      cudaDeviceSynchronize();
       checkCudaError();
     }
 
@@ -1053,7 +1053,7 @@ namespace quda {
         LongLinkArg<real, nColor, recon> arg(newOprod, link, oldOprod, coeff);
         HisqForce<decltype(arg)> longLink(arg, link, 0, 0, FORCE_LONG_LINK);
         longLink.apply(0);
-        qudaDeviceSynchronize();
+        cudaDeviceSynchronize();
         checkCudaError();
       }
     };
@@ -1075,7 +1075,7 @@ namespace quda {
         CompleteForceArg<real, nColor, recon> arg(force, link);
         HisqForce<decltype(arg)> completeForce(arg, link, 0, 0, FORCE_COMPLETE);
         completeForce.apply(0);
-        qudaDeviceSynchronize();
+        cudaDeviceSynchronize();
         checkCudaError();
       }
     };

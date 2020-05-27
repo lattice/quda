@@ -17,43 +17,43 @@ namespace quda {
   }
 
   template<int N>
-  void createEventArray(qudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
+  void createEventArray(cudaEvent_t (&event)[N], unsigned int flags=cudaEventDefault)
   {
     for(int i=0; i<N; ++i)
-      qudaEventCreateWithFlags(&event[i],flags);
+      cudaEventCreate(&event[i],flags);
     return;
   }
 
   template<int N>
-  void destroyEventArray(qudaEvent_t (&event)[N])
+  void destroyEventArray(cudaEvent_t (&event)[N])
   {
     for(int i=0; i<N; ++i)
-      qudaEventDestroy(event[i]);
+      cudaEventDestroy(event[i]);
   }
 
 
-  static qudaEvent_t packEnd;
-  static qudaEvent_t gatherEnd[4];
-  static qudaEvent_t scatterEnd[4];
-  static qudaEvent_t oprodStart;
-  static qudaEvent_t oprodEnd;
+  static cudaEvent_t packEnd;
+  static cudaEvent_t gatherEnd[4];
+  static cudaEvent_t scatterEnd[4];
+  static cudaEvent_t oprodStart;
+  static cudaEvent_t oprodEnd;
 
 
   void createCloverForceEvents(){
-    qudaEventCreateWithFlags(&packEnd, qudaEventDisableTiming);
-    createEventArray(gatherEnd, qudaEventDisableTiming);
-    createEventArray(scatterEnd, qudaEventDisableTiming);
-    qudaEventCreateWithFlags(&oprodStart, qudaEventDisableTiming);
-    qudaEventCreateWithFlags(&oprodEnd, qudaEventDisableTiming);
+    cudaEventCreate(&packEnd, cudaEventDisableTiming);
+    createEventArray(gatherEnd, cudaEventDisableTiming);
+    createEventArray(scatterEnd, cudaEventDisableTiming);
+    cudaEventCreate(&oprodStart, cudaEventDisableTiming);
+    cudaEventCreate(&oprodEnd, cudaEventDisableTiming);
     return;
   }
 
   void destroyCloverForceEvents(){
     destroyEventArray(gatherEnd);
     destroyEventArray(scatterEnd);
-    qudaEventDestroy(packEnd);
-    qudaEventDestroy(oprodStart);
-    qudaEventDestroy(oprodEnd);
+    cudaEventDestroy(packEnd);
+    cudaEventDestroy(oprodStart);
+    cudaEventDestroy(oprodEnd);
     return;
   }
 

@@ -12,7 +12,7 @@
 static QudaSumFloat *d_reduce=0;
 static QudaSumFloat *h_reduce=0;
 static QudaSumFloat *hd_reduce=0;
-static qudaEvent_t reduceEnd;
+static cudaEvent_t reduceEnd;
 static bool fast_reduce_enabled = false;
 
 namespace quda {
@@ -26,7 +26,7 @@ namespace quda {
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
     void* getHostReduceBuffer() { return h_reduce; }
-    qudaEvent_t* getReduceEvent() { return &reduceEnd; }
+    cudaEvent_t* getReduceEvent() { return &reduceEnd; }
     bool getFastReduce() { return fast_reduce_enabled; }
 
     void initFastReduce(int32_t words)
@@ -56,7 +56,7 @@ namespace quda {
         }
         if (count++ % 10000 == 0) { // check error every 10000 iterations
           // if there is an error in the kernel then we need to exit the spin-wait
-          if (qudaSuccess != cudaPeekAtLastError()) break;
+          if (cudaSuccess != cudaPeekAtLastError()) break;
         }
       }
     }
@@ -95,7 +95,7 @@ namespace quda {
 #if (defined(_MSC_VER) && defined(_WIN64)) || defined(__LP64__)
 	if(deviceProp.canMapHostMemory) {
 	  h_reduce = (QudaSumFloat *) mapped_malloc(bytes);
-	  qudaHostGetDevicePointer((void**)&hd_reduce, h_reduce, 0); // set the matching device pointer
+	  cudaHostGetDevicePointer(&hd_reduce, h_reduce, 0); // set the matching device pointer
 	} else
 #endif
 	  {
@@ -105,7 +105,7 @@ namespace quda {
 	memset(h_reduce, 0, bytes); // added to ensure that valgrind doesn't report h_reduce is unitialised
       }
 
-      qudaEventCreateWithFlags(&reduceEnd, qudaEventDisableTiming);
+      cudaEventCreateWithFlags(&reduceEnd, cudaEventDisableTiming);
 
       // enable fast reductions with CPU spin waiting as opposed to using CUDA events
       char *fast_reduce_env = getenv("QUDA_ENABLE_FAST_REDUCE");
@@ -129,7 +129,7 @@ namespace quda {
       }
       hd_reduce = 0;
 
-      qudaEventDestroy(reduceEnd);
+      cudaEventDestroy(reduceEnd);
     }
 
     /**
@@ -161,12 +161,12 @@ namespace quda {
             completeFastReduce(words);
           } else {
             qudaEventRecord(reduceEnd, stream);
-            while (qudaSuccess != cudaEventQuery(reduceEnd)) { ; }
+            while (cudaSuccess != qudaEventQuery(reduceEnd)) { ; }
           }
         } else
 #endif
         {
-          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), qudaMemcpyDeviceToHost);
+          qudaMemcpy(h_reduce, hd_reduce, sizeof(ReduceType), cudaMemcpyDeviceToHost);
         }
       }
       doubleN cpu_sum = set(((ReduceType *)h_reduce)[0]);

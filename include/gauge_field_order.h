@@ -666,7 +666,7 @@ namespace quda {
       const int offset_cb;
 #ifdef USE_TEXTURE_OBJECTS
       typedef typename TexVectorType<Float,2>::type TexVector;
-      qudaTextureObject_t tex;
+      cudaTextureObject_t tex;
 #endif
       const int volumeCB;
       const int stride;
@@ -1040,11 +1040,11 @@ namespace quda {
         }
 
         /**
-         * @brief Returns the L2 norm squared of the field in a given dimension
-         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-         * @return L2 norm squared
-         */
-        __host__ double norm2(int dim=-1, bool global=true) const {
+	 * @brief Returns the L2 norm squared of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return L2 norm squared
+	 */
+	__host__ double norm2(int dim=-1, bool global=true) const {
           double nrm2 = accessor.transform_reduce(location, dim, square_<double, storeFloat>(accessor.scale_inv), 0.0,
                                                   plus<double>());
           if (global) comm_allreduce(&nrm2);
@@ -1052,11 +1052,11 @@ namespace quda {
         }
 
         /**
-         * @brief Returns the Linfinity norm of the field in a given dimension
-         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-         * @return Linfinity norm
-         */
-        __host__ double abs_max(int dim=-1, bool global=true) const {
+	 * @brief Returns the Linfinity norm of the field in a given dimension
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return Linfinity norm
+	 */
+	__host__ double abs_max(int dim=-1, bool global=true) const {
           double absmax = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv), 0.0,
                                                     maximum<Float>());
           if (global) comm_allreduce_max(&absmax);
@@ -1064,11 +1064,11 @@ namespace quda {
         }
 
         /**
-         * @brief Returns the minimum absolute value of the field
-         * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
-         * @return Minimum norm
-         */
-        __host__ double abs_min(int dim=-1, bool global=true) const {
+	 * @brief Returns the minimum absolute value of the field
+	 * @param[in] dim Which dimension we are taking the norm of (dim=-1 mean all dimensions)
+	 * @return Minimum norm
+	 */
+	__host__ double abs_min(int dim=-1, bool global=true) const {
           double absmin = accessor.transform_reduce(location, dim, abs_<Float, storeFloat>(accessor.scale_inv),
                                                     std::numeric_limits<double>::max(), minimum<Float>());
           if (global) comm_allreduce_min(&absmin);
@@ -1076,7 +1076,7 @@ namespace quda {
         }
 
         /** Return the size of the allocation (geometry and parity left out and added as needed in Tunable::bytes) */
-        size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
+	size_t Bytes() const { return static_cast<size_t>(volumeCB) * nColor * nColor * 2ll * sizeof(storeFloat); }
       };
 
       /**
@@ -1675,7 +1675,7 @@ namespace quda {
         const AllocInt offset;
 #ifdef USE_TEXTURE_OBJECTS
         typedef typename TexVectorType<real, N>::type TexVector;
-        qudaTextureObject_t tex;
+        cudaTextureObject_t tex;
 #endif
       Float *ghost[4];
       QudaGhostExchange ghostExchange;
@@ -1987,18 +1987,18 @@ namespace quda {
       void save() {
 	if (backup_h) errorQuda("Already allocated host backup");
 	backup_h = safe_malloc(bytes);
-        qudaMemcpyNoTune(backup_h, gauge, bytes, qudaMemcpyDeviceToHost);
-        checkCudaError();
+	cudaMemcpy(backup_h, gauge, bytes, cudaMemcpyDeviceToHost);
+	checkCudaError();
       }
 
       /**
 	 @brief Restore the field from the host after tuning
       */
       void load() {
-        qudaMemcpy(gauge, backup_h, bytes, qudaMemcpyHostToDevice);
-        host_free(backup_h);
-        backup_h = nullptr;
-        checkCudaError();
+	cudaMemcpy(gauge, backup_h, bytes, cudaMemcpyHostToDevice);
+	host_free(backup_h);
+	backup_h = nullptr;
+	checkCudaError();
       }
 
       size_t Bytes() const { return reconLen * sizeof(Float); }

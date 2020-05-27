@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <quda_target.h>
+#include <cuda.h>
 #include <quda_internal.h>
 
 namespace quda {
@@ -255,8 +255,8 @@ namespace quda {
 #ifdef MULTI_GPU
         if(commDimPartitioned(dim) && dim!=3){
           while(1){
-            qudaError_t eventQuery = cudaEventQuery(gatherEnd);
-            if(eventQuery == qudaSuccess){
+            cudaError_t eventQuery = cudaEventQuery(gatherEnd);
+            if(eventQuery == cudaSuccess){
               face->commsStart(2*dim + offset); // if argument is even, send backwards, else send forwards
               break;
             }

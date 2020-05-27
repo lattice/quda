@@ -2,12 +2,16 @@
 # cmake-format: off
 set (QUDA_OBJS
   # cmake-format: sortable
-  timer.cpp malloc.cpp
+  vector_io.cpp
+  timer.cpp
+  targets/${QUDA_TARGET_DIR}/malloc.cpp
+  targets/${QUDA_TARGET_DIR}/tune.cpp
   interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp
   lattice_field.cpp
-  blas_quda.cu multi_blas_quda.cu 
+  blas_quda.cu multi_blas_quda.cu reduce_quda.cu
+  multi_reduce_quda.cu
   comm_common.cpp ${COMM_OBJS} ${NUMA_AFFINITY_OBJS} ${QIO_UTIL}
   copy_color_spinor.cu
   copy_color_spinor_dd.cu copy_color_spinor_ds.cu
@@ -18,7 +22,14 @@ set (QUDA_OBJS
   copy_color_spinor_hh.cu copy_color_spinor_hq.cu
   copy_color_spinor_qd.cu copy_color_spinor_qs.cu
   copy_color_spinor_qh.cu copy_color_spinor_qq.cu
+  copy_color_spinor_mg_dd.cu copy_color_spinor_mg_ds.cu
+  copy_color_spinor_mg_sd.cu copy_color_spinor_mg_ss.cu
+  copy_color_spinor_mg_sh.cu copy_color_spinor_mg_sq.cu
+  copy_color_spinor_mg_hs.cu copy_color_spinor_mg_hh.cu
+  copy_color_spinor_mg_hq.cu copy_color_spinor_mg_qs.cu
+  copy_color_spinor_mg_qh.cu copy_color_spinor_mg_qq.cu
   extended_color_spinor_utilities.cu
+  random.cu
   quda_cuda_api.cpp checksum.cu
   instantiate.cpp version.cpp )
 # cmake-format: on

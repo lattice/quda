@@ -24,20 +24,20 @@
 #include <clover_field.h>
 #include <llfat_quda.h>
 #include <unitarization_links.h>
+#endif //DPCPP
 #include <algorithm>
+#ifndef DPCPP_DEVELOP
 #include <staggered_oprod.h>
 #include <ks_improved_force.h>
 #include <ks_force_quda.h>
 #include <random_quda.h>
 #endif //DPCPP
 #include <mpi_comm_handle.h>
-
 #ifndef DPCPP_DEVELOP
 #include <multigrid.h>
 
 #include <deflation.h>
 #endif //DPCPP
-
 #ifdef NUMA_NVML
 #include <numa_affinity.h>
 #endif
@@ -46,8 +46,7 @@
 #include <nvml.h>
 #endif
 
-#include <quda_target.h>
-
+#include <cuda.h>
 #ifndef DPCPP_DEVELOP
 #include <ks_force_quda.h>
 
@@ -77,13 +76,15 @@
 #undef PRINT_PARAM
 
 #ifndef DPCPP_DEVELOP
+
 #include <gauge_tools.h>
 #include <contract_quda.h>
 
 #include <momentum.h>
+
 #endif //DPCPP
 
-//#include <quda_profiler_api.h>
+#include <cuda_profiler_api.h>
 
 using namespace quda;
 
@@ -163,7 +164,7 @@ std::vector< std::vector<ColorSpinorField*> > chronoResident(QUDA_MAX_CHRONO);
 static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
-qudaDeviceProp deviceProp;
+cudaDeviceProp deviceProp;
 qudaStream_t *streams;
 
 static bool initialized = false;
@@ -301,14 +302,14 @@ static void profilerStart(const char *f) {
   static int target_count = 0;
   static unsigned int i = 0;
   if (do_not_profile_quda){
-    qudaProfilerStop();
+    cudaProfilerStop();
     printfQuda("Stopping profiling in QUDA\n");
   } else {
     if (enable) {
       if (i < target_list.size() && target_count++ == target_list[i]) {
         enable_profiler = true;
         printfQuda("Starting profiling for %s\n", f);
-        qudaProfilerStart();
+        cudaProfilerStart();
       i++; // advance to next target
     }
   }
@@ -317,12 +318,12 @@ static void profilerStart(const char *f) {
 
 static void profilerStop(const char *f) {
   if(do_not_profile_quda){
-    qudaProfilerStart();
+    cudaProfilerStart();
   } else {
 
     if (enable_profiler) {
       printfQuda("Stopping profiling for %s\n", f);
-      qudaProfilerStop();
+      cudaProfilerStop();
       enable_profiler = false;
     }
   }
@@ -512,11 +513,11 @@ void initQudaDevice(int dev) {
   }
 
   int driver_version;
-  qudaDriverGetVersion(&driver_version);
+  cudaDriverGetVersion(&driver_version);
   printfQuda("CUDA Driver version = %d\n", driver_version);
 
   int runtime_version;
-  qudaRuntimeGetVersion(&runtime_version);
+  cudaRuntimeGetVersion(&runtime_version);
   printfQuda("CUDA Runtime version = %d\n", runtime_version);
 
 #ifdef QUDA_NVML
@@ -545,14 +546,14 @@ void initQudaDevice(int dev) {
 #endif
 
   int deviceCount;
-  qudaGetDeviceCount(&deviceCount);
+  cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
     errorQuda("No CUDA devices found");
   }
 
   for(int i=0; i<deviceCount; i++) {
-    qudaGetDeviceProperties(&deviceProp, i);
-    checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode, DPCPP version???
+    cudaGetDeviceProperties(&deviceProp, i);
+    checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
     if (getVerbosity() >= QUDA_SUMMARIZE) {
       printfQuda("Found device %d: %s\n", i, deviceProp.name);
     }
@@ -569,8 +570,8 @@ void initQudaDevice(int dev) {
   if (dev < 0 || dev >= 16) errorQuda("Invalid device number %d", dev);
 #endif
 
-  qudaGetDeviceProperties(&deviceProp, dev);
-  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode, DPCPP version???
+  cudaGetDeviceProperties(&deviceProp, dev);
+  checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
   if (deviceProp.major < 1) {
     errorQuda("Device %d does not support CUDA", dev);
   }
@@ -608,7 +609,7 @@ void initQudaDevice(int dev) {
     printfQuda("Using device %d: %s\n", dev, deviceProp.name);
   }
 #ifndef USE_QDPJIT
-  qudaSetDevice(dev);
+  cudaSetDevice(dev);
   checkCudaErrorNoSync(); // "NoSync" for correctness in HOST_DEBUG mode
 #endif
 
@@ -623,9 +624,11 @@ void initQudaDevice(int dev) {
   }
 #endif
 
-  qudaDeviceSetCacheConfig(qudaFuncCachePreferL1);
-  // cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  // qudaGetDeviceProperties(&deviceProp, dev);
+
+
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  //cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+  // cudaGetDeviceProperties(&deviceProp, dev);
 
   { // determine if we will do CPU or GPU data reordering (default is GPU)
     char *reorder_str = getenv("QUDA_REORDER_LOCATION");
@@ -657,26 +660,26 @@ void initQudaMemory()
 
   int greatestPriority;
   int leastPriority;
-  qudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
+  cudaDeviceGetStreamPriorityRange(&leastPriority, &greatestPriority);
   for (int i=0; i<Nstream-1; i++) {
-    cudaStreamCreateWithPriority(&streams[i], qudaStreamDefault, greatestPriority);
+    cudaStreamCreateWithPriority(&streams[i], cudaStreamDefault, greatestPriority);
   }
-  cudaStreamCreateWithPriority(&streams[Nstream - 1], qudaStreamDefault, leastPriority);
+  cudaStreamCreateWithPriority(&streams[Nstream-1], cudaStreamDefault, leastPriority);
 
   checkCudaError();
 #ifndef DPCPP_DEVELOP
   createDslashEvents();
-#endif
+#endif //DPCPP
   blas::init();
 #ifndef DPCPP_DEVELOP
   cublas::init();
-#endif
+#endif //DPCPP
 
   // initalize the memory pool allocators
   pool::init();
 
   num_failures_h = static_cast<int*>(mapped_malloc(sizeof(int)));
-  qudaHostGetDevicePointer((void **)&num_failures_d, num_failures_h, 0);
+  cudaHostGetDevicePointer(&num_failures_d, num_failures_h, 0);
 
   loadTuneCache();
 
@@ -702,9 +705,7 @@ void initQuda(int dev)
   // set the persistant memory allocations that QUDA uses (Blas, streams, etc.)
   initQudaMemory();
 }
-
 #ifndef DPCPP_DEVELOP
-
 // helper for creating extended gauge fields
 static cudaGaugeField* createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
 					   bool redundant_comms=false, QudaReconstructType recon=QUDA_RECONSTRUCT_INVALID)
@@ -1167,10 +1168,10 @@ void loadCloverQuda(void *h_clover, void *h_clovinv, QudaInvertParam *inv_param)
     // copy the field into the host application's clover field
     profileClover.TPSTART(QUDA_PROFILE_D2H);
     if (inv_param->return_clover) {
-      qudaMemcpy((char *)(in->V(false)), (char *)(hack->V(false)), in->Bytes(), qudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(false)), (char*)(hack->V(false)), in->Bytes(), cudaMemcpyDeviceToHost);
     }
     if (inv_param->return_clover_inverse) {
-      qudaMemcpy((char *)(in->V(true)), (char *)(hack->V(true)), in->Bytes(), qudaMemcpyDeviceToHost);
+      qudaMemcpy((char*)(in->V(true)), (char*)(hack->V(true)), in->Bytes(), cudaMemcpyDeviceToHost);
     }
 
     profileClover.TPSTOP(QUDA_PROFILE_D2H);
@@ -1486,9 +1487,7 @@ void flushChronoQuda(int i)
   }
   basis.clear();
 }
-
 #endif //DPCPP
-
 void endQuda(void)
 {
   profileEnd.TPSTART(QUDA_PROFILE_TOTAL);
@@ -1520,14 +1519,13 @@ void endQuda(void)
   num_failures_d = nullptr;
 
   if (streams) {
-    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);//DPCPP
+    for (int i=0; i<Nstream; i++) cudaStreamDestroy(streams[i]);
     delete []streams;
     streams = nullptr;
   }
 #ifndef DPCPP_DEVELOP
   destroyDslashEvents();
 #endif //DPCPP
-
   saveTuneCache();
   saveProfile();
 #ifndef DPCPP_DEVELOP
@@ -1589,7 +1587,7 @@ void endQuda(void)
   char *device_reset_env = getenv("QUDA_DEVICE_RESET");
   if (device_reset_env && strcmp(device_reset_env,"1") == 0) {
     // end this CUDA context
-    qudaDeviceReset();
+    cudaDeviceReset();
   }
 
 }
@@ -1889,7 +1887,7 @@ namespace quda {
     }
 
   }
-} //end quda namespace
+}
 
 void dslashQuda(void *h_out, void *h_in, QudaInvertParam *inv_param, QudaParity parity)
 {
@@ -4546,7 +4544,7 @@ void computeHISQForceQuda(void* const milc_momentum,
 
   if (*num_failures_h>0) errorQuda("Error in the unitarization component of the hisq fermion force: %d failures\n", *num_failures_h);
 
-  qudaMemset((void **)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
+  cudaMemset((void**)(cudaOutForce->Gauge_p()), 0, cudaOutForce->Bytes());
 
   // read in u-link
   cudaGauge->loadCPUField(cpuULink, profileHISQForce);
@@ -5107,7 +5105,7 @@ void invert_multishift_quda_(void *h_x, void *hp_b, QudaInvertParam *param) {
 void flush_chrono_quda_(int *index) { flushChronoQuda(*index); }
 
 void register_pinned_quda_(void *ptr, size_t *bytes) {
-  cudaHostRegister(ptr, *bytes, qudaHostRegisterDefault);
+  cudaHostRegister(ptr, *bytes, cudaHostRegisterDefault);
   checkCudaError();
 }
 
@@ -5792,7 +5790,7 @@ void contractQuda(const void *hp_x, const void *hp_y, void *h_result, const Quda
   profileContract.TPSTOP(QUDA_PROFILE_COMPUTE);
 
   profileContract.TPSTART(QUDA_PROFILE_D2H);
-  qudaMemcpy(h_result, d_result, data_bytes, qudaMemcpyDeviceToHost);
+  qudaMemcpy(h_result, d_result, data_bytes, cudaMemcpyDeviceToHost);
   profileContract.TPSTOP(QUDA_PROFILE_D2H);
 
   profileContract.TPSTART(QUDA_PROFILE_FREE);

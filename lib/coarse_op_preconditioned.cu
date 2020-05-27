@@ -16,7 +16,7 @@ namespace quda {
   */
   template <QudaFieldLocation location, typename Arg>
   struct Launch {
-    Launch(Arg &arg, QUresult &error, bool compute_max_only, TuneParam &tp, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const qudaStream_t &stream)
     {
       if (compute_max_only)
         CalculateYhatCPU<true, Arg>(arg);
@@ -30,7 +30,7 @@ namespace quda {
   */
   template <typename Arg>
   struct Launch<QUDA_CUDA_FIELD_LOCATION, Arg> {
-    Launch(Arg &arg, QUresult &error, bool compute_max_only, TuneParam &tp, const qudaStream_t &stream)
+    Launch(Arg &arg, CUresult &error, bool compute_max_only, TuneParam &tp, const qudaStream_t &stream)
     {
       if (compute_max_only) {
         if (!activeTuning()) {
@@ -51,7 +51,7 @@ namespace quda {
 #endif
       if (compute_max_only) {
         if (!activeTuning()) { // only do copy once tuning is done
-          qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), qudaMemcpyDeviceToHost, stream);
+          qudaMemcpyAsync(arg.max_h, arg.max_d, sizeof(typename Arg::Float), cudaMemcpyDeviceToHost, stream);
           qudaStreamSynchronize(const_cast<qudaStream_t&>(stream));
         }
       }

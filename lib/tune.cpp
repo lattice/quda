@@ -1,5 +1,5 @@
 // This file redirects the compiler to the correct target file for
-// quda_malloc.cpp
+// tune.cpp
 #ifdef CUDA_TARGET
-#include "targets/cuda/cuda_malloc.cpp"
+#include "targets/cuda/cuda_tune.cpp"
 #endif

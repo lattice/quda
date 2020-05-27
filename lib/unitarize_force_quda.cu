@@ -1,8 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
-#include <iomanip>
-#include <quda_target.h>
+
 #include <gauge_field.h>
 #include <tune_quda.h>
 #include <quda_matrix.h>
@@ -404,7 +402,7 @@ namespace quda {
       }
 
       void preTune() { ; }
-      void postTune() { qudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
+      void postTune() { cudaMemset(arg.fails, 0, sizeof(int)); } // reset fails counter
 
       long long flops() const { return 4ll*4528*meta.Volume(); }
       long long bytes() const { return 4ll * meta.Volume() * (arg.force.Bytes() + arg.force_old.Bytes() + arg.u.Bytes()); }
