@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <quda_cuda_api.h>
 
-#define qudaStream_t cudaStream_t
+using qudaStream_t = cudaStream_t;
 
 /**
    @file quda_cuda_api.h

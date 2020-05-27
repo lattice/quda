@@ -1,11 +1,19 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
+
+# Set target preprocessor flags
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  set(QUDA_TARGET_DIR "cuda")
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  set(QUDA_TARGET_DIR "hip")
+endif()
+
 set (QUDA_OBJS
   # cmake-format: sortable
+  ${TARGET_OBJS}
   vector_io.cpp
   timer.cpp
-  targets/${QUDA_TARGET_DIR}/malloc.cpp
-  targets/${QUDA_TARGET_DIR}/tune.cpp
   interface_quda.cpp util_quda.cpp
   color_spinor_field.cpp color_spinor_util.cu color_spinor_pack.cu
   cpu_color_spinor_field.cpp cuda_color_spinor_field.cpp
@@ -71,6 +79,11 @@ target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
 endif()
+
+target_sources(quda_cpp PUBLIC
+  targets/${QUDA_TARGET_DIR}/malloc.cpp
+  targets/${QUDA_TARGET_DIR}/tune.cpp
+)
 
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
