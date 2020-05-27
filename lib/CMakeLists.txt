@@ -22,13 +22,6 @@ if(DEBUG_BUILD)
   endif()
 endif()
 
-# Set target preprocessor flags
-if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
-  set(QUDA_TARGET_DIR "cuda")
-endif()
-if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
-  set(QUDA_TARGET_DIR "hip")
-endif()
 
 set (QUDA_OBJS
   # cmake-format: sortable
@@ -147,11 +140,7 @@ target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,comm_mpi.cpp,$<IF:$<BOO
 
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
-# add target specific files
-target_sources(quda_cpp PRIVATE
-  targets/${QUDA_TARGET_DIR}/malloc.cpp
-  targets/${QUDA_TARGET_DIR}/tune.cpp
-)
+
 
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
@@ -211,6 +200,16 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
+
+# add target specific files
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_subdirectory(targets/cuda)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  #set(QUDA_TARGET_DIR "hip")
+endif()
+
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
