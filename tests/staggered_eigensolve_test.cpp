@@ -36,7 +36,7 @@ void display_test_info()
   printfQuda("\n   Eigensolver parameters\n");
   printfQuda(" - solver mode %s\n", get_eig_type_str(eig_type));
   printfQuda(" - spectrum requested %s\n", get_eig_spectrum_str(eig_spectrum));
-    if(eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
+  if (eig_type == QUDA_EIG_BLK_TR_LANCZOS) printfQuda(" - eigenvector block size %d\n", eig_block_size);
   printfQuda(" - number of eigenvectors requested %d\n", eig_nConv);
   printfQuda(" - size of eigenvector search space %d\n", eig_nEv);
   printfQuda(" - size of Krylov space %d\n", eig_nKr);

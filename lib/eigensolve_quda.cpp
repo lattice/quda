@@ -139,7 +139,7 @@ namespace quda
       orthonormalizeMGS(kSpace, block_size);
       if (getVerbosity() >= QUDA_SUMMARIZE) {
         if (block_size > 1)
-          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k+1));
+          printfQuda("Orthonormalising initial guesses with Modified Gram Schmidt, iter k=%d/5\n", (k + 1));
         else
           printfQuda("Orthonormalising initial guess\n");
       }
@@ -390,7 +390,7 @@ namespace quda
     blas::hDotProduct(H.data(), vecs_ptr, vecs_ptr);
 
     double epsilon = setEpsilon(vecs[0]->Precision());
-    
+
     for (int i = 0; i < size; i++) {
       for (int j = 0; j < size; j++) {
         auto cnorm = H[i*size + j];
