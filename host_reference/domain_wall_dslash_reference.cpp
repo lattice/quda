@@ -1068,18 +1068,30 @@ void mdw_eofa_mat(void *out, void **gauge, void *in, int dagger, QudaPrecision p
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
-  mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
-  dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
-  mdw_eofa_m5(tmp, inOdd, 1, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  if (!dagger) {
+    mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5(tmp, inOdd, 1, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  } else {
+    dslash_4_4d(tmp, gauge, inEven, 1, dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(outOdd, gauge, tmp, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_eofa_m5(tmp, inOdd, 1, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  }
 
   for (int xs = 0; xs < Ls; xs++) {
     cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b,
           (char *)outOdd + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
   }
 
-  mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
-  dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
-  mdw_eofa_m5(tmp, inEven, 0, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  if (!dagger) {
+    mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
+    mdw_eofa_m5(tmp, inEven, 0, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  } else {
+    dslash_4_4d(tmp, gauge, inOdd, 0, dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(outEven, gauge, tmp, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_eofa_m5(tmp, inEven, 0, dagger, mferm, m5, b, c, mq1, mq2, mq3, eofa_pm, eofa_shift, precision);
+  }
 
   for (int xs = 0; xs < Ls; xs++) {
     cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b,
