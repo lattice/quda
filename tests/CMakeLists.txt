@@ -1,24 +1,19 @@
-#TODO: we might be able to clean that up a bit and have the include directories propagate with the libs
-include_directories(. googletest/include googletest ../utils ../host_reference)
-
 include(GNUInstallDirs)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_FULL_LIBDIR})
 
 # enable tests build a common library for all test utilities
 add_library(quda_test STATIC googletest/src/gtest-all.cc)
+target_include_directories(quda_test PUBLIC googletest/include googletest)
 
-# need to check why this is here ...
-if(QUDA_QDPJIT)
-  target_link_libraries(quda
-                        INTERFACE ${QDP_LDFLAGS} ${QDP_LIB} ${QDP_LIBS} ${QIO_LIB} ${LIME_LIB} ${QUDA_QMP_LDFLAGS}
-                                  ${QMP_LIB} ${MPI_CXX_LIBRARIES})
-endif()
-
-if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+if(QUDA_QIO
+   AND QUDA_DOWNLOAD_USQCD
+   AND NOT QIO_FOUND)
   add_dependencies(quda_test QIO)
 endif()
 
-if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+if(QUDA_QMP
+   AND QUDA_DOWNLOAD_USQCD
+   AND NOT QMP_FOUND)
   add_dependencies(quda_test QMP)
 endif()
 
@@ -29,13 +24,18 @@ macro(QUDA_CHECKBUILDTEST mytarget qudabuildtests)
   set_target_properties(${mytarget} PROPERTIES LINKER_LANGUAGE CUDA)
   if(NOT ${qudabuildtests})
     set_property(TARGET ${mytarget} PROPERTY EXCLUDE_FROM_ALL 1)
+    set(QUDA_EXCLUDE_FROM_INSTALL "EXCLUDE_FROM_ALL")
   endif()
 
-  if(QUDA_QIO AND QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
+  if(QUDA_QIO
+     AND QUDA_DOWNLOAD_USQCD
+     AND NOT QIO_FOUND)
     add_dependencies(${mytarget} QIO)
   endif()
 
-  if(QUDA_QMP AND QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
+  if(QUDA_QMP
+     AND QUDA_DOWNLOAD_USQCD
+     AND NOT QMP_FOUND)
     add_dependencies(${mytarget} QMP)
   endif()
 endmacro()
@@ -129,7 +129,7 @@ if(QUDA_DIRAC_STAGGERED)
     quda_checkbuildtest(staggered_invertmsrc_test QUDA_BUILD_ALL_TESTS)
     install(TARGETS staggered_invertmsrc_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
   endif()
-  
+
 endif()
 
 if(QUDA_DIRAC_WILSON
@@ -141,10 +141,10 @@ if(QUDA_DIRAC_WILSON
    OR QUDA_DIRAC_STAGGERED)
   add_executable(blas_test blas_test.cu)
   target_link_libraries(blas_test ${TEST_LIBS})
-  QUDA_CHECKBUILDTEST(blas_test QUDA_BUILD_ALL_TESTS)
+  quda_checkbuildtest(blas_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS blas_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-  
+
 if(QUDA_MULTIGRID)
   add_executable(multigrid_benchmark_test multigrid_benchmark_test.cu)
   target_link_libraries(multigrid_benchmark_test ${TEST_LIBS})
@@ -162,7 +162,7 @@ endif()
 
 add_executable(plaq_test plaq_test.cpp)
 target_link_libraries(plaq_test ${TEST_LIBS})
-QUDA_CHECKBUILDTEST(plaq_test QUDA_BUILD_ALL_TESTS)
+quda_checkbuildtest(plaq_test QUDA_BUILD_ALL_TESTS)
 install(TARGETS plaq_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_executable(su3_test su3_test.cpp)
@@ -185,7 +185,7 @@ endif()
 if(QUDA_CONTRACT)
   add_executable(contract_test contract_test.cpp)
   target_link_libraries(contract_test ${TEST_LIBS})
-  QUDA_CHECKBUILDTEST(contract_test QUDA_BUILD_ALL_TESTS)
+  quda_checkbuildtest(contract_test QUDA_BUILD_ALL_TESTS)
   install(TARGETS contract_test ${QUDA_EXCLUDE_FROM_INSTALL} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
