@@ -157,7 +157,8 @@ namespace quda
     };
 
     template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<sizeof(TC) == 16, void>::type gemm(const TA &op_a, const TB &op_b, TC &op_c)
+    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
       asm volatile("mma.sync.aligned.m8n8k4.col.row.f16.f16.f16.f16 {%0,%1,%2,%3}, {%4,%5}, {%6,%7}, {%0,%1,%2,%3};"
                    : "+r"(op_c.reg[0]), "+r"(op_c.reg[1]), "+r"(op_c.reg[2]), "+r"(op_c.reg[3])
@@ -165,7 +166,8 @@ namespace quda
     }
 
     template <class TA, class TB, class TC>
-    __device__ inline typename std::enable_if<sizeof(TC) == 32, void>::type gemm(const TA &op_a, const TB &op_b, TC &op_c)
+    __device__ inline typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
+    gemm(const TA &op_a, const TB &op_b, TC &op_c)
     {
       asm volatile("mma.sync.aligned.m8n8k4.col.row.f32.f16.f16.f32 {%0,%1,%2,%3,%4,%5,%6,%7}, {%8,%9}, {%10,%11}, "
                    "{%0,%1,%2,%3,%4,%5,%6,%7};"
@@ -180,13 +182,13 @@ namespace quda
       __device__ inline real &operator[](int i) { return v[i]; }
     };
 
-    template <int N, class TC, class GmemOperandC>
-    inline __device__ void store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
-                                         const TC &op_c_real, const TC &op_c_imag)
+    template <int ldc, class TC, class GmemOperandC>
+    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
+                  const TC &op_c_imag)
     {
       using store_type = typename GmemOperandC::store_type;
 
-#ifdef USE_FP16_HMMA_ACCUMULATE
       const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
       const int col = warp_col + wrm.quad_col * 8;
 
@@ -213,8 +215,16 @@ namespace quda
         }
       }
 
-      ptr_[(row * N + col) / 8] = s;
-#else // USE_FP16_HMMA_ACCUMULATE
+      ptr_[(row * ldc + col) / 8] = s;
+    }
+
+    template <int ldc, class TC, class GmemOperandC>
+    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
+    store_complex(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc, const TC &op_c_real,
+                  const TC &op_c_imag)
+    {
+      using store_type = typename GmemOperandC::store_type;
+
       const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
       const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
 
@@ -239,9 +249,9 @@ namespace quda
           s[2] = op_c_real.reg[i * 2 + 1];
           s[3] = op_c_imag.reg[i * 2 + 1];
         }
-        ptr_[((row + (i % 2) * 2) * N + (col + (i / 2) * 4)) / 2] = s;
+        ptr_[((row + (i % 2) * 2) * ldc + (col + (i / 2) * 4)) / 2] = s;
       }
-#endif
     }
+
   } // namespace mma
 } // namespace quda

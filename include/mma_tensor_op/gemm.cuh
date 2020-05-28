@@ -41,11 +41,9 @@ namespace quda
       static constexpr int bM = bM_;
       static constexpr int bN = bN_;
       static constexpr int bK = bK_;
-
     };
 
-    template <int M, int N, int ldm, int ldn, class T>
-    __device__ inline auto make_smem_obj(T *ptr_)
+    template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
     {
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
@@ -76,7 +74,7 @@ namespace quda
       }
 
 #ifdef USE_GMEM_MMA_PIPELINING
-      template <int matrix_n, bool transpose, class GmemAccessor>
+      template <int ld, bool transpose, class GmemAccessor>
       __device__ inline void g2r(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
         auto p = gmem.data();
@@ -89,8 +87,8 @@ namespace quda
             const int n_idx = n * n_stride + y + n_offset;
             const int m_idx = m * m_stride_pack + z + m_offset;
             if (transpose == dagger) {
-              auto xx = p[(m_idx + 0) * matrix_n + n_idx];
-              auto yy = p[(m_idx + 1) * matrix_n + n_idx];
+              auto xx = p[(m_idx + 0) * ld + n_idx];
+              auto yy = p[(m_idx + 1) * ld + n_idx];
 
               if (fixed) {
                 reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * xx.real(), scale_inv * yy.real());
@@ -104,7 +102,7 @@ namespace quda
             } else {
               using store_type = typename GmemAccessor::store_type;
               using store_vector_type = typename VectorType<store_type, 4>::type;
-              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * matrix_n + m_idx]);
+              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
 
               if (fixed) {
                 reg_real[m * n_dim + n] = __floats2half2_rn(scale_inv * v.x, scale_inv * v.z);
@@ -133,7 +131,7 @@ namespace quda
         }
       }
 #else
-      template <int matrix_n, bool transpose, class GmemAccessor>
+      template <int ld, bool transpose, class GmemAccessor>
       __device__ inline void g2s(const GmemAccessor &gmem, int m_offset, int n_offset)
       {
         auto p = gmem.data();
@@ -150,8 +148,8 @@ namespace quda
             const int m_idx = m_idx_smem + m_offset;
 
             if (transpose == dagger) {
-              auto xx = p[(m_idx + 0) * matrix_n + n_idx];
-              auto yy = p[(m_idx + 1) * matrix_n + n_idx];
+              auto xx = p[(m_idx + 0) * ld + n_idx];
+              auto yy = p[(m_idx + 1) * ld + n_idx];
 
               if (fixed) {
                 smem_real.vector_load(m_idx_smem, n_idx_smem,
@@ -168,7 +166,7 @@ namespace quda
             } else {
               using store_type = typename GmemAccessor::store_type;
               using store_vector_type = typename VectorType<store_type, 4>::type;
-              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * matrix_n + m_idx]);
+              store_vector_type v = *reinterpret_cast<store_vector_type *>(&p[n_idx * ld + m_idx]);
 
               if (fixed) {
                 smem_real.vector_load(m_idx_smem, n_idx_smem, __floats2half2_rn(scale_inv * v.x, scale_inv * v.z));
@@ -194,8 +192,8 @@ namespace quda
       constexpr int bN = Config::bN;
       constexpr int bK = Config::bK;
 
-      constexpr int lda = bM + pad_size(bM);
-      constexpr int ldb = bN + pad_size(bN);
+      constexpr int smem_lda = bM + pad_size(bM);
+      constexpr int smem_ldb = bN + pad_size(bN);
 
       constexpr int n_row = block_z;
       constexpr int n_col = block_y;
@@ -203,14 +201,14 @@ namespace quda
       extern __shared__ half smem_ptr[];
 
       half *smem_a_real = smem_ptr;
-      half *smem_a_imag = smem_a_real + lda * bK;
-      half *smem_b_real = smem_a_imag + lda * bK;
-      half *smem_b_imag = smem_b_real + ldb * bK;
+      half *smem_a_imag = smem_a_real + smem_lda * bK;
+      half *smem_b_real = smem_a_imag + smem_lda * bK;
+      half *smem_b_imag = smem_b_real + smem_ldb * bK;
 
-      auto smem_obj_a_real = make_smem_obj<bM, bK, 1, lda>(smem_a_real);
-      auto smem_obj_a_imag = make_smem_obj<bM, bK, 1, lda>(smem_a_imag);
-      auto smem_obj_b_real = make_smem_obj<bN, bK, 1, ldb>(smem_b_real);
-      auto smem_obj_b_imag = make_smem_obj<bN, bK, 1, ldb>(smem_b_imag);
+      auto smem_obj_a_real = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_real);
+      auto smem_obj_a_imag = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_imag);
+      auto smem_obj_b_real = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_real);
+      auto smem_obj_b_imag = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_imag);
 
       constexpr int total_warp = n_row * n_col / warp_size;
 
@@ -220,8 +218,8 @@ namespace quda
       using accumuate_reg_type = float;
 #endif
       static_assert(bM % WMMA_M == 0, "bM must be divisible by WMMA_M.");
-      static_assert(bN % WMMA_N == 0, "bM must be divisible by WMMA_N.");
-      static_assert(bK % WMMA_K == 0, "bM must be divisible by WMMA_K.");
+      static_assert(bN % WMMA_N == 0, "bN must be divisible by WMMA_N.");
+      static_assert(bK % WMMA_K == 0, "bK must be divisible by WMMA_K.");
 
       constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
       constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension
@@ -239,8 +237,8 @@ namespace quda
 
       float max = 0.0f; // XXX: Accessor::Float
 
-      MmaOperandC<ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
-      MmaOperandC<ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
+      MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
+      MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
 
       GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
                                                                                            smem_obj_a_imag);
@@ -288,14 +286,14 @@ namespace quda
 
             const int k_idx = tile_k;
 
-            MmaOperandA<lda / 2> op_a_real;
+            MmaOperandA<smem_lda / 2> op_a_real;
             op_a_real.load(smem_a_real, k_idx, warp_row, wrm);
-            MmaOperandA<lda / 2> op_a_imag;
+            MmaOperandA<smem_lda / 2> op_a_imag;
             op_a_imag.load(smem_a_imag, k_idx, warp_row, wrm);
 
-            MmaOperandB<ldb / 2> op_b_real;
+            MmaOperandB<smem_ldb / 2> op_b_real;
             op_b_real.load(smem_b_real, k_idx, warp_col, wrm);
-            MmaOperandB<ldb / 2> op_b_imag;
+            MmaOperandB<smem_ldb / 2> op_b_imag;
             op_b_imag.load(smem_b_imag, k_idx, warp_col, wrm);
 
             gemm(op_a_real, op_b_real, op_c_real[c]);
@@ -334,8 +332,8 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          store_complex<Config::N>(warp_row * WMMA_M + m_offset, warp_col * WMMA_N + n_offset, wrm, cc, op_c_real[c],
-                                   op_c_imag[c]);
+          store_complex<Config::ldc>(warp_row * WMMA_M + m_offset, warp_col * WMMA_N + n_offset, wrm, cc, op_c_real[c],
+                                     op_c_imag[c]);
         }
       }
 

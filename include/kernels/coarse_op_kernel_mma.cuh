@@ -68,7 +68,7 @@ namespace quda
       // L2 reuse since a given wave of thread blocks will be for different
       // coarse color but the same coarse grid point which will have common
       // loads.
-      static constexpr bool coarse_color_wave = true;
+      static constexpr bool coarse_color_wave = false;
 
       // Enable this for shared-memory atomics instead of global atomics.
       // Doing so means that all (modulo the parity) of the coarsening for a
@@ -310,6 +310,298 @@ namespace quda
       else
         impl::computeUV<from_coarse, dim, dir, fineSpin, coarseSpin, bM, bN, bK, block_y, block_z>(arg, arg.AV, parity,
                                                                                                    x_cb);
+    }
+
+    namespace impl
+    {
+      /**
+         @brief Do a single (AV)^\dagger * UV product, where for preconditioned
+         clover, AV correspond to the clover inverse multiplied by the
+         packed null space vectors, else AV is simply the packed null
+         space vectors.
+
+         @param[out] vuv Result array
+         @param[in,out] arg Arg storing the fields and parameters
+         @param[in] Fine grid parity we're working on
+         @param[in] x_cb Checkboarded x dimension
+       */
+      template <bool from_coarse, typename Float, int dim, QudaDirection dir, int fineSpin, int coarseSpin,
+                typename Arg, typename Gamma, typename Out>
+      __device__ __host__ inline void multiplyVUV(Out &vuv, const Arg &arg, const Gamma &gamma, int parity, int x_cb,
+                                                  int i0, int j0)
+      {
+        using complex = complex<Float>;
+        auto &tile = arg.vuvTile;
+
+        if (!from_coarse) { // fine grid is top level
+#if 1
+
+#else
+#pragma unroll
+          for (int s = 0; s < fineSpin; s++) { // Loop over fine spin
+
+            // Spin part of the color matrix.  Will always consist
+            // of two terms - diagonal and off-diagonal part of
+            // P_mu = (1+/-\gamma_mu)
+
+            const int s_c_row = arg.spin_map(s, parity); // Coarse spin row index
+
+            // Use Gamma to calculate off-diagonal coupling and
+            // column index.  Diagonal coupling is always 1.
+            // If computing the backwards (forwards) direction link then
+            // we desire the positive (negative) projector
+
+            const int s_col = gamma.getcol(s);
+            const int s_c_col = arg.spin_map(s_col, parity); // Coarse spin col index
+
+#pragma unroll
+            for (int k = 0; k < tile.k; k += tile.K) { // Sum over fine color
+              if (dir == QUDA_BACKWARDS) {
+                auto V = make_tile_At<complex, false>(tile);
+                V.loadCS(arg.V, 0, 0, parity, x_cb, s, k, i0);
+
+                // here UV is really UAV
+                // Diagonal Spin
+                auto UV = make_tile_B<complex, false>(tile);
+                UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
+                vuv[s_c_row * coarseSpin + s_c_row].mma_tn(V, UV);
+
+                // Off-diagonal Spin (backward link / positive projector applied)
+                auto gammaV = make_tile_A<complex, false>(tile);
+                for (int i = 0; i < tile.K; i++)
+                  for (int j = 0; j < tile.M; j++) { gammaV(j, i) = gamma.apply(s, conj(V(i, j))); }
+                UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
+                vuv[s_c_row * coarseSpin + s_c_col].mma_nn(gammaV, UV);
+              } else {
+                auto AV = make_tile_At<complex, false>(tile);
+                AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
+
+                auto UV = make_tile_B<complex, false>(tile);
+                UV.loadCS(arg.UV, 0, 0, parity, x_cb, s, k, j0);
+
+                // Diagonal Spin
+                vuv[s_c_row * coarseSpin + s_c_row].mma_tn(AV, UV);
+
+                // Off-diagonal Spin (forward link / negative projector applied)
+                auto gammaAV = make_tile_A<complex, false>(tile);
+
+                for (int i = 0; i < tile.K; i++)
+                  for (int j = 0; j < tile.M; j++) { gammaAV(j, i) = -gamma.apply(s, conj(AV(i, j))); }
+                UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col, k, j0);
+                vuv[s_c_row * coarseSpin + s_c_col].mma_nn(gammaAV, UV);
+              }
+            } // Fine color
+          }
+#endif
+        } else { // fine grid operator is a coarse operator
+#if 1
+          // We do coarseColor x coarseColor x fineColor
+
+          constexpr bool a_dagger = true;
+          constexpr bool b_dagger = false;
+
+          constexpr int M = tile.m;
+          constexpr int N = tile.n;
+          constexpr int K = tile.k;
+
+          constexpr int lda = K;
+          constexpr int ldb = N;
+          constexpr int ldc = N;
+
+          constexpr int bM = M;
+          constexpr int bN = N;
+          constexpr int bK = K;
+
+          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+
+          // Not unrolling to lift regiter pressure
+          for (int s = 0; s < fineSpin; s++) {
+
+            for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
+
+              auto aa = arg.AV.wrap(parity, x_cb, s);
+              auto bb = arg.UV.wrap(parity, x_cb, s_col * fineSpin + s);
+
+              // XXX: Need to factor the atomic store in here to the wrapper cc.
+              // auto cc = arg.Y_atomic.wrap( ... )
+
+            } // Fine color
+          }   // Fine spin
+
+#else
+#pragma unroll
+          for (int k = 0; k < tile.k; k += tile.K) { // Sum over fine color
+#pragma unroll
+            for (int s = 0; s < fineSpin; s++) {
+              auto AV = make_tile_At<complex, false>(tile);
+              AV.loadCS(arg.AV, 0, 0, parity, x_cb, s, k, i0);
+#pragma unroll
+              for (int s_col = 0; s_col < fineSpin; s_col++) { // which chiral block
+                auto UV = make_tile_B<complex, false>(tile);
+                UV.loadCS(arg.UV, 0, 0, parity, x_cb, s_col * fineSpin + s, k, j0);
+                vuv[s * coarseSpin + s_col].mma_tn(AV, UV);
+              } // Fine color
+            }   // Fine spin
+          }
+#endif
+        } // from_coarse
+      }
+
+      template <bool parity_flip, typename Float, QudaDirection dir, int coarseSpin, typename VUV, typename Arg>
+      inline __device__ __host__ void storeCoarseGlobalAtomic(VUV &vuv, bool isDiagonal, int coarse_x_cb,
+                                                              int coarse_parity, int i0, int j0, Arg &arg)
+      {
+        const int dim_index = arg.dim_index % arg.Y_atomic.geometry;
+        auto &tile = arg.vuvTile;
+
+        if (!isDiagonal) {
+#pragma unroll
+          for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+            for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+#pragma unroll
+              for (int i = 0; i < tile.M; i++)
+#pragma unroll
+                for (int j = 0; j < tile.N; j++)
+                  arg.Y_atomic.atomicAdd(dim_index, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                         vuv[s_row * coarseSpin + s_col](i, j));
+            }
+          }
+        } else {
+
+          if (dir == QUDA_BACKWARDS) {
+#pragma unroll
+            for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+              for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+#pragma unroll
+                for (int i = 0; i < tile.M; i++)
+#pragma unroll
+                  for (int j = 0; j < tile.N; j++)
+                    arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_col, s_row, j0 + j, i0 + i,
+                                           conj(vuv[s_row * coarseSpin + s_col](i, j)));
+              }
+            }
+          } else {
+#pragma unroll
+            for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+              for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+#pragma unroll
+                for (int i = 0; i < tile.M; i++)
+#pragma unroll
+                  for (int j = 0; j < tile.N; j++)
+                    arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                           vuv[s_row * coarseSpin + s_col](i, j));
+              }
+            }
+          }
+
+          if (!arg.bidirectional) {
+#pragma unroll
+            for (int s_row = 0; s_row < coarseSpin; s_row++) { // Chiral row block
+#pragma unroll
+              for (int s_col = 0; s_col < coarseSpin; s_col++) { // Chiral column block
+                if (s_row != s_col) vuv[s_row * coarseSpin + s_col] *= static_cast<Float>(-1.0);
+#pragma unroll
+                for (int i = 0; i < tile.M; i++)
+#pragma unroll
+                  for (int j = 0; j < tile.N; j++)
+                    arg.X_atomic.atomicAdd(0, coarse_parity, coarse_x_cb, s_row, s_col, i0 + i, j0 + j,
+                                           vuv[s_row * coarseSpin + s_col](i, j));
+              }
+            }
+          }
+        }
+      }
+
+      template <bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
+                int fineSpin, int coarseSpin, typename Arg, typename Gamma>
+      __device__ __host__ void computeVUV(Arg &arg, const Gamma &gamma, int parity, int x_cb, int i0, int j0,
+                                          int parity_coarse_, int coarse_x_cb_)
+      {
+        constexpr int nDim = 4;
+        int coord[QUDA_MAX_DIM];
+        int coord_coarse[QUDA_MAX_DIM];
+
+        getCoords(coord, x_cb, arg.x_size, parity);
+        for (int d = 0; d < nDim; d++) coord_coarse[d] = coord[d] / arg.geo_bs[d];
+
+        // Check to see if we are on the edge of a block.  If adjacent site
+        // is in same block, M = X, else M = Y
+        const bool isDiagonal
+          = ((coord[dim] + 1) % arg.x_size[dim]) / arg.geo_bs[dim] == coord_coarse[dim] ? true : false;
+
+        int coarse_parity = shared_atomic ? parity_coarse_ : 0;
+        if (!shared_atomic) {
+          for (int d = 0; d < nDim; d++) coarse_parity += coord_coarse[d];
+          coarse_parity &= 1;
+          coord_coarse[0] /= 2;
+        }
+        int coarse_x_cb = shared_atomic ?
+          coarse_x_cb_ :
+          ((coord_coarse[3] * arg.xc_size[2] + coord_coarse[2]) * arg.xc_size[1] + coord_coarse[1]) * (arg.xc_size[0] / 2)
+            + coord_coarse[0];
+
+        using Ctype = decltype(make_tile_C<complex<Float>, false>(arg.vuvTile));
+        Ctype vuv[coarseSpin * coarseSpin];
+        multiplyVUV<from_coarse, Float, dim, dir, fineSpin, coarseSpin, Arg>(vuv, arg, gamma, parity, x_cb, i0, j0);
+
+        if (isDiagonal) {
+#pragma unroll
+          for (int s2 = 0; s2 < coarseSpin * coarseSpin; s2++) vuv[s2] *= -arg.kappa;
+        }
+
+        if (shared_atomic) {
+          // blank
+        } else {
+          storeCoarseGlobalAtomic<parity_flip, Float, dir, coarseSpin>(vuv, isDiagonal, coarse_x_cb, coarse_parity, i0,
+                                                                       j0, arg);
+        }
+      }
+
+      // compute indices for global-atomic kernel
+      template <bool shared_atomic, bool parity_flip, typename Arg>
+      __device__ inline void getIndices(const Arg &arg, int &parity, int &x_cb, int &parity_coarse, int &x_coarse_cb,
+                                        int &c_row, int &c_col)
+      {
+        if (arg.coarse_color_wave) {
+          // blank
+        } else {
+          int parity_c_row = blockDim.y * blockIdx.y + threadIdx.y;
+          c_row = parity_flip ? (parity_c_row % arg.vuvTile.M_tiles) : (parity_c_row / 2);  // coarse color row index
+          parity = parity_flip ? (parity_c_row / arg.vuvTile.M_tiles) : (parity_c_row % 2); // coarse color row index
+          c_col = blockDim.z * blockIdx.z + threadIdx.z;                                    // coarse color col index
+        }
+
+        if (!shared_atomic) {
+          x_cb = blockDim.x * (arg.coarse_color_wave ? blockIdx.y : blockIdx.x) + threadIdx.x;
+          x_coarse_cb = 0;
+          parity_coarse = 0;
+        } else {
+          // blank
+        }
+      }
+
+    } // namespace impl
+
+    template <bool shared_atomic, bool parity_flip, bool from_coarse, typename Float, int dim, QudaDirection dir,
+              int fineSpin, int coarseSpin, typename Arg>
+    __global__ void ComputeVUVMMA(Arg arg)
+    {
+      static_assert(shared_atomic == false, "shared_atomic == true NOT implemented");
+      static_assert(parity_flip == false, "parity_flip == true NOT implemented");
+      Gamma<Float, QUDA_DEGRAND_ROSSI_GAMMA_BASIS, dim> gamma;
+      int parity, x_cb, parity_coarse, x_coarse_cb, c_col, c_row;
+      getIndices<shared_atomic, parity_flip>(arg, parity, x_cb, parity_coarse, x_coarse_cb, c_row, c_col);
+
+      if (parity > 1) return;
+      if (c_row >= arg.vuvTile.M_tiles) return;
+      if (c_col >= arg.vuvTile.N_tiles) return;
+      if (!shared_atomic && x_cb >= arg.fineVolumeCB) return;
+
+      impl::computeVUV<shared_atomic, parity_flip, from_coarse, Float, dim, dir, fineSpin, coarseSpin>(
+        arg, gamma, parity, x_cb, c_row * arg.vuvTile.M, c_col * arg.vuvTile.N, parity_coarse, x_coarse_cb);
     }
 
   } // namespace mma
