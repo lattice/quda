@@ -7,7 +7,7 @@
 #include <comm_quda.h>
 #include <util_quda.h>
 #include <object.h>
-#include <cuda_runtime.h>
+#include <quda_cuda_api.h>
 
 /**
  * @file lattice_field.h
@@ -642,16 +642,18 @@ namespace quda {
     */
     void *remoteFace_d(int dir, int dim) const { return ghost_remote_send_buffer_d[bufferIndex][dim][dir]; }
 
-    virtual void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL)
+    virtual void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL) { errorQuda("Not implemented"); }
+
+    virtual void commsStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                            bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
-    virtual void commsStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
-    { errorQuda("Not implemented"); }
-
-    virtual int commsQuery(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual int commsQuery(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); return 0; }
 
-    virtual void commsWait(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=NULL, bool gdr_send=false, bool gdr_recv=true)
+    virtual void commsWait(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = NULL, bool gdr_send = false,
+                           bool gdr_recv = true)
     { errorQuda("Not implemented"); }
 
     virtual void scatter(int nFace, int dagger, int dir)
@@ -674,7 +676,7 @@ namespace quda {
       all relevant memory fields to the current device or to the CPU.
       @param[in] mem_space Memory space we are prefetching to
     */
-    virtual void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const { ; }
+    virtual void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const { ; }
   };
   
   /**

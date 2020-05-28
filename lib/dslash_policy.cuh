@@ -115,7 +115,7 @@ namespace quda
      @param[in] gdr Whether we are using GPU Direct RDMA or not
   */
   template <typename Dslash>
-  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, cudaStream_t *stream, bool gdr)
+  inline void issueRecv(cudaColorSpinorField &input, const Dslash &dslash, qudaStream_t *stream, bool gdr)
   {
     for(int i=3; i>=0; i--){
       if (!dslash.dslashParam.commDim[i]) continue;
@@ -254,7 +254,7 @@ namespace quda
       bool gdr_recv, bool zero_copy_recv, bool async, int scatterIndex = -1)
   {
 
-    cudaStream_t *stream = nullptr;
+    qudaStream_t *stream = nullptr;
 
     PROFILE(int comms_test = dslash_comms ? in.commsQuery(dslash.Nface()/2, 2*dim+dir, dslash.Dagger(), stream, gdr_send, gdr_recv) : 1, profile, QUDA_PROFILE_COMMS_QUERY);
     if (comms_test) {
@@ -2193,7 +2193,7 @@ public:
 
    virtual ~DslashPolicyTune() { setPolicyTuning(false); }
 
-   void apply(const cudaStream_t &stream) {
+   void apply(const qudaStream_t &stream) {
      TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
      if (tp.aux.x >= static_cast<int>(policies.size())) errorQuda("Requested policy that is outside of range");

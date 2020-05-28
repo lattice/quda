@@ -21,7 +21,7 @@ namespace quda {
 
 #include <generic_reduce.cuh>
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
 
     void* getDeviceReduceBuffer() { return d_reduce; }
     void* getMappedHostReduceBuffer() { return hd_reduce; }
@@ -136,7 +136,7 @@ namespace quda {
        Generic reduction kernel launcher
     */
     template <typename doubleN, typename ReduceType, typename FloatN, int M, typename Arg>
-    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    doubleN reduceLaunch(Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
         errorQuda("Grid size %d greater than maximum %d\n", tp.grid.x, deviceProp.maxGridSize[0]);
@@ -243,7 +243,7 @@ namespace quda {
 
       inline TuneKey tuneKey() const { return TuneKey(x.VolString(), typeid(arg.r).name(), aux); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         result = reduceLaunch<doubleN, ReduceType, FloatN, M>(arg, tp, stream, *this);

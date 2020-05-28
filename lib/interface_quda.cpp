@@ -152,7 +152,7 @@ static int *num_failures_h = nullptr;
 static int *num_failures_d = nullptr;
 
 cudaDeviceProp deviceProp;
-cudaStream_t *streams;
+qudaStream_t *streams;
 
 static bool initialized = false;
 
@@ -643,7 +643,7 @@ void initQudaMemory()
 
   if (!comms_initialized) init_default_comms();
 
-  streams = new cudaStream_t[Nstream];
+  streams = new qudaStream_t[Nstream];
 
   int greatestPriority;
   int leastPriority;

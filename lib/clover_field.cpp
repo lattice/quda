@@ -373,12 +373,12 @@ namespace quda {
     checkCudaError();
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
     prefetch(mem_space, stream, CloverPrefetchType::BOTH_CLOVER_PREFETCH_TYPE);
   }
 
-  void cudaCloverField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream, CloverPrefetchType type,
+  void cudaCloverField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream, CloverPrefetchType type,
                                  QudaParity parity) const
   {
     if (is_prefetch_enabled()) {
