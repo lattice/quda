@@ -567,7 +567,7 @@ namespace quda {
           }
         }
 
-	if (use_heavy_quark_res && k%heavy_quark_check==0) {
+        if (use_heavy_quark_res && k%heavy_quark_check==0) {
 	  if (&x != &xSloppy) {
 	    blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);

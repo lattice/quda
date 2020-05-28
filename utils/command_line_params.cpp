@@ -227,59 +227,59 @@ namespace
   CLI::TransformPairs<QudaContractType> contract_type_map {{"open", QUDA_CONTRACT_TYPE_OPEN},
                                                            {"dr", QUDA_CONTRACT_TYPE_DR}};
 
-  CLI::TransformPairs<QudaDslashType> dslash_type_map{{"wilson", QUDA_WILSON_DSLASH},
-                                                      {"clover", QUDA_CLOVER_WILSON_DSLASH},
-                                                      {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
-                                                      {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
-                                                      {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
-                                                      {"staggered", QUDA_STAGGERED_DSLASH},
-                                                      {"asqtad", QUDA_ASQTAD_DSLASH},
-                                                      {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
-                                                      {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
-                                                      {"mobius", QUDA_MOBIUS_DWF_DSLASH},
-                                                      {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
-                                                      {"laplace", QUDA_LAPLACE_DSLASH}};
+  CLI::TransformPairs<QudaDslashType> dslash_type_map {{"wilson", QUDA_WILSON_DSLASH},
+                                                       {"clover", QUDA_CLOVER_WILSON_DSLASH},
+                                                       {"twisted-mass", QUDA_TWISTED_MASS_DSLASH},
+                                                       {"twisted-clover", QUDA_TWISTED_CLOVER_DSLASH},
+                                                       {"clover-hasenbusch-twist", QUDA_CLOVER_HASENBUSCH_TWIST_DSLASH},
+                                                       {"staggered", QUDA_STAGGERED_DSLASH},
+                                                       {"asqtad", QUDA_ASQTAD_DSLASH},
+                                                       {"domain-wall", QUDA_DOMAIN_WALL_DSLASH},
+                                                       {"domain-wall-4d", QUDA_DOMAIN_WALL_4D_DSLASH},
+                                                       {"mobius", QUDA_MOBIUS_DWF_DSLASH},
+                                                       {"mobius-eofa", QUDA_MOBIUS_DWF_EOFA_DSLASH},
+                                                       {"laplace", QUDA_LAPLACE_DSLASH}};
 
   CLI::TransformPairs<QudaTwistFlavorType> twist_flavor_type_map {{"singlet", QUDA_TWIST_SINGLET},
                                                                   {"deg-doublet", QUDA_TWIST_DEG_DOUBLET},
                                                                   {"nondeg-doublet", QUDA_TWIST_NONDEG_DOUBLET},
                                                                   {"no", QUDA_TWIST_NO}};
 
-  CLI::TransformPairs<QudaInverterType> inverter_type_map{{"invalid", QUDA_INVALID_INVERTER},
-                                                          {"cg", QUDA_CG_INVERTER},
-                                                          {"bicgstab", QUDA_BICGSTAB_INVERTER},
-                                                          {"gcr", QUDA_GCR_INVERTER},
-                                                          {"pcg", QUDA_PCG_INVERTER},
-                                                          {"mpcg", QUDA_MPCG_INVERTER},
-                                                          {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
-                                                          {"mr", QUDA_MR_INVERTER},
-                                                          {"sd", QUDA_SD_INVERTER},
-                                                          {"eigcg", QUDA_EIGCG_INVERTER},
-                                                          {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
-                                                          {"gmresdr", QUDA_GMRESDR_INVERTER},
-                                                          {"gmresdr-proj", QUDA_GMRESDR_PROJ_INVERTER},
-                                                          {"gmresdr-sh", QUDA_GMRESDR_SH_INVERTER},
-                                                          {"fgmresdr", QUDA_FGMRESDR_INVERTER},
-                                                          {"mg", QUDA_MG_INVERTER},
-                                                          {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
-                                                          {"cgne", QUDA_CGNE_INVERTER},
-                                                          {"cgnr", QUDA_CGNR_INVERTER},
-                                                          {"cg3", QUDA_CG3_INVERTER},
-                                                          {"cg3ne", QUDA_CG3NE_INVERTER},
-                                                          {"cg3nr", QUDA_CG3NR_INVERTER},
-                                                          {"ca-cg", QUDA_CA_CG_INVERTER},
-                                                          {"ca-cgne", QUDA_CA_CGNE_INVERTER},
-                                                          {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
-                                                          {"ca-gcr", QUDA_CA_GCR_INVERTER}};
+  CLI::TransformPairs<QudaInverterType> inverter_type_map {{"invalid", QUDA_INVALID_INVERTER},
+                                                           {"cg", QUDA_CG_INVERTER},
+                                                           {"bicgstab", QUDA_BICGSTAB_INVERTER},
+                                                           {"gcr", QUDA_GCR_INVERTER},
+                                                           {"pcg", QUDA_PCG_INVERTER},
+                                                           {"mpcg", QUDA_MPCG_INVERTER},
+                                                           {"mpbicgstab", QUDA_MPBICGSTAB_INVERTER},
+                                                           {"mr", QUDA_MR_INVERTER},
+                                                           {"sd", QUDA_SD_INVERTER},
+                                                           {"eigcg", QUDA_EIGCG_INVERTER},
+                                                           {"inc-eigcg", QUDA_INC_EIGCG_INVERTER},
+                                                           {"gmresdr", QUDA_GMRESDR_INVERTER},
+                                                           {"gmresdr-proj", QUDA_GMRESDR_PROJ_INVERTER},
+                                                           {"gmresdr-sh", QUDA_GMRESDR_SH_INVERTER},
+                                                           {"fgmresdr", QUDA_FGMRESDR_INVERTER},
+                                                           {"mg", QUDA_MG_INVERTER},
+                                                           {"bicgstab-l", QUDA_BICGSTABL_INVERTER},
+                                                           {"cgne", QUDA_CGNE_INVERTER},
+                                                           {"cgnr", QUDA_CGNR_INVERTER},
+                                                           {"cg3", QUDA_CG3_INVERTER},
+                                                           {"cg3ne", QUDA_CG3NE_INVERTER},
+                                                           {"cg3nr", QUDA_CG3NR_INVERTER},
+                                                           {"ca-cg", QUDA_CA_CG_INVERTER},
+                                                           {"ca-cgne", QUDA_CA_CGNE_INVERTER},
+                                                           {"ca-cgnr", QUDA_CA_CGNR_INVERTER},
+                                                           {"ca-gcr", QUDA_CA_GCR_INVERTER}};
 
   CLI::TransformPairs<QudaPrecision> precision_map {{"double", QUDA_DOUBLE_PRECISION},
                                                     {"single", QUDA_SINGLE_PRECISION},
                                                     {"half", QUDA_HALF_PRECISION},
                                                     {"quarter", QUDA_QUARTER_PRECISION}};
 
-  CLI::TransformPairs<QudaSchwarzType> schwarz_type_map{{"invalid", QUDA_INVALID_SCHWARZ},
-                                                        {"additive", QUDA_ADDITIVE_SCHWARZ},
-                                                        {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
+  CLI::TransformPairs<QudaSchwarzType> schwarz_type_map {{"invalid", QUDA_INVALID_SCHWARZ},
+                                                         {"additive", QUDA_ADDITIVE_SCHWARZ},
+                                                         {"multiplicative", QUDA_MULTIPLICATIVE_SCHWARZ}};
 
   CLI::TransformPairs<QudaSolutionType> solution_type_map {{"mat", QUDA_MAT_SOLUTION},
                                                            {"mat-dag-mat", QUDA_MATDAG_MAT_SOLUTION},
@@ -825,7 +825,7 @@ void add_eofa_option_group(std::shared_ptr<QUDAApp> quda_app)
 {
   auto opgroup = quda_app->add_option_group("EOFA", "Options controlling EOFA parameteres");
 
-  CLI::TransformPairs<int> eofa_pm_map{{"plus", 1}, {"minus", 0}};
+  CLI::TransformPairs<int> eofa_pm_map {{"plus", 1}, {"minus", 0}};
   opgroup->add_option("--eofa-pm", eofa_pm, "Set to evalute \"plus\" or \"minus\" EOFA operator (default plus)")
     ->transform(CLI::QUDACheckedTransformer(eofa_pm_map));
   opgroup->add_option("--eofa-shift", eofa_shift, "Set the shift for the EOFA operator (default -0.12345)");

@@ -1649,8 +1649,8 @@ public:
   {
 
   public:
-    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) {}
-    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) {}
+    DiracMdagMLocal(const Dirac &d) : DiracMatrix(d) { }
+    DiracMdagMLocal(const Dirac *d) : DiracMatrix(d) { }
 
     void operator()(ColorSpinorField &out, const ColorSpinorField &in) const { dirac->MdagMLocal(out, in); }
 
