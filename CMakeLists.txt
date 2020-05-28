@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-# Basic setup for cmake
-cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
-=======
 # basic setup for cmake
 cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
->>>>>>> feature/quda-targets
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -63,14 +58,14 @@ endif()
 
 # Target type
 set(VALID_TARGET_TYPES CUDA HIP)
-set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of backend, options are: ${VALID_TARGET_TYPES}")
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
 set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
 
 string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
 list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
 
 if(TARGET_TYPE_VALID LESS 0)
-  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid backend types are:" "${VALID_TARGET_TYPES}")
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
 #

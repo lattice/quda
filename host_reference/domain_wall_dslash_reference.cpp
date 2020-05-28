@@ -808,18 +808,30 @@ void mdw_mat(void *out, void **gauge, void *in, double _Complex *kappa_b, double
   void *outEven = out;
   void *outOdd = (char *)out + V5h * spinor_site_size * precision;
 
-  mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
-  dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
-  mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
+  if (!dagger) {
+    mdw_dslash_4_pre(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(outOdd, gauge, tmp, 1, dagger, precision, gauge_param, mferm);
+    mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
+  } else {
+    dslash_4_4d(tmp, gauge, inEven, 1, dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(outOdd, gauge, tmp, 0, dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_dslash_5(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, kappa5, true);
+  }
 
   for(int xs = 0 ; xs < Ls ; xs++) {
     cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b[xs],
           (char *)outOdd + precision * Vh * spinor_site_size * xs, Vh * spinor_site_size, precision);
   }
 
-  mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
-  dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
-  mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
+  if (!dagger) {
+    mdw_dslash_4_pre(tmp, gauge, inOdd, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
+    dslash_4_4d(outEven, gauge, tmp, 0, dagger, precision, gauge_param, mferm);
+    mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
+  } else {
+    dslash_4_4d(tmp, gauge, inOdd, 0, dagger, precision, gauge_param, mferm);
+    mdw_dslash_4_pre(outEven, gauge, tmp, 1, dagger, precision, gauge_param, mferm, b5, c5, true);
+    mdw_dslash_5(tmp, gauge, inEven, 0, dagger, precision, gauge_param, mferm, kappa5, true);
+  }
 
   for(int xs = 0 ; xs < Ls ; xs++) {
     cxpay((char *)tmp + precision * Vh * spinor_site_size * xs, -kappa_b[xs],
