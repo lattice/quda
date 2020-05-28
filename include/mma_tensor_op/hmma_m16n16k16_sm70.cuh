@@ -28,6 +28,7 @@ namespace quda
 
     struct WarpRegisterMapping {
 
+      int warp_id;
       int quad_id;
       int quad_row;
       int quad_col;
@@ -36,6 +37,7 @@ namespace quda
 
       __device__ inline WarpRegisterMapping(int thread_id)
       {
+        warp_id = thread_id >> 5;
         const int lane_id = thread_id & 31;
         const int octl_id = lane_id >> 2;
         quad_id = octl_id & 3;
@@ -235,8 +237,6 @@ namespace quda
 
 #pragma unroll
       for (int i = 0; i < 4; i++) {
-        const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
-        const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
         if (fixed) {
           auto scale = cc.scale;
           s[0] = static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
@@ -250,6 +250,107 @@ namespace quda
           s[3] = op_c_imag.reg[i * 2 + 1];
         }
         ptr_[((row + (i % 2) * 2) * ldc + (col + (i / 2) * 4)) / 2] = s;
+      }
+    }
+
+    template <int ldc, class TC, class GmemOperandC>
+    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, unsigned>::value, void>::type
+    store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
+                         const TC &op_c_real, const TC &op_c_imag)
+    {
+      using store_type = typename GmemOperandC::store_type;
+
+      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + wrm.quad_thread;
+      const int col = warp_col + wrm.quad_col * 8;
+
+      constexpr bool fixed = GmemOperandC::fixed;
+      using structure = Structure<store_type, 16>;
+      trove::coalesced_ptr<structure> ptr_(reinterpret_cast<structure *>(cc.data()));
+      structure s;
+
+#pragma unroll
+      for (int i = 0; i < 4; i++) {
+        const half2 r2 = *(reinterpret_cast<const half2 *>(&(op_c_real.reg[i])));
+        const half2 i2 = *(reinterpret_cast<const half2 *>(&(op_c_imag.reg[i])));
+        if (fixed) {
+          auto scale = cc.scale;
+          // TODO: Add the atomic code here.
+#if 0
+          s[i * 4 + 0] = __half2short_rn(__half2float(r2.x) * scale);
+          s[i * 4 + 1] = __half2short_rn(__half2float(i2.x) * scale);
+          s[i * 4 + 2] = __half2short_rn(__half2float(r2.y) * scale);
+          s[i * 4 + 3] = __half2short_rn(__half2float(i2.y) * scale);
+#endif
+        } else {
+#if 0
+          s[i * 4 + 0] = __half2float(r2.x);
+          s[i * 4 + 1] = __half2float(i2.x);
+          s[i * 4 + 2] = __half2float(r2.y);
+          s[i * 4 + 3] = __half2float(i2.y);
+#endif
+        }
+      }
+
+      ptr_[(row * ldc + col) / 8] = s;
+    }
+
+    template <int ldc, bool dagger, class TC, class GmemOperandC>
+    inline __device__ typename std::enable_if<std::is_same<typename TC::reg_type, float>::value, void>::type
+    store_complex_atomic(int warp_row, int warp_col, const WarpRegisterMapping &wrm, GmemOperandC &cc,
+                         const TC &op_c_real, const TC &op_c_imag)
+    {
+      using store_type = typename GmemOperandC::store_type;
+
+      const int row = warp_row + wrm.quad_row * 8 + wrm.quad_hilo * 4 + (wrm.quad_thread % 2);
+      const int col = warp_col + wrm.quad_col * 8 + (wrm.quad_thread / 2) * 2;
+
+      constexpr bool fixed = GmemOperandC::fixed;
+
+      using vector_type = typename VectorType<store_type, 2>::type;
+      auto ptr = reinterpret_cast<vector_type *>(cc.data());
+
+#pragma unroll
+      for (int i = 0; i < 4; i++) {
+        if (fixed) {
+          auto scale = cc.scale;
+
+          int m_index = row + (i % 2) * 2;
+          int n_index = col + (i / 2) * 4;
+
+          vector_type value;
+          if (dagger) {
+            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+            value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+            atomicAdd(&ptr[(n_index + 0) * ldc + m_index], value);
+
+            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+            value.y = -static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+            atomicAdd(&ptr[(n_index + 1) * ldc + m_index], value);
+          } else {
+            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+            value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+            atomicAdd(&ptr[m_index * ldc + (n_index + 0)], value);
+
+            value.x = +static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+            value.y = +static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+            atomicAdd(&ptr[m_index * ldc + (n_index + 1)], value);
+          }
+#if 0
+          s[0] = static_cast<store_type>(op_c_real.reg[i * 2 + 0] * scale);
+          s[1] = static_cast<store_type>(op_c_imag.reg[i * 2 + 0] * scale);
+          s[2] = static_cast<store_type>(op_c_real.reg[i * 2 + 1] * scale);
+          s[3] = static_cast<store_type>(op_c_imag.reg[i * 2 + 1] * scale);
+#endif
+        } else {
+          // TODO: Need to be added.
+
+#if 0
+          s[0] = op_c_real.reg[i * 2 + 0];
+          s[1] = op_c_imag.reg[i * 2 + 0];
+          s[2] = op_c_real.reg[i * 2 + 1];
+          s[3] = op_c_imag.reg[i * 2 + 1];
+#endif
+        }
       }
     }
 

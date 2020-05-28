@@ -30,6 +30,8 @@ namespace quda
       }
     };
 
+    enum class EpilogueType { COMPUTE_MAX_ONLY, VECTOR_STORE, ATOMIC_STORE_DAGGER_NO, ATOMIC_STORE_DAGGER_YES };
+
     template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_> struct MmaConfig {
 
       static constexpr int M = M_;
@@ -185,7 +187,56 @@ namespace quda
 #endif
     };
 
-    template <class Config, int block_y, int block_z, bool a_dag, bool b_dag, bool compute_max_only, class A, class B, class C>
+    template <class OperandC, int warp_cycle, int tile_col_dim> struct MmaOp {
+
+      static constexpr int size = warp_cycle;
+
+      OperandC op_c_real[warp_cycle];
+      OperandC op_c_imag[warp_cycle];
+
+      WarpRegisterMapping wrm;
+
+      __device__ inline MmaOp(int thread_id) : wrm(thread_id) { }
+
+      __device__ inline void ax(float alpha)
+      {
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          op_c_real[c].ax(alpha);
+          op_c_imag[c].ax(alpha);
+        }
+      }
+
+      template <int ldc, class C> __device__ inline void store(const C &cc, int m_offset, int n_offset)
+      {
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+
+          const int logical_warp_index = wrm.warp_id * warp_cycle + c;
+          const int warp_row = logical_warp_index / tile_col_dim;
+          const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+          const int warp_m_offset = warp_row * WMMA_M + m_offset;
+          const int warp_n_offset = warp_col * WMMA_N + n_offset;
+
+          store_complex<ldc>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
+        }
+      }
+
+      __device__ inline void abs_max(float &max)
+      {
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+          op_c_real[c].abs_max(max);
+          op_c_imag[c].abs_max(max);
+        }
+      }
+    };
+
+    template <class Config, int block_y, int block_z, bool a_dag, bool b_dag, EpilogueType epilogue_type, class A,
+              class B, class C>
     __device__ inline float perform_mma(const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
     {
       constexpr int bM = Config::bM;
@@ -237,8 +288,10 @@ namespace quda
 
       float max = 0.0f; // XXX: Accessor::Float
 
-      MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
-      MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
+      // MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
+      // MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
+
+      MmaOp<MmaOperandC<smem_ldb / 2, accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op(thread_id);
 
       GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
                                                                                            smem_obj_a_imag);
@@ -296,12 +349,12 @@ namespace quda
             MmaOperandB<smem_ldb / 2> op_b_imag;
             op_b_imag.load(smem_b_imag, k_idx, warp_col, wrm);
 
-            gemm(op_a_real, op_b_real, op_c_real[c]);
-            gemm(op_a_imag, op_b_real, op_c_imag[c]);
-            gemm(op_a_real, op_b_imag, op_c_imag[c]);
+            gemm(op_a_real, op_b_real, mma_op.op_c_real[c]);
+            gemm(op_a_imag, op_b_real, mma_op.op_c_imag[c]);
+            gemm(op_a_real, op_b_imag, mma_op.op_c_imag[c]);
             // revert op_imag
             op_a_imag.negate();
-            gemm(op_a_imag, op_b_imag, op_c_real[c]);
+            gemm(op_a_imag, op_b_imag, mma_op.op_c_real[c]);
           }
         }
 
@@ -318,10 +371,16 @@ namespace quda
       }
 
       // wrap up!
+      if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
+        mma_op.abs_max(max);
+      } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
+        mma_op.store<Config::ldc>(cc, m_offset, n_offset);
+      }
+#if 0
 #pragma unroll
       for (int c = 0; c < warp_cycle; c++) {
 
-        if (compute_max_only) {
+        if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
 
           op_c_real[c].abs_max(max);
           op_c_imag[c].abs_max(max);
@@ -332,13 +391,29 @@ namespace quda
           const int warp_row = logical_warp_index / tile_col_dim;
           const int warp_col = logical_warp_index - warp_row * tile_col_dim;
 
-          store_complex<Config::ldc>(warp_row * WMMA_M + m_offset, warp_col * WMMA_N + n_offset, wrm, cc, op_c_real[c],
-                                     op_c_imag[c]);
+          const int warp_m_offset = warp_row * WMMA_M + m_offset;
+          const int warp_n_offset = warp_col * WMMA_N + n_offset;
+
+          if (epilogue_type == EpilogueType::VECTOR_STORE) {
+
+            store_complex<Config::ldc>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
+
+          } else if (epilogue_type == EpilogueType::ATOMIC_STORE_DAGGER_NO) {
+
+            // dagger == false
+            store_complex_atomic<Config::ldc, false>(warp_m_offset, warp_n_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
+
+          } else if (epilogue_type == EpilogueType::ATOMIC_STORE_DAGGER_YES) {
+
+            // dagger == true
+            store_complex_atomic<Config::ldc, true>(warp_m_offset, warp_m_offset, wrm, cc, op_c_real[c], op_c_imag[c]);
+          }
         }
       }
-
+#endif
       return max;
     }
 
   } // namespace mma
+
 } // namespace quda
