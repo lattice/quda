@@ -499,7 +499,7 @@ namespace quda
 
       long long flops() const
       {
-        constexpr long long hop = 7ll * 8ll; // 8 for eight directions, 7 comes from Peter/Grid's count
+        constexpr long long hop = 7ll * 8ll;
         constexpr long long mat = 2ll * 4ll * Arg::Ls - 1ll;
         long long volume_4d_cb_halo_shift = (arg.dim[0] - 2 * arg.halo_shift[0]) * (arg.dim[1] - 2 * arg.halo_shift[1])
           * (arg.dim[2] - 2 * arg.halo_shift[2]) * (arg.dim[3] - 2 * arg.halo_shift[3]) / 2;
