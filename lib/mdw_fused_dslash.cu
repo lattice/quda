@@ -628,7 +628,7 @@ namespace quda
         }
       }
 
-      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         setMaxDynamicSharedBytesPerBlock(f);
         void *args[] = {&arg};
@@ -639,7 +639,7 @@ namespace quda
       // Specifically tp.aux.y dictates the minBlocksPerMultiprocessor in __launch_bounds__(..).
       // tp.aux.x dictates whether or not to reload.
       template <int block_dim_x, bool reload, int type>
-      void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      void apply(const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         switch (tp.aux.y) {
         case 1: launch(fused_tensor_core<block_dim_x, 1, reload, Arg, type>, tp, arg, stream); break;
@@ -649,7 +649,7 @@ namespace quda
         }
       }
 
-      template <bool reload, int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      template <bool reload, int type> void apply(const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         switch (tp.block.x) {
         case 16: apply<16, reload, type>(tp, arg, stream); break;
@@ -658,7 +658,7 @@ namespace quda
         }
       }
 
-      template <int type> void apply(const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      template <int type> void apply(const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         if (tp.aux.x == 0) {
           apply<false, type>(tp, arg, stream); // reload = false
@@ -667,7 +667,7 @@ namespace quda
         }
       }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {

@@ -92,7 +92,7 @@ namespace quda
       }
       virtual ~Dslash5() {}
 
-      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const cudaStream_t &stream)
+      template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
         if (shared && (arg.type == M5_EOFA || arg.type == M5INV_EOFA)) {
           // if inverse kernel uses shared memory then maximize total shared memory
@@ -102,7 +102,7 @@ namespace quda
         qudaLaunchKernel((const void *)f, tp.grid, tp.block, args, tp.shared_bytes, stream);
       }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         if (arg.type == M5_EOFA) {
