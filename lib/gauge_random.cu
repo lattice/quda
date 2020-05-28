@@ -122,7 +122,7 @@ namespace quda {
       arg(arg),
       meta(meta) {}
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeGenGauss<<<tp.grid, tp.block, tp.shared_bytes>>>(arg);

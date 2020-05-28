@@ -26,6 +26,13 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
+
+if(DEFINED ENV{QUDA_TARGET})
+  set(DEFTARGET $ENV{QUDA_TARGET})
+else()
+  set(DEFTARGET "CUDA")
+endif()
+
 set(VALID_BUILD_TYPES
     DEVEL
     RELEASE
@@ -47,6 +54,18 @@ list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
 
 if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
+
+# Target type
+set(VALID_TARGET_TYPES CUDA HIP)
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+
+string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
+list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
+
+if(TARGET_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
 #
