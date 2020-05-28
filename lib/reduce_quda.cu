@@ -356,7 +356,8 @@ namespace quda {
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
         if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
-          warningQuda("Device reductions on non-native fields is not supported\n");
+          warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           doubleN value;
           ::quda::zero(value);
           return value;
@@ -551,7 +552,8 @@ namespace quda {
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
         if (!x.isNative() && !(x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT2_FIELD_ORDER && x.Precision() == QUDA_SINGLE_PRECISION)) {
-          warningQuda("Device reductions on non-native fields is not supported\n");
+          warningQuda("Device reductions on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           doubleN value;
           ::quda::zero(value);
           return value;

@@ -151,6 +151,7 @@ namespace quda {
     }
 
       // used to create cpu params
+
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
         QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
         LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
@@ -187,7 +188,7 @@ namespace quda {
       suggested_parity = impliedParityFromMatPC(inv_param.matpc_type);
 
       if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
       } else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {

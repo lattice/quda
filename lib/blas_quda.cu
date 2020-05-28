@@ -183,7 +183,8 @@ namespace quda {
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
         if (!x.isNative() && x.FieldOrder() != QUDA_FLOAT2_FIELD_ORDER && x.FieldOrder() != QUDA_FLOAT8_FIELD_ORDER) {
-          warningQuda("Device blas on non-native fields is not supported\n");
+          warningQuda("Device blas on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           return;
         }
 
@@ -346,8 +347,11 @@ namespace quda {
 
       if (checkLocation(x, y, z, w, v) == QUDA_CUDA_FIELD_LOCATION) {
 
-        if (!x.isNative()) {
-          warningQuda("Device blas on non-native fields is not supported\n");
+        if (!x.isNative()
+            && !(x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER
+                 && x.Precision() == QUDA_QUARTER_PRECISION && y.Precision() == QUDA_HALF_PRECISION)) {
+          warningQuda("Device blas on non-native fields is not supported (prec = %d, order = %d)", x.Precision(),
+                      x.FieldOrder());
           return;
         }
 
@@ -464,7 +468,7 @@ namespace quda {
           } else if (y.Precision() == QUDA_SINGLE_PRECISION) {
 
 #if QUDA_PRECISION & 4
-            if (x.Nspin() == 4) {
+            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
 #if defined(NSPIN4)
               const int M = 6;
               nativeBlas<float4, char4, float4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
@@ -488,11 +492,20 @@ namespace quda {
           } else if (y.Precision() == QUDA_HALF_PRECISION) {
 
 #if QUDA_PRECISION & 2
-            if (x.Nspin() == 4) {
+            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT4_FIELD_ORDER) {
 #if defined(NSPIN4)
               const int M = 6;
               nativeBlas<float4, char4, short4, M, Functor, writeX, writeY, writeZ, writeW, writeV>(
                   a, b, c, x, y, z, w, v, x.Volume());
+#else
+              errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
+#endif
+            }
+            if (x.Nspin() == 4 && x.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER && y.FieldOrder() == QUDA_FLOAT8_FIELD_ORDER) {
+#if defined(NSPIN4)
+              const int M = 3;
+              nativeBlas<float8, char8, short8, M, Functor, writeX, writeY, writeZ, writeW, writeV>(a, b, c, x, y, z, w,
+                                                                                                    v, x.Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x.Nspin(), x.FieldOrder());
 #endif
