@@ -56,10 +56,7 @@ namespace quda
         return 2 * nSpin * nColor * sizeof(typename mapper<storage_type>::type);
       }
 
-      unsigned int sharedBytesPerBlock(const TuneParam &param) const
-      {
-        return 0; 
-      }
+      unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
 
       // overloaded to return max dynamic shared memory if doing shared-memory
       // inverse
@@ -90,7 +87,7 @@ namespace quda
         default: errorQuda("Unknown Dslash5Type %d", arg.type);
         }
       }
-      virtual ~Dslash5() {}
+      virtual ~Dslash5() { }
 
       template <typename T> inline void launch(T *f, const TuneParam &tp, Arg &arg, const qudaStream_t &stream)
       {
@@ -157,10 +154,7 @@ namespace quda
         param.shared_bytes = sharedBytesPerThread() * param.block.x * param.block.y * param.block.z;
       }
 
-      void defaultTuneParam(TuneParam &param) const
-      {
-        initTuneParam(param);
-      }
+      void defaultTuneParam(TuneParam &param) const { initTuneParam(param); }
 
       TuneKey tuneKey() const { return TuneKey(meta.VolString(), typeid(*this).name(), aux); }
     };

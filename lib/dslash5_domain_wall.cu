@@ -39,9 +39,7 @@ protected:
       case M5_INV_MOBIUS: // FIXME flops
         flops_ = ((2 + 8 * n) * Ls + (arg.xpay ? 4ll : 0)) * meta.Volume();
         break;
-      case M5_INV_ZMOBIUS:
-        flops_ = ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume();
-        break;
+      case M5_INV_ZMOBIUS: flops_ = ((12 + 16 * n) * Ls + (arg.xpay ? 8ll : 0)) * meta.Volume(); break;
       default: errorQuda("Unknown Dslash5Type %d", arg.type);
       }
 

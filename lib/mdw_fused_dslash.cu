@@ -112,12 +112,12 @@ namespace quda
         m_f(m_f_),
         m_5(m_5_),
         dagger(dagger_),
-        shift{shift_[0], shift_[1], shift_[2], shift_[3]},
-        halo_shift{halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]},
-        dim{(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
-            in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
-            in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
-        shrinked_dim{dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
+        shift {shift_[0], shift_[1], shift_[2], shift_[3]},
+        halo_shift {halo_shift_[0], halo_shift_[1], halo_shift_[2], halo_shift_[3]},
+        dim {(3 - nParity) * (in.VolumeCB() > out.VolumeCB() ? in.X(0) : out.X(0)),
+             in.VolumeCB() > out.VolumeCB() ? in.X(1) : out.X(1), in.VolumeCB() > out.VolumeCB() ? in.X(2) : out.X(2),
+             in.VolumeCB() > out.VolumeCB() ? in.X(3) : out.X(3)},
+        shrinked_dim {dim[0] - 2 * shift[0], dim[1] - 2 * shift[1], dim[2] - 2 * shift[2], dim[3] - 2 * shift[3]},
         volume_4d_cb_shift(shrinked_dim[0] * shrinked_dim[1] * shrinked_dim[2] * shrinked_dim[3] / 2),
         type(type_)
       {
@@ -125,9 +125,7 @@ namespace quda
 
         if (nParity == 2) { errorQuda("nParity = 2 NOT supported, yet.\n"); }
 
-        if (b_5[0] != b_5[1] || b_5[0].imag() != 0) {
-          errorQuda("zMobius is NOT supported yet.\n");
-        }
+        if (b_5[0] != b_5[1] || b_5[0].imag() != 0) { errorQuda("zMobius is NOT supported yet.\n"); }
 
         b = b_5[0].real();
         c = c_5[0].real();
@@ -257,8 +255,8 @@ namespace quda
       then shift the coordinate to the un-shrinked coordinate, e.g. (0,0,4,1) -> (2,2,6,3) with shift = (2,2,2,2)
     */
     template <class T>
-    __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index, const T shrinked_dim[4],
-                                                          const int shift[4], int parity)
+    __device__ inline void coordinate_from_shrinked_index(int coordinate[4], int shrinked_index,
+                                                          const T shrinked_dim[4], const int shift[4], int parity)
     {
       int aux[4];
       aux[0] = shrinked_index * 2;
@@ -535,11 +533,11 @@ namespace quda
         auto b_m1 = ((dim[0] - 1) * (dim[1] - 1) * (dim[2] - 1) * (dim[3] - 1) / 2) * site_size;
         auto b_m2 = ((dim[0] - 2) * (dim[1] - 2) * (dim[2] - 2) * (dim[3] - 2) / 2) * site_size;
         switch (arg.type) {
-        case MdwfFusedDslashType::D4_D5INV_D5PRE:           return b_m1 + b_m2 + arg.U.Bytes();
-        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:        return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
-        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:  return b_m1 + b_m0 + arg.U.Bytes();
-        case MdwfFusedDslashType::D4DAG_D5PREDAG:           return 2 * b_m2 + b_m1 + arg.U.Bytes();
-        case MdwfFusedDslashType::D5PRE:                    return 2 * b_m0;
+        case MdwfFusedDslashType::D4_D5INV_D5PRE: return b_m1 + b_m2 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG: return 2 * b_m2 + b_m1 + b_m0 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG: return b_m1 + b_m0 + arg.U.Bytes();
+        case MdwfFusedDslashType::D4DAG_D5PREDAG: return 2 * b_m2 + b_m1 + arg.U.Bytes();
+        case MdwfFusedDslashType::D5PRE: return 2 * b_m0;
         default: errorQuda("Unknown MdwfFusedDslashType");
         }
         return 0ll;
@@ -671,11 +669,11 @@ namespace quda
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         switch (arg.type) {
-        case MdwfFusedDslashType::D4_D5INV_D5PRE:           apply<0>(tp, arg, stream); break;
-        case MdwfFusedDslashType::D4_D5INV_D5INVDAG:        apply<1>(tp, arg, stream); break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG:  apply<2>(tp, arg, stream); break;
-        case MdwfFusedDslashType::D4DAG_D5PREDAG:           apply<3>(tp, arg, stream); break;
-        case MdwfFusedDslashType::D5PRE:                    apply<4>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4_D5INV_D5PRE: apply<0>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4_D5INV_D5INVDAG: apply<1>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG_D5INVDAG: apply<2>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D4DAG_D5PREDAG: apply<3>(tp, arg, stream); break;
+        case MdwfFusedDslashType::D5PRE: apply<4>(tp, arg, stream); break;
         default: errorQuda("Unknown MdwfFusedDslashType");
         }
       }
@@ -749,7 +747,8 @@ namespace quda
     {
 #if defined(GPU_DOMAIN_WALL_DIRAC) && (__CUDACC_VER_MAJOR__ >= 9 && __COMPUTE_CAPABILITY__ >= 700)
 #ifdef FLOAT8
-      if (checkOrder(out, in, y, x) != QUDA_FLOAT8_FIELD_ORDER) errorQuda("FLOAT8 enabled but fields are not FLOAT8 ordered");
+      if (checkOrder(out, in, y, x) != QUDA_FLOAT8_FIELD_ORDER)
+        errorQuda("FLOAT8 enabled but fields are not FLOAT8 ordered");
 #endif
       checkLocation(out, in); // check all locations match
       instantiatePreconditioner<FusedApply>(out, in, U, y, x, m_f, m_5, b_5, c_5, dagger, parity, shift, halo_shift,

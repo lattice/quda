@@ -567,17 +567,17 @@ namespace quda {
           }
         }
 
-        if (use_heavy_quark_res && k%heavy_quark_check==0) {
-	  if (&x != &xSloppy) {
+        if (use_heavy_quark_res && k % heavy_quark_check == 0) {
+          if (&x != &xSloppy) {
 	    blas::copy(tmp,y);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(xSloppy, tmp, rSloppy).z);
 	  } else {
 	    blas::copy(r, rSloppy);
 	    heavy_quark_res = sqrt(blas::xpyHeavyQuarkResidualNorm(x, y, r).z);
 	  }
-	}
+        }
 
-	// alternative reliable updates
+        // alternative reliable updates
 	if (alternative_reliable) {
 	  d = d_new;
 	  pnorm = pnorm + alpha[j] * alpha[j]* (ppnorm);

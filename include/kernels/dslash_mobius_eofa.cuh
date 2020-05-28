@@ -52,7 +52,7 @@ namespace quda
       const bool dagger; // dagger
       const bool xpay;   // whether we are doing xpay or not
 
-      real a;      // real xpay coefficient
+      real a; // real xpay coefficient
 
       real kappa;
       real inv;
@@ -94,9 +94,7 @@ namespace quda
 
         switch (type) {
         case M5_EOFA:
-          for (int s = 0; s < Ls; s++) {
-            eofa_coeffs->u[s] = eofa_u[s];
-          }
+          for (int s = 0; s < Ls; s++) { eofa_coeffs->u[s] = eofa_u[s]; }
           cudaMemcpyToSymbolAsync(mobius_eofa_d, mobius_eofa_h, sizeof(eofa_coeff<real>) / 3, 0, cudaMemcpyHostToDevice,
                                   streams[Nstream - 1]);
           break;
@@ -259,5 +257,5 @@ namespace quda
       }
     }
 
-  } // namespace eofa
+  } // namespace mobius_eofa
 } // namespace quda
