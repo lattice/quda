@@ -58,7 +58,7 @@ namespace quda
 
     solverParamPrec = new SolverParam(*solverParam);
     solverParamPrec->maxiter = 5;
-    solverParamPrec->tol = 1e-2;
+    solverParamPrec->tol = 1e-1;
 
     //mmPP = new DiracPrecProjCorr(matPrecon.Expose());
     mmPP = new DiracPrecProjCorr(mat.Expose());
