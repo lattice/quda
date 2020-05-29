@@ -89,7 +89,7 @@ class CalcFunc : TunableLocalParity {
   CalcFunc(KernelArg<Gauge> &arg) : arg(arg) {}
   ~CalcFunc () { }
 
-  void apply(const cudaStream_t &stream){
+  void apply(const qudaStream_t &stream){
     tp = tuneLaunch(*this, getTuning(), getVerbosity());
     arg.result_h[0] = make_double2(0.0, 0.0);
     LAUNCH_KERNEL_LOCAL_PARITY(compute_Value, (*this), tp, stream, arg, Float, Gauge, NCOLORS, functiontype);

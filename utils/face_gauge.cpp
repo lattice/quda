@@ -11,8 +11,8 @@
 
 using namespace quda;
 
-extern cudaStream_t *stream;
-  
+extern qudaStream_t *stream;
+
 /**************************************************************
  * Staple exchange routine
  * used in fat link computation

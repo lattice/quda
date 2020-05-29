@@ -1,5 +1,6 @@
 # all files for quda -- needs some cleanup
 # cmake-format: off
+
 # QUDA_HASH for tunecache
 if(NOT GITVERSION)
   set(GITVERSION ${PROJECT_VERSION})
@@ -22,7 +23,6 @@ if(DEBUG_BUILD)
 endif()
 
 
-
 set (QUDA_OBJS
   # cmake-format: sortable
   dirac_coarse.cpp dslash_coarse.cu dslash_coarse_dagger.cu
@@ -32,7 +32,7 @@ set (QUDA_OBJS
   eigensolve_quda.cpp quda_arpack_interface.cpp
   multigrid.cpp transfer.cpp block_orthogonalize.cu inv_bicgstab_quda.cpp
   prolongator.cu restrictor.cu staggered_prolong_restrict.cu
-  gauge_phase.cu timer.cpp malloc.cpp
+  gauge_phase.cu timer.cpp
   solver.cpp inv_bicgstab_quda.cpp inv_cg_quda.cpp inv_bicgstabl_quda.cpp
   inv_multi_cg_quda.cpp inv_eigcg_quda.cpp gauge_ape.cu
   gauge_stout.cu gauge_wilson_flow.cu gauge_plaq.cu
@@ -50,7 +50,7 @@ set (QUDA_OBJS
   dirac_clover_hasenbusch_twist.cpp
   dirac_improved_staggered.cpp dirac_domain_wall.cpp
   dirac_domain_wall_4d.cpp dirac_mobius.cpp dirac_twisted_clover.cpp
-  dirac_twisted_mass.cpp tune.cpp
+  dirac_twisted_mass.cpp 
   llfat_quda.cu gauge_force.cu gauge_random.cu
   gauge_field_strength_tensor.cu clover_quda.cu dslash_quda.cu
   dslash_staggered.cu dslash_improved_staggered.cu
@@ -62,6 +62,7 @@ set (QUDA_OBJS
   dslash_wilson_clover_hasenbusch_twist.cu
   dslash_wilson_clover_hasenbusch_twist_preconditioned.cu
   dslash_domain_wall_4d.cu  dslash_domain_wall_5d.cu
+  mdw_fused_dslash.cu dslash5_mobius_eofa.cu
   dslash_pack2.cu
   blas_quda.cu multi_blas_quda.cu reduce_quda.cu
   multi_reduce_quda.cu contract.cu
@@ -139,11 +140,14 @@ target_sources(quda_cpp PRIVATE $<IF:$<BOOL:${QUDA_MPI}>,comm_mpi.cpp,$<IF:$<BOO
 
 target_sources(quda_cpp PRIVATE $<$<BOOL:${QUDA_QIO}>:qio_field.cpp layout_hyper.cpp>)
 
+
+
 # add some deifnitions that cause issues with cmake 3.7 and nvcc only to cpp files
 target_compile_definitions(quda_cpp PUBLIC -DQUDA_HASH="${HASH}")
 if(GITVERSION)
   target_compile_definitions(quda_cpp PUBLIC -DGITVERSION="${GITVERSION}")
 endif()
+
 
 # make one library
 if(QUDA_BUILD_SHAREDLIB)
@@ -196,6 +200,16 @@ target_include_directories(quda PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/inc
 target_compile_definitions(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_DEFINITIONS>)
 target_include_directories(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,INCLUDE_DIRECTORIES>)
 target_compile_options(quda_cpp PRIVATE $<TARGET_PROPERTY:quda,COMPILE_OPTIONS>)
+
+# add target specific files
+if(${QUDA_TARGET_TYPE} STREQUAL "CUDA")
+  add_subdirectory(targets/cuda)
+endif()
+if(${QUDA_TARGET_TYPE} STREQUAL "HIP")
+  #set(QUDA_TARGET_DIR "hip")
+endif()
+
+target_sources(quda PRIVATE $<TARGET_OBJECTS:quda_target>)
 
 # propagate CXX flags to CUDA host compiler
 if(${QUDA_PROPAGATE_CXX_FLAGS})
@@ -280,7 +294,7 @@ endif(QUDA_DIRAC_NDEG_TWISTED_MASS)
 if(QUDA_MULTIGRID)
   target_link_libraries(quda PUBLIC ${CUDA_cublas_LIBRARY})
   target_compile_definitions(quda PRIVATE CUBLAS_LIB)
-  target_compile_definitions(quda GPU_MULTIGRID)
+  target_compile_definitions(quda PRIVATE GPU_MULTIGRID)
 endif(QUDA_MULTIGRID)
 
 if(QUDA_GAUGE_ALG)
@@ -358,6 +372,8 @@ if(QUDA_QMP)
   if(QUDA_DOWNLOAD_USQCD AND NOT QMP_FOUND)
     add_dependencies(quda QMP)
     add_dependencies(quda_cpp QMP)
+    #TODO: need to figure out how to propagate that cleanly
+    add_dependencies(quda_cuda_target QMP)
   endif()
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QMPHOME}/include>)
   target_compile_definitions(quda PUBLIC QMP_COMMS)
@@ -369,6 +385,8 @@ if(QUDA_QIO)
   if(QUDA_DOWNLOAD_USQCD AND NOT QIO_FOUND)
     add_dependencies(quda QIO)
     add_dependencies(quda_cpp QIO)
+    #TODO: need to figure out how to propagate that cleanly
+    add_dependencies(quda_cuda_target QMP)
   endif()
   target_compile_definitions(quda PUBLIC HAVE_QIO)
   target_include_directories(quda SYSTEM PUBLIC $<BUILD_INTERFACE:${QUDA_QIOHOME}/include>)

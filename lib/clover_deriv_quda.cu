@@ -70,7 +70,7 @@ namespace quda {
     }
     virtual ~CloverDerivative() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 #ifdef JITIFY
       using namespace jitify::reflection;

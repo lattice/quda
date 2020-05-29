@@ -269,7 +269,7 @@ namespace quda {
     }
     virtual ~Gamma() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	gammaCPU<Float,nColor>(arg);
       } else {
@@ -387,7 +387,7 @@ namespace quda {
     }
     virtual ~TwistGamma() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
 	if (arg.doublet) twistGammaCPU<true,Float,nColor>(arg);
 	twistGammaCPU<false,Float,nColor>(arg);
@@ -584,7 +584,7 @@ namespace quda {
     }
     virtual ~Clover() { }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {
@@ -742,7 +742,7 @@ namespace quda {
     }
     virtual ~TwistClover() { }
 
-    void apply(const cudaStream_t &stream)
+    void apply(const qudaStream_t &stream)
     {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (meta.Location() == QUDA_CPU_FIELD_LOCATION) {

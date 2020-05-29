@@ -26,6 +26,13 @@ if(DEFINED ENV{QUDA_BUILD_TYPE})
 else()
   set(DEFBUILD "DEVEL")
 endif()
+
+if(DEFINED ENV{QUDA_TARGET})
+  set(DEFTARGET $ENV{QUDA_TARGET})
+else()
+  set(DEFTARGET "CUDA")
+endif()
+
 set(VALID_BUILD_TYPES
     DEVEL
     RELEASE
@@ -47,6 +54,18 @@ list(FIND VALID_BUILD_TYPES ${CHECK_BUILD_TYPE} BUILD_TYPE_VALID)
 
 if(BUILD_TYPE_VALID LESS 0)
   message(SEND_ERROR "Please specify a valid CMAKE_BUILD_TYPE type! Valid build types are:" "${VALID_BUILD_TYPES}")
+endif()
+
+# Target type
+set(VALID_TARGET_TYPES CUDA HIP)
+set(QUDA_TARGET_TYPE "${DEFTARGET}" CACHE STRING "Choose the type of target, options are: ${VALID_TARGET_TYPES}")
+set_property(CACHE QUDA_TARGET_TYPE PROPERTY STRINGS CUDA HIP)
+
+string(TOUPPER ${QUDA_TARGET_TYPE} CHECK_TARGET_TYPE)
+list(FIND VALID_TARGET_TYPES ${CHECK_TARGET_TYPE} TARGET_TYPE_VALID)
+
+if(TARGET_TYPE_VALID LESS 0)
+  message(SEND_ERROR "Please specify a valid QUDA_TARGET_TYPE type! Valid target types are:" "${VALID_TARGET_TYPES}")
 endif()
 
 #
@@ -275,12 +294,12 @@ mark_as_advanced(QUDA_ARPACK_LOGGING)
 # some checks for invalid combinations
 
 if(QUDA_TEX AND QUDA_FLOAT8)
-  message(FATAL_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
+  message(SEND_ERROR "Cannot simultanteously enable QUDA_TEX and QUDA_FLOAT8")
 endif()
 
 if(QUDA_MPI AND QUDA_QMP)
   message(
-    WARNING
+    SEND_ERROR
       "Specifying QUDA_QMP and QUDA_MPI might result in undefined behavior. If you intend to use QMP set QUDA_MPI=OFF.")
 endif()
 

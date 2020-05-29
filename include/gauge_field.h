@@ -512,7 +512,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, qudaStream_t *stream_p = nullptr);
 
     /**
        @brief Wait for communication to complete
@@ -615,7 +615,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -738,6 +738,7 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
   /**
      This function is used for copying the gauge field into an
      extended gauge field.  Defined in copy_extended_gauge.cu.
@@ -749,6 +750,28 @@ namespace quda {
   */
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out=0, void *In=0);
+
+  /**
+     This function is used for creating an exteneded gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @param profile The `TimeProfile`
+     @param redundant_comms
+     @param recon The reconsturction type
+     @return the pointer to the extended gauge field
+  */
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
+
+  /**
+     This function is used for creating an exteneded (cpu) gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @return the pointer to the extended gauge field
+  */
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a
