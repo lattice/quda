@@ -47,11 +47,11 @@ namespace quda {
       if (matpcType == QUDA_MATPC_ODD_ODD_ASYMMETRIC) {
         ApplyWilsonClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, in.Even(), QUDA_EVEN_PARITY, dagger, commDim,
                           profile);
-        ApplyTwistedClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
-                          profile);
+        ApplyTwistedClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, mu, in.Odd(), QUDA_ODD_PARITY, dagger,
+                           commDim, profile);
       } else {
         ApplyTwistedClover(out.Even(), in.Odd(), *gauge, *clover, -kappa, mu, in.Even(), QUDA_EVEN_PARITY, dagger,
-                          commDim, profile);
+                           commDim, profile);
         ApplyWilsonClover(out.Odd(), in.Even(), *gauge, *clover, -kappa, in.Odd(), QUDA_ODD_PARITY, dagger, commDim,
                           profile);
       }

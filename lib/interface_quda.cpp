@@ -2534,7 +2534,6 @@ void updateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // setOutputPrefix(prefix);
   setOutputPrefix("MG level 1 (GPU): "); //fix me
 
-
   bool outer_pc_solve = (param->solve_type == QUDA_DIRECT_PC_SOLVE) ||
     (param->solve_type == QUDA_NORMOP_PC_SOLVE);
 
@@ -2602,7 +2601,7 @@ void thinUpdateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   profileInvert.TPSTART(QUDA_PROFILE_TOTAL);
   profileInvert.TPSTART(QUDA_PROFILE_PREAMBLE);
 
-  auto *mg = static_cast<multigrid_solver*>(mg_);
+  auto *mg = static_cast<multigrid_solver *>(mg_);
   checkMultigridParam(mg_param);
 
   QudaInvertParam *param = mg_param->invert_param;
@@ -2612,7 +2611,7 @@ void thinUpdateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   // for reporting level 1 is the fine level but internally use level 0 for indexing
   // sprintf(mg->prefix,"MG level 1 (%s): ", param.location == QUDA_CUDA_FIELD_LOCATION ? "GPU" : "CPU" );
   // setOutputPrefix(prefix);
-  setOutputPrefix("MG level 1 (GPU): "); //fix me
+  setOutputPrefix("MG level 1 (GPU): "); // fix me
 
   // FIXME: add support for updating kappa, mu as appropriate
 
@@ -2634,7 +2633,7 @@ void thinUpdateMultigridQuda(void *mg_, QudaMultigridParam *mg_param)
   }
   // These changes are propagated internally by use of references, pointers, etc, so
   // no further updates are needed.
-  
+
   setOutputPrefix("");
 
   // cache is written out even if a long benchmarking job gets interrupted

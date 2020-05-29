@@ -292,10 +292,11 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
       gauge = gauge_in;
     }
-
 
     /**
      * @brief Create the coarse operator (virtual parent)
@@ -431,7 +432,9 @@ namespace quda {
      *  @param long_gauge_in Updated long links
      *  @param clover_in Updated clover field
      */
-    virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
       DiracWilson::updateFields(gauge_in, nullptr, nullptr, nullptr);
       clover = clover_in;
     }
@@ -1160,7 +1163,9 @@ public:
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b,
 			     const QudaSolutionType) const;
 
-    virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
       Dirac::updateFields(fat_gauge_in, nullptr, nullptr, nullptr);
       fatGauge = fat_gauge_in;
       longGauge = long_gauge_in;
@@ -1362,7 +1367,9 @@ public:
 
     virtual void reconstruct(ColorSpinorField &x, const ColorSpinorField &b, const QudaSolutionType) const;
 
-    virtual void updateFields(cudaGaugeField* gauge_in, cudaGaugeField* fat_gauge_in, cudaGaugeField* long_gauge_in, cudaCloverField* clover_in) {
+    virtual void updateFields(cudaGaugeField *gauge_in, cudaGaugeField *fat_gauge_in, cudaGaugeField *long_gauge_in,
+                              cudaCloverField *clover_in)
+    {
       Dirac::updateFields(gauge_in, nullptr, nullptr, nullptr);
       warningQuda("Coarse gauge links cannot be trivially updated for DiracCoarse(PC). Perform an MG update instead.");
     }

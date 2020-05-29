@@ -308,13 +308,9 @@ extern "C" {
    * @param mg_param_file Path to an input text file describing the MG solve, to be documented on QUDA wiki
    * @return Void pointer wrapping a pack of multigrid-related structures
    */
-  void* qudaSetupMultigrid(int external_precision,
-      int quda_precision,
-      double mass,
-      QudaInvertArgs_t inv_args,
-      const void* const milc_fatlink,
-      const void* const milc_longlink,
-      const char* const mg_param_file);
+  void *qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                           const void *const milc_fatlink, const void *const milc_longlink,
+                           const char *const mg_param_file);
 
   /**
    * Solve Ax=b for an improved staggered operator using MG.
@@ -340,21 +336,10 @@ extern "C" {
    * @param final_relative_residual True Fermilab residual
    * @param num_iters Number of iterations taken
    */
-  void qudaInvertMG(int external_precision,
-      int quda_precision,
-      double mass,
-      QudaInvertArgs_t inv_args,
-      double target_residual,
-      double target_fermilab_residual,
-      const void *const milc_fatlink,
-      const void *const milc_longlink,
-      void *mg_pack_ptr,
-      int mg_rebuild_type,
-      void *source,
-      void *solution,
-      double *const final_residual,
-      double *const final_fermilab_residual,
-      int *num_iters);
+  void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                    double target_residual, double target_fermilab_residual, const void *const milc_fatlink,
+                    const void *const milc_longlink, void *mg_pack_ptr, int mg_rebuild_type, void *source,
+                    void *solution, double *const final_residual, double *const final_fermilab_residual, int *num_iters);
 
   /**
    * Clean up a staggered/HISQ multigrid object, freeing all internal
@@ -362,7 +347,7 @@ extern "C" {
    *
    * @param mg_pack_ptr Void pointer mapping to the multigrid structure returned by qudaSetupMultigrid
    */
-  void qudaCleanupMultigrid(void* mg_pack_ptr);
+  void qudaCleanupMultigrid(void *mg_pack_ptr);
 
   /**
    * Solve Ax=b for an improved staggered operator with many right hand sides. 

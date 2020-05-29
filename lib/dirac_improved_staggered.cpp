@@ -4,8 +4,12 @@
 
 namespace quda {
 
-  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param)
-    : Dirac(param), fatGauge(param.fatGauge), longGauge(param.longGauge) { }
+  DiracImprovedStaggered::DiracImprovedStaggered(const DiracParam &param) :
+    Dirac(param),
+    fatGauge(param.fatGauge),
+    longGauge(param.longGauge)
+  {
+  }
 
   DiracImprovedStaggered::DiracImprovedStaggered(const DiracImprovedStaggered &dirac)
     : Dirac(dirac), fatGauge(dirac.fatGauge), longGauge(dirac.longGauge) { }
@@ -37,8 +41,8 @@ namespace quda {
 		in.SiteSubset(), out.SiteSubset());
     }
 
-    if ((out.Volume()/out.X(4) != 2*fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET) ||
-	(out.Volume()/out.X(4) != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET) ) {
+    if ((out.Volume() / out.X(4) != 2 * fatGauge->VolumeCB() && out.SiteSubset() == QUDA_FULL_SITE_SUBSET)
+        || (out.Volume() / out.X(4) != fatGauge->VolumeCB() && out.SiteSubset() == QUDA_PARITY_SITE_SUBSET)) {
       errorQuda("Spinor volume %lu doesn't match gauge volume %lu", out.Volume(), fatGauge->VolumeCB());
     }
   }
@@ -79,13 +83,16 @@ namespace quda {
     // Need to flip sign via dagger convention if mass == 0.
     if (mass == 0.0) {
       if (dagger == QUDA_DAG_YES) {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_NO, commDim,
+                               profile);
       } else {
-        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim, profile);
+        ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 0., in, QUDA_INVALID_PARITY, QUDA_DAG_YES, commDim,
+                               profile);
       }
       flops += 1146ll * in.Volume();
     } else {
-      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim, profile);
+      ApplyImprovedStaggered(out, in, *fatGauge, *longGauge, 2. * mass, in, QUDA_INVALID_PARITY, dagger, commDim,
+                             profile);
       flops += 1158ll * in.Volume();
     }
   }

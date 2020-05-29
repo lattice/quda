@@ -1164,21 +1164,21 @@ struct mgInputStruct {
   bool verify_results;
 
   // Setup
-  int nvec[QUDA_MAX_MG_LEVEL]; // ignored on first level, if non-zero on last level we deflate
+  int nvec[QUDA_MAX_MG_LEVEL];                   // ignored on first level, if non-zero on last level we deflate
   QudaInverterType setup_inv[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
-  double setup_tol[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
-  double setup_maxiter[QUDA_MAX_MG_LEVEL]; // ignored on first and last level
-  char mg_vec_infile[QUDA_MAX_MG_LEVEL][256]; // ignored on first and last level
-  char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256]; // ignored on first and last level
-  int geo_block_size[QUDA_MAX_MG_LEVEL][4]; // ignored on first and last level (first is 2 2 2 2)
+  double setup_tol[QUDA_MAX_MG_LEVEL];           // ignored on first and last level
+  double setup_maxiter[QUDA_MAX_MG_LEVEL];       // ignored on first and last level
+  char mg_vec_infile[QUDA_MAX_MG_LEVEL][256];    // ignored on first and last level
+  char mg_vec_outfile[QUDA_MAX_MG_LEVEL][256];   // ignored on first and last level
+  int geo_block_size[QUDA_MAX_MG_LEVEL][4];      // ignored on first and last level (first is 2 2 2 2)
 
   // Solve
   QudaInverterType coarse_solver[QUDA_MAX_MG_LEVEL]; // ignored on first level
-  double coarse_solver_tol[QUDA_MAX_MG_LEVEL]; // ignored on first level
-  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL]; // ignored on first level
+  double coarse_solver_tol[QUDA_MAX_MG_LEVEL];       // ignored on first level
+  int coarse_solver_maxiter[QUDA_MAX_MG_LEVEL];      // ignored on first level
   QudaInverterType smoother_type[QUDA_MAX_MG_LEVEL]; // all but last level
-  int nu_pre[QUDA_MAX_MG_LEVEL]; // all but last level
-  int nu_post[QUDA_MAX_MG_LEVEL]; // all but last level
+  int nu_pre[QUDA_MAX_MG_LEVEL];                     // all but last level
+  int nu_post[QUDA_MAX_MG_LEVEL];                    // all but last level
 
   // Misc
   bool mg_verbosity[QUDA_MAX_MG_LEVEL]; // all levels
@@ -1193,12 +1193,18 @@ struct mgInputStruct {
   int deflate_poly_deg; // ignored if no polynomial acceleration
 
   // set defaults
-  mgInputStruct()
-    : mg_levels(4), verify_results(true), deflate_nEv(66),
-      deflate_nKr(128), deflate_max_restarts(50), deflate_tol(1e-5),
-      deflate_use_poly_acc(false), deflate_a_min(1e-2), deflate_poly_deg(50)
+  mgInputStruct() :
+    mg_levels(4),
+    verify_results(true),
+    deflate_nEv(66),
+    deflate_nKr(128),
+    deflate_max_restarts(50),
+    deflate_tol(1e-5),
+    deflate_use_poly_acc(false),
+    deflate_a_min(1e-2),
+    deflate_poly_deg(50)
   {
-    nvec[0] = 24; // must be this
+    nvec[0] = 24;             // must be this
     geo_block_size[0][0] = 2; // must be this...
     geo_block_size[0][1] = 2; // "
     geo_block_size[0][2] = 2; // "
@@ -1279,119 +1285,195 @@ struct mgInputStruct {
     deflate_use_poly_acc = false;
     deflate_a_min = 1e-2;
     deflate_poly_deg = 20;
-
   }
 
-  QudaInverterType getQudaInverterType(const char* name) {
-    if (strcmp(name, "gcr") == 0) { return QUDA_GCR_INVERTER; }
-    else if (strcmp(name, "cgnr") == 0) { return QUDA_CGNR_INVERTER; }
-    else if (strcmp(name, "cgne") == 0) { return QUDA_CGNE_INVERTER; }
-    else if (strcmp(name, "bicgstab") == 0) { return QUDA_BICGSTAB_INVERTER; }
-    else if (strcmp(name, "ca-gcr") == 0) { return QUDA_CA_GCR_INVERTER; }
-    else { return QUDA_INVALID_INVERTER; }
+  QudaInverterType getQudaInverterType(const char *name)
+  {
+    if (strcmp(name, "gcr") == 0) {
+      return QUDA_GCR_INVERTER;
+    } else if (strcmp(name, "cgnr") == 0) {
+      return QUDA_CGNR_INVERTER;
+    } else if (strcmp(name, "cgne") == 0) {
+      return QUDA_CGNE_INVERTER;
+    } else if (strcmp(name, "bicgstab") == 0) {
+      return QUDA_BICGSTAB_INVERTER;
+    } else if (strcmp(name, "ca-gcr") == 0) {
+      return QUDA_CA_GCR_INVERTER;
+    } else {
+      return QUDA_INVALID_INVERTER;
+    }
   }
-
 
   // parse out a line
-  bool update(std::vector<std::string>& input_line) {
-  
+  bool update(std::vector<std::string> &input_line)
+  {
+
     int error_code = 0; // no error
                         // 1 = wrong number of arguments
 
     if (strcmp(input_line[0].c_str(), "mg_levels") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { mg_levels = atoi(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        mg_levels = atoi(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "verify_results") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { verify_results = input_line[1][0] == 't' ? true : false; }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        verify_results = input_line[1][0] == 't' ? true : false;
+      }
 
     } else if (strcmp(input_line[0].c_str(), "mg_verbosity") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { mg_verbosity[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false; }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        mg_verbosity[atoi(input_line[1].c_str())] = input_line[2][0] == 't' ? true : false;
+      }
 
     } else /* Begin Setup */
-    if (strcmp(input_line[0].c_str(), "nvec") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { nvec[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+      if (strcmp(input_line[0].c_str(), "nvec") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        nvec[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "geo_block_size") == 0) {
-      if (input_line.size() < 6) { error_code = 1; }
-      else { for (int d = 0; d < 4; d++) geo_block_size[atoi(input_line[1].c_str())][d] = atoi(input_line[2+d].c_str()); }
+      if (input_line.size() < 6) {
+        error_code = 1;
+      } else {
+        for (int d = 0; d < 4; d++) geo_block_size[atoi(input_line[1].c_str())][d] = atoi(input_line[2 + d].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "setup_inv") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { setup_inv[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        setup_inv[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "setup_tol") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { setup_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        setup_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "setup_maxiter") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        setup_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "mg_vec_infile") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { strcpy(mg_vec_infile[atoi(input_line[1].c_str())], input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        strcpy(mg_vec_infile[atoi(input_line[1].c_str())], input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "mg_vec_outfile") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { strcpy(mg_vec_outfile[atoi(input_line[1].c_str())], input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        strcpy(mg_vec_outfile[atoi(input_line[1].c_str())], input_line[2].c_str());
+      }
 
     } else /* Begin Solvers */
-    if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { coarse_solver[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+      if (strcmp(input_line[0].c_str(), "coarse_solver") == 0) {
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solver[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "coarse_solver_tol") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { coarse_solver_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solver_tol[atoi(input_line[1].c_str())] = atof(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "coarse_solver_maxiter") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        coarse_solver_maxiter[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "smoother_type") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { smoother_type[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        smoother_type[atoi(input_line[1].c_str())] = getQudaInverterType(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "nu_pre") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { nu_pre[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        nu_pre[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "nu_post") == 0) {
-      if (input_line.size() < 3) { error_code = 1; }
-      else { nu_post[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str()); }
+      if (input_line.size() < 3) {
+        error_code = 1;
+      } else {
+        nu_post[atoi(input_line[1].c_str())] = atoi(input_line[2].c_str());
+      }
 
     } else /* Begin Deflation */
-    if (strcmp(input_line[0].c_str(), "deflate_nEv") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_nEv = atoi(input_line[1].c_str()); }
+      if (strcmp(input_line[0].c_str(), "deflate_nEv") == 0) {
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_nEv = atoi(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_nKr") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_nKr = atoi(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_nKr = atoi(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_max_restarts") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_max_restarts = atoi(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_max_restarts = atoi(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_tol") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_tol = atof(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_tol = atof(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_use_poly_acc") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_use_poly_acc = input_line[1][0] == 't' ? true : false; }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_use_poly_acc = input_line[1][0] == 't' ? true : false;
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_a_min") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_a_min = atof(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_a_min = atof(input_line[1].c_str());
+      }
 
     } else if (strcmp(input_line[0].c_str(), "deflate_poly_deg") == 0) {
-      if (input_line.size() < 2) { error_code = 1; }
-      else { deflate_poly_deg = atoi(input_line[1].c_str()); }
+      if (input_line.size() < 2) {
+        error_code = 1;
+      } else {
+        deflate_poly_deg = atoi(input_line[1].c_str());
+      }
 
     } else {
       printf("Invalid option %s\n", input_line[0].c_str());
@@ -1404,9 +1486,7 @@ struct mgInputStruct {
     }
 
     return true;
-
   }
-
 };
 
 // Internal structure that maintains `QudaMultigridParam`,
@@ -1418,13 +1498,13 @@ struct milcMultigridPack {
   QudaInvertParam mg_inv_param;
   QudaEigParam mg_eig_param[QUDA_MAX_MG_LEVEL];
   double last_mass;
-  void* mg_preconditioner;
+  void *mg_preconditioner;
 };
 
 // Parameters defining the eigensolver
-void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct& input_struct, int level)
+void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct &input_struct, int level)
 {
-  mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS; // mg_eig_type[level];
+  mg_eig_param.eig_type = QUDA_EIG_TR_LANCZOS;  // mg_eig_type[level];
   mg_eig_param.spectrum = QUDA_SPECTRUM_SR_EIG; // mg_eig_spectrum[level];
   if ((mg_eig_param.eig_type == QUDA_EIG_TR_LANCZOS || mg_eig_param.eig_type)
       && !(mg_eig_param.spectrum == QUDA_SPECTRUM_LR_EIG || mg_eig_param.spectrum == QUDA_SPECTRUM_SR_EIG)) {
@@ -1435,12 +1515,13 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct& input_s
   mg_eig_param.nKr = input_struct.deflate_nKr; // mg_eig_nKr[level];
   mg_eig_param.nConv = input_struct.nvec[level];
   mg_eig_param.batched_rotate = 0; // mg_eig_batched_rotate[level];
-  mg_eig_param.require_convergence = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_eig_param.require_convergence
+    = QUDA_BOOLEAN_TRUE; // mg_eig_require_convergence[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_eig_param.tol = input_struct.deflate_tol; // mg_eig_tol[level];
-  mg_eig_param.check_interval = 10; // mg_eig_check_interval[level];
+  mg_eig_param.tol = input_struct.deflate_tol;                   // mg_eig_tol[level];
+  mg_eig_param.check_interval = 10;                              // mg_eig_check_interval[level];
   mg_eig_param.max_restarts = input_struct.deflate_max_restarts; // mg_eig_max_restarts[level];
-  mg_eig_param.cuda_prec_ritz = QUDA_DOUBLE_PRECISION; // cuda_prec;
+  mg_eig_param.cuda_prec_ritz = QUDA_DOUBLE_PRECISION;           // cuda_prec;
 
   mg_eig_param.compute_svd = QUDA_BOOLEAN_FALSE;
   mg_eig_param.use_norm_op = QUDA_BOOLEAN_TRUE; // mg_eig_use_normop[level] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
@@ -1448,8 +1529,8 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct& input_s
 
   mg_eig_param.use_poly_acc = input_struct.deflate_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_eig_param.poly_deg = input_struct.deflate_poly_deg; // mg_eig_poly_deg[level];
-  mg_eig_param.a_min = input_struct.deflate_a_min; // mg_eig_amin[level];
-  mg_eig_param.a_max = 0.0; // compute estimate // mg_eig_amax[level];
+  mg_eig_param.a_min = input_struct.deflate_a_min;       // mg_eig_amin[level];
+  mg_eig_param.a_max = 0.0;                              // compute estimate // mg_eig_amax[level];
 
   // set file i/o parameters
   // Give empty strings, Multigrid will handle IO.
@@ -1457,14 +1538,14 @@ void milcSetMultigridEigParam(QudaEigParam &mg_eig_param, mgInputStruct& input_s
   strcpy(mg_eig_param.vec_outfile, "");
   mg_eig_param.io_parity_inflate = QUDA_BOOLEAN_FALSE; // do not inflate coarse vectors
 
-  strcpy(mg_eig_param.QUDA_logfile, ""/*eig_QUDA_logfile*/);
+  strcpy(mg_eig_param.QUDA_logfile, "" /*eig_QUDA_logfile*/);
 }
 
-void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precision, QudaPrecision device_precision,
-        QudaPrecision device_precision_sloppy, double mass, const char* const mg_param_file)
+void milcSetMultigridParam(milcMultigridPack *mg_pack, QudaPrecision host_precision, QudaPrecision device_precision,
+                           QudaPrecision device_precision_sloppy, double mass, const char *const mg_param_file)
 {
   static const QudaVerbosity verbosity = getVerbosity();
-  QudaMultigridParam& mg_param = mg_pack->mg_param;
+  QudaMultigridParam &mg_param = mg_pack->mg_param;
 
   // Create an input struct
   mgInputStruct input_struct;
@@ -1473,9 +1554,7 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
   if (comm_rank() == 0) {
     std::ifstream input_file(mg_param_file, std::ios_base::in);
 
-    if (!input_file.is_open()) {
-      errorQuda("MILC interface MG input file %s does not exist!", mg_param_file);
-    }
+    if (!input_file.is_open()) { errorQuda("MILC interface MG input file %s does not exist!", mg_param_file); }
 
     // enter parameter loop
     char buffer[1024];
@@ -1488,32 +1567,27 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
       input_file.getline(buffer, 1024);
 
       // split on spaces, tabs
-      char* pch = strtok (buffer," \t");
-      while (pch != nullptr)
-      {
+      char *pch = strtok(buffer, " \t");
+      while (pch != nullptr) {
         elements.emplace_back(std::string(pch));
-        pch = strtok (nullptr, " \t");
+        pch = strtok(nullptr, " \t");
       }
 
       // skip empty lines, comments
-      if (elements.size() == 0 || elements[0][0] == '#')
-        continue;
+      if (elements.size() == 0 || elements[0][0] == '#') continue;
 
       // debug: print back out
       if (verbosity == QUDA_VERBOSE) {
-        for (auto elem : elements) {
-          printf("%s ", elem.c_str());
-        }
+        for (auto elem : elements) { printf("%s ", elem.c_str()); }
         printf("\n");
       }
 
       input_struct.update(elements);
-
     }
   }
 
   comm_barrier();
-  comm_broadcast((void*)&input_struct, sizeof(mgInputStruct));
+  comm_broadcast((void *)&input_struct, sizeof(mgInputStruct));
 
   auto mg_levels = input_struct.mg_levels;
 
@@ -1577,13 +1651,11 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
         mg_param.geo_block_size[i][j] = 2; // Kahler-Dirac blocking
       }
     } else {
-      for (int j = 0; j < 4; j++) {
-        mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j];
-      }
+      for (int j = 0; j < 4; j++) { mg_param.geo_block_size[i][j] = input_struct.geo_block_size[i][j]; }
     }
 
     // mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE; //mg_eig[i] ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-    if (i == mg_param.n_level-1 && input_struct.nvec[i] > 0) {
+    if (i == mg_param.n_level - 1 && input_struct.nvec[i] > 0) {
       mg_param.use_eig_solver[i] = QUDA_BOOLEAN_TRUE;
     } else {
       mg_param.use_eig_solver[i] = QUDA_BOOLEAN_FALSE;
@@ -1596,22 +1668,24 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
     mg_param.setup_maxiter[i] = input_struct.setup_maxiter[i];
 
     // Basis to use for CA-CGN(E/R) setup
-    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; //setup_ca_basis[i];
+    mg_param.setup_ca_basis[i] = QUDA_POWER_BASIS; // setup_ca_basis[i];
 
     // Basis size for CACG setup
-    mg_param.setup_ca_basis_size[i] = 4; //setup_ca_basis_size[i];
+    mg_param.setup_ca_basis_size[i] = 4; // setup_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis setup
-    mg_param.setup_ca_lambda_min[i] = 0.0; // setup_ca_lambda_min[i];
+    mg_param.setup_ca_lambda_min[i] = 0.0;  // setup_ca_lambda_min[i];
     mg_param.setup_ca_lambda_max[i] = -1.0; // use power iterations // setup_ca_lambda_max[i];
 
     mg_param.spin_block_size[i] = 1;
     // change this to refresh fields when mass or links change
     mg_param.setup_maxiter_refresh[i] = 0; // setup_maxiter_refresh[i];
-    mg_param.n_vec[i] = (i==0) ? 24 : input_struct.nvec[i];
+    mg_param.n_vec[i] = (i == 0) ? 24 : input_struct.nvec[i];
     mg_param.n_block_ortho[i] = 2; // n_block_ortho[i];                    // number of times to Gram-Schmidt
-    mg_param.precision_null[i] = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
-    mg_param.smoother_halo_precision[i] = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
+    mg_param.precision_null[i]
+      = QUDA_HALF_PRECISION; // prec_null;                          // precision to store the null-space basis
+    mg_param.smoother_halo_precision[i]
+      = QUDA_HALF_PRECISION; // smoother_halo_prec;        // precision of the halo exchange in the smoother
     mg_param.nu_pre[i] = input_struct.nu_pre[i];
     mg_param.nu_post[i] = input_struct.nu_post[i];
     mg_param.mu_factor[i] = 1.; // mu_factor[i];
@@ -1622,16 +1696,15 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
     mg_param.coarse_solver[i] = input_struct.coarse_solver[i];
     mg_param.coarse_solver_tol[i] = input_struct.coarse_solver_tol[i];
     mg_param.coarse_solver_maxiter[i] = input_struct.coarse_solver_maxiter[i];
-    
 
     // Basis to use for CA-CGN(E/R) coarse solver
     mg_param.coarse_solver_ca_basis[i] = QUDA_POWER_BASIS; // coarse_solver_ca_basis[i];
 
     // Basis size for CACG coarse solver/
-    mg_param.coarse_solver_ca_basis_size[i] = 16; //coarse_solver_ca_basis_size[i];
+    mg_param.coarse_solver_ca_basis_size[i] = 16; // coarse_solver_ca_basis_size[i];
 
     // Minimum and maximum eigenvalue for Chebyshev CA basis
-    mg_param.coarse_solver_ca_lambda_min[i] = 0.0; // coarse_solver_ca_lambda_min[i];
+    mg_param.coarse_solver_ca_lambda_min[i] = 0.0;  // coarse_solver_ca_lambda_min[i];
     mg_param.coarse_solver_ca_lambda_max[i] = -1.0; // use power iterations // coarse_solver_ca_lambda_max[i];
 
     mg_param.smoother[i] = input_struct.smoother_type[i];
@@ -1641,13 +1714,14 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
 
     // set to QUDA_DIRECT_SOLVE for no even/odd preconditioning on the smoother
     // set to QUDA_DIRECT_PC_SOLVE for to enable even/odd preconditioning on the smoother
-    mg_param.smoother_solve_type[i] = (i==0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
+    mg_param.smoother_solve_type[i] = (i == 0) ? QUDA_DIRECT_SOLVE : QUDA_DIRECT_PC_SOLVE; // smoother_solve_type[i];
 
     // set to QUDA_ADDITIVE_SCHWARZ for Additive Schwarz precondioned smoother (presently only impelemented for MR)
     mg_param.smoother_schwarz_type[i] = QUDA_INVALID_SCHWARZ; // schwarz_type[i];
 
     // if using Schwarz preconditioning then use local reductions only
-    mg_param.global_reduction[i] = QUDA_BOOLEAN_TRUE; // (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+    mg_param.global_reduction[i]
+      = QUDA_BOOLEAN_TRUE; // (schwarz_type[i] == QUDA_INVALID_SCHWARZ) ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
     // set number of Schwarz cycles to apply
     mg_param.smoother_schwarz_cycle[i] = 1; // schwarz_cycle[i];
@@ -1713,7 +1787,7 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
       mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
 
       // solve
-      //if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
+      // if (coarse_solve_type[i] == QUDA_DIRECT_SOLVE) {
       //  mg_param.coarse_grid_solution_type[i] = QUDA_MAT_SOLUTION;
       //} else if (coarse_solve_type[i] == QUDA_DIRECT_PC_SOLVE) {
       //  mg_param.coarse_grid_solution_type[i] = QUDA_MATPC_SOLUTION;
@@ -1724,9 +1798,8 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
 
     mg_param.omega[i] = 0.85; // ignored // omega; // over/under relaxation factor
 
-    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION; //  solver_location[i];
+    mg_param.location[i] = QUDA_CUDA_FIELD_LOCATION;       //  solver_location[i];
     mg_param.setup_location[i] = QUDA_CUDA_FIELD_LOCATION; // setup_location[i];
-    
   }
 
   // whether to run GPU setup but putting temporaries into mapped (slow CPU) memory
@@ -1735,19 +1808,19 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
   // coarsening the spin on the first restriction is undefined for staggered fields.
   mg_param.spin_block_size[0] = 0;
 
-  mg_param.setup_type = QUDA_NULL_VECTOR_SETUP; // setup_type;
+  mg_param.setup_type = QUDA_NULL_VECTOR_SETUP;     // setup_type;
   mg_param.pre_orthonormalize = QUDA_BOOLEAN_FALSE; // pre_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.post_orthonormalize = QUDA_BOOLEAN_TRUE; // post_orthonormalize ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
-  mg_param.compute_null_vector = QUDA_COMPUTE_NULL_VECTOR_YES; // generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
+  mg_param.compute_null_vector
+    = QUDA_COMPUTE_NULL_VECTOR_YES; // generate_nullspace ? QUDA_COMPUTE_NULL_VECTOR_YES : QUDA_COMPUTE_NULL_VECTOR_NO;
 
   mg_param.generate_all_levels = QUDA_BOOLEAN_TRUE; // generate_all_levels ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
   mg_param.run_verify = input_struct.verify_results ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE; // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
+  mg_param.run_low_mode_check = QUDA_BOOLEAN_FALSE;     // low_mode_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   mg_param.run_oblique_proj_check = QUDA_BOOLEAN_FALSE; // oblique_proj_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  mg_param.preserve_deflation = QUDA_BOOLEAN_TRUE; // FIXME, controversial, should update if mass changes?
-
+  mg_param.preserve_deflation = QUDA_BOOLEAN_TRUE;      // FIXME, controversial, should update if mass changes?
 
   // set file i/o parameters
   for (int i = 0; i < mg_param.n_level; i++) {
@@ -1756,7 +1829,6 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
     if (strcmp(mg_param.vec_infile[i], "") != 0) mg_param.vec_load[i] = QUDA_BOOLEAN_TRUE;
     if (strcmp(mg_param.vec_outfile[i], "") != 0) mg_param.vec_store[i] = QUDA_BOOLEAN_TRUE;
   }
-
 
   mg_param.coarse_guess = QUDA_BOOLEAN_FALSE; // mg_eig_coarse_guess ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
@@ -1769,22 +1841,19 @@ void milcSetMultigridParam(milcMultigridPack* mg_pack, QudaPrecision host_precis
   inv_param.gcrNkrylov = 10;
 
   inv_param.verbosity = verbosity;
- 
+
   inv_param.verbosity_precondition = verbosity;
-
-
 }
 
-
-void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-      const void* const fatlink, const void* const longlink, const char* const mg_param_file)
+void *qudaSetupMultigrid(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
+                         const void *const fatlink, const void *const longlink, const char *const mg_param_file)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
   // Flip the sign of the mass to fix a consistency issue between MILC, QUDA full
   // parity dslash operator
-  mass = -mass; 
+  mass = -mass;
 
   // static const QudaVerbosity verbosity = getVerbosity();
   QudaPrecision host_precision = (external_precision == 2) ? QUDA_DOUBLE_PRECISION : QUDA_SINGLE_PRECISION;
@@ -1808,14 +1877,14 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
   long_param.reconstruct_refinement_sloppy = long_param.reconstruct_sloppy;
 
   // Prepare a multigrid pack
-  milcMultigridPack* mg_pack = new milcMultigridPack;
+  milcMultigridPack *mg_pack = new milcMultigridPack;
 
   // Set parameters incl. loading from the parameter file here.
   milcSetMultigridParam(mg_pack, host_precision, device_precision, device_precision_sloppy, mass, mg_param_file);
 
   // dirty hack to invalidate the cached gauge field without breaking interface compatability
   // compounding hack: *num_iters == 1 is always true here
-  //if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
+  // if (*num_iters == -1 || !canReuseResidentGauge(&invertParam)) invalidateGaugeQuda();
   invalidateGaugeQuda();
 
   if (invalidate_quda_gauge || !create_quda_gauge) {
@@ -1823,7 +1892,6 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
     if (longlink != nullptr) loadGaugeQuda(const_cast<void *>(longlink), &long_param);
     invalidate_quda_gauge = false;
   }
-
 
   mg_pack->mg_preconditioner = newMultigridQuda(&mg_pack->mg_param);
   mg_pack->last_mass = mass;
@@ -1834,24 +1902,22 @@ void* qudaSetupMultigrid(int external_precision, int quda_precision, double mass
 
   qudamilc_called<false>(__func__, verbosity);
 
-  return (void*)mg_pack;
+  return (void *)mg_pack;
 }
 
 void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaInvertArgs_t inv_args,
-                double target_residual, double target_fermilab_residual, const void *const fatlink,
-                const void *const longlink, void *mg_pack_ptr, int mg_rebuild_type, void *source, void *solution,
-                double *const final_residual, double *const final_fermilab_residual, int *num_iters)
+                  double target_residual, double target_fermilab_residual, const void *const fatlink,
+                  const void *const longlink, void *mg_pack_ptr, int mg_rebuild_type, void *source, void *solution,
+                  double *const final_residual, double *const final_fermilab_residual, int *num_iters)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
   // FIXME: Flip the sign of the mass to fix a consistency issue between
   // MILC, QUDA full parity dslash operator
-  mass = -mass; 
+  mass = -mass;
 
-
-  milcMultigridPack* mg_pack = (milcMultigridPack*)(mg_pack_ptr);
-
+  milcMultigridPack *mg_pack = (milcMultigridPack *)(mg_pack_ptr);
 
   if (target_fermilab_residual == 0 && target_residual == 0) errorQuda("qudaInvert: requesting zero residual\n");
 
@@ -1897,7 +1963,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertParam.solve_type = QUDA_DIRECT_SOLVE;
   invertParam.verbosity_precondition = QUDA_VERBOSE;
 
-  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION; // req'd
+  invertParam.cuda_prec_sloppy = QUDA_SINGLE_PRECISION;     // req'd
   invertParam.cuda_prec_precondition = QUDA_HALF_PRECISION; // can set via input
   invertParam.gcrNkrylov = 15;
   invertParam.pipeline = 16; // pipeline, get from file
@@ -1926,7 +1992,7 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
     // FIXME: hack to reset gaugeFatPrecise (see interface_quda.cpp), etc.
     // Solution is to have a version of this that _only_
     // rebuilds the Dirac matrices, I believe.
-    //updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
+    // updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
     if (mg_rebuild_type == 1) {
       if (verbosity >= QUDA_VERBOSE) printfQuda("Performing a full MG solver update\n");
       updateMultigridQuda(mg_pack->mg_preconditioner, &mg_pack->mg_param);
@@ -1948,17 +2014,13 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
   invertQuda(static_cast<char *>(solution) + quark_offset, static_cast<char *>(source) + quark_offset, &invertParam);
 
   // FIXME: Flip sign on solution to correct for mass convention
-  int cv_size = localDim[0]*localDim[1]*localDim[2]*localDim[3]*3*2; // (dimension * Nc = 3 * cplx)
+  int cv_size = localDim[0] * localDim[1] * localDim[2] * localDim[3] * 3 * 2; // (dimension * Nc = 3 * cplx)
   if (host_precision == QUDA_DOUBLE_PRECISION) {
-    auto soln = (double*)(solution);
-    for (long i = 0; i < cv_size; i++) {
-      soln[i] = -soln[i];
-    }
+    auto soln = (double *)(solution);
+    for (long i = 0; i < cv_size; i++) { soln[i] = -soln[i]; }
   } else {
-    auto soln = (float*)(solution);
-    for (long i = 0; i < cv_size; i++) {
-      soln[i] = -soln[i];
-    }
+    auto soln = (float *)(solution);
+    for (long i = 0; i < cv_size; i++) { soln[i] = -soln[i]; }
   }
 
   // return the number of iterations taken by the inverter
@@ -1968,25 +2030,22 @@ void qudaInvertMG(int external_precision, int quda_precision, double mass, QudaI
 
   if (!create_quda_gauge) invalidateGaugeQuda();
 
-
-
   qudamilc_called<false>(__func__, verbosity);
 }
 
-void qudaCleanupMultigrid(void* mg_pack_ptr)
+void qudaCleanupMultigrid(void *mg_pack_ptr)
 {
   static const QudaVerbosity verbosity = getVerbosity();
   qudamilc_called<true>(__func__, verbosity);
 
   if (mg_pack_ptr != 0) {
-    milcMultigridPack* mg_pack = (milcMultigridPack*)(mg_pack_ptr);
+    milcMultigridPack *mg_pack = (milcMultigridPack *)(mg_pack_ptr);
     destroyMultigridQuda(mg_pack->mg_preconditioner);
     delete mg_pack;
   }
 
-  qudamilc_called<false>(__func__, verbosity);  
+  qudamilc_called<false>(__func__, verbosity);
 }
-
 
 static int clover_alloc = 0;
 
