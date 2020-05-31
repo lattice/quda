@@ -343,8 +343,9 @@ extern QudaContractType contract_type;
 
 extern QudaCublasOperation cublas_trans_a;
 extern QudaCublasOperation cublas_trans_b;
-
 extern QudaCublasDataType cublas_data_type;
+extern QudaCublasDataOrder cublas_data_order;
+
 extern std::array<int, 3> cublas_mnk;
 extern std::array<int, 3> cublas_leading_dims;
 extern std::array<double, 2> cublas_alpha_re_im;

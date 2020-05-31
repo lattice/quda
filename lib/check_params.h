@@ -898,8 +898,9 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(lda, 0);
   P(ldb, 0);
   P(ldc, 0);
-  P(batch_count, 0);
-  P(type, QUDA_CUBLAS_DATATYPE_S);
+  P(batch_count, 1);
+  P(data_type, QUDA_CUBLAS_DATATYPE_S);
+  P(data_order, QUDA_CUBLAS_DATAORDER_ROW);
 #else
   P(trans_a, QUDA_CUBLAS_OP_INVALID);
   P(trans_b, QUDA_CUBLAS_OP_INVALID);
@@ -910,7 +911,8 @@ void printQudaCublasParam(QudaCublasParam *param)
   P(ldb, INVALID_INT);
   P(ldc, INVALID_INT);
   P(batch_count, INVALID_INT);
-  P(type, QUDA_CUBLAS_DATATYPE_INVALID);
+  P(data_type, QUDA_CUBLAS_DATATYPE_INVALID);
+  P(data_order, QUDA_CUBLAS_DATAORDER_INVALID);
 #endif
 
 
