@@ -64,8 +64,7 @@ namespace quda {
     void cabxpyAx(double a, const Complex &b, ColorSpinorField &x, ColorSpinorField &y);
     void caxpyXmaz(const Complex &a, ColorSpinorField &x,
 		   ColorSpinorField &y, ColorSpinorField &z);
-    void caxpyXmazMR(const Complex &a, ColorSpinorField &x,
-		     ColorSpinorField &y, ColorSpinorField &z);
+    void caxpyXmazMR(const double &a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z);
 
     void tripleCGUpdate(double alpha, double beta, ColorSpinorField &q,
 			ColorSpinorField &r, ColorSpinorField &x, ColorSpinorField &p);

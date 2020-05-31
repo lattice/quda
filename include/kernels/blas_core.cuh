@@ -32,9 +32,7 @@ namespace quda
           V(V),
           f(f),
           length(length)
-      {
-        ;
-      }
+      { ; }
     };
 
     /**
@@ -59,33 +57,32 @@ namespace quda
 #pragma unroll
         for (int j = 0; j < M; j++) arg.f(x[j], y[j], z[j], w[j], v[j]);
 
-        arg.X.save(x, i, parity);
-        arg.Y.save(y, i, parity);
-        arg.Z.save(z, i, parity);
-        arg.W.save(w, i, parity);
-        arg.V.save(v, i, parity);
+        if (arg.f.write.X) arg.X.save(x, i, parity);
+        if (arg.f.write.Y) arg.Y.save(y, i, parity);
+        if (arg.f.write.Z) arg.Z.save(z, i, parity);
+        if (arg.f.write.W) arg.W.save(w, i, parity);
+        if (arg.f.write.V) arg.V.save(v, i, parity);
         i += gridSize;
       }
     }
 
-    template <typename Float2, typename FloatN> struct BlasFunctor {
-
+    /**
+       Base class from which all blas functors should derive
+     */
+    struct BlasFunctor {
       //! pre-computation routine before the main loop
       virtual __device__ __host__ void init() { ; }
-
-      //! where the reduction is usually computed and any auxiliary operations
-      virtual __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) = 0;
     };
 
     /**
        Functor to perform the operation z = a*x + b*y
     */
-    template <typename Float2, typename FloatN> struct axpbyz_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct axpbyz_ : public BlasFunctor {
+      static constexpr write<0, 0, 0, 0, 1> write{ };
       const real a;
       const real b;
-      axpbyz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      axpbyz_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         v = a * x + b * y;
       }                                  // use v not z to ensure same precision as y
@@ -96,11 +93,11 @@ namespace quda
     /**
        Functor to perform the operation x *= a
     */
-    template <typename Float2, typename FloatN> struct ax_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct ax_ : public BlasFunctor {
+      static constexpr write<1> write{ };
       const real a;
-      ax_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      ax_(const real &a, const real &b, const real &c) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         x *= a;
       }
@@ -141,11 +138,11 @@ namespace quda
       _caxpy(a, x.y, y.y);
     }
 
-    template <typename Float2, typename FloatN> struct caxpy_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpy_ : public BlasFunctor {
+      static constexpr write<0, 1> write{ };
       const complex<real> a;
-      caxpy_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v) { _caxpy(a, x, y); }
+      caxpy_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v) { _caxpy(a, x, y); }
       static int streams() { return 3; } //! total number of input and output streams
       static int flops() { return 4; }   //! flops per element
     };
@@ -202,12 +199,12 @@ namespace quda
       _caxpby(a, x.y, b, y.y);
     }
 
-    template <typename Float2, typename FloatN> struct caxpby_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpby_ : public BlasFunctor {
+      static constexpr write<0, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpby_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpby_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpby(a, x, b, y);
       }
@@ -215,13 +212,13 @@ namespace quda
       static int flops() { return 7; }   //! flops per element
     };
 
-    template <typename Float2, typename FloatN> struct caxpbypczw_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpbypczw_ : public BlasFunctor {
+      static constexpr write<0, 0, 0, 1> write{ };
       const complex<real> a;
       const complex<real> b;
       const complex<real> c;
-      caxpbypczw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b), c(c) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpbypczw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b), c(c) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         w = y;
         _caxpby(a, x, b, w);
@@ -234,13 +231,13 @@ namespace quda
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = b*z[i] + c*x[i]
     */
-    template <typename Float2, typename FloatN> struct axpyBzpcx_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct axpyBzpcx_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const real a;
       const real b;
       const real c;
-      axpyBzpcx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b.x), c(c.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      axpyBzpcx_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         y += a * x;
         x = b * z + c * x;
@@ -252,12 +249,12 @@ namespace quda
     /**
        Functor performing the operations: y[i] = a*x[i] + y[i]; x[i] = z[i] + b*x[i]
     */
-    template <typename Float2, typename FloatN> struct axpyZpbx_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct axpyZpbx_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const real a;
       const real b;
-      axpyZpbx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      axpyZpbx_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         y += a * x;
         x = z + b * x;
@@ -269,12 +266,12 @@ namespace quda
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and x[i] = b*z[i] + x[i]
     */
-    template <typename Float2, typename FloatN> struct caxpyBzpx_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpyBzpx_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpyBzpx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpyBzpx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpy(a, x, y);
         _caxpy(b, z, x);
@@ -287,12 +284,12 @@ namespace quda
     /**
        Functor performing the operations y[i] = a*x[i] + y[i] and z[i] = b*x[i] + z[i]
     */
-    template <typename Float2, typename FloatN> struct caxpyBxpz_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpyBxpz_ : public BlasFunctor {
+      static constexpr write<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpyBxpz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpyBxpz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpy(a, x, y);
         _caxpy(b, x, z);
@@ -305,12 +302,12 @@ namespace quda
     /**
        Functor performing the operations z[i] = a*x[i] + b*y[i] + z[i] and y[i] -= b*w[i]
     */
-    template <typename Float2, typename FloatN> struct caxpbypzYmbw_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpbypzYmbw_ : public BlasFunctor {
+      static constexpr write<0, 1, 1> write{ };
       const complex<real> a;
       const complex<real> b;
-      caxpbypzYmbw_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpbypzYmbw_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpy(a, x, z);
         _caxpy(b, y, z);
@@ -324,12 +321,12 @@ namespace quda
     /**
        Functor performing the operation y[i] += a*b*x[i], x[i] *= a
     */
-    template <typename Float2, typename FloatN> struct cabxpyAx_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct cabxpyAx_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const real a;
       const complex<real> b;
-      cabxpyAx_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      cabxpyAx_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a.real()), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         x *= a;
         _caxpy(b, x, y);
@@ -343,11 +340,11 @@ namespace quda
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
-    template <typename Float2, typename FloatN> struct caxpyxmaz_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpyxmaz_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const complex<real> a;
-      caxpyxmaz_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      caxpyxmaz_(const complex<real> &a, const complex<real> &b, const complex<real> &c) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpy(a, x, y);
         _caxpy(-a, z, x);
@@ -364,12 +361,12 @@ namespace quda
        First performs the operation y[i] += a*x[i]
        Second performs the operator x[i] -= a*z[i]
     */
-    template <typename Float2, typename FloatN> struct caxpyxmazMR_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct caxpyxmazMR_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       complex<real> a;
       double3 *Ar3;
-      caxpyxmazMR_(const Float2 &a, const Float2 &b, const Float2 &c) :
-        a(a.x),
+      caxpyxmazMR_(const real &a, const real &b, const real &c) :
+        a(a),
         Ar3(static_cast<double3 *>(blas::getDeviceReduceBuffer()))
       { ; }
 
@@ -379,7 +376,7 @@ namespace quda
         a = a.real() * complex<real>((real)result.x, (real)result.y) * ((real)1.0 / (real)result.z);
       }
 
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         _caxpy(a, x, y);
         _caxpy(-a, z, x);
@@ -395,12 +392,12 @@ namespace quda
        Second performs the operation z[i] = z[i] - a*x[i]
        Third performs the operation w[i] = z[i] + b*w[i]
     */
-    template <typename Float2, typename FloatN> struct tripleCGUpdate_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct tripleCGUpdate_ : public BlasFunctor {
+      static constexpr write<0, 1, 1, 1> write{ };
       const real a;
       const real b;
-      tripleCGUpdate_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      tripleCGUpdate_(const real &a, const real &b, const real &c) : a(a), b(b) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         y += a * w;
         z -= a * x;
@@ -415,11 +412,11 @@ namespace quda
         y = x;
         x += a.x*z;
     */
-    template <typename Float2, typename FloatN> struct doubleCG3Init_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct doubleCG3Init_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const real a;
-      doubleCG3Init_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x) { ; }
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      doubleCG3Init_(const real &a, const real &b, const real &c) : a(a) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
         y = x;
         x += a * z;
@@ -434,16 +431,16 @@ namespace quda
         x = b.x*(x+a.x*z) + b.y*y;
         y = tmp;
     */
-    template <typename Float2, typename FloatN> struct doubleCG3Update_ : public BlasFunctor<Float2, FloatN> {
-      using real = typename scalar<Float2>::type;
+    template <typename real> struct doubleCG3Update_ : public BlasFunctor {
+      static constexpr write<1, 1> write{ };
       const real a;
       const real b;
-      doubleCG3Update_(const Float2 &a, const Float2 &b, const Float2 &c) : a(a.x), b(b.x) { ; }
-      FloatN tmp {};
-      __device__ __host__ void operator()(FloatN &x, FloatN &y, FloatN &z, FloatN &w, FloatN &v)
+      const real c;
+      doubleCG3Update_(const real &a, const real &b, const real &c) : a(a), b(b), c(c) { ; }
+      template <typename T> __device__ __host__ void operator()(T &x, T &y, T &z, T &w, T &v)
       {
-        tmp = x;
-        x = b * (x + a * z) + b * y;
+        auto tmp = x;
+        x = b * (x + a * z) + c * y;
         y = tmp;
       }
       static int streams() { return 4; } //! total number of input and output streams

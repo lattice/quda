@@ -101,7 +101,7 @@ namespace quda {
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
-        using coeff_t = typename decltype(arg.f)::type;
+        using coeff_t = typename decltype(arg.f)::coeff_t;
         size_t len = MAX_MATRIX_SIZE / sizeof(coeff_t);
 #ifdef JITIFY
         using namespace jitify::reflection;
@@ -177,16 +177,16 @@ namespace quda {
       void preTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (SpinorY::write) arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (SpinorW::write) arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.f.write.Y) arg.Y[i].backup(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+          if (arg.f.write.W) arg.W[i].backup(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
       void postTune()
       {
         for (int i = 0; i < NYW; ++i) {
-          if (SpinorY::write) arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
-          if (SpinorW::write) arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
+          if (arg.f.write.Y) arg.Y[i].restore(&Y_h[i], &Ynorm_h[i], y[i]->Bytes(), y[i]->NormBytes());
+          if (arg.f.write.W) arg.W[i].restore(&W_h[i], &Wnorm_h[i], w[i]->Bytes(), w[i]->NormBytes());
         }
       }
 
@@ -238,22 +238,20 @@ namespace quda {
       int tuningIter() const { return 3; }
     };
 
-    template <int NXZ_, typename RegType, typename StoreType, typename yType, int M,
-              template <int, typename, typename> class Functor, typename write, typename T>
+    template <int NXZ_, typename RegType, typename StoreType, typename yType, int M, template <int, typename> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                    std::vector<ColorSpinorField *> &z, std::vector<ColorSpinorField *> &w, int length)
     {
-      typedef typename scalar<RegType>::type Float;
+      using real = typename scalar<RegType>::type;
 
       const int NYW = y.size();
       // the below line enable NXZ = 128 for floating point types, which is invalid for fixed-point types
       constexpr int NXZ = isFixed<StoreType>::value && NXZ_ == 128 ? 64 : NXZ_;
-      Functor<NXZ, Float, RegType> f(NYW);
-      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, write, decltype(f)>();
-      constexpr int scalar_width = sizeof(typename decltype(f)::type) / sizeof(Float);
-      const int NYW_max_check
-        = max_YW_size<write>(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
+      Functor<NXZ, real> f(NYW);
+      constexpr int NYW_max = max_YW_size<NXZ, StoreType, yType, decltype(f)>();
+      constexpr int scalar_width = sizeof(typename decltype(f)::coeff_t) / sizeof(real);
+      const int NYW_max_check = max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), f.use_z, f.use_w, scalar_width, false);
 
       if (!is_valid_NXZ(NXZ, false, x[0]->Precision() < QUDA_SINGLE_PRECISION))
         errorQuda("NXZ=%d is not a valid size ( MAX_MULTI_BLAS_N %d)", NXZ, MAX_MULTI_BLAS_N);
@@ -263,9 +261,9 @@ namespace quda {
         errorQuda("Coefficient matrix exceeds max size (%d > %d)", NXZ * NYW * scalar_width, MAX_MATRIX_SIZE);
 
       Spinor<RegType, StoreType, M> X[NXZ];
-      Spinor<RegType, yType, M, write::Y> Y[NYW_max];
+      Spinor<RegType, yType, M> Y[NYW_max];
       Spinor<RegType, StoreType, M> Z[NXZ];
-      Spinor<RegType, StoreType, M, write::W> W[NYW_max];
+      Spinor<RegType, StoreType, M> W[NYW_max];
 
       for (int i = 0; i < NXZ; i++) {
         X[i].set(*dynamic_cast<cudaColorSpinorField *>(x[i]));
@@ -291,7 +289,7 @@ namespace quda {
     /**
        Driver for generic blas routine with four loads and two store.
     */
-    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
     void uniMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                       CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                       CompositeColorSpinorField &w)
@@ -304,7 +302,7 @@ namespace quda {
 #if QUDA_PRECISION & 8
 #if defined(NSPIN4) || defined(NSPIN2) || defined(NSPIN1)
           const int M = 1;
-          multiBlas<NXZ, double2, double2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
+          multiBlas<NXZ, double2, double2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
           errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -318,7 +316,7 @@ namespace quda {
           if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
             const int M = 1;
-            multiBlas<NXZ, float4, float4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
+            multiBlas<NXZ, float4, float4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (4 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -327,7 +325,7 @@ namespace quda {
 
 #if defined(NSPIN2) || defined(NSPIN1)
             const int M = 1;
-            multiBlas<NXZ, float2, float2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
+            multiBlas<NXZ, float2, float2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Length() / (2 * M));
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -345,14 +343,14 @@ namespace quda {
           if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
             const int M = 6;
-            multiBlas<NXZ, float4, short4, short4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, float4, short4, short4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
             const int M = 3;
-            multiBlas<NXZ, float2, short2, short2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, float2, short2, short2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -370,14 +368,14 @@ namespace quda {
           if (x[0]->Nspin() == 4) { // wilson
 #if defined(NSPIN4)
             const int M = 6;
-            multiBlas<NXZ, float4, char4, char4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, float4, char4, char4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
           } else if (x[0]->Nspin() == 1) { // staggered
 #if defined(NSPIN1)
             const int M = 3;
-            multiBlas<NXZ, float2, char2, char2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+            multiBlas<NXZ, float2, char2, char2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
             errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -400,7 +398,7 @@ namespace quda {
     /**
        Driver for generic blas routine with four loads and two store.
     */
-    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
     void mixedMultiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
         CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
         CompositeColorSpinorField &w)
@@ -416,7 +414,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 12;
-              multiBlas<NXZ, double2, float4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, float4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -424,7 +422,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, double2, float2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, float2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -440,7 +438,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 12;
-              multiBlas<NXZ, double2, short4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, short4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -449,7 +447,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, double2, short2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, short2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -464,7 +462,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 12;
-              multiBlas<NXZ, double2, char4, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, char4, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -473,7 +471,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, double2, char2, double2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, double2, char2, double2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -498,7 +496,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 6;
-              multiBlas<NXZ, float4, short4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, float4, short4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -507,7 +505,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, float2, short2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, float2, short2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -525,7 +523,7 @@ namespace quda {
             if (x[0]->Nspin() == 4) {
 #if defined(NSPIN4)
               const int M = 6;
-              multiBlas<NXZ, float4, char4, float4, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, float4, char4, float4, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -534,7 +532,7 @@ namespace quda {
 
 #if defined(NSPIN1)
               const int M = 3;
-              multiBlas<NXZ, float2, char2, float2, M, Functor, write>(a, b, c, x, y, z, w, x[0]->Volume());
+              multiBlas<NXZ, float2, char2, float2, M, Functor>(a, b, c, x, y, z, w, x[0]->Volume());
 #else
               errorQuda("blas has not been built for Nspin=%d order=%d fields", x[0]->Nspin(), x[0]->FieldOrder());
 #endif
@@ -560,86 +558,86 @@ namespace quda {
       }
     }
 
-    template <int NXZ, template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    template <int NXZ, template <int MXZ, typename Float> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                    CompositeColorSpinorField &w)
     {
       if (x[0]->Precision() != y[0]->Precision()) {
-        mixedMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+        mixedMultiBlas<NXZ, Functor>(a, b, c, x, y, x, w);
       } else {
-        uniMultiBlas<NXZ, Functor, write>(a, b, c, x, y, x, w);
+        uniMultiBlas<NXZ, Functor>(a, b, c, x, y, x, w);
       }
     }
 
-    template <template <int MXZ, typename Float, typename FloatN> class Functor, typename write, typename T>
+    template <template <int MXZ, typename Float> class Functor, typename T>
     void multiBlas(const coeff_array<T> &a, const coeff_array<T> &b, const coeff_array<T> &c,
                    CompositeColorSpinorField &x, CompositeColorSpinorField &y, CompositeColorSpinorField &z,
                    CompositeColorSpinorField &w)
     {
       // instantiate the loop unrolling template
       switch (x.size()) {
-      // by default all powers of two <= 64 are instantiated
-      case 1: multiBlas<1, Functor, write>(a, b, c, x, y, x, w); break;
-      case 2: multiBlas<2, Functor, write>(a, b, c, x, y, x, w); break;
-      case 4: multiBlas<4, Functor, write>(a, b, c, x, y, x, w); break;
-      case 8: multiBlas<8, Functor, write>(a, b, c, x, y, x, w); break;
-      case 16: multiBlas<16, Functor, write>(a, b, c, x, y, x, w); break;
-      case 32: multiBlas<32, Functor, write>(a, b, c, x, y, x, w); break;
-      case 64: multiBlas<64, Functor, write>(a, b, c, x, y, x, w); break;
-      case 128: multiBlas<128, Functor, write>(a, b, c, x, y, x, w); break;
+      // by default all powers of two <= 128 are instantiated
+      case 1: multiBlas<1, Functor>(a, b, c, x, y, x, w); break;
+      case 2: multiBlas<2, Functor>(a, b, c, x, y, x, w); break;
+      case 4: multiBlas<4, Functor>(a, b, c, x, y, x, w); break;
+      case 8: multiBlas<8, Functor>(a, b, c, x, y, x, w); break;
+      case 16: multiBlas<16, Functor>(a, b, c, x, y, x, w); break;
+      case 32: multiBlas<32, Functor>(a, b, c, x, y, x, w); break;
+      case 64: multiBlas<64, Functor>(a, b, c, x, y, x, w); break;
+      case 128: multiBlas<128, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 3
-      case 3: multiBlas<3, Functor, write>(a, b, c, x, y, x, w); break;
+      case 3: multiBlas<3, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 5
-      case 5: multiBlas<5, Functor, write>(a, b, c, x, y, x, w); break;
+      case 5: multiBlas<5, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 6
-      case 6: multiBlas<6, Functor, write>(a, b, c, x, y, x, w); break;
+      case 6: multiBlas<6, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 7
-      case 7: multiBlas<7, Functor, write>(a, b, c, x, y, x, w); break;
+      case 7: multiBlas<7, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 9
-      case 9: multiBlas<9, Functor, write>(a, b, c, x, y, x, w); break;
+      case 9: multiBlas<9, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 10
-      case 10: multiBlas<10, Functor, write>(a, b, c, x, y, x, w); break;
+      case 10: multiBlas<10, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 11
-      case 11: multiBlas<11, Functor, write>(a, b, c, x, y, x, w); break;
+      case 11: multiBlas<11, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 12
-      case 12: multiBlas<12, Functor, write>(a, b, c, x, y, x, w); break;
+      case 12: multiBlas<12, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 13
-      case 13: multiBlas<13, Functor, write>(a, b, c, x, y, x, w); break;
+      case 13: multiBlas<13, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 14
-      case 14: multiBlas<14, Functor, write>(a, b, c, x, y, x, w); break;
+      case 14: multiBlas<14, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 15
-      case 15: multiBlas<15, Functor, write>(a, b, c, x, y, x, w); break;
+      case 15: multiBlas<15, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 17
-      case 17: multiBlas<17, Functor, write>(a, b, c, x, y, x, w); break;
+      case 17: multiBlas<17, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 18
-      case 18: multiBlas<18, Functor, write>(a, b, c, x, y, x, w); break;
+      case 18: multiBlas<18, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 19
-      case 19: multiBlas<19, Functor, write>(a, b, c, x, y, x, w); break;
+      case 19: multiBlas<19, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 20
-      case 20: multiBlas<20, Functor, write>(a, b, c, x, y, x, w); break;
+      case 20: multiBlas<20, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 21
-      case 21: multiBlas<21, Functor, write>(a, b, c, x, y, x, w); break;
+      case 21: multiBlas<21, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 22
-      case 22: multiBlas<22, Functor, write>(a, b, c, x, y, x, w); break;
+      case 22: multiBlas<22, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 23
-      case 23: multiBlas<23, Functor, write>(a, b, c, x, y, x, w); break;
+      case 23: multiBlas<23, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 24
-      case 24: multiBlas<24, Functor, write>(a, b, c, x, y, x, w); break;
+      case 24: multiBlas<24, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 25
-      case 25: multiBlas<25, Functor, write>(a, b, c, x, y, x, w); break;
+      case 25: multiBlas<25, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 26
-      case 26: multiBlas<26, Functor, write>(a, b, c, x, y, x, w); break;
+      case 26: multiBlas<26, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 27
-      case 27: multiBlas<27, Functor, write>(a, b, c, x, y, x, w); break;
+      case 27: multiBlas<27, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 28
-      case 28: multiBlas<28, Functor, write>(a, b, c, x, y, x, w); break;
+      case 28: multiBlas<28, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 29
-      case 29: multiBlas<29, Functor, write>(a, b, c, x, y, x, w); break;
+      case 29: multiBlas<29, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 30
-      case 30: multiBlas<30, Functor, write>(a, b, c, x, y, x, w); break;
+      case 30: multiBlas<30, Functor>(a, b, c, x, y, x, w); break;
 #if MAX_MULTI_BLAS_N >= 31
-      case 31: multiBlas<31, Functor, write>(a, b, c, x, y, x, w); break;
+      case 31: multiBlas<31, Functor>(a, b, c, x, y, x, w); break;
 #endif // 31
 #endif // 30
 #endif // 29
@@ -672,13 +670,12 @@ namespace quda {
 
     using range = std::pair<size_t,size_t>;
 
-    template <template <int MXZ, typename Float, typename FloatN> class Functor, typename T>
+    template <template <int MXZ, typename Float> class Functor, typename T>
     void axpy_recurse(const T *a_, std::vector<ColorSpinorField *> &x, std::vector<ColorSpinorField *> &y,
                       const range &range_x, const range &range_y, int upper, int coeff_width)
     {
-      using write_ = write<0, 1, 0, 0>;
       // if greater than max single-kernel size, recurse
-      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, false)) {
+      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, false, coeff_width, false)) {
         // We need to split up 'a' carefully since it's row-major.
         T *tmpmajor = new T[x.size() * y.size()];
         T *tmpmajor0 = &tmpmajor[0];
@@ -714,7 +711,7 @@ namespace quda {
 
           // mark true since we will copy the "a" matrix into constant memory
           coeff_array<T> a(a_), b, c;
-          multiBlas<Functor, write_>(a, b, c, x, y, x, y);
+          multiBlas<Functor>(a, b, c, x, y, x, y);
         } else {
           // split the problem in half and recurse
           const T *a0 = &a_[0];
@@ -768,9 +765,7 @@ namespace quda {
                         int pass, int upper)
     {
       // if greater than max single-kernel size, recurse
-      using write_ = write<0, 0, 0, 1>;
-
-      if (y.size() > (size_t)max_YW_size<write_>(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, 2, false)) {
+      if (y.size() > (size_t)max_YW_size(x.size(), x[0]->Precision(), y[0]->Precision(), false, true, 2, false)) {
         // We need to split up 'a' carefully since it's row-major.
         Complex* tmpmajor = new Complex[x.size()*y.size()];
         Complex* tmpmajor0 = &tmpmajor[0];
@@ -817,7 +812,7 @@ namespace quda {
           }
 
           coeff_array<Complex> a(a_), b, c;
-          multiBlas<multicaxpyz_, write_>(a, b, c, x, y, x, z);
+          multiBlas<multicaxpyz_>(a, b, c, x, y, x, z);
         } else {
           // split the problem in half and recurse
           const Complex *a0 = &a_[0];
@@ -832,14 +827,16 @@ namespace quda {
       } // end if (y.size() > max_YW_size())
     }
 
-    void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
+    void caxpyz(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
+    {
       // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 0);
       // second pass does caxpy on the off diagonals
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 0);
     }
 
-    void caxpyz_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
+    void caxpyz_U(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
+    {
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, 1);
@@ -847,7 +844,8 @@ namespace quda {
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void caxpyz_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z) {
+    void caxpyz_L(const Complex *a, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y, std::vector<ColorSpinorField*> &z)
+    {
       // a is upper triangular.
       // first pass does the caxpyz on the diagonal
       caxpyz_recurse(a, x, y, z, range(0, x.size()), range(0, y.size()), 0, -1);
@@ -856,24 +854,25 @@ namespace quda {
     }
 
 
-    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    void caxpyz(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
       caxpyz(a, x.Components(), y.Components(), z.Components());
     }
 
-    void caxpyz_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    void caxpyz_U(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
       caxpyz_U(a, x.Components(), y.Components(), z.Components());
     }
 
-    void caxpyz_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z) {
+    void caxpyz_L(const Complex *a, ColorSpinorField &x, ColorSpinorField &y, ColorSpinorField &z)
+    {
       caxpyz_L(a, x.Components(), y.Components(), z.Components());
     }
 
     void axpyBzpcx(const double *a_, std::vector<ColorSpinorField *> &x_, std::vector<ColorSpinorField *> &y_,
                    const double *b_, ColorSpinorField &z_, const double *c_)
     {
-      using write_ = write<0, 1, 0, 1>;
-
-      if (y_.size() <= (size_t)max_YW_size<write_>(1, z_.Precision(), y_[0]->Precision(), false, true, 1, false)) {
+      if (y_.size() <= (size_t)max_YW_size(1, z_.Precision(), y_[0]->Precision(), false, true, 1, false)) {
         // swizzle order since we are writing to x_ and y_, but the
 	// multi-blas only allow writing to y and w, and moreover the
 	// block width of y and w must match, and x and z must match.
@@ -885,7 +884,7 @@ namespace quda {
 	x.push_back(&z_);
 
         coeff_array<double> a(a_), b(b_), c(c_);
-        multiBlas<1, multi_axpyBzpcx_, write_>(a, b, c, x, y, x, w);
+        multiBlas<1, multi_axpyBzpcx_>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
 	const double *a0 = &a_[0];
@@ -911,8 +910,6 @@ namespace quda {
     void caxpyBxpz(const Complex *a_, std::vector<ColorSpinorField*> &x_, ColorSpinorField &y_,
 		   const Complex *b_, ColorSpinorField &z_)
     {
-      using write_ = write<0, 1, 0, 1>;
-
       if (is_valid_NXZ(x_.size(), false, x_[0]->Precision() < QUDA_SINGLE_PRECISION)) // only swizzle if we have to.
       {
         // swizzle order since we are writing to y_ and z_, but the
@@ -928,7 +925,7 @@ namespace quda {
         std::vector<ColorSpinorField*> &x = x_;
 
         coeff_array<Complex> a(a_), b(b_), c;
-        multiBlas<multi_caxpyBxpz_, write_>(a, b, c, x, y, x, w);
+        multiBlas<multi_caxpyBxpz_>(a, b, c, x, y, x, w);
       } else {
         // split the problem in half and recurse
         const Complex *a0 = &a_[0];
@@ -947,13 +944,15 @@ namespace quda {
       }
     }
 
-    void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+    void axpy(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. false specifies the matrix is unstructured.
       axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 0, 1);
     }
 
-    void axpy_U(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+    void axpy_U(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. 1 indicates the matrix is upper-triangular,
       //                                         which lets us skip some tiles.
@@ -964,7 +963,8 @@ namespace quda {
       axpy_recurse<multiaxpy_>(a_, x, y, range(0, x.size()), range(0, y.size()), 1, 1);
     }
 
-    void axpy_L(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y) {
+    void axpy_L(const double *a_, std::vector<ColorSpinorField*> &x, std::vector<ColorSpinorField*> &y)
+    {
       // Enter a recursion.
       // Pass a, x, y. (0,0) indexes the tiles. -1 indicates the matrix is lower-triangular
       //                                         which lets us skip some tiles.

@@ -13,7 +13,6 @@
 */
 template <typename RegType, typename InterType, typename StoreType> void checkTypes()
 {
-
   const size_t reg_size = sizeof(((RegType *)0)->x);
   const size_t inter_size = sizeof(((InterType *)0)->x);
   const size_t store_size = sizeof(((StoreType *)0)->x);
@@ -116,9 +115,8 @@ template <typename RegType, typename StoreType> struct SpinorNorm<RegType, Store
    @param StoreType Type used to store field in memory
    @param N Length of vector of RegType elements that this Spinor represents
 */
-template <typename RegType_, typename StoreType_, int N, bool write_ = false>
+template <typename RegType_, typename StoreType_, int N>
 struct Spinor : SpinorNorm<RegType_, StoreType_, isFixed<StoreType_>::value> {
-  static constexpr bool write = write_;
   typedef RegType_ RegType;
   typedef StoreType_ StoreType;
   typedef typename bridge_mapper<RegType,StoreType>::type InterType;
@@ -251,43 +249,37 @@ public:
 
   __device__ inline void save(RegType x[], int i, const int parity = 0)
   {
-    if (write) {
-      constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
-      InterType y[M];
-      convert<InterType, RegType>(y, x, M);
+    constexpr int M = (N * vec_length<RegType>::value) / vec_length<InterType>::value;
+    InterType y[M];
+    convert<InterType, RegType>(y, x, M);
 
-      if (isFixed<StoreType>::value) {
-        float C = SN::template store_norm<M>(y, i, parity);
+    if (isFixed<StoreType>::value) {
+      float C = SN::template store_norm<M>(y, i, parity);
 #pragma unroll
-        for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], C * y[j]);
-      } else {
+      for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], C * y[j]);
+    } else {
 #pragma unroll
-        for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], y[j]);
-      }
+      for (int j = 0; j < M; j++) copyFloatN(spinor[cb_offset * parity + i + j * stride], y[j]);
     }
   }
 
   // used to backup the field to the host
   void backup(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
   {
-    if (write) {
-      *spinor_h = new char[bytes];
-      cudaMemcpy(*spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
-      SN::backup(norm_h, norm_bytes);
-      checkCudaError();
-    }
+    *spinor_h = new char[bytes];
+    cudaMemcpy(*spinor_h, spinor, bytes, cudaMemcpyDeviceToHost);
+    SN::backup(norm_h, norm_bytes);
+    checkCudaError();
   }
 
   // restore the field from the host
   void restore(char **spinor_h, char **norm_h, size_t bytes, size_t norm_bytes)
   {
-    if (write) {
-      cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
-      SN::restore(norm_h, norm_bytes);
-      delete[] * spinor_h;
-      *spinor_h = 0;
-      checkCudaError();
-    }
+    cudaMemcpy(spinor, *spinor_h, bytes, cudaMemcpyHostToDevice);
+    SN::restore(norm_h, norm_bytes);
+    delete[] * spinor_h;
+    *spinor_h = 0;
+    checkCudaError();
   }
 
   void *V()

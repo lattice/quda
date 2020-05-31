@@ -56,13 +56,6 @@ namespace quda
       }
     }
 
-    template <int writeX, int writeY, int writeZ, int writeW> struct write {
-      static constexpr int X = writeX;
-      static constexpr int Y = writeY;
-      static constexpr int Z = writeZ;
-      static constexpr int W = writeW;
-    };
-
     /**
        @brief Helper function to compute the maximum YW size for the
        multi-blas runctions.  Since the SpinorX and SpinorZ arrays are
@@ -85,7 +78,7 @@ namespace quda
         / (sizeof(SpinorY) + (Functor::use_w ? sizeof(SpinorW) : 0));
 
       // this is the maximum size limit imposed by the coefficient arrays
-      constexpr int coeff_size = Functor::coeff_mul ? MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::type)) : arg_size;
+      constexpr int coeff_size = Functor::coeff_mul ? MAX_MATRIX_SIZE / (NXZ * sizeof(typename Functor::coeff_t)) : arg_size;
 
       return std::min(arg_size, coeff_size);
     }
@@ -97,13 +90,13 @@ namespace quda
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
     */
-    template <int NXZ, typename xType, typename yType, typename write, typename Functor>
+    template <int NXZ, typename xType, typename yType, typename Functor>
     inline constexpr int max_YW_size()
     {
       using SpinorX = Spinor<typename mapper<xType>::type, xType, 6>;
-      using SpinorY = Spinor<typename mapper<yType>::type, yType, 6, write::Y>;
+      using SpinorY = Spinor<typename mapper<yType>::type, yType, 6>;
       using SpinorZ = SpinorX;
-      using SpinorW = Spinor<typename mapper<xType>::type, xType, 6, write::W>;
+      using SpinorW = Spinor<typename mapper<xType>::type, xType, 6>;
       return max_YW_size<NXZ, SpinorX, SpinorY, SpinorZ, SpinorW, Functor>();
     }
 
@@ -113,26 +106,21 @@ namespace quda
        statically allocated with length NXZ, we can statically compute how
        the maximum size of YW is and allocate this amount of space.  This
        allows for a much larger NXZ (NYW) when NYW (NXZ) is small.
-       @tparam write Structure type that determines what is being written
 
        @param[in] scalar_width Width of the scalar that we're
        multiplying by (1 = real, 2 = complex)
     */
-    template <typename write>
     inline int max_YW_size(int NXZ, QudaPrecision x_prec, QudaPrecision y_prec, bool use_z, bool use_w, int scalar_width, bool reduce)
     {
       bool x_fixed = x_prec < QUDA_SINGLE_PRECISION;
       bool y_fixed = y_prec < QUDA_SINGLE_PRECISION;
       size_t scalar_size = scalar_width * std::max(std::max(x_prec, y_prec), QUDA_SINGLE_PRECISION);
       NXZ = is_valid_NXZ(NXZ, reduce, x_fixed) ? NXZ : MAX_MULTI_BLAS_N; // ensure NXZ is a valid size
-      size_t spinor_x_size
-        = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
-      size_t spinor_y_size
-        = y_fixed ? sizeof(Spinor<float4, short4, 6, write::Y>) : sizeof(Spinor<float4, float4, 6, write::Y>);
+      size_t spinor_x_size = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
+      size_t spinor_y_size = y_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
 
       size_t spinor_z_size = spinor_x_size;
-      size_t spinor_w_size
-        = x_fixed ? sizeof(Spinor<float4, short4, 6, write::W>) : sizeof(Spinor<float4, float4, 6, write::W>);
+      size_t spinor_w_size = x_fixed ? sizeof(Spinor<float4, short4, 6>) : sizeof(Spinor<float4, float4, 6>);
 
       // compute the size remaining for the Y and W accessors
       int arg_size = (MAX_ARG_SIZE - sizeof(int)                       // NYW parameter
