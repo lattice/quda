@@ -5814,18 +5814,19 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   // and it will handle the data movement for the user.
 
   // Extract data from the param struct for device malloc
-  unsigned int arrayA_size = cublas_param->m * cublas_param->k; //A_mk
-  unsigned int arrayB_size = cublas_param->k * cublas_param->n; //B_kn
-  unsigned int arrayC_size = cublas_param->m * cublas_param->n; //C_mn
-  size_t data_size = (cublas_param->type == QUDA_CUBLAS_DATATYPE_D ||
-		      cublas_param->type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
-  if(cublas_param->type == QUDA_CUBLAS_DATATYPE_C || cublas_param->type == QUDA_CUBLAS_DATATYPE_Z) {
-    data_size *= 2;
+  unsigned int arrayA_size = cublas_param->m * cublas_param->lda; //A_mk
+  unsigned int arrayB_size = cublas_param->k * cublas_param->ldb; //B_kn
+  unsigned int arrayC_size = cublas_param->m * cublas_param->ldc; //C_mn
+  size_t data_size = (cublas_param->data_type == QUDA_CUBLAS_DATATYPE_D ||
+		      cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) ? sizeof(double) : sizeof(float);
+  int re_im = 1;  
+  if(cublas_param->data_type == QUDA_CUBLAS_DATATYPE_C || cublas_param->data_type == QUDA_CUBLAS_DATATYPE_Z) {
+    re_im *= 2;    
   }
-  
-  size_t A_bytes = arrayA_size * data_size * cublas_param->batch_count;
-  size_t B_bytes = arrayB_size * data_size * cublas_param->batch_count;
-  size_t C_bytes = arrayC_size * data_size * cublas_param->batch_count;  
+
+  size_t A_bytes = arrayA_size * re_im * data_size;
+  size_t B_bytes = arrayB_size * re_im * data_size;
+  size_t C_bytes = arrayC_size * re_im * data_size;
   void *A_d = pool_device_malloc(A_bytes);
   void *B_d = pool_device_malloc(B_bytes);
   void *C_d = pool_device_malloc(C_bytes);
@@ -5840,9 +5841,32 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
 
   // Compute Batched GEMM
   profileCuBLAS.TPSTART(QUDA_PROFILE_COMPUTE);
-  cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  if(cublas_param->data_order == QUDA_CUBLAS_DATAORDER_ROW) {
+    // cuBLAS works exclusively in column major order. Therefore, if
+    // the input data is in row major order, we may treat the A and B and C
+    // arrays as A^\dag, B^\dag, and C^\dag.
+    // We must now swap the order of the A * B multiplication and swap the
+    // operation types to recover the the desired result in the desired order.
+    // E.g: in row major, the operation,
+    // C = a * A^\dag * B + b * C
+    //
+    // will become the column major operation
+    // C^\dag = a * B^\dag * A + b * C^\dag
+    //
+    // By inspection, one can see that transposition of the above column major
+    // operation will result in the desired row major answer:
+    //
+    // (C^\dag)^\dag = a * (B^\dag * A)^\dag + b * (C^\dag)^\dag
+    //        -->  C = a *  A^\dag * B       + b *  C    
+    std::swap(cublas_param->trans_a, cublas_param->trans_b);
+    cublas::BatchGEMM(B_d, A_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+    std::swap(cublas_param->trans_a, cublas_param->trans_b);
+  } else {
+    // Data is already in column major format, no need for changes.
+    cublas::BatchGEMM(A_d, B_d, C_d, *cublas_param, QUDA_CUDA_FIELD_LOCATION);
+  }
   profileCuBLAS.TPSTOP(QUDA_PROFILE_COMPUTE);
-
+  
   // Copy device C array back to host
   profileCuBLAS.TPSTART(QUDA_PROFILE_D2H);  
   qudaMemcpy(arrayC, C_d, C_bytes, cudaMemcpyDeviceToHost);
@@ -5853,7 +5877,7 @@ void cublasGEMMQuda(void *arrayA, void *arrayB, void *arrayC, QudaCublasParam *c
   pool_device_free(A_d);
   pool_device_free(B_d);
   pool_device_free(C_d);
-  profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
+profileCuBLAS.TPSTOP(QUDA_PROFILE_FREE);  
   
   profileCuBLAS.TPSTOP(QUDA_PROFILE_TOTAL);
 }
