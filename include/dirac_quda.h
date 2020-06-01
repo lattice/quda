@@ -14,7 +14,7 @@ namespace quda {
 
   // Forward declarations for the JD eigensolver
   struct SolverParam;
-  class CG;
+  class GCR;
   class JD;
 
   // Forward declare: MG Transfer Class
@@ -1741,7 +1741,7 @@ public:
     void* Mproj;
     std::vector<ColorSpinorField *> Qhat;
     SolverParam *solverParam_;
-    CG *cg_;
+    GCR *gcrInner_;
     DiracMatrix *matUnconst_;
     std::vector<ColorSpinorField *> y_hat;
     JD *eigSlvr;

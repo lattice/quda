@@ -64,11 +64,9 @@ namespace quda
     mmPP = new DiracPrecProjCorr(mat.Expose());
 
     // Solvers used in the correction equation
-    //cg = new CG(const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon), const_cast<DiracMatrix &>(matPrecon),
-    //            *solverParam, *profile_mat_corr_eq_invs);
-    cg = new CG(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
-                *solverParam, *profile_mat_corr_eq_invs);
     gcrPrec = new GCR(*mmPP, *mmPP, *mmPP, *solverParamPrec, *profile_corr_eq_invs);
+    gcrInner = new GCR(const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat), const_cast<DiracMatrix &>(mat),
+                       *solverParam, *profile_mat_corr_eq_invs);
 
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
@@ -208,8 +206,8 @@ namespace quda
     // Main loop
     while (restart_iter < max_restarts) {
 
-      // Locking
-      orth(ort_dot_prod, t, eigSpace, k);
+      // Locking ---> keep an eye on <k-loopr> (need to revert to <k>?)
+      orth(ort_dot_prod, t, eigSpace, k-loopr);
 
       // Project t orthogonal to V: t = t - ( v_i^* . t ) . v_i
       orth(ort_dot_prod, t, V, m);
@@ -352,13 +350,14 @@ namespace quda
   // Jacobi-Davidson destructor
   JD::~JD()
   {
+    delete gcrInner;
+    delete gcrPrec;
+
     delete profile_corr_eq_invs;
     delete profile_mat_corr_eq_invs;
 
     delete solverParam;
     delete solverParamPrec;
-    delete gcrPrec;
-    delete cg;
 
     delete mmPP;
   }
@@ -390,11 +389,11 @@ namespace quda
     if (size_ps > 1) {
       for (int i = 0; i < size_ps; i++) {
         blas::copy(*Qhat[i], *qSpace[i]);
-        K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
+        K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[i], *qSpace[i]);
       }
     } else {
       blas::copy(*Qhat[0], *qSpace[0]);
-      K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
+      K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *Qhat[0], *qSpace[0]);
     }
 
     // and, switching back the shift parameters
@@ -438,7 +437,7 @@ namespace quda
     // <r_tilde> is "r-hat" for a few of the upcoming lines
 
     blas::copy(*r_tilde[0], b);
-    K(*cg, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
+    K(*gcrInner, corr_eq_tol, corr_eq_maxiter, QUDA_SILENT, *solverParam, *r_tilde[0], b);
 
     // and, switching back the shift parameters
     mat_unconst.shift = bare_shift;
@@ -466,7 +465,7 @@ namespace quda
     mmPP->Qhat = Qhat;
     mmPP->solverParam_ = solverParam;
     mmPP->matUnconst_ = &mat_unconst;
-    mmPP->cg_ = cg;
+    mmPP->gcrInner_ = gcrInner;
     mmPP->eigSlvr = this;
     mmPP->k = size_ps;
     mmPP->tol = corr_eq_tol;
@@ -479,7 +478,7 @@ namespace quda
     setVerbosity(verbTmp);
   }
 
-  void JD::K(CG &cgw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x,
+  void JD::K(GCR &slvw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPrm, ColorSpinorField &x,
              ColorSpinorField &b)
   {
     QudaVerbosity verbTmp = getVerbosity();
@@ -490,7 +489,7 @@ namespace quda
     int maxiter_buff = slvrPrm.maxiter;
     slvrPrm.maxiter = maxiter;
 
-    cgw(x, b);
+    slvw(x, b);
 
     slvrPrm.tol = tol_buff;
     slvrPrm.maxiter = maxiter_buff;
@@ -706,7 +705,7 @@ namespace quda
     // unpacking some attributes
     SolverParam &solverParam = *(mmPP.solverParam_);
     DiracMatrix &matUnconst = *(mmPP.matUnconst_);
-    CG &cgx = *(mmPP.cg_);
+    GCR &slvx = *(mmPP.gcrInner_);
 
     // 1. y = (A - \theta I)v
 
@@ -722,7 +721,7 @@ namespace quda
     double bare_shift = matUnconst.shift;
     matUnconst.shift = bare_shift - mmPP.theta;
 
-    (mmPP.eigSlvr)->K(cgx, mmPP.tol, mmPP.maxiter, QUDA_SILENT, solverParam, *(mmPP.y_hat[0]), out);
+    (mmPP.eigSlvr)->K(slvx, mmPP.tol, mmPP.maxiter, QUDA_SILENT, solverParam, *(mmPP.y_hat[0]), out);
 
     // Switching back the shift parameters
     matUnconst.shift = bare_shift;

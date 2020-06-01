@@ -509,8 +509,8 @@ public:
 
     SolverParam *solverParam;
     SolverParam *solverParamPrec;
-    CG *cg;
     GCR *gcrPrec;
+    GCR *gcrInner;
 
     // JD-specific workspace
     std::vector<ColorSpinorField *> t;
@@ -584,7 +584,7 @@ public:
        @param[in] x Output spinor
        @param[in] b Input spinor
     */
-    void K(CG &cg, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x,
+    void K(GCR &slvw, double tol, int maxiter, QudaVerbosity verb, SolverParam &slvrPar, ColorSpinorField &x,
            ColorSpinorField &b);
 
     /**
