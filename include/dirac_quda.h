@@ -8,8 +8,6 @@
 #include <dslash_quda.h>
 #include <blas_quda.h>
 
-#include <Eigen/LU>
-
 #include <typeinfo>
 
 namespace quda {
@@ -1740,7 +1738,7 @@ public:
     // Orthonormal set used in the projection of MMdag
     std::vector<ColorSpinorField *> projSpace;
     double theta;
-    Eigen::MatrixXcd Mproj;
+    void* Mproj;
     std::vector<ColorSpinorField *> Qhat;
     SolverParam *solverParam_;
     CG *cg_;

@@ -462,7 +462,7 @@ namespace quda
     // TODO: move some of the following assignments to the beginning of JD::operator()
     mmPP->projSpace = qSpace;
     mmPP->theta = theta;
-    mmPP->Mproj = M;
+    mmPP->Mproj = (void*) (&M);
     mmPP->Qhat = Qhat;
     mmPP->solverParam_ = solverParam;
     mmPP->matUnconst_ = &mat_unconst;
@@ -701,6 +701,8 @@ namespace quda
       return;
     }
 
+    MatrixXcd *Mproj_loc = (MatrixXcd*) mmPP.Mproj;
+
     // unpacking some attributes
     SolverParam &solverParam = *(mmPP.solverParam_);
     DiracMatrix &matUnconst = *(mmPP.matUnconst_);
@@ -731,11 +733,11 @@ namespace quda
     if (size_ps > 1) {
       Eigen::MatrixXcd gamma(size_ps, 1);
       for (int i = 0; i < size_ps; i++) { gamma(i, 0) = blas::cDotProduct(*(mmPP.projSpace[i]), *(mmPP.y_hat[0])); }
-      Eigen::MatrixXcd alpha = (mmPP.Mproj).fullPivLu().solve(gamma);
+      Eigen::MatrixXcd alpha = (Mproj_loc->fullPivLu()).solve(gamma);
       for (int i = 0; i < size_ps; i++) { blas::caxpy(-alpha(i), *(mmPP.Qhat[i]), *(mmPP.y_hat[0])); }
     } else {
       Complex gamma = blas::cDotProduct(*(mmPP.projSpace[0]), *(mmPP.y_hat[0]));
-      Complex alpha = gamma / (mmPP.Mproj(0, 0));
+      Complex alpha = gamma / (*Mproj_loc)(0, 0);
       blas::caxpy(-alpha, *(mmPP.Qhat[0]), *(mmPP.y_hat[0]));
     }
 
