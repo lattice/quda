@@ -159,8 +159,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < eig_nConv; i++) {
     host_evecs[i] = (void *)malloc(V * eig_inv_param.Ls * sss * eig_inv_param.cpu_prec);
   }
-  double _Complex *host_evals;
-  host_evals = (double _Complex *)malloc(eig_param.nConv * sizeof(double _Complex));
+  double _Complex *host_evals = (double _Complex *)malloc(eig_param.nEv * sizeof(double _Complex));
 
   // This function returns the host_evecs and host_evals pointers, populated with the
   // requested data, at the requested prec. All the information needed to perfom the

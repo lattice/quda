@@ -26,9 +26,9 @@ protected:
     //------------------
     int nEv;             /** Size of initial factorisation */
     int nKr;             /** Size of Krylov space after extension */
-    int m_min;            /** Minimim size of subspace for Jacobi-Davidson */
-    int m_max;            /** Maximum size of subspace for Jacobi-Davidson */
-    int k_max;            /** NUmber of requested eigenpairs for Jacobi-Davidson */
+    int m_min;           /** Minimim size of subspace for Jacobi-Davidson */
+    int m_max;           /** Maximum size of subspace for Jacobi-Davidson */
+    int k_max;           /** NUmber of requested eigenpairs for Jacobi-Davidson */
     int corr_eq_maxiter; /** Maximum number of iterations for the correction equation */
     double corr_eq_tol;  /** Tolerance for the correction equation */
     int nConv;           /** Number of converged eigenvalues requested */

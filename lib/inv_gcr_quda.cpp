@@ -289,7 +289,7 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space if requested.
-      constructDeflationSpace(b, matMdagM, DiracMdagM(matSloppy.Expose()), DiracMdagM(matPrecon.Expose()));
+      constructDeflationSpace(b, matMdagM);
       if (deflate_compute) {
         // compute the deflation space.
         profile.TPSTOP(QUDA_PROFILE_INIT);

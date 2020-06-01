@@ -163,8 +163,7 @@ namespace quda {
     return solver;
   }
 
-  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat,
-                                       const DiracMatrix &matSloppy, const DiracMatrix &matPrecon)
+  void Solver::constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat)
   {
     if (deflate_init) return;
 

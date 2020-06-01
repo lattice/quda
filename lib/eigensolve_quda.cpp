@@ -120,8 +120,8 @@ namespace quda
     if (!profile_running) profile.TPSTOP(QUDA_PROFILE_INIT);
   }
 
-  // We bake the matrix operators mat, matSloppy, and matPrecon, and the eigensolver
-  // parameters into the eigensolver.
+  // We bake the matrix operator 'mat' and the eigensolver parameters into the
+  // eigensolver.
   EigenSolver *EigenSolver::create(QudaEigParam *eig_param, const DiracMatrix &mat, TimeProfile &profile)
   {
     EigenSolver *eig_solver = nullptr;
@@ -704,8 +704,7 @@ namespace quda
                                  std::vector<Complex> &evals, int size)
   {
     if (size > (int)evecs.size()) errorQuda("Requesting %d eigenvectors with only storage allocated for %lu", size, evecs.size());
-    if (size > (int)evals.size())
-      errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
+    if (size > (int)evals.size()) errorQuda("Requesting %d eigenvalues with only storage allocated for %lu", size, evals.size());
 
     ColorSpinorParam csParamClone(*evecs[0]);
     std::vector<ColorSpinorField *> temp;

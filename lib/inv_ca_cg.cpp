@@ -495,7 +495,7 @@ namespace quda {
 
     if (param.deflate) {
       // Construct the eigensolver and deflation space.
-      constructDeflationSpace(b, matPrecon, matSloppy, matPrecon);
+      constructDeflationSpace(b, matPrecon);
       if (deflate_compute) {
         // compute the deflation space.
         if (!param.is_preconditioner) profile.TPSTOP(QUDA_PROFILE_PREAMBLE);

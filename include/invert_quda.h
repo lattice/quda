@@ -563,8 +563,7 @@ namespace quda {
        @param[in] mat The operator to eigensolve
        @param[in] Whether to compute the SVD
     */
-    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat, const DiracMatrix &matSloppy,
-                                 const DiracMatrix &matPrecon);
+    void constructDeflationSpace(const ColorSpinorField &meta, const DiracMatrix &mat);
 
     /**
        @brief Destroy the allocated deflation space
