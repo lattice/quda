@@ -177,6 +177,8 @@ namespace quda
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
 
+        extern __shared__ half smem_ptr[];
+
         if (arg.comm_dim[dim] && (coord[dim] + nFace >= arg.x_size[dim])) {
           int ghost_idx = ghostFaceIndex<1>(coord, arg.x_size, dim, nFace);
 
@@ -211,10 +213,11 @@ namespace quda
               constexpr int ldb = N;
               constexpr int ldc = N;
 
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+              Config config(smem_ptr);
 
               constexpr EpilogueType epilogue_type = EpilogueType::VECTOR_STORE;
-              perform_mma<Config, block_y, block_z, a_dagger, b_dagger, epilogue_type>(aa, bb, cc, 0, 0);
+              config.perform_mma<epilogue_type>(aa, bb, cc, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -267,10 +270,11 @@ namespace quda
               constexpr int ldb = N;
               constexpr int ldc = N;
 
-              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+              using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+              Config config(smem_ptr);
 
               constexpr EpilogueType epilogue_type = EpilogueType::VECTOR_STORE;
-              perform_mma<Config, block_y, block_z, a_dagger, b_dagger, epilogue_type>(aa, bb, cc, 0, 0);
+              config.perform_mma<epilogue_type>(aa, bb, cc, 0, 0);
             }
 #else
             for (int k = 0; k < tile.k; k += tile.K) { // Fine Color columns of gauge field
@@ -513,7 +517,7 @@ namespace quda
           constexpr int bN = N;
           constexpr int bK = K;
 
-          using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
+          // using Config = MmaConfig<M, N, K, lda, ldb, ldc, bM, bN, bK>;
 
           constexpr bool compute_max_only = false;
 

@@ -14,9 +14,14 @@ namespace quda
       return (bM + pad_size(bM) + bN + pad_size(bN)) * bK * 2 * sizeof(half);
     }
 
-    template <class T, int M, int N, int ldm, int ldn> struct SharedMemoryObject {
+    template <class T, int M_, int N_, int ldm, int ldn> struct SharedMemoryObject {
+
+      static constexpr int M = M_;
+      static constexpr int N = N_;
 
       T *ptr;
+
+      __device__ inline SharedMemoryObject(T *ptr_) : ptr(ptr_) { }
 
       __device__ inline T &operator()(int i, int j) { return ptr[i * ldm + j * ldn]; }
 
@@ -28,29 +33,26 @@ namespace quda
         constexpr int vector_length = sizeof(VecType) / sizeof(T);
         ptr_[(i * ldm + j * ldn) / vector_length] = vec;
       }
+
+      template <class VecType> __device__ inline void vector_store(int i, int j, VecType &vec)
+      {
+        VecType *ptr_ = reinterpret_cast<VecType *>(ptr);
+        constexpr int vector_length = sizeof(VecType) / sizeof(T);
+        vec = ptr_[(i * ldm + j * ldn) / vector_length];
+      }
     };
 
     enum class EpilogueType { COMPUTE_MAX_ONLY, VECTOR_STORE, ATOMIC_STORE_DAGGER_NO, ATOMIC_STORE_DAGGER_YES };
-
-    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_> struct MmaConfig {
-
-      static constexpr int M = M_;
-      static constexpr int N = N_;
-      static constexpr int K = K_;
-      static constexpr int lda = lda_;
-      static constexpr int ldb = ldb_;
-      static constexpr int ldc = ldc_;
-      static constexpr int bM = bM_;
-      static constexpr int bN = bN_;
-      static constexpr int bK = bK_;
-    };
 
     template <int M, int N, int ldm, int ldn, class T> __device__ inline auto make_smem_obj(T *ptr_)
     {
       return SharedMemoryObject<T, M, N, ldm, ldn> {ptr_};
     }
 
-    template <int M, int N, int m_stride, int n_stride, bool dagger, class SmemAccessor> struct GlobalMemoryLoader {
+    template <int m_stride, int n_stride, bool dagger, class SmemAccessor> struct GlobalMemoryLoader {
+
+      static constexpr int M = SmemAccessor::M;
+      static constexpr int N = SmemAccessor::N;
 
       static constexpr int m_stride_pack = m_stride * 2;
       static constexpr int m_dim = (M + m_stride_pack - 1) / m_stride_pack;
@@ -207,6 +209,44 @@ namespace quda
         }
       }
 
+      template <int tile_acc_dim, class SmemObjA, class SmemObjB>
+      __device__ inline void mma(SmemObjA smem_obj_a_real, SmemObjA smem_obj_a_imag, SmemObjB smem_obj_b_real,
+                                 SmemObjB smem_obj_b_imag)
+      {
+
+#pragma unroll
+        for (int c = 0; c < warp_cycle; c++) {
+
+          // The logical warp assigned to each part of the matrix.
+          const int logical_warp_index = wrm.warp_id * warp_cycle + c;
+          const int warp_row = logical_warp_index / tile_col_dim;
+          const int warp_col = logical_warp_index - warp_row * tile_col_dim;
+
+#pragma unroll
+          for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
+
+            const int k_idx = tile_k;
+
+            MmaOperandA op_a_real;
+            op_a_real.load(smem_obj_a_real, k_idx, warp_row, wrm);
+            MmaOperandA op_a_imag;
+            op_a_imag.load(smem_obj_a_imag, k_idx, warp_row, wrm);
+
+            MmaOperandB op_b_real;
+            op_b_real.load(smem_obj_b_real, k_idx, warp_col, wrm);
+            MmaOperandB op_b_imag;
+            op_b_imag.load(smem_obj_b_imag, k_idx, warp_col, wrm);
+
+            gemm(op_a_real, op_b_real, op_c_real[c]);
+            gemm(op_a_imag, op_b_real, op_c_imag[c]);
+            gemm(op_a_real, op_b_imag, op_c_imag[c]);
+            // revert op_imag
+            op_a_imag.negate();
+            gemm(op_a_imag, op_b_imag, op_c_real[c]);
+          }
+        }
+      }
+
       template <int ldc, class C> __device__ inline void store(const C &cc, int m_offset, int n_offset)
       {
 
@@ -235,33 +275,34 @@ namespace quda
       }
     };
 
-    template <class Config, int block_y, int block_z, bool a_dag, bool b_dag, EpilogueType epilogue_type, class A,
-              class B, class C>
-    __device__ inline float perform_mma(const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
-    {
-      constexpr int bM = Config::bM;
-      constexpr int bN = Config::bN;
-      constexpr int bK = Config::bK;
+    template <int M_, int N_, int K_, int lda_, int ldb_, int ldc_, int bM_, int bN_, int bK_, int block_y, int block_z,
+              bool a_dag, bool b_dag>
+    struct MmaConfig {
 
-      constexpr int smem_lda = bM + pad_size(bM);
-      constexpr int smem_ldb = bN + pad_size(bN);
+      static constexpr int M = M_;
+      static constexpr int N = N_;
+      static constexpr int K = K_;
+      static constexpr int lda = lda_;
+      static constexpr int ldb = ldb_;
+      static constexpr int ldc = ldc_;
+      static constexpr int bM = bM_;
+      static constexpr int bN = bN_;
+      static constexpr int bK = bK_;
 
-      constexpr int n_row = block_z;
-      constexpr int n_col = block_y;
+      static constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
+      static constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension
+      static constexpr int tile_acc_dim = bK / WMMA_K; // number of tiles in the accumulate dimension
 
-      extern __shared__ half smem_ptr[];
+      static constexpr int smem_lda = bM + pad_size(bM);
+      static constexpr int smem_ldb = bN + pad_size(bN);
 
-      half *smem_a_real = smem_ptr;
-      half *smem_a_imag = smem_a_real + smem_lda * bK;
-      half *smem_b_real = smem_a_imag + smem_lda * bK;
-      half *smem_b_imag = smem_b_real + smem_ldb * bK;
+      static constexpr int n_row = block_z;
+      static constexpr int n_col = block_y;
 
-      auto smem_obj_a_real = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_real);
-      auto smem_obj_a_imag = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_imag);
-      auto smem_obj_b_real = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_real);
-      auto smem_obj_b_imag = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_imag);
+      static constexpr int total_warp = n_row * n_col / warp_size;
 
-      constexpr int total_warp = n_row * n_col / warp_size;
+      static constexpr int total_tile = tile_row_dim * tile_col_dim;
+      static constexpr int warp_cycle = total_tile / total_warp;
 
 #ifdef USE_FP16_HMMA_ACCUMULATE
       using accumuate_reg_type = half;
@@ -272,98 +313,136 @@ namespace quda
       static_assert(bN % WMMA_N == 0, "bN must be divisible by WMMA_N.");
       static_assert(bK % WMMA_K == 0, "bK must be divisible by WMMA_K.");
 
-      constexpr int tile_row_dim = bM / WMMA_M; // number of tiles in the column dimension
-      constexpr int tile_col_dim = bN / WMMA_N; // number of tiles in the row dimension
-      constexpr int tile_acc_dim = bK / WMMA_K; // number of tiles in the accumulate dimension
-
       static_assert((tile_row_dim * tile_col_dim) % total_warp == 0,
                     "Total number of tiles should be divisible by the number of warps.");
 
-      constexpr int total_tile = tile_row_dim * tile_col_dim;
-      constexpr int warp_cycle = total_tile / total_warp;
+      using SmemObjA = SharedMemoryObject<half, bM, bK, 1, smem_lda>;
+      using SmemObjB = SharedMemoryObject<half, bN, bK, 1, smem_ldb>;
 
-      const int thread_id = (threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x;
-      const int warp_id = thread_id / warp_size;
-      const WarpRegisterMapping wrm(thread_id);
+      SmemObjA smem_obj_a_real; // = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_real);
+      SmemObjA smem_obj_a_imag; // = make_smem_obj<bM, bK, 1, smem_lda>(smem_a_imag);
+      SmemObjB smem_obj_b_real; // = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_real);
+      SmemObjB smem_obj_b_imag; // = make_smem_obj<bN, bK, 1, smem_ldb>(smem_b_imag);
 
-      float max = 0.0f; // XXX: Accessor::Float
+      MmaOp<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op; // (thread_id);
 
-      // MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_real[warp_cycle];
-      // MmaOperandC<smem_ldb / 2, accumuate_reg_type> op_c_imag[warp_cycle];
+      GlobalMemoryLoader<n_row, n_col, a_dag, SmemObjA> aa_loader; // (smem_obj_a_real,
+                                                                   // smem_obj_a_imag);
+      GlobalMemoryLoader<n_row, n_col, b_dag, SmemObjB> bb_loader; // (smem_obj_b_real,
+                                                                   // smem_obj_b_imag);
 
-      MmaOp<MmaOperandC<smem_ldb / 2, accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op(thread_id);
+      __device__ inline MmaConfig(half *smem_ptr) :
+        smem_obj_a_real(smem_ptr),
+        smem_obj_a_imag(smem_obj_a_real.ptr + smem_lda * bK),
+        smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK),
+        smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK),
+        mma_op((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x),
+        aa_loader(smem_obj_a_real, smem_obj_a_imag),
+        bb_loader(smem_obj_b_real, smem_obj_b_imag)
+      {
+      }
 
-      GlobalMemoryLoader<bM, bK, n_row, n_col, a_dag, decltype(smem_obj_a_real)> aa_loader(smem_obj_a_real,
-                                                                                           smem_obj_a_imag);
-      GlobalMemoryLoader<bN, bK, n_row, n_col, b_dag, decltype(smem_obj_b_real)> bb_loader(smem_obj_b_real,
-                                                                                           smem_obj_b_imag);
+      template <EpilogueType epilogue_type, class A, class B, class C>
+      __device__ inline float perform_mma(const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
+      {
+        float max = 0;
+
+        constexpr bool a_transpose = false;
+        constexpr bool b_transpose = true;
+
+#ifdef USE_GMEM_MMA_PIPELINING
+        aa_loader.g2r<lda, a_transpose>(aa, m_offset, 0);
+        aa_loader.r2s();
+
+        bb_loader.g2r<ldb, b_transpose>(bb, n_offset, 0);
+        bb_loader.r2s();
+
+        __syncthreads();
+#endif
+
+#pragma unroll 1
+        for (int bk = 0; bk < K; bk += bK) {
+
+#ifdef USE_GMEM_MMA_PIPELINING
+          if (bk + bK < K) {
+            aa_loader.g2r<lda, a_transpose>(aa, m_offset, bk + bK);
+            bb_loader.g2r<ldb, b_transpose>(bb, n_offset, bk + bK);
+          }
+#else
+          __syncthreads();
+          aa_loader.g2s<lda, a_transpose>(aa, m_offset, bk);
+          bb_loader.g2s<ldb, b_transpose>(bb, n_offset, bk);
+          __syncthreads();
+#endif
+
+          mma_op.mma<tile_acc_dim>(smem_obj_a_real, smem_obj_a_imag, smem_obj_b_real, smem_obj_b_imag);
+
+#ifdef USE_GMEM_MMA_PIPELINING
+          if (bk + bK < K) {
+            __syncthreads();
+
+            aa_loader.r2s();
+            bb_loader.r2s();
+
+            __syncthreads();
+          }
+#endif
+        }
+
+        // wrap up!
+        if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
+          mma_op.abs_max(max);
+        } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
+          mma_op.store<ldc>(cc, m_offset, n_offset);
+        }
+
+        return max;
+      }
+    };
+
+#if 0
+    template <EpilogueType epilogue_type, class Config, class A, class B, class C>
+    __device__ inline float perform_mma(Config &config, const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
+    {
+      float max = 0;
 
       constexpr bool a_transpose = false;
       constexpr bool b_transpose = true;
 
 #ifdef USE_GMEM_MMA_PIPELINING
-      aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, 0);
-      aa_loader.r2s();
+      config.aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, 0);
+      config.aa_loader.r2s();
 
-      bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, 0);
-      bb_loader.r2s();
+      config.bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, 0);
+      config.bb_loader.r2s();
 
       __syncthreads();
 #endif
 
 #pragma unroll 1
-      for (int bk = 0; bk < Config::K; bk += bK) {
+      for (int bk = 0; bk < Config::K; bk += Config::bK) {
 
 #ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + bK < Config::K) {
-          aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, bk + bK);
-          bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, bk + bK);
+        if (bk + Config::bK < Config::K) {
+          config.aa_loader.g2r<Config::lda, a_transpose>(aa, m_offset, bk + Config::bK);
+          config.bb_loader.g2r<Config::ldb, b_transpose>(bb, n_offset, bk + Config::bK);
         }
 #else
         __syncthreads();
-        aa_loader.g2s<Config::lda, a_transpose>(aa, m_offset, bk);
-        bb_loader.g2s<Config::ldb, b_transpose>(bb, n_offset, bk);
+        config.aa_loader.g2s<Config::lda, a_transpose>(aa, m_offset, bk);
+        config.bb_loader.g2s<Config::ldb, b_transpose>(bb, n_offset, bk);
         __syncthreads();
 #endif
 
-#pragma unroll
-        for (int c = 0; c < warp_cycle; c++) {
-
-          // The logical warp assigned to each part of the matrix.
-          const int logical_warp_index = warp_id * warp_cycle + c;
-          const int warp_row = logical_warp_index / tile_col_dim;
-          const int warp_col = logical_warp_index - warp_row * tile_col_dim;
-
-#pragma unroll
-          for (int tile_k = 0; tile_k < tile_acc_dim; tile_k++) {
-
-            const int k_idx = tile_k;
-
-            MmaOperandA<smem_lda / 2> op_a_real;
-            op_a_real.load(smem_a_real, k_idx, warp_row, wrm);
-            MmaOperandA<smem_lda / 2> op_a_imag;
-            op_a_imag.load(smem_a_imag, k_idx, warp_row, wrm);
-
-            MmaOperandB<smem_ldb / 2> op_b_real;
-            op_b_real.load(smem_b_real, k_idx, warp_col, wrm);
-            MmaOperandB<smem_ldb / 2> op_b_imag;
-            op_b_imag.load(smem_b_imag, k_idx, warp_col, wrm);
-
-            gemm(op_a_real, op_b_real, mma_op.op_c_real[c]);
-            gemm(op_a_imag, op_b_real, mma_op.op_c_imag[c]);
-            gemm(op_a_real, op_b_imag, mma_op.op_c_imag[c]);
-            // revert op_imag
-            op_a_imag.negate();
-            gemm(op_a_imag, op_b_imag, mma_op.op_c_real[c]);
-          }
-        }
+        config.mma_op.mma<Config::tile_acc_dim>(config.smem_obj_a_real, config.smem_obj_a_imag, config.smem_obj_b_real,
+                                                config.smem_obj_b_imag);
 
 #ifdef USE_GMEM_MMA_PIPELINING
-        if (bk + bK < Config::K) {
+        if (bk + Config::bK < Config::K) {
           __syncthreads();
 
-          aa_loader.r2s();
-          bb_loader.r2s();
+          config.aa_loader.r2s();
+          config.bb_loader.r2s();
 
           __syncthreads();
         }
@@ -372,9 +451,9 @@ namespace quda
 
       // wrap up!
       if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
-        mma_op.abs_max(max);
+        config.mma_op.abs_max(max);
       } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
-        mma_op.store<Config::ldc>(cc, m_offset, n_offset);
+        config.mma_op.store<Config::ldc>(cc, m_offset, n_offset);
       }
 #if 0
 #pragma unroll
@@ -413,6 +492,8 @@ namespace quda
 #endif
       return max;
     }
+
+#endif
 
   } // namespace mma
 

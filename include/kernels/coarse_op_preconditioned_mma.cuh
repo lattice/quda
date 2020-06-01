@@ -52,8 +52,6 @@ namespace quda
 
       real yHatMax = 0.0;
 
-      using Config = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK>;
-
       constexpr EpilogueType epilogue_type
         = compute_max_only ? EpilogueType::COMPUTE_MAX_ONLY : EpilogueType::VECTOR_STORE;
 
@@ -69,7 +67,10 @@ namespace quda
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
 
-        yHatMax = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, epilogue_type>(aa, bb, cc, m, n);
+        using Config
+          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+        Config config(smem_ptr);
+        yHatMax = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
 
       } else {
 
@@ -81,7 +82,10 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
-        yHatMax = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, epilogue_type>(aa, bb, cc, m, n);
+        using Config
+          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+        Config config(smem_ptr);
+        yHatMax = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
@@ -92,7 +96,10 @@ namespace quda
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
-        real yHatMax_ = perform_mma<Config, block_y, block_z, a_dagger, b_dagger, epilogue_type>(aa, bb, cc, m, n);
+        using Config
+          = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
+        Config config(smem_ptr);
+        real yHatMax_ = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
         yHatMax = fmax(yHatMax, yHatMax_);
       }
 
