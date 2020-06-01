@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <tune_quda.h>
 #include <uint_to_char.h>
-#include <typeinfo>
 #include <vector>
 #include <assert.h>
 #include <utility>
@@ -49,7 +48,7 @@ namespace quda {
 
         if (V.Location() == QUDA_CUDA_FIELD_LOCATION) {
 #ifdef JITIFY
-        create_jitify_program("kernels/block_orthogonalize.cuh");
+          create_jitify_program("kernels/block_orthogonalize.cuh");
 #endif
         }
       strcat(aux, compile_type_str(V));
@@ -96,7 +95,7 @@ namespace quda {
        orthogonalization.
      */
     template <typename Rotator, typename Vector, std::size_t... S>
-    void GPU(const TuneParam &tp, const cudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
+    void GPU(const TuneParam &tp, const qudaStream_t &stream, const std::vector<ColorSpinorField*> &B, std::index_sequence<S...>) {
       typedef typename mapper<vFloat>::type RegType; // need to redeclare typedef (WAR for CUDA 7 and 8)
       typedef BlockOrthoArg<Rotator,Vector,nSpin,spinBlockSize,coarseSpin,nVec> Arg;
       Arg arg(V, fine_to_coarse, coarse_to_fine, QUDA_INVALID_PARITY, geo_bs, n_block_ortho, V, B[S]...);
@@ -113,7 +112,7 @@ namespace quda {
 #endif
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (V.Location() == QUDA_CPU_FIELD_LOCATION) {
         if (V.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER && B[0]->FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {

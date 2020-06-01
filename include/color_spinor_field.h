@@ -159,6 +159,7 @@ namespace quda {
     }
 
       // used to create cpu params
+
     ColorSpinorParam(void *V, QudaInvertParam &inv_param, const int *X, const bool pc_solution,
         QudaFieldLocation location = QUDA_CPU_FIELD_LOCATION) :
         LatticeFieldParam(4, X, 0, inv_param.cpu_prec),
@@ -195,7 +196,7 @@ namespace quda {
       suggested_parity = impliedParityFromMatPC(inv_param.matpc_type);
 
       if (inv_param.dslash_type == QUDA_DOMAIN_WALL_DSLASH || inv_param.dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH
-          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
+          || inv_param.dslash_type == QUDA_MOBIUS_DWF_DSLASH || inv_param.dslash_type == QUDA_MOBIUS_DWF_EOFA_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
       } else if (inv_param.dslash_type == QUDA_TWISTED_MASS_DSLASH && (twistFlavor == QUDA_TWIST_NONDEG_DOUBLET)) {
@@ -204,6 +205,8 @@ namespace quda {
       } else if (inv_param.dslash_type == QUDA_STAGGERED_DSLASH || inv_param.dslash_type == QUDA_ASQTAD_DSLASH) {
         nDim++;
         x[4] = inv_param.Ls;
+      } else {
+        x[4] = 1;
       }
 
       if (inv_param.dirac_order == QUDA_INTERNAL_DIRAC_ORDER) {
@@ -253,6 +256,7 @@ namespace quda {
     {
       siteSubset = cpuParam.siteSubset;
       fieldOrder = (precision == QUDA_DOUBLE_PRECISION || nSpin == 1 || nSpin == 2) ? QUDA_FLOAT2_FIELD_ORDER : QUDA_FLOAT4_FIELD_ORDER;
+      for (int d = 0; d < QUDA_MAX_DIM; d++) x[d] = cpuParam.x[d];
     }
 
     /**
@@ -760,11 +764,11 @@ namespace quda {
        @param[in] c Twisted mass parameter (chiral twist factor, default=0)
       */
     void packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir, const int dagger,
-                   cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
+                   qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
                    bool spin_project, double a = 0, double b = 0, double c = 0);
 
-    void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim, const QudaDirection dir,
-			   const int dagger,cudaStream_t* stream, bool zero_copy=false);
+    void packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
+                           const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy = false);
 
     /**
       Initiate the gpu to cpu send of the ghost zone (halo)
@@ -775,8 +779,8 @@ namespace quda {
       @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
-        const int dagger, cudaStream_t *stream);
+    void sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir, const int dagger,
+                   qudaStream_t *stream);
 
     /**
       Initiate the cpu to gpu send of the ghost zone (halo)
@@ -787,8 +791,8 @@ namespace quda {
       @param dagger Whether the operator is daggerer or not
       @param stream The array of streams to use
       */
-    void unpackGhost(const void* ghost_spinor, const int nFace, const int dim,
-        const QudaDirection dir, const int dagger, cudaStream_t* stream);
+    void unpackGhost(const void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
+                     const int dagger, qudaStream_t *stream);
 
     /**
       Initiate the cpu to gpu copy of the extended border region
@@ -801,11 +805,10 @@ namespace quda {
       @param stream The array of streams to use
       @param zero_copy Whether we are unpacking from zero_copy memory
       */
-    void unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-			     const int dim, const QudaDirection dir, const int dagger, cudaStream_t* stream, bool zero_copy);
+    void unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity, const int dim,
+                             const QudaDirection dir, const int dagger, qudaStream_t *stream, bool zero_copy);
 
-
-    void streamInit(cudaStream_t *stream_p);
+    void streamInit(qudaStream_t *stream_p);
 
     /**
        Pack the field halos in preparation for halo exchange, e.g., for Dslash
@@ -826,10 +829,10 @@ namespace quda {
     void pack(int nFace, int parity, int dagger, int stream_idx, MemoryLocation location[],
               MemoryLocation location_label, bool spin_project = true, double a = 0, double b = 0, double c = 0);
 
-    void packExtended(const int nFace, const int R[], const int parity, const int dagger,
-        const int dim,  cudaStream_t *stream_p, const bool zeroCopyPack=false);
+    void packExtended(const int nFace, const int R[], const int parity, const int dagger, const int dim,
+                      qudaStream_t *stream_p, const bool zeroCopyPack = false);
 
-    void gather(int nFace, int dagger, int dir, cudaStream_t *stream_p=NULL);
+    void gather(int nFace, int dagger, int dir, qudaStream_t *stream_p = NULL);
 
     /**
        @brief Initiate halo communication receive
@@ -840,7 +843,7 @@ namespace quda {
        @param[in] stream CUDA stream to be used (unused)
        @param[in] gdr Whether we are using GDR on the receive side
     */
-    void recvStart(int nFace, int dir, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false);
+    void recvStart(int nFace, int dir, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false);
 
     /**
        @brief Initiate halo communication sending
@@ -853,7 +856,8 @@ namespace quda {
        @param[in] gdr Whether we are using GDR on the send side
        @param[in] remote_write Whether we are writing direct to remote memory (or using copy engines)
     */
-    void sendStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr=false, bool remote_write=false);
+    void sendStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr = false,
+                   bool remote_write = false);
 
     /**
        @brief Initiate halo communication
@@ -865,7 +869,8 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsStart(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    void commsStart(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                    bool gdr_recv = false);
 
     /**
        @brief Non-blocking query if the halo communication has completed
@@ -877,7 +882,8 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    int commsQuery(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    int commsQuery(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                   bool gdr_recv = false);
 
     /**
        @brief Wait on halo communication to complete
@@ -889,9 +895,10 @@ namespace quda {
        @param[in] gdr_send Whether we are using GDR on the send side
        @param[in] gdr_recv Whether we are using GDR on the receive side
     */
-    void commsWait(int nFace, int d, int dagger=0, cudaStream_t *stream_p=nullptr, bool gdr_send=false, bool gdr_recv=false);
+    void commsWait(int nFace, int d, int dagger = 0, qudaStream_t *stream_p = nullptr, bool gdr_send = false,
+                   bool gdr_recv = false);
 
-    void scatter(int nFace, int dagger, int dir, cudaStream_t *stream_p);
+    void scatter(int nFace, int dagger, int dir, qudaStream_t *stream_p);
     void scatter(int nFace, int dagger, int dir);
 
     void scatterExtended(int nFace, int parity, int dagger, int dir);
@@ -962,7 +969,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   // CPU implementation
@@ -1072,7 +1079,7 @@ namespace quda {
   void genericPrintVector(const cpuColorSpinorField &a, unsigned int x);
   void genericCudaPrintVector(const cudaColorSpinorField &a, unsigned x);
 
-  void exchangeExtendedGhost(cudaColorSpinorField* spinor, int R[], int parity, cudaStream_t *stream_p);
+  void exchangeExtendedGhost(cudaColorSpinorField *spinor, int R[], int parity, qudaStream_t *stream_p);
 
   void copyExtendedColorSpinor(ColorSpinorField &dst, const ColorSpinorField &src,
       QudaFieldLocation location, const int parity, void *Dst, void *Src, void *dstNorm, void *srcNorm);

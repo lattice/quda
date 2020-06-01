@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring> // needed for memset
-#include <typeinfo>
 
 #include <tune_quda.h>
 #include <blas_quda.h>
@@ -14,7 +13,7 @@ namespace quda {
 
   namespace blas {
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
 
     template <int NXZ, typename FloatN, int M, typename SpinorX, typename SpinorY, typename SpinorZ, typename SpinorW,
         typename Functor, typename T>
@@ -100,7 +99,7 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      inline void apply(const cudaStream_t &stream)
+      inline void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 

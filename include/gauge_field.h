@@ -130,58 +130,66 @@ namespace quda {
     {
     }
 
-  GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_=QUDA_INVALID_LINKS)
-    : LatticeFieldParam(param), location(QUDA_CPU_FIELD_LOCATION),
-      nColor(3), nFace(0), reconstruct(QUDA_RECONSTRUCT_NO),
-      order(param.gauge_order), fixed(param.gauge_fix),
-      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type), t_boundary(param.t_boundary),
-      anisotropy(param.anisotropy), tadpole(param.tadpole_coeff), gauge(h_gauge),
-      create(QUDA_REFERENCE_FIELD_CREATE), geometry(QUDA_VECTOR_GEOMETRY),
-      compute_fat_link_max(false), staggeredPhaseType(param.staggered_phase_type),
-      staggeredPhaseApplied(param.staggered_phase_applied), i_mu(param.i_mu),
-      site_offset(param.gauge_offset), site_size(param.site_size)
-	{
-	  switch(link_type) {
-	  case QUDA_SU3_LINKS:
-	  case QUDA_GENERAL_LINKS:
-	  case QUDA_SMEARED_LINKS:
-	  case QUDA_MOMENTUM_LINKS:
-	    nFace = 1; break;
-	  case QUDA_THREE_LINKS:
-	    nFace = 3; break;
-	  default:
-	    errorQuda("Error: invalid link type(%d)\n", link_type);
-	  }
-	}
+    GaugeFieldParam(void *h_gauge, const QudaGaugeParam &param, QudaLinkType link_type_ = QUDA_INVALID_LINKS) :
+      LatticeFieldParam(param),
+      location(QUDA_CPU_FIELD_LOCATION),
+      nColor(3),
+      nFace(0),
+      reconstruct(QUDA_RECONSTRUCT_NO),
+      order(param.gauge_order),
+      fixed(param.gauge_fix),
+      link_type(link_type_ != QUDA_INVALID_LINKS ? link_type_ : param.type),
+      t_boundary(param.t_boundary),
+      anisotropy(param.anisotropy),
+      tadpole(param.tadpole_coeff),
+      gauge(h_gauge),
+      create(QUDA_REFERENCE_FIELD_CREATE),
+      geometry(QUDA_VECTOR_GEOMETRY),
+      compute_fat_link_max(false),
+      staggeredPhaseType(param.staggered_phase_type),
+      staggeredPhaseApplied(param.staggered_phase_applied),
+      i_mu(param.i_mu),
+      site_offset(param.gauge_offset),
+      site_size(param.site_size)
+    {
+      switch (link_type) {
+      case QUDA_SU3_LINKS:
+      case QUDA_GENERAL_LINKS:
+      case QUDA_SMEARED_LINKS:
+      case QUDA_MOMENTUM_LINKS: nFace = 1; break;
+      case QUDA_THREE_LINKS: nFace = 3; break;
+      default: errorQuda("Error: invalid link type(%d)\n", link_type);
+      }
+    }
 
-        /**
-           @brief Helper function for setting the precision and corresponding
-           field order for QUDA internal fields.
-           @param precision The precision to use
-         */
-        void setPrecision(QudaPrecision precision, bool force_native = false)
-        {
-          // is the current status in native field order?
-          bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
-          this->precision = precision;
-          this->ghost_precision = precision;
+    /**
+       @brief Helper function for setting the precision and corresponding
+       field order for QUDA internal fields.
+       @param precision The precision to use
+    */
+    void setPrecision(QudaPrecision precision, bool force_native = false)
+    {
+      // is the current status in native field order?
+      bool native = force_native ? true : gauge::isNative(order, this->precision, reconstruct);
+      this->precision = precision;
+      this->ghost_precision = precision;
 
-          if (native) {
-            if (precision == QUDA_DOUBLE_PRECISION || precision == QUDA_DOUBLE_PRECISION
-                || reconstruct == QUDA_RECONSTRUCT_NO) {
-              order = QUDA_FLOAT2_GAUGE_ORDER;
-            } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
-                       && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
+      if (native) {
+        if (precision == QUDA_DOUBLE_PRECISION || reconstruct == QUDA_RECONSTRUCT_NO
+            || reconstruct == QUDA_RECONSTRUCT_10) {
+          order = QUDA_FLOAT2_GAUGE_ORDER;
+        } else if ((precision == QUDA_HALF_PRECISION || precision == QUDA_QUARTER_PRECISION)
+                   && (reconstruct == QUDA_RECONSTRUCT_8 || reconstruct == QUDA_RECONSTRUCT_9)) {
 #ifdef FLOAT8
-              order = QUDA_FLOAT8_GAUGE_ORDER;
+          order = QUDA_FLOAT8_GAUGE_ORDER;
 #else
-              order = QUDA_FLOAT4_GAUGE_ORDER;
+          order = QUDA_FLOAT4_GAUGE_ORDER;
 #endif
-            } else {
-              order = QUDA_FLOAT4_GAUGE_ORDER;
-            }
-          }
+        } else {
+          order = QUDA_FLOAT4_GAUGE_ORDER;
         }
+      }
+    }
   };
 
   std::ostream& operator<<(std::ostream& output, const GaugeFieldParam& param);
@@ -504,7 +512,7 @@ namespace quda {
        @param[in] stream_p Pointer to CUDA stream to post the
        communication in (if 0, then use null stream)
     */
-    void sendStart(int dim, int dir, cudaStream_t *stream_p=nullptr);
+    void sendStart(int dim, int dir, qudaStream_t *stream_p = nullptr);
 
     /**
        @brief Wait for communication to complete
@@ -607,7 +615,7 @@ namespace quda {
       @param[in] mem_space Memory space we are prefetching to
       @param[in] stream Which stream to run the prefetch in (default 0)
     */
-    void prefetch(QudaFieldLocation mem_space, cudaStream_t stream = 0) const;
+    void prefetch(QudaFieldLocation mem_space, qudaStream_t stream = 0) const;
   };
 
   class cpuGaugeField : public GaugeField {
@@ -730,6 +738,7 @@ namespace quda {
   */
   void copyGenericGauge(GaugeField &out, const GaugeField &in, QudaFieldLocation location, void *Out = 0, void *In = 0,
                         void **ghostOut = 0, void **ghostIn = 0, int type = 0);
+
   /**
      This function is used for copying the gauge field into an
      extended gauge field.  Defined in copy_extended_gauge.cu.
@@ -741,6 +750,28 @@ namespace quda {
   */
   void copyExtendedGauge(GaugeField &out, const GaugeField &in,
 			 QudaFieldLocation location, void *Out=0, void *In=0);
+
+  /**
+     This function is used for creating an exteneded gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @param profile The `TimeProfile`
+     @param redundant_comms
+     @param recon The reconsturction type
+     @return the pointer to the extended gauge field
+  */
+  cudaGaugeField *createExtendedGauge(cudaGaugeField &in, const int *R, TimeProfile &profile,
+                                      bool redundant_comms = false, QudaReconstructType recon = QUDA_RECONSTRUCT_INVALID);
+
+  /**
+     This function is used for creating an exteneded (cpu) gauge field from the input,
+     and copying the gauge field into the extended gauge field.  Defined in lib/gauge_field.cpp.
+     @param in The input field from which we are extending
+     @param R By how many do we want to extend the gauge field in each direction
+     @return the pointer to the extended gauge field
+  */
+  cpuGaugeField *createExtendedGauge(void **gauge, QudaGaugeParam &gauge_param, const int *R);
 
   /**
      This function is used for  extracting the gauge ghost zone from a

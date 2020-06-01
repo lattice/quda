@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
-#include <staggered_oprod.h>
 
+#include <staggered_oprod.h>
 #include <tune_quda.h>
 #include <quda_internal.h>
 #include <gauge_field_order.h>
@@ -287,7 +287,7 @@ namespace quda {
 
     virtual ~StaggeredOprodField() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if (meta.Location() == QUDA_CUDA_FIELD_LOCATION) {
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this, QUDA_TUNE_NO, getVerbosity());

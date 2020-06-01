@@ -1,7 +1,6 @@
 #include <color_spinor_field.h>
 #include <color_spinor_field_order.h>
 #include <tune_quda.h>
-#include <typeinfo>
 #include <multigrid_helper.cuh>
 
 namespace quda {
@@ -158,7 +157,7 @@ namespace quda {
 
     virtual ~ProlongateLaunch() { }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       if (location == QUDA_CPU_FIELD_LOCATION) {
         if (out.FieldOrder() == QUDA_SPACE_SPIN_COLOR_FIELD_ORDER) {
           ProlongateArg<Float,vFloat,fineSpin,fineColor,coarseSpin,coarseColor,QUDA_SPACE_SPIN_COLOR_FIELD_ORDER>

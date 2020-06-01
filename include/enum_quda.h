@@ -92,6 +92,7 @@ extern "C" {
     QUDA_DOMAIN_WALL_DSLASH,
     QUDA_DOMAIN_WALL_4D_DSLASH,
     QUDA_MOBIUS_DWF_DSLASH,
+    QUDA_MOBIUS_DWF_EOFA_DSLASH,
     QUDA_STAGGERED_DSLASH,
     QUDA_ASQTAD_DSLASH,
     QUDA_TWISTED_MASS_DSLASH,
@@ -132,9 +133,10 @@ extern "C" {
   } QudaInverterType;
 
   typedef enum QudaEigType_s {
-    QUDA_EIG_TR_LANCZOS, // Thick restarted lanczos solver
-    QUDA_EIG_IR_LANCZOS, // Implicitly Restarted Lanczos solver (not implemented)
-    QUDA_EIG_IR_ARNOLDI, // Implicitly Restarted Arnoldi solver (not implemented)
+    QUDA_EIG_TR_LANCZOS,     // Thick restarted lanczos solver
+    QUDA_EIG_BLK_TR_LANCZOS, // Block Thick restarted lanczos solver
+    QUDA_EIG_IR_LANCZOS,     // Implicitly Restarted Lanczos solver (not implemented)
+    QUDA_EIG_IR_ARNOLDI,     // Implicitly Restarted Arnoldi solver (not implemented)
     QUDA_EIG_INVALID = QUDA_INVALID_ENUM
   } QudaEigType;
 
@@ -309,6 +311,8 @@ extern "C" {
     QUDA_DOMAIN_WALL_4DPC_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALL_DIRAC,
     QUDA_MOBIUS_DOMAIN_WALLPC_DIRAC,
+    QUDA_MOBIUS_DOMAIN_WALL_EOFA_DIRAC,
+    QUDA_MOBIUS_DOMAIN_WALLPC_EOFA_DIRAC,
     QUDA_STAGGERED_DIRAC,
     QUDA_STAGGEREDPC_DIRAC,
     QUDA_ASQTAD_DIRAC,

@@ -82,7 +82,8 @@ namespace quda {
     
     // note that we can't set the stream parameter here so it is
     // ignored.  This is more of a future design direction to consider
-    void apply(const cudaStream_t &stream) {      
+    void apply(const qudaStream_t &stream)
+    {
       static int count = 0;
 
 #if 0
@@ -104,7 +105,6 @@ namespace quda {
 #endif
       if (++count == n_update) count = 0;
     }
-    
   };
 
   // this is the Worker pointer that the dslash uses to launch the shifted updates

@@ -1,5 +1,4 @@
-#ifndef _TUNE_QUDA_H
-#define _TUNE_QUDA_H
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -8,9 +7,17 @@
 #include <cfloat>
 #include <stdarg.h>
 #include <map>
+#include <algorithm>
+#include <typeinfo>
 
 #include <tune_key.h>
 #include <quda_internal.h>
+
+// this file has some workarounds to allow compilation using nvrtc of kernels that include this file
+#ifdef __CUDACC_RTC__
+#define CUresult bool
+#define CUDA_SUCCESS true
+#endif
 
 namespace quda {
 
@@ -46,6 +53,7 @@ namespace quda {
       return *this;
     }
 
+#ifndef __CUDACC_RTC__
     friend std::ostream& operator<<(std::ostream& output, const TuneParam& param) {
       output << "block=(" << param.block.x << "," << param.block.y << "," << param.block.z << "), ";
       output << "grid=(" << param.grid.x << "," << param.grid.y << "," << param.grid.z << "), ";
@@ -53,13 +61,16 @@ namespace quda {
       output << ", aux=(" << param.aux.x << "," << param.aux.y << "," << param.aux.z << "," << param.aux.w << ")";
       return output;
     }
+#endif
   };
 
+#ifndef __CUDACC_RTC__
   /**
    * @brief Returns a reference to the tunecache map
    * @return tunecache reference
    */
   const std::map<TuneKey, TuneParam> &getTuneCache();
+#endif
 
   class Tunable {
 
@@ -141,21 +152,26 @@ namespace quda {
         ret = true;
       }
 
-      if (!tuneGridDim()) 
+      if (!tuneGridDim())
 	param.grid = dim3((minThreads()+param.block.x-1)/param.block.x, 1, 1);
 
       return ret;
     }
 
     /**
-     * @brief For some reason this can't be queried from the device
-     * properties, so here we set set this.  Based on Table 14 of the
-     * CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability)
+     * @brief Returns the maximum number of simultaneously resident
+     * blocks per SM.  We can directly query this of CUDA 11, but
+     * previously this needed to be hand coded.
      * @return The maximum number of simultaneously resident blocks per SM
      */
     unsigned int maxBlocksPerSM() const
     {
+#if CUDA_VERSION >= 11000
+      static int max_blocks_per_sm = 0;
+      if (!max_blocks_per_sm) cudaDeviceGetAttribute(&max_blocks_per_sm, cudaDevAttrMaxBlocksPerMultiprocessor, comm_gpuid());
+      return max_blocks_per_sm;
+#else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
 	return 8;
@@ -174,6 +190,7 @@ namespace quda {
                     deviceProp.major, deviceProp.minor);
         return 32;
       }
+#endif
     }
 
     /**
@@ -193,30 +210,28 @@ namespace quda {
     }
 
     /**
-     * @brief This can't be correctly queried in CUDA for all
-     * architectures so here we set set this.  Based on Table 14 of
-     * the CUDA Programming Guide 10.0 (Technical Specifications per
-     * Compute Capability).
+     * @brief Returns the maximum dynamic shared memory per block.
      * @return The maximum dynamic shared memory to CUDA thread block
      */
     unsigned int maxDynamicSharedBytesPerBlock() const
     {
+#if CUDA_VERSION >= 9000
+      static int max_shared_bytes = 0;
+      if (!max_shared_bytes) cudaDeviceGetAttribute(&max_shared_bytes, cudaDevAttrMaxSharedMemoryPerBlockOptin, comm_gpuid());
+      return max_shared_bytes;
+#else
+      // these variables are taken from Table 14 of the CUDA 10.2 prgramming guide
       switch (deviceProp.major) {
       case 2:
       case 3:
       case 5:
       case 6: return 48 * 1024;
-      case 7:
-        switch (deviceProp.minor) {
-        case 0: return 96 * 1024;
-        case 2: return 96 * 1024;
-        case 5: return 64 * 1024;
-        }
       default:
         warningQuda("Unknown SM architecture %d.%d - assuming limit of 48 KiB per SM\n",
                     deviceProp.major, deviceProp.minor);
         return 48 * 1024;
       }
+#endif
     }
 
     /**
@@ -269,10 +284,13 @@ namespace quda {
     char aux[TuneKey::aux_n];
 
     int writeAuxString(const char *format, ...) {
+      int n = 0;
+#ifndef __CUDACC_RTC__
       va_list arguments;
       va_start(arguments, format);
-      int n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
-      if (n < 0 || n >=TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+      n = vsnprintf(aux, TuneKey::aux_n, format, arguments);
+      if (n < 0 || n >= TuneKey::aux_n) errorQuda("Error writing auxiliary string");
+#endif
       return n;
     }
 
@@ -285,6 +303,7 @@ namespace quda {
     */
     bool tuned()
     {
+#ifndef __CUDACC_RTC__
       // not tuning is equivalent to already tuned
       if (!getTuning()) return true;
 
@@ -292,33 +311,38 @@ namespace quda {
       if (use_managed_memory()) strcat(key.aux, ",managed");
       // if key is present in cache then already tuned
       return getTuneCache().find(key) != getTuneCache().end();
+#else
+      return true;
+#endif
     }
 
   public:
     Tunable() : jitify_error(CUDA_SUCCESS) { aux[0] = '\0'; }
     virtual ~Tunable() { }
     virtual TuneKey tuneKey() const = 0;
-    virtual void apply(const cudaStream_t &stream) = 0;
+    virtual void apply(const qudaStream_t &stream) = 0;
     virtual void preTune() { }
     virtual void postTune() { }
     virtual int tuningIter() const { return 1; }
 
+#ifndef __CUDACC_RTC__
     virtual std::string paramString(const TuneParam &param) const
-      {
-	std::stringstream ps;
-	ps << param;
-	return ps.str();
-      }
+    {
+      std::stringstream ps;
+      ps << param;
+      return ps.str();
+    }
 
     virtual std::string perfString(float time) const
-      {
-	float gflops = flops() / (1e9 * time);
-	float gbytes = bytes() / (1e9 * time);
-	std::stringstream ss;
-	ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
-	ss << gbytes << " GB/s";
-	return ss.str();
-      }
+    {
+      float gflops = flops() / (1e9 * time);
+      float gbytes = bytes() / (1e9 * time);
+      std::stringstream ss;
+      ss << std::setiosflags(std::ios::fixed) << std::setprecision(2) << gflops << " Gflop/s, ";
+      ss << gbytes << " GB/s";
+      return ss.str();
+    }
+#endif
 
     virtual void initTuneParam(TuneParam &param) const
     {
@@ -348,7 +372,7 @@ namespace quda {
     virtual void defaultTuneParam(TuneParam &param) const
     {
       initTuneParam(param);
-      if (tuneGridDim()) param.grid = dim3(maxGridSize(), 1, 1);
+      if (tuneGridDim()) param.grid.x = maxGridSize(); // don't set y and z in case derived initTuneParam has
     }
 
     virtual bool advanceTuneParam(TuneParam &param) const
@@ -365,29 +389,29 @@ namespace quda {
       if (param.block.x*param.block.y*param.block.z > (unsigned)deviceProp.maxThreadsPerBlock)
         errorQuda("Requested block size %dx%dx%d=%d greater than hardware limit %d",
                   param.block.x, param.block.y, param.block.z, param.block.x*param.block.y*param.block.z, deviceProp.maxThreadsPerBlock);
-      
+
       if (param.block.x > (unsigned int)deviceProp.maxThreadsDim[0])
-	errorQuda("Requested X-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested X-dimension block size %d greater than hardware limit %d",
 		  param.block.x, deviceProp.maxThreadsDim[0]);
-      
+
       if (param.block.y > (unsigned int)deviceProp.maxThreadsDim[1])
-	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested Y-dimension block size %d greater than hardware limit %d",
 		  param.block.y, deviceProp.maxThreadsDim[1]);
-	
+
       if (param.block.z > (unsigned int)deviceProp.maxThreadsDim[2])
-	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d", 
+	errorQuda("Requested Z-dimension block size %d greater than hardware limit %d",
 		  param.block.z, deviceProp.maxThreadsDim[2]);
-	  
+
       if (param.grid.x > (unsigned int)deviceProp.maxGridSize[0])
-	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested X-dimension grid size %d greater than hardware limit %d",
 		  param.grid.x, deviceProp.maxGridSize[0]);
 
       if (param.grid.y > (unsigned int)deviceProp.maxGridSize[1])
-	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested Y-dimension grid size %d greater than hardware limit %d",
 		  param.grid.y, deviceProp.maxGridSize[1]);
-    
+
       if (param.grid.z > (unsigned int)deviceProp.maxGridSize[2])
-	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d", 
+	errorQuda("Requested Z-dimension grid size %d greater than hardware limit %d",
 		  param.grid.z, deviceProp.maxGridSize[2]);
     }
 
@@ -395,7 +419,7 @@ namespace quda {
     CUresult& jitifyError() { return jitify_error; }
   };
 
-  
+
   /**
      This derived class is for algorithms that deploy parity across
      the y dimension of the thread block with no shared memory tuning.
@@ -423,7 +447,7 @@ namespace quda {
       param.block.y = 2;
       return rtn;
     }
-    
+
     void initTuneParam(TuneParam &param) const {
       Tunable::initTuneParam(param);
       param.block.y = 2;
@@ -435,7 +459,7 @@ namespace quda {
     }
 
   };
-  
+
   /**
      This derived class is for algorithms that deploy a vector of
      computations across the y dimension of both the threads block and
@@ -601,6 +625,10 @@ namespace quda {
 
 } // namespace quda
 
-#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)
+// undo jit-safe modifications
+#ifdef __CUDACC_RTC__
+#undef CUresult
+#undef CUDA_SUCCESS
+#endif
 
-#endif // _TUNE_QUDA_H
+#define postTrace() quda::postTrace_(__func__, quda::file_name(__FILE__), __LINE__)

@@ -576,7 +576,7 @@ namespace quda {
     backed_up = false;
   }
 
-  void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space, cudaStream_t stream) const
+  void cudaColorSpinorField::prefetch(QudaFieldLocation mem_space, qudaStream_t stream) const
   {
 
     // conditionals based on destructor
@@ -795,7 +795,7 @@ namespace quda {
 
   // pack the ghost zone into a contiguous buffer for communications
   void cudaColorSpinorField::packGhost(const int nFace, const QudaParity parity, const int dim, const QudaDirection dir,
-                                       const int dagger, cudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
+                                       const int dagger, qudaStream_t *stream, MemoryLocation location[2 * QUDA_MAX_DIM],
                                        MemoryLocation location_label, bool spin_project, double a, double b, double c)
   {
 #ifdef MULTI_GPU
@@ -826,10 +826,9 @@ namespace quda {
   }
 
   // send the ghost zone to the host
-  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim,
-				       const QudaDirection dir, const int dagger,
-				       cudaStream_t *stream) {
-
+  void cudaColorSpinorField::sendGhost(void *ghost_spinor, const int nFace, const int dim, const QudaDirection dir,
+                                       const int dagger, qudaStream_t *stream)
+  {
 #ifdef MULTI_GPU
     if (precision != ghost_precision) { pushKernelPackT(true); }
 
@@ -893,13 +892,10 @@ namespace quda {
 #else
     errorQuda("sendGhost not built on single-GPU build");
 #endif
-
   }
 
-
-  void cudaColorSpinorField::unpackGhost(const void* ghost_spinor, const int nFace,
-					 const int dim, const QudaDirection dir,
-					 const int dagger, cudaStream_t* stream)
+  void cudaColorSpinorField::unpackGhost(const void *ghost_spinor, const int nFace, const int dim,
+                                         const QudaDirection dir, const int dagger, qudaStream_t *stream)
   {
     const void *src = ghost_spinor;
 
@@ -911,24 +907,23 @@ namespace quda {
 
 
   // pack the ghost zone into a contiguous buffer for communications
-  void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity,
-					       const int dim, const QudaDirection dir,
-					       const int dagger, cudaStream_t *stream, bool zero_copy)
+  void cudaColorSpinorField::packGhostExtended(const int nFace, const int R[], const QudaParity parity, const int dim,
+                                               const QudaDirection dir, const int dagger, qudaStream_t *stream,
+                                               bool zero_copy)
   {
     errorQuda("not implemented");
   }
 
 
   // copy data from host buffer into boundary region of device field
-  void cudaColorSpinorField::unpackGhostExtended(const void* ghost_spinor, const int nFace, const QudaParity parity,
-                                                 const int dim, const QudaDirection dir,
-                                                 const int dagger, cudaStream_t* stream, bool zero_copy)
+  void cudaColorSpinorField::unpackGhostExtended(const void *ghost_spinor, const int nFace, const QudaParity parity,
+                                                 const int dim, const QudaDirection dir, const int dagger,
+                                                 qudaStream_t *stream, bool zero_copy)
   {
     errorQuda("not implemented");
   }
 
-
-  cudaStream_t *stream;
+  qudaStream_t *stream;
 
   void cudaColorSpinorField::createComms(int nFace, bool spin_project) {
 
@@ -964,9 +959,7 @@ namespace quda {
     createIPCComms();
   }
 
-  void cudaColorSpinorField::streamInit(cudaStream_t *stream_p) {
-    stream = stream_p;
-  }
+  void cudaColorSpinorField::streamInit(qudaStream_t *stream_p) { stream = stream_p; }
 
   void cudaColorSpinorField::pack(int nFace, int parity, int dagger, int stream_idx,
                                   MemoryLocation location[2 * QUDA_MAX_DIM], MemoryLocation location_label,
@@ -980,9 +973,8 @@ namespace quda {
               spin_project, a, b, c);
   }
 
-  void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity,
-                                          const int dagger, const int dim,
-                                          cudaStream_t *stream_p, const bool zero_copy)
+  void cudaColorSpinorField::packExtended(const int nFace, const int R[], const int parity, const int dagger,
+                                          const int dim, qudaStream_t *stream_p, const bool zero_copy)
   {
     createComms(nFace); // must call this first
 
@@ -991,12 +983,12 @@ namespace quda {
     packGhostExtended(nFace, R, (QudaParity)parity, dim, QUDA_BOTH_DIRS, dagger, &stream[zero_copy ? 0 : (Nstream-1)], zero_copy);
   }
 
-  void cudaColorSpinorField::gather(int nFace, int dagger, int dir, cudaStream_t* stream_p)
+  void cudaColorSpinorField::gather(int nFace, int dagger, int dir, qudaStream_t *stream_p)
   {
     int dim = dir/2;
 
     // If stream_p != 0, use pack_stream, else use the stream array
-    cudaStream_t *pack_stream = (stream_p) ? stream_p : stream+dir;
+    qudaStream_t *pack_stream = (stream_p) ? stream_p : stream + dir;
 
     if (dir%2 == 0) {
       // backwards copy to host
@@ -1011,8 +1003,8 @@ namespace quda {
     }
   }
 
-
-  void cudaColorSpinorField::recvStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr) {
+  void cudaColorSpinorField::recvStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr)
+  {
 
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -1043,8 +1035,8 @@ namespace quda {
     }
   }
 
-
-  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, cudaStream_t* stream_p, bool gdr, bool remote_write) {
+  void cudaColorSpinorField::sendStart(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr, bool remote_write)
+  {
 
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -1066,7 +1058,7 @@ namespace quda {
 	if (gdr) comm_start(mh_send_rdma_fwd[bufferIndex][dim]);
 	else comm_start(mh_send_fwd[bufferIndex][dim]);
     } else { // doing peer-to-peer
-      cudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
+      qudaStream_t *copy_stream = (stream_p) ? stream_p : stream + d;
 
       // if not using copy engine then the packing kernel will remotely write the halos
       if (!remote_write) {
@@ -1147,18 +1139,20 @@ namespace quda {
     }
   }
 
-  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, cudaStream_t* stream_p, bool gdr_send, bool gdr_recv) {
+  void cudaColorSpinorField::commsStart(int nFace, int dir, int dagger, qudaStream_t *stream_p, bool gdr_send,
+                                        bool gdr_recv)
+  {
     recvStart(nFace, dir, dagger, stream_p, gdr_recv);
     sendStart(nFace, dir, dagger, stream_p, gdr_send);
   }
-
 
   static bool complete_recv_fwd[QUDA_MAX_DIM] = { };
   static bool complete_recv_back[QUDA_MAX_DIM] = { };
   static bool complete_send_fwd[QUDA_MAX_DIM] = { };
   static bool complete_send_back[QUDA_MAX_DIM] = { };
 
-  int cudaColorSpinorField::commsQuery(int nFace, int d, int dagger, cudaStream_t *stream_p, bool gdr_send, bool gdr_recv) {
+  int cudaColorSpinorField::commsQuery(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr_send, bool gdr_recv)
+  {
 
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -1226,7 +1220,8 @@ namespace quda {
     return 0;
   }
 
-  void cudaColorSpinorField::commsWait(int nFace, int d, int dagger, cudaStream_t *stream_p, bool gdr_send, bool gdr_recv) {
+  void cudaColorSpinorField::commsWait(int nFace, int d, int dagger, qudaStream_t *stream_p, bool gdr_send, bool gdr_recv)
+  {
 
     // note this is scatter centric, so dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards)
@@ -1286,7 +1281,7 @@ namespace quda {
     return;
   }
 
-  void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir, cudaStream_t* stream_p)
+  void cudaColorSpinorField::scatter(int nFace, int dagger, int dim_dir, qudaStream_t *stream_p)
   {
     // note this is scatter centric, so input expects dir=0 (1) is send backwards
     // (forwards) and receive from forwards (backwards), so here we need flip to receive centric

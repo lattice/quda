@@ -325,7 +325,7 @@ namespace quda {
 
     virtual ~CloverForce() {}
 
-    void apply(const cudaStream_t &stream){
+    void apply(const qudaStream_t &stream){
       if(location == QUDA_CUDA_FIELD_LOCATION){
 	// Disable tuning for the time being
 	TuneParam tp = tuneLaunch(*this,getTuning(),getVerbosity());

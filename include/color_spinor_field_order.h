@@ -18,10 +18,10 @@
 #include <complex_quda.h>
 #include <index_helper.cuh>
 #include <color_spinor.h>
-#include <thrust_helper.cuh>
 #include <color_spinor_field.h>
 #include <trove_helper.cuh>
 #include <texture_helper.cuh>
+#include <transform_reduce.h>
 
 namespace quda {
 
@@ -745,17 +745,10 @@ namespace quda {
        * @param[in] global Whether to do a global or process local norm2 reduction
        * @return L2 norm squared
       */
-      __host__ double norm2(bool global=true) const {
-        double nrm2 = 0;
-        if (location == QUDA_CUDA_FIELD_LOCATION) {
-          thrust_allocator alloc;
-          thrust::device_ptr<complex<storeFloat> > ptr(v);
-          nrm2 = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-          square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-        } else {
-          nrm2 = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-          square_<double,storeFloat>(scale_inv), 0.0, thrust::plus<double>());
-        }
+      __host__ double norm2(bool global = true) const
+      {
+        double nrm2 = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                               square_<double, storeFloat>(scale_inv), 0.0, plus<double>());
         if (global) comm_allreduce(&nrm2);
         return nrm2;
       }
@@ -765,20 +758,12 @@ namespace quda {
        * @param[in] global Whether to do a global or process local Linfinity reduction
        * @return Linfinity norm
       */
-      __host__ double abs_max(bool global=true) const {
-
-	double absmax = 0;
-	if (location == QUDA_CUDA_FIELD_LOCATION) {
-	  thrust_allocator alloc;
-	  thrust::device_ptr<complex<storeFloat> > ptr(v);
-	  absmax = thrust::transform_reduce(thrust::cuda::par(alloc), ptr, ptr+nParity*volumeCB*nSpin*nColor*nVec,
-					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
-	} else {
-	  absmax = thrust::transform_reduce(thrust::seq, v, v+nParity*volumeCB*nSpin*nColor*nVec,
-					    abs_<double,storeFloat>(scale_inv), 0.0, thrust::maximum<double>());
-	}
-	if (global) comm_allreduce_max(&absmax);
-	return absmax;
+      __host__ double abs_max(bool global = true) const
+      {
+        double absmax = ::quda::transform_reduce(location, v, nParity * volumeCB * nSpin * nColor * nVec,
+                                                 abs_<double, storeFloat>(scale_inv), 0.0, maximum<double>());
+        if (global) comm_allreduce_max(&absmax);
+        return absmax;
       }
 
       size_t Bytes() const { return nParity * static_cast<size_t>(volumeCB) * nColor * nSpin * nVec * 2ll * sizeof(storeFloat); }

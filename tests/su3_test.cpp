@@ -5,18 +5,10 @@
 #include <string.h>
 
 #include <util_quda.h>
-#include <test_util.h>
-#include <test_params.h>
-#include <dslash_util.h>
-#include "misc.h"
-
-#include <qio_field.h>
-
-#if defined(QMP_COMMS)
-#include <qmp.h>
-#elif defined(MPI_COMMS)
-#include <mpi.h>
-#endif
+#include <host_utils.h>
+#include <command_line_params.h>
+#include <dslash_reference.h>
+#include <misc.h>
 
 #include <comm_quda.h>
 
@@ -69,10 +61,6 @@ void display_test_info()
   return;
 }
 
-QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-QudaPrecision &cuda_prec = prec;
-QudaPrecision &cuda_prec_sloppy = prec_sloppy;
-
 void setGaugeParam(QudaGaugeParam &gauge_param) {
 
   gauge_param.X[0] = xdim;
@@ -123,7 +111,7 @@ int main(int argc, char **argv)
     return app->exit(e);
   }
 
-  // initialize QMP/MPI, QUDA comms grid and RNG (test_util.cpp)
+  // initialize QMP/MPI, QUDA comms grid and RNG (host_utils.cpp)
   initComms(argc, argv, gridsize_from_cmdline);
 
   QudaGaugeParam gauge_param = newQudaGaugeParam();
@@ -134,13 +122,12 @@ int main(int argc, char **argv)
 
   setGaugeParam(gauge_param);
   setDims(gauge_param.X);
-  size_t gSize = gauge_param.cpu_prec;
 
   void *gauge[4], *new_gauge[4];
 
   for (int dir = 0; dir < 4; dir++) {
-    gauge[dir] = malloc(V*gaugeSiteSize*gSize);
-    new_gauge[dir] = malloc(V*gaugeSiteSize*gSize);
+    gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
+    new_gauge[dir] = malloc(V * gauge_site_size * host_gauge_data_type_size);
   }
 
   initQuda(device);
@@ -150,21 +137,9 @@ int main(int argc, char **argv)
   // call srand() with a rank-dependent seed
   initRand();
 
-  // load in the command line supplied gauge field
-  if (strcmp(latfile, "")) {
-    read_gauge_field(latfile, gauge, gauge_param.cpu_prec, gauge_param.X, argc, argv);
-    construct_gauge_field(gauge, 2, gauge_param.cpu_prec, &gauge_param);
-  } else { // else generate an SU(3) field
-    if (unit_gauge) {
-      // unit SU(3) field
-      construct_gauge_field(gauge, 0, gauge_param.cpu_prec, &gauge_param);
-    } else {
-      // random SU(3) field
-      construct_gauge_field(gauge, 1, gauge_param.cpu_prec, &gauge_param);
-    }
-  }
-
-  loadGaugeQuda(gauge, &gauge_param);
+  constructHostGaugeField(gauge, gauge_param, argc, argv);
+  // Load the gauge field to the device
+  loadGaugeQuda((void *)gauge, &gauge_param);
   saveGaugeQuda(new_gauge, &gauge_param);
 
   double plaq[3];
@@ -180,8 +155,8 @@ int main(int argc, char **argv)
   // Topological charge and gauge energy
   double q_charge_check = 0.0;
   // Size of floating point data
-  size_t sSize = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
-  size_t array_size = V * sSize;
+  size_t data_size = prec == QUDA_DOUBLE_PRECISION ? sizeof(double) : sizeof(float);
+  size_t array_size = V * data_size;
   void *qDensity = malloc(array_size);
   // start the timer
   double time0 = -((double)clock());

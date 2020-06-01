@@ -12,14 +12,14 @@ namespace quda {
 
   namespace blas {
 
-    cudaStream_t* getStream();
+    qudaStream_t* getStream();
     cudaEvent_t* getReduceEvent();
     bool getFastReduce();
     void initFastReduce(int words);
     void completeFastReduce(int32_t words);
 
     template <typename doubleN, typename ReduceType, typename FloatN, int M, int NXZ, typename Arg>
-    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const cudaStream_t &stream, Tunable &tunable)
+    void multiReduceLaunch(doubleN result[], Arg &arg, const TuneParam &tp, const qudaStream_t &stream, Tunable &tunable)
     {
 
       if (tp.grid.x > (unsigned int)deviceProp.maxGridSize[0])
@@ -158,7 +158,7 @@ namespace quda {
         return TuneKey(x[0]->VolString(), name, aux);
       }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
         multiReduceLaunch<doubleN, ReduceType, FloatN, M, NXZ>(result, arg, tp, stream, *this);
@@ -483,7 +483,7 @@ namespace quda {
       checkPrecision(*x[0], *z[0]);
       checkPrecision(*y[0], *w[0]);
 
-      assert(siteUnroll == true);
+      static_assert(siteUnroll == true, "site unrolling must be enabled for mixed precision");
       int reduce_length = siteUnroll ? x[0]->RealLength() : x[0]->Length();
 
       if (y[0]->Precision() == QUDA_DOUBLE_PRECISION && x[0]->Precision() == QUDA_SINGLE_PRECISION) {
@@ -1017,7 +1017,7 @@ namespace quda {
 
       virtual ~TileSizeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream) {
+      void apply(const qudaStream_t &stream) {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
         // tp.aux.x is where the tile size is stored. "tp" is the tuning struct.
@@ -1171,7 +1171,7 @@ namespace quda {
 
       virtual ~TransposeTune() { setPolicyTuning(false); }
 
-      void apply(const cudaStream_t &stream)
+      void apply(const qudaStream_t &stream)
       {
         TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
 
