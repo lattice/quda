@@ -110,7 +110,7 @@ namespace quda {
       apply(0);
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeLongLink<Float><<<tp.grid,tp.block,tp.shared_bytes>>>(arg);
     }
@@ -167,7 +167,7 @@ namespace quda {
       apply(0);
     }
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       computeOneLink<Float><<<tp.grid,tp.block>>>(arg);
     }
@@ -377,7 +377,7 @@ namespace quda {
 	  assert(j == arg.n_mu);
 	}
 
-    void apply(const cudaStream_t &stream) {
+    void apply(const qudaStream_t &stream) {
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
       if (save_staple)
 	computeStaple<Float,true><<<tp.grid,tp.block>>>(arg, nu);
