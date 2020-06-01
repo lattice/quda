@@ -232,11 +232,15 @@ void setInvertParam(QudaInvertParam &inv_param)
 
   inv_param.verbosity = verbosity;
 
-  inv_param.extlib_type = solver_ext_lib;
+  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
+    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
+  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
+    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
+  } 
 }
 
 // Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param)
+void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type = QUDA_INVALID_INVERTER)
 {
   eig_param.eig_type = eig_type;
   eig_param.spectrum = eig_spectrum;
@@ -253,6 +257,12 @@ void setEigParam(QudaEigParam &eig_param)
     eig_param.nConv = eig_nConv;
   }
 
+  if(inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER){
+    if ( eig_nConv < 0 ) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);	  
+      eig_param.nLockedMax = eig_nConv;
+      eig_param.nConv      = 0;
+  }
+
   eig_param.block_size = eig_param.eig_type == QUDA_EIG_TR_LANCZOS ? 1 : eig_block_size;
   eig_param.nEv = eig_nEv;
   eig_param.nKr = eig_nKr;
@@ -261,7 +271,7 @@ void setEigParam(QudaEigParam &eig_param)
   eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.check_interval = eig_check_interval;
   eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = cuda_prec;
+  eig_param.cuda_prec_ritz = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : cuda_prec; 
 
   eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
   eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;

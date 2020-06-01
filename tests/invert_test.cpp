@@ -92,68 +92,6 @@ void display_test_info()
     }
   }
 
-  printfQuda("Grid partition info:     X  Y  Z  T\n"); 
-  printfQuda("                         %d  %d  %d  %d\n", 
-	     dimPartitioned(0),
-	     dimPartitioned(1),
-	     dimPartitioned(2),
-	     dimPartitioned(3)); 
-}
-
-// Parameters defining the eigensolver
-void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
-{
-  eig_param.eig_type = eig_type;
-  eig_param.spectrum = eig_spectrum;
-  if ((eig_type == QUDA_EIG_TR_LANCZOS || eig_type == QUDA_EIG_IR_LANCZOS)
-      && !(eig_spectrum == QUDA_SPECTRUM_LR_EIG || eig_spectrum == QUDA_SPECTRUM_SR_EIG)) {
-    errorQuda("Only real spectrum type (LR or SR) can be passed to Lanczos type solver");
-  }
-
-  // The solver will exit when nConv extremal eigenpairs have converged
-  if (eig_nConv < 0) {
-    eig_param.nConv = eig_nEv;
-    eig_nConv = eig_nEv;
-  } else {
-    eig_param.nConv = eig_nConv;
-  }
-
-  if(inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER){
-    if ( eig_nConv < 0 ) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);	  
-      eig_param.nLockedMax = eig_nConv;
-      eig_param.nConv      = 0;
-  }
-
-
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
-  eig_param.tol = eig_tol;
-  eig_param.batched_rotate = eig_batched_rotate;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.check_interval = eig_check_interval;
-  eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : prec;
-
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
-    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
-  }
-
-  eig_param.use_poly_acc = eig_use_poly_acc ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.poly_deg = eig_poly_deg;
-  eig_param.a_min = eig_amin;
-  eig_param.a_max = eig_amax;
-
-  eig_param.arpack_check = eig_arpack_check ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  strcpy(eig_param.arpack_logfile, eig_arpack_logfile);
-  strcpy(eig_param.QUDA_logfile, eig_QUDA_logfile);
-
-  strcpy(eig_param.vec_infile, eig_vec_infile);
-  strcpy(eig_param.vec_outfile, eig_vec_outfile);
-
   printfQuda("Grid partition info:     X  Y  Z  T\n");
   printfQuda("                         %d  %d  %d  %d\n", dimPartitioned(0), dimPartitioned(1), dimPartitioned(2),
              dimPartitioned(3));
@@ -200,71 +138,6 @@ int main(int argc, char **argv)
     exit(0);
   }
 
-  QudaPrecision cpu_prec = QUDA_DOUBLE_PRECISION;
-  QudaPrecision cuda_prec = prec;
-  QudaPrecision cuda_prec_sloppy = prec_sloppy;
-  QudaPrecision cuda_prec_refinement_sloppy = prec_refinement_sloppy;
-  QudaPrecision cuda_prec_precondition = prec_precondition;
-
-  QudaGaugeParam gauge_param = newQudaGaugeParam();
-  QudaInvertParam inv_param = newQudaInvertParam();
-  QudaEigParam eig_param = newQudaEigParam();
-  setEigParam(eig_param, inv_type);
-  inv_param.eig_param = inv_deflate ? &eig_param : nullptr;
-
-  double kappa5 = 0;
-
-  gauge_param.X[0] = xdim;
-  gauge_param.X[1] = ydim;
-  gauge_param.X[2] = zdim;
-  gauge_param.X[3] = tdim;
-  inv_param.Ls = 1;
-
-  gauge_param.anisotropy = anisotropy;
-  gauge_param.type = QUDA_WILSON_LINKS;
-  gauge_param.gauge_order = QUDA_QDP_GAUGE_ORDER;
-  gauge_param.t_boundary = QUDA_PERIODIC_T;
-  
-  gauge_param.cpu_prec = cpu_prec;
-  gauge_param.cuda_prec = cuda_prec;
-  gauge_param.reconstruct = link_recon;
-  gauge_param.cuda_prec_sloppy = cuda_prec_sloppy;
-  gauge_param.reconstruct_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_precondition = cuda_prec_precondition;
-  gauge_param.reconstruct_precondition = link_recon_precondition;
-  gauge_param.reconstruct_refinement_sloppy = link_recon_sloppy;
-  gauge_param.cuda_prec_refinement_sloppy = cuda_prec_refinement_sloppy;
-
-  gauge_param.gauge_fix = QUDA_GAUGE_FIXED_NO;
-
-  inv_param.dslash_type = dslash_type;
-
-  if (kappa == -1.0) {
-    inv_param.mass = mass;
-    inv_param.kappa = 1.0 / (2.0 * (1 + 3/gauge_param.anisotropy + mass));
-  } else {
-    inv_param.kappa = kappa;
-    inv_param.mass = 0.5/kappa - (1 + 3/gauge_param.anisotropy);
-  }
-  inv_param.mu = mu;
-
-  if (dslash_type == QUDA_TWISTED_MASS_DSLASH || dslash_type == QUDA_TWISTED_CLOVER_DSLASH) {
-    inv_param.epsilon = epsilon;
-    inv_param.twist_flavor = twist_flavor;
-    inv_param.Ls = (inv_param.twist_flavor == QUDA_TWIST_NONDEG_DOUBLET) ? 2 : 1;
-  } else if (dslash_type == QUDA_DOMAIN_WALL_DSLASH ||
-             dslash_type == QUDA_DOMAIN_WALL_4D_DSLASH ||
-	     dslash_type == QUDA_MOBIUS_DWF_DSLASH) {
-    inv_param.m5 = m5;
-    kappa5 = 0.5/(5 + inv_param.m5);  
-    inv_param.Ls = Lsdim;
-    for(int k = 0; k < Lsdim; k++) // for mobius only
-    {
-      // b5[k], c[k] values are chosen for arbitrary values,
-      // but the difference of them are same as 1.0
-      inv_param.b_5[k] = b5;
-      inv_param.c_5[k] = c5;
-
   if (inv_multigrid) {
     // Only these fermions are supported with MG
     if (dslash_type != QUDA_WILSON_DSLASH && dslash_type != QUDA_CLOVER_WILSON_DSLASH
@@ -272,45 +145,6 @@ int main(int argc, char **argv)
       printfQuda("dslash_type %d not supported for MG\n", dslash_type);
       exit(0);
     }
-  }
-
-  // offsets used only by multi-shift solver
-  inv_param.num_offset = 12;
-  double offset[12] = {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12};
-  for (int i=0; i<inv_param.num_offset; i++) inv_param.offset[i] = offset[i];
-
-  inv_param.inv_type = inv_type;
-  inv_param.solution_type = solution_type;
-  inv_param.solve_type = solve_type;
-  inv_param.matpc_type = matpc_type;
-
-  if(inv_param.inv_type == QUDA_EIGCG_INVERTER || inv_param.inv_type == QUDA_INC_EIGCG_INVERTER ){
-    inv_param.solve_type = QUDA_NORMOP_PC_SOLVE;
-  }else if(inv_param.inv_type == QUDA_GMRESDR_INVERTER) {
-    inv_param.solve_type = QUDA_DIRECT_PC_SOLVE;
-  } 
-
-  inv_param.dagger = QUDA_DAG_NO;
-  inv_param.mass_normalization = normalization;
-  inv_param.solver_normalization = QUDA_DEFAULT_NORMALIZATION;
-
-
-  inv_param.pipeline = pipeline;
-
-  inv_param.Nsteps = 2;
-  inv_param.gcrNkrylov = gcrNkrylov;
-  inv_param.ca_basis = ca_basis;
-  inv_param.ca_lambda_min = ca_lambda_min;
-  inv_param.ca_lambda_max = ca_lambda_max;
-
-  inv_param.max_restart_num = max_restart_num;
-  inv_param.inc_tol = inc_tol;  
-
-  inv_param.tol = tol;
-  inv_param.tol_restart = tol_restart; 
-  if(tol_hq == 0 && tol == 0){
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
 
     // Only these solve types are supported with MG
     if (solve_type != QUDA_DIRECT_SOLVE && solve_type != QUDA_DIRECT_PC_SOLVE) {
@@ -351,7 +185,7 @@ int main(int argc, char **argv)
   }
 
   if (inv_deflate) {
-    setEigParam(eig_param);
+    setEigParam(eig_param, inv_type);
     inv_param.eig_param = &eig_param;
   } else {
     inv_param.eig_param = nullptr;
@@ -463,12 +297,11 @@ int main(int argc, char **argv)
 
     // Populate the host spinor with random numbers.
     constructRandomSpinorSource(in->V(), 4, 3, inv_param.cpu_prec, gauge_param.X, *rng);
-
-    // if deflating preserve the deflation space between solves
+    // If deflating, preserve the deflation space between solves
     if (inv_deflate) eig_param.preserve_deflation = i < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-
-    if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_YES) inv_type  = QUDA_CG_INVERTER;
-
+    //
+    if( inv_param.inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_YES ) inv_param.inv_type  = QUDA_CG_INVERTER;
+    // Perform QUDA inversions
     if (multishift > 1) {
       invertMultiShiftQuda((void **)outMulti, in->V(), &inv_param);
     } else {

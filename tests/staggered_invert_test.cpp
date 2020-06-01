@@ -102,7 +102,7 @@ void display_test_info()
              dimPartitioned(3));
 }
 
-void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
+int main(int argc, char **argv)
 {
   setQudaDefaultMgTestParams();
   // Parse command line options
@@ -120,29 +120,6 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
   }
 
   if (!inv_multigrid) solve_type = QUDA_INVALID_SOLVE;
-
-  if(inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER){
-    if ( eig_nConv < 0 ) errorQuda("Invalid value for parameter eig_nConv (= %d)", eig_nConv);
-      eig_param.nLockedMax = eig_nConv;
-      eig_param.nConv      = 0;
-  }
-
-  eig_param.nEv = eig_nEv;
-  eig_param.nKr = eig_nKr;
-  eig_param.tol = eig_tol;
-  eig_param.batched_rotate = eig_batched_rotate;
-  eig_param.require_convergence = eig_require_convergence ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.check_interval = eig_check_interval;
-  eig_param.max_restarts = eig_max_restarts;
-  eig_param.cuda_prec_ritz = (inv_type == QUDA_EIGCG_INVERTER || inv_type == QUDA_INC_EIGCG_INVERTER) ? prec_ritz : prec;
-
-  eig_param.use_norm_op = eig_use_normop ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.use_dagger = eig_use_dagger ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  eig_param.compute_svd = eig_compute_svd ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
-  if (eig_compute_svd) {
-    eig_param.use_dagger = QUDA_BOOLEAN_FALSE;
-    eig_param.use_norm_op = QUDA_BOOLEAN_TRUE;
-  }
 
   if (inv_deflate && inv_multigrid) {
     printfQuda("Error: Cannot use both deflation and multigrid preconditioners on top level solve.\n");
@@ -165,43 +142,6 @@ void setEigParam(QudaEigParam &eig_param, QudaInverterType inv_type)
     dslash_type = QUDA_ASQTAD_DSLASH;
   }
 
-#ifdef MULTI_GPU
-  int x_face_size = gauge_param.X[1] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int y_face_size = gauge_param.X[0] * gauge_param.X[2] * gauge_param.X[3] / 2;
-  int z_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[3] / 2;
-  int t_face_size = gauge_param.X[0] * gauge_param.X[1] * gauge_param.X[2] / 2;
-  int pad_size =MAX(x_face_size, y_face_size);
-  pad_size = MAX(pad_size, z_face_size);
-  pad_size = MAX(pad_size, t_face_size);
-  gauge_param.ga_pad = pad_size;
-#endif
-}
-
-int main(int argc, char **argv)
-{
-  // Solver params
-  inv_param.verbosity = QUDA_VERBOSE;
-  inv_param.mass = mass;
-  inv_param.kappa = kappa = 1.0 / (8.0 + mass); // for Laplace operator
-  inv_param.laplace3D = laplace3D;              // for Laplace operator
-
-  // outer solver parameters
-  inv_param.inv_type = inv_type;
-  inv_param.tol = tol;
-  inv_param.tol_restart = tol_restart; // now theoretical background for this parameter...
-  inv_param.maxiter = niter;
-  inv_param.max_restart_num = max_restart_num;//for the gmres-like solvers
-  inv_param.reliable_delta = reliable_delta;
-  inv_param.use_alternative_reliable = alternative_reliable;
-  inv_param.use_sloppy_partial_accumulator = false;
-  inv_param.solution_accumulator_pipeline = solution_accumulator_pipeline;
-  inv_param.pipeline = pipeline;
-
-  inv_param.Ls = 1; // Nsrc;
-
-  if (tol_hq == 0 && tol == 0) {
-    errorQuda("qudaInvert: requesting zero residual\n");
-    exit(1);
   // Need to add support for LAPLACE MG?
   if (inv_multigrid) {
     if (dslash_type != QUDA_STAGGERED_DSLASH && dslash_type != QUDA_ASQTAD_DSLASH) {
@@ -252,7 +192,6 @@ int main(int argc, char **argv)
   }
 
   QudaEigParam eig_param = newQudaEigParam();
-
   if (inv_deflate) {
     setEigParam(eig_param);
     inv_param.eig_param = &eig_param;
@@ -387,9 +326,7 @@ int main(int argc, char **argv)
       if (inv_deflate) eig_param.preserve_deflation = k < Nsrc - 1 ? QUDA_BOOLEAN_TRUE : QUDA_BOOLEAN_FALSE;
 
       if(inv_type == QUDA_INC_EIGCG_INVERTER && eig_param.is_complete == QUDA_BOOLEAN_TRUE) {
-        printfQuda("Switched to deflated CG solver.. \n");
-        inv_param.inv_type = QUDA_CG_INVERTER;
-	eig_param.nKr = 2*eig_param.nEv;
+        inv_param.inv_type  = QUDA_CG_INVERTER;
       }
 
       invertQuda(out->V(), in->V(), &inv_param);
