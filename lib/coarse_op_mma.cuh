@@ -289,9 +289,17 @@ namespace quda
             constexpr bool parity_flip = true;
 
             if (arg.dir == QUDA_BACKWARDS) {
-              if (arg.dim == 0)
+              if (arg.dim == 0) {
+#if 1
+                printfQuda("Launching backward MMA\n");
+                const int shared_bytes = shared_memory_bytes(64, 64, 24);
+                ComputeVUVMMA<false, false, from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
+                  <<<{8*8*8*16/2, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);
+#else
                 ComputeVUVGPU<true, parity_flip, from_coarse, Float, 0, QUDA_BACKWARDS, fineSpin, coarseSpin>
                   <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
+#endif
+              }
               else if (arg.dim == 1)
                 ComputeVUVGPU<true, parity_flip, from_coarse, Float, 1, QUDA_BACKWARDS, fineSpin, coarseSpin>
                   <<<tp.grid, tp.block, tp.shared_bytes>>>(arg);
@@ -304,7 +312,7 @@ namespace quda
             } else if (arg.dir == QUDA_FORWARDS) {
               if (arg.dim == 0) {
 #if 1
-                printfQuda("Launching MMA\n");
+                printfQuda("Launching forward MMA\n");
                 const int shared_bytes = shared_memory_bytes(64, 64, 24);
                 ComputeVUVMMA<false, false, from_coarse, Float, 0, QUDA_FORWARDS, fineSpin, coarseSpin>
                   <<<{8*8*8*16/2, 2, 1}, {1, 8, 8}, shared_bytes>>>(arg);

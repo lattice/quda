@@ -330,6 +330,9 @@ namespace quda
       static constexpr int total_tile = tile_row_dim * tile_col_dim;
       static constexpr int warp_cycle = total_tile / total_warp;
 
+      static constexpr bool a_transpose = false;
+      static constexpr bool b_transpose = true;
+
 #ifdef USE_FP16_HMMA_ACCUMULATE
       using accumuate_reg_type = half;
 #else
@@ -352,10 +355,10 @@ namespace quda
 
       MmaOp<MmaOperandC<accumuate_reg_type>, warp_cycle, tile_col_dim> mma_op; // (thread_id);
 
-      GlobalMemoryLoader<n_row, n_col, a_dag, SmemObjA> aa_loader; // (smem_obj_a_real,
-                                                                   // smem_obj_a_imag);
-      GlobalMemoryLoader<n_row, n_col, b_dag, SmemObjB> bb_loader; // (smem_obj_b_real,
-                                                                   // smem_obj_b_imag);
+      GlobalMemoryLoader<n_row, n_col, a_dag, SmemObjA> a_loader; // (smem_obj_a_real,
+                                                                  // smem_obj_a_imag);
+      GlobalMemoryLoader<n_row, n_col, b_dag, SmemObjB> b_loader; // (smem_obj_b_real,
+                                                                  // smem_obj_b_imag);
 
       __device__ inline MmaConfig(half *smem_ptr) :
         smem_obj_a_real(smem_ptr),
@@ -363,25 +366,22 @@ namespace quda
         smem_obj_b_real(smem_obj_a_imag.ptr + smem_lda * bK),
         smem_obj_b_imag(smem_obj_b_real.ptr + smem_ldb * bK),
         mma_op((threadIdx.z * blockDim.y + threadIdx.y) * blockDim.x + threadIdx.x),
-        aa_loader(smem_obj_a_real, smem_obj_a_imag),
-        bb_loader(smem_obj_b_real, smem_obj_b_imag)
+        a_loader(smem_obj_a_real, smem_obj_a_imag),
+        b_loader(smem_obj_b_real, smem_obj_b_imag)
       {
       }
 
       template <EpilogueType epilogue_type, class A, class B, class C>
-      __device__ inline float perform_mma(const A &aa, const B &bb, C &cc, int m_offset, int n_offset)
+      __device__ inline float perform_mma(const A &a, const B &b, C &c, int m_offset, int n_offset)
       {
         float max = 0;
 
-        constexpr bool a_transpose = false;
-        constexpr bool b_transpose = true;
-
 #ifdef USE_GMEM_MMA_PIPELINING
-        aa_loader.g2r<lda, a_transpose>(aa, m_offset, 0);
-        aa_loader.r2s();
+        a_loader.g2r<lda, a_transpose>(a, m_offset, 0);
+        a_loader.r2s();
 
-        bb_loader.g2r<ldb, b_transpose>(bb, n_offset, 0);
-        bb_loader.r2s();
+        b_loader.g2r<ldb, b_transpose>(b, n_offset, 0);
+        b_loader.r2s();
 
         __syncthreads();
 #endif
@@ -391,13 +391,13 @@ namespace quda
 
 #ifdef USE_GMEM_MMA_PIPELINING
           if (bk + bK < K) {
-            aa_loader.g2r<lda, a_transpose>(aa, m_offset, bk + bK);
-            bb_loader.g2r<ldb, b_transpose>(bb, n_offset, bk + bK);
+            a_loader.g2r<lda, a_transpose>(a, m_offset, bk + bK);
+            b_loader.g2r<ldb, b_transpose>(b, n_offset, bk + bK);
           }
 #else
           __syncthreads();
-          aa_loader.g2s<lda, a_transpose>(aa, m_offset, bk);
-          bb_loader.g2s<ldb, b_transpose>(bb, n_offset, bk);
+          a_loader.g2s<lda, a_transpose>(a, m_offset, bk);
+          b_loader.g2s<ldb, b_transpose>(b, n_offset, bk);
           __syncthreads();
 #endif
 
@@ -407,8 +407,8 @@ namespace quda
           if (bk + bK < K) {
             __syncthreads();
 
-            aa_loader.r2s();
-            bb_loader.r2s();
+            a_loader.r2s();
+            b_loader.r2s();
 
             __syncthreads();
           }
@@ -419,7 +419,7 @@ namespace quda
         if (epilogue_type == EpilogueType::COMPUTE_MAX_ONLY) {
           mma_op.abs_max(max);
         } else if (epilogue_type == EpilogueType::VECTOR_STORE) {
-          mma_op.store<ldc>(cc, m_offset, n_offset);
+          mma_op.store<ldc>(c, m_offset, n_offset);
         }
 
         return max;

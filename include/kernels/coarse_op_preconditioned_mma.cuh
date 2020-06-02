@@ -60,9 +60,9 @@ namespace quda
 
         const int ghost_idx = ghostFaceIndex<0, nDim>(coord, arg.dim, d, arg.nFace);
 
-        auto aa = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
-        auto bb = arg.Xinv.wrap(0, parity, x_cb);
-        auto cc = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
+        auto a = arg.Y.wrap_ghost(d, 1 - parity, ghost_idx);
+        auto b = arg.Xinv.wrap(0, parity, x_cb);
+        auto c = arg.Yhat.wrap_ghost(d, 1 - parity, ghost_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
@@ -70,36 +70,36 @@ namespace quda
         using Config
           = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
         Config config(smem_ptr);
-        yHatMax = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
+        yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
 
       } else {
 
         const int back_idx = linkIndexM1(coord, arg.dim, d);
 
-        auto aa = arg.Y.wrap(d, 1 - parity, back_idx);
-        auto bb = arg.Xinv.wrap(0, parity, x_cb);
-        auto cc = arg.Yhat.wrap(d, 1 - parity, back_idx);
+        auto a = arg.Y.wrap(d, 1 - parity, back_idx);
+        auto b = arg.Xinv.wrap(0, parity, x_cb);
+        auto c = arg.Yhat.wrap(d, 1 - parity, back_idx);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = true;
         using Config
           = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
         Config config(smem_ptr);
-        yHatMax = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
+        yHatMax = config.perform_mma<epilogue_type>(a, b, c, m, n);
       }
 
       { // now do the forwards links X^{-1} * Y^{-\mu}
 
-        auto aa = arg.Xinv.wrap(0, parity, x_cb);
-        auto bb = arg.Y.wrap(d + 4, parity, x_cb);
-        auto cc = arg.Yhat.wrap(d + 4, parity, x_cb);
+        auto a = arg.Xinv.wrap(0, parity, x_cb);
+        auto b = arg.Y.wrap(d + 4, parity, x_cb);
+        auto c = arg.Yhat.wrap(d + 4, parity, x_cb);
 
         constexpr bool a_dagger = false;
         constexpr bool b_dagger = false;
         using Config
           = MmaConfig<Arg::M, Arg::N, Arg::K, Arg::M, Arg::N, Arg::K, bM, bN, bK, block_y, block_z, a_dagger, b_dagger>;
         Config config(smem_ptr);
-        real yHatMax_ = config.perform_mma<epilogue_type>(aa, bb, cc, m, n);
+        real yHatMax_ = config.perform_mma<epilogue_type>(a, b, c, m, n);
         yHatMax = fmax(yHatMax, yHatMax_);
       }
 
